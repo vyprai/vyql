@@ -1,0 +1,43 @@
+// kotlin framework adapter (docs/07) — framework→concept content.
+// frameworks: spring-boot, ktor, android, jdbc
+adapter kotlin {
+  meta { match: contains, fidelity: resolved }
+
+  // Spring handler params (seeded http_input) + servlet inputs
+  source "http_input" -> code.HttpInput
+  source ".getParameter" -> code.HttpInput
+  source ".getHeader" -> code.HttpInput
+  source ".queryParameters" -> code.HttpInput
+
+  // command execution
+  sink method "exec" -> code.CommandExecution
+  sink path "ProcessBuilder" -> code.CommandExecution
+
+  // SQL — JDBC + Android SQLite
+  sink method "executeQuery" -> code.SqlExecution
+  sink method "executeUpdate" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+  sink method "execSQL" -> code.SqlExecution
+  sink method "rawQuery" -> code.SqlExecution
+  sink method "prepareStatement" -> code.SqlExecution
+  sink method "createQuery" -> code.SqlExecution
+
+  // path / file
+  sink path "File" -> code.FilePathAccess
+  sink path "FileInputStream" -> code.FilePathAccess
+  sink method "readText" -> code.FilePathAccess
+  sink method "readBytes" -> code.FilePathAccess
+
+  // code eval / dynamic
+  sink method "loadClass" -> code.CodeEval
+
+  // controls
+  control "encodeForHTML" -> core.HtmlEscape
+  control "escapeHtml4" -> core.HtmlEscape
+
+  // csrf disabled (CWE-352) — presence marker
+  mark "csrf.disable" -> code.CsrfDisabled
+
+  // expression-language injection (CWE-917)
+  sink method "parseExpression" -> code.ExpressionEval
+}

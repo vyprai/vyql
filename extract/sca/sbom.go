@@ -1,0 +1,101 @@
+// Package sca implements the dependency/SBOM path and the vulnerable-library
+// entrypoint projection (docs/20, docs/11), ported from poc/extract/sbom.py
+// and advisory.py. Dependency resolution is DECOUPLED from the AST extractor: a
+// manifest reader produces sbom.* nodes, an advisory feed marks vulnerable
+// versions, and a linker connects code imports to package nodes and flags
+// REACHABLE packages. Reachability-gated SCA is then a cross-domain join over
+// the SAME graph the SAST extractor populated.
+package sca
+
+import (
+	"strings"
+
+	"github.com/vyprai/vyql/usg"
+)
+
+// Dep is one parsed manifest entry.
+type Dep struct {
+	Name    string
+	Version string
+}
+
+// PkgKey identifies a (name, version) pair for advisory lookup.
+type PkgKey struct {
+	Name    string
+	Version string
+}
+
+// ParseRequirements is a minimal requirements.txt reader. Lines like
+// "name==1.2.3" produce (name, "1.2.3"); other non-comment lines produce
+// (name, "*"). Comments (#...) and option lines (-...) are skipped.
+func ParseRequirements(content string) []Dep {
+	var out []Dep
+	for _, raw := range strings.Split(content, "\n") {
+		line := raw
+		if i := strings.Index(line, "#"); i >= 0 {
+			line = line[:i]
+		}
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "-") {
+			continue
+		}
+		if i := strings.Index(line, "=="); i >= 0 {
+			out = append(out, Dep{strings.TrimSpace(line[:i]), strings.TrimSpace(line[i+2:])})
+		} else {
+			out = append(out, Dep{strings.TrimSpace(line), "*"})
+		}
+	}
+	return out
+}
+
+// BuildSBOM adds sbom.PackageVersion nodes and labels VulnerableDependency per
+// the advisories map ((name,version) -> advisory id, e.g. a CVE).
+func BuildSBOM(g usg.Store, deps []Dep, advisories map[PkgKey]string) error {
+	for _, d := range deps {
+		nid := "pkg:pypi/" + d.Name + "@" + d.Version
+		if err := g.AddNode(usg.Node{ID: nid, Type: "sbom.PackageVersion",
+			Props: map[string]string{"loc": "requirements.txt:" + d.Name, "name": d.Name, "version": d.Version}}); err != nil {
+			return err
+		}
+		if adv := advisories[PkgKey{d.Name, d.Version}]; adv != "" {
+			if err := g.AddLabel(nid, usg.Label{Concept: "sbom.VulnerableDependency",
+				Provenance: usg.Provenance{Adapter: "sbom.osv"}, Detail: map[string]string{"advisory": adv}}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// LinkReachability marks each package whose symbols are actually called (any
+// code node's callee_path rooted at the package name) with sbom.ReachableSymbol.
+// It reuses the import-resolved call graph the SAST frontend already produced.
+func LinkReachability(g usg.Store) error {
+	nodes, err := g.AllNodes()
+	if err != nil {
+		return err
+	}
+	used := map[string]bool{}
+	for _, n := range nodes {
+		path := n.Prop("callee_path")
+		if path == "" {
+			continue
+		}
+		root := path
+		if i := strings.IndexAny(root, ".["); i >= 0 {
+			root = root[:i]
+		}
+		if root != "" {
+			used[root] = true
+		}
+	}
+	for _, n := range nodes {
+		if n.Type == "sbom.PackageVersion" && used[n.Prop("name")] {
+			if err := g.AddLabel(n.ID, usg.Label{Concept: "sbom.ReachableSymbol",
+				Provenance: usg.Provenance{Adapter: "sbom.linker"}}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

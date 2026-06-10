@@ -1,0 +1,280 @@
+// python framework adapter (docs/07) — framework→concept content.
+// frameworks: flask, django, fastapi, starlette, aiohttp, tornado, bottle, pyramid, sanic, falcon, webapp2
+adapter python {
+  meta { fidelity: resolved }
+
+  source "request.form" -> code.HttpInput
+  source "request.args" -> code.HttpInput
+  source "request.values" -> code.HttpInput
+  source "request.cookies" -> code.HttpInput
+  source "request.get_json" -> code.HttpInput
+  source "request.json" -> code.HttpInput
+  source "request.data" -> code.HttpInput
+  source "request.headers" -> code.HttpInput
+  source "request.files" -> code.HttpInput
+  source "request.stream" -> code.HttpInput
+  source "request.get_data" -> code.HttpInput
+  source "request.view_args" -> code.HttpInput
+  source "request.GET" -> code.HttpInput
+  source "request.POST" -> code.HttpInput
+  source "request.body" -> code.HttpInput
+  source "request.COOKIES" -> code.HttpInput
+  source "request.META" -> code.HttpInput
+  source "request.FILES" -> code.HttpInput
+  source "request.path_info" -> code.HttpInput
+  source "request.query_params" -> code.HttpInput
+  source "request.path_params" -> code.HttpInput
+  source "request.data" -> code.HttpInput
+  source "request.query" -> code.HttpInput
+  source "request.post" -> code.HttpInput
+  source "request.match_info" -> code.HttpInput
+  source "request.rel_url" -> code.HttpInput
+  source "request.read" -> code.HttpInput
+  source "request.text" -> code.HttpInput
+  source "request.multipart" -> code.HttpInput
+  source "self.get_argument" -> code.HttpInput
+  source "self.get_query_argument" -> code.HttpInput
+  source "self.get_body_argument" -> code.HttpInput
+  source "self.get_arguments" -> code.HttpInput
+  source "self.request.arguments" -> code.HttpInput
+  source "self.request.body" -> code.HttpInput
+  source "self.get_cookie" -> code.HttpInput
+  source "self.request.query_arguments" -> code.HttpInput
+  source "request.forms" -> code.HttpInput
+  source "request.params" -> code.HttpInput
+  source "request.matchdict" -> code.HttpInput
+  source "request.json_body" -> code.HttpInput
+  source "request.query_parameters" -> code.HttpInput
+  source "request.urlargs" -> code.HttpInput
+  source "ctx.request.json" -> code.HttpInput
+  source "req.params" -> code.HttpInput
+  source "req.media" -> code.HttpInput
+  source "req.get_param" -> code.HttpInput
+  source "req.stream" -> code.HttpInput
+  source "os.environ" -> code.SecretValue
+  source "os.getenv" -> code.SecretValue
+  source "config.get" -> code.SecretValue
+  source "settings.SECRET_KEY" -> code.SecretValue
+
+  sink method "execute" -> code.SqlExecution
+  sink method "executemany" -> code.SqlExecution
+  sink method "executescript" -> code.SqlExecution
+  sink method "executescript" -> code.SqlExecution
+  sink method "raw" -> code.SqlExecution
+  sink method "extra" -> code.SqlExecution
+  sink path "sqlalchemy.text" -> code.SqlExecution
+  sink path "session.execute" -> code.SqlExecution
+  sink path "connection.execute" -> code.SqlExecution
+  sink path "db.execute" -> code.SqlExecution
+  sink path "cursor.execute" -> code.SqlExecution
+  sink path "RawSQL" -> code.SqlExecution
+  sink path "django.db.connection.cursor" -> code.SqlExecution
+  sink path "os.system" -> code.CommandExecution
+  sink path "os.popen" -> code.CommandExecution
+  sink path "os.popen2" -> code.CommandExecution
+  sink path "os.popen3" -> code.CommandExecution
+  sink path "os.popen4" -> code.CommandExecution
+  sink path "subprocess.call" -> code.CommandExecution
+  sink path "subprocess.run" -> code.CommandExecution
+  sink path "subprocess.Popen" -> code.CommandExecution
+  sink path "subprocess.check_output" -> code.CommandExecution
+  sink path "subprocess.check_call" -> code.CommandExecution
+  sink path "subprocess.getoutput" -> code.CommandExecution
+  sink path "subprocess.getstatusoutput" -> code.CommandExecution
+  sink path "commands.getoutput" -> code.CommandExecution
+  sink path "commands.getstatusoutput" -> code.CommandExecution
+  sink path "pty.spawn" -> code.CommandExecution
+  sink path "os.execv" -> code.CommandExecution
+  sink path "os.execve" -> code.CommandExecution
+  sink path "os.execvp" -> code.CommandExecution
+  sink path "os.execvpe" -> code.CommandExecution
+  sink path "os.spawnv" -> code.CommandExecution
+  sink path "os.spawnl" -> code.CommandExecution
+  sink path "asyncio.create_subprocess_shell" -> code.CommandExecution
+  sink path "asyncio.create_subprocess_exec" -> code.CommandExecution
+  sink path "popen2.popen2" -> code.CommandExecution
+  sink path "popen2.popen3" -> code.CommandExecution
+  sink path "eval" -> code.CodeEval
+  sink path "exec" -> code.CodeEval
+  sink path "execfile" -> code.CodeEval
+  sink path "compile" -> code.CodeEval
+  sink path "code.interact" -> code.CodeEval
+  sink path "code.InteractiveInterpreter" -> code.CodeEval
+  sink path "pickle.load" -> code.Deserialization
+  sink path "pickle.loads" -> code.Deserialization
+  sink path "cPickle.load" -> code.Deserialization
+  sink path "cPickle.loads" -> code.Deserialization
+  sink path "_pickle.load" -> code.Deserialization
+  sink path "_pickle.loads" -> code.Deserialization
+  sink path "marshal.load" -> code.Deserialization
+  sink path "marshal.loads" -> code.Deserialization
+  sink path "dill.load" -> code.Deserialization
+  sink path "dill.loads" -> code.Deserialization
+  sink path "jsonpickle.decode" -> code.Deserialization
+  sink path "shelve.open" -> code.Deserialization
+  sink path "joblib.load" -> code.Deserialization
+  sink path "numpy.load" -> code.Deserialization
+  sink path "pandas.read_pickle" -> code.Deserialization
+  sink path "etree.parse" -> code.XmlParse
+  sink path "etree.fromstring" -> code.XmlParse
+  sink path "etree.XML" -> code.XmlParse
+  sink path "lxml.etree.parse" -> code.XmlParse
+  sink path "lxml.etree.fromstring" -> code.XmlParse
+  sink path "xml.dom.minidom.parse" -> code.XmlParse
+  sink path "xml.dom.minidom.parseString" -> code.XmlParse
+  sink path "xml.sax.parse" -> code.XmlParse
+  sink path "xml.sax.parseString" -> code.XmlParse
+  sink path "ElementTree.parse" -> code.XmlParse
+  sink path "ElementTree.fromstring" -> code.XmlParse
+  sink path "xmlrpc.client.loads" -> code.XmlParse
+  sink path "xmltodict.parse" -> code.XmlParse
+  sink path "requests.get" -> code.UrlFetch
+  sink path "requests.post" -> code.UrlFetch
+  sink path "requests.put" -> code.UrlFetch
+  sink path "requests.delete" -> code.UrlFetch
+  sink path "requests.head" -> code.UrlFetch
+  sink path "requests.patch" -> code.UrlFetch
+  sink path "requests.options" -> code.UrlFetch
+  sink path "requests.request" -> code.UrlFetch
+  sink path "session.get" -> code.UrlFetch
+  sink path "session.post" -> code.UrlFetch
+  sink path "session.request" -> code.UrlFetch
+  sink path "urllib.request.urlopen" -> code.UrlFetch
+  sink path "urllib.request.Request" -> code.UrlFetch
+  sink path "urllib.urlopen" -> code.UrlFetch
+  sink path "urllib2.urlopen" -> code.UrlFetch
+  sink path "urllib2.Request" -> code.UrlFetch
+  sink path "urllib3.request" -> code.UrlFetch
+  sink path "urllib3.PoolManager" -> code.UrlFetch
+  sink path "httpx.get" -> code.UrlFetch
+  sink path "httpx.post" -> code.UrlFetch
+  sink path "httpx.request" -> code.UrlFetch
+  sink path "httpx.Client" -> code.UrlFetch
+  sink path "httpx.stream" -> code.UrlFetch
+  sink path "aiohttp.request" -> code.UrlFetch
+  sink path "aiohttp.ClientSession" -> code.UrlFetch
+  sink path "session.request" -> code.UrlFetch
+  sink path "pycurl.Curl" -> code.UrlFetch
+  sink path "treq.get" -> code.UrlFetch
+  sink path "treq.post" -> code.UrlFetch
+  sink path "open" -> code.FilePathAccess
+  sink path "io.open" -> code.FilePathAccess
+  sink path "os.open" -> code.FilePathAccess
+  sink path "codecs.open" -> code.FilePathAccess
+  sink path "os.remove" -> code.FilePathAccess
+  sink path "os.unlink" -> code.FilePathAccess
+  sink path "os.rename" -> code.FilePathAccess
+  sink path "os.replace" -> code.FilePathAccess
+  sink path "os.makedirs" -> code.FilePathAccess
+  sink path "os.mkdir" -> code.FilePathAccess
+  sink path "os.rmdir" -> code.FilePathAccess
+  sink path "shutil.copy" -> code.FilePathAccess
+  sink path "shutil.copyfile" -> code.FilePathAccess
+  sink path "shutil.move" -> code.FilePathAccess
+  sink path "shutil.rmtree" -> code.FilePathAccess
+  sink path "send_file" -> code.FilePathAccess
+  sink path "send_from_directory" -> code.FilePathAccess
+  sink path "flask.send_file" -> code.FilePathAccess
+  sink path "zipfile.ZipFile.extractall" -> code.FilePathAccess
+  sink path "tarfile.open" -> code.FilePathAccess
+  sink path "pathlib.Path" -> code.FilePathAccess
+  sink path "render_template_string" -> code.HtmlRender
+  sink path "flask.render_template_string" -> code.HtmlRender
+  sink path "Markup" -> code.HtmlRender
+  sink path "markupsafe.Markup" -> code.HtmlRender
+  sink path "mark_safe" -> code.HtmlRender
+  sink path "django.utils.safestring.mark_safe" -> code.HtmlRender
+  sink path "format_html" -> code.HtmlRender
+  sink path "jinja2.Template" -> code.HtmlRender
+  sink path "Template.render" -> code.HtmlRender
+  sink path "mako.template.Template" -> code.HtmlRender
+  sink path "Environment.from_string" -> code.HtmlRender
+  sink path "Template" -> code.TemplateRender
+  sink path "jinja2.Template" -> code.TemplateRender
+  sink path "jinja2.Environment.from_string" -> code.TemplateRender
+  sink path "mako.template.Template" -> code.TemplateRender
+  sink path "Environment.from_string" -> code.TemplateRender
+  sink path "render_template_string" -> code.TemplateRender
+  sink path "redirect" -> code.RedirectTarget
+  sink path "flask.redirect" -> code.RedirectTarget
+  sink path "HttpResponseRedirect" -> code.RedirectTarget
+  sink path "django.shortcuts.redirect" -> code.RedirectTarget
+  sink path "starlette.responses.RedirectResponse" -> code.RedirectTarget
+  sink path "RedirectResponse" -> code.RedirectTarget
+  sink path "ldap.search" -> code.LdapQuery
+  sink path "ldap.search_s" -> code.LdapQuery
+  sink path "ldap.search_ext" -> code.LdapQuery
+  sink path "ldap3.Connection.search" -> code.LdapQuery
+  sink path "connection.search" -> code.LdapQuery
+  sink path "collection.find" -> code.NosqlQuery
+  sink path "collection.find_one" -> code.NosqlQuery
+  sink path "db.eval" -> code.NosqlQuery
+  sink path "collection.where" -> code.NosqlQuery
+  sink path "find" -> code.NosqlQuery
+  sink path "aggregate" -> code.NosqlQuery
+
+  // XPath injection (CWE-643) — lxml: tree.xpath(expr) / etree.XPath(expr) compile a
+  // tainted query string. `.xpath` is a distinctive lxml method; taint-gated.
+  sink method "xpath" -> code.XpathQuery
+  sink path "etree.XPath" -> code.XpathQuery
+
+  // controls (sanitizers/validators) — neutralize a flow that passes through them
+  control "shlex.quote" -> core.ShellEscape
+  control "pipes.quote" -> core.ShellEscape
+  control "html.escape" -> core.HtmlEscape
+  control "cgi.escape" -> core.HtmlEscape
+  control "markupsafe.escape" -> core.HtmlEscape
+  control "bleach.clean" -> core.HtmlEscape
+  control "django.utils.html.escape" -> core.HtmlEscape
+  control "yaml.safe_load" -> core.SafeDeserialization
+  control "ldap.filter.escape_filter_chars" -> core.LdapEscape
+  control "ldap3.utils.conv.escape_filter_chars" -> core.LdapEscape
+
+  // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  sink path "re.compile" -> code.RegexCompile
+  sink path "re.match" -> code.RegexCompile
+  sink path "re.search" -> code.RegexCompile
+  sink path "re.sub" -> code.RegexCompile
+  sink path "re.findall" -> code.RegexCompile
+
+  // weak crypto (CWE-327) — presence marker on the call node
+  mark "hashlib.md5" -> code.WeakHash
+  mark "hashlib.sha1" -> code.WeakHash
+
+  // csrf disabled (CWE-352) — presence marker
+  mark "csrf_exempt" -> code.CsrfDisabled
+
+  // CSV injection (CWE-1236)
+  sink method "writerow" -> code.CsvCell
+  sink method "writerows" -> code.CsvCell
+
+  // weak cipher (CWE-327) — named broken ciphers
+  mark "DES.new" -> code.WeakCipher
+  mark "ARC4.new" -> code.WeakCipher
+  mark "Blowfish.new" -> code.WeakCipher
+  mark "DES3.new" -> code.WeakCipher
+
+  // insecure temp file (CWE-377) — tempfile.mktemp is documented-insecure (race)
+  mark "tempfile.mktemp" -> code.InsecureTempFile
+
+  // TLS cert validation disabled (CWE-295) — requests/httpx verify=False
+  mark "requests" val "verify=False" -> code.CertValidationDisabled
+  mark "httpx" val "verify=False" -> code.CertValidationDisabled
+
+  // JWT signature not verified (CWE-347) — pyjwt alg none / verify off
+  mark "jwt.decode" val "algorithms=none" -> code.JwtUnverified
+  mark "jwt.decode" val "verify_signature=False" -> code.JwtUnverified
+  mark "jwt.decode" val "verify=False" -> code.JwtUnverified
+  mark "jwt.encode" val "algorithm=none" -> code.JwtUnverified
+
+  // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
+  // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.
+  mark "requests" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "httpx" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "urllib.request.urlopen" val "http://" nval "127.0" -> code.CleartextChannel
+
+  // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled. Pure omission is
+  // not flagged (too many false positives from framework defaults / cookie deletions).
+  mark "set_cookie" val "httponly=False" -> code.InsecureCookie
+  mark "set_cookie" val "secure=False" -> code.InsecureCookie
+}

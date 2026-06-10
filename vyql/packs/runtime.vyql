@@ -1,0 +1,20 @@
+// Runtime — rules over a pre-aggregated runtime snapshot (docs/11 Part B).
+package vypr.runtime;
+
+rule CryptoMiningEgress {
+  meta { id: "VYQL-RTM-001", severity: high }
+  match runtime.Connection as c
+  where c.dst labeled threat.MiningPool
+}
+
+rule WorkloadDrift {
+  meta { id: "VYQL-RTM-002", severity: high }
+  match runtime.Process as p
+  where p.image not in [nginx, redis, postgres, python, node, ruby, java]
+}
+
+rule RuntimeCommandExecution {
+  meta { id: "VYQL-RTM-003", severity: critical }
+  taint runtime.HttpRequest -> runtime.ShellExecution
+  unless sanitized_by core.ShellEscape
+}

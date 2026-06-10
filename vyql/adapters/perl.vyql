@@ -1,0 +1,34 @@
+// perl framework adapter (docs/07) — framework→concept content.
+// frameworks: CGI.pm, DBI, mod_perl, vanilla
+adapter perl {
+  meta { match: contains, fidelity: resolved }
+
+  // untrusted input
+  source ".param" -> code.HttpInput
+  source ".url_param" -> code.HttpInput
+  source "ENV" -> code.HttpInput
+  source "ARGV" -> code.HttpInput
+  source "STDIN" -> code.HttpInput
+
+  // command execution
+  sink path "system" -> code.CommandExecution
+  sink path "exec" -> code.CommandExecution
+  sink path "qx" -> code.CommandExecution
+  sink path "readpipe" -> code.CommandExecution
+
+  // code evaluation
+  sink path "eval" -> code.CodeEval
+
+  // SQL — DBI
+  sink method "do" -> code.SqlExecution
+  sink method "prepare" -> code.SqlExecution
+  sink method "selectall_arrayref" -> code.SqlExecution
+  sink method "selectrow_array" -> code.SqlExecution
+  sink method "selectrow_arrayref" -> code.SqlExecution
+  sink method "selectall_hashref" -> code.SqlExecution
+
+  // path / file
+  sink path "open" -> code.FilePathAccess
+  sink path "opendir" -> code.FilePathAccess
+  sink path "unlink" -> code.FilePathAccess
+}

@@ -1,0 +1,4 @@
+{
+  "_comment": "Privilege partial order (docs/06) — ascending. The assume solver compares priv_level node props against a rule's min-level using this ranking. Vocabulary content, not engine code.",
+  "order": ["READ", "WRITE", "ADMIN", "SUPER_ADMIN"]
+}

@@ -1,0 +1,35 @@
+// swift framework adapter (docs/07) — framework→concept content.
+// frameworks: vapor, foundation, sqlite3, ios
+adapter swift {
+  meta { match: contains, fidelity: resolved }
+
+  // untrusted input
+  source "CommandLine.arguments" -> code.HttpInput
+  source ".environment" -> code.HttpInput
+  source "readLine" -> code.HttpInput
+  source ".query" -> code.HttpInput
+  source ".parameters" -> code.HttpInput
+  source ".queryParameters" -> code.HttpInput
+
+  // SQL — sqlite3 C API (query is arg1)
+  sink path "sqlite3_exec" arg 1 -> code.SqlExecution
+  sink path "sqlite3_prepare_v2" arg 1 -> code.SqlExecution
+  sink path "sqlite3_prepare" arg 1 -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+  sink method "run" -> code.SqlExecution
+
+  // command execution
+  sink path "Process" -> code.CommandExecution
+  sink method "launch" -> code.CommandExecution
+  sink path "system" -> code.CommandExecution
+  sink path "popen" -> code.CommandExecution
+
+  // path / file
+  sink method "contentsOfFile" -> code.FilePathAccess
+  sink method "contents" -> code.FilePathAccess
+  sink path "FileHandle" -> code.FilePathAccess
+
+  // SSRF
+  sink path "URL" -> code.UrlFetch
+  sink path "URLRequest" -> code.UrlFetch
+}

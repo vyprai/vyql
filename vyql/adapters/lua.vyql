@@ -1,0 +1,28 @@
+// lua framework adapter (docs/07) — framework→concept content.
+// frameworks: openresty/nginx-lua, kong, redis, cgilua
+adapter lua {
+  meta { fidelity: resolved }
+
+  // OpenResty / nginx-lua request inputs
+  source "ngx.var" -> code.HttpInput
+  source "ngx.req.get_uri_args" -> code.HttpInput
+  source "ngx.req.get_post_args" -> code.HttpInput
+  source "ngx.req.get_headers" -> code.HttpInput
+  source "ngx.req.get_body_data" -> code.HttpInput
+
+  // command execution
+  sink path "os.execute" -> code.CommandExecution
+  sink path "io.popen" -> code.CommandExecution
+
+  // code evaluation / dynamic load
+  sink path "loadstring" -> code.CodeEval
+  sink path "load" -> code.CodeEval
+  sink path "loadfile" -> code.CodeEval
+  sink path "dofile" -> code.CodeEval
+
+  // path / file
+  sink path "io.open" -> code.FilePathAccess
+  sink path "io.lines" -> code.FilePathAccess
+  sink path "os.remove" -> code.FilePathAccess
+  sink path "os.rename" -> code.FilePathAccess
+}

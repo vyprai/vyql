@@ -1,0 +1,206 @@
+// javascript framework adapter (docs/07) — framework→concept content.
+// frameworks: express, koa, fastify, hapi, nestjs, nextjs, restify, sails
+adapter javascript {
+  meta { fidelity: resolved }
+
+  source "req.body" -> code.HttpInput
+  source "req.query" -> code.HttpInput
+  source "req.params" -> code.HttpInput
+  source "req.headers" -> code.HttpInput
+  source "req.cookies" -> code.HttpInput
+  source "req.signedCookies" -> code.HttpInput
+  source "req.get" -> code.HttpInput
+  source "req.header" -> code.HttpInput
+  source "req.param" -> code.HttpInput
+  source "req.files" -> code.HttpInput
+  source "req.rawBody" -> code.HttpInput
+  source "req.url" -> code.HttpInput
+  source "req.originalUrl" -> code.HttpInput
+  source "request.body" -> code.HttpInput
+  source "request.query" -> code.HttpInput
+  source "request.params" -> code.HttpInput
+  source "request.headers" -> code.HttpInput
+  source "request.payload" -> code.HttpInput
+  source "request.state" -> code.HttpInput
+  source "request.cookies" -> code.HttpInput
+  source "ctx.request.body" -> code.HttpInput
+  source "ctx.query" -> code.HttpInput
+  source "ctx.params" -> code.HttpInput
+  source "ctx.request.query" -> code.HttpInput
+  source "ctx.cookies.get" -> code.HttpInput
+  source "ctx.headers" -> code.HttpInput
+  source "ctx.request.headers" -> code.HttpInput
+  source "ctx.request.querystring" -> code.HttpInput
+  source "process.env" -> code.SecretValue
+
+  sink method "query" -> code.SqlExecution
+  sink method "raw" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+  sink method "unprepared" -> code.SqlExecution
+  sink path "sequelize.query" -> code.SqlExecution
+  sink path "knex.raw" -> code.SqlExecution
+  sink path "connection.query" -> code.SqlExecution
+  sink path "pool.query" -> code.SqlExecution
+  sink path "db.query" -> code.SqlExecution
+  sink path "client.query" -> code.SqlExecution
+  sink path "mysql.query" -> code.SqlExecution
+  sink path "pg.query" -> code.SqlExecution
+  sink path "sql.query" -> code.SqlExecution
+  sink path "child_process.exec" -> code.CommandExecution
+  sink path "child_process.execSync" -> code.CommandExecution
+  sink path "child_process.spawn" -> code.CommandExecution
+  sink path "child_process.spawnSync" -> code.CommandExecution
+  sink path "child_process.execFile" -> code.CommandExecution
+  sink path "child_process.execFileSync" -> code.CommandExecution
+  sink path "child_process.fork" -> code.CommandExecution
+  sink path "cp.exec" -> code.CommandExecution
+  sink path "cp.execSync" -> code.CommandExecution
+  sink path "cp.spawn" -> code.CommandExecution
+  sink path "exec" -> code.CommandExecution
+  sink path "execSync" -> code.CommandExecution
+  sink path "spawn" -> code.CommandExecution
+  sink path "spawnSync" -> code.CommandExecution
+  sink path "execFile" -> code.CommandExecution
+  sink path "shelljs.exec" -> code.CommandExecution
+  sink path "shell.exec" -> code.CommandExecution
+  sink path "eval" -> code.CodeEval
+  sink path "Function" -> code.CodeEval
+  sink path "vm.runInNewContext" -> code.CodeEval
+  sink path "vm.runInThisContext" -> code.CodeEval
+  sink path "vm.runInContext" -> code.CodeEval
+  sink path "vm.compileFunction" -> code.CodeEval
+  sink path "vm2.run" -> code.CodeEval
+  sink path "globalEval" -> code.CodeEval
+  sink path "serialize.unserialize" -> code.Deserialization
+  sink path "node-serialize.unserialize" -> code.Deserialization
+  sink path "unserialize" -> code.Deserialization
+  sink path "funcster.deepDeserialize" -> code.Deserialization
+  sink path "cryo.parse" -> code.Deserialization
+  sink path "yaml.load" -> code.Deserialization
+  sink path "js-yaml.load" -> code.Deserialization
+  sink path "jsyaml.load" -> code.Deserialization
+  sink path "axios.get" -> code.UrlFetch
+  sink path "axios.post" -> code.UrlFetch
+  sink path "axios.put" -> code.UrlFetch
+  sink path "axios.delete" -> code.UrlFetch
+  sink path "axios.request" -> code.UrlFetch
+  sink path "axios" -> code.UrlFetch
+  sink path "fetch" -> code.UrlFetch
+  sink path "node-fetch" -> code.UrlFetch
+  sink path "http.get" -> code.UrlFetch
+  sink path "https.get" -> code.UrlFetch
+  sink path "http.request" -> code.UrlFetch
+  sink path "https.request" -> code.UrlFetch
+  sink path "request" -> code.UrlFetch
+  sink path "request.get" -> code.UrlFetch
+  sink path "request.post" -> code.UrlFetch
+  sink path "needle.get" -> code.UrlFetch
+  sink path "needle.post" -> code.UrlFetch
+  sink path "superagent.get" -> code.UrlFetch
+  sink path "superagent.post" -> code.UrlFetch
+  sink path "got" -> code.UrlFetch
+  sink path "got.get" -> code.UrlFetch
+  sink path "got.post" -> code.UrlFetch
+  sink path "undici.request" -> code.UrlFetch
+  sink path "fetch.default" -> code.UrlFetch
+  sink path "fs.readFile" -> code.FilePathAccess
+  sink path "fs.readFileSync" -> code.FilePathAccess
+  sink path "fs.writeFile" -> code.FilePathAccess
+  sink path "fs.writeFileSync" -> code.FilePathAccess
+  sink path "fs.unlink" -> code.FilePathAccess
+  sink path "fs.unlinkSync" -> code.FilePathAccess
+  sink path "fs.createReadStream" -> code.FilePathAccess
+  sink path "fs.createWriteStream" -> code.FilePathAccess
+  sink path "fs.appendFile" -> code.FilePathAccess
+  sink path "fs.appendFileSync" -> code.FilePathAccess
+  sink path "fs.readdir" -> code.FilePathAccess
+  sink path "fs.open" -> code.FilePathAccess
+  sink path "fs.openSync" -> code.FilePathAccess
+  sink path "fs.rename" -> code.FilePathAccess
+  sink path "fs.mkdir" -> code.FilePathAccess
+  sink path "fsPromises.readFile" -> code.FilePathAccess
+  sink path "fse.readFile" -> code.FilePathAccess
+  sink path "res.sendFile" -> code.FilePathAccess
+  sink path "res.download" -> code.FilePathAccess
+  sink path "res.send" -> code.HtmlRender
+  sink path "res.write" -> code.HtmlRender
+  sink path "res.end" -> code.HtmlRender
+  sink path "dangerouslySetInnerHTML" -> code.HtmlRender
+  sink path "innerHTML" -> code.HtmlRender
+  sink path "outerHTML" -> code.HtmlRender
+  sink path "document.write" -> code.HtmlRender
+  sink path "insertAdjacentHTML" -> code.HtmlRender
+  sink path "$.html" -> code.HtmlRender
+  sink path "el.html" -> code.HtmlRender
+  sink path "handlebars.compile" -> code.TemplateRender
+  sink path "Handlebars.compile" -> code.TemplateRender
+  sink path "ejs.render" -> code.TemplateRender
+  sink path "ejs.compile" -> code.TemplateRender
+  sink path "pug.compile" -> code.TemplateRender
+  sink path "pug.render" -> code.TemplateRender
+  sink path "lodash.template" -> code.TemplateRender
+  sink path "_.template" -> code.TemplateRender
+  sink path "nunjucks.renderString" -> code.TemplateRender
+  sink path "nunjucks.compile" -> code.TemplateRender
+  sink path "res.redirect" -> code.RedirectTarget
+  sink path "ctx.redirect" -> code.RedirectTarget
+  sink path "reply.redirect" -> code.RedirectTarget
+  sink path "response.redirect" -> code.RedirectTarget
+  sink path "collection.find" -> code.NosqlQuery
+  sink path "collection.findOne" -> code.NosqlQuery
+  sink path "db.eval" -> code.NosqlQuery
+  sink path "Model.find" -> code.NosqlQuery
+  sink path "Model.findOne" -> code.NosqlQuery
+  sink path "Model.where" -> code.NosqlQuery
+  sink path "mapReduce" -> code.NosqlQuery
+
+  // controls (sanitizers/validators) — neutralize a flow that passes through them
+  control "escape-html" -> core.HtmlEscape
+  control "he.encode" -> core.HtmlEscape
+  control "validator.escape" -> core.HtmlEscape
+  control "lodash.escape" -> core.HtmlEscape
+  control "_.escape" -> core.HtmlEscape
+  control "DOMPurify.sanitize" -> core.HtmlEscape
+  control "xss" -> core.HtmlEscape
+  control "mysql.escape" -> core.SqlParameterization
+  control "sqlstring.escape" -> core.SqlParameterization
+  control "shell-quote.quote" -> core.ShellEscape
+  control "shellQuote.quote" -> core.ShellEscape
+
+  // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  sink path "RegExp" -> code.RegexCompile
+
+  // mass assignment (CWE-915) — request body -> bulk bind
+  sink method "bulkCreate" -> code.MassAssign
+
+  // prototype pollution (CWE-1321) — untrusted source object (arg1) of a deep merge
+  sink path "_.merge" arg 1 -> code.ProtoPollute
+  sink path "lodash.merge" arg 1 -> code.ProtoPollute
+  sink path "_.mergeWith" arg 1 -> code.ProtoPollute
+  sink path "_.defaultsDeep" arg 1 -> code.ProtoPollute
+  sink path "deepmerge" arg 1 -> code.ProtoPollute
+  sink path "$.extend" arg 2 -> code.ProtoPollute
+  sink path "jQuery.extend" arg 2 -> code.ProtoPollute
+
+  // weak cipher (CWE-327) value-matched
+  mark "createCipheriv" val "ecb" -> code.WeakCipher
+  mark "createCipheriv" val "des" -> code.WeakCipher
+
+  // TLS cert validation disabled (CWE-295) — rejectUnauthorized:false
+  mark "https.request" val "rejectUnauthorized=false" -> code.CertValidationDisabled
+  mark "https.get" val "rejectUnauthorized=false" -> code.CertValidationDisabled
+  mark "https.Agent" val "rejectUnauthorized=false" -> code.CertValidationDisabled
+  mark "tls.connect" val "rejectUnauthorized=false" -> code.CertValidationDisabled
+
+  // JWT signature not verified (CWE-347) — jsonwebtoken alg none
+  mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified
+  mark "jwt.sign" val "algorithm=none" -> code.JwtUnverified
+
+  // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
+  // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.
+  mark "axios" val "http://" nval "127.0" -> code.CleartextChannel
+
+  // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled (omission not flagged).
+  mark "res.cookie" val "httpOnly=false" -> code.InsecureCookie
+  mark "res.cookie" val "secure=false" -> code.InsecureCookie
+}

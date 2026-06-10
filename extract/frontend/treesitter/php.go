@@ -1,0 +1,312 @@
+package treesitter
+
+import (
+	tree_sitter "github.com/tree-sitter/go-tree-sitter"
+	tsphp "github.com/tree-sitter/tree-sitter-php/bindings/go"
+
+	"github.com/vyprai/vyql/extract/nir"
+)
+
+// phConv walks a tree-sitter PHP CST into NIR. PHP functions live in a global
+// namespace (module key ""), like Ruby; `echo`/`print`/`include`/`require` are
+// modeled as calls so they can be sinks.
+type phConv struct {
+	src  []byte
+	root string
+	file string
+}
+
+// ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
+func ExtractPHP(files []string, root string) (nir.Program, error) {
+	parser := tree_sitter.NewParser()
+	defer parser.Close()
+	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsphp.LanguagePHP()))
+
+	var prog nir.Program
+	prog.SelfName = "this"
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		tree := parser.Parse(src, nil)
+		if tree == nil {
+			continue
+		}
+		rel := relPath(root, f)
+		c := &phConv{src: src, root: root, file: rel}
+		mod := nir.Module{Key: "", File: rel, Body: c.block(tree.RootNode())}
+		prog.Modules = append(prog.Modules, mod)
+		tree.Close()
+	}
+	return prog, nil
+}
+
+func (c *phConv) loc(n *tree_sitter.Node) string {
+	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
+}
+
+func (c *phConv) text(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *phConv) block(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	for _, st := range namedChildren(n) {
+		out = append(out, c.stmt(st)...)
+	}
+	return out
+}
+
+func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
+	L := c.loc(n)
+	switch n.Kind() {
+	case "function_definition", "method_declaration":
+		return []nir.Stmt{nir.FuncDef{
+			Name:   c.text(field(n, "name")),
+			Params: c.params(field(n, "parameters")),
+			Body:   c.block(field(n, "body")),
+			Loc:    L,
+		}}
+	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
+		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
+	case "expression_statement":
+		kids := namedChildren(n)
+		if len(kids) == 0 {
+			return nil
+		}
+		return c.exprStmt(kids[0])
+	case "echo_statement", "print_intrinsic", "unset_statement":
+		// model echo/print as a sink-able call
+		var args []nir.Expr
+		for _, a := range namedChildren(n) {
+			args = append(args, c.expr(a))
+		}
+		name := "echo"
+		if n.Kind() == "print_intrinsic" {
+			name = "print"
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: args, Path: name, Method: name, Loc: L}}}
+	case "return_statement":
+		kids := namedChildren(n)
+		if len(kids) > 0 {
+			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
+		}
+		return []nir.Stmt{nir.Return{}}
+	case "if_statement", "while_statement", "for_statement", "foreach_statement",
+		"do_statement", "try_statement", "switch_statement", "compound_statement":
+		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+	}
+	return nil
+}
+
+func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
+	switch inner.Kind() {
+	case "assignment_expression", "augmented_assignment_expression":
+		left := field(inner, "left")
+		right := c.expr(field(inner, "right"))
+		if left != nil && left.Kind() == "variable_name" {
+			if inner.Kind() == "augmented_assignment_expression" {
+				return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: right, Loc: c.loc(inner)}}
+			}
+			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: right}}
+	case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
+		// model include/require as a file-inclusion sink call
+		kids := namedChildren(inner)
+		var args []nir.Expr
+		if len(kids) > 0 {
+			args = append(args, c.expr(kids[0]))
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "include", Loc: c.loc(inner)},
+			Args: args, Path: "include", Method: "include", Loc: c.loc(inner)}}}
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+func (c *phConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		for _, ch := range children(m) {
+			switch ch.Kind() {
+			case "compound_statement":
+				out = append(out, c.block(ch)...)
+			case "else_clause", "else_if_clause", "catch_clause", "finally_clause",
+				"switch_block", "case_statement", "default_statement":
+				walk(ch)
+			default:
+				if ch.IsNamed() && ch.Kind() != "binary_expression" && ch.Kind() != "parenthesized_expression" {
+					// nested statements directly in a clause body
+					if isStmtKind(ch.Kind()) {
+						out = append(out, c.stmt(ch)...)
+					}
+				}
+			}
+		}
+	}
+	walk(n)
+	return out
+}
+
+func isStmtKind(k string) bool {
+	switch k {
+	case "expression_statement", "echo_statement", "return_statement", "if_statement",
+		"while_statement", "for_statement", "foreach_statement", "compound_statement",
+		"function_definition", "method_declaration", "class_declaration":
+		return true
+	}
+	return false
+}
+
+func (c *phConv) params(params *tree_sitter.Node) []string {
+	if params == nil {
+		return nil
+	}
+	var out []string
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() == "simple_parameter" || ch.Kind() == "variadic_parameter" || ch.Kind() == "property_promotion_parameter" {
+			if nm := field(ch, "name"); nm != nil {
+				out = append(out, c.text(nm))
+			} else {
+				for _, cc := range namedChildren(ch) {
+					if cc.Kind() == "variable_name" {
+						out = append(out, c.text(cc))
+						break
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+func (c *phConv) callArgs(args *tree_sitter.Node) []nir.Expr {
+	if args == nil {
+		return nil
+	}
+	var out []nir.Expr
+	for _, a := range namedChildren(args) {
+		if a.Kind() == "argument" {
+			if k := namedChildren(a); len(k) > 0 {
+				out = append(out, c.expr(k[len(k)-1]))
+			}
+		} else {
+			out = append(out, c.expr(a))
+		}
+	}
+	return out
+}
+
+func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
+	if n == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	L := c.loc(n)
+	switch n.Kind() {
+	case "variable_name", "name":
+		return nir.Name{ID: c.text(n), Loc: L}
+	case "integer", "float", "boolean", "null", "shell_command_expression":
+		return nir.Const{Loc: L}
+	case "string":
+		return nir.Const{Loc: L, Value: c.text(n)}
+	case "encapsed_string", "heredoc", "string_value":
+		// interpolated string: taint-propagating over the embedded variables
+		var parts []nir.Expr
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "variable_name" || ch.Kind() == "member_access_expression" ||
+				ch.Kind() == "subscript_expression" || ch.Kind() == "dynamic_variable_name" {
+				parts = append(parts, c.expr(ch))
+			}
+		}
+		if len(parts) > 0 {
+			return nir.Format{Parts: parts, Loc: L}
+		}
+		return nir.Const{Loc: L, Value: c.text(n)} // non-interpolated → literal value
+	case "member_access_expression":
+		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "name")), Path: c.dotted(n), Loc: L}
+	case "subscript_expression":
+		kids := namedChildren(n)
+		var base nir.Expr = nir.Const{Loc: L}
+		if len(kids) > 0 {
+			base = c.expr(kids[0])
+		}
+		return nir.Index{Base: base, Path: c.dotted(n), Loc: L}
+	case "function_call_expression":
+		fn := field(n, "function")
+		path := c.dotted(fn)
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
+	case "member_call_expression":
+		name := c.text(field(n, "name"))
+		path := c.dotted(n)
+		return nir.Call{Callee: nir.Attr{Base: c.expr(field(n, "object")), Attr: name, Path: path, Loc: L},
+			Args: c.callArgs(field(n, "arguments")), Path: path, Method: name, Loc: L}
+	case "scoped_call_expression":
+		name := c.text(field(n, "name"))
+		path := c.dotted(n)
+		return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: path, Method: name, Loc: L}
+	case "object_creation_expression":
+		var typ string
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "name" || ch.Kind() == "qualified_name" {
+				typ = c.text(ch)
+				break
+			}
+		}
+		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
+	case "binary_expression":
+		op := c.text(field(n, "operator"))
+		if op == "." || op == "+" {
+			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		}
+		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+	case "parenthesized_expression", "cast_expression":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
+		}
+	case "array_creation_expression":
+		var parts []nir.Expr
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "array_element_initializer" {
+				if k := namedChildren(ch); len(k) > 0 {
+					parts = append(parts, c.expr(k[len(k)-1]))
+				}
+			}
+		}
+		return nir.Seq{Parts: parts, Loc: L}
+	case "conditional_expression":
+		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "consequence")), c.expr(field(n, "alternative"))}, Loc: L}
+	}
+	var parts []nir.Expr
+	for _, ch := range namedChildren(n) {
+		parts = append(parts, c.expr(ch))
+	}
+	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *phConv) dotted(n *tree_sitter.Node) string {
+	if n == nil {
+		return "?"
+	}
+	switch n.Kind() {
+	case "variable_name", "name", "qualified_name":
+		return c.text(n)
+	case "member_access_expression":
+		return c.dotted(field(n, "object")) + "." + c.text(field(n, "name"))
+	case "member_call_expression":
+		return c.dotted(field(n, "object")) + "." + c.text(field(n, "name"))
+	case "scoped_call_expression":
+		return c.text(field(n, "scope")) + "." + c.text(field(n, "name"))
+	case "function_call_expression":
+		return c.dotted(field(n, "function"))
+	case "subscript_expression":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return c.dotted(kids[0])
+		}
+	}
+	return "?"
+}

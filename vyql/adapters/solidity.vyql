@@ -1,0 +1,21 @@
+// solidity framework adapter (docs/07) — smart-contract sinks/sources.
+// External/public function params are attacker-controllable (seeded http_input);
+// for to.call/to.transfer the RECEIVER address is modeled as arg0 (the danger).
+adapter solidity {
+  meta { fidelity: resolved }
+
+  source "http_input" -> code.HttpInput
+  source "msg.data" -> code.HttpInput
+  source "msg.value" -> code.HttpInput
+
+  // low-level external calls — tainted target/value
+  sink method "call" -> code.ExternalCall
+  sink method "delegatecall" -> code.ExternalCall
+  sink method "callcode" -> code.ExternalCall
+  sink method "send" -> code.ExternalCall
+  sink method "transfer" -> code.ExternalCall
+
+  // privileged destruct
+  sink path "selfdestruct" -> code.PrivilegedOp
+  sink path "suicide" -> code.PrivilegedOp
+}

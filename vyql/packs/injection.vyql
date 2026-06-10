@@ -1,0 +1,102 @@
+// Injection family — untrusted data reaching an interpreter/sink (OWASP A03).
+// Source is core.UserControlledData (the parent of HttpInput/Cookie/FileUpload/
+// HttpHeader/CliArgument), so each rule fires on any user-input refinement.
+package vypr.injection;
+
+rule Sql {
+  meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89] }
+  taint core.UserControlledData -> code.SqlExecution
+  unless sanitized_by core.SqlParameterization
+}
+
+rule Command {
+  meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78] }
+  taint core.UserControlledData -> code.CommandExecution
+  unless sanitized_by core.ShellEscape
+}
+
+rule Code {
+  meta { id: "VYQL-INJ-003", severity: critical, cwe: [CWE_94] }
+  taint core.UserControlledData -> code.CodeEval
+}
+
+rule Xss {
+  meta { id: "VYQL-INJ-004", severity: high, cwe: [CWE_79] }
+  taint core.UserControlledData -> code.HtmlRender
+  unless sanitized_by core.HtmlEscape
+}
+
+rule Ldap {
+  meta { id: "VYQL-INJ-005", severity: high, cwe: [CWE_90] }
+  taint core.UserControlledData -> code.LdapQuery
+  unless sanitized_by core.LdapEscape
+}
+
+rule Xpath {
+  meta { id: "VYQL-INJ-006", severity: high, cwe: [CWE_643] }
+  taint core.UserControlledData -> code.XpathQuery
+}
+
+rule Nosql {
+  meta { id: "VYQL-INJ-007", severity: high, cwe: [CWE_943] }
+  taint core.UserControlledData -> code.NosqlQuery
+}
+
+rule Template {
+  meta { id: "VYQL-INJ-008", severity: high, cwe: [CWE_1336] }
+  taint core.UserControlledData -> code.TemplateRender
+}
+
+rule Log {
+  meta { id: "VYQL-INJ-009", severity: medium, cwe: [CWE_117] }
+  taint core.UserControlledData -> code.LogOutput
+}
+
+rule HttpResponseSplitting {
+  meta { id: "VYQL-INJ-010", severity: medium, cwe: [CWE_113] }
+  taint core.UserControlledData -> code.ResponseHeaderWrite
+}
+
+// Untrusted data used as a printf-style FORMAT string (CWE-134).
+rule FormatString {
+  meta { id: "VYQL-INJ-011", severity: high, cwe: [CWE_134] }
+  taint core.UserControlledData -> code.FormatString
+}
+
+// Untrusted request body bulk-bound to a model/object (CWE-915).
+rule MassAssignment {
+  meta { id: "VYQL-INJ-012", severity: medium, cwe: [CWE_915] }
+  taint core.UserControlledData -> code.MassAssign
+}
+
+// Untrusted object recursively merged into a target — prototype pollution (CWE-1321).
+rule PrototypePollution {
+  meta { id: "VYQL-INJ-013", severity: medium, cwe: [CWE_1321] }
+  taint core.UserControlledData -> code.ProtoPollute
+}
+
+// Untrusted data written to a CSV/spreadsheet cell — formula injection (CWE-1236).
+rule CsvInjection {
+  meta { id: "VYQL-INJ-014", severity: low, cwe: [CWE_1236] }
+  taint core.UserControlledData -> code.CsvCell
+}
+
+// Untrusted filename/destination when saving an uploaded file (CWE-434).
+rule UnrestrictedUpload {
+  meta { id: "VYQL-INJ-015", severity: medium, cwe: [CWE_434] }
+  taint core.UserControlledData -> code.UnsafeUpload
+}
+
+// Untrusted data evaluated as an expression-language expression — SpEL/OGNL/MVEL/EL (CWE-917).
+rule ExpressionInjection {
+  meta { id: "VYQL-INJ-016", severity: critical, cwe: [CWE_917] }
+  taint core.UserControlledData -> code.ExpressionEval
+}
+
+// Untrusted data placed into email/SMTP headers — CRLF lets an attacker inject extra
+// headers / a new message body (CWE-93). Distinct from HTTP response splitting (CWE-113).
+rule EmailHeaderInjection {
+  meta { id: "VYQL-INJ-017", severity: medium, cwe: [CWE_93] }
+  taint core.UserControlledData -> code.MailHeaderWrite
+}
+

@@ -1,0 +1,38 @@
+// rust framework adapter (docs/07) — framework→concept content.
+// scoped paths (std::env::var) normalize to dotted (std.env.var) and match by
+// substring/suffix; format!/+ build tainted strings.
+adapter rust {
+  meta { match: contains, fidelity: resolved }
+
+  // untrusted input
+  source "env.var" -> code.HttpInput
+  source "env.args" -> code.HttpInput
+  source "env.vars" -> code.HttpInput
+  // web handler params (actix/axum/rocket) seeded by the frontend
+  source "http_input" -> code.HttpInput
+
+  // command execution — Command::new(prog) + .arg(x)/.args(x)
+  sink path "Command.new" -> code.CommandExecution
+  sink method "arg" -> code.CommandExecution
+  sink method "args" -> code.CommandExecution
+
+  // SQL
+  sink path "sqlx.query" -> code.SqlExecution
+  sink method "query" -> code.SqlExecution
+  sink method "query_as" -> code.SqlExecution
+  sink method "sql_query" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+
+  // path / file
+  sink path "File.open" -> code.FilePathAccess
+  sink path "File.create" -> code.FilePathAccess
+  sink path "fs.read" -> code.FilePathAccess
+  sink path "fs.read_to_string" -> code.FilePathAccess
+  sink path "fs.write" -> code.FilePathAccess
+  sink path "fs.remove_file" -> code.FilePathAccess
+  sink method "read_to_string" -> code.FilePathAccess
+
+  // deserialization
+  sink path "serde_json.from_str" -> code.Deserialization
+  sink path "serde_yaml.from_str" -> code.Deserialization
+}

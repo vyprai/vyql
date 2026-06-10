@@ -1,0 +1,108 @@
+// VyQL weakness-class vocabulary (docs/06) — the threats sinks are
+// vulnerable_to and controls neutralize.
+
+package access_control;
+threat PermissiveCors { cwe: [CWE_942], desc: "Permissive CORS — Access-Control-Allow-Origin set to '*'" }
+threat CsrfDisabled { cwe: [CWE_352], desc: "CSRF protection explicitly disabled / exempted" }
+threat BrokenAccess { cwe: [CWE_284], desc: "Improper access control" }
+threat Idor { cwe: [CWE_639], desc: "Insecure direct object reference" }
+threat IncorrectAuthorization { cwe: [CWE_863], desc: "Incorrect authorization logic" }
+threat MissingAuthorization { cwe: [CWE_862], desc: "Missing authorization check" }
+threat PrivilegeEscalation { cwe: [CWE_269], desc: "Improper privilege management" }
+
+package authentication;
+threat ImproperAuthentication { cwe: [CWE_287], desc: "Improper authentication" }
+threat MissingAuthentication { cwe: [CWE_306], desc: "Missing authentication for critical function" }
+
+package business_logic;
+threat BusinessLogic { cwe: [CWE_841], desc: "Improper enforcement of behavioral workflow (business logic)" }
+
+package concurrency;
+threat RaceCondition { cwe: [CWE_362], desc: "Concurrent execution using shared resource" }
+threat Toctou { cwe: [CWE_367], desc: "Time-of-check time-of-use race" }
+
+package crypto;
+threat WeakCipher { cwe: [CWE_327], desc: "Use of a broken/weak symmetric cipher (DES/RC4/Blowfish/RC2)" }
+threat WeakHash { cwe: [CWE_327], desc: "Use of a broken/weak cryptographic primitive (MD5/SHA1/DES/RC4/ECB)" }
+threat CleartextStorage { cwe: [CWE_312], desc: "Cleartext storage of sensitive information" }
+threat CleartextTransmission { cwe: [CWE_319], desc: "Cleartext transmission of sensitive information" }
+threat HardcodedCryptoKey { cwe: [CWE_321], desc: "Use of a hard-coded cryptographic key" }
+threat InsufficientEntropy { cwe: [CWE_331], desc: "Insufficient entropy" }
+threat MissingEncryption { cwe: [CWE_311], desc: "Missing encryption of sensitive data" }
+threat WeakCrypto { cwe: [CWE_327], desc: "Use of a broken/risky cryptographic algorithm" }
+threat ImproperCertValidation { cwe: [CWE_295], desc: "Improper certificate validation (verification disabled)" }
+threat ImproperSignatureCheck { cwe: [CWE_347], desc: "Improper verification of cryptographic signature (e.g. JWT alg none)" }
+
+package deserialization;
+threat DeserializationAbuse { cwe: [CWE_502], desc: "Deserialization of untrusted data" }
+threat UnsafeReflection { cwe: [CWE_470], desc: "Untrusted data selecting classes/code via reflection" }
+threat Xxe { cwe: [CWE_611], desc: "Improper restriction of XML external entities" }
+
+package dos;
+threat ReDoS { cwe: [CWE_1333], desc: "Untrusted data compiled as a regular expression (catastrophic backtracking)" }
+threat UncontrolledResourceConsumption { cwe: [CWE_400], desc: "Uncontrolled resource consumption (DoS)" }
+
+package injection;
+threat ArgumentInjection { cwe: [CWE_88], desc: "Untrusted data injected as command arguments" }
+threat CodeInjection { cwe: [CWE_94], desc: "Untrusted data evaluated as code" }
+threat CommandInjection { cwe: [CWE_78], desc: "Untrusted data in an OS command" }
+threat MassAssignment { cwe: [CWE_915], desc: "Untrusted request body bulk-bound to object attributes (mass assignment)" }
+threat CsvInjection { cwe: [CWE_1236], desc: "Untrusted data written to a spreadsheet/CSV cell (formula injection)" }
+threat UnrestrictedUpload { cwe: [CWE_434], desc: "Untrusted filename/destination when saving an uploaded file" }
+threat PrototypePollution { cwe: [CWE_1321], desc: "Untrusted object recursively merged, polluting Object.prototype" }
+threat FormatString { cwe: [CWE_134], desc: "Untrusted data used as a format string" }
+threat CrlfInjection { cwe: [CWE_93], desc: "Improper neutralization of CRLF sequences" }
+threat ExpressionLanguageInjection { cwe: [CWE_917], desc: "Untrusted data in an expression-language statement" }
+threat HttpResponseSplitting { cwe: [CWE_113], desc: "Untrusted data in HTTP headers" }
+threat LdapInjection { cwe: [CWE_90], desc: "Untrusted data in an LDAP query" }
+threat LogInjection { cwe: [CWE_117], desc: "Untrusted data in log output" }
+threat NosqlInjection { cwe: [CWE_943], desc: "Untrusted data in a data-query/NoSQL command" }
+threat SqlInjection { cwe: [CWE_89], desc: "Untrusted data in a SQL command" }
+threat TemplateInjection { cwe: [CWE_1336], desc: "Server-side template injection" }
+threat XmlInjection { cwe: [CWE_91], desc: "Untrusted data in an XML document" }
+threat XpathInjection { cwe: [CWE_643], desc: "Untrusted data in an XPath query" }
+threat Xss { cwe: [CWE_79], desc: "Untrusted data in rendered HTML (cross-site scripting)" }
+
+package memory;
+threat BufferOverflow { cwe: [CWE_120], desc: "Classic buffer copy without size check" }
+threat DoubleFree { cwe: [CWE_415], desc: "Double free" }
+threat IntegerOverflow { cwe: [CWE_190], desc: "Integer overflow/wraparound" }
+threat NullDereference { cwe: [CWE_476], desc: "NULL pointer dereference" }
+threat OobRead { cwe: [CWE_125], desc: "Out-of-bounds read" }
+threat OobWrite { cwe: [CWE_787], desc: "Out-of-bounds write (buffer overflow)" }
+threat TypeConfusion { cwe: [CWE_843], desc: "Type confusion" }
+threat UseAfterFree { cwe: [CWE_416], desc: "Use after free" }
+
+package path;
+threat FileInclusion { cwe: [CWE_98], desc: "Untrusted data controlling an include/require path" }
+threat LinkFollowing { cwe: [CWE_59], desc: "Improper link resolution before file access" }
+threat PathTraversal { cwe: [CWE_22], desc: "Untrusted data in a filesystem path" }
+threat InsecureTempFile { cwe: [CWE_377], desc: "Insecure temporary file (predictable name / race)" }
+
+package request_forgery;
+threat Csrf { cwe: [CWE_352], desc: "Cross-site request forgery" }
+threat OpenRedirect { cwe: [CWE_601], desc: "Untrusted data controlling a redirect target" }
+threat Ssrf { cwe: [CWE_918], desc: "Server-side request forgery" }
+
+package secrets;
+threat HardcodedCredentials { cwe: [CWE_798], desc: "Use of hard-coded credentials" }
+threat SecretLeak { cwe: [CWE_200], desc: "Exposure of sensitive information" }
+threat SensitiveLog { cwe: [CWE_532], desc: "Insertion of sensitive info into log files" }
+
+package session;
+threat SessionFixation { cwe: [CWE_384], desc: "Session fixation" }
+threat InsecureCookie { cwe: [CWE_614], desc: "Sensitive cookie without Secure/HttpOnly flag" }
+
+package supply_chain;
+threat MaliciousCode { cwe: [CWE_506], desc: "Embedded malicious code" }
+threat VulnerableDependency { cwe: [CWE_1104], desc: "Use of unmaintained/vulnerable third-party component" }
+
+package validation;
+threat ImproperEncoding { cwe: [CWE_116], desc: "Improper encoding/escaping of output" }
+threat ImproperInputValidation { cwe: [CWE_20], desc: "Improper input validation" }
+
+package smartcontract;
+threat ExternalCallInjection { cwe: [CWE_829], desc: "Untrusted address/value in a low-level external call (.call/.delegatecall/.send/.transfer)" }
+threat PrivilegedDestruct { cwe: [CWE_284], desc: "Untrusted-reachable selfdestruct/privileged operation" }
+threat TxOriginAuth { cwe: [CWE_477], desc: "Authorization via tx.origin (phishing-vulnerable)" }
+

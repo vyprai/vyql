@@ -1,0 +1,20 @@
+// Request forgery family — SSRF, open redirect, CSRF (OWASP A10 / A01).
+package vypr.request_forgery;
+
+rule Ssrf {
+  meta { id: "VYQL-RF-001", severity: high, cwe: [CWE_918] }
+  taint core.UserControlledData -> code.UrlFetch
+  unless sanitized_by core.AllowlistValidation
+}
+
+rule OpenRedirect {
+  meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601] }
+  taint core.UserControlledData -> code.RedirectTarget
+  unless sanitized_by core.RedirectAllowlist
+}
+
+rule Csrf {
+  meta { id: "VYQL-RF-003", severity: medium, cwe: [CWE_352] }
+  taint core.UserControlledData -> code.StateChangingOp
+  unless guarded_by core.CsrfProtection
+}

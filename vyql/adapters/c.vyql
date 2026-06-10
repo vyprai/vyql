@@ -1,0 +1,55 @@
+// c framework adapter (docs/07) — framework→concept content.
+// C has no string concat; the frontend models writer fns (sprintf/strcpy) as
+// assignments to their dest, and reader fns (fgets/gets) as sources on the dest.
+adapter c {
+  meta { fidelity: resolved }
+
+  // untrusted input
+  source "getenv" -> code.HttpInput
+  source "argv" -> code.HttpInput
+  source "fgets" -> code.HttpInput
+  source "gets" -> code.HttpInput
+  source "fread" -> code.HttpInput
+  source "recv" -> code.HttpInput
+  source "recvfrom" -> code.HttpInput
+
+  // command execution (the program/command string is arg0)
+  sink path "system" -> code.CommandExecution
+  sink path "popen" -> code.CommandExecution
+  sink path "execl" -> code.CommandExecution
+  sink path "execlp" -> code.CommandExecution
+  sink path "execle" -> code.CommandExecution
+  sink path "execv" -> code.CommandExecution
+  sink path "execvp" -> code.CommandExecution
+  sink path "execve" -> code.CommandExecution
+
+  // SQL (procedural — the query is arg1)
+  sink path "mysql_query" arg 1 -> code.SqlExecution
+  sink path "mysql_real_query" arg 1 -> code.SqlExecution
+  sink path "sqlite3_exec" arg 1 -> code.SqlExecution
+  sink path "sqlite3_prepare" arg 1 -> code.SqlExecution
+  sink path "sqlite3_prepare_v2" arg 1 -> code.SqlExecution
+  sink path "PQexec" arg 1 -> code.SqlExecution
+
+  // path / file
+  sink path "fopen" -> code.FilePathAccess
+  sink path "open" -> code.FilePathAccess
+  sink path "open64" -> code.FilePathAccess
+  sink path "unlink" -> code.FilePathAccess
+  sink path "remove" -> code.FilePathAccess
+  sink path "opendir" -> code.FilePathAccess
+
+  // dynamic loading (untrusted path -> code load)
+  sink path "dlopen" -> code.FilePathAccess
+
+  // insecure temp file (CWE-377) — predictable-name / race-prone temp APIs
+  mark "mktemp" -> code.InsecureTempFile
+  mark "tmpnam" -> code.InsecureTempFile
+  mark "tempnam" -> code.InsecureTempFile
+
+  // format string (CWE-134) — tainted FORMAT argument
+  sink path "printf" arg 0 -> code.FormatString
+  sink path "fprintf" arg 1 -> code.FormatString
+  sink path "syslog" arg 1 -> code.FormatString
+  sink path "vprintf" arg 0 -> code.FormatString
+}

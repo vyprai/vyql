@@ -1,0 +1,105 @@
+// java framework adapter (docs/07) — framework→concept content.
+// frameworks: servlet, spring-mvc, jax-rs, jdbc, jpa, spring-jdbc
+adapter java {
+  meta { match: contains, fidelity: resolved }
+
+  // Servlet / Spring request inputs (receiver name varies → substring match)
+  source ".getParameter" -> code.HttpInput
+  source ".getParameterValues" -> code.HttpInput
+  source ".getParameterMap" -> code.HttpInput
+  source ".getHeader" -> code.HttpInput
+  source ".getHeaders" -> code.HttpInput
+  source ".getQueryString" -> code.HttpInput
+  source ".getCookies" -> code.HttpInput
+  source ".getInputStream" -> code.HttpInput
+  source ".getReader" -> code.HttpInput
+  source ".getPathInfo" -> code.HttpInput
+  source ".getRequestURI" -> code.HttpInput
+  source ".getPart" -> code.HttpInput
+
+  // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate
+  sink method "executeQuery" -> code.SqlExecution
+  sink method "executeUpdate" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+  sink method "executeBatch" -> code.SqlExecution
+  sink method "executeLargeUpdate" -> code.SqlExecution
+  sink method "prepareStatement" -> code.SqlExecution
+  sink method "prepareCall" -> code.SqlExecution
+  sink method "createQuery" -> code.SqlExecution
+  sink method "createNativeQuery" -> code.SqlExecution
+  sink method "queryForObject" -> code.SqlExecution
+  sink method "queryForList" -> code.SqlExecution
+  sink method "query" -> code.SqlExecution
+
+  // Command execution
+  sink method "exec" -> code.CommandExecution
+  sink path "Runtime.getRuntime.exec" -> code.CommandExecution
+  sink path "ProcessBuilder" -> code.CommandExecution
+
+  // Deserialization
+  sink method "readObject" -> code.Deserialization
+  sink method "readUnshared" -> code.Deserialization
+  sink path "XMLDecoder" -> code.Deserialization
+  sink path "XMLDecoder.readObject" -> code.Deserialization
+
+  // XXE
+  sink method "parse" -> code.XmlParse
+  sink method "newDocumentBuilder" -> code.XmlParse
+
+  // Path / file
+  sink path "File" -> code.FilePathAccess
+  sink path "FileInputStream" -> code.FilePathAccess
+  sink path "FileReader" -> code.FilePathAccess
+  sink path "Files.readAllBytes" -> code.FilePathAccess
+  sink path "Files.newInputStream" -> code.FilePathAccess
+  sink path "Paths.get" -> code.FilePathAccess
+
+  // SSRF
+  sink path "URL" -> code.UrlFetch
+  sink method "openConnection" -> code.UrlFetch
+  sink method "getForObject" -> code.UrlFetch
+  sink method "getForEntity" -> code.UrlFetch
+
+  // Code eval / scripting
+  sink method "eval" -> code.CodeEval
+
+  // LDAP injection (CWE-90) — JNDI DirContext.search(name, filter, controls): the FILTER
+  // (arg 1) is injectable. Typed sink (on DirContext) + unambiguous dotted ctor forms.
+  sink method "search" arg 1 on DirContext -> code.LdapQuery
+  sink path "InitialDirContext.search" arg 1 -> code.LdapQuery
+  sink path "InitialLdapContext.search" arg 1 -> code.LdapQuery
+
+  // controls (sanitizers/validators)
+  control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
+  control "StringEscapeUtils.escapeHtml3" -> core.HtmlEscape
+  control "HtmlUtils.htmlEscape" -> core.HtmlEscape
+  control "ESAPI.encoder" -> core.HtmlEscape
+  control "encodeForHTML" -> core.HtmlEscape
+
+  // format string (CWE-134) — tainted FORMAT argument
+  sink path "String.format" arg 0 -> code.FormatString
+  sink method "printf" arg 0 -> code.FormatString
+
+  // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  sink path "Pattern.compile" -> code.RegexCompile
+
+  // csrf disabled (CWE-352) — presence marker
+  mark "csrf.disable" -> code.CsrfDisabled
+
+  // expression-language injection (CWE-917)
+  sink method "parseExpression" -> code.ExpressionEval
+  sink path "Ognl.getValue" -> code.ExpressionEval
+  sink path "Ognl.setValue" -> code.ExpressionEval
+  sink path "MVEL.eval" -> code.ExpressionEval
+  sink path "MVEL.evalToBoolean" -> code.ExpressionEval
+  sink method "createExpression" -> code.ExpressionEval
+
+  // weak cipher mode ECB (CWE-327)
+  mark "Cipher.getInstance" val "ECB" -> code.WeakCipher
+
+  // server-side template injection (CWE-1336) — unambiguous engine entrypoints that
+  // evaluate a STRING template (not load-by-name): Velocity static evaluate, Pebble
+  // literal-template, Groovy SimpleTemplateEngine. Tainted template arg -> SSTI.
+  sink path "Velocity.evaluate" arg 3 -> code.TemplateRender
+  sink method "getLiteralTemplate" -> code.TemplateRender
+}

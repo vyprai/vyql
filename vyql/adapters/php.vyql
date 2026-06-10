@@ -1,0 +1,94 @@
+// php framework adapter (docs/07) — framework→concept content.
+// frameworks: vanilla, laravel, symfony, wordpress, codeigniter
+adapter php {
+  meta { fidelity: resolved }
+
+  // superglobals (subscripted) -> HTTP input
+  source "$_GET" -> code.HttpInput
+  source "$_POST" -> code.HttpInput
+  source "$_REQUEST" -> code.HttpInput
+  source "$_COOKIE" -> code.HttpInput
+  source "$_FILES" -> code.HttpInput
+  source "$_SERVER" -> code.HttpInput
+
+  // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
+  sink path "mysqli_query" arg 1 -> code.SqlExecution
+  sink path "mysqli_real_query" arg 1 -> code.SqlExecution
+  sink path "mysqli_multi_query" arg 1 -> code.SqlExecution
+  sink path "mysql_query" -> code.SqlExecution
+  sink path "pg_query" arg 1 -> code.SqlExecution
+  sink path "sqlite_query" -> code.SqlExecution
+  sink method "query" -> code.SqlExecution
+  sink method "exec" -> code.SqlExecution
+  sink method "prepare" -> code.SqlExecution
+
+  // command execution
+  sink path "system" -> code.CommandExecution
+  sink path "exec" -> code.CommandExecution
+  sink path "shell_exec" -> code.CommandExecution
+  sink path "passthru" -> code.CommandExecution
+  sink path "popen" -> code.CommandExecution
+  sink path "proc_open" -> code.CommandExecution
+  sink path "pcntl_exec" -> code.CommandExecution
+
+  // code evaluation
+  sink path "eval" -> code.CodeEval
+  sink path "assert" -> code.CodeEval
+  sink path "create_function" arg 1 -> code.CodeEval
+
+  // deserialization
+  sink path "unserialize" -> code.Deserialization
+
+  // file inclusion (include/require modeled as include() call)
+  sink path "include" -> code.FileInclude
+
+  // path / file
+  sink path "fopen" -> code.FilePathAccess
+  sink path "file_get_contents" -> code.FilePathAccess
+  sink path "readfile" -> code.FilePathAccess
+  sink path "file" -> code.FilePathAccess
+  sink path "unlink" -> code.FilePathAccess
+  sink path "file_put_contents" -> code.FilePathAccess
+
+  // SSRF
+  sink path "curl_exec" -> code.UrlFetch
+
+  // reflected XSS — echo/print modeled as calls
+  sink path "echo" -> code.HtmlRender
+  sink path "print" -> code.HtmlRender
+  sink path "printf" -> code.HtmlRender
+
+  // controls (sanitizers/validators)
+  control "htmlspecialchars" -> core.HtmlEscape
+  control "htmlentities" -> core.HtmlEscape
+  control "strip_tags" -> core.HtmlEscape
+  control "escapeshellarg" -> core.ShellEscape
+  control "escapeshellcmd" -> core.ShellEscape
+  control "mysqli_real_escape_string" -> core.SqlParameterization
+  control "pg_escape_string" -> core.SqlParameterization
+  control "realpath" -> core.PathCanonicalization
+  control "basename" -> core.PathCanonicalization
+
+  // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  sink path "preg_match" -> code.RegexCompile
+  sink path "preg_replace" -> code.RegexCompile
+  sink path "preg_match_all" -> code.RegexCompile
+
+  // mass assignment (CWE-915) — request body -> bulk bind
+  sink method "fill" -> code.MassAssign
+  sink method "forceFill" -> code.MassAssign
+
+  // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
+  sink path "fputcsv" arg 1 -> code.CsvCell
+  sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
+
+  // session fixation (CWE-384) — user value as session id
+  sink path "session_id" -> code.SessionId
+
+  // permissive CORS (CWE-942)
+  mark "header" val "Access-Control-Allow-Origin: *" -> code.PermissiveCors
+
+  // email-header injection (CWE-93) — mail($to,$subj,$body,$headers): tainted CRLF in the
+  // additional-headers arg (index 3) injects extra headers / a second message.
+  sink path "mail" arg 3 -> code.MailHeaderWrite
+}

@@ -1,0 +1,418 @@
+package treesitter
+
+import (
+	tree_sitter "github.com/tree-sitter/go-tree-sitter"
+	tsc "github.com/tree-sitter/tree-sitter-c/bindings/go"
+	tscpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
+
+	objc "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/objc"
+
+	"github.com/vyprai/vyql/extract/nir"
+)
+
+// ccConv walks a tree-sitter C CST into NIR. C has no string-concat operator:
+// untrusted data reaches a buffer through writer functions (sprintf/strcpy/…),
+// so those are modeled as an ASSIGNMENT to their destination argument, and
+// reader functions (fgets/gets/…) seed their destination buffer as a source.
+type ccConv struct {
+	src  []byte
+	file string
+	key  string
+}
+
+// cPropagators taint their dest (arg0) from the remaining (source) arguments.
+var cPropagators = map[string]bool{
+	"sprintf": true, "snprintf": true, "vsprintf": true, "vsnprintf": true,
+	"strcpy": true, "strncpy": true, "strcat": true, "strncat": true,
+	"memcpy": true, "memmove": true, "stpcpy": true,
+}
+
+// cReaders read external input into their dest (arg0) buffer.
+var cReaders = map[string]bool{
+	"fgets": true, "gets": true, "fread": true, "read": true, "recv": true, "recvfrom": true,
+}
+
+// ExtractC parses C files into one NIR Program (one module per file).
+func ExtractC(files []string, root string) (nir.Program, error) {
+	return extractCLike(files, root, ".c", tree_sitter.NewLanguage(tsc.Language()))
+}
+
+// ExtractCPP parses C++ files. The C/C++ grammars share the ccConv walker; the
+// extra C++ node kinds (qualified_identifier, namespace/class, new_expression)
+// are handled there and are inert for C.
+func ExtractCPP(files []string, root string) (nir.Program, error) {
+	return extractCLike(files, root, ".cpp", tree_sitter.NewLanguage(tscpp.Language()))
+}
+
+// ExtractObjC parses Objective-C (.m) files. ObjC is a C superset; ccConv reuses
+// the C handling and adds message_expression + @implementation method nodes.
+func ExtractObjC(files []string, root string) (nir.Program, error) {
+	return extractCLike(files, root, ".m", tree_sitter.NewLanguage(objc.Language()))
+}
+
+func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) (nir.Program, error) {
+	parser := tree_sitter.NewParser()
+	defer parser.Close()
+	_ = parser.SetLanguage(lang)
+
+	var prog nir.Program
+	prog.SelfName = "this"
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		tree := parser.Parse(src, nil)
+		if tree == nil {
+			continue
+		}
+		rel := relPath(root, f)
+		c := &ccConv{src: src, file: rel, key: moduleKey(root, f, ext)}
+		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())})
+		tree.Close()
+	}
+	return prog, nil
+}
+
+func (c *ccConv) loc(n *tree_sitter.Node) string {
+	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
+}
+
+func (c *ccConv) text(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *ccConv) decls(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	for _, ch := range namedChildren(n) {
+		out = append(out, c.stmt(ch)...)
+	}
+	return out
+}
+
+// objcMethod extracts an ObjC method's selector name, parameter names, and body.
+func (c *ccConv) objcMethod(n *tree_sitter.Node) (string, []string, *tree_sitter.Node) {
+	var name string
+	var params []string
+	var body *tree_sitter.Node
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "identifier":
+			if name == "" {
+				name = c.text(ch)
+			} else {
+				name += ":" + c.text(ch)
+			}
+		case "method_parameter":
+			for _, p := range namedChildren(ch) {
+				if p.Kind() == "identifier" {
+					params = append(params, c.text(p))
+				}
+			}
+		case "compound_statement":
+			body = ch
+		}
+	}
+	return name, params, body
+}
+
+func sameCNode(a, b *tree_sitter.Node) bool {
+	return a != nil && b != nil && a.StartByte() == b.StartByte() && a.EndByte() == b.EndByte()
+}
+
+func isCExprArg(k string) bool {
+	switch k {
+	case "identifier", "call_expression", "message_expression", "string_literal",
+		"binary_expression", "field_expression", "subscript_expression", "cast_expression",
+		"unary_expression", "number_literal", "concatenated_string":
+		return true
+	}
+	return false
+}
+
+// declName unwraps pointer/array/function/parenthesized declarators to the
+// underlying identifier name.
+func (c *ccConv) declName(d *tree_sitter.Node) string {
+	for d != nil {
+		switch d.Kind() {
+		case "identifier", "field_identifier", "type_identifier":
+			return c.text(d)
+		case "pointer_declarator", "array_declarator", "parenthesized_declarator",
+			"init_declarator", "function_declarator":
+			d = field(d, "declarator")
+		default:
+			if inner := field(d, "declarator"); inner != nil {
+				d = inner
+			} else {
+				return ""
+			}
+		}
+	}
+	return ""
+}
+
+func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
+	L := c.loc(n)
+	switch n.Kind() {
+	case "function_definition":
+		decl := field(n, "declarator")
+		return []nir.Stmt{nir.FuncDef{
+			Name:   c.declName(decl),
+			Params: c.params(decl),
+			Body:   c.block(field(n, "body")),
+			Loc:    L,
+		}}
+	case "struct_specifier", "union_specifier", "enum_specifier":
+		return nil
+	case "class_implementation", "class_interface", "category_implementation", // ObjC
+		"category_interface", "protocol_declaration", "implementation_definition",
+		"interface_declaration_list", "protocol_declaration_list":
+		var out []nir.Stmt
+		for _, ch := range namedChildren(n) {
+			out = append(out, c.stmt(ch)...)
+		}
+		return out
+	case "method_definition", "method_declaration": // ObjC method
+		name, params, body := c.objcMethod(n)
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: c.block(body), Loc: L}}
+	case "namespace_definition", "linkage_specification", "declaration_list": // C++
+		if b := field(n, "body"); b != nil {
+			return c.decls(b)
+		}
+		return c.decls(n)
+	case "template_declaration": // C++ — process the templated decl
+		return c.decls(n)
+	case "class_specifier": // C++
+		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}}
+	case "field_declaration_list":
+		return c.decls(n)
+	case "declaration":
+		var out []nir.Stmt
+		for _, d := range namedChildren(n) {
+			if d.Kind() == "init_declarator" {
+				name := c.declName(field(d, "declarator"))
+				if val := field(d, "value"); name != "" && val != nil {
+					out = append(out, nir.Assign{Targets: []string{name}, Value: c.expr(val)})
+				}
+			}
+		}
+		return out
+	case "expression_statement":
+		kids := namedChildren(n)
+		if len(kids) == 0 {
+			return nil
+		}
+		return c.exprStmt(kids[0])
+	case "return_statement":
+		kids := namedChildren(n)
+		if len(kids) > 0 {
+			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
+		}
+		return []nir.Stmt{nir.Return{}}
+	case "if_statement", "while_statement", "for_statement", "do_statement",
+		"switch_statement", "compound_statement":
+		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+	}
+	return nil
+}
+
+func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
+	switch inner.Kind() {
+	case "assignment_expression":
+		left := field(inner, "left")
+		right := c.expr(field(inner, "right"))
+		if left != nil && left.Kind() == "identifier" {
+			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: right}}
+	case "call_expression":
+		name := lastSeg(c.dotted(field(inner, "function")))
+		args := namedChildren(field(inner, "arguments"))
+		// buffer writers: dest (arg0) is tainted from the source args / the read
+		if len(args) > 0 {
+			if dst := c.destName(args[0]); dst != "" {
+				if cPropagators[name] {
+					var parts []nir.Expr
+					for _, a := range args[1:] {
+						parts = append(parts, c.expr(a))
+					}
+					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: nir.Format{Parts: parts, Loc: c.loc(inner)}}}
+				}
+				if cReaders[name] {
+					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
+				}
+			}
+		}
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// destName returns the buffer variable name of a writer's destination argument,
+// unwrapping a leading `&`.
+func (c *ccConv) destName(a *tree_sitter.Node) string {
+	if a.Kind() == "pointer_expression" || a.Kind() == "unary_expression" {
+		if arg := field(a, "argument"); arg != nil {
+			a = arg
+		}
+	}
+	if a.Kind() == "identifier" {
+		return c.text(a)
+	}
+	return ""
+}
+
+func (c *ccConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		for _, ch := range children(m) {
+			switch ch.Kind() {
+			case "compound_statement":
+				out = append(out, c.block(ch)...)
+			case "else_clause", "case_statement":
+				walk(ch)
+			case "expression_statement", "declaration", "return_statement", "if_statement":
+				out = append(out, c.stmt(ch)...)
+			}
+		}
+	}
+	if n.Kind() == "compound_statement" {
+		return c.block(n)
+	}
+	walk(n)
+	return out
+}
+
+func (c *ccConv) block(block *tree_sitter.Node) []nir.Stmt {
+	if block == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, st := range namedChildren(block) {
+		out = append(out, c.stmt(st)...)
+	}
+	return out
+}
+
+func (c *ccConv) params(decl *tree_sitter.Node) []string {
+	pl := field(decl, "parameters")
+	if pl == nil {
+		return nil
+	}
+	var out []string
+	for _, ch := range namedChildren(pl) {
+		if ch.Kind() == "parameter_declaration" {
+			if nm := c.declName(field(ch, "declarator")); nm != "" {
+				out = append(out, nm)
+			}
+		}
+	}
+	return out
+}
+
+func (c *ccConv) callArgs(args *tree_sitter.Node) []nir.Expr {
+	if args == nil {
+		return nil
+	}
+	var out []nir.Expr
+	for _, a := range namedChildren(args) {
+		out = append(out, c.expr(a))
+	}
+	return out
+}
+
+func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
+	if n == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	L := c.loc(n)
+	switch n.Kind() {
+	case "identifier", "field_identifier", "qualified_identifier", "namespace_identifier", "type_identifier":
+		return nir.Name{ID: c.text(n), Loc: L}
+	case "number_literal", "char_literal", "true", "false", "null", "nullptr":
+		return nir.Const{Loc: L}
+	case "string_literal", "concatenated_string", "raw_string_literal":
+		return nir.Const{Loc: L}
+	case "new_expression": // C++
+		typ := c.text(field(n, "type"))
+		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
+	case "field_expression":
+		return nir.Attr{Base: c.expr(field(n, "argument")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
+	case "subscript_expression":
+		return nir.Index{Base: c.expr(field(n, "argument")), Path: c.dotted(field(n, "argument")), Loc: L}
+	case "call_expression":
+		fn := field(n, "function")
+		path := c.dotted(fn)
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
+	case "message_expression": // ObjC [receiver method:arg ...]
+		recv := field(n, "receiver")
+		methN := field(n, "method")
+		method := c.text(methN)
+		path := c.dotted(recv) + "." + method
+		var args []nir.Expr
+		// every named child except the receiver and the method selector is an arg
+		for _, ch := range namedChildren(n) {
+			if sameCNode(ch, recv) || sameCNode(ch, methN) || ch.Kind() == "selector" {
+				continue
+			}
+			args = append(args, c.expr(ch))
+		}
+		return nir.Call{Callee: nir.Attr{Base: c.expr(recv), Attr: method, Path: path, Loc: L}, Args: args, Path: path, Method: method, Loc: L}
+	case "binary_expression":
+		// C++ string concat with + builds tainted strings; treat as Format.
+		if c.text(field(n, "operator")) == "+" {
+			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		}
+		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+	case "parenthesized_expression", "cast_expression":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
+		}
+	case "pointer_expression", "unary_expression":
+		if arg := field(n, "argument"); arg != nil {
+			return nir.Thru{Inner: c.expr(arg)}
+		}
+	case "assignment_expression":
+		return c.expr(field(n, "right"))
+	case "conditional_expression":
+		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "consequence")), c.expr(field(n, "alternative"))}, Loc: L}
+	}
+	var parts []nir.Expr
+	for _, ch := range namedChildren(n) {
+		parts = append(parts, c.expr(ch))
+	}
+	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *ccConv) dotted(n *tree_sitter.Node) string {
+	if n == nil {
+		return "?"
+	}
+	switch n.Kind() {
+	case "identifier", "field_identifier", "type_identifier", "namespace_identifier":
+		return c.text(n)
+	case "qualified_identifier": // C++ std::system -> std.system (dotted boundary)
+		scope := field(n, "scope")
+		name := field(n, "name")
+		if scope == nil {
+			return c.dotted(name)
+		}
+		return c.dotted(scope) + "." + c.dotted(name)
+	case "field_expression":
+		return c.dotted(field(n, "argument")) + "." + c.text(field(n, "field"))
+	case "message_expression": // ObjC
+		return c.dotted(field(n, "receiver")) + "." + c.text(field(n, "method"))
+	case "call_expression":
+		return c.dotted(field(n, "function"))
+	case "subscript_expression":
+		return c.dotted(field(n, "argument")) + "[]"
+	case "parenthesized_expression":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return c.dotted(kids[0])
+		}
+	}
+	return "?"
+}

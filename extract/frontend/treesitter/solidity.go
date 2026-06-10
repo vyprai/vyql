@@ -1,0 +1,311 @@
+package treesitter
+
+import (
+	"strings"
+
+	tree_sitter "github.com/tree-sitter/go-tree-sitter"
+
+	sol "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/solidity"
+
+	"github.com/vyprai/vyql/extract/nir"
+)
+
+// solConv walks a tree-sitter Solidity CST into NIR. Solidity wraps operands in
+// `expression` nodes (peeled by solUnwrap). A public/external function's
+// parameters are attacker-controllable (model-bound like a web handler), so they
+// are seeded as sources. For a low-level call (to.call/to.transfer) the RECEIVER
+// address is the dangerous value, so it is modeled as arg0.
+type solConv struct {
+	src  []byte
+	file string
+	key  string
+}
+
+// ExtractSolidity parses .sol files into one NIR Program.
+func ExtractSolidity(files []string, root string) (nir.Program, error) {
+	parser := tree_sitter.NewParser()
+	defer parser.Close()
+	_ = parser.SetLanguage(tree_sitter.NewLanguage(sol.Language()))
+
+	var prog nir.Program
+	prog.SelfName = "this"
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		tree := parser.Parse(src, nil)
+		if tree == nil {
+			continue
+		}
+		rel := relPath(root, f)
+		c := &solConv{src: src, file: rel, key: moduleKey(root, f, ".sol")}
+		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())})
+		tree.Close()
+	}
+	return prog, nil
+}
+
+func (c *solConv) loc(n *tree_sitter.Node) string {
+	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
+}
+
+func (c *solConv) text(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *solConv) unwrap(n *tree_sitter.Node) *tree_sitter.Node {
+	for n != nil && n.Kind() == "expression" {
+		k := namedChildren(n)
+		if len(k) != 1 {
+			break
+		}
+		n = k[0]
+	}
+	return n
+}
+
+func (c *solConv) decls(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	for _, ch := range namedChildren(n) {
+		out = append(out, c.stmt(ch)...)
+	}
+	return out
+}
+
+func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
+	L := c.loc(n)
+	switch n.Kind() {
+	case "contract_declaration", "interface_declaration", "library_declaration":
+		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(c.solBody(n)), Loc: L}}
+	case "function_definition", "modifier_definition", "constructor_definition", "fallback_receive_definition":
+		params := c.params(n)
+		body := c.block(c.solBody(n))
+		if c.isPublicFn(n) {
+			var seed []nir.Stmt
+			for _, p := range params {
+				seed = append(seed, nir.Assign{Targets: []string{p},
+					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+			}
+			body = append(seed, body...)
+		}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L}}
+	case "statement":
+		var out []nir.Stmt
+		for _, ch := range namedChildren(n) {
+			out = append(out, c.stmt(ch)...)
+		}
+		return out
+	case "expression_statement":
+		k := namedChildren(n)
+		if len(k) == 0 {
+			return nil
+		}
+		return c.exprStmt(c.unwrap(k[0]))
+	case "variable_declaration_statement":
+		return c.varDeclStmt(n)
+	case "return_statement":
+		k := namedChildren(n)
+		if len(k) > 0 {
+			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
+		}
+		return []nir.Stmt{nir.Return{}}
+	case "if_statement", "for_statement", "while_statement", "do_while_statement",
+		"try_statement", "block_statement", "unchecked_block":
+		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+	}
+	return nil
+}
+
+func (c *solConv) varDeclStmt(n *tree_sitter.Node) []nir.Stmt {
+	var name string
+	var val *tree_sitter.Node
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "variable_declaration":
+			name = c.text(field(ch, "name"))
+		case "expression":
+			val = ch
+		}
+	}
+	if name != "" && val != nil {
+		return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(val)}}
+	}
+	return nil
+}
+
+func (c *solConv) exprStmt(n *tree_sitter.Node) []nir.Stmt {
+	if n != nil && n.Kind() == "assignment_expression" {
+		left := c.unwrap(field(n, "left"))
+		right := c.expr(field(n, "right"))
+		if left != nil && left.Kind() == "identifier" {
+			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: right}}
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *solConv) solBody(n *tree_sitter.Node) *tree_sitter.Node {
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "contract_body", "interface_body", "library_body", "function_body":
+			return ch
+		}
+	}
+	return nil
+}
+
+func (c *solConv) block(body *tree_sitter.Node) []nir.Stmt {
+	if body == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, ch := range namedChildren(body) {
+		out = append(out, c.stmt(ch)...)
+	}
+	return out
+}
+
+func (c *solConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		for _, ch := range children(m) {
+			switch ch.Kind() {
+			case "function_body", "block_statement":
+				out = append(out, c.block(ch)...)
+			case "statement":
+				out = append(out, c.stmt(ch)...)
+			case "if_statement", "else", "for_statement", "while_statement":
+				walk(ch)
+			}
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *solConv) params(n *tree_sitter.Node) []string {
+	var out []string
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "parameter" {
+			if nm := field(ch, "name"); nm != nil {
+				out = append(out, c.text(nm))
+			}
+		}
+	}
+	return out
+}
+
+func (c *solConv) isPublicFn(n *tree_sitter.Node) bool {
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "visibility" {
+			v := c.text(ch)
+			return v == "public" || v == "external"
+		}
+	}
+	// fallback/receive and constructors are externally reachable; functions with
+	// no explicit visibility default to public in old Solidity.
+	k := n.Kind()
+	return k == "fallback_receive_definition" || k == "constructor_definition" || k == "function_definition"
+}
+
+func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {
+	n = c.unwrap(n)
+	if n == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	L := c.loc(n)
+	switch n.Kind() {
+	case "identifier", "this":
+		return nir.Name{ID: c.text(n), Loc: L}
+	case "number_literal", "boolean_literal", "hex_string_literal":
+		return nir.Const{Loc: L}
+	case "string_literal", "string":
+		return nir.Const{Loc: L}
+	case "member_expression":
+		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "property")), Path: c.dotted(n), Loc: L}
+	case "array_access", "slice_access":
+		return nir.Index{Base: c.expr(field(n, "base")), Path: c.dotted(field(n, "base")), Loc: L}
+	case "call_expression":
+		return c.call(n)
+	case "struct_expression":
+		// `to.call{value: x}` — the call options; the real callee is its `type`.
+		return c.expr(field(n, "type"))
+	case "binary_expression":
+		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+	case "parenthesized_expression", "type_cast_expression", "unary_expression":
+		if k := namedChildren(n); len(k) > 0 {
+			return nir.Thru{Inner: c.expr(k[len(k)-1])}
+		}
+	case "tuple_expression", "inline_array_expression":
+		var parts []nir.Expr
+		for _, ch := range namedChildren(n) {
+			parts = append(parts, c.expr(ch))
+		}
+		return nir.Seq{Parts: parts, Loc: L}
+	case "assignment_expression":
+		return c.expr(field(n, "right"))
+	}
+	var parts []nir.Expr
+	for _, ch := range namedChildren(n) {
+		parts = append(parts, c.expr(ch))
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// call models a call_expression. For a member call (to.call(...), to.transfer(x))
+// the RECEIVER is prepended as arg0 so a sink can flag a tainted target address.
+func (c *solConv) call(n *tree_sitter.Node) nir.Expr {
+	L := c.loc(n)
+	callee := c.unwrap(field(n, "function"))
+	if callee != nil && callee.Kind() == "struct_expression" {
+		callee = c.unwrap(field(callee, "type"))
+	}
+	path := c.dotted(callee)
+	method := lastSeg(path)
+
+	var args []nir.Expr
+	if callee != nil && callee.Kind() == "member_expression" {
+		args = append(args, c.expr(field(callee, "object"))) // receiver as arg0
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "call_argument" {
+			k := namedChildren(ch)
+			if len(k) > 0 {
+				args = append(args, c.expr(k[len(k)-1]))
+			}
+		}
+	}
+	return nir.Call{Callee: c.expr(callee), Args: args, Path: path, Method: method, Loc: L}
+}
+
+func (c *solConv) dotted(n *tree_sitter.Node) string {
+	n = c.unwrap(n)
+	if n == nil {
+		return "?"
+	}
+	switch n.Kind() {
+	case "identifier", "this", "primitive_type":
+		return c.text(n)
+	case "member_expression":
+		return c.dotted(field(n, "object")) + "." + c.text(field(n, "property"))
+	case "call_expression":
+		return c.dotted(field(n, "function"))
+	case "struct_expression":
+		return c.dotted(field(n, "type"))
+	case "array_access":
+		return c.dotted(field(n, "base")) + "[]"
+	}
+	if t := c.text(n); strings.Contains(t, ".") {
+		return t
+	}
+	return "?"
+}

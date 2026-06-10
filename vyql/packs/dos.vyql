@@ -1,0 +1,8 @@
+// Denial-of-service weakness rules. docs/05 rule packs.
+package vypr.dos;
+
+// Untrusted data compiled as a regex pattern — ReDoS (CWE-1333).
+rule ReDoS {
+  meta { id: "VYQL-DOS-001", severity: medium, cwe: [CWE_1333] }
+  taint core.UserControlledData -> code.RegexCompile
+}

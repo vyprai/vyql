@@ -1,0 +1,46 @@
+// Security-misconfiguration rules (presence/config). docs/05 rule packs.
+package vypr.misconfig;
+
+// CSRF protection explicitly disabled / exempted (CWE-352) — a PRESENCE rule.
+rule CsrfDisabled {
+  meta { id: "VYQL-CFG-001", severity: high, cwe: [CWE_352] }
+  match code.CsrfDisabled as c
+}
+
+// User-controlled value used as the session identifier — session fixation (CWE-384).
+rule SessionFixation {
+  meta { id: "VYQL-CFG-002", severity: medium, cwe: [CWE_384] }
+  taint core.UserControlledData -> code.SessionId
+}
+
+// Permissive CORS — Access-Control-Allow-Origin: * (CWE-942), value-matched presence.
+rule PermissiveCors {
+  meta { id: "VYQL-CFG-003", severity: medium, cwe: [CWE_942] }
+  match code.PermissiveCors as c
+}
+
+// TLS certificate validation disabled — verify=False / rejectUnauthorized:false /
+// InsecureSkipVerify:true (CWE-295), named-value presence.
+rule CertValidationDisabled {
+  meta { id: "VYQL-CFG-004", severity: high, cwe: [CWE_295] }
+  match code.CertValidationDisabled as c
+}
+
+// JWT signature not verified — alg "none" / verify disabled (CWE-347), named-value presence.
+rule JwtUnverified {
+  meta { id: "VYQL-CFG-005", severity: high, cwe: [CWE_347] }
+  match code.JwtUnverified as c
+}
+
+// Cleartext channel — an http:// URL to an HTTP client (CWE-319), value-matched presence.
+rule CleartextChannel {
+  meta { id: "VYQL-CFG-006", severity: low, cwe: [CWE_319] }
+  match code.CleartextChannel as c
+}
+
+// Insecure cookie — set without the HttpOnly flag (CWE-614), value-ABSENCE presence.
+rule InsecureCookie {
+  meta { id: "VYQL-CFG-007", severity: low, cwe: [CWE_614] }
+  match code.InsecureCookie as c
+}
+

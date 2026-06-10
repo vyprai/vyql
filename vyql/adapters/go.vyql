@@ -1,0 +1,109 @@
+// go framework adapter (docs/07) — framework→concept content.
+// frameworks: net/http, gin, echo, fiber, chi, gorilla/mux, beego
+adapter go {
+  meta { match: contains, fidelity: resolved }
+
+  // constructor -> receiver type (for type-constrained sinks)
+  type "sql.Open" -> sql.DB
+  type "sql.OpenDB" -> sql.DB
+  type "sqlx.Open" -> sqlx.DB
+  type "sqlx.Connect" -> sqlx.DB
+  type "sqlx.MustConnect" -> sqlx.DB
+  type "gorm.Open" -> gorm.DB
+  type "redis.NewClient" -> redis.Client
+  type "mongo.Connect" -> mongo.Database
+  type "graphql.NewClient" -> graphql.Client
+
+  source ".URL.Query" -> code.HttpInput
+  source ".URL.RawQuery" -> code.HttpInput
+  source ".URL.Path" -> code.HttpInput
+  source "FormValue" -> code.HttpInput
+  source "PostFormValue" -> code.HttpInput
+  source "FormFile" -> code.HttpInput
+  source ".PostForm" -> code.HttpInput
+  source ".Form.Get" -> code.HttpInput
+  source ".Header.Get" -> code.HttpInput
+  source ".GetHeader" -> code.HttpInput
+  source ".QueryParam" -> code.HttpInput
+  source ".DefaultQuery" -> code.HttpInput
+  source ".QueryArray" -> code.HttpInput
+  source ".GetQuery" -> code.HttpInput
+  source ".ShouldBind" -> code.HttpInput
+  source ".BindJSON" -> code.HttpInput
+  source ".URLParam" -> code.HttpInput
+  source "mux.Vars" -> code.HttpInput
+  source ".Cookie" -> code.HttpInput
+  source ".Params" -> code.HttpInput
+  source ".Param" -> code.HttpInput
+
+  sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
+  sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
+  sink method "QueryContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
+  sink method "QueryRowContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
+  sink method "Exec" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
+  sink method "ExecContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
+  sink method "Prepare" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
+  sink method "PrepareContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
+  sink path "gorm.Raw" -> code.SqlExecution
+  sink path "db.Raw" -> code.SqlExecution
+  sink path "sqlx.Query" -> code.SqlExecution
+  sink path "sqlx.MustExec" -> code.SqlExecution
+  sink path "bun.Raw" -> code.SqlExecution
+  sink path "exec.Command" -> code.CommandExecution
+  sink path "exec.CommandContext" -> code.CommandExecution
+  sink path "os/exec.Command" -> code.CommandExecution
+  sink path "syscall.Exec" -> code.CommandExecution
+  sink path "syscall.ForkExec" -> code.CommandExecution
+  sink path "sh.Command" -> code.CommandExecution
+  sink path "http.Get" -> code.UrlFetch
+  sink path "http.Post" -> code.UrlFetch
+  sink path "http.Head" -> code.UrlFetch
+  sink path "http.PostForm" -> code.UrlFetch
+  sink path "http.NewRequest" -> code.UrlFetch
+  sink path "http.NewRequestWithContext" -> code.UrlFetch
+  sink path "client.Get" -> code.UrlFetch
+  sink path "client.Post" -> code.UrlFetch
+  sink path "client.Do" -> code.UrlFetch
+  sink path "client.Head" -> code.UrlFetch
+  sink path "resty.R" -> code.UrlFetch
+  sink path "req.Get" -> code.UrlFetch
+  sink path "os.Open" -> code.FilePathAccess
+  sink path "os.OpenFile" -> code.FilePathAccess
+  sink path "os.ReadFile" -> code.FilePathAccess
+  sink path "os.Create" -> code.FilePathAccess
+  sink path "os.Remove" -> code.FilePathAccess
+  sink path "os.RemoveAll" -> code.FilePathAccess
+  sink path "ioutil.ReadFile" -> code.FilePathAccess
+  sink path "ioutil.WriteFile" -> code.FilePathAccess
+  sink path "http.ServeFile" -> code.FilePathAccess
+  sink path "os.Mkdir" -> code.FilePathAccess
+  sink path "os.MkdirAll" -> code.FilePathAccess
+  sink path "filepath.Walk" -> code.FilePathAccess
+  sink path "template.HTML" -> code.TemplateRender
+  sink path "template.JS" -> code.TemplateRender
+  sink path "template.URL" -> code.TemplateRender
+  sink path "http.Redirect" -> code.RedirectTarget
+  sink path "c.Redirect" -> code.RedirectTarget
+  sink path "ctx.Redirect" -> code.RedirectTarget
+
+  // controls (sanitizers/validators) — neutralize a flow that passes through them
+  control "html.EscapeString" -> core.HtmlEscape
+  control "template.HTMLEscapeString" -> core.HtmlEscape
+
+  // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  sink path "regexp.Compile" -> code.RegexCompile
+  sink path "regexp.MustCompile" -> code.RegexCompile
+  sink path "regexp.MatchString" -> code.RegexCompile
+
+  // weak crypto (CWE-327) — presence marker on the call node
+  mark "md5.New" -> code.WeakHash
+  mark "sha1.New" -> code.WeakHash
+
+  // weak cipher (CWE-327) — named broken ciphers
+  mark "des.NewCipher" -> code.WeakCipher
+  mark "des.NewTripleDESCipher" -> code.WeakCipher
+  mark "rc4.NewCipher" -> code.WeakCipher
+
+  // TLS cert validation disabled (CWE-295) — tls.Config{InsecureSkipVerify: true}
+  mark "tls.Config" val "InsecureSkipVerify=true" -> code.CertValidationDisabled
+}

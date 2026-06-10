@@ -1,0 +1,105 @@
+package usg
+
+// InMemStore is the in-memory working-set representation used for hot-path
+// evaluation (docs/adr/0002). Maps + adjacency lists + a concept index.
+type InMemStore struct {
+	nodes    map[string]Node
+	out      map[string][]Edge
+	in       map[string][]Edge
+	byConcpt map[string][]string
+	labels   map[string][]Label
+}
+
+func NewInMemStore() *InMemStore {
+	return &InMemStore{
+		nodes:    map[string]Node{},
+		out:      map[string][]Edge{},
+		in:       map[string][]Edge{},
+		byConcpt: map[string][]string{},
+		labels:   map[string][]Label{},
+	}
+}
+
+func (s *InMemStore) AddNode(n Node) error {
+	s.nodes[n.ID] = n
+	return nil
+}
+
+func (s *InMemStore) AddEdge(e Edge) error {
+	s.out[e.Src] = append(s.out[e.Src], e)
+	s.in[e.Dst] = append(s.in[e.Dst], e)
+	return nil
+}
+
+func (s *InMemStore) AddLabel(nodeID string, l Label) error {
+	s.labels[nodeID] = append(s.labels[nodeID], l)
+	// keep the concept index a SET of node ids: two adapters may label the same
+	// node with the same concept (different provenance), but it is one node.
+	for _, id := range s.byConcpt[l.Concept] {
+		if id == nodeID {
+			return nil
+		}
+	}
+	s.byConcpt[l.Concept] = append(s.byConcpt[l.Concept], nodeID)
+	return nil
+}
+
+func (s *InMemStore) GetNode(id string) (Node, bool, error) {
+	n, ok := s.nodes[id]
+	return n, ok, nil
+}
+
+func (s *InMemStore) OutEdges(src, edgeType string) ([]Edge, error) {
+	return filterEdges(s.out[src], edgeType), nil
+}
+
+func (s *InMemStore) InEdges(dst, edgeType string) ([]Edge, error) {
+	return filterEdges(s.in[dst], edgeType), nil
+}
+
+func (s *InMemStore) NodesWithConcept(concept string) ([]string, error) {
+	out := make([]string, len(s.byConcpt[concept]))
+	copy(out, s.byConcpt[concept])
+	return out, nil
+}
+
+func (s *InMemStore) NodesOfType(nodeType string) ([]string, error) {
+	var out []string
+	for id, n := range s.nodes {
+		if n.Type == nodeType {
+			out = append(out, id)
+		}
+	}
+	return out, nil
+}
+
+func (s *InMemStore) AllNodes() ([]Node, error) {
+	out := make([]Node, 0, len(s.nodes))
+	for _, n := range s.nodes {
+		out = append(out, n)
+	}
+	return out, nil
+}
+
+func (s *InMemStore) Labels(nodeID string) ([]Label, error) {
+	out := make([]Label, len(s.labels[nodeID]))
+	copy(out, s.labels[nodeID])
+	return out, nil
+}
+
+func (s *InMemStore) Close() error { return nil }
+
+func filterEdges(edges []Edge, edgeType string) []Edge {
+	if edgeType == "" {
+		out := make([]Edge, len(edges))
+		copy(out, edges)
+		return out
+	}
+	var out []Edge
+	for _, e := range edges {
+		if e.Type == edgeType {
+			out = append(out, e)
+		}
+	}
+	return out
+}

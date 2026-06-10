@@ -1,0 +1,401 @@
+// VyQL ontology — the curated analysis vocabulary (docs/06).
+
+package business;
+
+concept Order : asset { }
+concept PaymentSystem : asset { }
+concept Refund : action { }
+
+package cloud;
+
+concept Database : asset { }
+concept Internet : exposure { }
+concept ObjectStore : asset { }
+concept PublicStorage : exposure { }
+concept SecretStore : asset { }
+
+package code;
+
+concept CliArgument : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
+concept CodeEval : sink {
+  vulnerable_to: [injection.CodeInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_94]
+}
+concept CommandExecution : sink {
+  vulnerable_to: [injection.CommandInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_78]
+}
+
+concept FormatString : sink {
+  vulnerable_to: [injection.FormatString]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_134]
+}
+
+concept RegexCompile : sink {
+  vulnerable_to: [dos.ReDoS]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_1333]
+}
+
+concept MassAssign : sink {
+  vulnerable_to: [injection.MassAssignment]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_915]
+}
+
+concept ProtoPollute : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_1321]
+}
+
+concept WeakHash : sink {
+  vulnerable_to: [crypto.WeakHash]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_327]
+}
+
+concept CsrfDisabled : sink {
+  vulnerable_to: [access_control.CsrfDisabled]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_352]
+}
+
+concept CsvCell : sink {
+  vulnerable_to: [injection.CsvInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_1236]
+}
+
+concept UnsafeUpload : sink {
+  vulnerable_to: [injection.UnrestrictedUpload]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_434]
+}
+
+concept ExpressionEval : sink {
+  vulnerable_to: [injection.ExpressionLanguageInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_917]
+}
+
+concept WeakCipher : sink {
+  vulnerable_to: [crypto.WeakCipher]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_327]
+}
+
+concept SessionId : sink {
+  vulnerable_to: [session.SessionFixation]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_384]
+}
+
+concept PermissiveCors : sink {
+  vulnerable_to: [access_control.PermissiveCors]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_942]
+}
+
+concept MailHeaderWrite : sink {
+  vulnerable_to: [injection.CrlfInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_93]
+}
+
+concept InsecureTempFile : sink {
+  vulnerable_to: [path.InsecureTempFile]
+  cwe: [CWE_377]
+}
+
+concept CertValidationDisabled : sink {
+  vulnerable_to: [crypto.ImproperCertValidation]
+  cwe: [CWE_295]
+}
+
+concept JwtUnverified : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+}
+
+concept CleartextChannel : sink {
+  vulnerable_to: [crypto.CleartextTransmission]
+  cwe: [CWE_319]
+}
+
+concept InsecureCookie : sink {
+  vulnerable_to: [session.InsecureCookie]
+  cwe: [CWE_614]
+}
+
+concept ExternalCall : sink {
+  vulnerable_to: [smartcontract.ExternalCallInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_829]
+}
+
+concept PrivilegedOp : sink {
+  vulnerable_to: [smartcontract.PrivilegedDestruct]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_284]
+}
+concept Cookie : source {
+  taint: [taint.UntrustedData]
+  cwe: [CWE_20]
+  refines: core.UserControlledData
+}
+concept DatabaseRead : source {
+  taint: [taint.UntrustedData]
+}
+concept Deserialization : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_502]
+}
+concept EnvVariable : source {
+  taint: [taint.UntrustedData]
+}
+concept ExternalApiResponse : source {
+  taint: [taint.UntrustedData]
+}
+concept FileInclude : sink {
+  vulnerable_to: [path.FileInclusion]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_98]
+}
+concept FilePathAccess : sink {
+  vulnerable_to: [path.PathTraversal]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_22]
+}
+concept FileUpload : source {
+  taint: [taint.UntrustedData]
+  cwe: [CWE_434]
+  refines: core.UserControlledData
+}
+concept HtmlRender : sink {
+  vulnerable_to: [injection.Xss]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_79]
+}
+concept HttpHeader : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
+concept HttpInput : source {
+  taint: [taint.UntrustedData]
+  cwe: [CWE_20]
+  refines: core.UserControlledData
+}
+concept LdapQuery : sink {
+  vulnerable_to: [injection.LdapInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_90]
+}
+concept LogOutput : sink {
+  vulnerable_to: [injection.LogInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_117]
+}
+concept LogWrite : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  enabled_by: [taint.SecretValue]
+}
+concept MessageInput : source {
+  taint: [taint.UntrustedData]
+}
+concept NosqlQuery : sink {
+  vulnerable_to: [injection.NosqlInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_943]
+}
+concept RedirectTarget : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_601]
+}
+concept ReflectionInvoke : sink {
+  vulnerable_to: [deserialization.UnsafeReflection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_470]
+}
+concept ResponseHeaderWrite : sink {
+  vulnerable_to: [injection.HttpResponseSplitting]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_113]
+}
+concept SecretValue : source {
+  taint: [taint.SecretValue]
+}
+concept SqlExecution : sink {
+  vulnerable_to: [injection.SqlInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_89]
+}
+concept StateChangingOp : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_352]
+}
+concept TemplateRender : sink {
+  vulnerable_to: [injection.TemplateInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_1336]
+}
+concept UrlFetch : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_918]
+}
+concept XmlParse : sink {
+  vulnerable_to: [deserialization.Xxe]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_611]
+}
+concept XpathQuery : sink {
+  vulnerable_to: [injection.XpathInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_643]
+}
+
+package core;
+
+concept AllowlistValidation : control {
+  neutralizes: [injection.CommandInjection, request_forgery.Ssrf]
+  applies: path
+}
+concept AuthenticationCheck : control {
+  neutralizes: [authentication.MissingAuthentication]
+  cwe: [CWE_306]
+  applies: endpoint
+}
+concept AuthorizationCheck : control {
+  neutralizes: [access_control.BrokenAccess]
+  applies: endpoint
+}
+concept CsrfProtection : control {
+  neutralizes: [request_forgery.Csrf]
+  applies: endpoint
+}
+concept EncryptionAtRest : control {
+  neutralizes: [crypto.CleartextStorage]
+  cwe: [CWE_312]
+  applies: scope
+}
+concept EncryptionInTransit : control {
+  neutralizes: [crypto.CleartextTransmission]
+  cwe: [CWE_319]
+  applies: scope
+}
+concept HtmlEscape : control {
+  neutralizes: [injection.Xss]
+  applies: path
+}
+concept LdapEscape : control {
+  neutralizes: [injection.LdapInjection]
+  cwe: [CWE_90]
+  applies: path
+}
+concept MfaRequirement : control {
+  neutralizes: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+  applies: endpoint
+}
+concept OutputEncoding : control {
+  neutralizes: [injection.Xss]
+  cwe: [CWE_116]
+  applies: path
+}
+concept OwnershipCheck : control {
+  neutralizes: [access_control.BrokenAccess]
+  applies: endpoint
+}
+concept PathCanonicalization : control {
+  neutralizes: [path.PathTraversal]
+  cwe: [CWE_22]
+  applies: path
+}
+concept RateLimit : control {
+  neutralizes: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  applies: endpoint
+}
+concept RedirectAllowlist : control {
+  neutralizes: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  applies: path
+}
+concept SafeDeserialization : control {
+  neutralizes: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+  applies: path
+}
+concept SecretRedaction : control {
+  neutralizes: [secrets.SensitiveLog]
+  cwe: [CWE_532]
+  applies: path
+}
+concept SecureRandom : control {
+  neutralizes: [crypto.InsufficientEntropy]
+  cwe: [CWE_331]
+  applies: scope
+}
+concept ShellEscape : control {
+  neutralizes: [injection.CommandInjection]
+  applies: path
+}
+concept SqlParameterization : control {
+  neutralizes: [injection.SqlInjection]
+  applies: path
+}
+concept StrongHashing : control {
+  neutralizes: [crypto.WeakHash]
+  cwe: [CWE_328]
+  applies: scope
+}
+concept UserControlledData : source {
+  taint: [taint.UntrustedData]
+}
+concept XmlHardening : control {
+  neutralizes: [deserialization.Xxe]
+  cwe: [CWE_611]
+  applies: path
+}
+
+package identity;
+
+concept AdminPrivilege : privilege { }
+concept Anonymous : principal { }
+concept AuthenticatedUser : principal { }
+concept CiPrincipal : principal { }
+concept ExternalPrincipal : principal { }
+concept SuperAdminPrivilege : privilege { }
+concept WorkloadIdentity : principal { }
+
+package runtime;
+
+concept Connection : observation { }
+concept HttpRequest : source {
+  taint: [taint.UntrustedData]
+}
+concept Process : observation { }
+concept ShellExecution : sink {
+  vulnerable_to: [injection.CommandInjection]
+  enabled_by: [taint.UntrustedData]
+}
+
+package sbom;
+
+concept ReachableSymbol : exposure { }
+concept VulnerableDependency : asset { }
+
+package threat;
+
+concept MiningPool : indicator { }
+

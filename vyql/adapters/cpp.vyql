@@ -1,0 +1,46 @@
+// cpp framework adapter (docs/07) — framework→concept content.
+// C++: qualified names (std::system) normalize to dotted (std.system) and match
+// by suffix; std::string + concat builds tainted strings.
+adapter cpp {
+  meta { fidelity: resolved }
+
+  // untrusted input
+  source "getenv" -> code.HttpInput
+  source "argv" -> code.HttpInput
+  source "fgets" -> code.HttpInput
+  source "gets" -> code.HttpInput
+  source "fread" -> code.HttpInput
+  source "recv" -> code.HttpInput
+
+  // command execution
+  sink path "system" -> code.CommandExecution
+  sink path "popen" -> code.CommandExecution
+  sink path "execl" -> code.CommandExecution
+  sink path "execlp" -> code.CommandExecution
+  sink path "execv" -> code.CommandExecution
+  sink path "execvp" -> code.CommandExecution
+  sink path "execve" -> code.CommandExecution
+
+  // SQL (the query is arg1 for the C-style APIs)
+  sink path "mysql_query" arg 1 -> code.SqlExecution
+  sink path "sqlite3_exec" arg 1 -> code.SqlExecution
+  sink path "sqlite3_prepare_v2" arg 1 -> code.SqlExecution
+  sink path "PQexec" arg 1 -> code.SqlExecution
+
+  // path / file (fopen, open(), and fstream .open(...))
+  sink path "fopen" -> code.FilePathAccess
+  sink path "open" -> code.FilePathAccess
+  sink path "ifstream" -> code.FilePathAccess
+  sink path "ofstream" -> code.FilePathAccess
+  sink path "fstream" -> code.FilePathAccess
+  sink path "remove" -> code.FilePathAccess
+  sink path "unlink" -> code.FilePathAccess
+
+  // dynamic loading
+  sink path "dlopen" -> code.FilePathAccess
+
+  // format string (CWE-134) — tainted FORMAT argument
+  sink path "printf" arg 0 -> code.FormatString
+  sink path "fprintf" arg 1 -> code.FormatString
+  sink path "syslog" arg 1 -> code.FormatString
+}

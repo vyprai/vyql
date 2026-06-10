@@ -1,0 +1,138 @@
+// ruby framework adapter (docs/07) — framework→concept content.
+// frameworks: rails, sinatra, grape, hanami, padrino
+adapter ruby {
+  meta { fidelity: resolved }
+
+  source "params" -> code.HttpInput
+  source "cookies" -> code.HttpInput
+  source "session" -> code.HttpInput
+  source "request.params" -> code.HttpInput
+  source "request.body" -> code.HttpInput
+  source "request.query_parameters" -> code.HttpInput
+  source "request.request_parameters" -> code.HttpInput
+  source "request.GET" -> code.HttpInput
+  source "request.POST" -> code.HttpInput
+  source "request.env" -> code.HttpInput
+  source "request.headers" -> code.HttpInput
+  source "request.path_parameters" -> code.HttpInput
+  source "request.raw_post" -> code.HttpInput
+  source "request.query_string" -> code.HttpInput
+  source "ENV" -> code.SecretValue
+  source "Rails.application.secrets" -> code.SecretValue
+  source "credentials" -> code.SecretValue
+
+  sink method "where" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+  sink method "find_by_sql" -> code.SqlExecution
+  sink method "exec_query" -> code.SqlExecution
+  sink method "select_all" -> code.SqlExecution
+  sink method "select_rows" -> code.SqlExecution
+  sink method "select_values" -> code.SqlExecution
+  sink method "select_one" -> code.SqlExecution
+  sink method "delete_all" -> code.SqlExecution
+  sink method "update_all" -> code.SqlExecution
+  sink method "pluck" -> code.SqlExecution
+  sink method "count_by_sql" -> code.SqlExecution
+  sink method "order" -> code.SqlExecution
+  sink method "group" -> code.SqlExecution
+  sink method "having" -> code.SqlExecution
+  sink method "from" -> code.SqlExecution
+  sink method "joins" -> code.SqlExecution
+  sink method "exec_update" -> code.SqlExecution
+  sink method "exec_delete" -> code.SqlExecution
+  sink method "exec_insert" -> code.SqlExecution
+  sink path "system" -> code.CommandExecution
+  sink path "exec" -> code.CommandExecution
+  sink path "spawn" -> code.CommandExecution
+  sink path "Kernel.system" -> code.CommandExecution
+  sink path "Kernel.exec" -> code.CommandExecution
+  sink path "Kernel.spawn" -> code.CommandExecution
+  sink path "IO.popen" -> code.CommandExecution
+  sink path "Open3.capture2" -> code.CommandExecution
+  sink path "Open3.capture2e" -> code.CommandExecution
+  sink path "Open3.capture3" -> code.CommandExecution
+  sink path "Open3.popen2" -> code.CommandExecution
+  sink path "Open3.popen3" -> code.CommandExecution
+  sink path "Open3.pipeline" -> code.CommandExecution
+  sink path "Process.spawn" -> code.CommandExecution
+  sink path "PTY.spawn" -> code.CommandExecution
+  sink path "syscall" -> code.CommandExecution
+  sink path "eval" -> code.CodeEval
+  sink path "instance_eval" -> code.CodeEval
+  sink path "class_eval" -> code.CodeEval
+  sink path "module_eval" -> code.CodeEval
+  sink path "instance_exec" -> code.CodeEval
+  sink path "class_exec" -> code.CodeEval
+  sink path "binding.eval" -> code.CodeEval
+  sink path "Marshal.load" -> code.Deserialization
+  sink path "Marshal.restore" -> code.Deserialization
+  sink path "YAML.load" -> code.Deserialization
+  sink path "YAML.load_stream" -> code.Deserialization
+  sink path "Psych.load" -> code.Deserialization
+  sink path "Oj.load" -> code.Deserialization
+  sink path "JSON.load" -> code.Deserialization
+  sink path "ActiveSupport.JSON.decode" -> code.Deserialization
+  sink path "Net.HTTP.get" -> code.UrlFetch
+  sink path "Net.HTTP.get_response" -> code.UrlFetch
+  sink path "Net.HTTP.start" -> code.UrlFetch
+  sink path "Net.HTTP.post" -> code.UrlFetch
+  sink path "HTTParty.get" -> code.UrlFetch
+  sink path "HTTParty.post" -> code.UrlFetch
+  sink path "RestClient.get" -> code.UrlFetch
+  sink path "RestClient.post" -> code.UrlFetch
+  sink path "open" -> code.UrlFetch
+  sink path "URI.open" -> code.UrlFetch
+  sink path "URI.parse" -> code.UrlFetch
+  sink path "Faraday.get" -> code.UrlFetch
+  sink path "Faraday.post" -> code.UrlFetch
+  sink path "Excon.get" -> code.UrlFetch
+  sink path "Typhoeus.get" -> code.UrlFetch
+  sink path "HTTP.get" -> code.UrlFetch
+  sink path "File.read" -> code.FilePathAccess
+  sink path "File.open" -> code.FilePathAccess
+  sink path "File.write" -> code.FilePathAccess
+  sink path "File.delete" -> code.FilePathAccess
+  sink path "File.new" -> code.FilePathAccess
+  sink path "IO.read" -> code.FilePathAccess
+  sink path "IO.write" -> code.FilePathAccess
+  sink path "FileUtils.cp" -> code.FilePathAccess
+  sink path "FileUtils.mv" -> code.FilePathAccess
+  sink path "FileUtils.rm" -> code.FilePathAccess
+  sink path "Dir.glob" -> code.FilePathAccess
+  sink path "Dir.entries" -> code.FilePathAccess
+  sink path "send_file" -> code.FilePathAccess
+  sink path "send_data" -> code.FilePathAccess
+  sink path "raw" -> code.HtmlRender
+  sink path "html_safe" -> code.HtmlRender
+  sink path "render" -> code.HtmlRender
+  sink path "content_tag" -> code.HtmlRender
+  sink path "concat" -> code.HtmlRender
+  sink path "safe_concat" -> code.HtmlRender
+  sink path "ERB.new" -> code.TemplateRender
+  sink path "Erubi.new" -> code.TemplateRender
+  sink path "Erubis.new" -> code.TemplateRender
+  sink path "Liquid.Template.parse" -> code.TemplateRender
+  sink path "Tilt.new" -> code.TemplateRender
+  sink path "redirect_to" -> code.RedirectTarget
+  sink path "redirect" -> code.RedirectTarget
+
+  // controls (sanitizers/validators) — neutralize a flow that passes through them
+  control "CGI.escapeHTML" -> core.HtmlEscape
+  control "ERB.Util.html_escape" -> core.HtmlEscape
+  control "ERB.Util.h" -> core.HtmlEscape
+  control "Rack.Utils.escape_html" -> core.HtmlEscape
+  control "Shellwords.escape" -> core.ShellEscape
+  control "Shellwords.shelljoin" -> core.ShellEscape
+
+  // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  sink path "Regexp.new" -> code.RegexCompile
+  sink path "Regexp.compile" -> code.RegexCompile
+
+  // mass assignment (CWE-915) — request body -> bulk bind
+  sink method "update_attributes" -> code.MassAssign
+  sink method "assign_attributes" -> code.MassAssign
+
+  // weak cipher (CWE-327) — named broken ciphers
+  mark "OpenSSL.Cipher.DES" -> code.WeakCipher
+  mark "OpenSSL.Cipher.RC4" -> code.WeakCipher
+}

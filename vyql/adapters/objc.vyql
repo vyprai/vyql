@@ -1,0 +1,28 @@
+// objc framework adapter (docs/07) — Objective-C (C superset + messaging).
+adapter objc {
+  meta { fidelity: resolved }
+
+  // untrusted input (C-style + Foundation)
+  source "getenv" -> code.HttpInput
+  source "argv" -> code.HttpInput
+  source ".environment" -> code.HttpInput
+
+  // command execution
+  sink path "system" -> code.CommandExecution
+  sink path "popen" -> code.CommandExecution
+  sink path "execl" -> code.CommandExecution
+  sink method "launch" -> code.CommandExecution
+
+  // SQL — sqlite3 C API (query is arg1)
+  sink path "sqlite3_exec" arg 1 -> code.SqlExecution
+  sink path "sqlite3_prepare_v2" arg 1 -> code.SqlExecution
+
+  // path / file
+  sink path "fopen" -> code.FilePathAccess
+  sink method "contentsOfFile" -> code.FilePathAccess
+
+  // format string (CWE-134) — tainted FORMAT argument
+  sink path "printf" arg 0 -> code.FormatString
+  sink path "NSLog" arg 0 -> code.FormatString
+  sink method "stringWithFormat" arg 0 -> code.FormatString
+}

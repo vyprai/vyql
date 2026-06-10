@@ -1,0 +1,264 @@
+package engine
+
+import (
+	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/solvers"
+)
+
+// evalMatch evaluates `match <concept> as id where <expr> unless guarded_by C`.
+// Composes solver calls in `where` through the engine (toxic combinations).
+func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
+	body := cr.Rule.Body.(*parser.MatchStmt)
+	if body.TargetKind == "transition" {
+		return e.evalTransition(cr)
+	}
+	candidates, _ := e.Store.NodesWithConcept(body.Concept)
+
+	var where parser.Expr
+	var guards []string
+	for _, cl := range cr.Rule.Clauses {
+		switch cl.Kind {
+		case "where":
+			where = cl.Where
+		case "unless":
+			if g, ok := cl.Unless.(parser.GuardedBy); ok {
+				guards = append(guards, g.Concept)
+			}
+		}
+	}
+
+	var out []*findings.Finding
+	for _, node := range candidates {
+		env := map[string]string{body.Binding: node}
+		ctx := []string{}
+		if where != nil {
+			ok, witnesses := e.evalWhere(where, env)
+			if !ok {
+				continue
+			}
+			ctx = witnesses
+		}
+		suppressed := false
+		var ne []findings.NegationEvidence
+		for _, g := range guards {
+			ok := e.endpointGuarded(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: "guarded_by " + g, Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		if suppressed {
+			continue
+		}
+		out = append(out, &findings.Finding{
+			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "match",
+			NegationEvidence: ne, Confidence: e.conf(node), Context: ctx,
+			Bindings: []findings.Binding{
+				{Name: body.Binding, NodeID: node, Concept: body.Concept, Loc: e.loc(node), LabelProvenance: e.prov(node, body.Concept)},
+			},
+		})
+	}
+	return out, nil
+}
+
+// evalTransition evaluates `match transition F -> T on M as t unless <expr>`.
+func (e *Engine) evalTransition(cr *CompiledRule) ([]*findings.Finding, error) {
+	body := cr.Rule.Body.(*parser.MatchStmt)
+	nodes, _ := e.Store.NodesOfType("business.Transition")
+	var out []*findings.Finding
+	for _, id := range nodes {
+		n, _, _ := e.Store.GetNode(id)
+		if n.Prop("machine") != body.Machine || n.Prop("to") != body.ToState {
+			continue
+		}
+		if body.FromState != "*" && n.Prop("from") != body.FromState {
+			continue
+		}
+		env := map[string]string{body.Binding: id}
+		suppressed := false
+		var ne []findings.NegationEvidence
+		for _, cl := range cr.Rule.Clauses {
+			if cl.Kind != "unless" {
+				continue
+			}
+			if ex, ok := cl.Unless.(parser.ExprException); ok {
+				okk, _ := e.evalWhere(ex.Expr, env)
+				ne = append(ne, findings.NegationEvidence{Clause: "expr guard", Satisfied: okk, Detail: "from=" + n.Prop("from")})
+				suppressed = suppressed || okk
+			}
+		}
+		if suppressed {
+			continue
+		}
+		out = append(out, &findings.Finding{
+			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "match",
+			NegationEvidence: ne, Confidence: "high",
+			Bindings: []findings.Binding{
+				{Name: body.Binding, NodeID: id, Concept: "transition", Loc: n.Prop("from") + "->" + n.Prop("to")},
+			},
+		})
+	}
+	return out, nil
+}
+
+// --- where-expression evaluator -----------------------------------------
+
+func (e *Engine) evalWhere(expr parser.Expr, env map[string]string) (bool, []string) {
+	var witnesses []string
+	for _, atom := range flattenAnd(expr) {
+		ok, w := e.evalAtom(atom, env)
+		if !ok {
+			return false, nil
+		}
+		witnesses = append(witnesses, w...)
+	}
+	return true, witnesses
+}
+
+func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []string) {
+	switch a := atom.(type) {
+	case parser.Not:
+		ok, _ := e.evalAtom(a.Inner, env)
+		return !ok, nil
+	case parser.And:
+		return e.evalWhere(a, env)
+	case parser.SolverCall:
+		return e.evalSolverCall(a, env)
+	case parser.HoldsAssetKind:
+		id := e.resolveRef(a.Ref, env)
+		req := map[string]bool{}
+		for _, k := range a.Kinds {
+			req[k] = true
+		}
+		return id != "" && intersect(e.assetKinds(id), req), nil
+	case parser.Has:
+		id := e.resolveRef(a.Ref, env)
+		return id != "" && e.nodeHasConcept(id, a.Concept), nil
+	case parser.Is:
+		return e.resolveScalar(a.Ref, env) == a.Concept, nil
+	case parser.NotIn:
+		val := e.resolveScalar(a.Ref, env)
+		in := false
+		for _, v := range a.Values {
+			if v == val {
+				in = true
+				break
+			}
+		}
+		if a.Negate {
+			return !in, nil // `not in` holds when the value is absent (drift)
+		}
+		return in, nil
+	case parser.Cmp:
+		val := e.resolveScalar(a.Ref, env)
+		want, _ := a.Value.(string)
+		if a.Op == "!=" {
+			return val != want, nil
+		}
+		return val == want, nil
+	case parser.Ref:
+		return e.resolveRef(a, env) != "", nil
+	}
+	return false, nil
+}
+
+func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (bool, []string) {
+	if len(call.Args) < 2 {
+		return false, nil
+	}
+	aIDs := e.resolveArg(call.Args[0], env)
+	switch call.Verb {
+	case "reach":
+		bIDs := e.resolveArg(call.Args[1], env)
+		paths, _ := solvers.FindReach(e.Store, aIDs, bIDs, nil)
+		if len(paths) > 0 {
+			var w []string
+			for _, h := range paths[0].Hops {
+				w = append(w, "reach "+h.From+"->"+h.To+" via "+h.Rule)
+			}
+			return true, w
+		}
+	case "assume":
+		bConcept := call.Args[1].Ref.String()
+		minLevel := ""
+		if bConcept == "identity.AdminPrivilege" {
+			minLevel = "ADMIN"
+		}
+		bIDs := e.resolveArg(call.Args[1], env)
+		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, minLevel)
+		if len(paths) > 0 {
+			var w []string
+			for _, s := range paths[0].Steps {
+				w = append(w, "assume "+s.From+"->"+s.To+" ["+s.Ability+"]")
+			}
+			return true, w
+		}
+	}
+	return false, nil
+}
+
+// resolveArg resolves a solver-call argument to node ids: a qualified concept
+// expands to its labeled nodes; a binding ref resolves to a single node.
+func (e *Engine) resolveArg(arg parser.Arg, env map[string]string) []string {
+	if e.Onto.Exists(arg.Ref.String()) {
+		ids, _ := e.Store.NodesWithConcept(arg.Ref.String())
+		return ids
+	}
+	if id := e.resolveRef(arg.Ref, env); id != "" {
+		return []string{id}
+	}
+	return nil
+}
+
+// resolveRef resolves a dotted ref to a node id (binding head, then property
+// hops that yield node ids, e.g. w.workload).
+func (e *Engine) resolveRef(ref parser.Ref, env map[string]string) string {
+	head := ref.Parts[0]
+	id := env[head]
+	if id == "" && e.Onto.Exists(ref.String()) {
+		if ids, _ := e.Store.NodesWithConcept(ref.String()); len(ids) > 0 {
+			return ids[0]
+		}
+		return ""
+	}
+	if id == "" {
+		return ""
+	}
+	for _, part := range ref.Parts[1:] {
+		n, ok, _ := e.Store.GetNode(id)
+		if !ok {
+			return ""
+		}
+		v := n.Prop(part)
+		if _, exists, _ := e.Store.GetNode(v); exists {
+			id = v
+		} else {
+			return ""
+		}
+	}
+	return id
+}
+
+// resolveScalar resolves a ref to a scalar value (binding head + a property).
+func (e *Engine) resolveScalar(ref parser.Ref, env map[string]string) string {
+	head := ref.Parts[0]
+	id := env[head]
+	if id == "" {
+		return ""
+	}
+	if len(ref.Parts) == 1 {
+		return id
+	}
+	if n, ok, _ := e.Store.GetNode(id); ok {
+		return n.Prop(ref.Parts[1])
+	}
+	return ""
+}
+
+func (e *Engine) nodeHasConcept(nodeID, concept string) bool {
+	for _, l := range e.labels(nodeID) {
+		if l.Concept == concept {
+			return true
+		}
+	}
+	return false
+}

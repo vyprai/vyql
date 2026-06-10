@@ -1,0 +1,39 @@
+// powershell framework adapter (docs/07) — framework→concept content.
+// A cmdlet/command is modeled as a call; $env:CGI vars + param() are sources.
+adapter powershell {
+  meta { fidelity: resolved }
+
+  // untrusted input
+  source "shell_input" -> code.HttpInput
+  source "http_input" -> code.HttpInput
+
+  // code evaluation
+  sink path "Invoke-Expression" -> code.CodeEval
+  sink path "iex" -> code.CodeEval
+  sink path "Invoke-Command" -> code.CodeEval
+
+  // command / process execution
+  sink path "Start-Process" -> code.CommandExecution
+  sink path "&" -> code.CommandExecution
+  sink path "cmd" -> code.CommandExecution
+  sink path "cmd.exe" -> code.CommandExecution
+  sink path "powershell" -> code.CommandExecution
+
+  // SSRF / remote fetch
+  sink path "Invoke-WebRequest" -> code.UrlFetch
+  sink path "Invoke-RestMethod" -> code.UrlFetch
+  sink path "iwr" -> code.UrlFetch
+  sink path "wget" -> code.UrlFetch
+  sink path "curl" -> code.UrlFetch
+
+  // SQL
+  sink path "Invoke-Sqlcmd" -> code.SqlExecution
+
+  // path / file
+  sink path "Get-Content" -> code.FilePathAccess
+  sink path "Set-Content" -> code.FilePathAccess
+  sink path "Add-Content" -> code.FilePathAccess
+  sink path "Out-File" -> code.FilePathAccess
+  sink path "Remove-Item" -> code.FilePathAccess
+  sink path "Import-Module" -> code.FilePathAccess
+}

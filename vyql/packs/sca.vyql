@@ -1,0 +1,13 @@
+// Supply chain — vulnerable dependencies, reachability-gated (docs/11).
+package vypr.sca;
+
+rule VulnerableDependency {
+  meta { id: "VYQL-SCA-001", severity: medium }
+  match sbom.VulnerableDependency as p
+}
+
+rule ReachableVulnerableDependency {
+  meta { id: "VYQL-SCA-002", severity: high }
+  match sbom.VulnerableDependency as p
+  where p has sbom.ReachableSymbol
+}

@@ -1,0 +1,15 @@
+// Smart-contract weakness rules (Solidity). docs/05 rule packs.
+package vypr.smartcontract;
+
+// An attacker-controlled address/value reaching a low-level external call —
+// arbitrary external call / value transfer (CWE-829).
+rule ExternalCall {
+  meta { id: "VYQL-SC-001", severity: high, cwe: [CWE_829] }
+  taint core.UserControlledData -> code.ExternalCall
+}
+
+// Attacker-reachable selfdestruct / privileged destruct (CWE-284).
+rule PrivilegedDestruct {
+  meta { id: "VYQL-SC-002", severity: critical, cwe: [CWE_284] }
+  taint core.UserControlledData -> code.PrivilegedOp
+}

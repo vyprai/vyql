@@ -1,0 +1,29 @@
+// scala framework adapter (docs/07) — framework→concept content.
+// frameworks: play, akka-http, slick, anorm
+adapter scala {
+  meta { match: contains, fidelity: resolved }
+
+  // Play / request inputs (receiver name varies → substring match)
+  source ".getQueryString" -> code.HttpInput
+  source ".queryString" -> code.HttpInput
+  source ".getQueryParameter" -> code.HttpInput
+  source "http_input" -> code.HttpInput
+
+  // command execution
+  sink path "Process" -> code.CommandExecution
+  sink method "exec" -> code.CommandExecution
+
+  // SQL
+  sink method "executeQuery" -> code.SqlExecution
+  sink method "executeUpdate" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+  sink path "SQL" -> code.SqlExecution
+  sink method "prepareStatement" -> code.SqlExecution
+
+  // path / file
+  sink path "Source.fromFile" -> code.FilePathAccess
+  sink method "readAllBytes" -> code.FilePathAccess
+
+  // expression-language injection (CWE-917)
+  sink method "parseExpression" -> code.ExpressionEval
+}

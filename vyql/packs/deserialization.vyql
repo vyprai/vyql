@@ -1,0 +1,19 @@
+// Deserialization family — unsafe deserialization, XXE, unsafe reflection.
+package vypr.deserialization;
+
+rule Unsafe {
+  meta { id: "VYQL-DESER-001", severity: critical, cwe: [CWE_502] }
+  taint core.UserControlledData -> code.Deserialization
+  unless sanitized_by core.SafeDeserialization
+}
+
+rule Xxe {
+  meta { id: "VYQL-DESER-002", severity: high, cwe: [CWE_611] }
+  taint core.UserControlledData -> code.XmlParse
+  unless sanitized_by core.XmlHardening
+}
+
+rule UnsafeReflection {
+  meta { id: "VYQL-DESER-003", severity: high, cwe: [CWE_470] }
+  taint core.UserControlledData -> code.ReflectionInvoke
+}

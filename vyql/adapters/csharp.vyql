@@ -1,0 +1,80 @@
+// csharp framework adapter (docs/07) — framework→concept content.
+// frameworks: asp.net, asp.net-core, ado.net, dapper, ef-core
+adapter csharp {
+  meta { match: contains, fidelity: resolved }
+
+  // MVC controller action parameters (model-bound from the request) — the
+  // frontend seeds each as http_input() at the method top.
+  source "http_input" -> code.HttpInput
+
+  // ASP.NET request inputs (receiver name varies → substring match)
+  source ".QueryString" -> code.HttpInput
+  source ".Form" -> code.HttpInput
+  source ".Params" -> code.HttpInput
+  source ".Query" -> code.HttpInput
+  source ".Headers" -> code.HttpInput
+  source ".Cookies" -> code.HttpInput
+  source ".RequestUri" -> code.HttpInput
+  source ".ReadAsStringAsync" -> code.HttpInput
+  source ".ReadToEnd" -> code.HttpInput
+
+  // SQL — ADO.NET command ctors take the query as arg0; Dapper uses methods
+  sink path "SqlCommand" -> code.SqlExecution
+  sink path "MySqlCommand" -> code.SqlExecution
+  sink path "NpgsqlCommand" -> code.SqlExecution
+  sink path "OracleCommand" -> code.SqlExecution
+  sink path "SqliteCommand" -> code.SqlExecution
+  sink path "SQLiteCommand" -> code.SqlExecution
+  sink path "OleDbCommand" -> code.SqlExecution
+  sink path "SqlDataAdapter" -> code.SqlExecution
+  sink method "ExecuteSqlRaw" -> code.SqlExecution
+  sink method "FromSqlRaw" -> code.SqlExecution
+  sink method "Query" -> code.SqlExecution
+  sink method "QueryAsync" -> code.SqlExecution
+  sink method "Execute" -> code.SqlExecution
+  sink method "ExecuteAsync" -> code.SqlExecution
+
+  // command execution
+  sink path "Process.Start" -> code.CommandExecution
+  sink path "ProcessStartInfo" -> code.CommandExecution
+
+  // deserialization
+  sink method "Deserialize" -> code.Deserialization
+  sink path "BinaryFormatter" -> code.Deserialization
+  sink path "LosFormatter" -> code.Deserialization
+  sink path "NetDataContractSerializer" -> code.Deserialization
+
+  // path / file
+  sink path "File.ReadAllText" -> code.FilePathAccess
+  sink path "File.ReadAllBytes" -> code.FilePathAccess
+  sink path "File.ReadAllLines" -> code.FilePathAccess
+  sink path "File.WriteAllText" -> code.FilePathAccess
+  sink path "File.Delete" -> code.FilePathAccess
+  sink path "File.Open" -> code.FilePathAccess
+  sink path "File.OpenRead" -> code.FilePathAccess
+  sink path "File.Copy" -> code.FilePathAccess
+  sink path "File.Move" -> code.FilePathAccess
+  sink path "FileStream" -> code.FilePathAccess
+  sink path "StreamReader" -> code.FilePathAccess
+
+  // SSRF
+  sink method "DownloadString" -> code.UrlFetch
+  sink method "DownloadData" -> code.UrlFetch
+  sink method "GetAsync" -> code.UrlFetch
+  sink path "WebClient" -> code.UrlFetch
+
+  // reflected XSS
+  sink path "Response.Write" -> code.HtmlRender
+  sink method "Raw" -> code.HtmlRender
+
+  // controls
+  control "HttpUtility.HtmlEncode" -> core.HtmlEscape
+  control "WebUtility.HtmlEncode" -> core.HtmlEscape
+  control "HtmlEncoder.Encode" -> core.HtmlEscape
+  control "AntiXss.HtmlEncode" -> core.HtmlEscape
+  control "Path.GetFullPath" -> core.PathCanonicalization
+  control "Path.GetFileName" -> core.PathCanonicalization
+
+  // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  sink path "Regex" -> code.RegexCompile
+}
