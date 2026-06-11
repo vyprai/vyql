@@ -157,6 +157,135 @@ func (l *lowerer) constKey(e nir.Expr, sc *scope) (string, bool) {
 	return "", false
 }
 
+// constInt evaluates an integer-constant expression (literals, const-propagated int vars,
+// and integer arithmetic), returning ok=false if any operand isn't a compile-time integer.
+// Used to fold opaque branch conditions; integer division/modulo use Go (== Java/C) truncation.
+func (l *lowerer) constInt(e nir.Expr, sc *scope) (int64, bool) {
+	parse := func(s string) (int64, bool) {
+		n, err := strconv.ParseInt(strings.TrimSpace(s), 0, 64)
+		return n, err == nil
+	}
+	switch v := e.(type) {
+	case nir.Const:
+		return parse(v.Value)
+	case nir.Name:
+		if cv := sc.cnst[v.ID]; cv != "" {
+			return parse(cv)
+		}
+	case nir.Thru:
+		return l.constInt(v.Inner, sc)
+	case nir.BinOp:
+		a, ok1 := l.constInt(v.Left, sc)
+		b, ok2 := l.constInt(v.Right, sc)
+		if !ok1 || !ok2 {
+			return 0, false
+		}
+		switch v.Op {
+		case "+":
+			return a + b, true
+		case "-":
+			return a - b, true
+		case "*":
+			return a * b, true
+		case "/":
+			if b != 0 {
+				return a / b, true
+			}
+		case "%":
+			if b != 0 {
+				return a % b, true
+			}
+		}
+	case nir.Format:
+		// `a + b` lowers to Format (concat-or-arithmetic); integer addition when both sides
+		// are integer constants (a string concat fails constInt on its parts and is ignored).
+		if len(v.Parts) == 2 {
+			if a, ok1 := l.constInt(v.Parts[0], sc); ok1 {
+				if b, ok2 := l.constInt(v.Parts[1], sc); ok2 {
+					return a + b, true
+				}
+			}
+		}
+	}
+	return 0, false
+}
+
+// constBool evaluates a boolean-constant expression (comparisons of integer/string
+// constants, !/&&/||, and true/false). Returns ok=false when not compile-time constant —
+// the caller then keeps both branches (sound, never prunes a live branch).
+func (l *lowerer) constBool(e nir.Expr, sc *scope) (bool, bool) {
+	switch v := e.(type) {
+	case nir.Thru:
+		return l.constBool(v.Inner, sc)
+	case nir.Const:
+		if v.Value == "true" {
+			return true, true
+		}
+		if v.Value == "false" {
+			return false, true
+		}
+	case nir.Name:
+		switch sc.cnst[v.ID] {
+		case "true", "True":
+			return true, true
+		case "false", "False":
+			return false, true
+		}
+	case nir.Unary:
+		if v.Op == "!" || v.Op == "not" {
+			if b, ok := l.constBool(v.Operand, sc); ok {
+				return !b, true
+			}
+		}
+	case nir.BinOp:
+		switch v.Op {
+		case "&&", "and":
+			if a, ok1 := l.constBool(v.Left, sc); ok1 {
+				if b, ok2 := l.constBool(v.Right, sc); ok2 {
+					return a && b, true
+				}
+			}
+		case "||", "or":
+			if a, ok1 := l.constBool(v.Left, sc); ok1 {
+				if b, ok2 := l.constBool(v.Right, sc); ok2 {
+					return a || b, true
+				}
+			}
+		case ">", "<", ">=", "<=", "==", "!=":
+			if a, ok1 := l.constInt(v.Left, sc); ok1 {
+				if b, ok2 := l.constInt(v.Right, sc); ok2 {
+					switch v.Op {
+					case ">":
+						return a > b, true
+					case "<":
+						return a < b, true
+					case ">=":
+						return a >= b, true
+					case "<=":
+						return a <= b, true
+					case "==":
+						return a == b, true
+					case "!=":
+						return a != b, true
+					}
+				}
+			}
+			if v.Op == "==" || v.Op == "!=" { // string/char constant equality
+				if sa, oka := l.constKey(v.Left, sc); oka {
+					if sb, okb := l.constKey(v.Right, sc); okb {
+						eq := sa == sb
+						if v.Op == "!=" {
+							eq = !eq
+						}
+						return eq, true
+					}
+				}
+			}
+		}
+	}
+	return false, false
+}
+
 // containerRead resolves an element-sensitive read of recv[key] into result. Returns false
 // when it can't (non-constant key, or recv was never written as a container) so the caller
 // falls back to the conservative whole-container flow. A constant key that was never written
@@ -566,6 +695,18 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	// Cond=nil and the eval is a no-op — each frontend keeps its exact prior node set.
 	case nir.If:
 		l.eval(st.Cond, sc)
+		// opaque-predicate pruning: a compile-time-constant condition has a dead branch that
+		// never executes — lower ONLY the live branch (no Phi join), so `if (const) x = src();
+		// else x = "safe";` doesn't taint x from the dead arm. Only fires when the whole
+		// condition is constant, so a live branch is never dropped.
+		if live, ok := l.constBool(st.Cond, sc); ok {
+			if live {
+				l.block(st.Then, sc)
+			} else {
+				l.block(st.Else, sc)
+			}
+			return
+		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
 		l.inRegion("if"+b+".t", func() { l.block(st.Then, sc) })
@@ -651,6 +792,29 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		for _, p := range ex.Parts {
 			l.flow(l.eval(p, sc), n)
 		}
+		return n
+	case nir.BinOp:
+		n := l.node("BinOp", ex.Loc, nil)
+		l.flow(l.eval(ex.Left, sc), n)
+		l.flow(l.eval(ex.Right, sc), n)
+		return n
+	case nir.Unary:
+		n := l.node("Unary", ex.Loc, nil)
+		l.flow(l.eval(ex.Operand, sc), n)
+		return n
+	case nir.Ternary:
+		// `cond ? then : else` — prune the dead arm when the condition is a compile-time
+		// constant; otherwise both arms flow (over-approximation).
+		l.eval(ex.Cond, sc)
+		if live, ok := l.constBool(ex.Cond, sc); ok {
+			if live {
+				return l.eval(ex.Then, sc)
+			}
+			return l.eval(ex.Else, sc)
+		}
+		n := l.node("Phi", ex.Loc, nil)
+		l.flow(l.eval(ex.Then, sc), n)
+		l.flow(l.eval(ex.Else, sc), n)
 		return n
 	case nir.Pair:
 		// A named entry's value carries the taint; the key is metadata used only

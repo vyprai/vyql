@@ -92,6 +92,29 @@ type Lambda struct {
 // Thru is a transparent wrapper (await, starred) that passes taint through.
 type Thru struct{ Inner Expr }
 
+// BinOp is a binary arithmetic/comparison/logical operation that preserves its operator
+// (e.g. `-`, `*`, `>`, `==`, `&&`). Used for compile-time constant evaluation of opaque
+// branch conditions so the dead branch can be pruned. String `+` stays a Format (concat).
+type BinOp struct {
+	Op          string
+	Left, Right Expr
+	Loc         string
+}
+
+// Unary is a unary operation preserving its operator (`!`, `-`), for constant evaluation.
+type Unary struct {
+	Op      string
+	Operand Expr
+	Loc     string
+}
+
+// Ternary is a conditional expression `Cond ? Then : Else`. When Cond is a compile-time
+// constant the dead arm is pruned; otherwise both arms flow (over-approximation).
+type Ternary struct {
+	Cond, Then, Else Expr
+	Loc              string
+}
+
 func (Name) isExpr()   {}
 func (Const) isExpr()  {}
 func (Attr) isExpr()   {}
@@ -100,8 +123,11 @@ func (Call) isExpr()   {}
 func (Format) isExpr() {}
 func (Seq) isExpr()    {}
 func (Pair) isExpr()   {}
-func (Lambda) isExpr() {}
-func (Thru) isExpr()   {}
+func (Lambda) isExpr()  {}
+func (Thru) isExpr()    {}
+func (BinOp) isExpr()   {}
+func (Unary) isExpr()   {}
+func (Ternary) isExpr() {}
 
 // Stmt is the NIR statement interface (a closed set, switched on in lowering).
 type Stmt interface{ isStmt() }

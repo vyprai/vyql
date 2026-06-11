@@ -219,7 +219,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// keeps a value tainted on one path even when the other path overwrites it with a
 		// constant (`if (c) x = src(); else x = "safe";`). A nested if/else in either
 		// branch is structured by c.stmt (proper else-if chaining).
-		return []nir.Stmt{nir.If{Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
+		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
 	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "enhanced_for_statement":
@@ -390,9 +390,13 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "this", "super":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "decimal_integer_literal", "hex_integer_literal", "decimal_floating_point_literal",
-		"null_literal", "character_literal":
+	case "null_literal":
 		return nir.Const{Loc: L}
+	case "decimal_integer_literal", "hex_integer_literal", "decimal_floating_point_literal",
+		"character_literal":
+		// carry the literal text so constant-folding (opaque branch conditions) and numeric
+		// value-matching (e.g. chmod modes) can read it.
+		return nir.Const{Loc: L, Value: c.text(n)}
 	case "true", "false":
 		return nir.Const{Loc: L, Value: c.text(n)} // boolean value for `val` matching
 	case "string_literal":
@@ -431,16 +435,24 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		// sinks/types can match (e.g. new ProcessBuilder, new File, new URL).
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: arglist, Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
-		if c.text(field(n, "operator")) == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		if op == "+" {
+			// `+` is overloaded (string concat / arithmetic); keep it a taint-propagating
+			// Format so string-building flows are preserved.
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		// other operators (-, *, /, %, >, <, ==, &&, …) preserve the operator for constant
+		// evaluation of opaque branch conditions; BinOp also flows taint through both sides.
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "unary_expression":
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "operand")), Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "ternary_expression":
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "consequence")), c.expr(field(n, "alternative"))}, Loc: L}
+		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	case "array_initializer":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
