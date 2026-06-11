@@ -267,6 +267,32 @@ func TestControlsWiredAreConsumedGate(t *testing.T) {
 	t.Logf("control concepts: %d defined, %d consumed by rules", len(controls), len(consumed))
 }
 
+// T0.9 — language-construct gate. Every frontend in the `languages` table must be
+// exercised by at least one test: a `.test.vyql` spec that targets it, or a NIR golden
+// (testdata/golden/<lang>.golden). A NEW language with neither fails here — forcing a
+// construct/behaviour test for every frontend that ships.
+func TestEveryLanguageHasATest(t *testing.T) {
+	// languages targeted by a code/graph spec (`lang <name>`); graph specs have no lang.
+	specLangs := map[string]bool{}
+	for _, c := range readDataFiles(t, "tests", ".test.vyql") {
+		for _, ln := range strings.Split(c, "\n") {
+			if f := strings.Fields(strings.TrimSpace(ln)); len(f) == 2 && f[0] == "lang" {
+				specLangs[f[1]] = true
+			}
+		}
+	}
+	for _, lg := range languages {
+		if specLangs[lg.name] {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join("testdata", "golden", lg.name+".golden")); err == nil {
+			continue
+		}
+		t.Errorf("frontend %q has neither a .test.vyql spec nor a NIR golden — add a construct test", lg.name)
+	}
+	t.Logf("frontends: %d in table, %d covered by a spec", len(languages), len(specLangs))
+}
+
 // T0.3 — every threat reference (vulnerable_to/neutralizes) resolves to a defined threat
 // in the correct package.
 func TestThreatRefsResolveGate(t *testing.T) {
