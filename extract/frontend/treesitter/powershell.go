@@ -141,8 +141,14 @@ func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: val}}
 	case "command":
 		return []nir.Stmt{nir.ExprStmt{Value: c.command(n)}}
-	case "if_statement", "while_statement", "for_statement", "foreach_statement",
-		"switch_statement", "try_statement", "do_statement", "trap_statement":
+	// branch-structured (B1); Cond nil (PowerShell did not evaluate the predicate) -> byte-identical.
+	case "if_statement":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "while_statement", "for_statement", "foreach_statement", "do_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "try_statement":
+		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+	case "switch_statement", "trap_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	// unwrap & retry, else treat as an expression statement

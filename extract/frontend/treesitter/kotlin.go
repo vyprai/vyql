@@ -112,8 +112,14 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if_expression", "when_expression", "for_statement", "while_statement",
-		"do_while_statement", "try_expression", "statements", "control_structure_body":
+	// branch-structured (B1); Cond nil (Kotlin did not evaluate the predicate) -> byte-identical.
+	case "if_expression":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "for_statement", "while_statement", "do_while_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "try_expression":
+		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+	case "when_expression", "statements", "control_structure_body":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil

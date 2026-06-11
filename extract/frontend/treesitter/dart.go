@@ -158,8 +158,14 @@ func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if_statement", "for_statement", "while_statement", "do_statement",
-		"try_statement", "switch_statement":
+	// branch-structured (B1); Cond nil (Dart did not evaluate the predicate) -> byte-identical.
+	case "if_statement":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "for_statement", "while_statement", "do_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "try_statement":
+		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+	case "switch_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	case "block":
 		return c.block(n)

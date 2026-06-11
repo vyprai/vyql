@@ -114,8 +114,14 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if_statement", "guard_statement", "for_statement", "while_statement",
-		"repeat_while_statement", "do_statement", "switch_statement":
+	// branch-structured (B1); Cond nil (Swift did not evaluate the predicate) -> byte-identical.
+	case "if_statement", "guard_statement":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "for_statement", "while_statement", "repeat_while_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "do_statement":
+		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+	case "switch_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil

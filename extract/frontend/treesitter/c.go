@@ -212,8 +212,12 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if_statement", "while_statement", "for_statement", "do_statement",
-		"switch_statement", "compound_statement":
+	// branch-structured (B1); Cond nil (C did not evaluate the predicate) -> byte-identical.
+	case "if_statement":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "while_statement", "for_statement", "do_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "switch_statement", "compound_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil

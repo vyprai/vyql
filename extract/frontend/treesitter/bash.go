@@ -98,8 +98,12 @@ func (c *shConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: c.command(n)}}
 	case "pipeline", "list", "subshell", "compound_statement", "negated_command":
 		return c.block(n)
-	case "if_statement", "for_statement", "while_statement", "c_style_for_statement",
-		"case_statement", "redirected_statement":
+	// branch-structured (B1); Cond nil (bash did not evaluate the predicate) -> byte-identical.
+	case "if_statement":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "for_statement", "while_statement", "c_style_for_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "case_statement", "redirected_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil

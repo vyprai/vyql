@@ -80,8 +80,12 @@ func (c *plConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if_statement", "unless_statement", "while_statement", "until_statement",
-		"for_statement", "foreach_statement", "block_statement":
+	// branch-structured (B1); Cond nil (Perl did not evaluate the predicate) -> byte-identical.
+	case "if_statement", "unless_statement":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "while_statement", "until_statement", "for_statement", "foreach_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "block_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	if isPlExpr(n.Kind()) {

@@ -103,7 +103,14 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 	case "closure", "block":
 		return c.block(n)
-	case "if_statement", "for_statement", "while_statement", "try_statement", "switch_statement":
+	// branch-structured (B1); Cond nil (Groovy did not evaluate the predicate) -> byte-identical.
+	case "if_statement":
+		return []nir.Stmt{nir.If{Then: c.collectGvBlocks(n)}}
+	case "for_statement", "while_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectGvBlocks(n)}}
+	case "try_statement":
+		return []nir.Stmt{nir.Try{Body: c.collectGvBlocks(n)}}
+	case "switch_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectGvBlocks(n)}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}

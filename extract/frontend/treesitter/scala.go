@@ -88,7 +88,14 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
-	case "if_expression", "match_expression", "try_expression", "for_expression", "while_expression", "block":
+	// branch-structured (B1); Cond nil (Scala did not evaluate the predicate) -> byte-identical.
+	case "if_expression":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "for_expression", "while_expression":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "try_expression":
+		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+	case "match_expression", "block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
