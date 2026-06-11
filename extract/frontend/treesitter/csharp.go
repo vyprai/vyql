@@ -151,12 +151,14 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1); Cond nil (C# did not evaluate the predicate) -> byte-identical.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.csBranch(field(n, "consequence")), Else: c.csBranch(field(n, "alternative"))}}
 	case "while_statement", "for_statement", "for_each_statement", "foreach_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement", "using_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
-	case "switch_statement", "lock_statement", "block", "checked_statement":
+	case "switch_statement":
+		return []nir.Stmt{c.csSwitch(n)}
+	case "lock_statement", "block", "checked_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
@@ -236,6 +238,66 @@ func (c *csConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// csBranch flattens one if-branch body: a `{}` block, a brace-less single statement, or a
+// nested if (else-if).
+func (c *csConv) csBranch(b *tree_sitter.Node) []nir.Stmt {
+	if b == nil {
+		return nil
+	}
+	if b.Kind() == "block" {
+		var out []nir.Stmt
+		for _, st := range namedChildren(b) {
+			out = append(out, c.stmt(st)...)
+		}
+		return out
+	}
+	return c.stmt(b)
+}
+
+// csSwitch lowers a switch into separate case branches with labels (consecutive
+// fall-through-empty sections merge into the next body) so a constant subject prunes.
+func (c *csConv) csSwitch(n *tree_sitter.Node) nir.Stmt {
+	var cases [][]nir.Stmt
+	var labels [][]nir.Expr
+	var deflt []nir.Stmt
+	var pending []nir.Expr
+	if b := field(n, "body"); b != nil {
+		for _, sec := range namedChildren(b) {
+			if sec.Kind() != "switch_section" {
+				continue
+			}
+			var labs []nir.Expr
+			var stmts []nir.Stmt
+			isDefault := false
+			for _, ch := range namedChildren(sec) {
+				switch ch.Kind() {
+				case "case_switch_label", "constant_pattern":
+					lv := ch
+					if k := namedChildren(ch); len(k) > 0 {
+						lv = k[0]
+					}
+					labs = append(labs, c.expr(lv))
+				case "default_switch_label":
+					isDefault = true
+				default:
+					stmts = append(stmts, c.stmt(ch)...)
+				}
+			}
+			if isDefault {
+				deflt = append(deflt, stmts...)
+				continue
+			}
+			pending = append(pending, labs...)
+			if len(stmts) > 0 {
+				cases = append(cases, stmts)
+				labels = append(labels, pending)
+				pending = nil
+			}
+		}
+	}
+	return nir.Switch{Subject: c.expr(field(n, "value")), Cases: cases, Labels: labels, Default: deflt}
 }
 
 func (c *csConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -321,8 +383,10 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "this", "base":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer_literal", "real_literal", "null_literal", "character_literal", "predefined_type":
+	case "null_literal", "predefined_type":
 		return nir.Const{Loc: L}
+	case "integer_literal", "real_literal", "character_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "boolean_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // true/false for `val` matching
 	case "string_literal", "verbatim_string_literal", "raw_string_literal":
@@ -343,7 +407,13 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "member_access_expression":
 		return nir.Attr{Base: c.expr(field(n, "expression")), Attr: c.text(field(n, "name")), Path: c.dotted(n), Loc: L}
 	case "element_access_expression":
-		return nir.Index{Base: c.expr(field(n, "expression")), Path: c.dotted(field(n, "expression")), Loc: L}
+		var key nir.Expr
+		if sub := field(n, "subscript"); sub != nil {
+			if k := namedChildren(sub); len(k) > 0 {
+				key = c.expr(k[0])
+			}
+		}
+		return nir.Index{Base: c.expr(field(n, "expression")), Key: key, Path: c.dotted(field(n, "expression")), Loc: L}
 	case "invocation_expression":
 		fn := field(n, "function")
 		path := c.dotted(fn)
@@ -352,16 +422,22 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 		typ := c.text(field(n, "type"))
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
-		if c.text(field(n, "operator")) == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		if op == "+" {
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L} // string concat
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "prefix_unary_expression":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return nir.Unary{Op: c.text(n)[:1], Operand: c.expr(kids[len(kids)-1]), Loc: L}
+		}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "conditional_expression":
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "consequence")), c.expr(field(n, "alternative"))}, Loc: L}
+		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	case "await_expression", "ref_expression", "checked_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
