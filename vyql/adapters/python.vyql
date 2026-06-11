@@ -284,8 +284,10 @@ adapter python {
   sink path "ldap.search" -> code.LdapQuery
   sink path "ldap.search_s" -> code.LdapQuery
   sink path "ldap.search_ext" -> code.LdapQuery
-  sink path "ldap3.Connection.search" -> code.LdapQuery
-  sink path "connection.search" -> code.LdapQuery
+  // ldap3 Connection.search(search_base, search_filter, …) — the FILTER is arg index 1.
+  sink path "ldap3.Connection.search" arg 1 -> code.LdapQuery
+  sink path "connection.search" arg 1 -> code.LdapQuery
+  sink path "conn.search" arg 1 -> code.LdapQuery
   sink path "collection.find" -> code.NosqlQuery
   sink path "collection.find_one" -> code.NosqlQuery
   sink path "db.eval" -> code.NosqlQuery
