@@ -67,11 +67,16 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "function_declaration", "init_declaration", "deinit_declaration":
 		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: c.params(n), Body: c.block(c.swBody(n)), Loc: L}}
 	case "property_declaration":
+		v := field(n, "value")
+		if v == nil {
+			return nil
+		}
 		name := c.bindingName(field(n, "name"))
-		if v := field(n, "value"); name != "" && v != nil {
+		if name != "" {
 			return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(v)}}
 		}
-		return nil
+		// `let _ = expr` binds no name, but the call still matters for sinks/marks.
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(v)}}
 	case "assignment":
 		target := field(n, "target")
 		result := c.expr(field(n, "result"))
@@ -270,7 +275,13 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(k) > 0 {
 			return nir.Index{Base: c.expr(k[0]), Path: c.dotted(k[0]), Loc: L}
 		}
-	case "try_expression", "await_expression", "prefix_expression", "postfix_expression", "as_expression":
+	case "postfix_expression":
+		// force-unwrap / optional-chaining: operand is the FIRST child, the
+		// trailing operator (e.g. `bang`) is a separate named node — pass the operand.
+		if k := namedChildren(n); len(k) > 0 {
+			return nir.Thru{Inner: c.expr(k[0])}
+		}
+	case "try_expression", "await_expression", "prefix_expression", "as_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}

@@ -41,4 +41,17 @@ adapter swift {
   // SSRF
   sink path "URL" -> code.UrlFetch
   sink path "URLRequest" -> code.UrlFetch
+
+  // regex compile (ReDoS) — tainted PATTERN
+  sink path "NSRegularExpression" -> code.RegexCompile
+
+  // weak crypto (CWE-327) — CryptoKit Insecure.* + CommonCrypto CC_MD5/CC_SHA1
+  mark "Insecure.MD5" -> code.WeakHash
+  mark "Insecure.SHA1" -> code.WeakHash
+  mark "CC_MD5" -> code.WeakHash
+  mark "CC_SHA1" -> code.WeakHash
+
+  // controls (sanitizers)
+  control "addingPercentEncoding" -> core.OutputEncoding
+  // NOTE: Leaf #unsafeHTML XSS is template syntax (not Swift source) — out of scope, like Vue v-html.
 }
