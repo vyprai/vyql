@@ -146,6 +146,41 @@ type ClassDef struct {
 // (flow-approximate, like the per-language extractors).
 type Block struct{ Stmts []Stmt }
 
+// Structured control-flow nodes (B1 / WS0). Frontends emit these instead of a flat
+// Block when they preserve branch structure; the lowering builds a real CFG (CONTROL
+// edges) from them under VYQL_CFG. With the flag off — or for a frontend that hasn't
+// been converted — they are lowered like a Block (flatten), so they are fully additive
+// and behaviour-preserving. Cond is retained for taint and (later) path feasibility.
+type If struct {
+	Cond Expr
+	Then []Stmt
+	Else []Stmt
+	Loc  string
+}
+
+// Loop covers while/for/foreach — a Cond (may be nil for infinite/range loops) and Body.
+type Loop struct {
+	Cond Expr
+	Body []Stmt
+	Loc  string
+}
+
+// Switch is a multi-way branch: each Cases entry is one arm's body, Default the fallthrough.
+type Switch struct {
+	Subject Expr
+	Cases   [][]Stmt
+	Default []Stmt
+	Loc     string
+}
+
+// Try models exception control flow: Body, zero+ Handlers (catch/except bodies), Finally.
+type Try struct {
+	Body     []Stmt
+	Handlers [][]Stmt
+	Finally  []Stmt
+	Loc      string
+}
+
 func (Assign) isStmt()    {}
 func (AugAssign) isStmt() {}
 func (Return) isStmt()    {}
@@ -153,6 +188,10 @@ func (ExprStmt) isStmt()  {}
 func (FuncDef) isStmt()   {}
 func (ClassDef) isStmt()  {}
 func (Block) isStmt()     {}
+func (If) isStmt()        {}
+func (Loop) isStmt()      {}
+func (Switch) isStmt()    {}
+func (Try) isStmt()       {}
 
 // Import is one import binding. Module is the target module key (source-root
 // key) or file path; Symbol is set for `from m import s` (empty for plain module

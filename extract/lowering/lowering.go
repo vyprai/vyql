@@ -275,6 +275,28 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.eval(st.Value, sc)
 	case nir.Block:
 		l.block(st.Stmts, sc)
+	// Structured control flow (B1). Until the CFG lowering lands (B1.2), these flatten
+	// exactly as the frontends do today: evaluate the condition/subject for taint and
+	// lower every branch body sequentially — fully behaviour-preserving.
+	case nir.If:
+		l.eval(st.Cond, sc)
+		l.block(st.Then, sc)
+		l.block(st.Else, sc)
+	case nir.Loop:
+		l.eval(st.Cond, sc)
+		l.block(st.Body, sc)
+	case nir.Switch:
+		l.eval(st.Subject, sc)
+		for _, c := range st.Cases {
+			l.block(c, sc)
+		}
+		l.block(st.Default, sc)
+	case nir.Try:
+		l.block(st.Body, sc)
+		for _, h := range st.Handlers {
+			l.block(h, sc)
+		}
+		l.block(st.Finally, sc)
 	}
 }
 
