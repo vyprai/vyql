@@ -22,11 +22,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
-	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
@@ -46,6 +44,7 @@ func main() {
 	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
 	format := fs.String("format", "text", "output format: text | sarif")
 	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
+	dump := fs.String("dump", "", "debug: dump the analysis graph instead of scanning (graph | taint)")
 	_ = fs.Parse(os.Args[2:])
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -61,6 +60,15 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+
+	if *dump != "" {
+		applyProfile(paths, *profileName)
+		if err := dumpGraph(paths, *dump); err != nil {
+			fmt.Fprintln(os.Stderr, "vyql: "+err.Error())
+			os.Exit(1)
+		}
+		return
+	}
 
 	if err := run(paths, *rulesPath, *format, *profileName); err != nil {
 		fmt.Fprintln(os.Stderr, "vyql: "+err.Error())
@@ -100,29 +108,13 @@ func profileNames() string {
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework adapters.
 func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, error) {
-	prog, ads, ctorTypes, stats, err := extractAll(paths)
+	g, stats, err := buildGraph(paths)
 	if err != nil {
 		return nil, stats, err
 	}
-	// Error only when NO recognized file was found at all. A recognized file that
-	// produces no NIR (e.g. a hardened config with nothing to flag) is a valid
-	// 0-finding scan, not an error.
-	if len(stats.files) == 0 {
-		return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
-	}
-	if len(prog.Modules) == 0 {
+	if g == nil {
 		return nil, stats, nil // recognized files, but nothing to analyze
 	}
-	g, err := lowering.LowerTyped(prog, true, ctorTypes)
-	if err != nil {
-		return nil, stats, err
-	}
-	if _, _, err := adapters.Apply(g, ads, nil); err != nil {
-		return nil, stats, err
-	}
-	// dependency/SBOM pass — add package nodes + reputation labels to the same graph so
-	// the SCA rules (SCA-001..004) evaluate alongside the SAST rules.
-	applySCA(g, paths)
 	onto := ontology.Seed()
 	decls, err := parser.Parse(rulesSrc)
 	if err != nil {

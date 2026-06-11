@@ -80,10 +80,10 @@ func (l *lowerer) nextBranch() string {
 // inherits the value's taint. Append/write cover StringBuilder/Writer; add/put/push/offer/
 // set/insert cover List/Map/Deque/Set.
 var mutatorMethods = map[string]bool{
-	"add": true, "addAll": true, "addElement": true, "addFirst": true, "addLast": true,
-	"push": true, "offer": true, "offerFirst": true, "offerLast": true, "put": true,
-	"putAll": true, "putIfAbsent": true, "set": true, "insert": true, "append": true,
-	"write": true, "enqueue": true,
+	"append": true, "insert": true, "write": true, "add": true, "addAll": true,
+	"addElement": true, "addFirst": true, "addLast": true, "push": true, "offer": true,
+	"offerFirst": true, "offerLast": true, "put": true, "putAll": true, "putIfAbsent": true,
+	"set": true, "enqueue": true,
 }
 
 // constStr returns the string value of a literal expression (unquoted), or "".

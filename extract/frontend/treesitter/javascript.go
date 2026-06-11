@@ -318,6 +318,16 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 // clause bodies (flow-approximate).
 func (c *jsConv) collectStatementBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
+	// jsBodyHandled reports whether a body-position node is already collected by the walk
+	// below (a `{}` block or a nested clause wrapper) — used to avoid double-lowering when
+	// picking up brace-less bodies.
+	jsBodyHandled := func(k string) bool {
+		switch k {
+		case "statement_block", "else_clause", "finally_clause", "catch_clause":
+			return true
+		}
+		return false
+	}
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
@@ -326,6 +336,22 @@ func (c *jsConv) collectStatementBlocks(n *tree_sitter.Node) []nir.Stmt {
 				out = append(out, c.blockChildren(ch)...)
 			case "else_clause", "finally_clause", "catch_clause":
 				walk(ch)
+			}
+		}
+		// brace-less single-statement bodies (`if (x) foo();` with no `{}`): the
+		// consequence/body field points straight at the statement. The else branch is an
+		// else_clause wrapper (walked above), so also lower its bare statement child.
+		for _, f := range []string{"consequence", "body"} {
+			if b := field(m, f); b != nil && !jsBodyHandled(b.Kind()) {
+				out = append(out, c.stmt(b)...)
+			}
+		}
+		switch m.Kind() {
+		case "else_clause", "catch_clause", "finally_clause":
+			for _, ch := range namedChildren(m) {
+				if !jsBodyHandled(ch.Kind()) {
+					out = append(out, c.stmt(ch)...)
+				}
 			}
 		}
 	}

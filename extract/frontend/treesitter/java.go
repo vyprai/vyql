@@ -244,6 +244,17 @@ func (c *jvConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 
 func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
+	// handled reports whether a body-position node was already collected/flattened by
+	// the children walk below (a brace block, or a nested if/else flattened into this
+	// same list). Used to avoid double-lowering when picking up brace-less bodies.
+	handled := func(k string) bool {
+		switch k {
+		case "block", "constructor_body", "switch_block", "switch_block_statement_group",
+			"catch_clause", "finally_clause", "resource_specification", "if_statement", "else":
+			return true
+		}
+		return false
+	}
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
@@ -253,6 +264,15 @@ func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 			case "switch_block", "switch_block_statement_group", "catch_clause", "finally_clause",
 				"resource_specification", "if_statement", "else":
 				walk(ch)
+			}
+		}
+		// brace-less single-statement bodies (`if (x) foo = y;` with no `{}`): the
+		// consequence/alternative/body field points straight at the statement instead of a
+		// block, so the children walk above skips it. Lower it here. A nested if/loop/try
+		// body is structured by c.stmt; a block or already-flattened if is skipped.
+		for _, f := range []string{"consequence", "alternative", "body"} {
+			if b := field(m, f); b != nil && !handled(b.Kind()) {
+				out = append(out, c.stmt(b)...)
 			}
 		}
 	}
