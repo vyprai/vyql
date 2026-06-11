@@ -288,6 +288,25 @@ adapter python {
   mark "hashlib.md5" -> code.WeakHash
   mark "hashlib.sha1" -> code.WeakHash
 
+  // weak randomness (CWE-330) — the `random` module is a non-crypto Mersenne-Twister
+  // PRNG. These are SOURCES; a finding needs a flow into a SecurityMaterialSink. Secure
+  // RNG (secrets.*, os.urandom, SystemRandom) is deliberately NOT marked.
+  source "random.random" -> code.WeakRandomValue
+  source "random.randint" -> code.WeakRandomValue
+  source "random.randrange" -> code.WeakRandomValue
+  source "random.getrandbits" -> code.WeakRandomValue
+  source "random.choice" -> code.WeakRandomValue
+  source "random.choices" -> code.WeakRandomValue
+  source "random.sample" -> code.WeakRandomValue
+  source "random.uniform" -> code.WeakRandomValue
+  // security material consumers — a predictable value reaching here is the weakness.
+  // set_cookie(name, VALUE) and jwt.encode(payload, KEY): the secret is arg index 1.
+  sink method "set_cookie" arg 1 -> code.SecurityMaterialSink
+  sink path "jwt.encode" arg 1 -> code.SecurityMaterialSink
+  sink path "hmac.new" -> code.SecurityMaterialSink
+  sink path "Cipher.new" -> code.SecurityMaterialSink
+  sink path "AES.new" -> code.SecurityMaterialSink
+
   // csrf disabled (CWE-352) — presence marker
   mark "csrf_exempt" -> code.CsrfDisabled
 

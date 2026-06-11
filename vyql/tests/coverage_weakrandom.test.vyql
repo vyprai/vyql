@@ -1,0 +1,57 @@
+# A2 — weak randomness used for security material (CWE-330, VYQL-CRY-003). A taint flow
+# from an insecure PRNG (random.* / Math.random) into a security sink (cookie/JWT/cipher).
+# Secure RNG (secrets / crypto.randomBytes) is not a source, so it never fires.
+
+test "weak-random: PRNG value into a session cookie is flagged (python)"
+  lang python
+  expect VYQL-CRY-003
+  code
+  ```
+  import random
+  from flask import make_response
+  token = random.randint(0, 999999)
+  resp = make_response("ok")
+  resp.set_cookie("session", str(token))
+  ```
+
+test "weak-random: PRNG value into a JWT signing key is flagged (python)"
+  lang python
+  expect VYQL-CRY-003
+  code
+  ```
+  import random
+  import jwt
+  secret = str(random.getrandbits(64))
+  jwt.encode({"u": 1}, secret, algorithm="HS256")
+  ```
+
+test "weak-random: Math.random into a session cookie is flagged (javascript)"
+  lang javascript
+  expect VYQL-CRY-003
+  code
+  ```
+  const token = Math.random().toString(36);
+  res.cookie("session", token);
+  ```
+
+test "weak-random: a CSPRNG token into a cookie is clean (python)"
+  lang python
+  reject VYQL-CRY-003
+  code
+  ```
+  import secrets
+  from flask import make_response
+  token = secrets.token_hex(16)
+  resp = make_response("ok")
+  resp.set_cookie("session", token)
+  ```
+
+test "weak-random: PRNG NOT used for security material is clean (python)"
+  lang python
+  reject VYQL-CRY-003
+  code
+  ```
+  import random
+  jitter = random.uniform(0, 1)
+  print("retry in", jitter)
+  ```

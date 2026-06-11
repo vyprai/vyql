@@ -14,3 +14,13 @@ rule WeakCipher {
   match code.WeakCipher as c
 }
 
+// Insecure-randomness used for security material — a TAINT flow (not presence): an
+// insecure PRNG value reaching a token/cookie/JWT-key/cipher-key/HMAC sink. Presence
+// alone is too noisy (random() is pervasive in non-security code); the flow to a
+// security sink is what makes it a weakness (CWE-330). Secure RNG (secrets / os.urandom
+// / crypto.randomBytes / SecureRandom) is simply not a source, so it never fires.
+rule WeakRandomness {
+  meta { id: "VYQL-CRY-003", severity: medium, cwe: [CWE_330] }
+  taint code.WeakRandomValue -> code.SecurityMaterialSink
+}
+

@@ -273,6 +273,19 @@ concept HardcodedSecret : sink {
   vulnerable_to: [secrets.HardcodedCredentials]
   cwe: [CWE_798]
 }
+// Insecure (non-cryptographic) PRNG output — Math.random / random.* / rand() etc.
+// A taint SOURCE: only a finding when this low-entropy value reaches security material.
+concept WeakRandomValue : source {
+  taint: [taint.WeakEntropy]
+  cwe: [CWE_330]
+}
+// Security-sensitive consumer of randomness (token/cookie/JWT key/cipher key/IV/HMAC).
+// A predictable value reaching here is the weakness (CWE-330/338 InsufficientEntropy).
+concept SecurityMaterialSink : sink {
+  vulnerable_to: [crypto.InsufficientEntropy]
+  enabled_by: [taint.WeakEntropy]
+  cwe: [CWE_330]
+}
 concept MessageInput : source {
   taint: [taint.UntrustedData]
 }
