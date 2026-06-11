@@ -1,0 +1,27 @@
+# OWASP-replica coverage for Rust — true positives plus opaque-predicate pruning
+# (if-as-value -> Ternary).
+
+# --- command injection (INJ-002) ---
+test "rust: env var -> Command is command injection"
+  lang rust
+  expect VYQL-INJ-002
+  code
+  ```
+  fn h() {
+    let p = std::env::var("ID").unwrap();
+    std::process::Command::new("sh").arg("-c").arg(format!("ls {}", p)).output();
+  }
+  ```
+
+test "rust: opaque if-as-value routes to a constant — clean command injection"
+  lang rust
+  reject VYQL-INJ-002
+  code
+  ```
+  fn g() {
+    let p = std::env::var("ID").unwrap();
+    let num = 88;
+    let bar = if (7*42)-num > 200 { "safe".to_string() } else { p.clone() };
+    std::process::Command::new("sh").arg("-c").arg(format!("ls {}", bar)).output();
+  }
+  ```

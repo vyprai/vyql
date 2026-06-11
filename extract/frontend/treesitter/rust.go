@@ -237,19 +237,24 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "self", "field_identifier", "type_identifier", "scoped_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer_literal", "float_literal", "boolean_literal", "char_literal", "unit_expression":
-		return nir.Const{Loc: L}
+	case "boolean_literal", "unit_expression":
+		return nir.Const{Loc: L, Value: c.text(n)}
+	case "integer_literal", "float_literal", "char_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "raw_string_literal":
 		return nir.Const{Loc: L}
 	case "field_expression":
 		return nir.Attr{Base: c.expr(field(n, "value")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "index_expression":
 		kids := namedChildren(n)
-		var base nir.Expr = nir.Const{Loc: L}
+		var base, key nir.Expr = nir.Const{Loc: L}, nil
 		if len(kids) > 0 {
 			base = c.expr(kids[0])
 		}
-		return nir.Index{Base: base, Path: c.dotted(n), Loc: L}
+		if len(kids) > 1 {
+			key = c.expr(kids[1])
+		}
+		return nir.Index{Base: base, Key: key, Path: c.dotted(n), Loc: L}
 	case "call_expression":
 		fn := field(n, "function")
 		path := c.dotted(fn)
@@ -270,16 +275,36 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		// other macros (e.g. query!) — model as a call so they can be sinks
 		return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: parts, Path: name, Method: name, Loc: L}
 	case "binary_expression":
-		if c.text(field(n, "operator")) == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		if op == "+" {
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "reference_expression", "unary_expression", "try_expression", "await_expression",
 		"parenthesized_expression", "type_cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
-	case "if_expression", "match_expression", "block":
+	case "if_expression":
+		// `let x = if c { A } else { B }` — model as a Ternary on the arms' tail values so a
+		// constant condition prunes. Falls back to Seq when an arm isn't a simple value.
+		then := c.blockTail(field(n, "consequence"))
+		var els nir.Expr
+		if alt := field(n, "alternative"); alt != nil {
+			if k := namedChildren(alt); len(k) > 0 {
+				if k[0].Kind() == "block" {
+					els = c.blockTail(k[0])
+				} else {
+					els = c.expr(k[0]) // else if …
+				}
+			}
+		}
+		if then != nil && els != nil {
+			return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: then, Else: els, Loc: L}
+		}
+		return nir.Seq{Parts: c.blockValues(n), Loc: L}
+	case "match_expression", "block":
 		return nir.Seq{Parts: c.blockValues(n), Loc: L}
 	}
 	var parts []nir.Expr
@@ -287,6 +312,24 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// blockTail returns the tail (value) expression of a `{ … }` block, or nil if the last
+// element isn't a bare expression (e.g. a let/assignment) — used to model an if-as-value.
+func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
+	if block == nil || block.Kind() != "block" {
+		return nil
+	}
+	kids := namedChildren(block)
+	if len(kids) == 0 {
+		return nil
+	}
+	last := kids[len(kids)-1]
+	switch last.Kind() {
+	case "let_declaration", "expression_statement", "empty_statement":
+		return nil
+	}
+	return c.expr(last)
 }
 
 func (c *rsConv) blockValues(n *tree_sitter.Node) []nir.Expr {
