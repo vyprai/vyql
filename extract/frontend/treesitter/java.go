@@ -212,8 +212,16 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if_statement", "while_statement", "for_statement", "enhanced_for_statement", "do_statement",
-		"try_statement", "try_with_resources_statement", "switch_expression", "block", "synchronized_statement":
+	// branch-structured (B1). Java did not evaluate the condition before, so Cond stays
+	// nil → the flattened node set is byte-identical.
+	case "if_statement":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "while_statement", "for_statement", "enhanced_for_statement", "do_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "try_statement", "try_with_resources_statement":
+		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+	case "switch_expression", "block", "synchronized_statement":
+		// switch arms are flattened by collectBlocks; keep as a Block (no false branching).
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	case "static_initializer", "constructor_body":
 		return []nir.Stmt{nir.Block{Stmts: c.block(n)}}

@@ -105,7 +105,17 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if", "unless", "while", "until", "case", "begin", "for":
+	// branch-structured (B1). Ruby did not evaluate the condition (collectBodies gathers
+	// then/else/elsif/when bodies, not the predicate), so Cond stays nil → byte-identical.
+	case "if", "unless":
+		return []nir.Stmt{nir.If{Then: c.collectBodies(n)}}
+	case "while", "until", "for":
+		return []nir.Stmt{nir.Loop{Body: c.collectBodies(n)}}
+	case "begin":
+		return []nir.Stmt{nir.Try{Body: c.collectBodies(n)}}
+	case "case":
+		// `case` stays a Block: collectBodies flattens its `when` arms, so a Switch would
+		// group them into one region (false sibling dominance). Conservative.
 		return []nir.Stmt{nir.Block{Stmts: c.collectBodies(n)}}
 	case "body_statement", "then", "else", "elsif", "ensure", "when", "do_block", "block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBodies(n)}}

@@ -96,8 +96,15 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if_statement", "while_statement", "for_statement", "foreach_statement",
-		"do_statement", "try_statement", "switch_statement", "compound_statement":
+	// branch-structured (B1). PHP did not evaluate the condition before → Cond stays nil,
+	// byte-identical.
+	case "if_statement":
+		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	case "while_statement", "for_statement", "foreach_statement", "do_statement":
+		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "try_statement":
+		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+	case "switch_statement", "compound_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil

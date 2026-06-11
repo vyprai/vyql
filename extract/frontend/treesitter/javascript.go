@@ -190,13 +190,20 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.Return{}}
 	case "if_statement", "while_statement", "for_statement", "for_in_statement":
-		var inner []nir.Stmt
-		if cond := field(n, "condition"); cond != nil {
-			inner = append(inner, nir.ExprStmt{Value: c.expr(cond)})
+		// branch-structured (B1). Cond is retained where present (JS evaluated it before,
+		// and the flatten lowering still does → byte-identical node set).
+		var cond nir.Expr
+		if cn := field(n, "condition"); cn != nil {
+			cond = c.expr(cn)
 		}
-		inner = append(inner, c.collectStatementBlocks(n)...)
-		return []nir.Stmt{nir.Block{Stmts: inner}}
-	case "try_statement", "statement_block":
+		body := c.collectStatementBlocks(n)
+		if n.Kind() == "if_statement" {
+			return []nir.Stmt{nir.If{Cond: cond, Then: body}}
+		}
+		return []nir.Stmt{nir.Loop{Cond: cond, Body: body}}
+	case "try_statement":
+		return []nir.Stmt{nir.Try{Body: c.collectStatementBlocks(n)}}
+	case "statement_block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectStatementBlocks(n)}}
 	case "export_statement":
 		// unwrap `export [default] <decl>` / `export async function …` so the
