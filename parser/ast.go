@@ -144,6 +144,17 @@ type FlowStmt struct {
 
 func (*FlowStmt) isStmt() {}
 
+// OrderStmt is `order <conceptA> before <conceptB>` (B2 type-state / temporal): it fires
+// when an A-operation can reach a B-operation on a CFG path (order-A < order-B, comparable
+// regions). Models reentrancy (external_call before state_write), TOCTOU, etc.
+type OrderStmt struct {
+	First  Endpoint
+	Second Endpoint
+	Loc    string
+}
+
+func (*OrderStmt) isStmt() {}
+
 // MatchStmt is `match <target> as id`.
 type MatchStmt struct {
 	TargetKind string // "concept" | "transition" (action concepts are "concept")

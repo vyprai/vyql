@@ -28,6 +28,38 @@ func Dominates(store usg.Store, gID, sID string) bool {
 	return dominatesRegion(gn.Prop("region"), gn.Prop("order"), sn.Prop("region"), sn.Prop("order"))
 }
 
+// Reaches reports whether node a can reach node b on a CFG path — a executes, then b can
+// execute after it. For structured control flow that is: order(a) < order(b) AND their
+// regions are COMPARABLE (one is an ancestor of the other, i.e. not in disjoint sibling
+// branches). Used by order-rules (reentrancy: external_call before state_write).
+func Reaches(store usg.Store, aID, bID string) bool {
+	if aID == "" || bID == "" || aID == bID {
+		return false
+	}
+	an, ok1, _ := store.GetNode(aID)
+	bn, ok2, _ := store.GetNode(bID)
+	if !ok1 || !ok2 {
+		return false
+	}
+	return reachesRegion(an.Prop("region"), an.Prop("order"), bn.Prop("region"), bn.Prop("order"))
+}
+
+func reachesRegion(rA, oA, rB, oB string) bool {
+	if rA == "" || rB == "" {
+		return false // no CFG metadata → not decidable
+	}
+	comparable := rA == rB || strings.HasPrefix(rB, rA+"/") || strings.HasPrefix(rA, rB+"/")
+	if !comparable {
+		return false // disjoint sibling branches — no path from a to b
+	}
+	a, err1 := strconv.Atoi(oA)
+	b, err2 := strconv.Atoi(oB)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return a < b
+}
+
 // dominatesRegion is the pure structural check (split out for testing).
 func dominatesRegion(gRegion, gOrder, sRegion, sOrder string) bool {
 	// region must be present on both — an unconverted frontend stamps neither.

@@ -34,3 +34,24 @@ func TestDominatesRegion(t *testing.T) {
 		}
 	}
 }
+
+// Reaches: a can reach b iff order(a)<order(b) and regions are comparable (not siblings).
+func TestReachesRegion(t *testing.T) {
+	cases := []struct {
+		rA, oA, rB, oB string
+		want           bool
+	}{
+		{"/fn1", "2", "/fn1", "5", true},
+		{"/fn1", "5", "/fn1", "2", false},
+		{"/fn1", "2", "/fn1/if3.t", "6", true},
+		{"/fn1/if3.t", "2", "/fn1", "6", true},
+		{"/fn1/if3.t", "2", "/fn1/if3.e", "6", false},
+		{"/fn1", "2", "/fn2", "6", false},
+		{"", "1", "", "2", false},
+	}
+	for _, c := range cases {
+		if got := reachesRegion(c.rA, c.oA, c.rB, c.oB); got != c.want {
+			t.Errorf("reachesRegion(%q@%s -> %q@%s) = %v, want %v", c.rA, c.oA, c.rB, c.oB, got, c.want)
+		}
+	}
+}

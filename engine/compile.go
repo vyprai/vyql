@@ -134,6 +134,13 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 				}
 			}
 		}
+	case *parser.OrderStmt:
+		if err := requireConcept(onto, body.First.Concept, "first op of "+r.QualifiedName()); err != nil {
+			return nil, err
+		}
+		if err := requireConcept(onto, body.Second.Concept, "second op of "+r.QualifiedName()); err != nil {
+			return nil, err
+		}
 	}
 	return cr, nil
 }

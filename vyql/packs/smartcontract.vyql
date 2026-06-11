@@ -20,3 +20,11 @@ rule TxOriginAuth {
   meta { id: "VYQL-SC-003", severity: high, cwe: [CWE_477] }
   match code.TxOriginAuth
 }
+
+// Reentrancy (CWE-841) — an external call BEFORE a state write on a CFG path violates
+// checks-effects-interactions: the callee can re-enter before storage is updated. A
+// temporal order-rule (B2 type-state) over the structured CFG.
+rule Reentrancy {
+  meta { id: "VYQL-SC-004", severity: high, cwe: [CWE_841] }
+  order code.ExternalCall before code.StateWrite
+}

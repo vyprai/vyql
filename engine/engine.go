@@ -46,8 +46,35 @@ func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 	case *parser.MatchStmt:
 		return e.evalMatch(cr)
+	case *parser.OrderStmt:
+		return e.evalOrder(cr)
 	}
 	return nil, nil
+}
+
+// evalOrder evaluates `order A before B` (B2 temporal): a finding for each (A,B) where an
+// A-operation can reach a B-operation on a CFG path (reentrancy, TOCTOU, …).
+func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
+	body := cr.Rule.Body.(*parser.OrderStmt)
+	firsts, _ := e.Store.NodesWithConcept(body.First.Concept)
+	seconds, _ := e.Store.NodesWithConcept(body.Second.Concept)
+	var out []*findings.Finding
+	for _, a := range firsts {
+		for _, b := range seconds {
+			if !solvers.Reaches(e.Store, a, b) {
+				continue
+			}
+			out = append(out, &findings.Finding{
+				RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "order",
+				Confidence: e.conf(a),
+				Bindings: []findings.Binding{
+					{Name: "first", NodeID: a, Concept: body.First.Concept, Loc: e.loc(a), LabelProvenance: e.prov(a, body.First.Concept)},
+					{Name: "second", NodeID: b, Concept: body.Second.Concept, Loc: e.loc(b), LabelProvenance: e.prov(b, body.Second.Concept)},
+				},
+			})
+		}
+	}
+	return out, nil
 }
 
 func (e *Engine) evalReach(cr *CompiledRule) ([]*findings.Finding, error) {

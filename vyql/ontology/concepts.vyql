@@ -192,6 +192,12 @@ concept PrivilegedOp : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_284]
 }
+// A contract storage write (member/mapping assignment). Paired with ExternalCall by the
+// reentrancy order-rule: an external call BEFORE a state write is the reentrancy anti-pattern.
+concept StateWrite : sink {
+  vulnerable_to: [smartcontract.Reentrancy]
+  cwe: [CWE_841]
+}
 concept TxOriginAuth : sink {
   vulnerable_to: [smartcontract.TxOriginAuth]
   cwe: [CWE_477]

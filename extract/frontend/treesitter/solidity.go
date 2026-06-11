@@ -144,13 +144,17 @@ func (c *solConv) varDeclStmt(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *solConv) exprStmt(n *tree_sitter.Node) []nir.Stmt {
-	if n != nil && n.Kind() == "assignment_expression" {
+	if n != nil && (n.Kind() == "assignment_expression" || n.Kind() == "augmented_assignment_expression") {
 		left := c.unwrap(field(n, "left"))
 		right := c.expr(field(n, "right"))
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		return []nir.Stmt{nir.ExprStmt{Value: right}}
+		// a member / index target (balances[x] = …, self.owner = …) is a STORAGE write —
+		// emit a markable state_write node (B2 reentrancy: external_call before state_write).
+		L := c.loc(n)
+		sw := nir.Call{Callee: nir.Name{ID: "state_write", Loc: L}, Path: "state_write", Method: "state_write", Loc: L}
+		return []nir.Stmt{nir.ExprStmt{Value: right}, nir.ExprStmt{Value: sw}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 }

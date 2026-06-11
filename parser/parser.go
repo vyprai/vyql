@@ -173,8 +173,23 @@ func (p *parser) parseBody() Stmt {
 	if p.atWord("match") {
 		return p.parseMatchStmt()
 	}
-	p.fail("expected flow or match statement, got %q at %d", t.val, t.pos)
+	if p.atWord("order") {
+		return p.parseOrderStmt()
+	}
+	p.fail("expected flow, match or order statement, got %q at %d", t.val, t.pos)
 	return nil
+}
+
+// parseOrderStmt parses `order <conceptA> before <conceptB>`.
+func (p *parser) parseOrderStmt() *OrderStmt {
+	p.next() // 'order'
+	first := p.parseEndpoint()
+	if !p.atWord("before") {
+		p.fail("expected 'before' in order statement at %d", p.peek().pos)
+	}
+	p.next()
+	second := p.parseEndpoint()
+	return &OrderStmt{First: first, Second: second}
 }
 
 func (p *parser) parseFlowStmt() *FlowStmt {

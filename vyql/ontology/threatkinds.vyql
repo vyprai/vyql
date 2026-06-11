@@ -114,6 +114,7 @@ package smartcontract;
 threat ExternalCallInjection { cwe: [CWE_829], desc: "Untrusted address/value in a low-level external call (.call/.delegatecall/.send/.transfer)" }
 threat PrivilegedDestruct { cwe: [CWE_284], desc: "Untrusted-reachable selfdestruct/privileged operation" }
 threat TxOriginAuth { cwe: [CWE_477], desc: "Authorization via tx.origin (phishing-vulnerable)" }
+threat Reentrancy { cwe: [CWE_841], desc: "External call before a state update — reentrancy (checks-effects-interactions violated)" }
 
 
 package mobile;
