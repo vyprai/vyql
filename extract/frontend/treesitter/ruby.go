@@ -107,16 +107,20 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1). Ruby did not evaluate the condition (collectBodies gathers
 	// then/else/elsif/when bodies, not the predicate), so Cond stays nil → byte-identical.
-	case "if", "unless":
-		return []nir.Stmt{nir.If{Then: c.collectBodies(n)}}
+	case "if":
+		// separate Then/Else so the join-merge keeps the live branch tainted and a constant
+		// condition prunes.
+		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}}
+	case "unless":
+		// `unless c` runs the body when c is FALSE — split branches for the join-merge, but
+		// leave Cond nil (no const-prune, to avoid inverting the condition incorrectly).
+		return []nir.Stmt{nir.If{Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}}
 	case "while", "until", "for":
 		return []nir.Stmt{nir.Loop{Body: c.collectBodies(n)}}
 	case "begin":
 		return []nir.Stmt{nir.Try{Body: c.collectBodies(n)}}
 	case "case":
-		// `case` stays a Block: collectBodies flattens its `when` arms, so a Switch would
-		// group them into one region (false sibling dominance). Conservative.
-		return []nir.Stmt{nir.Block{Stmts: c.collectBodies(n)}}
+		return []nir.Stmt{c.rubyCase(n)}
 	case "body_statement", "then", "else", "elsif", "ensure", "when", "do_block", "block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBodies(n)}}
 	case "comment":
@@ -124,6 +128,63 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	}
 	// any other expression used as a statement
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+// rubyBody lowers the statements of a then/else clause node (or a bare body).
+func (c *rbConv) rubyBody(n *tree_sitter.Node) []nir.Stmt {
+	if n == nil {
+		return nil
+	}
+	if n.Kind() == "then" || n.Kind() == "else" || n.Kind() == "body_statement" {
+		var out []nir.Stmt
+		for _, ch := range namedChildren(n) {
+			out = append(out, c.stmt(ch)...)
+		}
+		return out
+	}
+	return c.stmt(n)
+}
+
+// rubyAlt builds the Else branch from an `elsif`/`else` alternative node (elsif chains
+// into a nested If for the join-merge + pruning).
+func (c *rbConv) rubyAlt(n *tree_sitter.Node) []nir.Stmt {
+	if n == nil {
+		return nil
+	}
+	if n.Kind() == "elsif" {
+		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}}
+	}
+	return c.rubyBody(n) // else
+}
+
+// rubyCase lowers `case x; when a,b then …; else …; end` into a Switch with subject +
+// per-arm labels so a constant subject prunes to the matching arm.
+func (c *rbConv) rubyCase(n *tree_sitter.Node) nir.Stmt {
+	var cases [][]nir.Stmt
+	var labels [][]nir.Expr
+	var deflt []nir.Stmt
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "when":
+			var labs []nir.Expr
+			var body []nir.Stmt
+			for _, w := range namedChildren(ch) {
+				switch w.Kind() {
+				case "pattern":
+					if k := namedChildren(w); len(k) > 0 {
+						labs = append(labs, c.expr(k[0]))
+					}
+				case "then":
+					body = append(body, c.rubyBody(w)...)
+				}
+			}
+			cases = append(cases, body)
+			labels = append(labels, labs)
+		case "else":
+			deflt = append(deflt, c.rubyBody(ch)...)
+		}
+	}
+	return nir.Switch{Subject: c.expr(field(n, "value")), Cases: cases, Labels: labels, Default: deflt}
 }
 
 // collectBodies gathers statements from a control node's body / clause children
@@ -170,8 +231,10 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "constant", "instance_variable", "global_variable":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer", "float", "nil", "simple_symbol", "hash_key_symbol":
+	case "nil", "simple_symbol", "hash_key_symbol":
 		return nir.Const{Loc: L}
+	case "integer", "float":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "true", "false":
 		return nir.Const{Loc: L, Value: c.text(n)} // boolean value for `val` matching
 	case "string":
@@ -179,9 +242,23 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "call", "method_call", "command", "command_call":
 		return c.call(n, L)
 	case "element_reference":
-		return nir.Index{Base: c.expr(field(n, "object")), Path: c.dotted(field(n, "object")), Loc: L}
+		var key nir.Expr
+		if kids := namedChildren(n); len(kids) > 1 {
+			key = c.expr(kids[1])
+		}
+		return nir.Index{Base: c.expr(field(n, "object")), Key: key, Path: c.dotted(field(n, "object")), Loc: L}
 	case "binary":
-		return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		switch op {
+		case "+", "<<", "%": // string concat / append / format — keep taint-propagating Format
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
+		}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "conditional":
+		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
+	case "unary":
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "operand")), Loc: L}
 	case "parenthesized_statements":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return c.expr(kids[len(kids)-1])
