@@ -232,8 +232,46 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Loop{Body: body}}
 	case "try_statement", "try_with_resources_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
-	case "switch_expression", "block", "synchronized_statement":
-		// switch arms are flattened by collectBlocks; keep as a Block (no false branching).
+	case "switch_expression":
+		// each `case` group is a separate Switch branch so the join-merge keeps a value
+		// tainted on one arm even when another arm overwrites it (`case 'A': bar = src();`
+		// vs `case 'B': bar = "safe";`). Classic colon-form; arrow/yield form has no
+		// statement groups and falls back to a flat Block.
+		var cases [][]nir.Stmt
+		var deflt []nir.Stmt
+		var hasGroups bool
+		for _, blk := range children(n) {
+			if blk.Kind() != "switch_block" {
+				continue
+			}
+			for _, grp := range children(blk) {
+				if grp.Kind() != "switch_block_statement_group" {
+					continue
+				}
+				hasGroups = true
+				var stmts []nir.Stmt
+				isDefault := false
+				for _, ch := range children(grp) {
+					if ch.Kind() == "switch_label" {
+						if strings.Contains(c.text(ch), "default") {
+							isDefault = true
+						}
+						continue
+					}
+					stmts = append(stmts, c.stmt(ch)...)
+				}
+				if isDefault {
+					deflt = append(deflt, stmts...)
+				} else {
+					cases = append(cases, stmts)
+				}
+			}
+		}
+		if hasGroups {
+			return []nir.Stmt{nir.Switch{Cases: cases, Default: deflt}}
+		}
+		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+	case "block", "synchronized_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	case "static_initializer", "constructor_body":
 		return []nir.Stmt{nir.Block{Stmts: c.block(n)}}
