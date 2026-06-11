@@ -267,7 +267,14 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// member/subscript assignment: still evaluate RHS for effect
+		// member-property write (e.g. el.innerHTML = x, location.href = x): model as a
+		// PATH sink call so DOM-XSS / open-redirect `sink path "innerHTML"` etc. fire.
+		// Method is empty so it can never collide with method-name sinks (query/exec/…).
+		if left != nil && left.Kind() == "member_expression" {
+			p := c.dotted(left)
+			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}
+		}
+		// subscript / other assignment: still evaluate RHS for effect
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	case "augmented_assignment_expression":
 		left := field(inner, "left")

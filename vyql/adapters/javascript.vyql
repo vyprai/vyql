@@ -33,6 +33,22 @@ adapter javascript {
   source "ctx.request.querystring" -> code.HttpInput
   source "process.env" -> code.SecretValue
 
+  // Browser / SPA DOM entry points (attacker-controlled URL / storage / window state)
+  source "location.search" -> code.DomInput
+  source "location.hash" -> code.DomInput
+  source "location.href" -> code.DomInput
+  source "location.pathname" -> code.DomInput
+  source "window.location.search" -> code.DomInput
+  source "window.location.hash" -> code.DomInput
+  source "window.location.href" -> code.DomInput
+  source "document.location" -> code.DomInput
+  source "document.URL" -> code.DomInput
+  source "document.documentURI" -> code.DomInput
+  source "document.referrer" -> code.DomInput
+  source "window.name" -> code.DomInput
+  source "localStorage.getItem" -> code.DomInput
+  source "sessionStorage.getItem" -> code.DomInput
+
   sink method "query" -> code.SqlExecution
   sink method "raw" -> code.SqlExecution
   sink method "execute" -> code.SqlExecution
@@ -129,7 +145,7 @@ adapter javascript {
   sink path "innerHTML" -> code.HtmlRender
   sink path "outerHTML" -> code.HtmlRender
   sink path "document.write" -> code.HtmlRender
-  sink path "insertAdjacentHTML" -> code.HtmlRender
+  sink path "insertAdjacentHTML" arg 1 -> code.HtmlRender
   sink path "$.html" -> code.HtmlRender
   sink path "el.html" -> code.HtmlRender
   sink path "handlebars.compile" -> code.TemplateRender
@@ -146,6 +162,12 @@ adapter javascript {
   sink path "ctx.redirect" -> code.RedirectTarget
   sink path "reply.redirect" -> code.RedirectTarget
   sink path "response.redirect" -> code.RedirectTarget
+  // DOM open-redirect: writing a tainted URL to location (property-write sinks)
+  sink path "location.href" -> code.RedirectTarget
+  sink path "location.assign" -> code.RedirectTarget
+  sink path "location.replace" -> code.RedirectTarget
+  sink path "window.location.href" -> code.RedirectTarget
+  sink path "window.location" -> code.RedirectTarget
   sink path "collection.find" -> code.NosqlQuery
   sink path "collection.findOne" -> code.NosqlQuery
   sink path "db.eval" -> code.NosqlQuery

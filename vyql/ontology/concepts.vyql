@@ -193,6 +193,11 @@ concept HttpInput : source {
   cwe: [CWE_20]
   refines: core.UserControlledData
 }
+concept DomInput : source {
+  taint: [taint.UntrustedData]
+  cwe: [CWE_20]
+  refines: core.UserControlledData
+}
 concept LdapQuery : sink {
   vulnerable_to: [injection.LdapInjection]
   enabled_by: [taint.UntrustedData]
