@@ -214,10 +214,12 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1); Cond nil (C did not evaluate the predicate) -> byte-identical.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.cBranch(field(n, "consequence")), Else: c.cBranch(field(n, "alternative"))}}
 	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
-	case "switch_statement", "compound_statement":
+	case "switch_statement":
+		return []nir.Stmt{c.cSwitch(n)}
+	case "compound_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
@@ -266,6 +268,65 @@ func (c *ccConv) destName(a *tree_sitter.Node) string {
 		return c.text(a)
 	}
 	return ""
+}
+
+// cBranch flattens one if-branch body: a `{}` compound_statement, an else_clause wrapper,
+// or a brace-less single statement.
+func (c *ccConv) cBranch(b *tree_sitter.Node) []nir.Stmt {
+	if b == nil {
+		return nil
+	}
+	switch b.Kind() {
+	case "compound_statement":
+		var out []nir.Stmt
+		for _, st := range namedChildren(b) {
+			out = append(out, c.stmt(st)...)
+		}
+		return out
+	case "else_clause":
+		var out []nir.Stmt
+		for _, ch := range namedChildren(b) {
+			out = append(out, c.cBranch(ch)...)
+		}
+		return out
+	default:
+		return c.stmt(b)
+	}
+}
+
+// cSwitch lowers a switch into separate case branches with labels (consecutive
+// fall-through-empty cases merge into the next body) so a constant subject prunes.
+func (c *ccConv) cSwitch(n *tree_sitter.Node) nir.Stmt {
+	var cases [][]nir.Stmt
+	var labels [][]nir.Expr
+	var deflt []nir.Stmt
+	var pending []nir.Expr
+	if b := field(n, "body"); b != nil {
+		for _, cs := range namedChildren(b) {
+			if cs.Kind() != "case_statement" {
+				continue
+			}
+			lv := field(cs, "value")
+			var stmts []nir.Stmt
+			for _, ch := range namedChildren(cs) {
+				if lv != nil && ch.StartByte() == lv.StartByte() {
+					continue
+				}
+				stmts = append(stmts, c.stmt(ch)...)
+			}
+			if lv == nil { // default:
+				deflt = append(deflt, stmts...)
+				continue
+			}
+			pending = append(pending, c.expr(lv))
+			if len(stmts) > 0 {
+				cases = append(cases, stmts)
+				labels = append(labels, pending)
+				pending = nil
+			}
+		}
+	}
+	return nir.Switch{Subject: c.expr(field(n, "condition")), Cases: cases, Labels: labels, Default: deflt}
 }
 
 func (c *ccConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -336,8 +397,10 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "field_identifier", "qualified_identifier", "namespace_identifier", "type_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "number_literal", "char_literal", "true", "false", "null", "nullptr":
+	case "true", "false", "null", "nullptr":
 		return nir.Const{Loc: L}
+	case "number_literal", "char_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "concatenated_string", "raw_string_literal":
 		return nir.Const{Loc: L}
 	case "new_expression": // C++
@@ -346,7 +409,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "field_expression":
 		return nir.Attr{Base: c.expr(field(n, "argument")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "subscript_expression":
-		return nir.Index{Base: c.expr(field(n, "argument")), Path: c.dotted(field(n, "argument")), Loc: L}
+		return nir.Index{Base: c.expr(field(n, "argument")), Key: c.expr(field(n, "index")), Path: c.dotted(field(n, "argument")), Loc: L}
 	case "call_expression":
 		fn := field(n, "function")
 		path := c.dotted(fn)
@@ -366,23 +429,29 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Call{Callee: nir.Attr{Base: c.expr(recv), Attr: method, Path: path, Loc: L}, Args: args, Path: path, Method: method, Loc: L}
 	case "binary_expression":
-		// C++ string concat with + builds tainted strings; treat as Format.
-		if c.text(field(n, "operator")) == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		if op == "+" {
+			// C++ string concat with + builds tainted strings; treat as Format.
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
-	case "pointer_expression", "unary_expression":
+	case "pointer_expression":
 		if arg := field(n, "argument"); arg != nil {
 			return nir.Thru{Inner: c.expr(arg)}
+		}
+	case "unary_expression":
+		if arg := field(n, "argument"); arg != nil {
+			return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(arg), Loc: L}
 		}
 	case "assignment_expression":
 		return c.expr(field(n, "right"))
 	case "conditional_expression":
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "consequence")), c.expr(field(n, "alternative"))}, Loc: L}
+		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {

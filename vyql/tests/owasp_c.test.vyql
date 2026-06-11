@@ -1,0 +1,81 @@
+# OWASP-replica coverage for C/C++ — true positives plus precision patterns
+# (opaque-predicate pruning) unlocked by the parity port. The C frontend serves both
+# C and C++ (tree-sitter c + cpp).
+
+# --- command injection (INJ-002) ---
+test "c: getenv -> system is command injection"
+  lang c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+  void g() {
+    char *p = getenv("CMD");
+    char cmd[256];
+    sprintf(cmd, "ls %s", p);
+    system(cmd);
+  }
+  ```
+
+test "c: opaque if/else assigns constant on the live branch — clean command injection"
+  lang c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+  void h() {
+    char *p = getenv("CMD");
+    int num = 88;
+    char *bar;
+    if ((7*42)-num > 200) bar = "safe"; else bar = "alsosafe";
+    char cmd[256];
+    sprintf(cmd, "ls %s", bar);
+    system(cmd);
+  }
+  ```
+
+test "c: ternary routes to a constant — clean command injection"
+  lang c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+  void h() {
+    char *p = getenv("CMD");
+    int num = 106;
+    char *bar = ((7*18)+num > 200) ? "safe" : p;
+    char cmd[256];
+    sprintf(cmd, "ls %s", bar);
+    system(cmd);
+  }
+  ```
+
+# --- path traversal (PATH-001) ---
+test "c: getenv -> fopen is path traversal"
+  lang c
+  expect VYQL-PATH-001
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  void g() {
+    char *p = getenv("F");
+    char path[256];
+    sprintf(path, "/tmp/%s", p);
+    FILE *fh = fopen(path, "r");
+  }
+  ```
+
+# --- C++ SQL injection (INJ-001) ---
+test "cpp: getenv -> sqlite3_exec is SQLi"
+  lang cpp
+  expect VYQL-INJ-001
+  code
+  ```
+  #include <cstdlib>
+  void g(sqlite3 *db) {
+    std::string p = getenv("ID");
+    std::string q = "SELECT * FROM u WHERE id=" + p;
+    sqlite3_exec(db, q.c_str(), 0, 0, 0);
+  }
+  ```
