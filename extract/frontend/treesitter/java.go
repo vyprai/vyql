@@ -18,12 +18,20 @@ type jvConv struct {
 	inController bool // inside a @RestController/@Controller class
 }
 
-// jvHandlerAnns mark a Spring class/method as a request handler, so its method
-// parameters (e.g. @RequestParam/@PathVariable values) are seeded as http_input.
+// jvHandlerAnns mark a Spring/JAX-RS/Micronaut class/method as a request handler,
+// so its method parameters (e.g. @RequestParam/@PathVariable/@QueryParam values)
+// are seeded as http_input.
 var jvHandlerAnns = map[string]bool{
+	// Spring MVC / WebFlux
 	"RestController": true, "Controller": true, "RequestMapping": true,
 	"GetMapping": true, "PostMapping": true, "PutMapping": true,
 	"DeleteMapping": true, "PatchMapping": true,
+	// JAX-RS (Jersey/RESTEasy) + Quarkus (which reuses JAX-RS): @Path on the
+	// resource class, @GET/@POST/... on the methods.
+	"Path": true, "GET": true, "POST": true, "PUT": true,
+	"DELETE": true, "HEAD": true, "OPTIONS": true,
+	// Micronaut
+	"Get": true, "Post": true, "Put": true, "Delete": true,
 }
 
 // hasHandlerAnn reports whether a class/method declaration carries a Spring

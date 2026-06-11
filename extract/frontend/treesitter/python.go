@@ -172,9 +172,26 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				def = cs[len(cs)-1]
 			}
 		}
-		if def != nil {
-			return c.stmt(def)
+		if def == nil {
+			return nil
 		}
+		// FastAPI/Flask/Starlette route handlers: `@app.get(...)`, `@router.post(...)`,
+		// `@app.route(...)` — the function's parameters are bound from the request
+		// (path/query/body), so seed each as http_input (like Java controllers).
+		if def.Kind() == "function_definition" && c.hasRouteDecorator(n) {
+			params := c.params(field(def, "parameters"))
+			body := c.block(field(def, "body"))
+			var seed []nir.Stmt
+			for _, p := range params {
+				if p == "self" || p == "cls" {
+					continue
+				}
+				seed = append(seed, nir.Assign{Targets: []string{p},
+					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+			}
+			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, Body: append(seed, body...), Loc: L}}
+		}
+		return c.stmt(def)
 	case "class_definition":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
 	case "expression_statement":
@@ -249,6 +266,49 @@ func (c *pyConv) block(block *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	return c.blockChildren(block)
+}
+
+// pyRouteMethods are the decorator attributes that mark a request handler whose
+// parameters are bound from the request (FastAPI/Flask/Starlette/APIRouter).
+var pyRouteMethods = map[string]bool{
+	"get": true, "post": true, "put": true, "delete": true, "patch": true,
+	"head": true, "options": true, "route": true, "websocket": true, "api_route": true,
+}
+
+// hasRouteDecorator reports whether a decorated_definition carries a route
+// decorator like `@app.get("/x")` / `@router.post(...)` / `@app.route(...)`.
+func (c *pyConv) hasRouteDecorator(n *tree_sitter.Node) bool {
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "decorator" {
+			continue
+		}
+		// the decorator's expression: a call (`app.get(...)`) or bare attribute.
+		var name string
+		var walk func(m *tree_sitter.Node)
+		walk = func(m *tree_sitter.Node) {
+			if m == nil || name != "" {
+				return
+			}
+			if m.Kind() == "attribute" {
+				if a := field(m, "attribute"); a != nil {
+					name = c.text(a)
+				}
+				return
+			}
+			if m.Kind() == "call" {
+				walk(field(m, "function"))
+				return
+			}
+			for _, k := range namedChildren(m) {
+				walk(k)
+			}
+		}
+		walk(ch)
+		if pyRouteMethods[name] {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *pyConv) params(params *tree_sitter.Node) []string {

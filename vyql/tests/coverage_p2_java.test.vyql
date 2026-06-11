@@ -1,0 +1,45 @@
+# P2 entry-point seeding: JAX-RS / Micronaut / Quarkus handler params.
+
+test "java: JAX-RS @QueryParam -> SQL is injection"
+  lang java
+  expect VYQL-INJ-001
+  code
+  ```
+  @Path("/users")
+  public class UserResource {
+    @GET
+    public String find(@QueryParam("name") String name) throws Exception {
+      Statement st = conn.createStatement();
+      return st.executeQuery("SELECT * FROM users WHERE name = '" + name + "'").toString();
+    }
+  }
+  ```
+
+test "java: JAX-RS constant query is clean"
+  lang java
+  reject VYQL-INJ-001
+  code
+  ```
+  @Path("/users")
+  public class UserResource {
+    @GET
+    public String all() throws Exception {
+      Statement st = conn.createStatement();
+      return st.executeQuery("SELECT * FROM users").toString();
+    }
+  }
+  ```
+
+test "java: Micronaut @Get handler param -> command injection"
+  lang java
+  expect VYQL-INJ-002
+  code
+  ```
+  @Controller("/ping")
+  public class PingController {
+    @Get
+    public void ping(String host) throws Exception {
+      Runtime.getRuntime().exec("ping " + host);
+    }
+  }
+  ```

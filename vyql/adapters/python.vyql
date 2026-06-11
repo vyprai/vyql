@@ -3,6 +3,10 @@
 adapter python {
   meta { fidelity: resolved }
 
+  // FastAPI/Starlette route-handler params, seeded by the frontend (the decorator
+  // marks the handler; each parameter is request-bound path/query/body input).
+  source "http_input" -> code.HttpInput
+
   source "request.form" -> code.HttpInput
   source "request.args" -> code.HttpInput
   source "request.values" -> code.HttpInput
