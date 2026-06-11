@@ -23,6 +23,11 @@ adapter bash {
   sink path "php" arg 1 -> code.CodeEval
   sink path "node" arg 1 -> code.CodeEval
 
+  // SSRF — fetching a tainted URL (any argument position may carry it)
+  sink path "curl" -> code.UrlFetch
+  sink path "wget" -> code.UrlFetch
+
   // file inclusion (sourcing an untrusted path)
   sink path "source" -> code.FileInclude
+  sink path "." -> code.FileInclude
 }
