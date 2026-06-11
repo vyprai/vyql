@@ -52,11 +52,22 @@ adapter javascript {
   source "localStorage.getItem" -> code.DomInput
   source "sessionStorage.getItem" -> code.DomInput
   source "document.cookie" -> code.DomInput
+  // Next.js App Router — searchParams (page prop / destructured) + nextUrl query
+  source "searchParams" -> code.HttpInput
+  source "req.nextUrl" -> code.HttpInput
+  source "request.nextUrl" -> code.HttpInput
 
   sink method "query" -> code.SqlExecution
   sink method "raw" -> code.SqlExecution
   sink method "execute" -> code.SqlExecution
   sink method "unprepared" -> code.SqlExecution
+  // Prisma raw (CWE-89) — $queryRawUnsafe/$executeRawUnsafe take a raw string
+  sink method "$queryRaw" -> code.SqlExecution
+  sink method "$queryRawUnsafe" -> code.SqlExecution
+  sink method "$executeRaw" -> code.SqlExecution
+  sink method "$executeRawUnsafe" -> code.SqlExecution
+  // Sequelize.literal injects raw SQL into a query
+  sink method "literal" -> code.SqlExecution
   sink path "sequelize.query" -> code.SqlExecution
   sink path "knex.raw" -> code.SqlExecution
   sink path "connection.query" -> code.SqlExecution

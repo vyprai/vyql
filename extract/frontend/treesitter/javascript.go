@@ -198,6 +198,14 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Block{Stmts: inner}}
 	case "try_statement", "statement_block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectStatementBlocks(n)}}
+	case "export_statement":
+		// unwrap `export [default] <decl>` / `export async function …` so the
+		// declaration inside is analyzed (Next.js route handlers are all exports).
+		var out []nir.Stmt
+		for _, ch := range namedChildren(n) {
+			out = append(out, c.stmt(ch)...)
+		}
+		return out
 	}
 	return nil
 }
