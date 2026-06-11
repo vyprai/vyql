@@ -358,6 +358,14 @@ adapter python {
   // tainted query string. `.xpath` is a distinctive lxml method; taint-gated.
   sink method "xpath" -> code.XpathQuery
   sink path "etree.XPath" -> code.XpathQuery
+  sink path "XPath" -> code.XpathQuery
+  // elementpath.select(root, expr): the XPath expression is arg 1.
+  sink path "elementpath.select" arg 1 -> code.XpathQuery
+  sink path "elementpath.iter_select" arg 1 -> code.XpathQuery
+  // ElementTree .find/.findall/.iterfind/.findtext take an XPath-subset path expression.
+  sink method "findall" -> code.XpathQuery
+  sink method "iterfind" -> code.XpathQuery
+  sink method "findtext" -> code.XpathQuery
 
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "shlex.quote" -> core.ShellEscape

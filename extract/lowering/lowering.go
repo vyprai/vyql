@@ -828,6 +828,12 @@ func (l *lowerer) resolveCtor(callee nir.Expr) ([2]string, bool) {
 				return [2]string{imp.module, c.Attr}, true
 			}
 		}
+		// qualified dotted constructor `pkg.mod.ClassName(...)` (a nested attribute, so the
+		// base isn't a simple module Name) — resolve by the class name (the last segment)
+		// when exactly one module defines it.
+		if cm, ok := l.classModule(c.Attr, imports); ok {
+			return [2]string{cm, c.Attr}, true
+		}
 	}
 	return [2]string{}, false
 }
