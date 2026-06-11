@@ -288,6 +288,17 @@ func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 			case "switch_block", "switch_block_statement_group", "catch_clause", "finally_clause",
 				"resource_specification", "if_statement", "else":
 				walk(ch)
+			case "resource":
+				// try-with-resources `try (T x = new FileInputStream(path); …)` — lower the
+				// resource initializer (often a file/stream sink) and bind its variable.
+				if val := field(ch, "value"); val != nil {
+					v := c.expr(val)
+					if nm := field(ch, "name"); nm != nil {
+						out = append(out, nir.Assign{Targets: []string{c.text(nm)}, Value: v})
+					} else {
+						out = append(out, nir.ExprStmt{Value: v})
+					}
+				}
 			}
 		}
 		// brace-less single-statement bodies (`if (x) foo = y;` with no `{}`): the

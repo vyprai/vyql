@@ -60,11 +60,13 @@ adapter java {
   sink method "queryForStream" -> code.SqlExecution
   sink method "batchUpdate" -> code.SqlExecution
 
-  // Command execution
-  sink method "exec" -> code.CommandExecution
-  sink path "Runtime.getRuntime.exec" -> code.CommandExecution
-  sink path "ProcessBuilder" -> code.CommandExecution
-  sink method "command" -> code.CommandExecution
+  // Command execution. arg all: the tainted value can be the command, an argument, or the
+  // environment array — Runtime.exec(cmd) / exec(cmdarray, envp), ProcessBuilder(a, b, …),
+  // ProcessBuilder.command(list) — so any tainted argument triggers.
+  sink method "exec" arg all -> code.CommandExecution
+  sink path "Runtime.getRuntime.exec" arg all -> code.CommandExecution
+  sink path "ProcessBuilder" arg all -> code.CommandExecution
+  sink method "command" arg all -> code.CommandExecution
 
   // Deserialization
   sink method "readObject" -> code.Deserialization
