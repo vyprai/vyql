@@ -391,16 +391,38 @@ func (e *Engine) conf(nodeIDs ...string) string {
 	return "high"
 }
 
+// endpointGuarded reports whether a guard carrying `control` covers the sink. Path-
+// sensitive (B1.4): when both the guard and sink carry CFG metadata, the guard must
+// DOMINATE the sink to suppress — a guard in one branch does not cover a flow through a
+// sibling branch (the presence model's false-negative). Without CFG metadata (hand-built
+// graphs, frontends not yet converted to structured NIR) it falls back to presence
+// semantics at a lower fidelity, so existing behaviour and tests are unchanged.
 func (e *Engine) endpointGuarded(sinkID, control string) bool {
+	sinkCFG := hasCFG(e.Store, sinkID)
 	for _, et := range []string{"PROTECTS", "CHECKS"} {
 		edges, _ := e.Store.InEdges(sinkID, et)
 		for _, ed := range edges {
 			for _, l := range e.labels(ed.Src) {
-				if l.Concept == control {
-					return true
+				if l.Concept != control {
+					continue
 				}
+				if sinkCFG && hasCFG(e.Store, ed.Src) {
+					if solvers.Dominates(e.Store, ed.Src, sinkID) {
+						return true // guard dominates → covers every path → suppress
+					}
+					continue // non-dominating guard → keep looking for one that does
+				}
+				return true // presence fallback (no CFG metadata)
 			}
 		}
+	}
+	return false
+}
+
+// hasCFG reports whether a node carries structured-CFG metadata (a region tag).
+func hasCFG(store usg.Store, id string) bool {
+	if n, ok, _ := store.GetNode(id); ok {
+		return n.Prop("region") != ""
 	}
 	return false
 }
