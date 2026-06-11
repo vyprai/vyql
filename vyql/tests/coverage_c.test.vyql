@@ -1,0 +1,73 @@
+# C / C++ coverage breadth: ReDoS, SSRF, XXE, weak crypto, realpath sanitizer.
+
+test "c: env var -> regcomp is ReDoS"
+  lang c
+  expect VYQL-DOS-001
+  code
+  ```
+  void h() {
+    char *u = getenv("PAT");
+    regcomp(&re, u, 0);
+  }
+  ```
+
+test "c: env var -> curl_easy_setopt URL is SSRF"
+  lang c
+  expect VYQL-RF-001
+  code
+  ```
+  void h() {
+    char *u = getenv("URL");
+    curl_easy_setopt(curl, CURLOPT_URL, u);
+  }
+  ```
+
+test "c: env var -> xmlReadMemory is XXE"
+  lang c
+  expect VYQL-DESER-002
+  code
+  ```
+  void h() {
+    char *u = getenv("XML");
+    xmlReadMemory(u, sz, NULL, NULL, 0);
+  }
+  ```
+
+test "c: MD5_Init is weak crypto"
+  lang c
+  expect VYQL-CRY-001
+  code
+  ```
+  void h() { MD5_Init(&ctx); }
+  ```
+
+test "c: realpath neutralizes path traversal"
+  lang c
+  reject VYQL-PATH-001
+  code
+  ```
+  void h() {
+    char *u = getenv("FILE");
+    char *p = realpath(u, buf);
+    fopen(p, "r");
+  }
+  ```
+
+test "cpp: env var -> regcomp is ReDoS"
+  lang cpp
+  expect VYQL-DOS-001
+  code
+  ```
+  void h() {
+    char *u = getenv("PAT");
+    regcomp(&re, u, 0);
+  }
+  ```
+
+test "cpp: SHA1_Init is weak crypto"
+  lang cpp
+  expect VYQL-CRY-001
+  code
+  ```
+  void h() { SHA1_Init(&ctx); }
+  ```

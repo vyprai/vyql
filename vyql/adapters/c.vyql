@@ -52,4 +52,29 @@ adapter c {
   sink path "fprintf" arg 1 -> code.FormatString
   sink path "syslog" arg 1 -> code.FormatString
   sink path "vprintf" arg 0 -> code.FormatString
+
+  // regex compile (ReDoS) — POSIX regcomp (pattern is arg1)
+  sink path "regcomp" arg 1 -> code.RegexCompile
+
+  // SSRF — libcurl (tainted option value, most commonly CURLOPT_URL, is arg2)
+  sink path "curl_easy_setopt" arg 2 -> code.UrlFetch
+
+  // XXE (CWE-611) — libxml2 readers (xml content/path is arg0)
+  sink path "xmlReadMemory" -> code.XmlParse
+  sink path "xmlReadFile" -> code.XmlParse
+  sink path "xmlReadDoc" -> code.XmlParse
+  sink path "xmlParseFile" -> code.XmlParse
+  sink path "xmlParseMemory" -> code.XmlParse
+
+  // weak crypto (CWE-327) — OpenSSL MD4/MD5/SHA1 (presence)
+  mark "MD5_Init" -> code.WeakHash
+  mark "MD5" -> code.WeakHash
+  mark "MD4" -> code.WeakHash
+  mark "SHA1_Init" -> code.WeakHash
+  mark "SHA1" -> code.WeakHash
+  mark "EVP_md5" -> code.WeakHash
+  mark "EVP_sha1" -> code.WeakHash
+
+  // controls (sanitizers) — realpath canonicalizes a path
+  control "realpath" -> core.PathCanonicalization
 }
