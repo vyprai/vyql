@@ -9,9 +9,22 @@ import (
 	"github.com/vyprai/vyql/extract/frontend"
 	cfgfront "github.com/vyprai/vyql/extract/frontend/config"
 	"github.com/vyprai/vyql/extract/frontend/golang"
+	"github.com/vyprai/vyql/extract/frontend/secretscan"
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/nir"
 )
+
+// secretscanExts: source + config/env formats where hardcoded secrets commonly live.
+// secretscan runs ALONGSIDE the real frontend (extractAll runs every matching language),
+// adding HardcodedSecret nodes without affecting the source parse.
+var secretscanExts = map[string]bool{
+	".go": true, ".py": true, ".js": true, ".jsx": true, ".ts": true, ".tsx": true,
+	".rb": true, ".java": true, ".php": true, ".cs": true, ".c": true, ".cpp": true,
+	".rs": true, ".sh": true, ".bash": true, ".scala": true, ".kt": true, ".kts": true,
+	".swift": true, ".pl": true, ".ex": true, ".exs": true, ".dart": true, ".groovy": true,
+	".env": true, ".yaml": true, ".yml": true, ".properties": true, ".json": true,
+	".toml": true, ".ini": true, ".cfg": true, ".conf": true, ".tf": true,
+}
 
 // language ties a file extension set to its real source→NIR frontend and the
 // framework adapters that label its graph. Adding a language is a frontend +
@@ -50,6 +63,9 @@ var languages = []language{
 	// mobile config files (AndroidManifest.xml / Info.plist) — a non-tree-sitter
 	// frontend; non-manifest XML yields no nodes so other repos are unaffected.
 	{"config", map[string]bool{".xml": true, ".plist": true}, cfgfront.Extract, frontend.ConfigAdapters},
+	// hardcoded-secret scanner — runs over source + config/env files (alongside the real
+	// frontend), emitting HardcodedSecret nodes from provider tokens / secret literals.
+	{"secretscan", secretscanExts, secretscan.Extract, frontend.SecretscanAdapters},
 }
 
 // scanStats reports per-language file counts for the run summary.

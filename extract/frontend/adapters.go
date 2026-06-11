@@ -348,11 +348,15 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			// md5_hex…), but some are bare member accesses with no call — e.g.
 			// Solidity `tx.origin` used for authorization — so scan Attr nodes too.
 			var out []adapters.Mapping
+			// secretscan is a CROSS-LANGUAGE scanner — its nodes live in source files of
+			// every language, so the per-language tech filter doesn't apply (its synthetic
+			// `hardcoded_secret` marker matches no real callee path).
+			crossLang := spec.Technology == "secretscan"
 			for _, nodeType := range []string{"code.Call", "code.Attr"} {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
 					n, _, _ := s.GetNode(id)
-					if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
+					if t := nodeTech(n.Prop("loc")); !crossLang && t != "" && t != spec.Technology {
 						continue
 					}
 					path := n.Prop("callee_path")
@@ -415,7 +419,8 @@ func matchPath(path string, patterns []string, mode string) bool {
 }
 
 // Per-language adapter sets (loaded from vyql/adapters/*.vyql).
-func ConfigAdapters() []adapters.Adapter { return AdaptersFor("config") }
+func ConfigAdapters() []adapters.Adapter     { return AdaptersFor("config") }
+func SecretscanAdapters() []adapters.Adapter { return AdaptersFor("secretscan") }
 func ElixirAdapters() []adapters.Adapter { return AdaptersFor("elixir") }
 func DartAdapters() []adapters.Adapter   { return AdaptersFor("dart") }
 func GroovyAdapters() []adapters.Adapter { return AdaptersFor("groovy") }

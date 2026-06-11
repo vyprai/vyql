@@ -268,6 +268,11 @@ concept LogWrite : sink {
   vulnerable_to: [secrets.SecretLeak]
   enabled_by: [taint.SecretValue]
 }
+// A hardcoded secret literal flagged by the secretscan frontend (presence — no flow).
+concept HardcodedSecret : sink {
+  vulnerable_to: [secrets.HardcodedCredentials]
+  cwe: [CWE_798]
+}
 concept MessageInput : source {
   taint: [taint.UntrustedData]
 }
