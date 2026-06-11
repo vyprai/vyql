@@ -58,6 +58,9 @@ adapter php {
   sink path "print" -> code.HtmlRender
   sink path "printf" -> code.HtmlRender
 
+  // server-side template injection (CWE-1336) — Twig compiles a STRING template
+  sink method "createTemplate" -> code.TemplateRender
+
   // controls (sanitizers/validators)
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
