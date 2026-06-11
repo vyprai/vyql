@@ -1,0 +1,115 @@
+# T13 — the global "must NOT fire" precision matrix. Safe forms stay clean across
+# languages: parameterized queries, prepared statements, constant args, sanitized flows.
+
+# --- parameterized / prepared SQL = clean (the core SQLi precision invariant) ---
+
+test "python: parameterized query (%s + params tuple) is clean"
+  lang python
+  reject VYQL-INJ-001
+  code
+  ```
+  def h():
+      x = request.args.get('id')
+      cursor.execute("SELECT * FROM t WHERE id = %s", (x,))
+  ```
+
+test "go: parameterized query ($1 + arg) is clean"
+  lang go
+  reject VYQL-INJ-001
+  code
+  ```
+  package m
+  import "net/http"
+  func h(r *http.Request) {
+    id := r.URL.Query().Get("id")
+    db.Query("SELECT * FROM t WHERE id = $1", id)
+  }
+  ```
+
+test "java: PreparedStatement is clean"
+  lang java
+  reject VYQL-INJ-001
+  code
+  ```
+  @RestController
+  public class C {
+    @GetMapping("/x")
+    public void x(@RequestParam String id) throws Exception {
+      PreparedStatement ps = conn.prepareStatement("SELECT * FROM t WHERE id = ?");
+      ps.setString(1, id);
+    }
+  }
+  ```
+
+test "javascript: parameterized query (? + values array) is clean"
+  lang javascript
+  reject VYQL-INJ-001
+  code
+  ```
+  function h(req) {
+    var id = req.query.id;
+    db.query("SELECT * FROM t WHERE id = ?", [id]);
+  }
+  ```
+
+test "ruby: ActiveRecord placeholder condition is clean"
+  lang ruby
+  reject VYQL-INJ-001
+  code
+  ```
+  def index
+    id = params[:id]
+    User.where("id = ?", id)
+  end
+  ```
+
+test "csharp: a constant Dapper query is clean"
+  lang csharp
+  reject VYQL-INJ-001
+  code
+  ```
+  public class C {
+    public object Get() { return conn.Query("SELECT * FROM t"); }
+  }
+  ```
+
+test "php: a constant query is clean"
+  lang php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  $rows = mysqli_query($c, "SELECT * FROM users");
+  ```
+
+# --- constant / literal args = clean (every taint sink) ---
+
+test "python: constant command is clean"
+  lang python
+  reject VYQL-INJ-002
+  code
+  ```
+  import os
+  def h():
+      os.system("ls -la")
+  ```
+
+test "javascript: constant URL is clean (SSRF)"
+  lang javascript
+  reject VYQL-RF-001
+  code
+  ```
+  function h() { http.get("https://api.example.com/v1"); }
+  ```
+
+# --- loopback http:// is clean (cleartext nval 127.0) ---
+
+test "python: loopback http URL is not flagged cleartext"
+  lang python
+  reject VYQL-CRY-003
+  code
+  ```
+  import requests
+  def h():
+      requests.get("http://127.0.0.1:8080/health")
+  ```
