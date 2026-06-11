@@ -137,6 +137,13 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 			return nil
 		}
 		return c.exprStmt(kids[0])
+	// if/match in statement position become branch-structured control flow (predicate
+	// attached) so dead arms prune AND nested reassignments are tracked (no FN). The
+	// value-context forms (`let x = if …`) are still handled in expr() as a Ternary.
+	case "if_expression":
+		return []nir.Stmt{c.rsIf(n)}
+	case "match_expression":
+		return []nir.Stmt{c.rsMatch(n)}
 	case "block":
 		return c.block(n)
 	}
@@ -145,6 +152,12 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 }
 
 func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
+	switch inner.Kind() {
+	case "if_expression":
+		return []nir.Stmt{c.rsIf(inner)}
+	case "match_expression":
+		return []nir.Stmt{c.rsMatch(inner)}
+	}
 	if inner.Kind() == "assignment_expression" {
 		left := field(inner, "left")
 		right := c.expr(field(inner, "right"))
@@ -281,11 +294,25 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
-	case "reference_expression", "unary_expression", "try_expression", "await_expression",
+	case "reference_expression", "try_expression", "await_expression",
 		"parenthesized_expression", "type_cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
+	case "unary_expression":
+		// `-x`, `!x` — the operator is the leading unnamed token.
+		op := "?"
+		for i := uint(0); i < n.ChildCount(); i++ {
+			if ch := n.Child(i); !ch.IsNamed() {
+				op = c.text(ch)
+				break
+			}
+		}
+		var operand nir.Expr = nir.Const{Loc: L}
+		if kids := namedChildren(n); len(kids) > 0 {
+			operand = c.expr(kids[len(kids)-1])
+		}
+		return nir.Unary{Op: op, Operand: operand, Loc: L}
 	case "if_expression":
 		// `let x = if c { A } else { B }` — model as a Ternary on the arms' tail values so a
 		// constant condition prunes. Falls back to Seq when an arm isn't a simple value.
@@ -312,6 +339,72 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// rsIf lowers a statement-position if with its predicate so constant-false arms prune.
+func (c *rsConv) rsIf(n *tree_sitter.Node) nir.Stmt {
+	it := nir.If{Loc: c.loc(n)}
+	it.Cond = c.expr(field(n, "condition"))
+	it.Then = c.block(field(n, "consequence"))
+	if alt := field(n, "alternative"); alt != nil {
+		it.Else = c.rsElse(alt)
+	}
+	return it
+}
+
+// rsElse unwraps an else branch: a block, a chained else-if, or an else_clause wrapper.
+func (c *rsConv) rsElse(alt *tree_sitter.Node) []nir.Stmt {
+	switch alt.Kind() {
+	case "block":
+		return c.block(alt)
+	case "if_expression":
+		return []nir.Stmt{c.rsIf(alt)}
+	case "else_clause":
+		var out []nir.Stmt
+		for _, ch := range namedChildren(alt) {
+			out = append(out, c.rsElse(ch)...)
+		}
+		return out
+	}
+	return nil
+}
+
+// rsMatch lowers a statement-position match to a subject+labelled Switch so dead arms
+// prune. A wildcard `_` arm is the default; literal patterns become case labels.
+func (c *rsConv) rsMatch(n *tree_sitter.Node) nir.Stmt {
+	sw := nir.Switch{Loc: c.loc(n), Subject: c.expr(field(n, "value"))}
+	body := field(n, "body")
+	if body == nil {
+		return sw
+	}
+	for _, arm := range namedChildren(body) {
+		if arm.Kind() != "match_arm" {
+			continue
+		}
+		pat := field(arm, "pattern")
+		stmts := c.rsArmBody(field(arm, "value"))
+		if pat == nil || c.text(pat) == "_" {
+			sw.Default = append(sw.Default, stmts...)
+			continue
+		}
+		label := pat // unwrap match_pattern -> the inner literal so labels are foldable
+		if k := namedChildren(pat); len(k) == 1 {
+			label = k[0]
+		}
+		sw.Cases = append(sw.Cases, stmts)
+		sw.Labels = append(sw.Labels, []nir.Expr{c.expr(label)})
+	}
+	return sw
+}
+
+func (c *rsConv) rsArmBody(v *tree_sitter.Node) []nir.Stmt {
+	if v == nil {
+		return nil
+	}
+	if v.Kind() == "block" {
+		return c.block(v)
+	}
+	return c.exprStmt(v)
 }
 
 // blockTail returns the tail (value) expression of a `{ … }` block, or nil if the last
