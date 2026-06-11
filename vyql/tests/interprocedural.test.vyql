@@ -4,8 +4,8 @@
 # with the neutralization placed in the SOURCE file, an INTERMEDIATE file, the SINK
 # file, or provided by the framework.
 #
-# Engine cross-file support (see vyql/tests/README): Python, Ruby, PHP, Go trace
-# fully; JavaScript partially (object-export); Java cross-class is not yet traced.
+# Engine cross-file support (see vyql/tests/README): Python, Ruby, PHP, Go, Java, and
+# JavaScript all trace across files (controller/service/repo, DI fields, CommonJS exports).
 
 # ============================================================================
 # Python (Flask) — full interprocedural
@@ -350,31 +350,129 @@ test "go: parameterized query in the repo is clean"
   ```
 
 # ============================================================================
-# JavaScript (Express) — partial cross-file (object-export forwarding)
+# JavaScript (Express) — CommonJS require + exports
 # ============================================================================
 
-test "js: tainted SQL built in route, forwarded through a db module, is SQLi"
+test "js: route -> required db module (exports.fn) raw SQL is SQLi"
   lang javascript
   expect VYQL-INJ-001
-  file app.js
+  file routes.js
   ```
   const db = require('./db');
-  app.get('/u', (req, res) => { db.query("SELECT * FROM u WHERE n = '" + req.query.n + "'"); });
+  app.get('/u', (req, res) => { db.run(req.query.name); });
   ```
   file db.js
   ```
-  module.exports = { query: function (s) { connection.query(s); } };
+  exports.run = function (value) {
+    connection.query("SELECT * FROM users WHERE name = '" + value + "'");
+  };
   ```
 
-test "js: parameterized query forwarded through a db module is clean"
+test "js: route -> module.exports object method raw SQL is SQLi"
   lang javascript
-  reject VYQL-INJ-001
-  file app.js
+  expect VYQL-INJ-001
+  file routes.js
   ```
   const db = require('./db');
-  app.get('/u', (req, res) => { db.query("SELECT * FROM u WHERE n = $1", [req.query.n]); });
+  app.get('/u', (req, res) => { db.lookup(req.query.name); });
   ```
   file db.js
   ```
-  module.exports = { query: function (s, p) { connection.query(s, p); } };
+  module.exports = { lookup: function (q) { connection.query("SELECT * FROM u WHERE n='" + q + "'"); } };
+  ```
+
+test "js: parameterized query in the required module is clean"
+  lang javascript
+  reject VYQL-INJ-001
+  file routes.js
+  ```
+  const db = require('./db');
+  app.get('/u', (req, res) => { db.run(req.query.name); });
+  ```
+  file db.js
+  ```
+  exports.run = function (value) {
+    connection.query("SELECT * FROM users WHERE name = $1", [value]);
+  };
+  ```
+
+# ============================================================================
+# Java (Spring) — controller -> service -> repository across classes/files
+# ============================================================================
+
+test "java: @RestController -> @Autowired service -> repo raw SQL is SQLi"
+  lang java
+  expect VYQL-INJ-001
+  file UserController.java
+  ```
+  @RestController
+  public class UserController {
+    @Autowired UserService service;
+    @GetMapping("/u")
+    public void get(@RequestParam String name) throws Exception { service.handle(name); }
+  }
+  ```
+  file UserService.java
+  ```
+  public class UserService {
+    @Autowired UserRepo repo;
+    public void handle(String v) throws Exception { repo.run(v); }
+  }
+  ```
+  file UserRepo.java
+  ```
+  public class UserRepo {
+    public void run(String value) throws Exception {
+      stmt.executeQuery("SELECT * FROM users WHERE name = '" + value + "'");
+    }
+  }
+  ```
+
+test "java: a parameterized PreparedStatement in the repo is clean"
+  lang java
+  reject VYQL-INJ-001
+  file UserController.java
+  ```
+  @RestController
+  public class UserController {
+    @Autowired UserService service;
+    @GetMapping("/u")
+    public void get(@RequestParam String name) throws Exception { service.handle(name); }
+  }
+  ```
+  file UserService.java
+  ```
+  public class UserService {
+    @Autowired UserRepo repo;
+    public void handle(String v) throws Exception { repo.run(v); }
+  }
+  ```
+  file UserRepo.java
+  ```
+  public class UserRepo {
+    public void run(String value) throws Exception {
+      PreparedStatement ps = conn.prepareStatement("SELECT * FROM users WHERE name = ?");
+      ps.setString(1, value);
+    }
+  }
+  ```
+
+test "java: servlet -> new-instance service -> repo command injection"
+  lang java
+  expect VYQL-INJ-002
+  file Ctrl.java
+  ```
+  public class Ctrl {
+    void get(HttpServletRequest request) throws Exception {
+      new Runner().run(request.getParameter("host"));
+    }
+  }
+  ```
+  file Runner.java
+  ```
+  public class Runner {
+    void run(String value) throws Exception {
+      Runtime.getRuntime().exec("ping " + value);
+    }
+  }
   ```

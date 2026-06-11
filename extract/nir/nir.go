@@ -104,10 +104,14 @@ func (Thru) isExpr()   {}
 // Stmt is the NIR statement interface (a closed set, switched on in lowering).
 type Stmt interface{ isStmt() }
 
-// Assign binds Value to each of Targets.
+// Assign binds Value to each of Targets. Type is the DECLARED type name when the
+// frontend knows it (e.g. Java `UserService svc = …` or an uninitialized field
+// `UserService svc;`), enabling cross-file method resolution on the variable even
+// without a constructor on the RHS; empty when unknown.
 type Assign struct {
 	Targets []string
 	Value   Expr
+	Type    string
 }
 
 // AugAssign is x += y.

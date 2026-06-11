@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"path/filepath"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -110,7 +111,7 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 					if args := field(val, "arguments"); args != nil {
 						for _, a := range namedChildren(args) {
 							if a.Kind() == "string" {
-								mod := strings.Trim(c.text(a), "'\"`")
+								mod := c.resolveRequire(strings.Trim(c.text(a), "'\"`"))
 								name := field(n, "name")
 								if name != nil && name.Kind() == "identifier" {
 									out = append(out, nir.Import{Local: c.text(name), Module: mod, IsModule: true})
@@ -188,11 +189,81 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	return nil
 }
 
+// resolveRequire normalizes a relative require/import specifier to the dotted,
+// root-relative module key the lowering registers modules under (matching
+// jsModuleKey). Bare specifiers (node_modules) are returned unchanged.
+func (c *jsConv) resolveRequire(spec string) string {
+	if !strings.HasPrefix(spec, ".") {
+		return spec
+	}
+	p := filepath.Clean(filepath.Join(filepath.Dir(c.file), spec))
+	for _, ext := range []string{".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".json"} {
+		p = strings.TrimSuffix(p, ext)
+	}
+	p = strings.TrimSuffix(p, string(filepath.Separator)+"index")
+	return strings.ReplaceAll(p, string(filepath.Separator), ".")
+}
+
+func isJsFuncNode(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Kind() {
+	case "function_expression", "arrow_function", "function", "generator_function":
+		return true
+	}
+	return false
+}
+
+// isModuleExports reports whether a member_expression is `module.exports`.
+func (c *jsConv) isModuleExports(n *tree_sitter.Node) bool {
+	return n != nil && n.Kind() == "member_expression" &&
+		c.text(field(n, "object")) == "module" && c.text(field(n, "property")) == "exports"
+}
+
+// exportFuncName returns the exported function name for `exports.NAME` or
+// `module.exports.NAME` member targets ("" if it is neither).
+func (c *jsConv) exportFuncName(left *tree_sitter.Node) string {
+	obj := field(left, "object")
+	name := c.text(field(left, "property"))
+	if obj == nil || name == "" {
+		return ""
+	}
+	if obj.Kind() == "identifier" && c.text(obj) == "exports" {
+		return name
+	}
+	if c.isModuleExports(obj) {
+		return name
+	}
+	return ""
+}
+
 func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 	switch inner.Kind() {
 	case "assignment_expression":
 		left := field(inner, "left")
-		right := c.expr(field(inner, "right"))
+		rhs := field(inner, "right")
+		// CommonJS function exports become named FuncDefs so cross-file calls
+		// resolve: `exports.f = function…`, `module.exports.f = …`, and
+		// `module.exports = { f: function… }`.
+		if left != nil && left.Kind() == "member_expression" && isJsFuncNode(rhs) {
+			if name := c.exportFuncName(left); name != "" {
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: c.params(field(rhs, "parameters")), Body: c.body(field(rhs, "body")), Loc: L}}
+			}
+		}
+		if left != nil && c.isModuleExports(left) && rhs != nil && rhs.Kind() == "object" {
+			var out []nir.Stmt
+			for _, pr := range namedChildren(rhs) {
+				if pr.Kind() == "pair" && isJsFuncNode(field(pr, "value")) {
+					v := field(pr, "value")
+					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: c.params(field(v, "parameters")), Body: c.body(field(v, "body")), Loc: L})
+				}
+			}
+			if len(out) > 0 {
+				return out
+			}
+		}
+		right := c.expr(rhs)
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}

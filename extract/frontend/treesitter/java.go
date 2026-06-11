@@ -11,10 +11,52 @@ import (
 
 // jvConv walks a tree-sitter Java CST into NIR.
 type jvConv struct {
-	src  []byte
-	root string
-	file string
-	key  string
+	src          []byte
+	root         string
+	file         string
+	key          string
+	inController bool // inside a @RestController/@Controller class
+}
+
+// jvHandlerAnns mark a Spring class/method as a request handler, so its method
+// parameters (e.g. @RequestParam/@PathVariable values) are seeded as http_input.
+var jvHandlerAnns = map[string]bool{
+	"RestController": true, "Controller": true, "RequestMapping": true,
+	"GetMapping": true, "PostMapping": true, "PutMapping": true,
+	"DeleteMapping": true, "PatchMapping": true,
+}
+
+// hasHandlerAnn reports whether a class/method declaration carries a Spring
+// handler annotation. Annotations live under the `modifiers` child; the name is
+// an identifier/scoped_identifier child of the (marker_)annotation node.
+func (c *jvConv) hasHandlerAnn(n *tree_sitter.Node) bool {
+	found := false
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil || found {
+			return
+		}
+		if m.Kind() == "marker_annotation" || m.Kind() == "annotation" {
+			for _, k := range namedChildren(m) {
+				if k.Kind() == "identifier" || k.Kind() == "scoped_identifier" {
+					if jvHandlerAnns[lastSeg(c.text(k))] {
+						found = true
+					}
+					break
+				}
+			}
+			return
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
+		}
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "modifiers" {
+			walk(ch)
+		}
+	}
+	return found
 }
 
 // ExtractJava parses Java files into one NIR Program (one module per file, keyed
@@ -56,6 +98,32 @@ func (c *jvConv) text(n *tree_sitter.Node) string {
 	return string(c.src[n.StartByte():n.EndByte()])
 }
 
+// simpleTypeName returns a bare user-class type name from a declaration's `type`
+// node — e.g. `UserService` (from `UserService`, `com.x.UserService`, or
+// `List<UserService>` it returns the head). Primitives and `String`/`var` yield "".
+func (c *jvConv) simpleTypeName(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Kind() {
+	case "type_identifier", "scoped_type_identifier":
+		t := c.text(n)
+		if i := strings.LastIndex(t, "."); i >= 0 {
+			t = t[i+1:]
+		}
+		switch t {
+		case "String", "Object", "Integer", "Long", "Boolean", "Double", "Float", "var":
+			return ""
+		}
+		return t
+	case "generic_type":
+		if k := namedChildren(n); len(k) > 0 {
+			return c.simpleTypeName(k[0])
+		}
+	}
+	return ""
+}
+
 func (c *jvConv) imports(root *tree_sitter.Node) []nir.Import {
 	var out []nir.Import
 	var walk func(n *tree_sitter.Node)
@@ -89,16 +157,27 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "class_declaration", "interface_declaration", "enum_declaration", "record_declaration":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}}
+		prev := c.inController
+		c.inController = prev || c.hasHandlerAnn(n)
+		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}
+		c.inController = prev
+		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration":
-		return []nir.Stmt{nir.FuncDef{
-			Name:   c.text(field(n, "name")),
-			Params: c.params(field(n, "parameters")),
-			Body:   c.block(field(n, "body")),
-			Loc:    L,
-		}}
+		params := c.params(field(n, "parameters"))
+		body := c.block(field(n, "body"))
+		// Spring handler params (e.g. @RequestParam/@PathVariable) are request input.
+		if c.inController || c.hasHandlerAnn(n) {
+			var seed []nir.Stmt
+			for _, p := range params {
+				seed = append(seed, nir.Assign{Targets: []string{p},
+					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+			}
+			body = append(seed, body...)
+		}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
+		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution
 		for _, d := range namedChildren(n) {
 			if d.Kind() == "variable_declarator" {
 				name := field(d, "name")
@@ -108,7 +187,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					v = c.expr(val)
 				}
 				if name != nil {
-					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v})
+					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Type: declType})
 				}
 			}
 		}

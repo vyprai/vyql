@@ -58,13 +58,19 @@ func TestPrecisionCorpus(t *testing.T) {
 		t.Skip("could not clone vulpy (no network?)")
 	}
 	bad := scan(filepath.Join(vulpy, "bad"))
-	if len(bad) < 6 {
-		t.Errorf("vulpy/bad: expected >=6 SQLi, got %d", len(bad))
-	}
+	var sqli int
 	for _, f := range bad {
-		if f.RuleID != "VYQL-INJ-001" {
-			t.Errorf("vulpy/bad: unexpected rule %s (expected all SQLi)", f.RuleID)
+		switch f.RuleID {
+		case "VYQL-INJ-001":
+			sqli++
+		case "VYQL-PATH-001":
+			// path traversal: user-controlled apikey filename in Path(...).touch()
+		default:
+			t.Errorf("vulpy/bad: unexpected rule %s (expected SQLi / path-traversal)", f.RuleID)
 		}
+	}
+	if sqli < 6 {
+		t.Errorf("vulpy/bad: expected >=6 SQLi, got %d", sqli)
 	}
 	if good := scan(filepath.Join(vulpy, "good")); len(good) != 0 {
 		t.Errorf("vulpy/good (parameterized): expected 0, got %d", len(good))

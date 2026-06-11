@@ -67,18 +67,18 @@ that language's extension and routed through its frontend + adapters).
 
 ## Cross-file (interprocedural) support
 
-The lowering resolves imports + function calls to trace taint across files. Current
-reach, per `interprocedural.test.vyql`:
+The lowering resolves imports + function calls to trace taint across files. Reach, per
+`interprocedural.test.vyql`:
 
 | Language | Cross-file trace |
 |---|---|
-| Python, Ruby, PHP, Go | ✅ full — 2–3 hop chains, sanitizers in any file, framework-parameterized forms |
-| JavaScript | 🟡 partial — `module.exports = { … }` object methods resolve; bare `exports.fn = function` does not |
-| Java | 🚫 cross-class method calls (controller → service → repo) are not yet traced |
+| Python, Ruby, PHP, Go | ✅ 2–3 hop chains, sanitizers in any file, framework-parameterized forms |
+| Java | ✅ cross-class controller → service → repo: static calls, `new T().m()`, fields (incl. Spring `@Autowired` DI), and `@RequestParam`/handler params as sources |
+| JavaScript | ✅ CommonJS `require('./x')` with `exports.fn = …`, `module.exports.fn = …`, and `module.exports = { fn: … }` |
 
-Known sanitizer-resolution gap: a bare `from pkg import fn; fn(x)` alias is not mapped to
-the dotted control name (`pkg.fn`), so use the dotted form (`import pkg; pkg.fn(x)`) for
-sanitizers in specs.
+Imported aliases resolve to their dotted paths, so both bare-imported **sinks** and
+**sanitizers** are recognized — e.g. `from markupsafe import escape; escape(x)` neutralizes
+like `markupsafe.escape`, and `from pathlib import Path; Path(p)` is a file-path sink.
 
 > Note: a few engine-level checks (e.g. relative confidence tiering in
 > `fidelity_test.go`) remain as Go tests because they assert on behavior that isn't a

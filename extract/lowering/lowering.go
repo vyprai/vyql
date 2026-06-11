@@ -43,9 +43,11 @@ type lowerer struct {
 	g              usg.Store
 	ctr            int
 
-	funcQual     map[string]*funcInfo   // "modkey::qual" -> info
-	funcShort    map[string][]*funcInfo // short name -> infos
-	classQual    map[string]bool        // "modkey::Class"
+	funcQual     map[string]*funcInfo         // "modkey::qual" -> info
+	funcShort    map[string][]*funcInfo       // short name -> infos
+	classQual    map[string]bool              // "modkey::Class"
+	classDefs    map[string][]string          // bare class name -> modules that define it
+	classFields  map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables map[string]map[string]importEntry
 
 	curModule string
@@ -94,6 +96,8 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		funcQual:       map[string]*funcInfo{},
 		funcShort:      map[string][]*funcInfo{},
 		classQual:      map[string]bool{},
+		classDefs:      map[string][]string{},
+		classFields:    map[string]map[string]string{},
 		importTables:   map[string]map[string]importEntry{},
 	}
 	if err := l.run(); err != nil {
@@ -165,6 +169,17 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 		switch st := s.(type) {
 		case nir.ClassDef:
 			l.classQual[modkey+"::"+st.Name] = true
+			l.classDefs[st.Name] = appendUniq(l.classDefs[st.Name], modkey)
+			// record field -> declared class type (for cross-file method resolution
+			// on field receivers, e.g. Spring `@Autowired UserService svc; svc.m()`).
+			for _, bs := range st.Body {
+				if a, ok := bs.(nir.Assign); ok && a.Type != "" && len(a.Targets) == 1 {
+					if l.classFields[modkey+"::"+st.Name] == nil {
+						l.classFields[modkey+"::"+st.Name] = map[string]string{}
+					}
+					l.classFields[modkey+"::"+st.Name][a.Targets[0]] = a.Type
+				}
+			}
 			l.register(modkey, st.Body, st.Name)
 		case nir.FuncDef:
 			prefix := ""
@@ -222,6 +237,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
 			inner.typ[l.selfName] = [2]string{l.curModule, l.curClass}
 		}
+		// seed enclosing-class field receivers so `field.method()` resolves
+		for fld, typ := range l.classFields[l.curModule+"::"+l.curClass] {
+			if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
+				inner.typ[fld] = [2]string{cm, typ}
+			}
+		}
 		l.block(st.Body, inner)
 	case nir.Assign:
 		val := l.eval(st.Value, sc)
@@ -230,6 +251,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if call, ok := st.Value.(nir.Call); ok {
 			if t, ok := l.resolveCtor(call.Callee); ok {
 				typ, hasTyp = t, true
+			}
+		}
+		if !hasTyp && st.Type != "" { // declared type (no/foreign RHS), e.g. Spring DI field
+			if cm, ok := l.classModule(st.Type, l.importTables[l.curModule]); ok {
+				typ, hasTyp = [2]string{cm, st.Type}, true
 			}
 		}
 		for _, t := range st.Targets {
@@ -410,7 +436,18 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		args = append(args, an)
 		collectValTokens(a, "", &valToks)
 	}
-	props := map[string]string{"callee_path": call.Path, "method": call.Method}
+	// A bare call to a `from mod import sym` alias is matched by adapters under its
+	// resolved dotted path, so imported sinks/sanitizers (e.g. `escape` from
+	// `markupsafe.escape`, `system` from `os.system`) are recognized.
+	calleePath := call.Path
+	if l.resolveImports {
+		if nm, ok := call.Callee.(nir.Name); ok {
+			if imp, ok := l.importTables[l.curModule][nm.ID]; ok && imp.kind == "sym" {
+				calleePath = imp.module + "." + imp.symbol
+			}
+		}
+	}
+	props := map[string]string{"callee_path": calleePath, "method": call.Method}
 	if len(valToks) > 0 {
 		props["str_args"] = strings.Join(valToks, "\x00")
 	}
@@ -475,7 +512,20 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		}
 		return nil
 	case nir.Attr:
-		base, isName := c.Base.(nir.Name)
+		// `new T().method()` — receiver is a constructor call; resolve T's method.
+		baseExpr := c.Base
+		if thru, ok := baseExpr.(nir.Thru); ok {
+			baseExpr = thru.Inner
+		}
+		if call, ok := baseExpr.(nir.Call); ok {
+			if t, ok := l.resolveCtor(call.Callee); ok {
+				if m := l.funcQual[t[0]+"::"+t[1]+"."+c.Attr]; m != nil {
+					return []*funcInfo{m}
+				}
+			}
+			return nil
+		}
+		base, isName := baseExpr.(nir.Name)
 		if !isName {
 			return nil
 		}
@@ -508,7 +558,23 @@ func (l *lowerer) classModule(name string, imports map[string]importEntry) (stri
 	if imp, ok := imports[name]; ok && imp.kind == "sym" && l.classQual[imp.module+"::"+imp.symbol] {
 		return imp.module, true
 	}
+	// Cross-module fallback: a class referenced without an import (e.g. Java
+	// same-package classes). Only when EXACTLY ONE module defines that name, to
+	// avoid wrongly linking same-named classes in unrelated files.
+	if mods := l.classDefs[name]; len(mods) == 1 {
+		return mods[0], true
+	}
 	return "", false
+}
+
+// appendUniq appends s to xs if not already present.
+func appendUniq(xs []string, s string) []string {
+	for _, x := range xs {
+		if x == s {
+			return xs
+		}
+	}
+	return append(xs, s)
 }
 
 func (l *lowerer) resolveCtor(callee nir.Expr) ([2]string, bool) {
