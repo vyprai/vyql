@@ -370,16 +370,25 @@ func (e *Engine) conceptIn(nodeID string, set map[string]bool) string {
 }
 
 func (e *Engine) prov(nodeID, concept string) string {
+	var fallback string
 	for _, l := range e.labels(nodeID) {
 		if l.Concept == concept && l.Provenance.Adapter != "" {
 			fid := l.Provenance.Fidelity
 			if fid == "" {
 				fid = "resolved"
 			}
-			return concept + " by " + l.Provenance.Adapter + "@" + fid
+			s := concept + " by " + l.Provenance.Adapter + "@" + fid
+			// an SCA advisory (CVE/GHSA) is the most specific provenance — prefer it over a
+			// generic adapter sink that labels the same node (e.g. yaml.load is both).
+			if strings.HasPrefix(l.Provenance.Adapter, "advisory:") {
+				return s
+			}
+			if fallback == "" {
+				fallback = s
+			}
 		}
 	}
-	return ""
+	return fallback
 }
 
 // fidelityCeil caps confidence by match fidelity (docs/07): a syntactic match

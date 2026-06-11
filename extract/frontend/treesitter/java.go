@@ -401,7 +401,7 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "field_access":
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "array_access":
-		return nir.Index{Base: c.expr(field(n, "array")), Path: c.dotted(field(n, "array")), Loc: L}
+		return nir.Index{Base: c.expr(field(n, "array")), Key: c.expr(field(n, "index")), Path: c.dotted(field(n, "array")), Loc: L}
 	case "method_invocation":
 		obj := field(n, "object")
 		name := c.text(field(n, "name"))

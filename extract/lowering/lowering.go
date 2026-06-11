@@ -64,6 +64,17 @@ type lowerer struct {
 	region   string
 	order    int
 	branchCt int
+
+	// container element-sensitivity: per-container-node taint of individual constant
+	// keys/indices, so `m.put("kB", tainted); m.get("kA")` reads a clean element rather
+	// than the whole (over-approximated) container. Keyed by container node id.
+	containers map[string]*containerInfo
+}
+
+type containerInfo struct {
+	elems   map[string]string // constant key/index -> element node id holding that slot's taint
+	dirty   bool              // a write with a NON-constant key happened (any key may be tainted)
+	nextIdx int               // append counter for add()/append()/push()
 }
 
 // inRegion lowers f inside a nested control region (then/else/loop/case/handler).
@@ -90,6 +101,127 @@ var mutatorMethods = map[string]bool{
 	// __setitem__ models a subscript store `container[k] = v` (frontends lower it to this
 	// synthetic call) so the container inherits the stored value's taint.
 	"__setitem__": true,
+}
+
+// keyedMutators map a key/value position: `m.put(key, val)` / `list.set(i, val)`.
+var keyedMutators = map[string]bool{"put": true, "putIfAbsent": true, "set": true}
+
+// appendMutators add at the next sequence index: `list.add(val)` / `sb.append(val)`.
+var appendMutators = map[string]bool{
+	"add": true, "append": true, "push": true, "offer": true, "offerFirst": true,
+	"offerLast": true, "addFirst": true, "addLast": true, "addElement": true, "enqueue": true,
+}
+
+// modeledContainerMethod reports whether the lowering precisely tracks a container method's
+// effect on its element slots. Any OTHER method on a tracked container (remove/insert/sort/
+// clear/pop/… — anything that may shift or invalidate keys/indices) marks it dirty so later
+// keyed reads conservatively fall back to the whole container (sound — never a false negative).
+func modeledContainerMethod(m string) bool {
+	return m == "get" || m == "__setitem__" || keyedMutators[m] || appendMutators[m]
+}
+
+// cinfo returns (creating if needed) the element-taint record for a container node.
+func (l *lowerer) cinfo(node string) *containerInfo {
+	ci := l.containers[node]
+	if ci == nil {
+		ci = &containerInfo{elems: map[string]string{}}
+		l.containers[node] = ci
+	}
+	return ci
+}
+
+// elemNode returns the synthetic node holding container[key]'s taint (created on first use).
+func (l *lowerer) elemNode(container, key, loc string) string {
+	ci := l.cinfo(container)
+	if id := ci.elems[key]; id != "" {
+		return id
+	}
+	id := l.node("Elem", loc, nil)
+	ci.elems[key] = id
+	return id
+}
+
+// constKey resolves a subscript/argument expression to a constant key string (a string or
+// integer literal, or a const-propagated variable), used to disambiguate container slots.
+func (l *lowerer) constKey(e nir.Expr, sc *scope) (string, bool) {
+	switch v := e.(type) {
+	case nir.Const:
+		if s := unquoteLit(v.Value); s != "" {
+			return s, true
+		}
+	case nir.Name:
+		if cv := sc.cnst[v.ID]; cv != "" {
+			return cv, true
+		}
+	}
+	return "", false
+}
+
+// containerRead resolves an element-sensitive read of recv[key] into result. Returns false
+// when it can't (non-constant key, or recv was never written as a container) so the caller
+// falls back to the conservative whole-container flow. A constant key that was never written
+// (and no dynamic write happened) reads CLEAN — this is the precision win.
+func (l *lowerer) containerRead(recv, result string, keyExpr nir.Expr, sc *scope) bool {
+	ci := l.containers[recv]
+	if ci == nil {
+		return false
+	}
+	key, ok := l.constKey(keyExpr, sc)
+	if !ok {
+		return false // dynamic key — any slot could be read
+	}
+	switch {
+	case ci.dirty:
+		// a shift/invalidating op happened — slot taint is unreliable, read the whole
+		// container (sound) even if a stale element node still exists for this key.
+		l.flow(recv, result)
+	case ci.elems[key] != "":
+		l.flow(ci.elems[key], result)
+	}
+	// neither dirty nor a known tainted slot → clean (the precision win)
+	return true
+}
+
+// containerWrite records an element-sensitive write into recv and keeps the whole container
+// tainted (for whole-container reads / dynamic-key gets). Recognised keyed/append mutators
+// taint a specific slot; any other mutator marks the container dirty (unknown slot).
+func (l *lowerer) containerWrite(call nir.Call, args []string, recv string, sc *scope) {
+	switch {
+	case keyedMutators[call.Method] && len(args) == 2:
+		// map.put(key, val) / list.set(i, val) — EXACTLY two args. Other arities (e.g.
+		// configparser.set(section, key, val)) fall through to the sound default.
+		l.flow(args[1], recv)
+		if key, ok := l.constKey(call.Args[0], sc); ok {
+			l.flow(args[1], l.elemNode(recv, key, call.Loc))
+		} else {
+			l.cinfo(recv).dirty = true
+		}
+	case call.Method == "__setitem__" && len(args) >= 1:
+		// synthetic subscript store, args = [value, key]
+		l.flow(args[0], recv)
+		if len(call.Args) >= 2 {
+			if key, ok := l.constKey(call.Args[1], sc); ok {
+				l.flow(args[0], l.elemNode(recv, key, call.Loc))
+				return
+			}
+		}
+		l.cinfo(recv).dirty = true
+	case appendMutators[call.Method] && len(args) == 1:
+		// list.add(val) / sb.append(val) — EXACTLY one arg (a 2-arg add(i, e) is an insert
+		// that shifts indices, handled by the sound default below).
+		l.flow(args[0], recv)
+		ci := l.cinfo(recv)
+		l.flow(args[0], l.elemNode(recv, strconv.Itoa(ci.nextIdx), call.Loc))
+		ci.nextIdx++
+	default:
+		// bulk / wrong-arity / unknown mutator (putAll/addAll/insert/configparser.set/…):
+		// every arg taints the container and any constant slot may now be tainted — mark
+		// dirty so later keyed reads fall back to the whole container (sound, never an FN).
+		for _, a := range args {
+			l.flow(a, recv)
+		}
+		l.cinfo(recv).dirty = true
+	}
 }
 
 // constStr returns the string value of a literal expression (unquoted), or "".
@@ -216,6 +348,7 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		classDefs:      map[string][]string{},
 		classFields:    map[string]map[string]string{},
 		importTables:   map[string]map[string]importEntry{},
+		containers:     map[string]*containerInfo{},
 	}
 	if err := l.run(); err != nil {
 		return nil, err
@@ -500,7 +633,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
 		n := l.node("Subscript", ex.Loc, map[string]string{"callee_path": ex.Path})
-		l.flow(base, n)
+		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
+		if !l.containerRead(base, n, ex.Key, sc) {
+			l.flow(base, n)
+		}
 		return n
 	case nir.Call:
 		return l.evalCall(ex, sc)
@@ -671,14 +807,19 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	result := l.node("Call", call.Loc, props)
 	if recvNode != "" { // receiver taint (chained calls)
-		l.flow(recvNode, result)
+		// a container get with a CONSTANT key reads only that slot (element-sensitive), so
+		// `m.put("kB", p); m.get("kA")` stays clean. Anything else flows the whole receiver
+		// (chained-call taint / dynamic key — over-approximation).
+		if !(call.Method == "get" && len(call.Args) == 1 && l.containerRead(recvNode, result, call.Args[0], sc)) {
+			l.flow(recvNode, result)
+		}
 		// a collection/builder MUTATOR taints its receiver from the added value, so a
 		// later read or a sink fed the whole container sees the taint (e.g.
-		// list.add(param); ProcessBuilder(list)). Recall-oriented over-approximation.
+		// list.add(param); ProcessBuilder(list)). Element-sensitive per constant key.
 		if mutatorMethods[call.Method] {
-			for _, a := range args {
-				l.flow(a, recvNode)
-			}
+			l.containerWrite(call, args, recvNode, sc)
+		} else if ci := l.containers[recvNode]; ci != nil && !modeledContainerMethod(call.Method) {
+			ci.dirty = true // remove/insert/sort/… may shift slots — fall back to whole container
 		}
 	}
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that

@@ -40,9 +40,11 @@ type Attr struct {
 	Loc  string
 }
 
-// Index is a subscript x[k]; Path is the dotted callee path.
+// Index is a subscript x[k]; Path is the dotted callee path. Key is the index/key
+// expression (may be nil) — used for container element-sensitivity (x[a] vs x[b]).
 type Index struct {
 	Base Expr
+	Key  Expr
 	Path string
 	Loc  string
 }

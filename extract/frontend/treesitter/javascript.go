@@ -485,7 +485,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "member_expression":
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "property")), Path: c.dotted(n), Loc: L}
 	case "subscript_expression":
-		return nir.Index{Base: c.expr(field(n, "object")), Path: c.dotted(field(n, "object")), Loc: L}
+		return nir.Index{Base: c.expr(field(n, "object")), Key: c.expr(field(n, "index")), Path: c.dotted(field(n, "object")), Loc: L}
 	case "call_expression":
 		fn := field(n, "function")
 		path := c.dotted(fn)
