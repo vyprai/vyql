@@ -215,7 +215,11 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	// branch-structured (B1). Java did not evaluate the condition before, so Cond stays
 	// nil → the flattened node set is byte-identical.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		// Separate Then/Else branches (not a flattened single list) so the join-merge
+		// keeps a value tainted on one path even when the other path overwrites it with a
+		// constant (`if (c) x = src(); else x = "safe";`). A nested if/else in either
+		// branch is structured by c.stmt (proper else-if chaining).
+		return []nir.Stmt{nir.If{Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
 	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "enhanced_for_statement":
@@ -248,6 +252,18 @@ func (c *jvConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// branchBody flattens a single if-branch body: a `{}` block, a brace-less single
+// statement, or a nested control statement (structured by c.stmt).
+func (c *jvConv) branchBody(b *tree_sitter.Node) []nir.Stmt {
+	if b == nil {
+		return nil
+	}
+	if b.Kind() == "block" {
+		return c.block(b)
+	}
+	return c.stmt(b)
 }
 
 func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {

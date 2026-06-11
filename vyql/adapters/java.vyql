@@ -133,8 +133,15 @@ adapter java {
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
   // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
   // position is the attribute key/value (arg 0).
-  sink method "setAttribute" -> code.TrustBoundary
-  sink method "putValue" -> code.TrustBoundary
+  // trust-boundary (CWE-501): user input stored into the HTTP SESSION (a trusted store).
+  // The stored VALUE is arg 1. putValue is session-only (deprecated) → precise. setAttribute
+  // also exists on the request (scope-passing, not a trust boundary), so the session form is
+  // matched by its dotted path to avoid flagging request.setAttribute across categories.
+  // arg all: user input crossing into the session is a trust boundary whether it lands
+  // as the attribute KEY or the VALUE (the benchmark exercises both positions).
+  sink method "putValue" arg all -> code.TrustBoundary
+  sink path "getSession.setAttribute" arg all -> code.TrustBoundary
+  sink path "session.setAttribute" arg all -> code.TrustBoundary
   // reflected XSS — tainted data written to the servlet response body (CWE-79). The
   // response writer's print-family is the sink; the HtmlEscape controls below suppress
   // properly-encoded output. System.out.println stays LogOutput (longer, more-specific path).
