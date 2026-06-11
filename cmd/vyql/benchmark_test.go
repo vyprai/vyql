@@ -28,11 +28,22 @@ func TestOWASPBenchmark(t *testing.T) {
 	}
 
 	rules, _ := loadRules("")
-	scanRoots := []string{filepath.Join(dir, "testcode"), filepath.Join(dir, "helpers")}
+	// python layout: testcode/ + helpers/. java layout: src/main/java (testcode + helpers).
+	candidates := [][]string{
+		{filepath.Join(dir, "testcode"), filepath.Join(dir, "helpers")},
+		{filepath.Join(dir, "src", "main", "java")},
+	}
 	var roots []string
-	for _, r := range scanRoots {
-		if _, err := os.Stat(r); err == nil {
-			roots = append(roots, r)
+	for _, set := range candidates {
+		var have []string
+		for _, r := range set {
+			if _, err := os.Stat(r); err == nil {
+				have = append(have, r)
+			}
+		}
+		if len(have) > 0 {
+			roots = have
+			break
 		}
 	}
 	if len(roots) == 0 {
@@ -115,8 +126,8 @@ var ruleCategory = map[string]string{
 	"VYQL-INJ-004":   "xss",
 	"VYQL-INJ-005":   "ldapi",
 	"VYQL-INJ-006":   "xpathi",
-	"VYQL-CRY-001":   "hash",
-	"VYQL-CRY-002":   "hash",
+	"VYQL-CRY-001":   "hash",   // weak hash/digest (MD5/SHA1)
+	"VYQL-CRY-002":   "crypto", // weak cipher (DES/RC4/ECB)
 	"VYQL-CRY-003":   "weakrand",
 	"VYQL-CFG-007":   "securecookie",
 	"VYQL-RF-002":    "redirect",

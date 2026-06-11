@@ -151,6 +151,12 @@ adapter java {
   mark "Cipher.getInstance" val "ECB" -> code.WeakCipher
   // NullCipher (CWE-327) — a "cipher" that performs no encryption at all.
   mark "NullCipher" -> code.WeakCipher
+  // weak randomness (CWE-330) — java.util.Random / Math.random (presence). SecureRandom is
+  // the CSPRNG and is deliberately NOT marked.
+  mark "java.util.Random" -> code.WeakRandomValue
+  mark "Random" -> code.WeakRandomValue
+  mark "Math.random" -> code.WeakRandomValue
+  mark "ThreadLocalRandom.current" -> code.WeakRandomValue
   // Weak hash: MD2/MD5/SHA-1 via MessageDigest.getInstance("MD5") etc.
   mark "MessageDigest.getInstance" val "MD2" -> code.WeakHash
   mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
