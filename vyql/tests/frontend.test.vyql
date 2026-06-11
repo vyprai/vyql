@@ -82,3 +82,23 @@ test "clean: a same-origin constant redirect"
   ```
   window.location.href = "/dashboard";
   ```
+
+# Framework breadth
+test "angular: bypassSecurityTrustHtml on tainted input is XSS"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  function render(sanitizer) {
+    const u = location.hash;
+    return sanitizer.bypassSecurityTrustHtml(u);
+  }
+  ```
+
+test "dom: document.cookie -> innerHTML is DOM-XSS"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  el.innerHTML = document.cookie;
+  ```

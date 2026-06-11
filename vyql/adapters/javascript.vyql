@@ -49,6 +49,7 @@ adapter javascript {
   source "window.name" -> code.DomInput
   source "localStorage.getItem" -> code.DomInput
   source "sessionStorage.getItem" -> code.DomInput
+  source "document.cookie" -> code.DomInput
 
   sink method "query" -> code.SqlExecution
   sink method "raw" -> code.SqlExecution
@@ -156,6 +157,12 @@ adapter javascript {
   sink path "insertAdjacentHTML" arg 1 -> code.HtmlRender
   sink path "$.html" -> code.HtmlRender
   sink path "el.html" -> code.HtmlRender
+  // Angular: bypassSecurityTrust* defeats the sanitizer (untrusted -> trusted HTML/URL)
+  sink method "bypassSecurityTrustHtml" -> code.HtmlRender
+  sink method "bypassSecurityTrustUrl" -> code.HtmlRender
+  sink method "bypassSecurityTrustResourceUrl" -> code.HtmlRender
+  sink method "bypassSecurityTrustScript" -> code.HtmlRender
+  sink method "bypassSecurityTrustStyle" -> code.HtmlRender
   sink path "handlebars.compile" -> code.TemplateRender
   sink path "Handlebars.compile" -> code.TemplateRender
   sink path "ejs.render" -> code.TemplateRender

@@ -1,0 +1,9 @@
+// Reusable library / SDK. There is no single entry point — any caller may pass attacker
+// data through a public API. Treat externally-derived data and any user-controlled value
+// as untrusted, and flag unsafe defaults. (Public-API-param tainting is conceptual; the
+// permissive source set approximates it.)
+profile library {
+  title: "Library / SDK"
+  detect: ["file:setup.py", "file:pyproject.toml", "dep:rollup", "dep:tsup"]
+  entrypoints: [UserControlledData, ExternalApiResponse, HttpInput, DatabaseRead, SecretValue]
+}
