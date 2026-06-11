@@ -274,13 +274,6 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic"})
 						continue
 					}
-					arg := n.Prop("arg" + strconv.Itoa(sk.ArgIndex))
-					if arg == "" {
-						continue
-					}
-					if a, ok, _ := s.GetNode(arg); ok && a.Prop("vkind") == "Seq" {
-						continue
-					}
 					fidelity := "resolved"
 					if sk.ByMethod {
 						fidelity = "syntactic"
@@ -294,6 +287,28 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						default:
 							continue // known, conflicting type — not this sink
 						}
+					}
+					// arg all (ArgIndex == -1): any tainted argument is the vuln (e.g. a
+					// writer .format/.printf where the injectable value can be at any position).
+					if sk.ArgIndex < 0 {
+						for ai := 0; ; ai++ {
+							arg := n.Prop("arg" + strconv.Itoa(ai))
+							if arg == "" {
+								break
+							}
+							if a, ok, _ := s.GetNode(arg); ok && a.Prop("vkind") == "Seq" {
+								continue
+							}
+							out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity})
+						}
+						continue
+					}
+					arg := n.Prop("arg" + strconv.Itoa(sk.ArgIndex))
+					if arg == "" {
+						continue
+					}
+					if a, ok, _ := s.GetNode(arg); ok && a.Prop("vkind") == "Seq" {
+						continue
 					}
 					out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity})
 				}

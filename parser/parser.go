@@ -478,9 +478,12 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 			}
 			pat := p.parsePattern()
 			m := AdapterMapping{Kind: kind, Pattern: pat}
-			if p.atWord("arg") { // which argument is dangerous (default 0)
+			if p.atWord("arg") { // which argument is dangerous (default 0; `arg all` = every arg)
 				p.next()
-				if n, err := strconv.Atoi(p.expect(tWord, "arg index").val); err == nil {
+				if p.atWord("all") {
+					p.next()
+					m.ArgIndex = -1
+				} else if n, err := strconv.Atoi(p.expect(tWord, "arg index").val); err == nil {
 					m.ArgIndex = n
 				}
 			}

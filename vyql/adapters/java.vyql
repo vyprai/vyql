@@ -108,6 +108,13 @@ adapter java {
   // Code eval / scripting
   sink method "eval" -> code.CodeEval
 
+  // XPath injection (CWE-643) — javax.xml.xpath: XPath.evaluate(expr, doc) / XPath.compile(expr)
+  // and the JAXP XPathExpression returned by compile. The expression string (arg 0) is injectable.
+  sink method "evaluate" arg 0 on XPath -> code.XpathQuery
+  sink method "compile" arg 0 on XPath -> code.XpathQuery
+  sink path "XPath.evaluate" arg 0 -> code.XpathQuery
+  sink path "XPath.compile" arg 0 -> code.XpathQuery
+
   // LDAP injection (CWE-90) — JNDI DirContext.search(name, filter, controls): the FILTER
   // (arg 1) is injectable. Typed sink (on DirContext) + unambiguous dotted ctor forms.
   sink method "search" arg 1 on DirContext -> code.LdapQuery
@@ -131,11 +138,13 @@ adapter java {
   // reflected XSS — tainted data written to the servlet response body (CWE-79). The
   // response writer's print-family is the sink; the HtmlEscape controls below suppress
   // properly-encoded output. System.out.println stays LogOutput (longer, more-specific path).
-  sink method "println" -> code.HtmlRender
-  sink method "print" -> code.HtmlRender
-  sink method "printf" -> code.HtmlRender
-  sink method "write" -> code.HtmlRender
-  sink method "format" -> code.HtmlRender
+  // arg all: the injectable value can sit at any position — println(x), printf(fmt, x),
+  // format(Locale, fmt, x) — so a tainted arg anywhere triggers the sink.
+  sink method "println" arg all -> code.HtmlRender
+  sink method "print" arg all -> code.HtmlRender
+  sink method "printf" arg all -> code.HtmlRender
+  sink method "write" arg all -> code.HtmlRender
+  sink method "format" arg all -> code.HtmlRender
   control "escapeHtml" -> core.HtmlEscape
   control "Encode.forHtml" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape

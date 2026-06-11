@@ -216,8 +216,16 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	// nil → the flattened node set is byte-identical.
 	case "if_statement":
 		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
-	case "while_statement", "for_statement", "enhanced_for_statement", "do_statement":
+	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+	case "enhanced_for_statement":
+		// `for (T x : coll)` — bind the loop variable to the iterable so a tainted
+		// collection taints each element (flow-approximate element-of).
+		body := c.collectBlocks(n)
+		if nm, val := field(n, "name"), field(n, "value"); nm != nil && val != nil {
+			body = append([]nir.Stmt{nir.Assign{Targets: []string{c.text(nm)}, Value: c.expr(val)}}, body...)
+		}
+		return []nir.Stmt{nir.Loop{Body: body}}
 	case "try_statement", "try_with_resources_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
 	case "switch_expression", "block", "synchronized_statement":
