@@ -31,4 +31,32 @@ adapter perl {
   sink path "open" -> code.FilePathAccess
   sink path "opendir" -> code.FilePathAccess
   sink path "unlink" -> code.FilePathAccess
+
+  // SSRF — LWP::Simple / LWP::UserAgent / HTTP::Tiny (URL is the call argument)
+  sink path "getstore" -> code.UrlFetch
+  sink path "getprint" -> code.UrlFetch
+  sink path "mirror" -> code.UrlFetch
+  sink method "request" -> code.UrlFetch
+
+  // weak crypto (CWE-327) — Digest::MD5 / Digest::SHA1 (`::` normalized to `.`)
+  mark "md5_hex" -> code.WeakHash
+  mark "md5_base64" -> code.WeakHash
+  mark "Digest.MD5" -> code.WeakHash
+  mark "sha1_hex" -> code.WeakHash
+  mark "Digest.SHA1" -> code.WeakHash
+
+  // deserialization (CWE-502) — Storable
+  sink path "Storable.thaw" -> code.Deserialization
+  sink method "thaw" -> code.Deserialization
+  sink path "retrieve" -> code.Deserialization
+
+  // XXE (CWE-611) — XML::LibXML parser
+  sink method "parse_string" -> code.XmlParse
+  sink method "parse_file" -> code.XmlParse
+  sink method "load_xml" -> code.XmlParse
+
+  // controls (sanitizers)
+  control "quotemeta" -> core.ShellEscape
+  control "encode_entities" -> core.HtmlEscape
+  control "escapeHTML" -> core.HtmlEscape
 }

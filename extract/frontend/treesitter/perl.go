@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 
 	pl "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/perl"
@@ -257,9 +259,11 @@ func (c *plConv) dotted(n *tree_sitter.Node) string {
 	case "scalar", "array", "hash", "varname":
 		return c.plVarName(n)
 	case "function", "bareword", "method":
-		return c.text(n)
+		// normalize package separator `::` to `.` so dotted paths are boundary-
+		// matchable like every other language (Digest::MD5::md5_hex -> Digest.MD5.md5_hex).
+		return strings.ReplaceAll(c.text(n), "::", ".")
 	case "method_call_expression":
-		return c.dotted(field(n, "invocant")) + "." + c.text(field(n, "method"))
+		return c.dotted(field(n, "invocant")) + "." + strings.ReplaceAll(c.text(field(n, "method")), "::", ".")
 	case "function_call_expression", "ambiguous_function_call_expression":
 		return c.dotted(field(n, "function"))
 	case "hash_element_expression":
