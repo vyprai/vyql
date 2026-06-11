@@ -1,0 +1,380 @@
+# Interprocedural / multi-file call-trace tests: untrusted input enters in one file
+# (a framework entrypoint) and reaches a sink in another, through 2-3 hops. Each
+# weakness has positive (vulnerable) and negative (sanitized / parameterized) forms,
+# with the neutralization placed in the SOURCE file, an INTERMEDIATE file, the SINK
+# file, or provided by the framework.
+#
+# Engine cross-file support (see vyql/tests/README): Python, Ruby, PHP, Go trace
+# fully; JavaScript partially (object-export); Java cross-class is not yet traced.
+
+# ============================================================================
+# Python (Flask) — full interprocedural
+# ============================================================================
+
+test "py: Flask view -> service -> repo, raw SQL is SQLi (3-hop)"
+  lang python
+  expect VYQL-INJ-001
+  file views.py
+  ```
+  from service import handle
+  def index():
+      handle(request.args['name'])
+  ```
+  file service.py
+  ```
+  from repo import run
+  def handle(v):
+      run(v)
+  ```
+  file repo.py
+  ```
+  def run(value):
+      cursor.execute("SELECT * FROM users WHERE name = '" + value + "'")
+  ```
+
+test "py: parameterized query in the repo (sink file) is clean"
+  lang python
+  reject VYQL-INJ-001
+  file views.py
+  ```
+  from repo import run
+  def index():
+      run(request.args['name'])
+  ```
+  file repo.py
+  ```
+  def run(value):
+      cursor.execute("SELECT * FROM users WHERE name = %s", (value,))
+  ```
+
+test "py: command injection across files is positive"
+  lang python
+  expect VYQL-INJ-002
+  file views.py
+  ```
+  from runner import run
+  def index():
+      run(request.args['host'])
+  ```
+  file runner.py
+  ```
+  import os
+  def run(value):
+      os.system("ping " + value)
+  ```
+
+test "py: shlex.quote in the INTERMEDIATE file neutralizes the command injection"
+  lang python
+  reject VYQL-INJ-002
+  file views.py
+  ```
+  from service import handle
+  def index():
+      handle(request.args['host'])
+  ```
+  file service.py
+  ```
+  import shlex
+  from runner import run
+  def handle(v):
+      run(shlex.quote(v))
+  ```
+  file runner.py
+  ```
+  import os
+  def run(value):
+      os.system("ping " + value)
+  ```
+
+test "py: XSS across files (Markup sink) is positive"
+  lang python
+  expect VYQL-INJ-004
+  file views.py
+  ```
+  from render import show
+  def index():
+      show(request.args['name'])
+  ```
+  file render.py
+  ```
+  def show(v):
+      return Markup(v)
+  ```
+
+test "py: html.escape in the SOURCE file neutralizes the XSS"
+  lang python
+  reject VYQL-INJ-004
+  file views.py
+  ```
+  import html
+  from render import show
+  def index():
+      show(html.escape(request.args['name']))
+  ```
+  file render.py
+  ```
+  def show(v):
+      return Markup(v)
+  ```
+
+test "py: html.escape in the SINK file neutralizes the XSS"
+  lang python
+  reject VYQL-INJ-004
+  file views.py
+  ```
+  from render import show
+  def index():
+      show(request.args['name'])
+  ```
+  file render.py
+  ```
+  import html
+  def show(v):
+      return Markup(html.escape(v))
+  ```
+
+test "py: one safe route does not suppress a second vulnerable route"
+  lang python
+  expect VYQL-INJ-001
+  file views.py
+  ```
+  from repo import run
+  def safe():
+      run_safe(request.args['a'])
+  def vuln():
+      run(request.args['b'])
+  ```
+  file repo.py
+  ```
+  def run_safe(value):
+      cursor.execute("SELECT * FROM t WHERE a = %s", (value,))
+  def run(value):
+      cursor.execute("SELECT * FROM t WHERE b = '" + value + "'")
+  ```
+
+# ============================================================================
+# Ruby (Rails) — full interprocedural
+# ============================================================================
+
+test "ruby: controller -> service -> model, raw SQL is SQLi (3-hop)"
+  lang ruby
+  expect VYQL-INJ-001
+  file users_controller.rb
+  ```
+  class UsersController
+    def search; Service.handle(params[:name]); end
+  end
+  ```
+  file service.rb
+  ```
+  class Service
+    def self.handle(v); Repo.run(v); end
+  end
+  ```
+  file repo.rb
+  ```
+  class Repo
+    def self.run(value)
+      ActiveRecord::Base.connection.execute("SELECT * FROM users WHERE name = '" + value + "'")
+    end
+  end
+  ```
+
+test "ruby: parameterized where across files is clean (framework)"
+  lang ruby
+  reject VYQL-INJ-001
+  file c.rb
+  ```
+  class C
+    def search; Repo.run(params[:name]); end
+  end
+  ```
+  file repo.rb
+  ```
+  class Repo
+    def self.run(value)
+      User.where("name = ?", value)
+    end
+  end
+  ```
+
+test "ruby: ActiveRecord hash condition across files is clean (framework)"
+  lang ruby
+  reject VYQL-INJ-001
+  file c.rb
+  ```
+  class C
+    def search; Repo.run(params[:name]); end
+  end
+  ```
+  file repo.rb
+  ```
+  class Repo
+    def self.run(value)
+      User.where(name: value)
+    end
+  end
+  ```
+
+test "ruby: Shellwords.escape in the SINK file neutralizes the command injection"
+  lang ruby
+  reject VYQL-INJ-002
+  file c.rb
+  ```
+  class C
+    def ping; Runner.run(params[:host]); end
+  end
+  ```
+  file runner.rb
+  ```
+  require 'shellwords'
+  class Runner
+    def self.run(value)
+      system("ping " + Shellwords.escape(value))
+    end
+  end
+  ```
+
+test "ruby: command injection across files (no escape) is positive"
+  lang ruby
+  expect VYQL-INJ-002
+  file c.rb
+  ```
+  class C
+    def ping; Runner.run(params[:host]); end
+  end
+  ```
+  file runner.rb
+  ```
+  class Runner
+    def self.run(value)
+      system("ping " + value)
+    end
+  end
+  ```
+
+# ============================================================================
+# PHP — full interprocedural
+# ============================================================================
+
+test "php: controller -> service -> dao, raw SQL is SQLi (3-hop)"
+  lang php
+  expect VYQL-INJ-001
+  file ctrl.php
+  ```
+  <?php require 'service.php'; function h($c) { svc($c, $_GET['name']); }
+  ```
+  file service.php
+  ```
+  <?php require 'dao.php'; function svc($c, $v) { dao($c, $v); }
+  ```
+  file dao.php
+  ```
+  <?php function dao($c, $value) { mysqli_query($c, "SELECT * FROM u WHERE n='" . $value . "'"); }
+  ```
+
+test "php: mysqli_real_escape_string in the SOURCE file neutralizes the SQLi"
+  lang php
+  reject VYQL-INJ-001
+  file ctrl.php
+  ```
+  <?php require 'dao.php';
+  function h($c) { dao($c, mysqli_real_escape_string($c, $_GET['name'])); }
+  ```
+  file dao.php
+  ```
+  <?php function dao($c, $value) { mysqli_query($c, "SELECT * FROM u WHERE n='" . $value . "'"); }
+  ```
+
+test "php: command injection across files is positive"
+  lang php
+  expect VYQL-INJ-002
+  file ctrl.php
+  ```
+  <?php require 'runner.php'; function h() { run($_GET['host']); }
+  ```
+  file runner.php
+  ```
+  <?php function run($value) { system("ping " . $value); }
+  ```
+
+test "php: escapeshellarg in the SINK file neutralizes the command injection"
+  lang php
+  reject VYQL-INJ-002
+  file ctrl.php
+  ```
+  <?php require 'runner.php'; function h() { run($_GET['host']); }
+  ```
+  file runner.php
+  ```
+  <?php function run($value) { system("ping " . escapeshellarg($value)); }
+  ```
+
+# ============================================================================
+# Go — full interprocedural (same package, multiple files)
+# ============================================================================
+
+test "go: handler -> service -> repo, raw SQL is SQLi (3-hop)"
+  lang go
+  expect VYQL-INJ-001
+  file h.go
+  ```
+  package app
+  import "net/http"
+  func handler(r *http.Request) { svc(r.URL.Query().Get("name")) }
+  ```
+  file service.go
+  ```
+  package app
+  func svc(v string) { repo(v) }
+  ```
+  file repo.go
+  ```
+  package app
+  func repo(value string) { db.Query("SELECT * FROM u WHERE n = '" + value + "'") }
+  ```
+
+test "go: parameterized query in the repo is clean"
+  lang go
+  reject VYQL-INJ-001
+  file h.go
+  ```
+  package app
+  import "net/http"
+  func handler(r *http.Request) { repo(r.URL.Query().Get("name")) }
+  ```
+  file repo.go
+  ```
+  package app
+  func repo(value string) { db.Query("SELECT * FROM u WHERE n = $1", value) }
+  ```
+
+# ============================================================================
+# JavaScript (Express) — partial cross-file (object-export forwarding)
+# ============================================================================
+
+test "js: tainted SQL built in route, forwarded through a db module, is SQLi"
+  lang javascript
+  expect VYQL-INJ-001
+  file app.js
+  ```
+  const db = require('./db');
+  app.get('/u', (req, res) => { db.query("SELECT * FROM u WHERE n = '" + req.query.n + "'"); });
+  ```
+  file db.js
+  ```
+  module.exports = { query: function (s) { connection.query(s); } };
+  ```
+
+test "js: parameterized query forwarded through a db module is clean"
+  lang javascript
+  reject VYQL-INJ-001
+  file app.js
+  ```
+  const db = require('./db');
+  app.get('/u', (req, res) => { db.query("SELECT * FROM u WHERE n = $1", [req.query.n]); });
+  ```
+  file db.js
+  ```
+  module.exports = { query: function (s, p) { connection.query(s, p); } };
+  ```
