@@ -94,8 +94,19 @@ adapter java {
   sink path "MVEL.evalToBoolean" -> code.ExpressionEval
   sink method "createExpression" -> code.ExpressionEval
 
-  // weak cipher mode ECB (CWE-327)
+  // weak crypto (CWE-327) — named-value on the algorithm-spec string argument.
+  // Weak cipher: DES/DESede(3DES)/RC4(ARCFOUR)/RC2/Blowfish, or ECB mode (any cipher).
+  mark "Cipher.getInstance" val "DES" -> code.WeakCipher
+  mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
+  mark "Cipher.getInstance" val "ARCFOUR" -> code.WeakCipher
+  mark "Cipher.getInstance" val "RC2" -> code.WeakCipher
+  mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
   mark "Cipher.getInstance" val "ECB" -> code.WeakCipher
+  // Weak hash: MD2/MD5/SHA-1 via MessageDigest.getInstance("MD5") etc.
+  mark "MessageDigest.getInstance" val "MD2" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "SHA1" -> code.WeakHash
 
   // server-side template injection (CWE-1336) — unambiguous engine entrypoints that
   // evaluate a STRING template (not load-by-name): Velocity static evaluate, Pebble

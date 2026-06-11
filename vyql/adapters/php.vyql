@@ -91,4 +91,18 @@ adapter php {
   // email-header injection (CWE-93) — mail($to,$subj,$body,$headers): tainted CRLF in the
   // additional-headers arg (index 3) injects extra headers / a second message.
   sink path "mail" arg 3 -> code.MailHeaderWrite
+
+  // weak crypto (CWE-327) — named-value on the algorithm string.
+  // Cipher: openssl_encrypt($d, "des-ede3-cbc"/"rc4"/"...-ecb", ...) / mcrypt des/rc4.
+  mark "openssl_encrypt" val "des" -> code.WeakCipher
+  mark "openssl_encrypt" val "rc4" -> code.WeakCipher
+  mark "openssl_encrypt" val "rc2" -> code.WeakCipher
+  mark "openssl_encrypt" val "bf-" -> code.WeakCipher
+  mark "openssl_encrypt" val "ecb" -> code.WeakCipher
+  mark "mcrypt_encrypt" val "des" -> code.WeakCipher
+  mark "mcrypt_encrypt" val "rc4" -> code.WeakCipher
+  // Hash: explicit hash("md5"/"sha1", ...) — clearer security signal than bare md5().
+  mark "hash" val "md5" -> code.WeakHash
+  mark "hash" val "sha1" -> code.WeakHash
+  mark "hash_hmac" val "md5" -> code.WeakHash
 }

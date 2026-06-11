@@ -77,4 +77,17 @@ adapter csharp {
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "Regex" -> code.RegexCompile
+
+  // weak crypto (CWE-327) — broken cipher/hash constructors (presence)
+  mark "DES.Create" -> code.WeakCipher
+  mark "TripleDES.Create" -> code.WeakCipher
+  mark "RC2.Create" -> code.WeakCipher
+  mark "DESCryptoServiceProvider" -> code.WeakCipher
+  mark "TripleDESCryptoServiceProvider" -> code.WeakCipher
+  mark "RC2CryptoServiceProvider" -> code.WeakCipher
+  mark "MD5.Create" -> code.WeakHash
+  mark "SHA1.Create" -> code.WeakHash
+  mark "MD5CryptoServiceProvider" -> code.WeakHash
+  mark "SHA1CryptoServiceProvider" -> code.WeakHash
+  mark "SHA1Managed" -> code.WeakHash
 }

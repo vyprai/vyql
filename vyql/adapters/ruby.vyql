@@ -132,7 +132,18 @@ adapter ruby {
   sink method "update_attributes" -> code.MassAssign
   sink method "assign_attributes" -> code.MassAssign
 
-  // weak cipher (CWE-327) — named broken ciphers
+  // weak cipher (CWE-327) — named broken ciphers + named-value on Cipher.new("des-cbc")
   mark "OpenSSL.Cipher.DES" -> code.WeakCipher
   mark "OpenSSL.Cipher.RC4" -> code.WeakCipher
+  mark "OpenSSL.Cipher.new" val "des" -> code.WeakCipher
+  mark "OpenSSL.Cipher.new" val "rc4" -> code.WeakCipher
+  mark "OpenSSL.Cipher.new" val "rc2" -> code.WeakCipher
+  mark "OpenSSL.Cipher.new" val "bf" -> code.WeakCipher
+  mark "OpenSSL.Cipher.new" val "ecb" -> code.WeakCipher
+
+  // weak hash (CWE-327) — MD5/SHA1 digests
+  mark "Digest.MD5" -> code.WeakHash
+  mark "Digest.SHA1" -> code.WeakHash
+  mark "OpenSSL.Digest.MD5" -> code.WeakHash
+  mark "OpenSSL.Digest.SHA1" -> code.WeakHash
 }

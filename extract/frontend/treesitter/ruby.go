@@ -217,7 +217,8 @@ func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {
 	if len(parts) > 0 {
 		return nir.Format{Parts: parts, Loc: L}
 	}
-	return nir.Const{Loc: L}
+	// non-interpolated string: carry the literal text for value-matching (`val "…"`).
+	return nir.Const{Loc: L, Value: c.text(n)}
 }
 
 func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
