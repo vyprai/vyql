@@ -52,11 +52,19 @@ adapter java {
   sink method "queryForObject" -> code.SqlExecution
   sink method "queryForList" -> code.SqlExecution
   sink method "query" -> code.SqlExecution
+  // Spring JdbcTemplate query/update family (CWE-89) — all take the SQL as arg 0.
+  sink method "queryForRowSet" -> code.SqlExecution
+  sink method "queryForMap" -> code.SqlExecution
+  sink method "queryForInt" -> code.SqlExecution
+  sink method "queryForLong" -> code.SqlExecution
+  sink method "queryForStream" -> code.SqlExecution
+  sink method "batchUpdate" -> code.SqlExecution
 
   // Command execution
   sink method "exec" -> code.CommandExecution
   sink path "Runtime.getRuntime.exec" -> code.CommandExecution
   sink path "ProcessBuilder" -> code.CommandExecution
+  sink method "command" -> code.CommandExecution
 
   // Deserialization
   sink method "readObject" -> code.Deserialization
@@ -75,9 +83,20 @@ adapter java {
   // Path / file
   sink path "File" -> code.FilePathAccess
   sink path "FileInputStream" -> code.FilePathAccess
+  sink path "FileOutputStream" -> code.FilePathAccess
   sink path "FileReader" -> code.FilePathAccess
+  sink path "FileWriter" -> code.FilePathAccess
+  sink path "RandomAccessFile" -> code.FilePathAccess
   sink path "Files.readAllBytes" -> code.FilePathAccess
+  sink path "Files.readAllLines" -> code.FilePathAccess
   sink path "Files.newInputStream" -> code.FilePathAccess
+  sink path "Files.newOutputStream" -> code.FilePathAccess
+  sink path "Files.newBufferedReader" -> code.FilePathAccess
+  sink path "Files.newBufferedWriter" -> code.FilePathAccess
+  sink path "Files.write" -> code.FilePathAccess
+  sink path "Files.lines" -> code.FilePathAccess
+  sink path "Files.delete" -> code.FilePathAccess
+  sink path "Files.copy" -> code.FilePathAccess
   sink path "Paths.get" -> code.FilePathAccess
 
   // SSRF

@@ -76,6 +76,16 @@ func (l *lowerer) nextBranch() string {
 	return strconv.Itoa(l.branchCt)
 }
 
+// mutatorMethods add a value into their receiver (collection/builder), so the receiver
+// inherits the value's taint. Append/write cover StringBuilder/Writer; add/put/push/offer/
+// set/insert cover List/Map/Deque/Set.
+var mutatorMethods = map[string]bool{
+	"add": true, "addAll": true, "addElement": true, "addFirst": true, "addLast": true,
+	"push": true, "offer": true, "offerFirst": true, "offerLast": true, "put": true,
+	"putAll": true, "putIfAbsent": true, "set": true, "insert": true, "append": true,
+	"write": true, "enqueue": true,
+}
+
 func cloneStrMap(m map[string]string) map[string]string {
 	out := make(map[string]string, len(m))
 	for k, v := range m {
@@ -586,6 +596,14 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	result := l.node("Call", call.Loc, props)
 	if recvNode != "" { // receiver taint (chained calls)
 		l.flow(recvNode, result)
+		// a collection/builder MUTATOR taints its receiver from the added value, so a
+		// later read or a sink fed the whole container sees the taint (e.g.
+		// list.add(param); ProcessBuilder(list)). Recall-oriented over-approximation.
+		if mutatorMethods[call.Method] {
+			for _, a := range args {
+				l.flow(a, recvNode)
+			}
+		}
 	}
 	for _, a := range args {
 		l.flow(a, result)
