@@ -2,6 +2,7 @@ package sarif
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/findings"
@@ -58,5 +59,40 @@ func TestValidateCatchesBadDoc(t *testing.T) {
 	bad := map[string]any{"version": "1.0", "runs": []any{}}
 	if len(ValidateSARIF(bad)) == 0 {
 		t.Fatal("validator should reject a malformed SARIF doc")
+	}
+}
+
+// T9.1 — the SARIF 2.1.0 schema-required shape: version, $schema, a tool driver with a
+// rules array, and each result carrying a ruleId. The CWE travels on the rule metadata.
+func TestSARIFSchemaShape(t *testing.T) {
+	doc := ToSARIF([]*findings.Finding{sampleFinding()},
+		"0.1.0", map[string]map[string]any{"VYQL-INJ-001": {"cwe": []string{"CWE_89"}}})
+
+	if doc["version"] != "2.1.0" {
+		t.Errorf("SARIF version = %v, want 2.1.0", doc["version"])
+	}
+	if _, ok := doc["$schema"]; !ok {
+		t.Error("SARIF doc missing $schema")
+	}
+	run := doc["runs"].([]any)[0].(map[string]any)
+	driver := run["tool"].(map[string]any)["driver"].(map[string]any)
+	rules, ok := driver["rules"].([]any)
+	if !ok || len(rules) == 0 {
+		t.Fatalf("tool.driver.rules missing/empty: %v", driver["rules"])
+	}
+	// the result references a rule by id.
+	res := run["results"].([]any)[0].(map[string]any)
+	if res["ruleId"] != "VYQL-INJ-001" {
+		t.Errorf("result.ruleId = %v, want VYQL-INJ-001", res["ruleId"])
+	}
+	// the CWE metadata is carried somewhere on the emitted rule object.
+	foundCWE := false
+	for _, r := range rules {
+		if blob, err := json.Marshal(r); err == nil && strings.Contains(string(blob), "CWE") {
+			foundCWE = true
+		}
+	}
+	if !foundCWE {
+		t.Error("rule metadata does not carry the CWE")
 	}
 }
