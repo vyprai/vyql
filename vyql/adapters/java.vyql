@@ -135,7 +135,7 @@ adapter java {
   sink method "print" -> code.HtmlRender
   sink method "printf" -> code.HtmlRender
   sink method "write" -> code.HtmlRender
-  sink method "format" arg 1 -> code.HtmlRender
+  sink method "format" -> code.HtmlRender
   control "escapeHtml" -> core.HtmlEscape
   control "Encode.forHtml" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape

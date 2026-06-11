@@ -86,6 +86,14 @@ var mutatorMethods = map[string]bool{
 	"write": true, "enqueue": true,
 }
 
+// constStr returns the string value of a literal expression (unquoted), or "".
+func constStr(e nir.Expr) string {
+	if c, ok := e.(nir.Const); ok {
+		return unquoteLit(c.Value)
+	}
+	return ""
+}
+
 func cloneStrMap(m map[string]string) map[string]string {
 	out := make(map[string]string, len(m))
 	for k, v := range m {
@@ -128,6 +136,7 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 			l.flow(s, phi)
 		}
 		sc.node[v] = phi
+		delete(sc.cnst, v) // a merged value is no longer a known constant
 	}
 }
 
@@ -135,10 +144,11 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 type scope struct {
 	node map[string]string
 	typ  map[string][2]string
+	cnst map[string]string // variable -> its string-constant value (lightweight const-prop)
 }
 
 func newScope() *scope {
-	return &scope{node: map[string]string{}, typ: map[string][2]string{}}
+	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}}
 }
 
 func (s *scope) clone() *scope {
@@ -341,10 +351,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				typ, hasTyp = [2]string{cm, st.Type}, true
 			}
 		}
+		cv := constStr(st.Value)
 		for _, t := range st.Targets {
 			sc.node[t] = val
 			if hasTyp {
 				sc.typ[t] = typ
+			}
+			if cv != "" {
+				sc.cnst[t] = cv // x = "literal"
+			} else {
+				delete(sc.cnst, t) // reassigned to a non-constant → value unknown
 			}
 		}
 	case nir.AugAssign:
@@ -565,6 +581,13 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		l.flow(av, an)
 		args = append(args, an)
 		collectValTokens(a, "", &valToks)
+		// const-prop: a variable holding a string literal contributes that literal to the
+		// value tokens, so `algo = "MD5"; getInstance(algo)` value-matches like the inline form.
+		if nm, ok := a.(nir.Name); ok {
+			if cv := sc.cnst[nm.ID]; cv != "" {
+				valToks = append(valToks, cv)
+			}
+		}
 	}
 	// A bare call to a `from mod import sym` alias is matched by adapters under its
 	// resolved dotted path, so imported sinks/sanitizers (e.g. `escape` from
