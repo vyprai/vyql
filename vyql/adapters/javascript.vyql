@@ -93,6 +93,13 @@ adapter javascript {
   control "checkPermission" -> core.AuthorizationCheck
   control "hasPermission" -> core.AuthorizationCheck
   control "ability.can" -> core.AuthorizationCheck
+  // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
+  control "isSafeRedirect" -> core.RedirectAllowlist
+  control "isValidRedirect" -> core.RedirectAllowlist
+  control "isAllowedRedirect" -> core.RedirectAllowlist
+  control "isUrlAllowed" -> core.AllowlistValidation
+  control "isAllowedHost" -> core.AllowlistValidation
+  control "validateUrl" -> core.AllowlistValidation
   // Electron: shell.openExternal can launch arbitrary apps/protocols from a URL
   sink path "shell.openExternal" -> code.CommandExecution
   // Electron insecure renderer config (named-value on the BrowserWindow options)

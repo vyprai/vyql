@@ -36,8 +36,8 @@ type sinkSpec struct {
 type controlSpec struct {
 	Concept    string
 	Pattern    string
-	ValMatches []string // `val "substr"` (AND, marks)
-	ValAbsents []string // `nval "substr"` (AND, marks)
+	ValMatches []string // `val "substr"` (AND — marks AND controls)
+	ValAbsents []string // `nval "substr"` (AND — marks AND controls)
 }
 
 // activeSources, when non-nil, restricts which source concepts the input adapters
@@ -167,7 +167,8 @@ func loadSpec(tech string) adapterSpec {
 			// `u.toRegex()`); match the bare method name, label the call node itself.
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "control":
-			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern})
+			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "mark":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		}
@@ -313,8 +314,9 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 					continue // only label this language's nodes
 				}
 				path := n.Prop("callee_path")
+				strArgs := n.Prop("str_args")
 				for _, c := range spec.Controls {
-					if matchPath(path, []string{c.Pattern}, "prefix") {
+					if matchPath(path, []string{c.Pattern}, "prefix") && valConds(strArgs, c.ValMatches, c.ValAbsents) {
 						out = append(out, adapters.Mapping{NodeID: id, Concept: c.Concept})
 						break
 					}

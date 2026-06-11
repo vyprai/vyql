@@ -111,6 +111,21 @@ adapter python {
   control "has_permission" -> core.AuthorizationCheck
   control "permission_required" -> core.AuthorizationCheck
   control "user_passes_test" -> core.AuthorizationCheck
+  // SSRF / open-redirect allowlist validators — guard the fetch/redirect they dominate
+  // (validators gate via control flow; B1 connects them to the sink). Django's
+  // url_has_allowed_host_and_scheme / is_safe_url is the canonical redirect check.
+  control "url_has_allowed_host_and_scheme" -> core.RedirectAllowlist
+  control "is_safe_url" -> core.RedirectAllowlist
+  control "is_safe_redirect_url" -> core.RedirectAllowlist
+  control "is_allowed_url" -> core.AllowlistValidation
+  control "is_allowed_host" -> core.AllowlistValidation
+  control "validate_url" -> core.AllowlistValidation
+  // XXE hardening — a parser configured to not resolve external entities / fetch network,
+  // dominating the parse it is passed to (value-matched config).
+  control "etree.XMLParser" val "resolve_entities=False" -> core.XmlHardening
+  control "etree.XMLParser" val "no_network=True" -> core.XmlHardening
+  control "lxml.etree.XMLParser" val "resolve_entities=False" -> core.XmlHardening
+  control "XMLParser" val "resolve_entities=False" -> core.XmlHardening
   // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
   // are a LogOutput sink (user data) AND a LogWrite mark (secret).
   sink path "logging.info" -> code.LogOutput

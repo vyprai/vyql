@@ -100,6 +100,11 @@ adapter java {
   control "hasPermission" -> core.AuthorizationCheck
   control "hasAuthority" -> core.AuthorizationCheck
   control "hasRole" -> core.AuthorizationCheck
+  // XXE hardening — a parser factory configured to disallow DOCTYPE / external entities,
+  // dominating the parse (value-matched feature flag).
+  control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
+  control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
+  control "setExpandEntityReferences" val "false" -> core.XmlHardening
   control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml3" -> core.HtmlEscape
   control "HtmlUtils.htmlEscape" -> core.HtmlEscape

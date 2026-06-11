@@ -485,10 +485,23 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 			m.Concept = p.parseQName()
 			a.Mappings = append(a.Mappings, m)
 		case p.atWord("control"):
+			// `control "fn" [val "x"] [nval "y"] -> concept` labels a sanitizer/validator on
+			// the matching CALL node so `unless sanitized_by` can kill a flow through it. The
+			// optional val/nval gate value-based hardening (e.g. resolve_entities=False).
 			p.next()
 			pat := p.parsePattern()
+			ctl := AdapterMapping{Kind: "control", Pattern: pat}
+			for p.atWord("val") {
+				p.next()
+				ctl.ValMatches = append(ctl.ValMatches, p.parsePattern())
+			}
+			for p.atWord("nval") {
+				p.next()
+				ctl.ValAbsents = append(ctl.ValAbsents, p.parsePattern())
+			}
 			p.expect(tArrow, "->")
-			a.Mappings = append(a.Mappings, AdapterMapping{Kind: "control", Pattern: pat, Concept: p.parseQName()})
+			ctl.Concept = p.parseQName()
+			a.Mappings = append(a.Mappings, ctl)
 		case p.atWord("mark"):
 			// `mark "fn" [val "x"] -> concept` labels the matching CALL node with a
 			// presence concept (for `match`-style rules — no taint flow).

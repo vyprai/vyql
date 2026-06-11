@@ -11,6 +11,7 @@ rule Xxe {
   meta { id: "VYQL-DESER-002", severity: high, cwe: [CWE_611] }
   taint core.UserControlledData -> code.XmlParse
   unless sanitized_by core.XmlHardening
+  unless guarded_by core.XmlHardening
 }
 
 rule UnsafeReflection {
