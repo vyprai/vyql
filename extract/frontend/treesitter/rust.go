@@ -121,11 +121,16 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 	case "struct_item", "enum_item", "use_declaration", "const_item", "static_item":
 		return nil
 	case "let_declaration":
+		val := field(n, "value")
+		if val == nil {
+			return nil
+		}
 		name := c.patName(field(n, "pattern"))
-		if val := field(n, "value"); name != "" && val != nil {
+		if name != "" {
 			return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(val)}}
 		}
-		return nil
+		// `let _ = expr;` binds no name, but the call still matters for sinks/marks.
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(val)}}
 	case "expression_statement":
 		kids := namedChildren(n)
 		if len(kids) == 0 {

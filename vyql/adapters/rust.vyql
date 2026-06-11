@@ -5,9 +5,9 @@ adapter rust {
   meta { match: contains, fidelity: resolved }
 
   // untrusted input
-  source "env.var" -> code.HttpInput
+  source "env.var" -> code.EnvVariable
+  source "env.vars" -> code.EnvVariable
   source "env.args" -> code.CliArgument
-  source "env.vars" -> code.HttpInput
   // web handler params (actix/axum/rocket) seeded by the frontend
   source "http_input" -> code.HttpInput
 
@@ -15,6 +15,40 @@ adapter rust {
   sink path "Command.new" -> code.CommandExecution
   sink method "arg" -> code.CommandExecution
   sink method "args" -> code.CommandExecution
+
+  // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
+  sink path "reqwest.get" -> code.UrlFetch
+  sink path "reqwest.post" -> code.UrlFetch
+  sink path "reqwest.Client.get" -> code.UrlFetch
+  sink path "reqwest.Client.post" -> code.UrlFetch
+  sink path "ureq.get" -> code.UrlFetch
+  sink path "ureq.post" -> code.UrlFetch
+  sink path "ureq.request" -> code.UrlFetch
+  sink path "surf.get" -> code.UrlFetch
+  sink path "surf.post" -> code.UrlFetch
+
+  // regex compile (ReDoS) — tainted PATTERN
+  sink path "Regex.new" -> code.RegexCompile
+  sink path "RegexBuilder.new" -> code.RegexCompile
+
+  // XSS — maud PreEscaped bypasses HTML escaping
+  sink path "maud.PreEscaped" -> code.HtmlRender
+  sink path "PreEscaped" -> code.HtmlRender
+
+  // weak crypto (CWE-327) — broken hash/cipher crates (presence)
+  mark "md5.compute" -> code.WeakHash
+  mark "Md5.new" -> code.WeakHash
+  mark "Sha1.new" -> code.WeakHash
+  mark "sha1.Sha1" -> code.WeakHash
+  mark "Des.new" -> code.WeakCipher
+  mark "Rc4.new" -> code.WeakCipher
+
+  // controls (sanitizers) — neutralize a flow
+  control "shell_escape.escape" -> core.ShellEscape
+  control "html_escape.encode_text" -> core.HtmlEscape
+  control "html_escape.encode_safe" -> core.HtmlEscape
+  control "htmlescape.encode_minimal" -> core.HtmlEscape
+  control "ammonia.clean" -> core.HtmlEscape
 
   // SQL
   sink path "sqlx.query" -> code.SqlExecution

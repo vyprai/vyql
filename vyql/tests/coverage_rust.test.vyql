@@ -1,0 +1,62 @@
+# Rust coverage breadth: SSRF, ReDoS, weak crypto, XSS, and sanitizer recognition.
+
+test "rust: env var -> reqwest::get is SSRF"
+  lang rust
+  expect VYQL-RF-001
+  code
+  ```
+  fn h() {
+    let u = std::env::var("URL").unwrap();
+    let _ = reqwest::get(&u);
+  }
+  ```
+
+test "rust: a constant URL is clean (SSRF)"
+  lang rust
+  reject VYQL-RF-001
+  code
+  ```
+  fn h() { let _ = reqwest::get("https://api.example.com/v1"); }
+  ```
+
+test "rust: env var -> Regex::new is ReDoS"
+  lang rust
+  expect VYQL-DOS-001
+  code
+  ```
+  fn h() {
+    let p = std::env::var("PAT").unwrap();
+    let _ = regex::Regex::new(&p);
+  }
+  ```
+
+test "rust: md5::compute is weak crypto"
+  lang rust
+  expect VYQL-CRY-001
+  code
+  ```
+  fn h(data: &[u8]) { let _ = md5::compute(data); }
+  ```
+
+test "rust: env var -> maud PreEscaped is XSS"
+  lang rust
+  expect VYQL-INJ-004
+  code
+  ```
+  fn h() {
+    let s = std::env::var("S").unwrap();
+    let _ = maud::PreEscaped(s);
+  }
+  ```
+
+test "rust: shell_escape neutralizes the command injection"
+  lang rust
+  reject VYQL-INJ-002
+  code
+  ```
+  fn h() {
+    let name = std::env::var("NAME").unwrap();
+    let safe = shell_escape::escape(name.into());
+    std::process::Command::new("sh").arg("-c").arg(format!("ping {}", safe)).output();
+  }
+  ```
