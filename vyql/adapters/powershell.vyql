@@ -29,6 +29,12 @@ adapter powershell {
   // SQL
   sink path "Invoke-Sqlcmd" -> code.SqlExecution
 
+  // deserialization (CWE-502) — Import-Clixml reconstructs arbitrary objects
+  sink path "Import-Clixml" -> code.Deserialization
+
+  // XXE (CWE-611) — Select-Xml / XML cmdlets
+  sink path "Select-Xml" -> code.XmlParse
+
   // path / file
   sink path "Get-Content" -> code.FilePathAccess
   sink path "Set-Content" -> code.FilePathAccess

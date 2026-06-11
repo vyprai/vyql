@@ -1,0 +1,27 @@
+# PowerShell coverage breadth: unsafe deserialization, XXE.
+
+test "powershell: QUERY_STRING -> Import-Clixml is unsafe deserialization"
+  lang powershell
+  expect VYQL-DESER-001
+  code
+  ```
+  $u = $env:QUERY_STRING
+  Import-Clixml -Path $u
+  ```
+
+test "powershell: QUERY_STRING -> Select-Xml is XXE"
+  lang powershell
+  expect VYQL-DESER-002
+  code
+  ```
+  $u = $env:QUERY_STRING
+  Select-Xml -Xml $u -XPath "/a"
+  ```
+
+test "powershell: a constant path is clean (deserialization)"
+  lang powershell
+  reject VYQL-DESER-001
+  code
+  ```
+  Import-Clixml -Path "C:\config\state.xml"
+  ```
