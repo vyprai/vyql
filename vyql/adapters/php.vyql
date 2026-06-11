@@ -125,4 +125,10 @@ adapter php {
   sink path "ldap_search" arg 2 -> code.LdapQuery
   sink path "ldap_list" arg 2 -> code.LdapQuery
   sink path "ldap_read" arg 2 -> code.LdapQuery
+
+  // cleartext channel (CWE-319) — http:// URL to a fetch/transport (loopback excluded; low sev)
+  mark "file_get_contents" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "fopen" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "curl_init" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "curl_setopt" val "http://" nval "127.0" -> code.CleartextChannel
 }

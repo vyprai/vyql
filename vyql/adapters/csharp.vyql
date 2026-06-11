@@ -99,4 +99,10 @@ adapter csharp {
 
   // LDAP injection (CWE-90) — new DirectorySearcher(filter) constructor (filter arg 0)
   sink path "DirectorySearcher" -> code.LdapQuery
+
+  // cleartext channel (CWE-319) — http:// URL to a client (loopback excluded; low sev)
+  mark "Uri" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "GetStringAsync" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "GetAsync" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "DownloadString" val "http://" nval "127.0" -> code.CleartextChannel
 }

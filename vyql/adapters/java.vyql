@@ -121,4 +121,9 @@ adapter java {
   // insecure cookie (CWE-614) — a flag EXPLICITLY disabled: cookie.setHttpOnly(false)
   mark "setHttpOnly" val "false" -> code.InsecureCookie
   mark "setSecure" val "false" -> code.InsecureCookie
+
+  // cleartext channel (CWE-319) — http:// URL to a client/connection (loopback excluded; low sev)
+  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "HttpGet" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "getForObject" val "http://" nval "127.0" -> code.CleartextChannel
 }

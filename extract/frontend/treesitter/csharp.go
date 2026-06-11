@@ -315,10 +315,12 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "this", "base":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer_literal", "real_literal", "boolean_literal", "null_literal", "character_literal", "predefined_type":
+	case "integer_literal", "real_literal", "null_literal", "character_literal", "predefined_type":
 		return nir.Const{Loc: L}
+	case "boolean_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // true/false for `val` matching
 	case "string_literal", "verbatim_string_literal", "raw_string_literal":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)} // literal text for `val` matching
 	case "interpolated_string_expression", "interpolated_verbatim_string_expression":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {

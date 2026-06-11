@@ -155,4 +155,10 @@ adapter ruby {
   // XPath injection (CWE-643) — Nokogiri doc.xpath(expr) / at_xpath(expr) (distinctive)
   sink method "xpath" -> code.XpathQuery
   sink method "at_xpath" -> code.XpathQuery
+
+  // cleartext channel (CWE-319) — http:// URL to an HTTP client (loopback excluded; low sev)
+  mark "HTTParty" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "RestClient" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "open" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "URI.open" val "http://" nval "127.0" -> code.CleartextChannel
 }
