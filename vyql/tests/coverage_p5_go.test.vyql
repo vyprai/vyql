@@ -1,0 +1,26 @@
+# P5 framework depth (go): exec.Command("sh","-c",X) arg-index.
+
+test "go: query param -> exec.Command sh -c is command injection"
+  lang go
+  expect VYQL-INJ-002
+  code
+  ```
+  package main
+  import ("net/http"; "os/exec")
+  func handler(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("host")
+    exec.Command("sh", "-c", "ping "+name).Run()
+  }
+  ```
+
+test "go: a constant sh -c command is clean"
+  lang go
+  reject VYQL-INJ-002
+  code
+  ```
+  package main
+  import "os/exec"
+  func handler() {
+    exec.Command("sh", "-c", "ping localhost").Run()
+  }
+  ```

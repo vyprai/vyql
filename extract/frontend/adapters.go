@@ -237,7 +237,13 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if !hit {
 						continue
 					}
-					if best < 0 || len(sk.Pattern) > len(spec.Sinks[best].Pattern) {
+					// Most specific wins: longer pattern, then more value constraints
+					// (a `val`-matched sink like exec.Command arg2 val "-c" is more
+					// specific than the plain exec.Command arg0 form).
+					if best < 0 {
+						best = i
+					} else if cur := spec.Sinks[best]; len(sk.Pattern) > len(cur.Pattern) ||
+						(len(sk.Pattern) == len(cur.Pattern) && len(sk.ValMatches) > len(cur.ValMatches)) {
 						best = i
 					}
 				}

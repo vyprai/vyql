@@ -55,6 +55,10 @@ adapter go {
   sink path "exec.Command" -> code.CommandExecution
   sink path "exec.CommandContext" -> code.CommandExecution
   sink path "os/exec.Command" -> code.CommandExecution
+  // `exec.Command("sh", "-c", X)` — arg0 is the constant shell, the tainted script
+  // is arg2; the `-c` literal disambiguates this shell-wrapper form.
+  sink path "exec.Command" arg 2 val "-c" -> code.CommandExecution
+  sink path "exec.CommandContext" arg 3 val "-c" -> code.CommandExecution
   sink path "syscall.Exec" -> code.CommandExecution
   sink path "syscall.ForkExec" -> code.CommandExecution
   sink path "sh.Command" -> code.CommandExecution
