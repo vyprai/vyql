@@ -4,6 +4,7 @@ adapter java {
   meta { match: contains, fidelity: resolved }
 
   // Spring handler params (seeded http_input by the frontend) + servlet inputs
+  source "System.console.readLine" -> code.StdinInput
   source "http_input" -> code.HttpInput
   // Servlet / Spring request inputs (receiver name varies → substring match)
   source ".getParameter" -> code.HttpInput

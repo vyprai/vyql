@@ -3,6 +3,9 @@
 adapter ruby {
   meta { fidelity: resolved }
 
+  source "ARGV" -> code.CliArgument
+  source "gets" -> code.StdinInput
+  source "STDIN" -> code.StdinInput
   source "params" -> code.HttpInput
   source "cookies" -> code.HttpInput
   source "session" -> code.HttpInput

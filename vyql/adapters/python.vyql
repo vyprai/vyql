@@ -51,6 +51,10 @@ adapter python {
   source "req.media" -> code.HttpInput
   source "req.get_param" -> code.HttpInput
   source "req.stream" -> code.HttpInput
+  source "sys.argv" -> code.CliArgument
+  source "input" -> code.StdinInput
+  source "sys.stdin" -> code.StdinInput
+  source "fileinput.input" -> code.StdinInput
   source "os.environ" -> code.SecretValue
   source "os.getenv" -> code.SecretValue
   source "config.get" -> code.SecretValue

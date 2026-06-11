@@ -160,6 +160,15 @@ concept Deserialization : sink {
 }
 concept EnvVariable : source {
   taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
+concept StdinInput : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
+concept ConfigFileInput : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
 }
 concept ExternalApiResponse : source {
   taint: [taint.UntrustedData]

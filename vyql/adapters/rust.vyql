@@ -6,7 +6,7 @@ adapter rust {
 
   // untrusted input
   source "env.var" -> code.HttpInput
-  source "env.args" -> code.HttpInput
+  source "env.args" -> code.CliArgument
   source "env.vars" -> code.HttpInput
   // web handler params (actix/axum/rocket) seeded by the frontend
   source "http_input" -> code.HttpInput

@@ -4,6 +4,7 @@ adapter php {
   meta { fidelity: resolved }
 
   // superglobals (subscripted) -> HTTP input
+  source "$argv" -> code.CliArgument
   source "$_GET" -> code.HttpInput
   source "$_POST" -> code.HttpInput
   source "$_REQUEST" -> code.HttpInput

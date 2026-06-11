@@ -5,10 +5,10 @@ adapter c {
   meta { fidelity: resolved }
 
   // untrusted input
-  source "getenv" -> code.HttpInput
-  source "argv" -> code.HttpInput
-  source "fgets" -> code.HttpInput
-  source "gets" -> code.HttpInput
+  source "getenv" -> code.EnvVariable
+  source "argv" -> code.CliArgument
+  source "fgets" -> code.StdinInput
+  source "gets" -> code.StdinInput
   source "fread" -> code.HttpInput
   source "recv" -> code.HttpInput
   source "recvfrom" -> code.HttpInput

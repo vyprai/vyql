@@ -3,9 +3,9 @@ adapter objc {
   meta { fidelity: resolved }
 
   // untrusted input (C-style + Foundation)
-  source "getenv" -> code.HttpInput
-  source "argv" -> code.HttpInput
-  source ".environment" -> code.HttpInput
+  source "getenv" -> code.EnvVariable
+  source "argv" -> code.CliArgument
+  source ".environment" -> code.EnvVariable
 
   // command execution
   sink path "system" -> code.CommandExecution

@@ -1,9 +1,10 @@
-// Command-line tool. Trust boundary = argv, environment, stdin, and the files /
-// responses it reads. The operator is usually trusted; the threat is malicious
-// INPUT (or a higher-privilege context invoking the tool). Browser threats N/A.
+// Command-line tool. Trust boundary = argv, environment, stdin, config files, and the
+// files / responses it reads. The operator is usually trusted; the threat is malicious
+// INPUT (or a higher-privilege context invoking the tool). Browser/HTTP threats N/A.
 profile cli {
   title: "Command-line tool"
   detect: ["dep:cobra", "dep:click", "dep:argparse", "dep:clap", "dep:commander",
-           "dep:yargs"]
-  entrypoints: [CliArgument, EnvVariable, ExternalApiResponse, SecretValue]
+           "dep:yargs", "dep:picocli", "dep:thor"]
+  entrypoints: [CliArgument, EnvVariable, StdinInput, ConfigFileInput,
+                ExternalApiResponse, SecretValue]
 }

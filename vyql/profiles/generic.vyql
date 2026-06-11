@@ -1,6 +1,11 @@
-// Default / unknown application — no narrowing: every wired source family is an
-// entry point and every pack runs. Used when no --profile is given and
-// auto-detection is inconclusive.
+// Default / unknown application. Permissive: HTTP request data, uploads, cookies,
+// secrets, store/external reads, AND process-level inputs (argv/env/stdin) are all
+// treated as untrusted. Archetype-specific BROWSER (DOM) and MOBILE (intent/URL-scheme)
+// entry points are OFF here — those only matter under their own profile. Each archetype
+// profile NARROWS this to its precise trust boundary.
 profile generic {
   title: "Generic application (no archetype detected)"
+  entrypoints: [HttpInput, HttpHeader, HttpRequest, Cookie, FileUpload, SecretValue,
+                DatabaseRead, ExternalApiResponse, MessageInput, UserControlledData,
+                CliArgument, EnvVariable, StdinInput, ConfigFileInput]
 }

@@ -1,0 +1,94 @@
+# CLI threat model: argv / environment / stdin are the trust boundary. A tainted
+# command-line argument, env var, or stdin read reaching a command/path/code sink is
+# a finding. (Under the `cli` profile these are the ONLY sources; under `generic` they
+# are also active. Specs run with all sources on, exercising the wiring directly.)
+
+test "python: sys.argv -> os.system is command injection"
+  lang python
+  expect VYQL-INJ-002
+  code
+  ```
+  import os, sys
+  os.system("ping " + sys.argv[1])
+  ```
+
+test "python: sys.argv -> open is path traversal"
+  lang python
+  expect VYQL-PATH-001
+  code
+  ```
+  import sys
+  open(sys.argv[1]).read()
+  ```
+
+test "python: stdin input() -> os.system is command injection"
+  lang python
+  expect VYQL-INJ-002
+  code
+  ```
+  import os
+  os.system("echo " + input())
+  ```
+
+test "go: os.Args -> exec.Command (tainted program) is command injection"
+  lang go
+  expect VYQL-INJ-002
+  code
+  ```
+  package main
+  import ("os"; "os/exec")
+  func main() { exec.Command(os.Args[1]).Run() }
+  ```
+
+test "ruby: ARGV -> system is command injection"
+  lang ruby
+  expect VYQL-INJ-002
+  code
+  ```
+  system("ping " + ARGV[0])
+  ```
+
+test "php: $argv -> system is command injection"
+  lang php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php system("ping " . $argv[1]);
+  ```
+
+test "rust: env::args -> Command is command injection"
+  lang rust
+  expect VYQL-INJ-002
+  code
+  ```
+  fn main() {
+    let a: Vec<String> = std::env::args().collect();
+    std::process::Command::new("sh").arg("-c").arg(format!("ping {}", a[1])).output();
+  }
+  ```
+
+test "csharp: GetCommandLineArgs -> Process.Start is command injection"
+  lang csharp
+  expect VYQL-INJ-002
+  code
+  ```
+  class C { void F() { var a = System.Environment.GetCommandLineArgs(); System.Diagnostics.Process.Start("ping " + a[1]); } }
+  ```
+
+test "c: getenv -> system is command injection (env trust boundary)"
+  lang c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+  void h() { char *t = getenv("TARGET"); char cmd[256]; sprintf(cmd, "ping %s", t); system(cmd); }
+  ```
+
+test "python: a constant command is clean"
+  lang python
+  reject VYQL-INJ-002
+  code
+  ```
+  import os
+  os.system("ping localhost")
+  ```

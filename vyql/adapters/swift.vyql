@@ -5,7 +5,7 @@ adapter swift {
 
   // untrusted input
   source "CommandLine.arguments" -> code.HttpInput
-  source ".environment" -> code.HttpInput
+  source ".environment" -> code.EnvVariable
   source "readLine" -> code.HttpInput
   source ".query" -> code.HttpInput
   source ".parameters" -> code.HttpInput

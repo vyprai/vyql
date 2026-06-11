@@ -6,8 +6,8 @@ adapter perl {
   // untrusted input
   source ".param" -> code.HttpInput
   source ".url_param" -> code.HttpInput
-  source "ENV" -> code.HttpInput
-  source "ARGV" -> code.HttpInput
+  source "ENV" -> code.EnvVariable
+  source "ARGV" -> code.CliArgument
   source "STDIN" -> code.HttpInput
 
   // command execution

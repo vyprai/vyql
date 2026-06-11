@@ -5,6 +5,8 @@ adapter csharp {
 
   // MVC controller action parameters (model-bound from the request) — the
   // frontend seeds each as http_input() at the method top.
+  source "Environment.GetCommandLineArgs" -> code.CliArgument
+  source "Console.ReadLine" -> code.StdinInput
   source "http_input" -> code.HttpInput
 
   // ASP.NET request inputs (receiver name varies → substring match)

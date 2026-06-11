@@ -14,6 +14,9 @@ adapter go {
   type "mongo.Connect" -> mongo.Database
   type "graphql.NewClient" -> graphql.Client
 
+  source "os.Args" -> code.CliArgument
+  source "flag.Arg" -> code.CliArgument
+  source "flag.Args" -> code.CliArgument
   source ".URL.Query" -> code.HttpInput
   source ".URL.RawQuery" -> code.HttpInput
   source ".URL.Path" -> code.HttpInput
