@@ -90,4 +90,13 @@ adapter csharp {
   mark "MD5CryptoServiceProvider" -> code.WeakHash
   mark "SHA1CryptoServiceProvider" -> code.WeakHash
   mark "SHA1Managed" -> code.WeakHash
+
+  // XPath injection (CWE-643) — SelectNodes/SelectSingleNode/XPathSelectElements (distinctive XML)
+  sink method "SelectNodes" -> code.XpathQuery
+  sink method "SelectSingleNode" -> code.XpathQuery
+  sink method "XPathSelectElements" -> code.XpathQuery
+  sink method "XPathSelectElement" -> code.XpathQuery
+
+  // LDAP injection (CWE-90) — new DirectorySearcher(filter) constructor (filter arg 0)
+  sink path "DirectorySearcher" -> code.LdapQuery
 }

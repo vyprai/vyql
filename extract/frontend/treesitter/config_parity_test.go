@@ -44,6 +44,17 @@ func runRuby(t *testing.T, src, rule string) int {
 	return runLang(t, g, rule)
 }
 
+func runCSharp(t *testing.T, src, rule string) int {
+	t.Helper()
+	dir := t.TempDir()
+	p := filepath.Join(dir, "C.cs")
+	_ = os.WriteFile(p, []byte(src), 0o644)
+	prog, _ := treesitter.ExtractCSharp([]string{p}, dir)
+	g, _ := lowering.Lower(prog, true)
+	adapters.Apply(g, frontend.CSharpAdapters(), nil)
+	return runLang(t, g, rule)
+}
+
 func TestInsecureCookiePHP(t *testing.T) {
 	if runPHP(t, `<?php setcookie("sid", $v, ["httponly" => false]);`, cookieRule) == 0 {
 		t.Fatal("expected insecure-cookie for httponly=>false, got 0")

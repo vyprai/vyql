@@ -151,4 +151,8 @@ adapter ruby {
   mark "JWT.decode" val "false" -> code.JwtUnverified
   mark "JWT.decode" val "algorithm=none" -> code.JwtUnverified
   mark "JWT.encode" val "algorithm=none" -> code.JwtUnverified
+
+  // XPath injection (CWE-643) — Nokogiri doc.xpath(expr) / at_xpath(expr) (distinctive)
+  sink method "xpath" -> code.XpathQuery
+  sink method "at_xpath" -> code.XpathQuery
 }

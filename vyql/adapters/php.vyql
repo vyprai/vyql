@@ -117,4 +117,12 @@ adapter php {
   // TLS cert validation disabled (CWE-295) — curl_setopt_array([CURLOPT_SSL_VERIFYPEER => false])
   mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYPEER=false" -> code.CertValidationDisabled
   mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYHOST=0" -> code.CertValidationDisabled
+
+  // XPath injection (CWE-643) — SimpleXMLElement::xpath($expr) (distinctive method)
+  sink method "xpath" -> code.XpathQuery
+
+  // LDAP injection (CWE-90) — ldap_search/list/read($conn, $base, $filter): filter is arg 2
+  sink path "ldap_search" arg 2 -> code.LdapQuery
+  sink path "ldap_list" arg 2 -> code.LdapQuery
+  sink path "ldap_read" arg 2 -> code.LdapQuery
 }
