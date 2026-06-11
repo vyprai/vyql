@@ -147,7 +147,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "do_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
 	case "switch_statement":
-		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+		return []nir.Stmt{c.swSwitch(n)}
 	}
 	return nil
 }
@@ -175,6 +175,49 @@ func (c *swConv) block(body *tree_sitter.Node) []nir.Stmt {
 		}
 	}
 	return out
+}
+
+// swSwitch lowers a switch to subject+labelled branches so a constant subject prunes
+// the non-matching arms (and so arm bodies are no longer flattened — which previously
+// let a later arm's clean reassignment mask a live arm's taint).
+func (c *swConv) swSwitch(n *tree_sitter.Node) nir.Stmt {
+	sw := nir.Switch{Loc: c.loc(n)}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "switch_entry" {
+			if sw.Subject == nil {
+				sw.Subject = c.expr(ch) // the scrutinee precedes the entries
+			}
+			continue
+		}
+		isDefault := false
+		var labs []nir.Expr
+		var stmts []nir.Stmt
+		for _, e := range namedChildren(ch) {
+			switch e.Kind() {
+			case "default_keyword":
+				isDefault = true
+			case "switch_pattern":
+				lbl := e // descend to the innermost single child (the literal)
+				for {
+					k := namedChildren(lbl)
+					if len(k) != 1 {
+						break
+					}
+					lbl = k[0]
+				}
+				labs = append(labs, c.expr(lbl))
+			case "statements":
+				stmts = append(stmts, c.decls(e)...)
+			}
+		}
+		if isDefault || len(labs) == 0 {
+			sw.Default = append(sw.Default, stmts...)
+		} else {
+			sw.Cases = append(sw.Cases, stmts)
+			sw.Labels = append(sw.Labels, labs)
+		}
+	}
+	return sw
 }
 
 // swOp returns the operator symbol of a binary node (first non-named child).
@@ -363,6 +406,13 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "multiplicative_expression", "comparison_expression", "equality_expression",
 		"conjunction_expression", "disjunction_expression":
 		return nir.BinOp{Op: c.swOp(n), Left: c.expr(field(n, "lhs")), Right: c.expr(field(n, "rhs")), Loc: L}
+	case "prefix_expression":
+		// `-x`, `!x` — operator is the leading token, operand the trailing child.
+		var operand nir.Expr = nir.Const{Loc: L}
+		if k := namedChildren(n); len(k) > 0 {
+			operand = c.expr(k[len(k)-1])
+		}
+		return nir.Unary{Op: c.swOp(n), Operand: operand, Loc: L}
 	case "array_literal":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
@@ -384,7 +434,7 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		if k := namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[0])}
 		}
-	case "try_expression", "await_expression", "prefix_expression", "as_expression":
+	case "try_expression", "await_expression", "as_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
