@@ -148,7 +148,9 @@ func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
-	case "switch_statement", "trap_statement":
+	case "switch_statement":
+		return []nir.Stmt{c.psSwitch(n)}
+	case "trap_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	// unwrap & retry, else treat as an expression statement
@@ -207,6 +209,40 @@ func (c *psConv) psIf(n *tree_sitter.Node) nir.Stmt {
 		}
 	}
 	return it
+}
+
+// psSwitch lowers a switch to subject+labelled branches so a constant subject prunes
+// the non-matching clauses (instead of flattening, which let a later clause mask a live
+// one — and dropped the clause bodies' statement_block, an FN).
+func (c *psConv) psSwitch(n *tree_sitter.Node) nir.Stmt {
+	sw := nir.Switch{Loc: c.loc(n)}
+	if cond := lastChildKind(n, "switch_condition"); cond != nil {
+		if k := namedChildren(cond); len(k) > 0 {
+			sw.Subject = c.expr(k[0])
+		}
+	}
+	body := lastChildKind(n, "switch_body")
+	if body == nil {
+		return sw
+	}
+	clauses := lastChildKind(body, "switch_clauses")
+	if clauses == nil {
+		return sw
+	}
+	for _, cl := range namedChildren(clauses) {
+		if cl.Kind() != "switch_clause" {
+			continue
+		}
+		condN := lastChildKind(cl, "switch_clause_condition")
+		stmts := c.psBlock(lastChildKind(cl, "statement_block"))
+		if condN == nil || strings.EqualFold(c.text(condN), "default") {
+			sw.Default = append(sw.Default, stmts...)
+		} else {
+			sw.Cases = append(sw.Cases, stmts)
+			sw.Labels = append(sw.Labels, []nir.Expr{c.expr(condN)})
+		}
+	}
+	return sw
 }
 
 // psBlock lowers the statements inside a statement_block.

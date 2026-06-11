@@ -40,3 +40,37 @@ test "elixir: opaque-false if selects the clean arm — clean cmdi"
     end
   end
   ```
+
+test "elixir: tainted arm in a live case is still cmdi (no FN)"
+  lang elixir
+  expect VYQL-INJ-002
+  code
+  ```
+  defmodule H do
+    def h(conn, params) do
+      name = params["q"]
+      c = case 1 do
+        1 -> name
+        _ -> "ls"
+      end
+      System.shell(c)
+    end
+  end
+  ```
+
+test "elixir: opaque case routes taint to a dead arm — clean cmdi"
+  lang elixir
+  reject VYQL-INJ-002
+  code
+  ```
+  defmodule H do
+    def h(conn, params) do
+      name = params["q"]
+      c = case 1 do
+        9 -> name
+        _ -> "ls"
+      end
+      System.shell(c)
+    end
+  end
+  ```

@@ -71,11 +71,18 @@ func (c *exConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "binary_operator":
 		if c.text(field(n, "operator")) == "=" {
 			left := field(n, "left")
-			right := c.expr(field(n, "right"))
+			rightN := field(n, "right")
 			if left != nil && left.Kind() == "identifier" {
-				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+				name := c.text(left)
+				// `c = case S do … end` → a Switch assigning `c` per arm, so a constant
+				// subject prunes to one assignment (case-as-value otherwise drops arm
+				// values — an FN).
+				if rightN != nil && c.isCaseCall(rightN) {
+					return []nir.Stmt{c.exCaseAssign(name, rightN)}
+				}
+				return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(rightN)}}
 			}
-			return []nir.Stmt{nir.ExprStmt{Value: right}}
+			return []nir.Stmt{nir.ExprStmt{Value: c.expr(rightN)}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 	case "do_block", "block":
@@ -103,6 +110,8 @@ func (c *exConv) callStmt(n *tree_sitter.Node) []nir.Stmt {
 		return nil
 	case "def", "defp", "defmacro":
 		return c.funcDef(n)
+	case "case":
+		return []nir.Stmt{c.exCaseStmt(n)}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 }
@@ -270,6 +279,99 @@ func (c *exConv) callExpr(n *tree_sitter.Node) nir.Expr {
 		}
 	}
 	return nir.Call{Callee: c.expr(fn), Args: args, Path: path, Method: lastSeg(path), Loc: L}
+}
+
+// isCaseCall reports whether a node is a `case … do … end` macro call.
+func (c *exConv) isCaseCall(n *tree_sitter.Node) bool {
+	if n.Kind() != "call" {
+		return false
+	}
+	k := namedChildren(n)
+	return len(k) > 0 && k[0].Kind() == "identifier" && c.text(k[0]) == "case"
+}
+
+type exArm struct {
+	label     nir.Expr
+	isDefault bool
+	body      *tree_sitter.Node
+}
+
+// exCaseParts extracts a case's subject and its stab_clause arms (`_` = default).
+func (c *exConv) exCaseParts(n *tree_sitter.Node) (nir.Expr, []exArm) {
+	var subject nir.Expr = nir.Const{Loc: c.loc(n)}
+	if args := lastChildKind(n, "arguments"); args != nil {
+		if k := namedChildren(args); len(k) > 0 {
+			subject = c.expr(k[0])
+		}
+	}
+	var arms []exArm
+	if do := lastChildKind(n, "do_block"); do != nil {
+		for _, sc := range namedChildren(do) {
+			if sc.Kind() != "stab_clause" {
+				continue
+			}
+			a := exArm{body: field(sc, "right")}
+			if lft := field(sc, "left"); lft != nil {
+				if pk := namedChildren(lft); len(pk) > 0 {
+					if c.text(pk[0]) == "_" {
+						a.isDefault = true
+					} else {
+						a.label = c.expr(pk[0])
+					}
+				}
+			}
+			arms = append(arms, a)
+		}
+	}
+	return subject, arms
+}
+
+// exCaseAssign lowers `name = case S do … end` to a Switch assigning `name` per arm.
+func (c *exConv) exCaseAssign(name string, n *tree_sitter.Node) nir.Stmt {
+	subject, arms := c.exCaseParts(n)
+	sw := nir.Switch{Loc: c.loc(n), Subject: subject}
+	for _, a := range arms {
+		arm := []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.exBodyTail(a.body)}}
+		if a.isDefault || a.label == nil {
+			sw.Default = append(sw.Default, arm...)
+		} else {
+			sw.Cases = append(sw.Cases, arm)
+			sw.Labels = append(sw.Labels, []nir.Expr{a.label})
+		}
+	}
+	return sw
+}
+
+// exCaseStmt lowers a statement-position `case S do … end` to a Switch over arm bodies.
+func (c *exConv) exCaseStmt(n *tree_sitter.Node) nir.Stmt {
+	subject, arms := c.exCaseParts(n)
+	sw := nir.Switch{Loc: c.loc(n), Subject: subject}
+	for _, a := range arms {
+		var stmts []nir.Stmt
+		if a.body != nil {
+			for _, b := range namedChildren(a.body) {
+				stmts = append(stmts, c.stmt(b)...)
+			}
+		}
+		if a.isDefault || a.label == nil {
+			sw.Default = append(sw.Default, stmts...)
+		} else {
+			sw.Cases = append(sw.Cases, stmts)
+			sw.Labels = append(sw.Labels, []nir.Expr{a.label})
+		}
+	}
+	return sw
+}
+
+func (c *exConv) exBodyTail(body *tree_sitter.Node) nir.Expr {
+	if body == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	bk := namedChildren(body)
+	if len(bk) == 0 {
+		return nir.Const{Loc: c.loc(body)}
+	}
+	return c.expr(bk[len(bk)-1])
 }
 
 // exIf models `if cond, do: A, else: B` (keyword form) and `if cond do A else B end`
