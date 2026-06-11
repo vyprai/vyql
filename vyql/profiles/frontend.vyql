@@ -1,0 +1,9 @@
+// Browser / single-page app. Trust boundary = the DOM and the URL: the attacker
+// controls location/hash/referrer/window-name/storage and the markup these flow into.
+// Server-side sources are irrelevant (the code runs on the attacker's machine).
+profile frontend {
+  title: "Frontend / single-page app (browser)"
+  detect: ["dep:react", "dep:vue", "dep:@angular/core", "dep:svelte", "dep:preact",
+           "file:angular.json", "ext:.jsx", "ext:.tsx", "ext:.vue", "ext:.svelte"]
+  entrypoints: [DomInput, HttpInput, SecretValue]
+}

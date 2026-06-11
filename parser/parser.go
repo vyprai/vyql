@@ -99,6 +99,8 @@ func (p *parser) parseDecl() Decl {
 		return p.parseThreatDecl()
 	case p.atWord("state_machine"):
 		return p.parseStateMachine()
+	case p.atWord("profile"):
+		return p.parseProfile()
 	}
 	p.fail("unexpected top-level token %q", p.peek().val)
 	return nil
@@ -401,6 +403,24 @@ func (p *parser) parseConceptDecl() *ConceptDecl {
 	}
 	p.expect(tRBrace, "}")
 	return cd
+}
+
+// parseProfile parses `profile <name> { key: value … }` where values are strings
+// or word/string lists (title, detect, entrypoints, packs).
+func (p *parser) parseProfile() *ProfileDecl {
+	p.next() // 'profile'
+	pd := &ProfileDecl{Name: p.parseQName(), Fields: map[string]any{}}
+	p.expect(tLBrace, "{")
+	for !p.at(tRBrace) {
+		key := p.expect(tWord, "word").val
+		p.expect(tColon, ":")
+		pd.Fields[key] = p.parseConceptValue()
+		if p.at(tComma) {
+			p.next()
+		}
+	}
+	p.expect(tRBrace, "}")
+	return pd
 }
 
 // parseAdapterDecl parses `adapter <tech> { meta {…}? (source|sink …)* }`

@@ -25,10 +25,12 @@ import (
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
+	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/profile"
 	"github.com/vyprai/vyql/risk"
 	"github.com/vyprai/vyql/sarif"
 )
@@ -43,6 +45,7 @@ func main() {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
 	format := fs.String("format", "text", "output format: text | sarif")
+	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
 	_ = fs.Parse(os.Args[2:])
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -59,10 +62,38 @@ func main() {
 		}
 	}()
 
-	if err := run(paths, *rulesPath, *format); err != nil {
+	if err := run(paths, *rulesPath, *format, *profileName); err != nil {
 		fmt.Fprintln(os.Stderr, "vyql: "+err.Error())
 		os.Exit(1)
 	}
+}
+
+// applyProfile selects the threat-model profile (explicit name or auto-detected),
+// sets the source trust boundary, and returns it for reporting.
+func applyProfile(paths []string, name string) profile.Profile {
+	profiles, _ := profile.Load()
+	var p profile.Profile
+	switch {
+	case name == "" || name == "auto":
+		p = profile.Detect(paths, profiles)
+	default:
+		var ok bool
+		if p, ok = profile.ByName(profiles, name); !ok {
+			fmt.Fprintf(os.Stderr, "vyql: unknown profile %q; using generic\n", name)
+			p = profile.Profile{Name: "generic", Title: "Generic application"}
+		}
+	}
+	frontend.SetActiveSources(p.ActiveSources())
+	return p
+}
+
+func profileNames() string {
+	profiles, _ := profile.Load()
+	var names []string
+	for _, p := range profiles {
+		names = append(names, p.Name)
+	}
+	return strings.Join(names, " | ")
 }
 
 // scanPaths runs the full pipeline (extract → lower → adapters → compile →
@@ -107,7 +138,8 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	return all, stats, nil
 }
 
-func run(paths []string, rulesPath, format string) error {
+func run(paths []string, rulesPath, format, profileName string) error {
+	prof := applyProfile(paths, profileName)
 	src, err := loadRules(rulesPath)
 	if err != nil {
 		return err
@@ -124,6 +156,7 @@ func run(paths []string, rulesPath, format string) error {
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	default:
+		fmt.Printf("threat model: %s (%s)\n\n", prof.Title, prof.Name)
 		printReport(all)
 		printSummary(stats, len(all))
 	}

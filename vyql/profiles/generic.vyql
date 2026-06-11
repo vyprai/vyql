@@ -1,0 +1,6 @@
+// Default / unknown application — no narrowing: every wired source family is an
+// entry point and every pack runs. Used when no --profile is given and
+// auto-detection is inconclusive.
+profile generic {
+  title: "Generic application (no archetype detected)"
+}

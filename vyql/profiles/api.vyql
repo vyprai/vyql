@@ -1,0 +1,9 @@
+// HTTP API / microservice (no server-rendered HTML). Every request is hostile,
+// including authenticated ones — emphasis on injection, authz/IDOR, mass-assignment,
+// SSRF, deserialization, and JWT handling.
+profile api {
+  title: "HTTP API server"
+  detect: ["dep:fastapi", "dep:@nestjs/core", "dep:gin-gonic/gin", "dep:express",
+           "dep:grpc", "file:openapi.yaml", "file:openapi.json"]
+  entrypoints: [HttpInput, HttpHeader, SecretValue]
+}

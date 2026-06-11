@@ -102,6 +102,18 @@ func (t *ThreatDecl) QualifiedName() string {
 	return t.Package + "." + t.Name
 }
 
+// ProfileDecl is an application-archetype threat-modelling profile
+// (`profile <name> { title:…  detect:[…]  entrypoints:[…]  packs:[…] }`). It
+// selects the trust boundary (active entry-point source concepts), the relevant
+// rule packs, and the fingerprints used to auto-detect the archetype. Fields are
+// string or []string (same value model as ConceptDecl).
+type ProfileDecl struct {
+	Name   string
+	Fields map[string]any
+}
+
+func (*ProfileDecl) isDecl() {}
+
 // StateMachine is a `state_machine` declaration.
 type StateMachine struct {
 	Name        string

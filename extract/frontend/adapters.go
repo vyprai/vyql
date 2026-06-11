@@ -38,6 +38,14 @@ type controlSpec struct {
 	ValAbsents []string // `nval "substr"` (AND, marks)
 }
 
+// activeSources, when non-nil, restricts which source concepts the input adapters
+// emit — i.e. the active profile's trust boundary. nil = every source active.
+var activeSources map[string]bool
+
+// SetActiveSources sets the trust-boundary filter for source labelling (the
+// active application profile's entry-point families). Pass nil to disable.
+func SetActiveSources(s map[string]bool) { activeSources = s }
+
 // valContains reports whether the NUL-joined str_args prop contains sub,
 // case-insensitively. Used by `val`/`nval` matching.
 func valContains(tokens, sub string) bool {
@@ -172,7 +180,11 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				}
 				for _, in := range spec.Inputs {
 					if matchPath(path, in.Paths, in.Match) {
-						out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept})
+						// trust-boundary gating: an active profile restricts which
+						// source families count as attacker-controlled.
+						if activeSources == nil || activeSources[in.Concept] {
+							out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept})
+						}
 						break
 					}
 				}
