@@ -65,9 +65,18 @@ adapter csharp {
   sink method "GetAsync" -> code.UrlFetch
   sink path "WebClient" -> code.UrlFetch
 
-  // reflected XSS
+  // reflected XSS — Response.Write, Razor @Html.Raw, Blazor MarkupString
   sink path "Response.Write" -> code.HtmlRender
   sink method "Raw" -> code.HtmlRender
+  sink path "MarkupString" -> code.HtmlRender
+
+  // XXE (CWE-611) — legacy parsers that resolve external entities by default
+  // (XmlDocument/XmlReader/XPathDocument). LINQ-to-XML (XDocument/XElement) prohibits
+  // DTDs by default, so it is deliberately NOT mapped here.
+  sink path "XmlReader.Create" -> code.XmlParse
+  sink method "LoadXml" -> code.XmlParse
+  sink path "XmlDocument.Load" -> code.XmlParse
+  sink path "XPathDocument" -> code.XmlParse
 
   // controls
   control "HttpUtility.HtmlEncode" -> core.HtmlEscape
