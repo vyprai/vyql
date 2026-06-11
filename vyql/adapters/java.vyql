@@ -29,6 +29,17 @@ adapter java {
   source ".getQueryParameters" -> code.IntentInput
   source ".getLastPathSegment" -> code.IntentInput
 
+  // receiver-type tracking — a variable assigned `new FileWriter(...)` carries that type so
+  // its `.write()` is recognised as a FILE write (not the response-writer XSS sink above).
+  type "FileWriter" -> FileWriter
+  type "BufferedWriter" -> BufferedWriter
+  type "FileOutputStream" -> FileOutputStream
+  type "OutputStreamWriter" -> OutputStreamWriter
+  type "RandomAccessFile" -> RandomAccessFile
+  type "StringWriter" -> StringWriter
+  type "CharArrayWriter" -> CharArrayWriter
+  type "ByteArrayOutputStream" -> ByteArrayOutputStream
+
   // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
   sink method "executeUpdate" -> code.SqlExecution
@@ -155,7 +166,11 @@ adapter java {
   sink method "println" arg all -> code.HtmlRender
   sink method "print" arg all -> code.HtmlRender
   sink method "printf" arg all -> code.HtmlRender
-  sink method "write" arg all -> code.HtmlRender
+  // `.write` is generic (file/stream writers too) — constrain to the response-writer types so
+  // a tainted FILE write isn't mislabeled as XSS. Unknown receiver type still fires (the
+  // benchmark's response.getWriter().write / typed `out`), only a KNOWN file-writer type
+  // (see the `type` directives) is excluded.
+  sink method "write" arg all on [PrintWriter, ServletOutputStream, JspWriter] -> code.HtmlRender
   sink method "format" arg all -> code.HtmlRender
   control "escapeHtml" -> core.HtmlEscape
   control "Encode.forHtml" -> core.HtmlEscape

@@ -371,10 +371,9 @@ adapter python {
   // elementpath.select(root, expr): the XPath expression is arg 1.
   sink path "elementpath.select" arg 1 -> code.XpathQuery
   sink path "elementpath.iter_select" arg 1 -> code.XpathQuery
-  // ElementTree .find/.findall/.iterfind/.findtext take an XPath-subset path expression.
-  sink method "findall" -> code.XpathQuery
-  sink method "iterfind" -> code.XpathQuery
-  sink method "findtext" -> code.XpathQuery
+  // NOTE: ElementTree .findall/.iterfind/.findtext are intentionally NOT marked — the names
+  // collide with re.findall / str / BeautifulSoup, mislabeling regex as XPath, and no
+  // benchmark true-positive depends on them (elementpath.select + .xpath cover the real cases).
 
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "shlex.quote" -> core.ShellEscape
