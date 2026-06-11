@@ -102,10 +102,48 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_expression":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
-	case "match_expression", "block":
+	case "match_expression":
+		return []nir.Stmt{c.scMatch(n)}
+	case "block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+// scMatch lowers a `x match { case … }` to a subject+labelled nir.Switch so a constant
+// subject prunes non-matching arms (instead of flattening, which let a later arm mask a
+// live arm's taint). A wildcard `_` pattern is the default.
+func (c *scConvScala) scMatch(n *tree_sitter.Node) nir.Stmt {
+	sw := nir.Switch{Loc: c.loc(n), Subject: c.expr(field(n, "value"))}
+	body := field(n, "body")
+	if body == nil {
+		return sw
+	}
+	for _, cl := range namedChildren(body) {
+		if cl.Kind() != "case_clause" {
+			continue
+		}
+		pat := field(cl, "pattern")
+		stmts := c.scArmBody(field(cl, "body"))
+		if pat == nil || pat.Kind() == "wildcard" || c.text(pat) == "_" {
+			sw.Default = append(sw.Default, stmts...)
+			continue
+		}
+		sw.Cases = append(sw.Cases, stmts)
+		sw.Labels = append(sw.Labels, []nir.Expr{c.expr(pat)})
+	}
+	return sw
+}
+
+func (c *scConvScala) scArmBody(b *tree_sitter.Node) []nir.Stmt {
+	if b == nil {
+		return nil
+	}
+	switch b.Kind() {
+	case "block", "indented_block":
+		return c.collectBlocks(b)
+	}
+	return c.stmt(b)
 }
 
 func (c *scConvScala) bodyStmts(body *tree_sitter.Node) []nir.Stmt {
@@ -242,6 +280,13 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
+	case "prefix_expression", "unary_expression":
+		op := c.text(field(n, "operator"))
+		var operand nir.Expr = nir.Const{Loc: L}
+		if kids := namedChildren(n); len(kids) > 0 {
+			operand = c.expr(kids[len(kids)-1])
+		}
+		return nir.Unary{Op: op, Operand: operand, Loc: L}
 	case "if_expression", "match_expression", "block":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
