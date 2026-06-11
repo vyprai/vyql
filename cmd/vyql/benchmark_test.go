@@ -147,8 +147,9 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		}
 		return cats[c]
 	}
-	dumpCat, dumpKind := os.Getenv("BENCH_DUMP_CAT"), os.Getenv("BENCH_DUMP_KIND") // e.g. sqli / fp
+	dumpCat, dumpKind := os.Getenv("BENCH_DUMP_CAT"), os.Getenv("BENCH_DUMP_KIND") // e.g. sqli / fp; cat "all" dumps every category
 	var dumped []string
+	byCat := map[string][]string{} // for dumpCat=="all": category -> matching test names
 	for name, e := range expected {
 		got := detected[name][e.category]
 		tl := get(e.category)
@@ -170,8 +171,21 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		if e.category == dumpCat && kind == dumpKind {
 			dumped = append(dumped, name)
 		}
+		if dumpCat == "all" && kind == dumpKind {
+			byCat[e.category] = append(byCat[e.category], name)
+		}
 	}
-	if dumpCat != "" {
+	if dumpCat == "all" {
+		var cs []string
+		for c := range byCat {
+			cs = append(cs, c)
+		}
+		sort.Strings(cs)
+		for _, c := range cs {
+			sort.Strings(byCat[c])
+			fmt.Printf("\n%s %s (%d): %s\n", c, dumpKind, len(byCat[c]), strings.Join(byCat[c], " "))
+		}
+	} else if dumpCat != "" {
 		sort.Strings(dumped)
 		fmt.Printf("\n%s %s (%d): %s\n", dumpCat, dumpKind, len(dumped), strings.Join(dumped, " "))
 	}

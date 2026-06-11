@@ -8,6 +8,9 @@ adapter python {
   source "http_input" -> code.HttpInput
 
   source "request.form" -> code.HttpInput
+  source "request.query_string" -> code.HttpInput
+  source "request.full_path" -> code.HttpInput
+  source "request.url" -> code.HttpInput
   // request stored on an object (e.g. a wrapper `self.request = flask.request`, then
   // `self.request.form.get(...)`): the same accessors under a `.request.` prefix.
   source "self.request.form" -> code.HttpInput
@@ -203,6 +206,12 @@ adapter python {
   sink path "compile" -> code.CodeEval
   sink path "code.interact" -> code.CodeEval
   sink path "code.InteractiveInterpreter" -> code.CodeEval
+  // unsafe YAML deserialization (CWE-502) — yaml.load with the full/unsafe Loader can
+  // construct arbitrary objects. safe_load / SafeLoader is the SafeDeserialization control.
+  sink path "yaml.load" -> code.Deserialization
+  sink path "yaml.full_load" -> code.Deserialization
+  sink path "yaml.unsafe_load" -> code.Deserialization
+  sink path "yaml.load_all" -> code.Deserialization
   sink path "pickle.load" -> code.Deserialization
   sink path "pickle.loads" -> code.Deserialization
   sink path "cPickle.load" -> code.Deserialization
