@@ -111,6 +111,16 @@ adapter go {
   mark "des.NewTripleDESCipher" -> code.WeakCipher
   mark "rc4.NewCipher" -> code.WeakCipher
 
+  // insecure file permission (CWE-732) — world-writable mode on chmod/WriteFile/MkdirAll.
+  // octal literal text is carried by the frontend; restrictive modes are not matched.
+  mark "os.Chmod" val "0777" -> code.InsecurePermission
+  mark "os.Chmod" val "0666" -> code.InsecurePermission
+  mark "os.MkdirAll" val "0777" -> code.InsecurePermission
+  mark "os.WriteFile" val "0777" -> code.InsecurePermission
+  mark "os.WriteFile" val "0666" -> code.InsecurePermission
+  mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
+  mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission
+
   // TLS cert validation disabled (CWE-295) — tls.Config{InsecureSkipVerify: true}
   mark "tls.Config" val "InsecureSkipVerify=true" -> code.CertValidationDisabled
 

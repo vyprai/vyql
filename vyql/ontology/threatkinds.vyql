@@ -9,6 +9,7 @@ threat Idor { cwe: [CWE_639], desc: "Insecure direct object reference" }
 threat IncorrectAuthorization { cwe: [CWE_863], desc: "Incorrect authorization logic" }
 threat MissingAuthorization { cwe: [CWE_862], desc: "Missing authorization check" }
 threat PrivilegeEscalation { cwe: [CWE_269], desc: "Improper privilege management" }
+threat InsecurePermission { cwe: [CWE_732], desc: "Incorrect permission assignment for a critical resource (world-writable / overly broad mode)" }
 
 package authentication;
 threat ImproperAuthentication { cwe: [CWE_287], desc: "Improper authentication" }

@@ -44,3 +44,11 @@ rule InsecureCookie {
   match code.InsecureCookie as c
 }
 
+// World-writable / overly-broad file permission — chmod 0o777, FileMode(0o777),
+// umask(0) (CWE-732), value-matched presence. Restrictive modes (0o600/0o640/0o644)
+// are not matched.
+rule InsecurePermission {
+  meta { id: "VYQL-CFG-008", severity: medium, cwe: [CWE_732] }
+  match code.InsecurePermission as p
+}
+

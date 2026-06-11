@@ -286,6 +286,11 @@ concept SecurityMaterialSink : sink {
   enabled_by: [taint.WeakEntropy]
   cwe: [CWE_330]
 }
+// World-writable / overly-broad file mode (chmod 0o777, umask 000) — presence (CWE-732).
+concept InsecurePermission : sink {
+  vulnerable_to: [access_control.InsecurePermission]
+  cwe: [CWE_732]
+}
 concept MessageInput : source {
   taint: [taint.UntrustedData]
 }

@@ -288,6 +288,14 @@ adapter python {
   mark "hashlib.md5" -> code.WeakHash
   mark "hashlib.sha1" -> code.WeakHash
 
+  // insecure file permission (CWE-732) — world-writable / overly-broad mode. Restrictive
+  // modes (0o600/0o640/0o644) are not matched. octal forms 0o777 and 0o666 are covered.
+  mark "os.chmod" val "0o777" -> code.InsecurePermission
+  mark "os.chmod" val "0o666" -> code.InsecurePermission
+  mark "os.fchmod" val "0o777" -> code.InsecurePermission
+  mark "os.fchmod" val "0o666" -> code.InsecurePermission
+  mark "Path.chmod" val "0o777" -> code.InsecurePermission
+
   // weak randomness (CWE-330) — the `random` module is a non-crypto Mersenne-Twister
   // PRNG. These are SOURCES; a finding needs a flow into a SecurityMaterialSink. Secure
   // RNG (secrets.*, os.urandom, SystemRandom) is deliberately NOT marked.

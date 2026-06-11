@@ -1,0 +1,44 @@
+# A3 — insecure file permission (CWE-732, VYQL-CFG-008). World-writable / overly-broad
+# file modes (0o777/0o666) are a presence finding; restrictive modes are clean.
+
+test "file-perm: chmod world-writable is flagged (python)"
+  lang python
+  expect VYQL-CFG-008
+  code
+  ```
+  import os
+  os.chmod("/var/data", 0o777)
+  ```
+
+test "file-perm: a restrictive mode is clean (python)"
+  lang python
+  reject VYQL-CFG-008
+  code
+  ```
+  import os
+  os.chmod("/var/data", 0o600)
+  ```
+
+test "file-perm: world-writable WriteFile is flagged (go)"
+  lang go
+  expect VYQL-CFG-008
+  code
+  ```
+  package main
+  import "os"
+  func main() {
+  	os.WriteFile("/var/data", []byte("x"), 0666)
+  }
+  ```
+
+test "file-perm: a restrictive mode is clean (go)"
+  lang go
+  reject VYQL-CFG-008
+  code
+  ```
+  package main
+  import "os"
+  func main() {
+  	os.WriteFile("/var/data", []byte("x"), 0640)
+  }
+  ```

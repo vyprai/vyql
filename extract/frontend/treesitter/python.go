@@ -376,8 +376,12 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer", "float", "concatenated_string":
+	case "concatenated_string":
 		return nir.Const{Loc: L}
+	case "integer", "float":
+		// carry the literal text so value-matching can see numeric modes/flags
+		// (e.g. os.chmod(p, 0o777)); taint is unaffected (Value is val-match only).
+		return nir.Const{Loc: L, Value: c.text(n)}
 	case "true", "false", "none":
 		// carry the literal text so value-matching can see verify=False etc.
 		return nir.Const{Loc: L, Value: c.text(n)}
