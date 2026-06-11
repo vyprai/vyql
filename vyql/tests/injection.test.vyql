@@ -205,3 +205,155 @@ test "php: a constant headers string is clean"
   ```
   <?php mail("to@x.com", "subj", "body", "From: noreply@x.com");
   ```
+
+# --- CSV/formula injection (VYQL-INJ-014) ---
+test "python: tainted writerow is CSV injection"
+  lang python
+  expect VYQL-INJ-014
+  code
+  ```
+  def export(writer):
+      row = request.args['row']
+      writer.writerow(row)
+  ```
+
+test "python: a constant CSV row is clean"
+  lang python
+  reject VYQL-INJ-014
+  code
+  ```
+  def export(writer):
+      writer.writerow("static,header")
+  ```
+
+# --- Mass assignment (VYQL-INJ-012) ---
+test "ruby: update_attributes(params) is mass assignment"
+  lang ruby
+  expect VYQL-INJ-012
+  code
+  ```
+  def update
+    user = User.new
+    user.update_attributes(params[:user])
+  end
+  ```
+
+test "ruby: update_attributes with a static hash is clean"
+  lang ruby
+  reject VYQL-INJ-012
+  code
+  ```
+  def update
+    user = User.new
+    user.update_attributes(name: "static")
+  end
+  ```
+
+# --- Prototype pollution (VYQL-INJ-013) ---
+test "js: _.merge(config, req.body) is prototype pollution"
+  lang javascript
+  expect VYQL-INJ-013
+  code
+  ```
+  function h(req) {
+    _.merge(config, req.body);
+  }
+  ```
+
+test "js: _.merge with a constant source is clean"
+  lang javascript
+  reject VYQL-INJ-013
+  code
+  ```
+  function h(req) {
+    _.merge(config, defaults);
+  }
+  ```
+
+# --- ReDoS (VYQL-DOS-001) ---
+test "python: re.compile of a tainted pattern is ReDoS"
+  lang python
+  expect VYQL-DOS-001
+  code
+  ```
+  def h():
+      pat = request.args['p']
+      re.compile(pat)
+  ```
+
+test "python: re.compile of a constant pattern is clean"
+  lang python
+  reject VYQL-DOS-001
+  code
+  ```
+  def h():
+      re.compile("[a-z]+")
+  ```
+
+# --- Unrestricted upload (VYQL-INJ-015) ---
+test "php: tainted move_uploaded_file destination is unrestricted upload"
+  lang php
+  expect VYQL-INJ-015
+  code
+  ```
+  <?php
+  function upload() {
+    $dest = "uploads/" . $_FILES['f']['name'];
+    move_uploaded_file($_FILES['f']['tmp_name'], $dest);
+  }
+  ```
+
+test "php: a fixed upload destination is clean"
+  lang php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+  function upload() {
+    move_uploaded_file($_FILES['f']['tmp_name'], "uploads/fixed.dat");
+  }
+  ```
+
+# --- Format string (VYQL-INJ-011) ---
+test "c: printf with a tainted format argument is a format-string bug"
+  lang c
+  expect VYQL-INJ-011
+  code
+  ```
+  void h() {
+    char *name = getenv("NAME");
+    printf(name);
+  }
+  ```
+
+test "c: printf with a constant format and %s is clean"
+  lang c
+  reject VYQL-INJ-011
+  code
+  ```
+  void h() {
+    char *name = getenv("NAME");
+    printf("%s", name);
+  }
+  ```
+
+# --- Sanitizer recognition (VYQL-INJ-002 command injection) ---
+test "python: os.system of raw request input is command injection"
+  lang python
+  expect VYQL-INJ-002
+  code
+  ```
+  def unsafe():
+      y = request.args['q']
+      os.system("ping " + y)
+  ```
+
+test "python: shlex.quote neutralizes the command injection"
+  lang python
+  reject VYQL-INJ-002
+  code
+  ```
+  def safe():
+      x = request.args['q']
+      os.system("ping " + shlex.quote(x))
+  ```

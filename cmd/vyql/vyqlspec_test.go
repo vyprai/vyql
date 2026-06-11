@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -26,13 +27,18 @@ import (
 //	  class C { void f() { Cipher.getInstance("DES/CBC/PKCS5Padding"); } }
 //	  ```
 
+type specFile struct {
+	name string // explicit filename, or "" for the default snippet name
+	code string
+}
+
 type vyqlSpec struct {
 	name   string
 	lang   string
 	expect []string
 	reject []string
-	code   string
-	file   string
+	files  []specFile // one or more code blocks (multi-file specs supported)
+	src    string     // source spec filename (for messages)
 	line   int
 }
 
@@ -55,13 +61,19 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 	var cur *vyqlSpec
 	inCode := false
 	var code []string
+	pendingFile := "" // filename from a preceding `file <name>` line
+	closeCur := func() {
+		if cur != nil {
+			specs = append(specs, *cur)
+			cur = nil
+		}
+	}
 	lines := strings.Split(string(data), "\n")
 	for i, raw := range lines {
 		if inCode {
 			if strings.TrimSpace(raw) == "```" {
-				cur.code = strings.Join(code, "\n")
-				specs = append(specs, *cur)
-				cur, inCode, code = nil, false, nil
+				cur.files = append(cur.files, specFile{name: pendingFile, code: strings.Join(code, "\n")})
+				inCode, code, pendingFile = false, nil, ""
 				continue
 			}
 			code = append(code, raw)
@@ -71,35 +83,36 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
 			continue
 		}
+		if line == "```" {
+			inCode = true
+			continue
+		}
 		kw, rest, _ := strings.Cut(line, " ")
 		rest = strings.TrimSpace(rest)
 		switch kw {
 		case "test":
-			if cur != nil {
-				t.Fatalf("%s:%d: new `test` before previous one closed (missing code fence?)", rel, i+1)
-			}
-			cur = &vyqlSpec{name: strings.Trim(rest, `"`), file: rel, line: i + 1}
+			closeCur() // a test ends at the next `test` (or EOF)
+			cur = &vyqlSpec{name: strings.Trim(rest, `"`), src: rel, line: i + 1}
 		case "lang":
 			cur.lang = rest
 		case "expect":
 			cur.expect = append(cur.expect, rest)
 		case "reject":
 			cur.reject = append(cur.reject, rest)
+		case "file":
+			pendingFile = rest // next fence writes to this filename
 		case "code":
-			// next non-comment line should open the fence; tolerate `code` alone.
-		case "```":
-			inCode = true
+			// optional keyword; the following ``` opens the block
 		default:
-			if line == "```" {
-				inCode = true
-			} else if cur != nil {
+			if cur != nil {
 				t.Fatalf("%s:%d: unknown spec line %q", rel, i+1, line)
 			}
 		}
 	}
-	if cur != nil {
-		t.Fatalf("%s:%d: unterminated `test %q` (missing closing code fence)", rel, cur.line, cur.name)
+	if inCode {
+		t.Fatalf("%s:%d: unterminated code fence in `test %q`", rel, cur.line, cur.name)
 	}
+	closeCur()
 	return specs
 }
 
@@ -130,17 +143,29 @@ func TestVyqlSpecs(t *testing.T) {
 		for _, s := range parseSpecFile(t, f) {
 			s := s
 			total++
-			t.Run(s.file+"/"+s.name, func(t *testing.T) {
+			t.Run(s.src+"/"+s.name, func(t *testing.T) {
 				ext, ok := primaryExt[s.lang]
 				if !ok {
-					t.Fatalf("%s:%d: unknown lang %q", s.file, s.line, s.lang)
+					t.Fatalf("%s:%d: unknown lang %q", s.src, s.line, s.lang)
 				}
 				if len(s.expect) == 0 && len(s.reject) == 0 {
-					t.Fatalf("%s:%d: spec has neither expect nor reject", s.file, s.line)
+					t.Fatalf("%s:%d: spec has neither expect nor reject", s.src, s.line)
+				}
+				if len(s.files) == 0 {
+					t.Fatalf("%s:%d: spec %q has no code block", s.src, s.line, s.name)
 				}
 				dir := t.TempDir()
-				if err := os.WriteFile(filepath.Join(dir, "snippet"+ext), []byte(s.code), 0o644); err != nil {
-					t.Fatal(err)
+				for n, fl := range s.files {
+					name := fl.name
+					if name == "" {
+						name = "snippet" + ext
+						if n > 0 {
+							name = "snippet" + strconv.Itoa(n) + ext
+						}
+					}
+					if err := os.WriteFile(filepath.Join(dir, name), []byte(fl.code), 0o644); err != nil {
+						t.Fatal(err)
+					}
 				}
 				found, _, err := scanPaths([]string{dir}, rules)
 				if err != nil {

@@ -411,6 +411,31 @@ test "python: requests.get https:// is fine"
   requests.get("https://secure.example/api")
   ```
 
+# --- CSRF disabled (VYQL-CFG-001) ---
+test "java: http.csrf().disable() disables CSRF protection"
+  lang java
+  expect VYQL-CFG-001
+  code
+  ```
+  class Sec {
+    void configure(HttpSecurity http) throws Exception {
+      http.csrf().disable();
+    }
+  }
+  ```
+
+test "java: http.csrf().enable() is fine"
+  lang java
+  reject VYQL-CFG-001
+  code
+  ```
+  class Sec {
+    void configure(HttpSecurity http) throws Exception {
+      http.csrf().enable();
+    }
+  }
+  ```
+
 # --- Session fixation (VYQL-CFG-002) ---
 test "php: user-controlled session id is session fixation"
   lang php
