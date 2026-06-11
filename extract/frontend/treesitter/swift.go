@@ -65,7 +65,28 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "class_declaration", "protocol_declaration", "extension_declaration", "enum_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(c.swBody(n)), Loc: L}}
 	case "function_declaration", "init_declaration", "deinit_declaration":
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: c.params(n), Body: c.block(c.swBody(n)), Loc: L}}
+		name := c.text(field(n, "name"))
+		pairs := c.paramPairs(n)
+		params := make([]string, 0, len(pairs))
+		for _, p := range pairs {
+			params = append(params, p[1])
+		}
+		body := c.block(c.swBody(n))
+		// iOS attacker-controlled entry points seeded as URL-scheme input:
+		//   application(_:open:) — deep-link URL param `open url:`
+		//   userContentController(_:didReceive:) — WKScriptMessage param (.body is web JS)
+		var seedParam string
+		if name == "application" {
+			seedParam = labeledInternal(pairs, "open")
+		} else if name == "userContentController" {
+			seedParam = labeledInternal(pairs, "didReceive")
+		}
+		if seedParam != "" {
+			seed := nir.Assign{Targets: []string{seedParam},
+				Value: nir.Call{Callee: nir.Name{ID: "url_scheme_input", Loc: L}, Path: "url_scheme_input", Method: "url_scheme_input", Loc: L}}
+			body = append([]nir.Stmt{seed}, body...)
+		}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
 	case "property_declaration":
 		v := field(n, "value")
 		if v == nil {
@@ -142,19 +163,47 @@ func (c *swConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
-func (c *swConv) params(n *tree_sitter.Node) []string {
-	var out []string
+// paramPairs returns (external-label, internal-name) for each parameter. A swift
+// parameter `open url: URL` has external label "open" and internal name "url" — the
+// internal name is what the body binds to. `name: T` has both equal; `_ x:` → ("_","x").
+func (c *swConv) paramPairs(n *tree_sitter.Node) [][2]string {
+	var out [][2]string
 	for _, ch := range namedChildren(n) {
-		if ch.Kind() == "parameter" {
-			for _, id := range namedChildren(ch) {
-				if id.Kind() == "simple_identifier" {
-					out = append(out, c.text(id))
-					break
-				}
+		if ch.Kind() != "parameter" {
+			continue
+		}
+		var ids []string
+		for _, id := range namedChildren(ch) {
+			if id.Kind() == "simple_identifier" {
+				ids = append(ids, c.text(id))
 			}
 		}
+		if len(ids) == 0 {
+			continue
+		}
+		out = append(out, [2]string{ids[0], ids[len(ids)-1]})
 	}
 	return out
+}
+
+func (c *swConv) params(n *tree_sitter.Node) []string {
+	pairs := c.paramPairs(n)
+	out := make([]string, 0, len(pairs))
+	for _, p := range pairs {
+		out = append(out, p[1]) // internal name (the body binding)
+	}
+	return out
+}
+
+// labeledInternal returns the internal name of the parameter with the given
+// external label, or "" if none.
+func labeledInternal(pairs [][2]string, label string) string {
+	for _, p := range pairs {
+		if p[0] == label {
+			return p[1]
+		}
+	}
+	return ""
 }
 
 func (c *swConv) bindingName(pat *tree_sitter.Node) string {

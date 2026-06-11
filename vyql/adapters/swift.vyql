@@ -10,6 +10,9 @@ adapter swift {
   source ".query" -> code.HttpInput
   source ".parameters" -> code.HttpInput
   source ".queryParameters" -> code.HttpInput
+  // iOS deep-link / WKScriptMessage entry-point params, seeded by the frontend:
+  // application(_:open:) url and userContentController(_:didReceive:) message.
+  source "url_scheme_input" -> code.URLSchemeInput
   // iOS clipboard (any app can seed the pasteboard)
   source "UIPasteboard.general.string" -> code.PasteboardInput
   source "UIPasteboard.general.strings" -> code.PasteboardInput

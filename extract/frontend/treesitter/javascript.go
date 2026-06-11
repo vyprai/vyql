@@ -343,6 +343,31 @@ var jsRouteDecorators = map[string]bool{
 // jsHasRouteDecorator reports whether a method_definition carries a NestJS route
 // decorator (`@Get()`, `@Post(':id')`, …) — a `decorator` child whose callee name
 // (identifier of the call, or a bare identifier) is an HTTP-method decorator.
+// isIpcHandler reports whether a call path registers an Electron IPC handler
+// (`ipcMain.on/handle/once`, `ipcRenderer.on/once`) whose callback receives
+// renderer-controlled data.
+func (c *jsConv) isIpcHandler(path string) bool {
+	if !strings.Contains(path, "ipcMain") && !strings.Contains(path, "ipcRenderer") {
+		return false
+	}
+	return strings.HasSuffix(path, ".on") || strings.HasSuffix(path, ".handle") || strings.HasSuffix(path, ".once")
+}
+
+// seedIpcLambda seeds an IPC callback's payload parameters (every param after the
+// first `event` arg) as http_input.
+func (c *jsConv) seedIpcLambda(lam nir.Lambda, L string) nir.Lambda {
+	var seed []nir.Stmt
+	for i, p := range lam.Params {
+		if i == 0 { // the IPC `event` object, not the payload
+			continue
+		}
+		seed = append(seed, nir.Assign{Targets: []string{p},
+			Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+	}
+	lam.Body = append(seed, lam.Body...)
+	return lam
+}
+
 func (c *jsConv) jsHasRouteDecorator(n *tree_sitter.Node) bool {
 	for _, ch := range namedChildren(n) {
 		if ch.Kind() != "decorator" {
@@ -427,6 +452,15 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		if args := field(n, "arguments"); args != nil {
 			for _, a := range namedChildren(args) {
 				arglist = append(arglist, c.expr(a))
+			}
+		}
+		// Electron IPC handler registration `ipcMain.on/handle/once(channel, (event, arg) => …)`:
+		// the callback's args after `event` are renderer-controlled — seed them.
+		if c.isIpcHandler(path) {
+			for i, a := range arglist {
+				if lam, ok := a.(nir.Lambda); ok {
+					arglist[i] = c.seedIpcLambda(lam, L)
+				}
 			}
 		}
 		method := path
