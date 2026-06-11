@@ -23,3 +23,10 @@ test "a typosquatting / known-bad dependency is flagged (SCA-003)"
   ```
   node dep sbom.SuspiciousDependency
   ```
+
+test "a confirmed-malicious dependency is flagged (SCA-004)"
+  expect VYQL-SCA-004
+  graph
+  ```
+  node dep sbom.MaliciousDependency
+  ```

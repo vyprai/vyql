@@ -70,25 +70,7 @@ adapter python {
   source method "fetchall" -> code.DatabaseRead
   source method "fetchone" -> code.DatabaseRead
   source method "fetchmany" -> code.DatabaseRead
-
-  // PII / regulated data (CWE-359/532) — high-signal field reads & getters (user.ssn,
-  // user.get_credit_card()). `source method` matches the attr/method name regardless of
-  // receiver. Only unambiguous identifiers (no email/name/phone — too broad).
-  source method "ssn" -> code.PiiValue
-  source method "social_security_number" -> code.PiiValue
-  source method "credit_card" -> code.PiiValue
-  source method "credit_card_number" -> code.PiiValue
-  source method "card_number" -> code.PiiValue
-  source method "cvv" -> code.PiiValue
-  source method "passport_number" -> code.PiiValue
-  source method "tax_id" -> code.PiiValue
-  source method "date_of_birth" -> code.PiiValue
-  source method "drivers_license" -> code.PiiValue
-  source method "bank_account" -> code.PiiValue
-  source method "get_ssn" -> code.PiiValue
-  source method "get_credit_card" -> code.PiiValue
-  source method "getSsn" -> code.PiiValue
-  source method "getCreditCard" -> code.PiiValue
+  // PII sources are now a CROSS-LANGUAGE configurable taxonomy — see adapters/pii.vyql.
 
   sink method "execute" -> code.SqlExecution
   sink method "executemany" -> code.SqlExecution

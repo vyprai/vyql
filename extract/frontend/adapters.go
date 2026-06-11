@@ -74,6 +74,7 @@ type adapterSpec struct {
 	Name          string
 	Technology    string
 	containsMatch bool
+	crossLang     bool // labels nodes in EVERY language (skips the per-tech filter)
 	Inputs        []inputSpec
 	Sinks         []sinkSpec
 	Controls      []controlSpec
@@ -130,6 +131,9 @@ func loadSpec(tech string) adapterSpec {
 	s := adapterSpec{Name: d.Name, Technology: d.Name}
 	if m, _ := d.Meta["match"].(string); m == "contains" {
 		s.containsMatch = true
+	}
+	if cl, _ := d.Meta["cross_language"].(string); cl == "true" {
+		s.crossLang = true
 	}
 	matchMode := "prefix"
 	if s.containsMatch {
@@ -189,8 +193,8 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				if path == "" && method == "" {
 					continue
 				}
-				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
-					continue // only label this language's nodes
+				if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
+					continue // only label this language's nodes (cross-language adapters skip this)
 				}
 				for _, in := range spec.Inputs {
 					if (path != "" && matchPath(path, in.Paths, in.Match)) ||
@@ -358,10 +362,9 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			// md5_hex…), but some are bare member accesses with no call — e.g.
 			// Solidity `tx.origin` used for authorization — so scan Attr nodes too.
 			var out []adapters.Mapping
-			// secretscan is a CROSS-LANGUAGE scanner — its nodes live in source files of
-			// every language, so the per-language tech filter doesn't apply (its synthetic
-			// `hardcoded_secret` marker matches no real callee path).
-			crossLang := spec.Technology == "secretscan"
+			// cross-language adapters (secretscan, …) label nodes in source files of
+			// every language, so the per-language tech filter doesn't apply.
+			crossLang := spec.crossLang
 			for _, nodeType := range []string{"code.Call", "code.Attr"} {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
@@ -431,6 +434,10 @@ func matchPath(path string, patterns []string, mode string) bool {
 // Per-language adapter sets (loaded from vyql/adapters/*.vyql).
 func ConfigAdapters() []adapters.Adapter     { return AdaptersFor("config") }
 func SecretscanAdapters() []adapters.Adapter { return AdaptersFor("secretscan") }
+
+// PiiAdapters is the cross-language PII taxonomy (adapters/pii.vyql). It labels nodes
+// in every language, so it is applied once per scan rather than per present frontend.
+func PiiAdapters() []adapters.Adapter { return AdaptersFor("pii") }
 func ElixirAdapters() []adapters.Adapter { return AdaptersFor("elixir") }
 func DartAdapters() []adapters.Adapter   { return AdaptersFor("dart") }
 func GroovyAdapters() []adapters.Adapter { return AdaptersFor("groovy") }

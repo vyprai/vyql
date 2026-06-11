@@ -123,5 +123,10 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 			stats.languages = append(stats.languages, lg.name)
 		}
 	}
+	// the PII taxonomy is a cross-language labeler (not a frontend) — apply it once
+	// whenever any source was parsed, so `user.ssn` is a PII source in every language.
+	if len(prog.Modules) > 0 {
+		ads = append(ads, frontend.PiiAdapters()...)
+	}
 	return prog, ads, ctorTypes, stats, nil
 }
