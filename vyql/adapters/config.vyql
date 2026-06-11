@@ -12,4 +12,14 @@ adapter config {
   mark "android_debuggable" -> code.DebuggableApp
   // iOS Info.plist: ATS NSAllowsArbitraryLoads(/InWebContent/ForMedia) = <true/>
   mark "ats_arbitrary_loads" -> code.CleartextConfig
+
+  // IaC / container misconfig (CWE-250/653/284) — tokens from the Dockerfile / K8s YAML
+  // / Terraform scanners.
+  mark "k8s_privileged" -> code.PrivilegedContainer
+  mark "container_user_root" -> code.PrivilegedContainer
+  mark "docker_privileged" -> code.PrivilegedContainer
+  mark "k8s_host_namespace" -> code.HostNamespaceShare
+  mark "k8s_host_path" -> code.HostNamespaceShare
+  mark "tf_open_cidr" -> code.PublicNetworkExposure
+  mark "tf_wildcard_iam" -> code.WildcardIamPolicy
 }

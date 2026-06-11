@@ -60,9 +60,11 @@ var languages = []language{
 	{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, frontend.ElixirAdapters},
 	{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, frontend.DartAdapters},
 	{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, frontend.GroovyAdapters},
-	// mobile config files (AndroidManifest.xml / Info.plist) — a non-tree-sitter
-	// frontend; non-manifest XML yields no nodes so other repos are unaffected.
-	{"config", map[string]bool{".xml": true, ".plist": true}, cfgfront.Extract, frontend.ConfigAdapters},
+	// config / IaC files (AndroidManifest.xml, Info.plist, Dockerfile, K8s YAML,
+	// Terraform) — a non-tree-sitter frontend; non-matching files yield no nodes so
+	// other repos are unaffected. "dockerfile" matches by basename (no extension).
+	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
+		".tf": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
 	// hardcoded-secret scanner — runs over source + config/env files (alongside the real
 	// frontend), emitting HardcodedSecret nodes from provider tokens / secret literals.
 	{"secretscan", secretscanExts, secretscan.Extract, frontend.SecretscanAdapters},
@@ -93,7 +95,7 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 			if info.IsDir() {
 				files, _ = treesitter.ListFiles(p, lg.exts)
 				root = p
-			} else if lg.exts[strings.ToLower(filepath.Ext(p))] {
+			} else if lg.exts[strings.ToLower(filepath.Ext(p))] || lg.exts[strings.ToLower(filepath.Base(p))] {
 				files = []string{p}
 				root = filepath.Dir(p)
 			}

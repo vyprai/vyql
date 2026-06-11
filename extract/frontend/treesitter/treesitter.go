@@ -29,7 +29,8 @@ func ListFiles(root string, exts map[string]bool) ([]string, error) {
 			}
 			return nil
 		}
-		if exts[strings.ToLower(filepath.Ext(path))] {
+		// match by extension, or by basename for extensionless files (e.g. Dockerfile).
+		if exts[strings.ToLower(filepath.Ext(path))] || exts[strings.ToLower(filepath.Base(path))] {
 			out = append(out, path)
 		}
 		return nil

@@ -98,6 +98,13 @@ threat InsecureCookie { cwe: [CWE_614], desc: "Sensitive cookie without Secure/H
 package supply_chain;
 threat MaliciousCode { cwe: [CWE_506], desc: "Embedded malicious code" }
 threat VulnerableDependency { cwe: [CWE_1104], desc: "Use of unmaintained/vulnerable third-party component" }
+threat Typosquat { cwe: [CWE_1357], desc: "Reliance on a dependency whose name typosquats a popular package" }
+
+package iac;
+threat PrivilegedContainer { cwe: [CWE_250], desc: "Container running privileged / as root (execution with unnecessary privileges)" }
+threat HostNamespaceShare { cwe: [CWE_653], desc: "Pod/container shares a host namespace or mounts a host path (weak compartmentalization)" }
+threat PublicNetworkExposure { cwe: [CWE_284], desc: "Security group / firewall rule open to 0.0.0.0/0" }
+threat WildcardIamPolicy { cwe: [CWE_284], desc: "IAM policy grants wildcard action or resource" }
 
 package validation;
 threat ImproperEncoding { cwe: [CWE_116], desc: "Improper encoding/escaping of output" }

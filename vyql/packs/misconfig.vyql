@@ -60,3 +60,21 @@ rule MissingFrameProtection {
   match code.MissingFrameProtection as f
 }
 
+// IaC / container misconfig (presence over the config frontend — Dockerfile/K8s/Terraform).
+rule PrivilegedContainer {
+  meta { id: "VYQL-CFG-010", severity: high, cwe: [CWE_250] }
+  match code.PrivilegedContainer as c
+}
+rule HostNamespaceShare {
+  meta { id: "VYQL-CFG-011", severity: medium, cwe: [CWE_653] }
+  match code.HostNamespaceShare as h
+}
+rule PublicNetworkExposure {
+  meta { id: "VYQL-CFG-012", severity: high, cwe: [CWE_284] }
+  match code.PublicNetworkExposure as n
+}
+rule WildcardIamPolicy {
+  meta { id: "VYQL-CFG-013", severity: high, cwe: [CWE_284] }
+  match code.WildcardIamPolicy as w
+}
+

@@ -162,6 +162,25 @@ concept DebuggableApp : sink {
   cwe: [CWE_489]
 }
 
+// IaC / container misconfig — presence findings from the config frontend (K8s YAML,
+// Dockerfile, Terraform). Each is a markable token labeled by the config adapter.
+concept PrivilegedContainer : sink {
+  vulnerable_to: [iac.PrivilegedContainer]
+  cwe: [CWE_250]
+}
+concept HostNamespaceShare : sink {
+  vulnerable_to: [iac.HostNamespaceShare]
+  cwe: [CWE_653]
+}
+concept PublicNetworkExposure : sink {
+  vulnerable_to: [iac.PublicNetworkExposure]
+  cwe: [CWE_284]
+}
+concept WildcardIamPolicy : sink {
+  vulnerable_to: [iac.WildcardIamPolicy]
+  cwe: [CWE_284]
+}
+
 concept ExternalCall : sink {
   vulnerable_to: [smartcontract.ExternalCallInjection]
   enabled_by: [taint.UntrustedData]
