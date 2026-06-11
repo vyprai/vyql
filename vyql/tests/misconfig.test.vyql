@@ -168,12 +168,20 @@ test "js: res.cookie httpOnly:false is insecure"
   app.get('/', (req, res) => { res.cookie('sid', token, {httpOnly: false}); });
   ```
 
-test "js: res.cookie httpOnly:true is fine"
+test "js: res.cookie without secure:true is insecure (CWE-614)"
+  lang javascript
+  expect VYQL-CFG-007
+  code
+  ```
+  app.get('/', (req, res) => { res.cookie('sid', token, {httpOnly: true}); });
+  ```
+
+test "js: res.cookie with secure:true is fine"
   lang javascript
   reject VYQL-CFG-007
   code
   ```
-  app.get('/', (req, res) => { res.cookie('sid', token, {httpOnly: true}); });
+  app.get('/', (req, res) => { res.cookie('sid', token, {httpOnly: true, secure: true}); });
   ```
 
 # --- Cert validation disabled (VYQL-CFG-004) ---

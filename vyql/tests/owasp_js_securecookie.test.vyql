@@ -1,0 +1,25 @@
+# Insecure cookie (CWE-614): res.cookie set without secure:true.
+
+test "js: cookie with no options is insecure"
+  lang javascript
+  expect VYQL-CFG-007
+  code
+  ```
+  function h(req, res) { res.cookie("n", "v"); }
+  ```
+
+test "js: cookie httpOnly-only (secure omitted) is insecure"
+  lang javascript
+  expect VYQL-CFG-007
+  code
+  ```
+  function h(req, res) { res.cookie("n", "v", { httpOnly: true }); }
+  ```
+
+test "js: cookie with secure:true is safe"
+  lang javascript
+  reject VYQL-CFG-007
+  code
+  ```
+  function h(req, res) { res.cookie("n", "v", { httpOnly: true, secure: true }); }
+  ```

@@ -184,6 +184,8 @@ adapter javascript {
   sink path "res.sendFile" -> code.FilePathAccess
   sink path "res.download" -> code.FilePathAccess
   sink path "res.send" -> code.HtmlRender
+  // chained / callback emit: res.type("html").send(x), res.format({html:()=>res.send(x)})
+  sink method "send" -> code.HtmlRender
   sink path "res.write" -> code.HtmlRender
   sink path "res.end" -> code.HtmlRender
   sink path "dangerouslySetInnerHTML" -> code.HtmlRender
@@ -256,13 +258,14 @@ adapter javascript {
   sink path "jQuery.extend" arg 2 -> code.ProtoPollute
 
   // weak cipher (CWE-327) value-matched
-  mark "createCipheriv" val "ecb" -> code.WeakCipher
-  mark "createCipheriv" val "des" -> code.WeakCipher
+  // weak cipher (CWE-327): fire unless a strong AEAD/256-bit algorithm literal is present
+  // (catches ecb/cbc/des/rc4/aes-128 + dynamic algorithm vars; accepts FP on dynamic-strong).
+  mark "createCipheriv" nval "gcm" nval "chacha" nval "poly1305" -> code.WeakCipher
 
   // weak hash (CWE-328) — crypto.createHash('md5'|'sha1') (value-matched).
-  mark "createHash" val "md5" -> code.WeakHash
-  mark "createHash" val "sha1" -> code.WeakHash
-  mark "createHash" val "md4" -> code.WeakHash
+  // weak hash (CWE-328): fire unless a strong (>=sha224) algorithm literal is present
+  // (catches md5/sha1/md4/ripemd + dynamic algorithm vars; accepts FP on dynamic-strong).
+  mark "createHash" nval "sha224" nval "sha256" nval "sha384" nval "sha512" nval "sha3" nval "blake2" nval "shake" -> code.WeakHash
 
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.
@@ -284,7 +287,7 @@ adapter javascript {
 
   // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled (omission not flagged).
   mark "res.cookie" val "httpOnly=false" -> code.InsecureCookie
-  mark "res.cookie" val "secure=false" -> code.InsecureCookie
+  mark "res.cookie" nval "secure=true" -> code.InsecureCookie
 
   // permissive CORS (CWE-942) — ACAO header set to "*" (multi-val: name AND wildcard)
   mark "res.header" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
@@ -324,4 +327,6 @@ adapter javascript {
   sink path "session" -> code.TrustBoundary
   sink path "securityContext" -> code.TrustBoundary
   sink path "authContext" -> code.TrustBoundary
+  // Object.assign(trustContext, { k: untrusted }) — the source object (arg1+) carries taint.
+  sink path "Object.assign" arg all collection -> code.TrustBoundary
 }
