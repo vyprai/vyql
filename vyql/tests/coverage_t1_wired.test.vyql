@@ -1,0 +1,66 @@
+# T1.1 — close unspecced rules whose sink is already wired (NoSQL / file-include / selfdestruct).
+
+test "js: req.query -> collection.find is NoSQL injection (operator injection)"
+  lang javascript
+  expect VYQL-INJ-007
+  code
+  ```
+  function handler(req, res) {
+    const q = req.query;
+    collection.find(q);
+  }
+  ```
+
+test "js: a constant NoSQL query is clean"
+  lang javascript
+  reject VYQL-INJ-007
+  code
+  ```
+  function handler(req, res) {
+    collection.find({ active: true });
+  }
+  ```
+
+test "php: GET -> include is file inclusion (LFI/RFI)"
+  lang php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  $page = $_GET['page'];
+  include($page);
+  ```
+
+test "php: a constant include is clean"
+  lang php
+  reject VYQL-PATH-002
+  code
+  ```
+  <?php
+  include("header.php");
+  ```
+
+test "solidity: attacker-reachable selfdestruct is privileged-op abuse"
+  lang solidity
+  expect VYQL-SC-002
+  code
+  ```
+  contract C {
+    function kill(address payable a) public {
+      selfdestruct(a);
+    }
+  }
+  ```
+
+test "solidity: a hardcoded-beneficiary selfdestruct is clean"
+  lang solidity
+  reject VYQL-SC-002
+  code
+  ```
+  contract C {
+    address payable owner;
+    function kill() public {
+      selfdestruct(owner);
+    }
+  }
+  ```
