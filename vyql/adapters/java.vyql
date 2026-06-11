@@ -34,6 +34,7 @@ adapter java {
   sink method "executeUpdate" -> code.SqlExecution
   sink method "execute" -> code.SqlExecution
   sink method "executeBatch" -> code.SqlExecution
+  sink method "addBatch" -> code.SqlExecution
   sink method "rawQuery" -> code.SqlExecution
   sink method "execSQL" -> code.SqlExecution
   // Android WebView: tainted URL/JS loaded or evaluated (CWE-749)
