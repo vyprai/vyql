@@ -80,9 +80,10 @@ func (c *plConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	// branch-structured (B1); Cond nil (Perl did not evaluate the predicate) -> byte-identical.
-	case "if_statement", "unless_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+	// branch-structured with predicate attached so constant-false arms are pruned.
+	// (The block-form `if`/`unless` parses as conditional_statement in this grammar.)
+	case "conditional_statement", "if_statement", "unless_statement":
+		return []nir.Stmt{c.plIf(n)}
 	case "while_statement", "until_statement", "for_statement", "foreach_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "block_statement":
@@ -133,6 +134,36 @@ func (c *plConv) lvalName(n *tree_sitter.Node) string {
 	return ""
 }
 
+// plIf lowers a block-form if/unless with its predicate so a constant-false arm is
+// pruned. The predicate is only attached for plain `if` (not `unless`, whose inverted
+// sense we don't fold) — keeping the over-approximation FN-safe.
+func (c *plConv) plIf(n *tree_sitter.Node) nir.Stmt {
+	it := nir.If{Loc: c.loc(n)}
+	isIf := false
+	for i := uint(0); i < n.ChildCount(); i++ {
+		if ch := n.Child(i); !ch.IsNamed() && c.text(ch) == "if" {
+			isIf = true
+		}
+	}
+	if isIf {
+		if cond := field(n, "condition"); cond != nil {
+			it.Cond = c.expr(cond)
+		}
+	}
+	if blk := field(n, "block"); blk != nil {
+		it.Then = c.block(blk)
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "else", "elsif", "elsif_clause", "else_clause":
+			if b := field(ch, "block"); b != nil {
+				it.Else = append(it.Else, c.block(b)...)
+			}
+		}
+	}
+	return it
+}
+
 func (c *plConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var walk func(m *tree_sitter.Node)
@@ -171,7 +202,7 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 	}
 	L := c.loc(n)
 	switch n.Kind() {
-	case "scalar", "array", "hash", "varname":
+	case "scalar", "array", "hash", "varname", "container_variable":
 		return nir.Name{ID: c.plVarName(n), Loc: L}
 	case "number", "boolean":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
@@ -213,16 +244,46 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		return nir.Call{Callee: nir.Name{ID: fn, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: fn, Method: fn, Loc: L}
-	case "binary_expression":
+	case "binary_expression", "relational_expression", "equality_expression", "comparison_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
 		if op == "." {
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "conditional_expression", "ternary_expression":
+		// The grammar tags several children `condition`, so take the first named child
+		// as the predicate and fall back to positional consequent/alternative.
+		kids := namedChildren(n)
+		t := nir.Ternary{Loc: L}
+		if len(kids) > 0 {
+			t.Cond = c.expr(kids[0])
+		}
+		if then := field(n, "consequent"); then != nil {
+			t.Then = c.expr(then)
+		} else if len(kids) > 1 {
+			t.Then = c.expr(kids[1])
+		}
+		if alt := field(n, "alternative"); alt != nil {
+			t.Else = c.expr(alt)
+		} else if len(kids) > 2 {
+			t.Else = c.expr(kids[2])
+		}
+		return t
+	case "unary_expression":
+		op := c.text(field(n, "operator"))
+		var operand nir.Expr = nir.Const{Loc: L}
+		if k := namedChildren(n); len(k) > 0 {
+			operand = c.expr(k[len(k)-1])
+		}
+		return nir.Unary{Op: op, Operand: operand, Loc: L}
 	case "hash_element_expression":
 		// $ENV{X} / $hash{key}
-		return nir.Index{Base: c.expr(field(n, "variable")), Path: c.dotted(field(n, "variable")), Loc: L}
+		base := field(n, "hash")
+		if base == nil {
+			base = field(n, "variable")
+		}
+		return nir.Index{Base: c.expr(base), Key: c.expr(field(n, "key")), Path: c.dotted(base), Loc: L}
 	case "parenthesized_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
@@ -261,7 +322,7 @@ func (c *plConv) dotted(n *tree_sitter.Node) string {
 		return "?"
 	}
 	switch n.Kind() {
-	case "scalar", "array", "hash", "varname":
+	case "scalar", "array", "hash", "varname", "container_variable":
 		return c.plVarName(n)
 	case "function", "bareword", "method":
 		// normalize package separator `::` to `.` so dotted paths are boundary-
