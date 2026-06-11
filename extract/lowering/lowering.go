@@ -52,6 +52,28 @@ type lowerer struct {
 
 	curModule string
 	curClass  string // "" = none
+
+	// B1 structured-CFG metadata. `region` is the current control-region path (e.g.
+	// "/if3.t/loop5"); every node is stamped with it plus a monotonic `order`. For
+	// goto-free structured control flow this encodes the dominator tree directly:
+	// G dominates S iff region(G) is an ancestor of region(S) and order(G) < order(S)
+	// (see solvers.Dominates). Pure metadata — inert until a path-sensitive rule reads it.
+	region   string
+	order    int
+	branchCt int
+}
+
+// inRegion lowers f inside a nested control region (then/else/loop/case/handler).
+func (l *lowerer) inRegion(seg string, f func()) {
+	save := l.region
+	l.region = save + "/" + seg
+	f()
+	l.region = save
+}
+
+func (l *lowerer) nextBranch() string {
+	l.branchCt++
+	return strconv.Itoa(l.branchCt)
 }
 
 // scope holds variable -> node bindings and variable -> (module, class) types.
@@ -115,7 +137,8 @@ func (l *lowerer) nid(prefix string) string {
 
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
 	id := l.nid(kind)
-	p := map[string]string{"loc": loc}
+	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.order)}
+	l.order++
 	for k, v := range props {
 		p[k] = v
 	}
@@ -243,7 +266,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				inner.typ[fld] = [2]string{cm, typ}
 			}
 		}
+		// each function gets a distinct region ROOT, so structural dominance never spans
+		// functions (cross-function flows fall back to presence semantics — conservative).
+		saveRegion := l.region
+		l.region = "/fn" + l.nextBranch()
 		l.block(st.Body, inner)
+		l.region = saveRegion
 	case nir.Assign:
 		val := l.eval(st.Value, sc)
 		var typ [2]string
@@ -281,23 +309,26 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	// Cond=nil and the eval is a no-op — each frontend keeps its exact prior node set.
 	case nir.If:
 		l.eval(st.Cond, sc)
-		l.block(st.Then, sc)
-		l.block(st.Else, sc)
+		b := l.nextBranch()
+		l.inRegion("if"+b+".t", func() { l.block(st.Then, sc) })
+		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
 	case nir.Loop:
 		l.eval(st.Cond, sc)
-		l.block(st.Body, sc)
+		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
 	case nir.Switch:
 		l.eval(st.Subject, sc)
-		for _, c := range st.Cases {
-			l.block(c, sc)
+		b := l.nextBranch()
+		for i, c := range st.Cases {
+			l.inRegion("sw"+b+".c"+strconv.Itoa(i), func() { l.block(c, sc) })
 		}
-		l.block(st.Default, sc)
+		l.inRegion("sw"+b+".d", func() { l.block(st.Default, sc) })
 	case nir.Try:
-		l.block(st.Body, sc)
-		for _, h := range st.Handlers {
-			l.block(h, sc)
+		b := l.nextBranch()
+		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
+		for i, h := range st.Handlers {
+			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
 		}
-		l.block(st.Finally, sc)
+		l.inRegion("try"+b+".f", func() { l.block(st.Finally, sc) })
 	}
 }
 
