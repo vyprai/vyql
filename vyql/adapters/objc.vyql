@@ -33,4 +33,18 @@ adapter objc {
   sink path "printf" arg 0 -> code.FormatString
   sink path "NSLog" arg 0 -> code.FormatString
   sink method "stringWithFormat" arg 0 -> code.FormatString
+
+  // SSRF — NSURL / NSURLSession / NSURLConnection (tainted URL)
+  sink method "URLWithString" -> code.UrlFetch
+  sink method "dataTaskWithURL" -> code.UrlFetch
+  sink method "dataWithContentsOfURL" -> code.UrlFetch
+  sink method "requestWithURL" -> code.UrlFetch
+
+  // regex compile (ReDoS) — tainted PATTERN
+  sink method "regularExpressionWithPattern" -> code.RegexCompile
+
+  // weak crypto (CWE-327) — CommonCrypto CC_MD5 / CC_SHA1
+  mark "CC_MD5" -> code.WeakHash
+  mark "CC_MD2" -> code.WeakHash
+  mark "CC_SHA1" -> code.WeakHash
 }

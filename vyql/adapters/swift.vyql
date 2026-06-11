@@ -51,7 +51,7 @@ adapter swift {
   mark "CC_MD5" -> code.WeakHash
   mark "CC_SHA1" -> code.WeakHash
 
-  // controls (sanitizers)
-  control "addingPercentEncoding" -> core.OutputEncoding
+  // NOTE: addingPercentEncoding maps to no wired neutralizer (OutputEncoding is unused
+  // by any rule and percent-encoding doesn't neutralize cmd/SQL/HTML) — omitted.
   // NOTE: Leaf #unsafeHTML XSS is template syntax (not Swift source) — out of scope, like Vue v-html.
 }
