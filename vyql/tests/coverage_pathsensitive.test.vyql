@@ -25,3 +25,29 @@ test "path-sensitive: a CSRF guard in a SIBLING branch does NOT cover the sink (
   edge FLOWS src -> op
   edge PROTECTS guard -> op
   ```
+
+# Real-code guards (B1 enabler): a guard-control-labelled call (validate_csrf_token)
+# now suppresses the sinks it DOMINATES — `guarded_by` works on code, not just graphs.
+
+test "path-sensitive: a CSRF check dominating the state change suppresses (real code)"
+  lang python
+  reject VYQL-RF-003
+  code
+  ```
+  def change_pw(request, account):
+      validate_csrf_token(request)
+      pw = request.form["new_password"]
+      account.change_password(pw)
+  ```
+
+test "path-sensitive: a CSRF check in ONE branch does not cover the sink (real code)"
+  lang python
+  expect VYQL-RF-003
+  code
+  ```
+  def change_pw(request, account, safe):
+      if safe:
+          validate_csrf_token(request)
+      pw = request.form["new_password"]
+      account.change_password(pw)
+  ```

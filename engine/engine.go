@@ -399,6 +399,7 @@ func (e *Engine) conf(nodeIDs ...string) string {
 // semantics at a lower fidelity, so existing behaviour and tests are unchanged.
 func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	sinkCFG := hasCFG(e.Store, sinkID)
+	// (1) an explicit PROTECTS/CHECKS edge (graph specs; a future endpoint-linking pass).
 	for _, et := range []string{"PROTECTS", "CHECKS"} {
 		edges, _ := e.Store.InEdges(sinkID, et)
 		for _, ed := range edges {
@@ -413,6 +414,20 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 					continue // non-dominating guard → keep looking for one that does
 				}
 				return true // presence fallback (no CFG metadata)
+			}
+		}
+	}
+	// (2) B1: a guard-control-labelled node that DOMINATES the sink. This is what makes
+	// `guarded_by` work on REAL CODE — adapters label the check (e.g. validate_csrf_token,
+	// a @login_required decorator) with the control concept, and the structured CFG lets us
+	// connect it to exactly the sinks it covers (path-sensitive: a check in one branch does
+	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free
+	// graphs — those rely on the explicit edge above.
+	if sinkCFG {
+		guards, _ := e.Store.NodesWithConcept(control)
+		for _, gid := range guards {
+			if gid != sinkID && hasCFG(e.Store, gid) && solvers.Dominates(e.Store, gid, sinkID) {
+				return true
 			}
 		}
 	}
