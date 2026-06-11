@@ -109,7 +109,6 @@ threat TxOriginAuth { cwe: [CWE_477], desc: "Authorization via tx.origin (phishi
 
 package mobile;
 threat WebViewInjection { cwe: [CWE_749], desc: "Untrusted data loaded/evaluated in a WebView, or a native bridge exposed to it" }
-threat InsecureStorage { cwe: [CWE_922], desc: "Sensitive data stored without protection (plaintext prefs/defaults)" }
 
 package desktop;
 threat InsecureElectronConfig { cwe: [CWE_829], desc: "Electron renderer with nodeIntegration enabled / contextIsolation disabled (untrusted web content can run Node)" }

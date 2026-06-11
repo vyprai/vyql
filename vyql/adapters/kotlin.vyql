@@ -13,8 +13,6 @@ adapter kotlin {
   source ".getCharSequenceExtra" -> code.IntentInput
   source ".getBundleExtra" -> code.IntentInput
   source ".getDataString" -> code.IntentInput
-  source ".getData" -> code.IntentInput
-  source ".getExtras" -> code.IntentInput
   source ".getQueryParameter" -> code.IntentInput
   source ".getLastPathSegment" -> code.IntentInput
 
