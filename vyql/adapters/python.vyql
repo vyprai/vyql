@@ -8,6 +8,18 @@ adapter python {
   source "http_input" -> code.HttpInput
 
   source "request.form" -> code.HttpInput
+  // request stored on an object (e.g. a wrapper `self.request = flask.request`, then
+  // `self.request.form.get(...)`): the same accessors under a `.request.` prefix.
+  source "self.request.form" -> code.HttpInput
+  source "self.request.args" -> code.HttpInput
+  source "self.request.values" -> code.HttpInput
+  source "self.request.cookies" -> code.HttpInput
+  source "self.request.headers" -> code.HttpInput
+  source "self.request.get_json" -> code.HttpInput
+  source "self.request.json" -> code.HttpInput
+  source "self.request.data" -> code.HttpInput
+  source "self.request.files" -> code.HttpInput
+  source "self.request.get_data" -> code.HttpInput
   source "request.args" -> code.HttpInput
   source "request.values" -> code.HttpInput
   source "request.cookies" -> code.HttpInput

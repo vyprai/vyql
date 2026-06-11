@@ -194,6 +194,26 @@ func firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
 	return nil
 }
 
+// stringInterps returns the lowered expressions of every `{…}` interpolation in a string
+// node (empty for a plain string literal).
+func (c *pyConv) stringInterps(n *tree_sitter.Node) []nir.Expr {
+	var interps []nir.Expr
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "interpolation" {
+			e := field(ch, "expression")
+			if e == nil {
+				if kids := namedChildren(ch); len(kids) > 0 {
+					e = kids[0]
+				}
+			}
+			if e != nil {
+				interps = append(interps, c.expr(e))
+			}
+		}
+	}
+	return interps
+}
+
 func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
@@ -545,6 +565,18 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "concatenated_string":
+		// implicit adjacent-string concatenation `f'a {x}' f'b {y}'` — gather the
+		// interpolations from EVERY part (previously this dropped them all, hiding any
+		// tainted value or sink call inside the later parts).
+		var interps []nir.Expr
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "string" {
+				interps = append(interps, c.stringInterps(ch)...)
+			}
+		}
+		if len(interps) > 0 {
+			return nir.Format{Parts: interps, Loc: L}
+		}
 		return nir.Const{Loc: L}
 	case "integer", "float":
 		// carry the literal text so value-matching can see numeric modes/flags
@@ -592,21 +624,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
 	case "string":
-		var interps []nir.Expr
-		for _, ch := range namedChildren(n) {
-			if ch.Kind() == "interpolation" {
-				e := field(ch, "expression")
-				if e == nil {
-					if kids := namedChildren(ch); len(kids) > 0 {
-						e = kids[0]
-					}
-				}
-				if e != nil {
-					interps = append(interps, c.expr(e))
-				}
-			}
-		}
-		if len(interps) > 0 {
+		if interps := c.stringInterps(n); len(interps) > 0 {
 			return nir.Format{Parts: interps, Loc: L}
 		}
 		return nir.Const{Loc: L, Value: c.text(n)}
