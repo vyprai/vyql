@@ -44,4 +44,8 @@ adapter elixir {
   // weak hash — :crypto.hash(:md5|:sha, …).
   mark ":crypto.hash" val ":md5" -> code.WeakHash
   mark ":crypto.hash" val ":sha" -> code.WeakHash
+
+  // XSS — Phoenix.HTML.raw bypasses auto-escaping.
+  sink path "raw" -> code.HtmlRender
+  sink path "Phoenix.HTML.raw" -> code.HtmlRender
 }

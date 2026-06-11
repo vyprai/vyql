@@ -140,4 +140,5 @@ adapter go {
   mark "http.Get" val "http://" nval "127.0" -> code.CleartextChannel
   mark "http.Post" val "http://" nval "127.0" -> code.CleartextChannel
   mark "http.NewRequest" val "http://" nval "127.0" -> code.CleartextChannel
+
 }

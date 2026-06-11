@@ -47,4 +47,7 @@ adapter scala {
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval
+
+  // XSS — Play Twirl Html(...) emits unescaped markup.
+  sink path "Html" -> code.HtmlRender
 }
