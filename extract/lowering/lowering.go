@@ -210,6 +210,34 @@ func (l *lowerer) constInt(e nir.Expr, sc *scope) (int64, bool) {
 	return 0, false
 }
 
+// constStrVal evaluates a string/char-valued constant expression — a literal, a
+// const-propagated variable, or `s.charAt(i)` on a constant string — used to fold a
+// switch subject so the matching case can be selected. Returns ok=false otherwise.
+func (l *lowerer) constStrVal(e nir.Expr, sc *scope) (string, bool) {
+	switch v := e.(type) {
+	case nir.Const:
+		s := unquoteLit(v.Value)
+		return s, s != ""
+	case nir.Name:
+		if cv := sc.cnst[v.ID]; cv != "" {
+			return cv, true
+		}
+	case nir.Thru:
+		return l.constStrVal(v.Inner, sc)
+	case nir.Call:
+		if v.Method == "charAt" && len(v.Args) == 1 {
+			if attr, ok := v.Callee.(nir.Attr); ok {
+				if base, ok := l.constStrVal(attr.Base, sc); ok {
+					if idx, ok := l.constInt(v.Args[0], sc); ok && idx >= 0 && int(idx) < len(base) {
+						return string(base[idx]), true
+					}
+				}
+			}
+		}
+	}
+	return "", false
+}
+
 // constBool evaluates a boolean-constant expression (comparisons of integer/string
 // constants, !/&&/||, and true/false). Returns ok=false when not compile-time constant —
 // the caller then keeps both branches (sound, never prunes a live branch).
@@ -656,6 +684,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				cv = pv
 			}
 		}
+		if cv == "" { // foldable string/char value (e.g. switchTarget = "ABC".charAt(1) -> "B")
+			if sv, ok := l.constStrVal(st.Value, sc); ok {
+				cv = sv
+			}
+		}
 		for _, t := range st.Targets {
 			sc.node[t] = val
 			if hasTyp {
@@ -725,6 +758,27 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.mergeBindings(sc, before, []map[string]string{bodyB})
 	case nir.Switch:
 		l.eval(st.Subject, sc)
+		// constant subject → lower only the matching case (or default), like if/ternary
+		// pruning. `switch ("ABC".charAt(1)) { case 'A': x=src(); case 'B': x="safe"; }` runs
+		// only case 'B'. Requires the frontend to have captured case labels.
+		if len(st.Labels) == len(st.Cases) && len(st.Cases) > 0 {
+			if subj, ok := l.constStrVal(st.Subject, sc); ok {
+				matched := -1
+				for i, labs := range st.Labels {
+					for _, lab := range labs {
+						if lv, ok := l.constStrVal(lab, sc); ok && lv == subj {
+							matched = i
+						}
+					}
+				}
+				if matched >= 0 {
+					l.block(st.Cases[matched], sc)
+				} else {
+					l.block(st.Default, sc)
+				}
+				return
+			}
+		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
 		var branches []map[string]string

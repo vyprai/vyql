@@ -204,9 +204,12 @@ type Loop struct {
 }
 
 // Switch is a multi-way branch: each Cases entry is one arm's body, Default the fallthrough.
+// Labels[i] holds the case-label expressions for Cases[i] (parallel slice; empty when the
+// frontend doesn't capture them) — used to prune to the matching arm when Subject is constant.
 type Switch struct {
 	Subject Expr
 	Cases   [][]Stmt
+	Labels  [][]Expr
 	Default []Stmt
 	Loc     string
 }

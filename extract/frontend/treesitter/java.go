@@ -238,8 +238,10 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// vs `case 'B': bar = "safe";`). Classic colon-form; arrow/yield form has no
 		// statement groups and falls back to a flat Block.
 		var cases [][]nir.Stmt
+		var labels [][]nir.Expr
 		var deflt []nir.Stmt
 		var hasGroups bool
+		var pending []nir.Expr // labels of empty (fall-through) case groups, merged into the next body
 		for _, blk := range children(n) {
 			if blk.Kind() != "switch_block" {
 				continue
@@ -250,11 +252,14 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				}
 				hasGroups = true
 				var stmts []nir.Stmt
+				var labs []nir.Expr
 				isDefault := false
 				for _, ch := range children(grp) {
 					if ch.Kind() == "switch_label" {
 						if strings.Contains(c.text(ch), "default") {
 							isDefault = true
+						} else if lk := namedChildren(ch); len(lk) > 0 {
+							labs = append(labs, c.expr(lk[0])) // the case's label value(s)
 						}
 						continue
 					}
@@ -262,13 +267,18 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				}
 				if isDefault {
 					deflt = append(deflt, stmts...)
-				} else {
+					continue
+				}
+				pending = append(pending, labs...)
+				if len(stmts) > 0 { // body present — flush the accumulated fall-through labels with it
 					cases = append(cases, stmts)
+					labels = append(labels, pending)
+					pending = nil
 				}
 			}
 		}
 		if hasGroups {
-			return []nir.Stmt{nir.Switch{Cases: cases, Default: deflt}}
+			return []nir.Stmt{nir.Switch{Subject: c.expr(field(n, "condition")), Cases: cases, Labels: labels, Default: deflt}}
 		}
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	case "block", "synchronized_statement":
