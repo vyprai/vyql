@@ -76,6 +76,51 @@ func (l *lowerer) nextBranch() string {
 	return strconv.Itoa(l.branchCt)
 }
 
+func cloneStrMap(m map[string]string) map[string]string {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+// mergeBindings reconciles variable bindings after branches (flow-sensitive JOIN): a
+// variable reassigned in any branch becomes a Phi flowing from every branch's value AND the
+// pre-branch value (a branch may not execute). A variable tainted on ANY path therefore
+// stays tainted past the join — last-write-wins, which silently dropped taint from a sibling
+// branch, is gone. Straight-line reassignment (e.g. x = sanitize(x)) is NOT a branch and is
+// unaffected, so sanitizers still work.
+func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []map[string]string) {
+	changed := map[string]bool{}
+	for _, br := range branches {
+		for v, n := range br {
+			if before[v] != n {
+				changed[v] = true
+			}
+		}
+	}
+	for v := range changed {
+		phi := l.node("Phi", "?:0", nil)
+		srcs := map[string]bool{}
+		for _, br := range branches {
+			val := br[v]
+			if val == "" {
+				val = before[v]
+			}
+			if val != "" {
+				srcs[val] = true
+			}
+		}
+		if before[v] != "" {
+			srcs[before[v]] = true // the branch(es) may not run — keep the pre-branch value
+		}
+		for s := range srcs {
+			l.flow(s, phi)
+		}
+		sc.node[v] = phi
+	}
+}
+
 // scope holds variable -> node bindings and variable -> (module, class) types.
 type scope struct {
 	node map[string]string
@@ -310,18 +355,36 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.If:
 		l.eval(st.Cond, sc)
 		b := l.nextBranch()
+		before := cloneStrMap(sc.node)
 		l.inRegion("if"+b+".t", func() { l.block(st.Then, sc) })
+		thenB := cloneStrMap(sc.node)
+		sc.node = cloneStrMap(before)
 		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
+		elseB := cloneStrMap(sc.node)
+		sc.node = before
+		l.mergeBindings(sc, before, []map[string]string{thenB, elseB})
 	case nir.Loop:
 		l.eval(st.Cond, sc)
+		before := cloneStrMap(sc.node)
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
+		bodyB := cloneStrMap(sc.node)
+		sc.node = before
+		l.mergeBindings(sc, before, []map[string]string{bodyB})
 	case nir.Switch:
 		l.eval(st.Subject, sc)
 		b := l.nextBranch()
+		before := cloneStrMap(sc.node)
+		var branches []map[string]string
 		for i, c := range st.Cases {
+			sc.node = cloneStrMap(before)
 			l.inRegion("sw"+b+".c"+strconv.Itoa(i), func() { l.block(c, sc) })
+			branches = append(branches, cloneStrMap(sc.node))
 		}
+		sc.node = cloneStrMap(before)
 		l.inRegion("sw"+b+".d", func() { l.block(st.Default, sc) })
+		branches = append(branches, cloneStrMap(sc.node))
+		sc.node = before
+		l.mergeBindings(sc, before, branches)
 	case nir.Try:
 		b := l.nextBranch()
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
