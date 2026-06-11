@@ -13,3 +13,10 @@ rule PrivilegedDestruct {
   meta { id: "VYQL-SC-002", severity: critical, cwe: [CWE_284] }
   taint core.UserControlledData -> code.PrivilegedOp
 }
+
+// Authorization decided by tx.origin — phishing-vulnerable (CWE-477). Presence:
+// using tx.origin (instead of msg.sender) for auth is the anti-pattern itself.
+rule TxOriginAuth {
+  meta { id: "VYQL-SC-003", severity: high, cwe: [CWE_477] }
+  match code.TxOriginAuth
+}

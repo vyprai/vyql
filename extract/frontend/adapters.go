@@ -323,24 +323,29 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 		Name: spec.Name + ".marks", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
-			ids, _ := s.NodesOfType("code.Call")
+			// Marks flag a dangerous USE. Most are calls (weak-crypto getInstance,
+			// md5_hex…), but some are bare member accesses with no call — e.g.
+			// Solidity `tx.origin` used for authorization — so scan Attr nodes too.
 			var out []adapters.Mapping
-			for _, id := range ids {
-				n, _, _ := s.GetNode(id)
-				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
-					continue
-				}
-				path := n.Prop("callee_path")
-				strArgs := n.Prop("str_args")
-				for _, m := range spec.Marks {
-					if !matchSinkPath(path, m.Pattern) {
+			for _, nodeType := range []string{"code.Call", "code.Attr"} {
+				ids, _ := s.NodesOfType(nodeType)
+				for _, id := range ids {
+					n, _, _ := s.GetNode(id)
+					if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
 						continue
 					}
-					if !valConds(strArgs, m.ValMatches, m.ValAbsents) {
-						continue
+					path := n.Prop("callee_path")
+					strArgs := n.Prop("str_args")
+					for _, m := range spec.Marks {
+						if !matchSinkPath(path, m.Pattern) {
+							continue
+						}
+						if !valConds(strArgs, m.ValMatches, m.ValAbsents) {
+							continue
+						}
+						out = append(out, adapters.Mapping{NodeID: id, Concept: m.Concept})
+						break
 					}
-					out = append(out, adapters.Mapping{NodeID: id, Concept: m.Concept})
-					break
 				}
 			}
 			return out

@@ -159,6 +159,10 @@ concept PrivilegedOp : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_284]
 }
+concept TxOriginAuth : sink {
+  vulnerable_to: [smartcontract.TxOriginAuth]
+  cwe: [CWE_477]
+}
 concept Cookie : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_20]

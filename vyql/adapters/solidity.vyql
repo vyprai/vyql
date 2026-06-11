@@ -18,4 +18,7 @@ adapter solidity {
   // privileged destruct
   sink path "selfdestruct" -> code.PrivilegedOp
   sink path "suicide" -> code.PrivilegedOp
+
+  // tx.origin authorization anti-pattern (CWE-477) — presence of tx.origin
+  mark "tx.origin" -> code.TxOriginAuth
 }
