@@ -1,0 +1,38 @@
+# OWASP-replica coverage for Lua — true positive plus opaque-predicate pruning.
+
+test "lua: ngx request args -> os.execute is command injection"
+  lang lua
+  expect VYQL-INJ-002
+  code
+  ```
+  local function h()
+    local x = ngx.req.get_uri_args()
+    os.execute("echo " .. x)
+  end
+  ```
+
+test "lua: tainted assign in a live branch is still cmdi (no FN)"
+  lang lua
+  expect VYQL-INJ-002
+  code
+  ```
+  local function h()
+    local x = ngx.req.get_uri_args()
+    local c = "ls"
+    if 1 < 100 then c = x end
+    os.execute("echo " .. c)
+  end
+  ```
+
+test "lua: opaque-false if taints only the dead branch — clean cmdi"
+  lang lua
+  reject VYQL-INJ-002
+  code
+  ```
+  local function h()
+    local x = ngx.req.get_uri_args()
+    local c = "ls"
+    if 1 > 100 then c = x end
+    os.execute("echo " .. c)
+  end
+  ```

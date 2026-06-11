@@ -90,9 +90,9 @@ func (c *luaConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	// branch-structured (B1); Cond nil (Lua did not evaluate the predicate) -> byte-identical.
+	// branch-structured with predicate attached so constant-false arms are pruned.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		return []nir.Stmt{c.luaIf(n)}
 	case "while_statement", "for_statement", "for_numeric_statement", "for_generic_statement", "repeat_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "do_statement":
@@ -141,6 +141,29 @@ func (c *luaConv) lvalName(n *tree_sitter.Node) string {
 		return c.text(n)
 	}
 	return ""
+}
+
+// luaIf lowers an if with its predicate so a constant-false arm is pruned. elseif/else
+// bodies are folded into Else as an over-approximation (no per-elseif pruning) — FN-safe.
+func (c *luaConv) luaIf(n *tree_sitter.Node) nir.Stmt {
+	it := nir.If{Loc: c.loc(n)}
+	if cond := field(n, "condition"); cond != nil {
+		it.Cond = c.expr(cond)
+	}
+	if cons := field(n, "consequence"); cons != nil {
+		it.Then = c.block(cons)
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "else_statement", "elseif_statement":
+			for _, b := range namedChildren(ch) {
+				if b.Kind() == "block" {
+					it.Else = append(it.Else, c.block(b)...)
+				}
+			}
+		}
+	}
+	return it
 }
 
 func (c *luaConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -215,6 +238,13 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "unary_expression":
+		op := c.text(field(n, "operator"))
+		var operand nir.Expr = nir.Const{Loc: L}
+		if k := namedChildren(n); len(k) > 0 {
+			operand = c.expr(k[len(k)-1])
+		}
+		return nir.Unary{Op: op, Operand: operand, Loc: L}
 	case "parenthesized_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
