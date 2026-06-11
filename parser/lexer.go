@@ -1,6 +1,9 @@
 package parser
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type tokKind int
 
@@ -70,13 +73,42 @@ func lex(src string) ([]tok, error) {
 		case c == '"':
 			start := i
 			i++
+			// Fast path: no backslash before the closing quote → the raw slice IS the
+			// value (no allocation). Otherwise decode escapes (\" \\ \n \t \r, and
+			// \<other> → the literal char) so an escaped quote doesn't end the string.
+			j := i
+			for j < n && src[j] != '"' && src[j] != '\\' {
+				j++
+			}
+			if j < n && src[j] == '"' {
+				toks = append(toks, tok{tString, src[i:j], start})
+				i = j + 1
+				continue
+			}
+			var b strings.Builder
 			for i < n && src[i] != '"' {
+				if src[i] == '\\' && i+1 < n {
+					i++
+					switch src[i] {
+					case 'n':
+						b.WriteByte('\n')
+					case 't':
+						b.WriteByte('\t')
+					case 'r':
+						b.WriteByte('\r')
+					default:
+						b.WriteByte(src[i]) // \" \\ \' and any other → literal char
+					}
+					i++
+					continue
+				}
+				b.WriteByte(src[i])
 				i++
 			}
 			if i >= n {
 				return nil, fmt.Errorf("unterminated string at %d", start)
 			}
-			toks = append(toks, tok{tString, src[start+1 : i], start})
+			toks = append(toks, tok{tString, b.String(), start})
 			i++
 		case isWordStart(c):
 			start := i

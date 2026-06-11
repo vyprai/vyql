@@ -219,3 +219,30 @@ adapter python {
 		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[3])
 	}
 }
+
+// String literals support backslash escapes: \" keeps a quote inside the string
+// (without ending it), \\ a literal backslash, and \n/\t/\r the usual whitespace.
+// The escape-free fast path must return the raw text unchanged.
+func TestLexStringEscapes(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{`"plain"`, "plain"},                               // fast path, no escapes
+		{`"a=\"b\""`, `a="b"`},                             // escaped quotes don't terminate
+		{`"back\\slash"`, `back\slash`},                    // literal backslash
+		{`"tab\tend"`, "tab\tend"},                         // \t
+		{`"line\nbreak"`, "line\nbreak"},                   // \n
+		{`"x\qy"`, "xqy"},                                  // unknown escape → literal char
+	}
+	for _, c := range cases {
+		toks, err := lex(c.src)
+		if err != nil {
+			t.Fatalf("lex(%q) error: %v", c.src, err)
+		}
+		if toks[0].kind != tString || toks[0].val != c.want {
+			t.Errorf("lex(%q) = %q, want %q", c.src, toks[0].val, c.want)
+		}
+	}
+	// an unterminated string (trailing escape eats the closing quote) still errors.
+	if _, err := lex(`"oops\"`); err == nil {
+		t.Errorf("expected unterminated-string error")
+	}
+}
