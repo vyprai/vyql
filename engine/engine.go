@@ -461,6 +461,28 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	return false
 }
 
+// endpointClosed reports whether a release carrying `control` POST-DOMINATES the alloc —
+// i.e. the resource is released on every path to function exit (so there is no leak). With
+// CFG metadata it uses post-dominance; without it falls back to presence (any release
+// suppresses — conservative, to avoid leak false positives on unconverted frontends).
+func (e *Engine) endpointClosed(allocID, control string) bool {
+	allocCFG := hasCFG(e.Store, allocID)
+	releases, _ := e.Store.NodesWithConcept(control)
+	for _, rid := range releases {
+		if rid == allocID {
+			continue
+		}
+		if allocCFG && hasCFG(e.Store, rid) {
+			if solvers.PostDominates(e.Store, rid, allocID) {
+				return true
+			}
+			continue
+		}
+		return true // presence fallback (no CFG metadata)
+	}
+	return false
+}
+
 // hasCFG reports whether a node carries structured-CFG metadata (a region tag).
 func hasCFG(store usg.Store, id string) bool {
 	if n, ok, _ := store.GetNode(id); ok {

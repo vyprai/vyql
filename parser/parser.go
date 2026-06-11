@@ -276,6 +276,10 @@ func (p *parser) parseException() Exception {
 		p.next()
 		return GuardedBy{Concept: p.parseQName()}
 	}
+	if p.atWord("closed_by") {
+		p.next()
+		return ClosedBy{Concept: p.parseQName()}
+	}
 	return ExprException{Expr: p.parseExpr()}
 }
 
@@ -504,8 +508,13 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 			// the matching CALL node so `unless sanitized_by` can kill a flow through it. The
 			// optional val/nval gate value-based hardening (e.g. resolve_entities=False).
 			p.next()
+			kind := "control"
+			if p.atWord("method") { // receiver-agnostic: match the call method name (e.g. .close())
+				p.next()
+				kind = "control_method"
+			}
 			pat := p.parsePattern()
-			ctl := AdapterMapping{Kind: "control", Pattern: pat}
+			ctl := AdapterMapping{Kind: kind, Pattern: pat}
 			for p.atWord("val") {
 				p.next()
 				ctl.ValMatches = append(ctl.ValMatches, p.parsePattern())

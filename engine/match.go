@@ -16,14 +16,17 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 	candidates, _ := e.Store.NodesWithConcept(body.Concept)
 
 	var where parser.Expr
-	var guards []string
+	var guards, closers []string
 	for _, cl := range cr.Rule.Clauses {
 		switch cl.Kind {
 		case "where":
 			where = cl.Where
 		case "unless":
-			if g, ok := cl.Unless.(parser.GuardedBy); ok {
-				guards = append(guards, g.Concept)
+			switch ex := cl.Unless.(type) {
+			case parser.GuardedBy:
+				guards = append(guards, ex.Concept)
+			case parser.ClosedBy:
+				closers = append(closers, ex.Concept)
 			}
 		}
 	}
@@ -44,6 +47,11 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		for _, g := range guards {
 			ok := e.endpointGuarded(node, g)
 			ne = append(ne, findings.NegationEvidence{Clause: "guarded_by " + g, Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, rel := range closers {
+			ok := e.endpointClosed(node, rel)
+			ne = append(ne, findings.NegationEvidence{Clause: "closed_by " + rel, Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		if suppressed {

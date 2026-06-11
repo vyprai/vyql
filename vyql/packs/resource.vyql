@@ -1,0 +1,9 @@
+// Resource lifecycle (B2 type-state). A handle allocated but not released on every path
+// to function exit is a leak — closed_by is a POST-dominance check over the structured CFG.
+package vypr.resource;
+
+rule ResourceLeak {
+  meta { id: "VYQL-RES-001", severity: medium, cwe: [CWE_772] }
+  match code.ResourceHandle as h
+  unless closed_by core.ResourceRelease
+}

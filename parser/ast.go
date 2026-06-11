@@ -182,10 +182,12 @@ type Exception interface{ isException() }
 
 type SanitizedBy struct{ Concept string }
 type GuardedBy struct{ Concept string }
+type ClosedBy struct{ Concept string } // post-dominance: a release on every path to exit
 type ExprException struct{ Expr Expr }
 
 func (SanitizedBy) isException()   {}
 func (GuardedBy) isException()     {}
+func (ClosedBy) isException()      {}
 func (ExprException) isException() {}
 
 // --- expressions ---------------------------------------------------------

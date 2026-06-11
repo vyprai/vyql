@@ -1,0 +1,37 @@
+# B2 — resource leak (CWE-772, VYQL-RES-001). A type-state rule: a handle allocated but
+# not released on EVERY path to function exit leaks. `closed_by` is a POST-dominance check
+# over the structured CFG — a close in only one branch does not cover the others.
+
+test "resource-leak: a socket closed on every path is clean (python)"
+  lang python
+  reject VYQL-RES-001
+  code
+  ```
+  import socket
+  def f():
+      s = socket.socket()
+      s.close()
+  ```
+
+test "resource-leak: a socket never closed leaks (python)"
+  lang python
+  expect VYQL-RES-001
+  code
+  ```
+  import socket
+  def f():
+      s = socket.socket()
+      s.send(b"x")
+  ```
+
+test "resource-leak: a socket closed only in one branch leaks on the others (python)"
+  lang python
+  expect VYQL-RES-001
+  code
+  ```
+  import socket
+  def f(cond):
+      s = socket.socket()
+      if cond:
+          s.close()
+  ```

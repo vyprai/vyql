@@ -325,6 +325,12 @@ adapter python {
   mark "os.fchmod" val "0o666" -> code.InsecurePermission
   mark "Path.chmod" val "0o777" -> code.InsecurePermission
 
+  // resource lifecycle (CWE-772, RES-001) — a raw socket handle that must be closed on
+  // every path. close() is receiver-agnostic (control method). Context-manager (`with`)
+  // forms don't lower the alloc, so they aren't flagged.
+  mark "socket.socket" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
+
   // weak randomness (CWE-330) — the `random` module is a non-crypto Mersenne-Twister
   // PRNG. These are SOURCES; a finding needs a flow into a SecurityMaterialSink. Secure
   // RNG (secrets.*, os.urandom, SystemRandom) is deliberately NOT marked.

@@ -55,3 +55,24 @@ func TestReachesRegion(t *testing.T) {
 		}
 	}
 }
+
+// PostDominates: release runs on every path from alloc to exit (leak = its negation).
+func TestPostDominatesRegion(t *testing.T) {
+	cases := []struct {
+		rRel, oRel, rAlloc, oAlloc string
+		want                      bool
+	}{
+		{"/fn1", "5", "/fn1", "2", true},             // release after alloc, same region
+		{"/fn1", "5", "/fn1/if3.t", "2", true},       // alloc nested, release after the branch
+		{"/fn1/if3.t", "5", "/fn1", "2", false},      // release nested → conditionally skipped → leak
+		{"/fn1/if3.e", "5", "/fn1/if3.t", "2", false},// sibling branch → leak
+		{"/fn1", "2", "/fn1", "5", false},            // release before alloc
+		{"", "1", "", "2", false},                    // no metadata
+	}
+	for _, c := range cases {
+		if got := postDominatesRegion(c.rRel, c.oRel, c.rAlloc, c.oAlloc); got != c.want {
+			t.Errorf("postDominatesRegion(rel %q@%s, alloc %q@%s) = %v, want %v",
+				c.rRel, c.oRel, c.rAlloc, c.oAlloc, got, c.want)
+		}
+	}
+}

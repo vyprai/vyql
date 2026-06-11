@@ -132,6 +132,10 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 				if err := requireConcept(onto, ex.Concept, "control of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}
+			case parser.ClosedBy:
+				if err := requireConcept(onto, ex.Concept, "release of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
 			}
 		}
 	case *parser.OrderStmt:

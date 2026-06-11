@@ -44,6 +44,40 @@ func Reaches(store usg.Store, aID, bID string) bool {
 	return reachesRegion(an.Prop("region"), an.Prop("order"), bn.Prop("region"), bn.Prop("order"))
 }
 
+// PostDominates reports whether `release` runs on EVERY path from `alloc` to function
+// exit — the test for "the resource is always released" (leak detection is its negation).
+// For structured control flow: release is in an ancestor-or-equal region of alloc (so it
+// is not skipped by leaving a branch alloc sits in) and comes after it in order.
+func PostDominates(store usg.Store, releaseID, allocID string) bool {
+	if releaseID == "" || allocID == "" {
+		return false
+	}
+	rn, ok1, _ := store.GetNode(releaseID)
+	an, ok2, _ := store.GetNode(allocID)
+	if !ok1 || !ok2 {
+		return false
+	}
+	return postDominatesRegion(rn.Prop("region"), rn.Prop("order"), an.Prop("region"), an.Prop("order"))
+}
+
+func postDominatesRegion(rRel, oRel, rAlloc, oAlloc string) bool {
+	if rRel == "" || rAlloc == "" {
+		return false
+	}
+	// alloc must be in the release's region or NESTED under it: then exiting the alloc's
+	// scope still reaches the release. (release nested deeper than alloc → conditionally
+	// skipped → does NOT post-dominate → leak.)
+	if !(rAlloc == rRel || strings.HasPrefix(rAlloc, rRel+"/")) {
+		return false
+	}
+	r, err1 := strconv.Atoi(oRel)
+	a, err2 := strconv.Atoi(oAlloc)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return r > a
+}
+
 func reachesRegion(rA, oA, rB, oB string) bool {
 	if rA == "" || rB == "" {
 		return false // no CFG metadata → not decidable

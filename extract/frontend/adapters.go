@@ -36,6 +36,7 @@ type sinkSpec struct {
 type controlSpec struct {
 	Concept    string
 	Pattern    string
+	ByMethod   bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
 	ValMatches []string // `val "substr"` (AND — marks AND controls)
 	ValAbsents []string // `nval "substr"` (AND — marks AND controls)
 }
@@ -169,6 +170,9 @@ func loadSpec(tech string) adapterSpec {
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+		case "control_method":
+			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "mark":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		}
@@ -313,10 +317,11 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
 					continue // only label this language's nodes
 				}
-				path := n.Prop("callee_path")
+				path, method := n.Prop("callee_path"), n.Prop("method")
 				strArgs := n.Prop("str_args")
 				for _, c := range spec.Controls {
-					if matchPath(path, []string{c.Pattern}, "prefix") && valConds(strArgs, c.ValMatches, c.ValAbsents) {
+					hit := c.ByMethod && method == c.Pattern || !c.ByMethod && matchPath(path, []string{c.Pattern}, "prefix")
+					if hit && valConds(strArgs, c.ValMatches, c.ValAbsents) {
 						out = append(out, adapters.Mapping{NodeID: id, Concept: c.Concept})
 						break
 					}

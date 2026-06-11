@@ -198,6 +198,12 @@ concept StateWrite : sink {
   vulnerable_to: [smartcontract.Reentrancy]
   cwe: [CWE_841]
 }
+// A resource allocation (raw socket/handle). A leak when no ResourceRelease post-dominates
+// it (type-state, B2). CWE-772.
+concept ResourceHandle : sink {
+  vulnerable_to: [resource.ResourceLeak]
+  cwe: [CWE_772]
+}
 concept TxOriginAuth : sink {
   vulnerable_to: [smartcontract.TxOriginAuth]
   cwe: [CWE_477]
@@ -387,6 +393,10 @@ concept XpathQuery : sink {
 
 package core;
 
+concept ResourceRelease : control {
+  neutralizes: [resource.ResourceLeak]
+  cwe: [CWE_772]
+}
 concept AllowlistValidation : control {
   neutralizes: [injection.CommandInjection, request_forgery.Ssrf]
   applies: path

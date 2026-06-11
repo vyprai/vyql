@@ -241,7 +241,7 @@ func TestControlsWiredAreConsumedGate(t *testing.T) {
 	controls := conceptsByKind(t, "control")
 	wired := conceptRefsIn(t, "adapters")
 	consumed := map[string]bool{}
-	re := regexp.MustCompile(`(?:sanitized_by|guarded_by)\s+(?:core|code)\.([A-Za-z0-9_]+)`)
+	re := regexp.MustCompile(`(?:sanitized_by|guarded_by|closed_by)\s+(?:core|code)\.([A-Za-z0-9_]+)`)
 	for _, c := range readDataFiles(t, "packs", ".vyql") {
 		for _, m := range re.FindAllStringSubmatch(c, -1) {
 			consumed[m[1]] = true
