@@ -509,6 +509,9 @@ package sbom;
 
 concept ReachableSymbol : exposure { }
 concept VulnerableDependency : asset { }
+// A dependency whose name typosquats a popular package, or is on a known-bad list
+// (CWE-1357 reliance on an untrusted/undesirable component).
+concept SuspiciousDependency : asset { }
 
 package threat;
 

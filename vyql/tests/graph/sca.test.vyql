@@ -16,3 +16,10 @@ test "a reachable vulnerable dependency is higher severity (SCA-002)"
   node dep sbom.VulnerableDependency
   label dep sbom.ReachableSymbol
   ```
+
+test "a typosquatting / known-bad dependency is flagged (SCA-003)"
+  expect VYQL-SCA-003
+  graph
+  ```
+  node dep sbom.SuspiciousDependency
+  ```

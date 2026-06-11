@@ -11,3 +11,10 @@ rule ReachableVulnerableDependency {
   match sbom.VulnerableDependency as p
   where p has sbom.ReachableSymbol
 }
+
+// A dependency name that typosquats a popular package (or is on a known-bad list) —
+// name-intelligence, not a CVE feed (CWE-1357).
+rule SuspiciousDependency {
+  meta { id: "VYQL-SCA-003", severity: high, cwe: [CWE_1357] }
+  match sbom.SuspiciousDependency as p
+}
