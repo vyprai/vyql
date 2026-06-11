@@ -1,0 +1,26 @@
+# OWASP-replica coverage for Kotlin — true positives plus opaque-predicate pruning.
+
+test "kotlin: request param -> executeQuery is SQLi"
+  lang kotlin
+  expect VYQL-INJ-001
+  code
+  ```
+  fun g(req: javax.servlet.http.HttpServletRequest, st: java.sql.Statement) {
+    val p = req.getParameter("id")
+    st.executeQuery("SELECT * FROM u WHERE id='" + p + "'")
+  }
+  ```
+
+test "kotlin: opaque if/else assigns constant on the live branch — clean SQLi"
+  lang kotlin
+  reject VYQL-INJ-001
+  code
+  ```
+  fun h(req: javax.servlet.http.HttpServletRequest, st: java.sql.Statement) {
+    val p = req.getParameter("id")
+    val num = 88
+    val bar: String
+    if ((7*42)-num > 200) { bar = "safe" } else { bar = "alsosafe" }
+    st.executeQuery("SELECT * FROM u WHERE id='" + bar + "'")
+  }
+  ```

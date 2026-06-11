@@ -90,7 +90,14 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	// branch-structured (B1); Cond nil (Scala did not evaluate the predicate) -> byte-identical.
 	case "if_expression":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		ifn := nir.If{Cond: c.expr(field(n, "condition"))}
+		if cons := field(n, "consequence"); cons != nil {
+			ifn.Then = c.collectBlocks(cons)
+		}
+		if alt := field(n, "alternative"); alt != nil {
+			ifn.Else = c.collectBlocks(alt)
+		}
+		return []nir.Stmt{ifn}
 	case "for_expression", "while_expression":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_expression":
@@ -192,7 +199,9 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "this", "stable_identifier", "wildcard":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer_literal", "floating_point_literal", "boolean_literal", "null_literal", "character_literal", "unit":
+	case "integer_literal", "floating_point_literal", "character_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
+	case "boolean_literal", "null_literal", "unit":
 		return nir.Const{Loc: L}
 	case "string", "symbol_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // literal text for `val` matching
@@ -224,10 +233,11 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		return c.expr(field(n, "function"))
 	case "infix_expression":
 		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
 		if op == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "parenthesized_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}

@@ -114,7 +114,23 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1); Cond nil (Kotlin did not evaluate the predicate) -> byte-identical.
 	case "if_expression":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		var cond nir.Expr
+		var bodies []*tree_sitter.Node
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "control_structure_body" {
+				bodies = append(bodies, ch)
+			} else if cond == nil {
+				cond = c.expr(ch)
+			}
+		}
+		ifn := nir.If{Cond: cond}
+		if len(bodies) > 0 {
+			ifn.Then = c.collectBlocks(bodies[0])
+		}
+		if len(bodies) > 1 {
+			ifn.Else = c.collectBlocks(bodies[1])
+		}
+		return []nir.Stmt{ifn}
 	case "for_statement", "while_statement", "do_while_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_expression":
@@ -123,6 +139,16 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
+}
+
+// opToken returns the operator symbol of a binary node (the first non-named child).
+func (c *ktConv) opToken(n *tree_sitter.Node) string {
+	for i := uint(0); i < n.ChildCount(); i++ {
+		if ch := n.Child(i); !ch.IsNamed() {
+			return c.text(ch)
+		}
+	}
+	return "?"
 }
 
 func (c *ktConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -305,8 +331,15 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "simple_identifier", "this_expression", "super_expression":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer_literal", "real_literal", "boolean_literal", "null_literal", "character_literal", "long_literal", "hex_literal":
-		return nir.Const{Loc: L}
+	case "boolean_literal", "null_literal":
+		return nir.Const{Loc: L, Value: c.text(n)}
+	case "integer_literal", "real_literal", "character_literal", "long_literal", "hex_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
+	case "comparison_expression", "equality_expression":
+		k := namedChildren(n)
+		if len(k) >= 2 {
+			return nir.BinOp{Op: c.opToken(n), Left: c.expr(k[0]), Right: c.expr(k[len(k)-1]), Loc: L}
+		}
 	case "string_literal":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
