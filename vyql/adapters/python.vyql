@@ -257,6 +257,7 @@ adapter python {
   sink path "render_template_string" -> code.HtmlRender
   sink path "flask.render_template_string" -> code.HtmlRender
   // the response BODY reflected to the browser (Flask make_response / Response / HttpResponse).
+  // and the synthetic http_response wrapping a route handler's return value).
   sink path "make_response" -> code.HtmlRender
   sink path "Response" -> code.HtmlRender
   sink path "HttpResponse" -> code.HtmlRender

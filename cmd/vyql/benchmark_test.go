@@ -145,19 +145,33 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		}
 		return cats[c]
 	}
+	dumpCat, dumpKind := os.Getenv("BENCH_DUMP_CAT"), os.Getenv("BENCH_DUMP_KIND") // e.g. sqli / fp
+	var dumped []string
 	for name, e := range expected {
 		got := detected[name][e.category]
 		tl := get(e.category)
+		var kind string
 		switch {
 		case e.real && got:
 			tl.tp++
+			kind = "tp"
 		case e.real && !got:
 			tl.fn++
+			kind = "fn"
 		case !e.real && got:
 			tl.fp++
+			kind = "fp"
 		default:
 			tl.tn++
+			kind = "tn"
 		}
+		if e.category == dumpCat && kind == dumpKind {
+			dumped = append(dumped, name)
+		}
+	}
+	if dumpCat != "" {
+		sort.Strings(dumped)
+		fmt.Printf("\n%s %s (%d): %s\n", dumpCat, dumpKind, len(dumped), strings.Join(dumped, " "))
 	}
 
 	var names []string
