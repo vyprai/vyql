@@ -52,6 +52,7 @@ type lowerer struct {
 
 	curModule string
 	curClass  string // "" = none
+	curRoute  bool   // lowering the body of a web request handler (FuncDef.IsRoute)
 
 	// B1 structured-CFG metadata. `region` is the current control-region path (e.g.
 	// "/if3.t/loop5"); every node is stamped with it plus a monotonic `order`. For
@@ -359,7 +360,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// functions (cross-function flows fall back to presence semantics — conservative).
 		saveRegion := l.region
 		l.region = "/fn" + l.nextBranch()
+		saveRoute := l.curRoute
+		l.curRoute = st.IsRoute
 		l.block(st.Body, inner)
+		l.curRoute = saveRoute
 		l.region = saveRegion
 	case nir.Assign:
 		val := l.eval(st.Value, sc)
@@ -398,7 +402,18 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.flow(sc.node[st.Target], n)
 		sc.node[st.Target] = n
 	case nir.Return:
-		l.flow(l.eval(st.Value, sc), sc.node["__ret__"])
+		rv := l.eval(st.Value, sc)
+		l.flow(rv, sc.node["__ret__"])
+		// reflected XSS: a route handler returning a freshly-built string (an f-string or
+		// concatenation) writes it straight to the response body unescaped. Only string-build
+		// nodes qualify — returning a template render / Response object / redirect (all Calls)
+		// is not a raw-string sink, so secure handlers that render templates stay clean.
+		if l.curRoute && rv != "" {
+			if n, ok, _ := l.g.GetNode(rv); ok && (n.Type == "code.Concat" || n.Type == "code.Format") {
+				l.g.AddLabel(rv, usg.Label{Concept: "code.HtmlRender",
+					Provenance: usg.Provenance{Adapter: "route.return", Fidelity: "syntactic", Confidence: "medium"}})
+			}
+		}
 	case nir.ExprStmt:
 		l.eval(st.Value, sc)
 	case nir.Block:

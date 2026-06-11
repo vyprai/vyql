@@ -192,7 +192,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				seed = append(seed, nir.Assign{Targets: []string{p},
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
-			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, Body: append(seed, body...), Loc: L}}
+			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, Body: append(seed, body...), Loc: L, IsRoute: true}}
 		}
 		return c.stmt(def)
 	case "class_definition":
@@ -238,7 +238,10 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if n.Kind() == "while_statement" {
 			return []nir.Stmt{nir.Loop{Cond: cond, Body: c.collectBlocks(n)}}
 		}
-		return []nir.Stmt{nir.If{Cond: cond, Then: c.collectBlocks(n)}}
+		// Separate Then/Else (the elif/else chain) instead of flattening every clause into
+		// Then, so a value tainted on one path stays tainted past the join even when another
+		// path overwrites it (`if c: p = src()` / `else: p = "safe"`).
+		return []nir.Stmt{nir.If{Cond: cond, Then: c.block(field(n, "consequence")), Else: c.pyIfElse(n)}}
 	case "for_statement":
 		var inner []nir.Stmt
 		left, right := field(n, "left"), field(n, "right")
@@ -277,6 +280,43 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		walk(n)
 		return []nir.Stmt{nir.Switch{Cases: cases}}
+	}
+	return nil
+}
+
+// pyIfElse builds the Else branch of an if_statement from its elif_clause/else_clause
+// children: each elif becomes a nested If chaining to the alternatives after it, and a
+// trailing else becomes a plain block. Returns nil when there is no else/elif.
+func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
+	var alts []*tree_sitter.Node
+	for _, ch := range children(n) {
+		if ch.Kind() == "elif_clause" || ch.Kind() == "else_clause" {
+			alts = append(alts, ch)
+		}
+	}
+	var els []nir.Stmt
+	for i := len(alts) - 1; i >= 0; i-- {
+		a := alts[i]
+		body := c.clauseBlock(a)
+		if a.Kind() == "else_clause" {
+			els = body
+			continue
+		}
+		var cond nir.Expr // elif: a nested If whose Else is the chain built so far
+		if cn := field(a, "condition"); cn != nil {
+			cond = c.expr(cn)
+		}
+		els = []nir.Stmt{nir.If{Cond: cond, Then: body, Else: els}}
+	}
+	return els
+}
+
+// clauseBlock returns the lowered statements of a clause's `block` child.
+func (c *pyConv) clauseBlock(clause *tree_sitter.Node) []nir.Stmt {
+	for _, cc := range children(clause) {
+		if cc.Kind() == "block" {
+			return c.block(cc)
+		}
 	}
 	return nil
 }

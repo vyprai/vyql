@@ -133,6 +133,11 @@ type FuncDef struct {
 	Params []string
 	Body   []Stmt
 	Loc    string
+	// IsRoute marks a web request handler (e.g. a Flask/FastAPI @app.route function).
+	// The lowering treats a returned freshly-built string (Concat/Format) as written to
+	// the HTTP response body — a reflected-XSS sink — since the framework does not escape
+	// raw string returns (only template renders).
+	IsRoute bool
 }
 
 // ClassDef is a class definition.
