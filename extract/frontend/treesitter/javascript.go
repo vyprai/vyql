@@ -541,7 +541,9 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "number":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "regex":
-		return nir.Const{Loc: L}
+		// carry the literal `/pattern/flags` so a `filter` directive can analyze the
+		// output alphabet of x.replace(/…/g, repl).
+		return nir.Const{Loc: L, Value: c.text(n)}
 	case "true", "false", "null", "undefined":
 		// carry the literal text so value-matching sees rejectUnauthorized=false etc.
 		return nir.Const{Loc: L, Value: c.text(n)}

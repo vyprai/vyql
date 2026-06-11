@@ -1087,6 +1087,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for i, a := range args { // arg0, arg1, … so sinks can target a non-first arg
 		props["arg"+strconv.Itoa(i)] = a
 	}
+	// per-arg literal value (first literal token) — lets a `filter` directive read the
+	// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
+	for i, a := range call.Args {
+		var toks []string
+		collectValTokens(a, "", &toks)
+		if len(toks) > 0 {
+			props["lit"+strconv.Itoa(i)] = toks[0]
+		}
+	}
 	// resolve the receiver once; if it was assigned from a known constructor,
 	// stamp recv_type so type-constrained sink adapters can reason about it.
 	var recvNode string

@@ -291,4 +291,7 @@ adapter java {
   mark "log.error" -> code.LogWrite
   mark "LOG.info" -> code.LogWrite
   mark "System.out.println" -> code.LogWrite
+
+  // character-filter: String.replaceAll(regex, repl) is always global.
+  filter method "replaceAll" global
 }

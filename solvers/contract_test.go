@@ -33,7 +33,7 @@ func TestSolverContractConformance(t *testing.T) {
 	gt.AddLabel("a", usg.Label{Concept: "code.HttpInput"})
 	gt.AddLabel("b", usg.Label{Concept: "code.SqlExecution"})
 	gt.AddEdge(usg.Edge{Type: "FLOWS", Src: "a", Dst: "b"})
-	tflows, err := FindTaintFlows(gt, set("code.HttpInput"), set("code.SqlExecution"), set("code.UntrustedData"), set())
+	tflows, err := FindTaintFlows(gt, set("code.HttpInput"), set("code.SqlExecution"), set("code.UntrustedData"), set(), "")
 	if err != nil {
 		t.Fatal(err)
 	}

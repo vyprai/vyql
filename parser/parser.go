@@ -546,6 +546,26 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 			p.expect(tArrow, "->")
 			mk.Concept = p.parseQName()
 			a.Mappings = append(a.Mappings, mk)
+		case p.atWord("filter"):
+			// `filter method "replace"` / `filter path "preg_replace"` marks a
+			// character-filtering replace(pattern, repl). The engine analyzes the
+			// pattern's output alphabet and labels the result core.CharFilter — a
+			// threat-aware sanitizer (sound for sinks whose dangerous chars it excludes).
+			p.next()
+			kind := "filter_path"
+			if p.atWord("method") {
+				p.next()
+				kind = "filter_method"
+			} else if p.atWord("path") {
+				p.next()
+			}
+			pat := p.parsePattern()
+			fm := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.CharFilter"}
+			if p.atWord("global") { // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
+				p.next()
+				fm.Constraint = "global"
+			}
+			a.Mappings = append(a.Mappings, fm)
 		case p.atWord("type"):
 			p.next()
 			pat := p.parsePattern()

@@ -256,6 +256,26 @@ func intersect(a, b map[string]bool) bool {
 	return false
 }
 
+// weakCharFilter returns an assumption note if a character-filter (replace) lies on a
+// live taint path — meaning vyql could NOT prove it neutralizes this sink's dangerous
+// chars (a sound allowlist filter would have killed the flow already).
+func (e *Engine) weakCharFilter(path []string, dangerous string) string {
+	for _, id := range path {
+		labels, _ := e.Store.Labels(id)
+		for _, l := range labels {
+			if l.Concept != "core.CharFilter" {
+				continue
+			}
+			pat := l.Detail["pattern"]
+			if dangerous == "" {
+				return "a character-filter replace(" + pat + ") is on the path but this sink declares no dangerous_chars to verify against; finding holds unless the filter neutralizes by other means"
+			}
+			return "a character-filter replace(" + pat + ") is on the path but its bounded output is not proven to exclude [" + dangerous + "]; false positive if it sanitizes correctly (e.g. an escaper or value-specific allowlist)"
+		}
+	}
+	return ""
+}
+
 func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.FlowStmt)
 	srcConcepts := e.Onto.Descendants(body.Src.Concept)
@@ -269,7 +289,22 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 	}
 
-	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls)
+	// dangerous characters for this sink threat (declared on the sink concept(s) via
+	// `dangerous_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
+	dangerous := ""
+	seenRune := map[rune]bool{}
+	for c := range sinkConcepts {
+		if cc, err := e.Onto.Get(c); err == nil {
+			for _, r := range cc.DangerousChars {
+				if !seenRune[r] {
+					seenRune[r] = true
+					dangerous += string(r)
+				}
+			}
+		}
+	}
+
+	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, dangerous)
 	if err != nil {
 		return nil, err
 	}
@@ -303,6 +338,12 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				detail += "none found anywhere on flows"
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: "sanitized_by " + sanitizer, Satisfied: false, Detail: detail})
+		}
+		// A character-filter on a still-LIVE path is, by definition, not provably sound
+		// for this sink (a sound one would have killed the flow). Surface it as an
+		// assumption: the finding is a false positive IF that filter actually neutralizes.
+		if wf := e.weakCharFilter(fl.Path, dangerous); wf != "" {
+			ne = append(ne, findings.NegationEvidence{Clause: "char-filter (assumption)", Satisfied: false, Detail: wf})
 		}
 		suppressed := false
 		for _, g := range guards {

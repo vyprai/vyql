@@ -29,6 +29,10 @@ type Concept struct {
 	Attack       []string `json:"attack,omitempty"`        // MITRE ATT&CK technique ids
 	Aliases      []string `json:"aliases,omitempty"`
 	Deprecated   string   `json:"deprecated,omitempty"`
+	// DangerousChars: for sinks, the characters that MUST be absent for taint to be
+	// neutralized — lets a character-filter (allowlist replace) be proven a sound
+	// sanitizer when its output alphabet excludes all of them.
+	DangerousChars string `json:"dangerous_chars,omitempty"`
 }
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.

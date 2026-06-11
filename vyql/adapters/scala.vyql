@@ -54,4 +54,7 @@ adapter scala {
   // sanitizer — Apache Commons Text HTML escaping.
   control "escapeHtml4" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
+
+  // character-filter: replaceAll (java interop) is global.
+  filter method "replaceAll" global
 }

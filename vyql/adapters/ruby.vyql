@@ -190,4 +190,7 @@ adapter ruby {
   mark "RestClient" val "http://" nval "127.0" -> code.CleartextChannel
   mark "open" val "http://" nval "127.0" -> code.CleartextChannel
   mark "URI.open" val "http://" nval "127.0" -> code.CleartextChannel
+
+  // character-filter: gsub is always global.
+  filter method "gsub" global
 }

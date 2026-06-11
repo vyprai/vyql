@@ -23,6 +23,7 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 		Attack:       list(d.Fields, "attack"),
 		Aliases:      list(d.Fields, "aliases"),
 		Deprecated:   str(d.Fields, "deprecated"),
+		DangerousChars: str(d.Fields, "dangerous_chars"),
 	}
 	return c
 }

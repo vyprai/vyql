@@ -157,4 +157,7 @@ adapter php {
   mark "fopen" val "http://" nval "127.0" -> code.CleartextChannel
   mark "curl_init" val "http://" nval "127.0" -> code.CleartextChannel
   mark "curl_setopt" val "http://" nval "127.0" -> code.CleartextChannel
+
+  // character-filter: preg_replace(pattern, repl, subject) is global.
+  filter path "preg_replace" global
 }

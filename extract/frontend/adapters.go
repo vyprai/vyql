@@ -71,6 +71,12 @@ func valConds(tokens string, vals, nvals []string) bool {
 	return true
 }
 
+type filterSpec struct {
+	Pattern  string
+	ByMethod bool // match the bare method name (x.replace) vs the dotted path (re.sub)
+	Global   bool // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
+}
+
 type adapterSpec struct {
 	Name          string
 	Technology    string
@@ -80,6 +86,7 @@ type adapterSpec struct {
 	Sinks         []sinkSpec
 	Controls      []controlSpec
 	Marks         []controlSpec // presence markers (label the call node with a concept)
+	Filters       []filterSpec  // character-filtering replaces (core.CharFilter)
 }
 
 // AdaptersFor loads the framework adapters for a technology from
@@ -99,7 +106,53 @@ func AdaptersFor(tech string) []adapters.Adapter {
 	if len(spec.Marks) > 0 {
 		out = append(out, spec.markAdapter())
 	}
+	if len(spec.Filters) > 0 {
+		out = append(out, spec.filterAdapter())
+	}
 	return out
+}
+
+// filterAdapter labels character-filtering replace(pattern, repl) calls with
+// core.CharFilter, recording the proven OUTPUT alphabet (or that it is unbounded) in
+// the label Detail. The solver then treats it as a SOUND sanitizer for any sink whose
+// dangerous chars the alphabet excludes, and the engine surfaces an unproven filter as
+// an assumption note. The regex math is general (charfilter.go); WHICH methods filter
+// is data (the `filter` directive).
+func (spec adapterSpec) filterAdapter() adapters.Adapter {
+	return adapters.Adapter{
+		Name: spec.Name + ".filters", Technology: spec.Technology, Specificity: 2,
+		Fidelity: "resolved", Origin: "human",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			ids, _ := s.NodesOfType("code.Call")
+			var out []adapters.Mapping
+			for _, id := range ids {
+				n, _, _ := s.GetNode(id)
+				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
+					continue
+				}
+				method, path := n.Prop("method"), n.Prop("callee_path")
+				matched, global := false, false
+				for _, f := range spec.Filters {
+					if f.ByMethod && method == f.Pattern || !f.ByMethod && matchSinkPath(path, f.Pattern) {
+						matched, global = true, f.Global
+						break
+					}
+				}
+				if !matched {
+					continue
+				}
+				pattern, repl := n.Prop("lit0"), n.Prop("lit1")
+				alphabet, bounded := outputAlphabet(pattern, repl, global)
+				detail := map[string]string{"bounded": "false", "pattern": pattern}
+				if bounded {
+					detail["bounded"] = "true"
+					detail["alphabet"] = alphabet
+				}
+				out = append(out, adapters.Mapping{NodeID: id, Concept: "core.CharFilter", Detail: detail})
+			}
+			return out
+		},
+	}
 }
 
 // CtorTypesFor returns the constructor→type table declared in the adapter (the
@@ -175,6 +228,10 @@ func loadSpec(tech string) adapterSpec {
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "mark":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+		case "filter_method":
+			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global"})
+		case "filter_path":
+			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global"})
 		}
 	}
 	return s

@@ -127,4 +127,7 @@ adapter csharp {
   mark "GetStringAsync" val "http://" nval "127.0" -> code.CleartextChannel
   mark "GetAsync" val "http://" nval "127.0" -> code.CleartextChannel
   mark "DownloadString" val "http://" nval "127.0" -> code.CleartextChannel
+
+  // character-filter: Regex.Replace(input, pattern, repl) is global.
+  filter path "Regex.Replace" global
 }

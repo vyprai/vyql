@@ -239,6 +239,9 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)} // boolean value for `val` matching
 	case "string":
 		return c.string(n, L)
+	case "regex":
+		// carry `/pattern/` so a `filter` directive (gsub) can analyze its output alphabet.
+		return nir.Const{Loc: L, Value: c.text(n)}
 	case "call", "method_call", "command", "command_call":
 		return c.call(n, L)
 	case "element_reference":

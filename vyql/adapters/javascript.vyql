@@ -297,4 +297,8 @@ adapter javascript {
   mark "res.set" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
   mark "res.header" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
   mark "helmet" val "frameguard=false" -> code.MissingFrameProtection
+
+  // character-filtering replace(/regex/g, repl): the engine analyzes the output
+  // alphabet (charfilter.go) -> sound sanitizer where it excludes the sink dangerous_chars.
+  filter method "replace"
 }

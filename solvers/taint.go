@@ -5,7 +5,11 @@
 // some path with no neutralizing control on it.
 package solvers
 
-import "github.com/vyprai/vyql/usg"
+import (
+	"strings"
+
+	"github.com/vyprai/vyql/usg"
+)
 
 // TaintFlow is one source->sink taint result with its witness path.
 type TaintFlow struct {
@@ -36,6 +40,43 @@ func killingControl(concepts, killControls map[string]bool) string {
 	return ""
 }
 
+// charFilterSound reports whether a node carries a core.CharFilter label (a character-
+// filtering replace) and, if so, whether it PROVABLY neutralizes the given dangerous
+// characters — its output alphabet is bounded and excludes all of them.
+func charFilterSound(store usg.Store, nodeID, dangerous string) (present, sound bool) {
+	if dangerous == "" {
+		// no dangerous-char set declared for this sink → a filter can never be proven
+		// sound (but is still "present" so a weak-filter note can be emitted).
+		labels, _ := store.Labels(nodeID)
+		for _, l := range labels {
+			if l.Concept == "core.CharFilter" {
+				return true, false
+			}
+		}
+		return false, false
+	}
+	labels, _ := store.Labels(nodeID)
+	for _, l := range labels {
+		if l.Concept != "core.CharFilter" {
+			continue
+		}
+		present = true
+		if l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], dangerous) {
+			sound = true
+		}
+	}
+	return
+}
+
+func excludesAll(alphabet, dangerous string) bool {
+	for _, d := range dangerous {
+		if strings.ContainsRune(alphabet, d) {
+			return false
+		}
+	}
+	return true
+}
+
 func intersects(a, b map[string]bool) bool {
 	for c := range a {
 		if b[c] {
@@ -55,7 +96,7 @@ func firstKey(m map[string]bool) string {
 // FindTaintFlows enumerates source->sink paths; a path yields a flow iff no
 // kill-control node lies on it (the control killed the fact). Records near-miss
 // controls seen on killed sibling paths.
-func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool) ([]TaintFlow, error) {
+func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, dangerous string) ([]TaintFlow, error) {
 	// collect source nodes (nodes carrying any source concept)
 	sourceNodes := map[string]bool{}
 	for c := range sourceConcepts {
@@ -83,6 +124,12 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			if k := killingControl(concepts, killControls); k != "" {
 				nowSan = true
 				local = append(append([][2]string{}, killers...), [2]string{nodeID, k})
+			}
+			// A character-filtering replace whose bounded output alphabet excludes every
+			// dangerous char for this sink soundly neutralizes the taint (allowlist).
+			if _, sound := charFilterSound(store, nodeID, dangerous); sound {
+				nowSan = true
+				local = append(append([][2]string{}, killers...), [2]string{nodeID, "core.CharFilter"})
 			}
 			// sink? (DFS starts only at sources, so a sink reached here is
 			// genuinely tainted — including the source node itself)

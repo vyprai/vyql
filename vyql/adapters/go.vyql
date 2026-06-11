@@ -141,4 +141,8 @@ adapter go {
   mark "http.Post" val "http://" nval "127.0" -> code.CleartextChannel
   mark "http.NewRequest" val "http://" nval "127.0" -> code.CleartextChannel
 
+
+  // character-filter: regexp (*Regexp).ReplaceAllString is global.
+  filter method "ReplaceAllString" global
+  filter method "ReplaceAll" global
 }

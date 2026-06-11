@@ -497,4 +497,8 @@ adapter python {
   // call (omission / subscript-assignment not flagged).
   mark "headers.add" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
   mark "headers.setdefault" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+
+  // character-filter: re.sub(pattern, repl, s) is always global.
+  filter path "re.sub" global
+  filter path "re.subn" global
 }
