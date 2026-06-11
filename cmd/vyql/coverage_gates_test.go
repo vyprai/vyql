@@ -5,6 +5,7 @@ package main
 // feature cannot ship untested. They read the shipped VyQL data (vyql/) directly.
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -66,9 +67,8 @@ func ruleIDs(files map[string]string) map[string]string { // id -> file
 // As specs are added, allowlisted ids that gain coverage must be REMOVED (asserted below).
 func TestRuleFiresCoverageGate(t *testing.T) {
 	unspecced := map[string]bool{
-		// graph/solver rules — need the asset-graph fixture harness (T0.6):
+		// graph/solver rules covered via the graph-fixture harness (T0.6) as fixtures land:
 		"VYQL-BIZ-001": true, "VYQL-BIZ-002": true,
-		"VYQL-CLD-001": true, "VYQL-CLD-002": true, "VYQL-CLD-003": true, "VYQL-CLD-004": true,
 		"VYQL-IDN-001": true, "VYQL-IDN-002": true, "VYQL-IDN-003": true, "VYQL-IDN-004": true,
 		"VYQL-RTM-001": true, "VYQL-RTM-002": true, "VYQL-RTM-003": true,
 		"VYQL-SCA-001": true, "VYQL-SCA-002": true,
@@ -84,6 +84,17 @@ func TestRuleFiresCoverageGate(t *testing.T) {
 		for _, ln := range strings.Split(c, "\n") {
 			if f := strings.Fields(strings.TrimSpace(ln)); len(f) == 2 && f[0] == "expect" {
 				expected[f[1]] = true
+			}
+		}
+	}
+	// graph-fixture coverage (vyql/tests/graph/*.graph.json) counts too.
+	for _, c := range readDataFiles(t, "tests/graph", ".graph.json") {
+		var fixtures []graphFixture
+		if json.Unmarshal([]byte(c), &fixtures) == nil {
+			for _, fx := range fixtures {
+				for _, id := range fx.Expect {
+					expected[id] = true
+				}
 			}
 		}
 	}
