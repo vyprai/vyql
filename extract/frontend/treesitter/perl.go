@@ -174,7 +174,7 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "scalar", "array", "hash", "varname":
 		return nir.Name{ID: c.plVarName(n), Loc: L}
 	case "number", "boolean":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "bareword", "heredoc_content":
 		return nir.Const{Loc: L}
 	case "interpolated_string_literal", "qq_string", "command_string":
@@ -215,10 +215,11 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: nir.Name{ID: fn, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: fn, Method: fn, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
 		if op == "." {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "hash_element_expression":
 		// $ENV{X} / $hash{key}
 		return nir.Index{Base: c.expr(field(n, "variable")), Path: c.dotted(field(n, "variable")), Loc: L}

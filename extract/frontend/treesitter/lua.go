@@ -192,14 +192,16 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "self", "vararg_expression":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "number", "true", "false", "nil":
-		return nir.Const{Loc: L}
+	case "true", "false", "nil":
+		return nir.Const{Loc: L, Value: c.text(n)}
+	case "number":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string":
 		return nir.Const{Loc: L}
 	case "dot_index_expression":
 		return nir.Attr{Base: c.expr(field(n, "table")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "bracket_index_expression":
-		return nir.Index{Base: c.expr(field(n, "table")), Path: c.dotted(field(n, "table")), Loc: L}
+		return nir.Index{Base: c.expr(field(n, "table")), Key: c.expr(field(n, "field")), Path: c.dotted(field(n, "table")), Loc: L}
 	case "method_index_expression":
 		return nir.Attr{Base: c.expr(field(n, "table")), Attr: c.text(field(n, "method")), Path: c.dotted(n), Loc: L}
 	case "function_call":
@@ -208,10 +210,11 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
 		if op == ".." || op == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "parenthesized_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}

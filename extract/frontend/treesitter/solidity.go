@@ -233,21 +233,28 @@ func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "this":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "number_literal", "boolean_literal", "hex_string_literal":
-		return nir.Const{Loc: L}
+	case "boolean_literal", "hex_string_literal":
+		return nir.Const{Loc: L, Value: c.text(n)}
+	case "number_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "string":
 		return nir.Const{Loc: L}
 	case "member_expression":
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "property")), Path: c.dotted(n), Loc: L}
 	case "array_access", "slice_access":
-		return nir.Index{Base: c.expr(field(n, "base")), Path: c.dotted(field(n, "base")), Loc: L}
+		return nir.Index{Base: c.expr(field(n, "base")), Key: c.expr(field(n, "index")), Path: c.dotted(field(n, "base")), Loc: L}
 	case "call_expression":
 		return c.call(n)
 	case "struct_expression":
 		// `to.call{value: x}` — the call options; the real callee is its `type`.
 		return c.expr(field(n, "type"))
 	case "binary_expression":
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		if op == "+" {
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
+		}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "parenthesized_expression", "type_cast_expression", "unary_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}

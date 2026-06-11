@@ -158,7 +158,7 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "word", "number", "raw_string", "test_operator":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "simple_expansion", "expansion":
 		name := c.expansionVar(n)
 		if shSourceVar(name) { // $1 / $QUERY_STRING / … → untrusted input

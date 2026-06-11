@@ -252,7 +252,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Name{ID: c.varName(n), Loc: L}
 	case "integer_literal", "decimal_integer_literal", "real_literal", "boolean":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "verbatim_string_characters", "expandable_string_literal", "literal_expression":
 		var parts []nir.Expr
 		var walk func(m *tree_sitter.Node)

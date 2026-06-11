@@ -168,7 +168,7 @@ func (c *exConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "alias":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "integer", "float", "boolean", "nil", "atom", "char":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string", "charlist":
 		// strings with #{…} interpolation propagate taint.
 		var parts []nir.Expr

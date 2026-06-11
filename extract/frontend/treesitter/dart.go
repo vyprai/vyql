@@ -264,8 +264,25 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "this", "type_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "decimal_integer_literal", "decimal_floating_point_literal", "true", "false", "null":
-		return nir.Const{Loc: L}
+	case "true", "false", "null":
+		return nir.Const{Loc: L, Value: c.text(n)}
+	case "decimal_integer_literal", "decimal_floating_point_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
+	case "relational_expression", "equality_expression", "multiplicative_expression":
+		var ops []nir.Expr
+		op := "?"
+		for i := uint(0); i < n.ChildCount(); i++ {
+			ch := n.Child(i)
+			if ch.IsNamed() {
+				ops = append(ops, c.expr(ch))
+			} else {
+				op = c.text(ch)
+			}
+		}
+		if len(ops) == 2 {
+			return nir.BinOp{Op: op, Left: ops[0], Right: ops[1], Loc: L}
+		}
+		return nir.Seq{Parts: ops, Loc: L}
 	case "string_literal":
 		// interpolated strings ("$x"/"${x}") carry taint via template_substitution.
 		var parts []nir.Expr
@@ -280,10 +297,10 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Format{Parts: parts, Loc: L}
 		}
 		return nir.Const{Loc: L}
-	case "additive_expression", "multiplicative_expression":
+	case "additive_expression":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
-			if ch.Kind() == "additive_operator" || ch.Kind() == "multiplicative_operator" {
+			if ch.Kind() == "additive_operator" {
 				continue
 			}
 			parts = append(parts, c.expr(ch))
