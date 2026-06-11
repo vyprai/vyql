@@ -154,6 +154,29 @@ func (c *pyConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
+// hasValidatorComment reports whether a function carries a `# vyql: validator` marker
+// comment in its body — opting it in as a trust-boundary input-validator/authenticator the
+// tool can't infer by name. Matched loosely (any comment containing "vyql" and "validat").
+func (c *pyConv) hasValidatorComment(fn *tree_sitter.Node) bool {
+	// the marker comment attaches as a direct child of the function_definition (between the
+	// signature and the body suite) or as a leading statement inside the body block.
+	scan := func(n *tree_sitter.Node) bool {
+		if n == nil {
+			return false
+		}
+		for _, ch := range children(n) {
+			if ch.Kind() == "comment" {
+				s := strings.ToLower(c.text(ch))
+				if strings.Contains(s, "vyql") && strings.Contains(s, "validat") {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return scan(fn) || scan(field(fn, "body"))
+}
+
 func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
@@ -166,7 +189,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if strings.HasPrefix(name, "resolve_") {
 			body = append(c.seedResolverParams(params, L), body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L, IsValidator: c.hasValidatorComment(n)}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -217,9 +240,17 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			// from v — otherwise a later read `x = container[k]` loses the taint.
 			if len(tgts) == 0 && left != nil && left.Kind() == "subscript" {
 				base := c.expr(field(left, "value"))
+				args := []nir.Expr{val}
+				if k := field(left, "subscript"); k != nil {
+					args = append(args, c.expr(k)) // include the key: session[tainted_key] = x
+				}
+				path := c.dotted(field(left, "value"))
+				if path != "" {
+					path += ".__setitem__"
+				}
 				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 					Callee: nir.Attr{Base: base, Attr: "__setitem__", Loc: L},
-					Method: "__setitem__", Args: []nir.Expr{val}, Loc: L}}}
+					Method: "__setitem__", Args: args, Path: path, Loc: L}}}
 			}
 			return []nir.Stmt{nir.Assign{Targets: tgts, Value: val}}
 		case "augmented_assignment":

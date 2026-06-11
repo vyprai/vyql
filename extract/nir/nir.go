@@ -138,6 +138,11 @@ type FuncDef struct {
 	// the HTTP response body — a reflected-XSS sink — since the framework does not escape
 	// raw string returns (only template renders).
 	IsRoute bool
+	// IsValidator marks a function annotated `# vyql: validator` — a custom
+	// input-validator/authenticator the tool can't infer by name. Its return value is
+	// treated as validated (clears the trust-boundary threat), so storing it across a
+	// trust boundary is legitimate.
+	IsValidator bool
 }
 
 // ClassDef is a class definition.

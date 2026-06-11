@@ -401,6 +401,13 @@ concept AllowlistValidation : control {
   neutralizes: [injection.CommandInjection, request_forgery.Ssrf]
   applies: path
 }
+concept InputValidation : control {
+  // a function that validates/authenticates untrusted input before it crosses a trust
+  // boundary (e.g. login()/authenticate() returning an authenticated identity). Clears the
+  // trust-boundary threat: storing the result into a trusted store is then legitimate.
+  neutralizes: [validation.TrustBoundary, validation.ImproperInputValidation]
+  applies: path
+}
 concept AuthenticationCheck : control {
   neutralizes: [authentication.MissingAuthentication]
   cwe: [CWE_306]

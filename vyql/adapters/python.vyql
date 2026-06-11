@@ -119,6 +119,21 @@ adapter python {
   control "is_safe_redirect_url" -> core.RedirectAllowlist
   control "is_allowed_url" -> core.AllowlistValidation
   control "is_allowed_host" -> core.AllowlistValidation
+  // input validation / authentication boundary (CWE-501): a value that passed through an
+  // authenticator (login → returns the authenticated identity) or an explicit validator is
+  // trusted enough to cross into the session. Returns clean data for the trust-boundary
+  // threat (not for XSS/SQLi — those controls are separate). Custom validators the tool
+  // can't infer are opted in with a `# vyql: validator` comment on the function.
+  control method "login" -> core.InputValidation
+  control method "authenticate" -> core.InputValidation
+  control method "authenticate_user" -> core.InputValidation
+  control method "sign_in" -> core.InputValidation
+  control method "log_in" -> core.InputValidation
+  control method "check_credentials" -> core.InputValidation
+  control method "verify_credentials" -> core.InputValidation
+  control method "validate_credentials" -> core.InputValidation
+  control method "check_password" -> core.InputValidation
+  control method "verify_password" -> core.InputValidation
   control "validate_url" -> core.AllowlistValidation
   // XXE hardening — a parser configured to not resolve external entities / fetch network,
   // dominating the parse it is passed to (value-matched config).
@@ -233,6 +248,13 @@ adapter python {
   sink path "pycurl.Curl" -> code.UrlFetch
   sink path "treq.get" -> code.UrlFetch
   sink path "treq.post" -> code.UrlFetch
+  // trust boundary (CWE-501): user input stored into the server-trusted Flask session
+  // (`flask.session[key] = value`, lowered to __setitem__). A tainted KEY or VALUE is the
+  // violation (arg all) — UNLESS it passed through a validator/authenticator first (the
+  // InputValidation controls below), which is the legitimate `session['user'] = login(...)`
+  // pattern. The TrustBoundary rule's `unless sanitized_by core.InputValidation` clears it.
+  sink path "session.__setitem__" arg all -> code.TrustBoundary
+
   sink path "open" -> code.FilePathAccess
   sink path "io.open" -> code.FilePathAccess
   sink path "os.open" -> code.FilePathAccess

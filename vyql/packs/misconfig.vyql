@@ -81,6 +81,9 @@ rule WildcardIamPolicy {
 // Trust-boundary violation (CWE-501) — untrusted data stored into the HTTP session.
 rule TrustBoundary {
   meta { id: "VYQL-CFG-014", severity: medium, cwe: [CWE_501] }
+  // data that passed through a validator/authenticator (login(), an @vyql:validator
+  // function) before reaching the store is no longer an untrusted-data violation.
   taint core.UserControlledData -> code.TrustBoundary
+    unless sanitized_by core.InputValidation
 }
 

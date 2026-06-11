@@ -27,6 +27,7 @@ type funcInfo struct {
 	module     string
 	cls        string
 	name       string
+	validator  bool // a `# vyql: validator` function: its result clears trust-boundary taint
 }
 
 type importEntry struct {
@@ -314,6 +315,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				params:     params,
 				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
 				module:     modkey, cls: cls, name: st.Name,
+				validator: st.IsValidator,
 			}
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
@@ -685,6 +687,12 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 		l.flow(target.ret, result)
+		// a `# vyql: validator` function returns validated data: label the call result so
+		// `unless sanitized_by core.InputValidation` clears the trust-boundary threat.
+		if target.validator {
+			l.g.AddLabel(result, usg.Label{Concept: "core.InputValidation",
+				Provenance: usg.Provenance{Adapter: "vyql.validator", Fidelity: "resolved", Confidence: "high"}})
+		}
 	}
 	return result
 }
