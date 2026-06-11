@@ -316,7 +316,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)} // literal text for `val` matching
 	case "navigation_expression":
 		base := c.navBase(n)
 		return nir.Attr{Base: c.expr(base), Attr: c.navSuffix(n), Path: c.dotted(n), Loc: L}

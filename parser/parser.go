@@ -446,6 +446,9 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 			if p.atWord("method") {
 				p.next()
 				kind = "sink_method"
+			} else if p.atWord("receiver") {
+				p.next()
+				kind = "sink_receiver"
 			} else if p.atWord("path") {
 				p.next()
 			}

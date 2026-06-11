@@ -25,6 +25,7 @@ type sinkSpec struct {
 	Concept    string
 	Pattern    string
 	ByMethod   bool   // match the bare method name vs the dotted callee path
+	Receiver   bool   // tainted data is the RECEIVER, not an arg — label the call node
 	Constraint string // optional `on <type>` receiver-type constraint
 	ArgIndex   int    // which argument is the dangerous one (default 0)
 	ValMatches []string // `val "substr"` (AND) — every substr must be in some arg/option literal
@@ -148,6 +149,10 @@ func loadSpec(tech string) adapterSpec {
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "sink_path":
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+		case "sink_receiver":
+			// the tainted DATA is the receiver of a no-arg method (e.g. `URL(u).openConnection()`,
+			// `u.toRegex()`); match the bare method name, label the call node itself.
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern})
 		case "mark":
@@ -238,6 +243,12 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 				}
 				if best >= 0 {
 					sk := spec.Sinks[best]
+					// receiver-sink: the tainted data is the receiver; the call node
+					// carries that taint, so label the node itself rather than an arg.
+					if sk.Receiver {
+						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic"})
+						continue
+					}
 					arg := n.Prop("arg" + strconv.Itoa(sk.ArgIndex))
 					if arg == "" {
 						continue

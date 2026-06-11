@@ -186,6 +186,7 @@ adapter python {
   source "request.form" -> code.HttpInput
   sink method "execute" -> code.SqlExecution
   sink path "os.system" -> code.CommandExecution
+  sink receiver "openConnection" -> code.UrlFetch
 }
 `
 	decls, err := Parse(src)
@@ -205,7 +206,7 @@ adapter python {
 	if th == nil || th.QualifiedName() != "injection.SqlInjection" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 3 {
+	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 4 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "code.HttpInput" {
@@ -213,5 +214,8 @@ adapter python {
 	}
 	if ad.Mappings[1].Kind != "sink_method" || ad.Mappings[2].Kind != "sink_path" {
 		t.Fatalf("sink mapping kinds wrong: %+v", ad.Mappings[1:])
+	}
+	if ad.Mappings[3].Kind != "sink_receiver" || ad.Mappings[3].Concept != "code.UrlFetch" {
+		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[3])
 	}
 }

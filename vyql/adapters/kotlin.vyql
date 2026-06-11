@@ -45,6 +45,30 @@ adapter kotlin {
   // code eval / dynamic
   sink method "loadClass" -> code.CodeEval
 
+  // SSRF — java.net URL.openConnection + OkHttp newCall: the tainted URL is the
+  // RECEIVER of these no-arg methods (`URL(u).openConnection()`). `readText` is NOT
+  // used — it is also File.readText, a path-access sink.
+  sink receiver "openConnection" -> code.UrlFetch
+  sink receiver "newCall" -> code.UrlFetch
+
+  // regex compile (ReDoS) — tainted PATTERN (arg) or receiver (`u.toRegex()`)
+  sink path "Pattern.compile" -> code.RegexCompile
+  sink path "Regex" -> code.RegexCompile
+  sink receiver "toRegex" -> code.RegexCompile
+
+  // deserialization (CWE-502) — Java ObjectInputStream + Jackson
+  sink method "readObject" -> code.Deserialization
+  sink method "readValue" -> code.Deserialization
+
+  // weak crypto (CWE-327) — JCA (same API as Java), val-matched on algorithm
+  mark "MessageDigest.getInstance" val "MD2" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "SHA1" -> code.WeakHash
+  mark "Cipher.getInstance" val "DES" -> code.WeakCipher
+  mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
+  mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
+
   // controls
   control "encodeForHTML" -> core.HtmlEscape
   control "escapeHtml4" -> core.HtmlEscape
