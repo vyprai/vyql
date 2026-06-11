@@ -112,6 +112,73 @@ var appendMutators = map[string]bool{
 	"offerLast": true, "addFirst": true, "addLast": true, "addElement": true, "enqueue": true,
 }
 
+// containerInvalidate handles a container method that may shift/invalidate element slots.
+// It models precisely ONLY unambiguous by-index removals on a clean (non-dirty) container —
+// `pop(constInt)` (Python, by index) and a Java/C#-receiver `remove(constInt)` (List.remove
+// by index; Python's remove is by-value, so it's excluded by language) — and `clear()`.
+// Everything else (by-value remove, sort/reverse, dynamic index, …) marks the container
+// dirty, so later keyed reads fall back to the whole container. Never produces a false negative.
+func (l *lowerer) containerInvalidate(call nir.Call, recv string, sc *scope) {
+	ci := l.containers[recv]
+	if ci == nil || ci.dirty {
+		return
+	}
+	ext := ""
+	if n, ok, _ := l.g.GetNode(recv); ok {
+		loc := n.Prop("loc")
+		if i := strings.LastIndexByte(loc, ':'); i >= 0 {
+			loc = loc[:i]
+		}
+		if i := strings.LastIndexByte(loc, '.'); i >= 0 {
+			ext = loc[i:]
+		}
+	}
+	pyRemoveByValue := ext == ".py" // Python list.remove(x) removes by VALUE, not index
+	switch {
+	case call.Method == "clear":
+		ci.elems = map[string]string{}
+		ci.nextIdx = 0
+	case call.Method == "pop" && len(call.Args) == 1: // list.pop(i) — by index (Python)
+		if idx, ok := l.constInt(call.Args[0], sc); ok {
+			l.shiftDown(ci, int(idx))
+			return
+		}
+		ci.dirty = true
+	case call.Method == "remove" && len(call.Args) == 1 && !pyRemoveByValue: // List.remove(int) — by index
+		if idx, ok := l.constInt(call.Args[0], sc); ok {
+			l.shiftDown(ci, int(idx))
+			return
+		}
+		ci.dirty = true
+	default:
+		ci.dirty = true
+	}
+}
+
+// shiftDown removes element slot `removed` and shifts every higher integer index down by one
+// (non-integer keys — map entries — are untouched), mirroring List.remove(i)/pop(i).
+func (l *lowerer) shiftDown(ci *containerInfo, removed int) {
+	ne := make(map[string]string, len(ci.elems))
+	for k, v := range ci.elems {
+		idx, err := strconv.Atoi(k)
+		if err != nil {
+			ne[k] = v // non-integer (map) key — unaffected
+			continue
+		}
+		switch {
+		case idx < removed:
+			ne[k] = v
+		case idx == removed: // dropped
+		default:
+			ne[strconv.Itoa(idx-1)] = v
+		}
+	}
+	ci.elems = ne
+	if ci.nextIdx > removed {
+		ci.nextIdx--
+	}
+}
+
 // modeledContainerMethod reports whether the lowering precisely tracks a container method's
 // effect on its element slots. Any OTHER method on a tracked container (remove/insert/sort/
 // clear/pop/… — anything that may shift or invalidate keys/indices) marks it dirty so later
@@ -1043,7 +1110,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		if mutatorMethods[call.Method] {
 			l.containerWrite(call, args, recvNode, sc)
 		} else if ci := l.containers[recvNode]; ci != nil && !modeledContainerMethod(call.Method) {
-			ci.dirty = true // remove/insert/sort/… may shift slots — fall back to whole container
+			l.containerInvalidate(call, recvNode, sc) // precise index-shift where unambiguous, else dirty
 		}
 	}
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
