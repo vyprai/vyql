@@ -108,6 +108,9 @@ adapter php {
   // permissive CORS (CWE-942)
   mark "header" val "Access-Control-Allow-Origin: *" -> code.PermissiveCors
 
+  // clickjacking (CWE-1021) — header("X-Frame-Options: ALLOWALL") explicitly permits framing
+  mark "header" val "X-Frame-Options: ALLOWALL" -> code.MissingFrameProtection
+
   // email-header injection (CWE-93) — mail($to,$subj,$body,$headers): tainted CRLF in the
   // additional-headers arg (index 3) injects extra headers / a second message.
   sink path "mail" arg 3 -> code.MailHeaderWrite

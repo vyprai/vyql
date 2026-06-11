@@ -291,6 +291,12 @@ concept InsecurePermission : sink {
   vulnerable_to: [access_control.InsecurePermission]
   cwe: [CWE_732]
 }
+// Frame protection explicitly disabled — X-Frame-Options: ALLOWALL, helmet frameguard
+// off, CSP frame-ancestors * (CWE-1021 clickjacking). Presence (value-matched).
+concept MissingFrameProtection : sink {
+  vulnerable_to: [access_control.Clickjacking]
+  cwe: [CWE_1021]
+}
 concept MessageInput : source {
   taint: [taint.UntrustedData]
 }

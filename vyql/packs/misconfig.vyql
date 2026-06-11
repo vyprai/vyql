@@ -52,3 +52,11 @@ rule InsecurePermission {
   match code.InsecurePermission as p
 }
 
+// Clickjacking — frame protection explicitly disabled: X-Frame-Options ALLOWALL,
+// helmet frameguard off, CSP frame-ancestors * (CWE-1021), value-matched presence.
+// Pure omission is NOT flagged (framework defaults vary) — only explicit disabling.
+rule MissingFrameProtection {
+  meta { id: "VYQL-CFG-009", severity: medium, cwe: [CWE_1021] }
+  match code.MissingFrameProtection as f
+}
+

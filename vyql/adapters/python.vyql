@@ -357,4 +357,9 @@ adapter python {
   mark "headers.add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "CORS" val "origins=*" -> code.PermissiveCors
   mark "cross_origin" val "origins=*" -> code.PermissiveCors
+
+  // clickjacking (CWE-1021) — X-Frame-Options EXPLICITLY set to ALLOWALL via a header
+  // call (omission / subscript-assignment not flagged).
+  mark "headers.add" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  mark "headers.setdefault" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
 }

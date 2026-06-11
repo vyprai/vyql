@@ -282,4 +282,11 @@ adapter javascript {
   mark "res.header" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "res.set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "res.setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+
+  // clickjacking (CWE-1021) — frame protection EXPLICITLY disabled (omission not flagged):
+  // X-Frame-Options: ALLOWALL, or helmet frameguard turned off.
+  mark "res.setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  mark "res.set" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  mark "res.header" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  mark "helmet" val "frameguard=false" -> code.MissingFrameProtection
 }

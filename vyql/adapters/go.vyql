@@ -128,6 +128,10 @@ adapter go {
   mark "Header.Set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "Header.Add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
 
+  // clickjacking (CWE-1021) — X-Frame-Options EXPLICITLY set to ALLOWALL (omission not flagged)
+  mark "Header.Set" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  mark "Header.Add" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+
   // insecure cookie (CWE-614) — http.Cookie{HttpOnly: false} / {Secure: false} explicit
   mark "http.Cookie" val "HttpOnly=false" -> code.InsecureCookie
   mark "http.Cookie" val "Secure=false" -> code.InsecureCookie
