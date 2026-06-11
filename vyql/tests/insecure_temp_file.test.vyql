@@ -1,0 +1,28 @@
+# Insecure temporary file (VYQL-PATH-003, CWE-377) — presence of a predictable-name
+# / race-prone temp API. Safe APIs (NamedTemporaryFile) stay clean.
+
+test "python: tempfile.mktemp is insecure"
+  lang python
+  expect VYQL-PATH-003
+  code
+  ```
+  import tempfile
+  p = tempfile.mktemp()
+  ```
+
+test "python: NamedTemporaryFile is safe"
+  lang python
+  reject VYQL-PATH-003
+  code
+  ```
+  import tempfile
+  f = tempfile.NamedTemporaryFile()
+  ```
+
+test "c: mktemp is insecure"
+  lang c
+  expect VYQL-PATH-003
+  code
+  ```
+  int main(){ char *p = mktemp("/tmp/fooXXXXXX"); return 0; }
+  ```

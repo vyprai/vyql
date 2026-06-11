@@ -1,0 +1,207 @@
+# Taint-driven injection rules across languages:
+#   INJ-005 LDAP (90), INJ-006 XPath (643), INJ-008 SSTI (1336),
+#   INJ-016 expression-language (917), INJ-017 email-header (93).
+# Tainted source -> sink fires; a constant argument stays clean.
+
+# --- XPath injection (VYQL-INJ-006) ---
+test "php: tainted SimpleXML xpath is injection"
+  lang php
+  expect VYQL-INJ-006
+  code
+  ```
+  <?php $q = $_GET['q']; $xml->xpath("//user[@name='" . $q . "']");
+  ```
+
+test "php: a constant XPath is clean"
+  lang php
+  reject VYQL-INJ-006
+  code
+  ```
+  <?php $xml->xpath("//user[@name='admin']");
+  ```
+
+test "ruby: tainted Nokogiri xpath is injection"
+  lang ruby
+  expect VYQL-INJ-006
+  code
+  ```
+  def f(doc); q = params[:q]; doc.xpath("//user[@name='#{q}']"); end
+  ```
+
+test "python: tainted lxml xpath is injection"
+  lang python
+  expect VYQL-INJ-006
+  code
+  ```
+  from flask import request
+  def f(tree):
+      uid = request.args.get("uid")
+      return tree.xpath("//user[@id='" + uid + "']")
+  ```
+
+test "csharp: tainted SelectNodes is XPath injection"
+  lang csharp
+  expect VYQL-INJ-006
+  code
+  ```
+  class C { void F() { var q = Request.QueryString["q"]; doc.SelectNodes("//user[@name='" + q + "']"); } }
+  ```
+
+test "csharp: a constant XPath is clean"
+  lang csharp
+  reject VYQL-INJ-006
+  code
+  ```
+  class C { void F() { doc.SelectNodes("//user"); } }
+  ```
+
+# --- LDAP injection (VYQL-INJ-005) ---
+test "php: tainted ldap_search filter is injection"
+  lang php
+  expect VYQL-INJ-005
+  code
+  ```
+  <?php $u = $_GET['u']; ldap_search($conn, "dc=x", "(uid=" . $u . ")");
+  ```
+
+test "php: a constant LDAP filter is clean"
+  lang php
+  reject VYQL-INJ-005
+  code
+  ```
+  <?php ldap_search($conn, "dc=x", "(uid=admin)");
+  ```
+
+test "csharp: tainted DirectorySearcher is LDAP injection"
+  lang csharp
+  expect VYQL-INJ-005
+  code
+  ```
+  class C { void F() { var u = Request.QueryString["u"]; new DirectorySearcher("(uid=" + u + ")"); } }
+  ```
+
+test "java: tainted DirContext.search filter is LDAP injection"
+  lang java
+  expect VYQL-INJ-005
+  code
+  ```
+  class L {
+    void run(HttpServletRequest request, DirContext ctx) throws Exception {
+      String user = request.getParameter("user");
+      ctx.search("ou=people", "(uid=" + user + ")", new SearchControls());
+    }
+  }
+  ```
+
+test "java: a constant DirContext filter is clean"
+  lang java
+  reject VYQL-INJ-005
+  code
+  ```
+  class L {
+    void run(DirContext ctx) throws Exception {
+      ctx.search("ou=people", "(uid=admin)", new SearchControls());
+    }
+  }
+  ```
+
+# --- Server-side template injection (VYQL-INJ-008) ---
+test "php: tainted Twig createTemplate is SSTI"
+  lang php
+  expect VYQL-INJ-008
+  code
+  ```
+  <?php $t = $_GET['t']; $twig->createTemplate($t);
+  ```
+
+test "php: a constant Twig template is clean"
+  lang php
+  reject VYQL-INJ-008
+  code
+  ```
+  <?php $twig->createTemplate("<h1>hello</h1>");
+  ```
+
+test "java: tainted Velocity.evaluate template is SSTI"
+  lang java
+  expect VYQL-INJ-008
+  code
+  ```
+  class H {
+    void run(HttpServletRequest request) {
+      String tpl = request.getParameter("tpl");
+      Velocity.evaluate(ctx, writer, "log", tpl);
+    }
+  }
+  ```
+
+test "java: a constant Velocity template is clean"
+  lang java
+  reject VYQL-INJ-008
+  code
+  ```
+  class H {
+    void run() {
+      Velocity.evaluate(ctx, writer, "log", "static template");
+    }
+  }
+  ```
+
+test "js: tainted nunjucks.compile is SSTI"
+  lang javascript
+  expect VYQL-INJ-008
+  code
+  ```
+  app.get('/', function(req, res){ var t = req.query.tpl; nunjucks.compile(t); });
+  ```
+
+test "js: a constant nunjucks template is clean"
+  lang javascript
+  reject VYQL-INJ-008
+  code
+  ```
+  nunjucks.compile('<h1>hello</h1>');
+  ```
+
+# --- Expression-language injection (VYQL-INJ-016) ---
+test "java: tainted SpEL parseExpression is EL injection"
+  lang java
+  expect VYQL-INJ-016
+  code
+  ```
+  class H {
+    void run(HttpServletRequest request, ExpressionParser parser) {
+      String q = request.getParameter("q");
+      parser.parseExpression(q).getValue();
+    }
+  }
+  ```
+
+test "java: a constant expression is clean"
+  lang java
+  reject VYQL-INJ-016
+  code
+  ```
+  class H {
+    void run(ExpressionParser parser) {
+      parser.parseExpression("1 + 1").getValue();
+    }
+  }
+  ```
+
+# --- Email-header injection (VYQL-INJ-017) ---
+test "php: tainted mail() headers arg is email-header injection"
+  lang php
+  expect VYQL-INJ-017
+  code
+  ```
+  <?php $from = $_GET['from']; mail("to@x.com", "subj", "body", "From: " . $from);
+  ```
+
+test "php: a constant headers string is clean"
+  lang php
+  reject VYQL-INJ-017
+  code
+  ```
+  <?php mail("to@x.com", "subj", "body", "From: noreply@x.com");
+  ```
