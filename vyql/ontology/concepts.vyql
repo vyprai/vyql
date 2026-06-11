@@ -328,6 +328,12 @@ concept MissingFrameProtection : sink {
 concept PiiValue : source {
   taint: [taint.PiiData]
 }
+// Untrusted data stored across a trust boundary — e.g. into the HTTP session (CWE-501).
+concept TrustBoundary : sink {
+  vulnerable_to: [validation.TrustBoundary]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_501]
+}
 concept MessageInput : source {
   taint: [taint.UntrustedData]
 }

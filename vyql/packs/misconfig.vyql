@@ -78,3 +78,9 @@ rule WildcardIamPolicy {
   match code.WildcardIamPolicy as w
 }
 
+// Trust-boundary violation (CWE-501) — untrusted data stored into the HTTP session.
+rule TrustBoundary {
+  meta { id: "VYQL-CFG-014", severity: medium, cwe: [CWE_501] }
+  taint core.UserControlledData -> code.TrustBoundary
+}
+

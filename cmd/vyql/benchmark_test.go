@@ -133,6 +133,7 @@ var ruleCategory = map[string]string{
 	"VYQL-RF-002":    "redirect",
 	"VYQL-DESER-001": "deserialization",
 	"VYQL-DESER-002": "xxe",
+	"VYQL-CFG-014":   "trustbound",
 }
 
 func score(t *testing.T, expected map[string]expRow, detected map[string]map[string]bool) {

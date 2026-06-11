@@ -112,6 +112,7 @@ threat WildcardIamPolicy { cwe: [CWE_284], desc: "IAM policy grants wildcard act
 package validation;
 threat ImproperEncoding { cwe: [CWE_116], desc: "Improper encoding/escaping of output" }
 threat ImproperInputValidation { cwe: [CWE_20], desc: "Improper input validation" }
+threat TrustBoundary { cwe: [CWE_501], desc: "Untrusted data stored across a trust boundary (e.g. into the HTTP session)" }
 
 package smartcontract;
 threat ExternalCallInjection { cwe: [CWE_829], desc: "Untrusted address/value in a low-level external call (.call/.delegatecall/.send/.transfer)" }

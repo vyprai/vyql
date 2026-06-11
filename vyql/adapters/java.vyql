@@ -105,6 +105,20 @@ adapter java {
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
+  // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
+  // position is the attribute key/value (arg 0).
+  sink method "setAttribute" -> code.TrustBoundary
+  sink method "putValue" -> code.TrustBoundary
+  // reflected XSS — tainted data written to the servlet response body (CWE-79). The
+  // response writer's print-family is the sink; the HtmlEscape controls below suppress
+  // properly-encoded output. System.out.println stays LogOutput (longer, more-specific path).
+  sink method "println" -> code.HtmlRender
+  sink method "print" -> code.HtmlRender
+  sink method "printf" -> code.HtmlRender
+  sink method "write" -> code.HtmlRender
+  sink method "format" arg 1 -> code.HtmlRender
+  control "escapeHtml" -> core.HtmlEscape
+  control "Encode.forHtml" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml3" -> core.HtmlEscape
   control "HtmlUtils.htmlEscape" -> core.HtmlEscape

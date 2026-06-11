@@ -1,0 +1,27 @@
+# Trust-boundary violation (CWE-501, VYQL-CFG-014): untrusted data stored into the HTTP
+# session. A constant key/value is clean.
+
+test "trust-boundary: request data into session.setAttribute is flagged (java)"
+  lang java
+  expect VYQL-CFG-014
+  code
+  ```
+  class X {
+    void f(javax.servlet.http.HttpServletRequest request) {
+      String p = request.getParameter("x");
+      request.getSession().setAttribute(p, "v");
+    }
+  }
+  ```
+
+test "trust-boundary: a constant key is clean (java)"
+  lang java
+  reject VYQL-CFG-014
+  code
+  ```
+  class X {
+    void f(javax.servlet.http.HttpServletRequest request) {
+      request.getSession().setAttribute("constkey", "v");
+    }
+  }
+  ```
