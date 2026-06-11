@@ -105,6 +105,12 @@ adapter python {
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "validate_csrf_token" -> core.CsrfProtection
   control "verify_authenticity_token" -> core.CsrfProtection
+  // authorization checks (guards BIZ-001) — high-precision permission predicates. With B1
+  // the labelled check suppresses only the sinks it DOMINATES (path-sensitive).
+  control "has_perm" -> core.AuthorizationCheck
+  control "has_permission" -> core.AuthorizationCheck
+  control "permission_required" -> core.AuthorizationCheck
+  control "user_passes_test" -> core.AuthorizationCheck
   // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
   // are a LogOutput sink (user data) AND a LogWrite mark (secret).
   sink path "logging.info" -> code.LogOutput

@@ -63,6 +63,9 @@ adapter ruby {
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verify_authenticity_token" -> core.CsrfProtection
   control "validate_csrf_token" -> core.CsrfProtection
+  // authorization checks (guards BIZ-001) — Pundit/CanCan predicates (path-sensitive via B1).
+  control "authorize" -> core.AuthorizationCheck
+  control "authorize!" -> core.AuthorizationCheck
   // Sequel raw SQL (DB.fetch / DB.run / DB['...'])
   sink path "DB.fetch" -> code.SqlExecution
   sink path "DB.run" -> code.SqlExecution

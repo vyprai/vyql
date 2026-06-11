@@ -79,6 +79,9 @@ adapter php {
   sink method "createTemplate" -> code.TemplateRender
 
   // controls (sanitizers/validators)
+  // authorization checks (guards BIZ-001) — Laravel Gate predicates (path-sensitive via B1).
+  control "Gate.allows" -> core.AuthorizationCheck
+  control "Gate.authorize" -> core.AuthorizationCheck
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape

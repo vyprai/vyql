@@ -22,3 +22,23 @@ test "an invalid transition into Refunded (BIZ-002)"
   ```
   node t1 business.Transition { machine = Order, from = Created, to = Refunded }
   ```
+
+# Path-sensitive authorization (B1): a permission check suppresses only the actions it
+# DOMINATES. These carry CFG metadata (region/order) and NO explicit CHECKS edge — the
+# same dominance-label mechanism that now makes guarded_by work on real code.
+
+test "path-sensitive authz: a check dominating the refund suppresses (BIZ-001)"
+  reject VYQL-BIZ-001
+  graph
+  ```
+  node authz core.AuthorizationCheck {region=/fn1, order=1}
+  node refund business.Refund {region=/fn1, order=5}
+  ```
+
+test "path-sensitive authz: a check in a sibling branch does NOT cover the refund (BIZ-001)"
+  expect VYQL-BIZ-001
+  graph
+  ```
+  node authz core.AuthorizationCheck {region=/fn1/if2.e, order=2}
+  node refund business.Refund {region=/fn1/if2.t, order=5}
+  ```

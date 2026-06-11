@@ -89,6 +89,10 @@ adapter javascript {
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verifyCsrfToken" -> core.CsrfProtection
   control "validateCsrfToken" -> core.CsrfProtection
+  // authorization checks (guards BIZ-001) — path-sensitive via B1.
+  control "checkPermission" -> core.AuthorizationCheck
+  control "hasPermission" -> core.AuthorizationCheck
+  control "ability.can" -> core.AuthorizationCheck
   // Electron: shell.openExternal can launch arbitrary apps/protocols from a URL
   sink path "shell.openExternal" -> code.CommandExecution
   // Electron insecure renderer config (named-value on the BrowserWindow options)

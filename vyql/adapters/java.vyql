@@ -96,6 +96,10 @@ adapter java {
   sink path "InitialLdapContext.search" arg 1 -> code.LdapQuery
 
   // controls (sanitizers/validators)
+  // authorization checks (guards BIZ-001) — Spring Security predicates (path-sensitive via B1).
+  control "hasPermission" -> core.AuthorizationCheck
+  control "hasAuthority" -> core.AuthorizationCheck
+  control "hasRole" -> core.AuthorizationCheck
   control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml3" -> core.HtmlEscape
   control "HtmlUtils.htmlEscape" -> core.HtmlEscape
