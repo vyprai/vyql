@@ -24,6 +24,27 @@ adapter scala {
   sink path "Source.fromFile" -> code.FilePathAccess
   sink method "readAllBytes" -> code.FilePathAccess
 
+  // SSRF — Play WS (ws.url), akka-http, sttp client
+  sink path "ws.url" -> code.UrlFetch
+  sink method "singleRequest" -> code.UrlFetch
+
+  // regex compile (ReDoS) — tainted PATTERN
+  sink path "Pattern.compile" -> code.RegexCompile
+
+  // deserialization (CWE-502) — Java ObjectInputStream + Apache Commons / Jackson
+  sink method "readObject" -> code.Deserialization
+  sink method "deserialize" -> code.Deserialization
+  sink method "readValue" -> code.Deserialization
+
+  // weak crypto (CWE-327) — JCA, same API as Java
+  mark "MessageDigest.getInstance" val "MD2" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "SHA1" -> code.WeakHash
+  mark "Cipher.getInstance" val "DES" -> code.WeakCipher
+  mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
+  mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
+
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval
 }

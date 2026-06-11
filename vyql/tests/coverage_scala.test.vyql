@@ -1,0 +1,64 @@
+# Scala coverage breadth: SSRF, ReDoS, deserialization, weak crypto.
+
+test "scala: query string -> ws.url is SSRF"
+  lang scala
+  expect VYQL-RF-001
+  code
+  ```
+  object H {
+    def h(req: Request) = {
+      val u = req.getQueryString("u").get
+      ws.url(u).get()
+    }
+  }
+  ```
+
+test "scala: a constant URL is clean (SSRF)"
+  lang scala
+  reject VYQL-RF-001
+  code
+  ```
+  object H { def h() = ws.url("https://api.example.com/v1").get() }
+  ```
+
+test "scala: query string -> Pattern.compile is ReDoS"
+  lang scala
+  expect VYQL-DOS-001
+  code
+  ```
+  object H {
+    def h(req: Request) = {
+      val u = req.getQueryString("p").get
+      Pattern.compile(u)
+    }
+  }
+  ```
+
+test "scala: MessageDigest MD5 is weak crypto"
+  lang scala
+  expect VYQL-CRY-001
+  code
+  ```
+  object H { def h() = MessageDigest.getInstance("MD5") }
+  ```
+
+test "scala: MessageDigest SHA-256 is clean (weak crypto)"
+  lang scala
+  reject VYQL-CRY-001
+  code
+  ```
+  object H { def h() = MessageDigest.getInstance("SHA-256") }
+  ```
+
+test "scala: request -> SerializationUtils.deserialize is unsafe deserialization"
+  lang scala
+  expect VYQL-DESER-001
+  code
+  ```
+  object H {
+    def h(req: Request) = {
+      val u = req.getQueryString("d").get
+      SerializationUtils.deserialize(u)
+    }
+  }
+  ```
