@@ -99,12 +99,14 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	// branch-structured (B1). PHP did not evaluate the condition before → Cond stays nil,
 	// byte-identical.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.phpBranch(field(n, "body")), Else: c.phpElse(n)}}
 	case "while_statement", "for_statement", "foreach_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
-	case "switch_statement", "compound_statement":
+	case "switch_statement":
+		return []nir.Stmt{c.phpSwitch(n)}
+	case "compound_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
@@ -133,6 +135,80 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			Args: args, Path: "include", Method: "include", Loc: c.loc(inner)}}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// phpBranch flattens one if-branch body: a `{}` compound_statement, or a brace-less
+// single statement (PHP allows `if ($c) $x = 1;`).
+func (c *phConv) phpBranch(b *tree_sitter.Node) []nir.Stmt {
+	if b == nil {
+		return nil
+	}
+	if b.Kind() == "compound_statement" {
+		var out []nir.Stmt
+		for _, st := range namedChildren(b) {
+			out = append(out, c.stmt(st)...)
+		}
+		return out
+	}
+	return c.stmt(b)
+}
+
+// phpElse builds the Else branch from else_if_clause / else_clause children (elseif chains
+// into a nested If), so the join-merge and constant-condition pruning work.
+func (c *phConv) phpElse(n *tree_sitter.Node) []nir.Stmt {
+	var alts []*tree_sitter.Node
+	for _, ch := range children(n) {
+		if ch.Kind() == "else_if_clause" || ch.Kind() == "else_clause" {
+			alts = append(alts, ch)
+		}
+	}
+	var els []nir.Stmt
+	for i := len(alts) - 1; i >= 0; i-- {
+		a := alts[i]
+		if a.Kind() == "else_clause" {
+			els = c.phpBranch(field(a, "body"))
+			continue
+		}
+		els = []nir.Stmt{nir.If{Cond: c.expr(field(a, "condition")), Then: c.phpBranch(field(a, "body")), Else: els}}
+	}
+	return els
+}
+
+// phpSwitch lowers a switch into separate case branches with labels (consecutive
+// fall-through labels merge into the next body) so a constant subject prunes to its arm.
+func (c *phConv) phpSwitch(n *tree_sitter.Node) nir.Stmt {
+	var cases [][]nir.Stmt
+	var labels [][]nir.Expr
+	var deflt []nir.Stmt
+	var pending []nir.Expr
+	if b := field(n, "body"); b != nil {
+		for _, cs := range namedChildren(b) {
+			switch cs.Kind() {
+			case "case_statement":
+				lv := field(cs, "value")
+				var stmts []nir.Stmt
+				for _, ch := range namedChildren(cs) {
+					if lv != nil && ch.StartByte() == lv.StartByte() {
+						continue
+					}
+					stmts = append(stmts, c.stmt(ch)...)
+				}
+				if lv != nil {
+					pending = append(pending, c.expr(lv))
+				}
+				if len(stmts) > 0 {
+					cases = append(cases, stmts)
+					labels = append(labels, pending)
+					pending = nil
+				}
+			case "default_statement":
+				for _, ch := range namedChildren(cs) {
+					deflt = append(deflt, c.stmt(ch)...)
+				}
+			}
+		}
+	}
+	return nir.Switch{Subject: c.expr(field(n, "condition")), Cases: cases, Labels: labels, Default: deflt}
 }
 
 func (c *phConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -217,8 +293,10 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "variable_name", "name":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer", "float", "null", "shell_command_expression":
+	case "null", "shell_command_expression":
 		return nir.Const{Loc: L}
+	case "integer", "float":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "boolean":
 		return nir.Const{Loc: L, Value: c.text(n)} // true/false value for `val` matching
 	case "string":
@@ -240,11 +318,14 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "name")), Path: c.dotted(n), Loc: L}
 	case "subscript_expression":
 		kids := namedChildren(n)
-		var base nir.Expr = nir.Const{Loc: L}
+		var base, key nir.Expr = nir.Const{Loc: L}, nil
 		if len(kids) > 0 {
 			base = c.expr(kids[0])
 		}
-		return nir.Index{Base: base, Path: c.dotted(n), Loc: L}
+		if len(kids) > 1 {
+			key = c.expr(kids[1])
+		}
+		return nir.Index{Base: base, Key: key, Path: c.dotted(n), Loc: L}
 	case "function_call_expression":
 		fn := field(n, "function")
 		path := c.dotted(fn)
@@ -269,10 +350,13 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
 		if op == "." || op == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L} // string concat
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "unary_op_expression":
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "operand")), Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
@@ -292,7 +376,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "conditional_expression":
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "consequence")), c.expr(field(n, "alternative"))}, Loc: L}
+		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {
