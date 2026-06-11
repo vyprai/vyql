@@ -172,13 +172,18 @@ adapter java {
   // (see the `type` directives) is excluded.
   sink method "write" arg all on [PrintWriter, ServletOutputStream, JspWriter] -> code.HtmlRender
   sink method "format" arg all -> code.HtmlRender
-  control "escapeHtml" -> core.HtmlEscape
-  control "Encode.forHtml" -> core.HtmlEscape
-  control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
-  control "StringEscapeUtils.escapeHtml3" -> core.HtmlEscape
-  control "HtmlUtils.htmlEscape" -> core.HtmlEscape
-  control "ESAPI.encoder" -> core.HtmlEscape
-  control "encodeForHTML" -> core.HtmlEscape
+  // HTML-output encoders that neutralise reflected XSS. Method-matched (not path-prefix) so
+  // a fully-qualified call like org.owasp.esapi.ESAPI.encoder().encodeForHTML(x) is
+  // recognised — these escapers are almost always invoked through a package/receiver prefix.
+  control method "encodeForHTML" -> core.HtmlEscape
+  control method "encodeForHTMLAttribute" -> core.HtmlEscape
+  control method "forHtml" -> core.HtmlEscape
+  control method "forHtmlContent" -> core.HtmlEscape
+  control method "forHtmlAttribute" -> core.HtmlEscape
+  control method "escapeHtml" -> core.HtmlEscape
+  control method "escapeHtml4" -> core.HtmlEscape
+  control method "escapeHtml3" -> core.HtmlEscape
+  control method "htmlEscape" -> core.HtmlEscape
 
   // format string (CWE-134) — tainted FORMAT argument
   sink path "String.format" arg 0 -> code.FormatString
