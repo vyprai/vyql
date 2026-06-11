@@ -144,12 +144,17 @@ func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return nil
 	case "expression_statement":
-		return []nir.Stmt{nir.ExprStmt{Value: c.foldChain(namedChildren(n))}}
+		// a bare `c = v;` parses as expression_statement>assignment_expression; route it
+		// through the assignment case so block-nested reassignments are tracked (no FN).
+		kids := namedChildren(n)
+		if len(kids) == 1 && kids[0].Kind() == "assignment_expression" {
+			return c.stmt(kids[0])
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: c.foldChain(kids)}}
 	case "assignment_expression":
-		left := firstNamed(n)
-		if left != nil && left.Kind() == "identifier" {
+		if name := c.assignTargetName(field(n, "left")); name != "" {
 			if v := field(n, "right"); v != nil {
-				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: c.expr(v)}}
+				return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(v)}}
 			}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
@@ -158,15 +163,15 @@ func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	// branch-structured (B1); Cond nil (Dart did not evaluate the predicate) -> byte-identical.
+	// branch-structured with predicate attached so constant-false arms are pruned.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		return []nir.Stmt{c.dartIf(n)}
 	case "for_statement", "while_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
 	case "switch_statement":
-		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+		return []nir.Stmt{c.dartSwitch(n)}
 	case "block":
 		return c.block(n)
 	}
@@ -185,6 +190,100 @@ func (c *dartConv) chainAfterName(ivd *tree_sitter.Node, name string) nir.Expr {
 		}
 	}
 	return nil
+}
+
+// assignTargetName returns the scalar variable name of an assignment target, or ""
+// for member/index targets (a.b = …, arr[i] = …) which aren't tracked as scalars.
+func (c *dartConv) assignTargetName(left *tree_sitter.Node) string {
+	if left == nil {
+		return ""
+	}
+	switch left.Kind() {
+	case "identifier":
+		return c.text(left)
+	case "assignable_expression":
+		if k := namedChildren(left); len(k) == 1 && k[0].Kind() == "identifier" {
+			return c.text(k[0])
+		}
+	}
+	return ""
+}
+
+// dartBranch lowers an if branch: a block's statements, or a single/else-if statement.
+func (c *dartConv) dartBranch(n *tree_sitter.Node) []nir.Stmt {
+	if n == nil {
+		return nil
+	}
+	switch n.Kind() {
+	case "block":
+		return c.block(n)
+	case "if_statement":
+		return []nir.Stmt{c.dartIf(n)}
+	}
+	return c.stmt(n)
+}
+
+// dartIf lowers an if with its predicate so a constant-false arm is pruned.
+func (c *dartConv) dartIf(n *tree_sitter.Node) nir.Stmt {
+	it := nir.If{Loc: c.loc(n)}
+	for i := uint(0); i < n.ChildCount(); i++ {
+		ch := n.Child(i)
+		if !ch.IsNamed() {
+			continue
+		}
+		switch n.FieldNameForChild(uint32(i)) {
+		case "consequence":
+			it.Then = c.dartBranch(ch)
+		case "alternative":
+			it.Else = c.dartBranch(ch)
+		default:
+			if it.Cond == nil {
+				it.Cond = c.expr(ch)
+			}
+		}
+	}
+	return it
+}
+
+// dartSwitch lowers a switch to subject+labelled branches so dead arms are pruned.
+func (c *dartConv) dartSwitch(n *tree_sitter.Node) nir.Stmt {
+	sw := nir.Switch{Loc: c.loc(n)}
+	if cond := field(n, "condition"); cond != nil {
+		sw.Subject = c.expr(cond)
+	}
+	body := field(n, "body")
+	if body == nil {
+		return sw
+	}
+	for _, cs := range namedChildren(body) {
+		switch cs.Kind() {
+		case "switch_statement_case":
+			var labs []nir.Expr
+			var stmts []nir.Stmt
+			for _, ch := range namedChildren(cs) {
+				switch ch.Kind() {
+				case "case_builtin":
+					// the `case` keyword wrapper
+				case "constant_pattern":
+					labs = append(labs, c.expr(ch))
+				case "break_statement", "continue_statement":
+					// drop terminators
+				default:
+					stmts = append(stmts, c.stmt(ch)...)
+				}
+			}
+			sw.Cases = append(sw.Cases, stmts)
+			sw.Labels = append(sw.Labels, labs)
+		case "switch_statement_default":
+			for _, ch := range namedChildren(cs) {
+				if k := ch.Kind(); k == "break_statement" || k == "continue_statement" {
+					continue
+				}
+				sw.Default = append(sw.Default, c.stmt(ch)...)
+			}
+		}
+	}
+	return sw
 }
 
 func (c *dartConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -233,7 +332,13 @@ func (c *dartConv) foldChain(nodes []*tree_sitter.Node) nir.Expr {
 		case "argument_part":
 			cur = nir.Call{Callee: cur, Args: c.args(inner), Path: path, Method: lastSeg(path), Loc: L}
 		default: // index selector etc.
-			cur = nir.Index{Base: cur, Path: path + "[]", Loc: L}
+			var key nir.Expr
+			if inner.Kind() == "index_selector" {
+				if k := namedChildren(inner); len(k) > 0 {
+					key = c.expr(k[0])
+				}
+			}
+			cur = nir.Index{Base: cur, Key: key, Path: path + "[]", Loc: L}
 		}
 	}
 	return cur
@@ -269,14 +374,16 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "decimal_integer_literal", "decimal_floating_point_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "relational_expression", "equality_expression", "multiplicative_expression":
+		// Dart wraps the operator in a NAMED *_operator node, so pull it out explicitly
+		// rather than assuming it is an unnamed token.
 		var ops []nir.Expr
 		op := "?"
-		for i := uint(0); i < n.ChildCount(); i++ {
-			ch := n.Child(i)
-			if ch.IsNamed() {
-				ops = append(ops, c.expr(ch))
-			} else {
+		for _, ch := range namedChildren(n) {
+			switch ch.Kind() {
+			case "relational_operator", "equality_operator", "multiplicative_operator":
 				op = c.text(ch)
+			default:
+				ops = append(ops, c.expr(ch))
 			}
 		}
 		if len(ops) == 2 {
@@ -306,6 +413,36 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Format{Parts: parts, Loc: L}
+	case "conditional_expression":
+		t := nir.Ternary{Loc: L}
+		for i := uint(0); i < n.ChildCount(); i++ {
+			ch := n.Child(i)
+			if !ch.IsNamed() {
+				continue
+			}
+			switch n.FieldNameForChild(uint32(i)) {
+			case "consequence":
+				t.Then = c.expr(ch)
+			case "alternative":
+				t.Else = c.expr(ch)
+			default:
+				if t.Cond == nil {
+					t.Cond = c.expr(ch)
+				}
+			}
+		}
+		return t
+	case "unary_expression":
+		var op string
+		var operand nir.Expr = nir.Const{Loc: L}
+		for _, ch := range namedChildren(n) {
+			if k := ch.Kind(); k == "prefix_operator" || k == "postfix_operator" {
+				op = c.text(ch)
+			} else {
+				operand = c.expr(ch)
+			}
+		}
+		return nir.Unary{Op: op, Operand: operand, Loc: L}
 	case "argument":
 		return c.foldChain(namedChildren(n))
 	case "expression_statement":
