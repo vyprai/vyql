@@ -208,7 +208,7 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		// Init runs before the branch. Cond is left nil — the Go frontend did not evaluate
 		// it before B1, so omitting it keeps the flattened node set byte-identical (branch
 		// STRUCTURE is what the CFG/dominance pass needs, not the predicate expression).
-		ifn := nir.If{Then: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
+		ifn := nir.If{Cond: c.expr(st.Cond), Then: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 		if st.Else != nil {
 			if s := c.stmt(st.Else); s != nil {
 				ifn.Else = []nir.Stmt{s}
@@ -225,7 +225,7 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 	case *ast.RangeStmt:
 		return nir.Loop{Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 	case *ast.SwitchStmt:
-		return c.switchStmt(st.Body)
+		return c.switchStmt(st.Body, st.Tag)
 	// NOTE: *ast.TypeSwitchStmt is intentionally left to the nil default (it was a no-op
 	// before B1 — converting it would lower previously-ignored bodies and shift baselines).
 	case *ast.CaseClause:
@@ -237,11 +237,11 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 // switchStmt converts a switch body to a branch-structured nir.Switch. Each case clause
 // body becomes a branch; a default clause (nil case list) is the Default branch. Flatten-
 // lowering lowers every branch body in turn — the same node set the prior Block produced.
-func (c *conv) switchStmt(body *ast.BlockStmt) nir.Stmt {
+func (c *conv) switchStmt(body *ast.BlockStmt, tag ast.Expr) nir.Stmt {
 	if body == nil {
 		return nil
 	}
-	var sw nir.Switch
+	sw := nir.Switch{Subject: c.expr(tag)}
 	for _, clause := range body.List {
 		cc, ok := clause.(*ast.CaseClause)
 		if !ok {
@@ -251,7 +251,14 @@ func (c *conv) switchStmt(body *ast.BlockStmt) nir.Stmt {
 		if cc.List == nil {
 			sw.Default = b
 		} else {
+			// each case `case a, b:` lists one or more label expressions (Go has no
+			// fall-through by default, so each clause is self-contained).
+			var labs []nir.Expr
+			for _, e := range cc.List {
+				labs = append(labs, c.expr(e))
+			}
 			sw.Cases = append(sw.Cases, b)
+			sw.Labels = append(sw.Labels, labs)
 		}
 	}
 	return sw
@@ -295,18 +302,19 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 	case *ast.StarExpr:
 		return nir.Thru{Inner: c.expr(ex.X)}
 	case *ast.UnaryExpr:
-		return nir.Thru{Inner: c.expr(ex.X)}
+		return nir.Unary{Op: ex.Op.String(), Operand: c.expr(ex.X), Loc: c.loc(ex.Pos())}
 	case *ast.SelectorExpr:
 		return nir.Attr{Base: c.expr(ex.X), Attr: ex.Sel.Name, Path: c.path(ex), Loc: c.loc(ex.Pos())}
 	case *ast.IndexExpr:
-		return nir.Index{Base: c.expr(ex.X), Path: c.path(ex.X), Loc: c.loc(ex.Pos())}
+		return nir.Index{Base: c.expr(ex.X), Key: c.expr(ex.Index), Path: c.path(ex.X), Loc: c.loc(ex.Pos())}
 	case *ast.CallExpr:
 		return c.call(ex)
 	case *ast.BinaryExpr:
 		if ex.Op == token.ADD { // string/operand concat propagates taint
 			return nir.Format{Parts: []nir.Expr{c.expr(ex.X), c.expr(ex.Y)}, Loc: c.loc(ex.Pos())}
 		}
-		return nir.Const{Loc: c.loc(ex.Pos())}
+		// other operators preserve the operator (constant-folding) and flow taint through both sides
+		return nir.BinOp{Op: ex.Op.String(), Left: c.expr(ex.X), Right: c.expr(ex.Y), Loc: c.loc(ex.Pos())}
 	case *ast.CompositeLit:
 		var parts []nir.Expr
 		for _, el := range ex.Elts {
