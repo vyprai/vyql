@@ -1,0 +1,40 @@
+# P5 framework depth (php): WordPress $wpdb, Drupal db_query, Laravel raw.
+
+test "php: GET -> WordPress wpdb get_results is SQLi"
+  lang php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  $name = $_GET['name'];
+  $rows = $wpdb->get_results("SELECT * FROM users WHERE name = '" . $name . "'");
+  ```
+
+test "php: GET -> Drupal db_query is SQLi"
+  lang php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  $name = $_GET['name'];
+  $r = db_query("SELECT * FROM users WHERE name = '" . $name . "'");
+  ```
+
+test "php: GET -> Laravel whereRaw is SQLi"
+  lang php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  $name = $_GET['name'];
+  $users = User::whereRaw("name = '" . $name . "'")->get();
+  ```
+
+test "php: a constant wpdb query is clean"
+  lang php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  $rows = $wpdb->get_results("SELECT * FROM users");
+  ```

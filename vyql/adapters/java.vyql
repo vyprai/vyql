@@ -63,6 +63,10 @@ adapter java {
   sink method "readUnshared" -> code.Deserialization
   sink path "XMLDecoder" -> code.Deserialization
   sink path "XMLDecoder.readObject" -> code.Deserialization
+  // Jackson polymorphic / SnakeYAML — untrusted document into a deserializer
+  sink method "readValue" -> code.Deserialization
+  sink path "yaml.load" -> code.Deserialization
+  sink path "Yaml.load" -> code.Deserialization
 
   // XXE
   sink method "parse" -> code.XmlParse

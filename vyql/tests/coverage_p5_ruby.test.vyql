@@ -1,0 +1,22 @@
+# P5 framework depth (ruby): Sequel raw SQL.
+
+test "ruby: params -> Sequel DB.fetch is SQLi"
+  lang ruby
+  expect VYQL-INJ-001
+  code
+  ```
+  def index
+    name = params[:name]
+    DB.fetch("SELECT * FROM users WHERE name = '" + name + "'")
+  end
+  ```
+
+test "ruby: a constant Sequel query is clean"
+  lang ruby
+  reject VYQL-INJ-001
+  code
+  ```
+  def index
+    DB.fetch("SELECT * FROM users")
+  end
+  ```

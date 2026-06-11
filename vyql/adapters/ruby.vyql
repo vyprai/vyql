@@ -44,6 +44,10 @@ adapter ruby {
   sink method "exec_update" -> code.SqlExecution
   sink method "exec_delete" -> code.SqlExecution
   sink method "exec_insert" -> code.SqlExecution
+  // Sequel raw SQL (DB.fetch / DB.run / DB['...'])
+  sink path "DB.fetch" -> code.SqlExecution
+  sink path "DB.run" -> code.SqlExecution
+  sink path "DB.execute" -> code.SqlExecution
   sink path "system" -> code.CommandExecution
   sink path "exec" -> code.CommandExecution
   sink path "spawn" -> code.CommandExecution

@@ -22,6 +22,22 @@ adapter php {
   sink method "query" -> code.SqlExecution
   sink method "exec" -> code.SqlExecution
   sink method "prepare" -> code.SqlExecution
+  // WordPress $wpdb raw queries (CWE-89)
+  sink method "get_results" -> code.SqlExecution
+  sink method "get_var" -> code.SqlExecution
+  sink method "get_row" -> code.SqlExecution
+  sink method "get_col" -> code.SqlExecution
+  // Drupal
+  sink path "db_query" -> code.SqlExecution
+  // Laravel Eloquent / query-builder raw expressions
+  sink method "raw" -> code.SqlExecution
+  sink method "whereRaw" -> code.SqlExecution
+  sink method "havingRaw" -> code.SqlExecution
+  sink method "orderByRaw" -> code.SqlExecution
+  sink method "selectRaw" -> code.SqlExecution
+  sink path "DB.statement" -> code.SqlExecution
+  sink path "DB.select" -> code.SqlExecution
+  sink path "DB.raw" -> code.SqlExecution
 
   // command execution
   sink path "system" -> code.CommandExecution

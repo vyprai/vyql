@@ -35,6 +35,15 @@ adapter csharp {
   sink method "QueryAsync" -> code.SqlExecution
   sink method "Execute" -> code.SqlExecution
   sink method "ExecuteAsync" -> code.SqlExecution
+  // Dapper single-row / scalar / multi variants (raw SQL is arg0)
+  sink method "QueryFirst" -> code.SqlExecution
+  sink method "QueryFirstAsync" -> code.SqlExecution
+  sink method "QueryFirstOrDefault" -> code.SqlExecution
+  sink method "QuerySingle" -> code.SqlExecution
+  sink method "QuerySingleAsync" -> code.SqlExecution
+  sink method "QueryMultiple" -> code.SqlExecution
+  sink method "ExecuteScalar" -> code.SqlExecution
+  sink method "ExecuteScalarAsync" -> code.SqlExecution
 
   // command execution
   sink path "Process.Start" -> code.CommandExecution
