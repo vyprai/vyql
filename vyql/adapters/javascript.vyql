@@ -317,4 +317,11 @@ adapter javascript {
 
   // ldapjs — client.search(base, {filter}, cb): the filter rides in the options object (arg1).
   sink method "search" arg 1 collection -> code.LdapQuery
+
+  // trust boundary (CWE-501) — untrusted data written into a trust context object
+  // (req.session.* / req.securityContext.* / req.authContext.*). These lower to member-
+  // write path sinks; the taint requirement means only user-controlled values fire.
+  sink path "session" -> code.TrustBoundary
+  sink path "securityContext" -> code.TrustBoundary
+  sink path "authContext" -> code.TrustBoundary
 }
