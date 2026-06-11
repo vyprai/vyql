@@ -1075,8 +1075,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	calleePath := call.Path
 	if l.resolveImports {
 		if nm, ok := call.Callee.(nir.Name); ok {
-			if imp, ok := l.importTables[l.curModule][nm.ID]; ok && imp.kind == "sym" {
-				calleePath = imp.module + "." + imp.symbol
+			if imp, ok := l.importTables[l.curModule][nm.ID]; ok {
+				switch imp.kind {
+				case "sym":
+					calleePath = imp.module + "." + imp.symbol
+				case "mod":
+					// a default-export module called directly: f = require('escape-html'); f(x)
+					// resolves to the module's own path so module-named sinks/controls match.
+					calleePath = imp.module
+				}
 			}
 		}
 	}
