@@ -1,0 +1,18 @@
+# Supply chain (graph specs) — vulnerable dependencies, reachability-gated.
+
+test "a vulnerable dependency is flagged (SCA-001)"
+  expect VYQL-SCA-001
+  reject VYQL-SCA-002
+  graph
+  ```
+  node dep sbom.VulnerableDependency
+  ```
+
+test "a reachable vulnerable dependency is higher severity (SCA-002)"
+  expect VYQL-SCA-001
+  expect VYQL-SCA-002
+  graph
+  ```
+  node dep sbom.VulnerableDependency
+  label dep sbom.ReachableSymbol
+  ```

@@ -1,0 +1,46 @@
+# Cloud posture (graph specs) — public exposure of sensitive data stores.
+
+test "internet reaches a PII database (CLD-001)"
+  expect VYQL-CLD-001
+  reject VYQL-CLD-002
+  reject VYQL-CLD-003
+  graph
+  ```
+  node internet cloud.Internet
+  node db cloud.Database { asset_kinds = data.Pii }
+  edge NET internet -> db { rule = sg-pub:5432 }
+  ```
+
+test "internet reaches a database WITHOUT PII is clean (CLD-001)"
+  reject VYQL-CLD-001
+  graph
+  ```
+  node internet cloud.Internet
+  node db cloud.Database
+  edge NET internet -> db { rule = sg-pub:5432 }
+  ```
+
+test "internet reaches an object store (CLD-002)"
+  expect VYQL-CLD-002
+  graph
+  ```
+  node internet cloud.Internet
+  node bucket cloud.ObjectStore
+  edge NET internet -> bucket { rule = public-acl }
+  ```
+
+test "internet reaches a secret store (CLD-003)"
+  expect VYQL-CLD-003
+  graph
+  ```
+  node internet cloud.Internet
+  node vault cloud.SecretStore
+  edge NET internet -> vault { rule = sg-open }
+  ```
+
+test "public storage holding PII (CLD-004)"
+  expect VYQL-CLD-004
+  graph
+  ```
+  node bucket cloud.PublicStorage { asset_kinds = data.Pii }
+  ```

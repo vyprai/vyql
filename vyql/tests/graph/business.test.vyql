@@ -1,0 +1,24 @@
+# Business logic (graph specs) — unauthorized actions and invalid transitions.
+
+test "an unguarded refund action (BIZ-001)"
+  expect VYQL-BIZ-001
+  graph
+  ```
+  node refund business.Refund
+  ```
+
+test "a refund action guarded by an authorization check is clean (BIZ-001)"
+  reject VYQL-BIZ-001
+  graph
+  ```
+  node refund business.Refund
+  node authz core.AuthorizationCheck
+  edge CHECKS authz -> refund
+  ```
+
+test "an invalid transition into Refunded (BIZ-002)"
+  expect VYQL-BIZ-002
+  graph
+  ```
+  node t1 business.Transition { machine = Order, from = Created, to = Refunded }
+  ```

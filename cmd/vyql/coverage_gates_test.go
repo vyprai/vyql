@@ -5,7 +5,6 @@ package main
 // feature cannot ship untested. They read the shipped VyQL data (vyql/) directly.
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -76,23 +75,13 @@ func TestRuleFiresCoverageGate(t *testing.T) {
 	}
 
 	rules := ruleIDs(readDataFiles(t, "packs", ".vyql"))
+	// every .test.vyql `expect` (code AND graph specs alike — both live in one format).
 	specs := readDataFiles(t, "tests", ".test.vyql")
 	expected := map[string]bool{}
 	for _, c := range specs {
 		for _, ln := range strings.Split(c, "\n") {
 			if f := strings.Fields(strings.TrimSpace(ln)); len(f) == 2 && f[0] == "expect" {
 				expected[f[1]] = true
-			}
-		}
-	}
-	// graph-fixture coverage (vyql/tests/graph/*.graph.json) counts too.
-	for _, c := range readDataFiles(t, "tests/graph", ".graph.json") {
-		var fixtures []graphFixture
-		if json.Unmarshal([]byte(c), &fixtures) == nil {
-			for _, fx := range fixtures {
-				for _, id := range fx.Expect {
-					expected[id] = true
-				}
 			}
 		}
 	}

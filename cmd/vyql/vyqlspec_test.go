@@ -8,6 +8,10 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/engine"
+	"github.com/vyprai/vyql/ontology"
+	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/usg"
 )
 
 // VyQL test specs (`vyql/tests/*.test.vyql`) are declarative, language-agnostic
@@ -33,13 +37,14 @@ type specFile struct {
 }
 
 type vyqlSpec struct {
-	name   string
-	lang   string
-	expect []string
-	reject []string
-	files  []specFile // one or more code blocks (multi-file specs supported)
-	src    string     // source spec filename (for messages)
-	line   int
+	name     string
+	lang     string
+	expect   []string
+	reject   []string
+	files    []specFile // one or more code blocks (multi-file specs supported)
+	graphSrc string     // a `graph` block: an asset/identity graph (mutually exclusive with code)
+	src      string     // source spec filename (for messages)
+	line     int
 }
 
 // primaryExt maps a spec `lang` to the file extension its frontend keys on.
@@ -49,10 +54,10 @@ var primaryExt = map[string]string{
 	"rust": ".rs", "bash": ".sh", "scala": ".scala", "lua": ".lua", "kotlin": ".kt",
 	"powershell": ".ps1", "swift": ".swift", "perl": ".pl", "solidity": ".sol", "objc": ".m",
 	// mobile config files — specs supply the real filename via `file <name>` blocks.
-	"config":  ".xml",
-	"elixir":  ".ex",
-	"dart":    ".dart",
-	"groovy":  ".groovy",
+	"config": ".xml",
+	"elixir": ".ex",
+	"dart":   ".dart",
+	"groovy": ".groovy",
 }
 
 func parseSpecFile(t *testing.T, path string) []vyqlSpec {
@@ -65,6 +70,7 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 	var specs []vyqlSpec
 	var cur *vyqlSpec
 	inCode := false
+	pendingGraph := false // the next fence is a `graph` block, not a code block
 	var code []string
 	pendingFile := "" // filename from a preceding `file <name>` line
 	closeCur := func() {
@@ -77,8 +83,12 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 	for i, raw := range lines {
 		if inCode {
 			if strings.TrimSpace(raw) == "```" {
-				cur.files = append(cur.files, specFile{name: pendingFile, code: strings.Join(code, "\n")})
-				inCode, code, pendingFile = false, nil, ""
+				if pendingGraph {
+					cur.graphSrc = strings.Join(code, "\n")
+				} else {
+					cur.files = append(cur.files, specFile{name: pendingFile, code: strings.Join(code, "\n")})
+				}
+				inCode, code, pendingFile, pendingGraph = false, nil, "", false
 				continue
 			}
 			code = append(code, raw)
@@ -108,6 +118,8 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			pendingFile = rest // next fence writes to this filename
 		case "code":
 			// optional keyword; the following ``` opens the block
+		case "graph":
+			pendingGraph = true // the following ``` opens an asset/identity graph block
 		default:
 			if cur != nil {
 				t.Fatalf("%s:%d: unknown spec line %q", rel, i+1, line)
@@ -131,6 +143,17 @@ func TestVyqlSpecs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load packs: %v", err)
 	}
+	// compile the shipped packs once — `graph` specs evaluate them over a synthetic
+	// asset/identity graph (the code specs scan source instead).
+	onto := ontology.Seed()
+	decls, err := parser.Parse(rules)
+	if err != nil {
+		t.Fatalf("parse packs: %v", err)
+	}
+	compiled, cerrs := engine.CompileRules(decls, onto)
+	if len(cerrs) != 0 {
+		t.Fatalf("compile packs: %v", cerrs)
+	}
 
 	var files []string
 	_ = filepath.WalkDir(testsDir, func(p string, d os.DirEntry, err error) error {
@@ -149,36 +172,52 @@ func TestVyqlSpecs(t *testing.T) {
 			s := s
 			total++
 			t.Run(s.src+"/"+s.name, func(t *testing.T) {
-				ext, ok := primaryExt[s.lang]
-				if !ok {
-					t.Fatalf("%s:%d: unknown lang %q", s.src, s.line, s.lang)
-				}
 				if len(s.expect) == 0 && len(s.reject) == 0 {
 					t.Fatalf("%s:%d: spec has neither expect nor reject", s.src, s.line)
 				}
-				if len(s.files) == 0 {
-					t.Fatalf("%s:%d: spec %q has no code block", s.src, s.line, s.name)
-				}
-				dir := t.TempDir()
-				for n, fl := range s.files {
-					name := fl.name
-					if name == "" {
-						name = "snippet" + ext
-						if n > 0 {
-							name = "snippet" + strconv.Itoa(n) + ext
+				fired := map[string]bool{}
+				if s.graphSrc != "" {
+					// graph spec: build the asset/identity graph and evaluate the packs.
+					store := buildGraphStore(t, s)
+					eng := engine.New(onto, store)
+					for _, cr := range compiled {
+						got, err := eng.Evaluate(cr)
+						if err != nil {
+							t.Fatalf("evaluate: %v", err)
+						}
+						for _, fnd := range got {
+							fired[fnd.RuleID] = true
 						}
 					}
-					if err := os.WriteFile(filepath.Join(dir, name), []byte(fl.code), 0o644); err != nil {
-						t.Fatal(err)
+				} else {
+					// code spec: write the snippet(s) and scan as source.
+					ext, ok := primaryExt[s.lang]
+					if !ok {
+						t.Fatalf("%s:%d: unknown lang %q", s.src, s.line, s.lang)
 					}
-				}
-				found, _, err := scanPaths([]string{dir}, rules)
-				if err != nil {
-					t.Fatalf("scan: %v", err)
-				}
-				fired := map[string]bool{}
-				for _, fnd := range found {
-					fired[fnd.RuleID] = true
+					if len(s.files) == 0 {
+						t.Fatalf("%s:%d: spec %q has no code or graph block", s.src, s.line, s.name)
+					}
+					dir := t.TempDir()
+					for n, fl := range s.files {
+						name := fl.name
+						if name == "" {
+							name = "snippet" + ext
+							if n > 0 {
+								name = "snippet" + strconv.Itoa(n) + ext
+							}
+						}
+						if err := os.WriteFile(filepath.Join(dir, name), []byte(fl.code), 0o644); err != nil {
+							t.Fatal(err)
+						}
+					}
+					found, _, err := scanPaths([]string{dir}, rules)
+					if err != nil {
+						t.Fatalf("scan: %v", err)
+					}
+					for _, fnd := range found {
+						fired[fnd.RuleID] = true
+					}
 				}
 				for _, want := range s.expect {
 					if !fired[want] {
@@ -194,6 +233,58 @@ func TestVyqlSpecs(t *testing.T) {
 		}
 	}
 	t.Logf("ran %d VyQL spec(s) from %d file(s)", total, len(files))
+}
+
+// buildGraphStore parses a `graph` block's mini-DSL into a USG store. Lines:
+//
+//	node <id> <type-or-concept> [{ k = v, ... }]   — a vertex; auto-labelled with the
+//	                                                 concept (props mirrored onto the label)
+//	label <id> <concept> [{ k = v, ... }]          — an additional concept label
+//	edge <TYPE> <src> -> <dst> [{ k = v, ... }]    — a typed edge (NET/STEP/FLOWS/CHECKS/…)
+func buildGraphStore(t *testing.T, s vyqlSpec) *usg.InMemStore {
+	t.Helper()
+	store := usg.NewInMemStore()
+	for n, raw := range strings.Split(s.graphSrc, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		props := map[string]string{}
+		if i := strings.Index(line, "{"); i >= 0 {
+			props = parseGraphProps(line[i:])
+			line = strings.TrimSpace(line[:i])
+		}
+		f := strings.Fields(line)
+		switch {
+		case f[0] == "node" && len(f) >= 3:
+			_ = store.AddNode(usg.Node{ID: f[1], Type: f[2], Props: props})
+			_ = store.AddLabel(f[1], usg.Label{Concept: f[2], Detail: props})
+		case f[0] == "label" && len(f) >= 3:
+			_ = store.AddLabel(f[1], usg.Label{Concept: f[2], Detail: props})
+		case f[0] == "edge" && len(f) >= 5 && f[3] == "->":
+			_ = store.AddEdge(usg.Edge{Type: f[1], Src: f[2], Dst: f[4], Props: props})
+		default:
+			t.Fatalf("%s:%d: malformed graph line %d: %q", s.src, s.line, n+1, raw)
+		}
+	}
+	return store
+}
+
+func parseGraphProps(s string) map[string]string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "{")
+	s = strings.TrimSuffix(s, "}")
+	out := map[string]string{}
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if k, v, ok := strings.Cut(part, "="); ok {
+			out[strings.TrimSpace(k)] = strings.TrimSpace(v)
+		}
+	}
+	return out
 }
 
 func keys(m map[string]bool) string {
