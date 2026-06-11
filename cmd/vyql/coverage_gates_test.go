@@ -72,12 +72,9 @@ func TestRuleFiresCoverageGate(t *testing.T) {
 		"VYQL-IDN-001": true, "VYQL-IDN-002": true, "VYQL-IDN-003": true, "VYQL-IDN-004": true,
 		"VYQL-RTM-001": true, "VYQL-RTM-002": true, "VYQL-RTM-003": true,
 		"VYQL-SCA-001": true, "VYQL-SCA-002": true,
-		// code rules that reference a sink/control concept NO adapter wires yet — latent
-		// rules needing adapter wiring before they can fire (T1.1, next iteration):
-		//   INJ-009 LogOutput, INJ-010 ResponseHeaderWrite, DESER-003 ReflectionInvoke,
-		//   RF-003 StateChangingOp+CsrfProtection, SEC-001 LogWrite.
-		"VYQL-DESER-003": true, "VYQL-INJ-009": true, "VYQL-INJ-010": true,
-		"VYQL-RF-003": true, "VYQL-SEC-001": true,
+		// RF-003 (CSRF): StateChangingOp + CsrfProtection — needs a state-change/CSRF
+		// model; tracked separately, kept here until that lands.
+		"VYQL-RF-003": true,
 	}
 
 	rules := ruleIDs(readDataFiles(t, "packs", ".vyql"))

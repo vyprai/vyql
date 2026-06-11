@@ -152,4 +152,36 @@ adapter java {
   mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
   mark "HttpGet" val "http://" nval "127.0" -> code.CleartextChannel
   mark "getForObject" val "http://" nval "127.0" -> code.CleartextChannel
+
+  // unsafe reflection (CWE-470) — tainted class/method name dynamically invoked
+  sink path "Class.forName" -> code.ReflectionInvoke
+  sink method "newInstance" -> code.ReflectionInvoke
+  sink method "getDeclaredMethod" -> code.ReflectionInvoke
+  sink method "getMethod" -> code.ReflectionInvoke
+
+  // HTTP response splitting / header injection (CWE-113) — the header VALUE is arg1
+  sink method "setHeader" arg 1 -> code.ResponseHeaderWrite
+  sink method "addHeader" arg 1 -> code.ResponseHeaderWrite
+
+  // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
+  // are a LogOutput sink (user data → log injection) AND a LogWrite mark (secret → leak).
+  sink path "logger.info" -> code.LogOutput
+  sink path "logger.warn" -> code.LogOutput
+  sink path "logger.error" -> code.LogOutput
+  sink path "logger.debug" -> code.LogOutput
+  sink path "log.info" -> code.LogOutput
+  sink path "log.warn" -> code.LogOutput
+  sink path "log.error" -> code.LogOutput
+  sink path "log.debug" -> code.LogOutput
+  sink path "LOG.info" -> code.LogOutput
+  sink path "LOG.error" -> code.LogOutput
+  sink path "System.out.println" -> code.LogOutput
+  mark "logger.info" -> code.LogWrite
+  mark "logger.warn" -> code.LogWrite
+  mark "logger.error" -> code.LogWrite
+  mark "logger.debug" -> code.LogWrite
+  mark "log.info" -> code.LogWrite
+  mark "log.error" -> code.LogWrite
+  mark "LOG.info" -> code.LogWrite
+  mark "System.out.println" -> code.LogWrite
 }

@@ -81,6 +81,25 @@ adapter python {
   sink method "fetch" -> code.SqlExecution
   sink method "fetchrow" -> code.SqlExecution
   sink method "fetchval" -> code.SqlExecution
+  // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
+  // are a LogOutput sink (user data) AND a LogWrite mark (secret).
+  sink path "logging.info" -> code.LogOutput
+  sink path "logging.warning" -> code.LogOutput
+  sink path "logging.error" -> code.LogOutput
+  sink path "logging.debug" -> code.LogOutput
+  sink path "logger.info" -> code.LogOutput
+  sink path "logger.warning" -> code.LogOutput
+  sink path "logger.error" -> code.LogOutput
+  sink path "logger.debug" -> code.LogOutput
+  sink path "log.info" -> code.LogOutput
+  sink path "log.error" -> code.LogOutput
+  mark "logging.info" -> code.LogWrite
+  mark "logging.warning" -> code.LogWrite
+  mark "logging.error" -> code.LogWrite
+  mark "logging.debug" -> code.LogWrite
+  mark "logger.info" -> code.LogWrite
+  mark "logger.error" -> code.LogWrite
+  mark "log.info" -> code.LogWrite
   sink path "os.system" -> code.CommandExecution
   sink path "os.popen" -> code.CommandExecution
   sink path "os.popen2" -> code.CommandExecution
