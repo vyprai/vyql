@@ -256,6 +256,10 @@ adapter python {
   sink path "pathlib.Path" -> code.FilePathAccess
   sink path "render_template_string" -> code.HtmlRender
   sink path "flask.render_template_string" -> code.HtmlRender
+  // the response BODY reflected to the browser (Flask make_response / Response / HttpResponse).
+  sink path "make_response" -> code.HtmlRender
+  sink path "Response" -> code.HtmlRender
+  sink path "HttpResponse" -> code.HtmlRender
   sink path "Markup" -> code.HtmlRender
   sink path "markupsafe.Markup" -> code.HtmlRender
   sink path "mark_safe" -> code.HtmlRender
@@ -299,6 +303,7 @@ adapter python {
   control "pipes.quote" -> core.ShellEscape
   control "html.escape" -> core.HtmlEscape
   control "cgi.escape" -> core.HtmlEscape
+  control "escape_for_html" -> core.HtmlEscape
   control "markupsafe.escape" -> core.HtmlEscape
   control "bleach.clean" -> core.HtmlEscape
   control "django.utils.html.escape" -> core.HtmlEscape
@@ -331,24 +336,28 @@ adapter python {
   mark "socket.socket" -> code.ResourceHandle
   control method "close" -> core.ResourceRelease
 
-  // weak randomness (CWE-330) — the `random` module is a non-crypto Mersenne-Twister
-  // PRNG. These are SOURCES; a finding needs a flow into a SecurityMaterialSink. Secure
+  // weak randomness (CWE-330) — presence of the non-crypto `random` module PRNG. Secure
   // RNG (secrets.*, os.urandom, SystemRandom) is deliberately NOT marked.
-  source "random.random" -> code.WeakRandomValue
-  source "random.randint" -> code.WeakRandomValue
-  source "random.randrange" -> code.WeakRandomValue
-  source "random.getrandbits" -> code.WeakRandomValue
-  source "random.choice" -> code.WeakRandomValue
-  source "random.choices" -> code.WeakRandomValue
-  source "random.sample" -> code.WeakRandomValue
-  source "random.uniform" -> code.WeakRandomValue
-  // security material consumers — a predictable value reaching here is the weakness.
-  // set_cookie(name, VALUE) and jwt.encode(payload, KEY): the secret is arg index 1.
-  sink method "set_cookie" arg 1 -> code.SecurityMaterialSink
-  sink path "jwt.encode" arg 1 -> code.SecurityMaterialSink
-  sink path "hmac.new" -> code.SecurityMaterialSink
-  sink path "Cipher.new" -> code.SecurityMaterialSink
-  sink path "AES.new" -> code.SecurityMaterialSink
+  mark "random.random" -> code.WeakRandomValue
+  mark "random.randint" -> code.WeakRandomValue
+  mark "random.randrange" -> code.WeakRandomValue
+  mark "random.getrandbits" -> code.WeakRandomValue
+  mark "random.randbytes" -> code.WeakRandomValue
+  mark "random.choice" -> code.WeakRandomValue
+  mark "random.choices" -> code.WeakRandomValue
+  mark "random.sample" -> code.WeakRandomValue
+  mark "random.uniform" -> code.WeakRandomValue
+  mark "random.normalvariate" -> code.WeakRandomValue
+  mark "random.gauss" -> code.WeakRandomValue
+  mark "random.betavariate" -> code.WeakRandomValue
+  mark "random.gammavariate" -> code.WeakRandomValue
+  mark "random.expovariate" -> code.WeakRandomValue
+  mark "random.lognormvariate" -> code.WeakRandomValue
+  mark "random.paretovariate" -> code.WeakRandomValue
+  mark "random.weibullvariate" -> code.WeakRandomValue
+  mark "random.vonmisesvariate" -> code.WeakRandomValue
+  mark "random.triangular" -> code.WeakRandomValue
+  mark "random.shuffle" -> code.WeakRandomValue
 
   // csrf disabled (CWE-352) — presence marker
   mark "csrf_exempt" -> code.CsrfDisabled

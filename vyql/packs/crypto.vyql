@@ -21,6 +21,6 @@ rule WeakCipher {
 // / crypto.randomBytes / SecureRandom) is simply not a source, so it never fires.
 rule WeakRandomness {
   meta { id: "VYQL-CRY-003", severity: medium, cwe: [CWE_330] }
-  taint code.WeakRandomValue -> code.SecurityMaterialSink
+  match code.WeakRandomValue as r
 }
 

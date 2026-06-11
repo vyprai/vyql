@@ -251,6 +251,32 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+	case "match_statement":
+		// Python 3.10 structural match — each case_clause body becomes a Switch branch so
+		// the (often tainted) assignments inside the cases are analysed (B1 gives each case
+		// its own region). Without this the whole match body was invisible.
+		var cases [][]nir.Stmt
+		var walk func(node *tree_sitter.Node)
+		walk = func(node *tree_sitter.Node) {
+			for _, ch := range children(node) {
+				switch ch.Kind() {
+				case "case_clause":
+					if b := field(ch, "consequence"); b != nil {
+						cases = append(cases, c.block(b))
+					} else {
+						for _, cc := range children(ch) {
+							if cc.Kind() == "block" {
+								cases = append(cases, c.block(cc))
+							}
+						}
+					}
+				case "block":
+					walk(ch)
+				}
+			}
+		}
+		walk(n)
+		return []nir.Stmt{nir.Switch{Cases: cases}}
 	}
 	return nil
 }

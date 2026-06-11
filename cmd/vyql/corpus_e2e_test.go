@@ -65,8 +65,10 @@ func TestPrecisionCorpus(t *testing.T) {
 			sqli++
 		case "VYQL-PATH-001":
 			// path traversal: user-controlled apikey filename in Path(...).touch()
+		case "VYQL-CRY-003":
+			// weak randomness: libapi.py uses random.getrandbits for an API key (a real TP).
 		default:
-			t.Errorf("vulpy/bad: unexpected rule %s (expected SQLi / path-traversal)", f.RuleID)
+			t.Errorf("vulpy/bad: unexpected rule %s (expected SQLi / path-traversal / weak-random)", f.RuleID)
 		}
 	}
 	if sqli < 6 {

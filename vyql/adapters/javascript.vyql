@@ -259,17 +259,9 @@ adapter javascript {
   mark "createCipheriv" val "ecb" -> code.WeakCipher
   mark "createCipheriv" val "des" -> code.WeakCipher
 
-  // weak randomness (CWE-330) — Math.random() is a non-crypto PRNG. SOURCE only; a
-  // finding needs a flow into a SecurityMaterialSink. crypto.randomBytes / randomUUID
-  // (CSPRNG) are deliberately NOT marked.
-  source "Math.random" -> code.WeakRandomValue
-  // security material consumers — predictable value reaching here is the weakness.
-  // res.cookie(name, VALUE), jwt.sign(payload, KEY), createHmac(alg, KEY),
-  // createCipheriv(alg, KEY, iv): the secret material is arg index 1.
-  sink method "cookie" arg 1 -> code.SecurityMaterialSink
-  sink path "jwt.sign" arg 1 -> code.SecurityMaterialSink
-  sink path "crypto.createHmac" arg 1 -> code.SecurityMaterialSink
-  sink path "crypto.createCipheriv" arg 1 -> code.SecurityMaterialSink
+  // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
+  // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.
+  mark "Math.random" -> code.WeakRandomValue
 
   // TLS cert validation disabled (CWE-295) — rejectUnauthorized:false
   mark "https.request" val "rejectUnauthorized=false" -> code.CertValidationDisabled
