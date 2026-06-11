@@ -629,8 +629,17 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "object":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
-			if ch.Kind() == "pair" {
+			switch ch.Kind() {
+			case "pair":
 				parts = append(parts, nir.Pair{Key: c.keyName(field(ch, "key")), Value: c.expr(field(ch, "value")), Loc: L})
+			case "shorthand_property_identifier", "shorthand_property_identifier_pattern":
+				// `{ filter }` === `{ filter: filter }` — the property carries the variable's taint.
+				nm := c.text(ch)
+				parts = append(parts, nir.Pair{Key: nm, Value: nir.Name{ID: nm, Loc: L}, Loc: L})
+			case "spread_element":
+				if k := namedChildren(ch); len(k) > 0 {
+					parts = append(parts, c.expr(k[len(k)-1]))
+				}
 			}
 		}
 		return nir.Seq{Parts: parts, Loc: L}

@@ -301,4 +301,20 @@ adapter javascript {
   // character-filtering replace(/regex/g, repl): the engine analyzes the output
   // alphabet (charfilter.go) -> sound sanitizer where it excludes the sink dangerous_chars.
   filter method "replace"
+
+  // sqlite3 / better-sqlite3 — db.all/get/each/run/exec/prepare(sql, …). A non-SQL
+  // collection arg0 (Promise.all([...])) is a Seq and is skipped by the sink matcher.
+  sink method "all" -> code.SqlExecution
+  sink method "get" -> code.SqlExecution
+  sink method "each" -> code.SqlExecution
+  sink method "exec" -> code.SqlExecution
+  sink method "prepare" -> code.SqlExecution
+
+  // xpath (npm xpath) — the expression is arg0.
+  sink path "xpath.select" -> code.XpathQuery
+  sink path "xpath.select1" -> code.XpathQuery
+  sink path "xpath.evaluate" -> code.XpathQuery
+
+  // ldapjs — client.search(base, {filter}, cb): the filter rides in the options object (arg1).
+  sink method "search" arg 1 collection -> code.LdapQuery
 }

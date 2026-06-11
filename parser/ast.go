@@ -83,6 +83,7 @@ type AdapterMapping struct {
 	ArgIndex   int    // which argument is the dangerous one (default 0; `arg N`)
 	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
 	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
+	Collection bool     // `collection` — also flag a Seq/collection-literal arg (e.g. ldap search options {filter})
 }
 
 // ThreatDecl is a `threat <ns>.<Name> { cwe: [...] }` weakness-class declaration

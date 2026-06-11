@@ -31,6 +31,7 @@ type sinkSpec struct {
 	ArgIndex   int    // which argument is the dangerous one (default 0)
 	ValMatches []string // `val "substr"` (AND) — every substr must be in some arg/option literal
 	ValAbsents []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
+	Collection bool     // also flag a Seq/collection-literal arg (e.g. ldap options {filter})
 }
 
 type controlSpec struct {
@@ -213,9 +214,9 @@ func loadSpec(tech string) adapterSpec {
 			}
 			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Collection: mp.Collection})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Collection: mp.Collection})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method (e.g. `URL(u).openConnection()`,
 			// `u.toRegex()`); match the bare method name, label the call node itself.
@@ -353,7 +354,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							if arg == "" {
 								break
 							}
-							if a, ok, _ := s.GetNode(arg); ok && a.Prop("vkind") == "Seq" {
+							if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && a.Prop("vkind") == "Seq" {
 								continue
 							}
 							out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity})
@@ -364,7 +365,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if arg == "" {
 						continue
 					}
-					if a, ok, _ := s.GetNode(arg); ok && a.Prop("vkind") == "Seq" {
+					if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && a.Prop("vkind") == "Seq" {
 						continue
 					}
 					out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity})

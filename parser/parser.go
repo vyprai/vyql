@@ -487,6 +487,10 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 					m.ArgIndex = n
 				}
 			}
+			if p.atWord("collection") { // also flag a Seq/collection-literal arg (ldap options {filter})
+				p.next()
+				m.Collection = true
+			}
 			if p.atWord("on") { // optional receiver-type constraint (one type or [list])
 				p.next()
 				if p.at(tLBrack) {
