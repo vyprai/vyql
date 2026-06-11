@@ -43,13 +43,14 @@ func readDataFiles(t *testing.T, sub, suffix string) map[string]string {
 }
 
 var (
-	ruleIDRe   = regexp.MustCompile(`id:\s*"(VYQL-[A-Z]+-[0-9]+)"`)
-	conceptDef = regexp.MustCompile(`(?m)^concept\s+([A-Za-z0-9_]+)`)
-	conceptRef = regexp.MustCompile(`(?:code|core)\.([A-Z][A-Za-z0-9_]+)`)
-	quoted     = regexp.MustCompile(`"[^"]*"`)
-	pkgLine    = regexp.MustCompile(`(?m)^package\s+([A-Za-z0-9_.]+)\s*;`)
-	threatDef  = regexp.MustCompile(`(?m)^threat\s+([A-Za-z0-9_]+)`)
-	threatRef  = regexp.MustCompile(`(?:vulnerable_to|neutralizes):\s*\[([^\]]+)\]`)
+	ruleIDRe    = regexp.MustCompile(`id:\s*"(VYQL-[A-Z]+-[0-9]+)"`)
+	conceptDef  = regexp.MustCompile(`(?m)^concept\s+([A-Za-z0-9_]+)`)
+	conceptKind = regexp.MustCompile(`(?m)^concept\s+([A-Za-z0-9_]+)\s*:\s*(sink|source|control)`)
+	conceptRef  = regexp.MustCompile(`(?:code|core)\.([A-Z][A-Za-z0-9_]+)`)
+	quoted      = regexp.MustCompile(`"[^"]*"`)
+	pkgLine     = regexp.MustCompile(`(?m)^package\s+([A-Za-z0-9_.]+)\s*;`)
+	threatDef   = regexp.MustCompile(`(?m)^threat\s+([A-Za-z0-9_]+)`)
+	threatRef   = regexp.MustCompile(`(?:vulnerable_to|neutralizes):\s*\[([^\]]+)\]`)
 )
 
 func ruleIDs(files map[string]string) map[string]string { // id -> file
@@ -142,6 +143,64 @@ func TestConceptRefsResolveGate(t *testing.T) {
 	check("adapters", ".vyql")
 	check("packs", ".vyql")
 	t.Logf("concept refs: %d concepts defined", len(defined))
+}
+
+// conceptRefsIn returns the set of code/core concept names referenced (as targets or
+// in rule clauses) across the given vyql/<sub> files, quoted strings stripped.
+func conceptRefsIn(t *testing.T, sub string) map[string]bool {
+	out := map[string]bool{}
+	for _, c := range readDataFiles(t, sub, ".vyql") {
+		bare := quoted.ReplaceAllString(c, `""`)
+		for _, m := range conceptRef.FindAllStringSubmatch(bare, -1) {
+			out[m[1]] = true
+		}
+	}
+	return out
+}
+
+// T2.5 — concept-coverage gate. Every SINK concept that a rule consumes must be wired
+// in at least one adapter (otherwise the rule is latent — it can never fire). This is
+// the gate that catches dead sinks (e.g. the reflection/log/header sinks that shipped
+// referenced-but-unwired). The allowlist holds sinks for documented-deferred rules.
+func TestSinkConceptsWiredGate(t *testing.T) {
+	deferred := map[string]bool{
+		// RF-003 (CSRF) is documented-deferred — its sink/control are intentionally unwired.
+		"StateChangingOp": true, "CsrfProtection": true,
+	}
+	sinks := map[string]bool{}
+	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
+		for _, m := range conceptKind.FindAllStringSubmatch(c, -1) {
+			if m[2] == "sink" {
+				sinks[m[1]] = true
+			}
+		}
+	}
+	adapterRefs := conceptRefsIn(t, "adapters")
+	ruleRefs := conceptRefsIn(t, "packs")
+	var latent []string
+	for s := range sinks {
+		if deferred[s] {
+			continue
+		}
+		if ruleRefs[s] && !adapterRefs[s] {
+			latent = append(latent, s)
+		}
+	}
+	sort.Strings(latent)
+	for _, s := range latent {
+		t.Errorf("sink concept %q is consumed by a rule but wired in NO adapter — latent rule (wire it or document-defer)", s)
+	}
+	t.Logf("sink concepts: %d defined, %d adapter-wired", len(sinks), countWired(sinks, adapterRefs))
+}
+
+func countWired(sinks, wired map[string]bool) int {
+	n := 0
+	for s := range sinks {
+		if wired[s] {
+			n++
+		}
+	}
+	return n
 }
 
 // T0.3 — every threat reference (vulnerable_to/neutralizes) resolves to a defined threat
