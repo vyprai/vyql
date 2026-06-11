@@ -189,18 +189,22 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	case "if_statement", "while_statement", "for_statement", "for_in_statement":
-		// branch-structured (B1). Cond is retained where present (JS evaluated it before,
-		// and the flatten lowering still does → byte-identical node set).
+	case "if_statement":
+		// separate Then/Else branches so the join-merge keeps a value tainted on the live
+		// path even when the other arm overwrites it, and a constant condition prunes.
 		var cond nir.Expr
 		if cn := field(n, "condition"); cn != nil {
 			cond = c.expr(cn)
 		}
-		body := c.collectStatementBlocks(n)
-		if n.Kind() == "if_statement" {
-			return []nir.Stmt{nir.If{Cond: cond, Then: body}}
+		return []nir.Stmt{nir.If{Cond: cond, Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
+	case "while_statement", "for_statement", "for_in_statement":
+		var cond nir.Expr
+		if cn := field(n, "condition"); cn != nil {
+			cond = c.expr(cn)
 		}
-		return []nir.Stmt{nir.Loop{Cond: cond, Body: body}}
+		return []nir.Stmt{nir.Loop{Cond: cond, Body: c.collectStatementBlocks(n)}}
+	case "switch_statement":
+		return []nir.Stmt{c.switchStmt(n)}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectStatementBlocks(n)}}
 	case "statement_block":
@@ -312,6 +316,63 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(field(inner, "right"))}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// branchBody flattens one if-branch body: a `{}` block, an else_clause wrapper, or a
+// brace-less single statement / nested control statement.
+func (c *jsConv) branchBody(n *tree_sitter.Node) []nir.Stmt {
+	if n == nil {
+		return nil
+	}
+	switch n.Kind() {
+	case "statement_block":
+		return c.blockChildren(n)
+	case "else_clause":
+		var out []nir.Stmt
+		for _, ch := range namedChildren(n) {
+			out = append(out, c.branchBody(ch)...)
+		}
+		return out
+	default:
+		return c.stmt(n)
+	}
+}
+
+// switchStmt lowers a switch into separate case branches with labels (consecutive
+// fall-through labels merge into the next body), so a constant subject prunes to its arm.
+func (c *jsConv) switchStmt(n *tree_sitter.Node) nir.Stmt {
+	var cases [][]nir.Stmt
+	var labels [][]nir.Expr
+	var deflt []nir.Stmt
+	var pending []nir.Expr
+	if b := field(n, "body"); b != nil {
+		for _, sc := range namedChildren(b) {
+			switch sc.Kind() {
+			case "switch_case":
+				lv := field(sc, "value")
+				var stmts []nir.Stmt
+				for _, ch := range namedChildren(sc) {
+					if lv != nil && ch.StartByte() == lv.StartByte() {
+						continue // the label expr, not a body statement
+					}
+					stmts = append(stmts, c.stmt(ch)...)
+				}
+				if lv != nil {
+					pending = append(pending, c.expr(lv))
+				}
+				if len(stmts) > 0 {
+					cases = append(cases, stmts)
+					labels = append(labels, pending)
+					pending = nil
+				}
+			case "switch_default":
+				for _, ch := range namedChildren(sc) {
+					deflt = append(deflt, c.stmt(ch)...)
+				}
+			}
+		}
+	}
+	return nir.Switch{Subject: c.expr(field(n, "value")), Cases: cases, Labels: labels, Default: deflt}
 }
 
 // collectStatementBlocks gathers statements from nested statement_blocks and
@@ -477,7 +538,9 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "shorthand_property_identifier", "property_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "number", "regex":
+	case "number":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
+	case "regex":
 		return nir.Const{Loc: L}
 	case "true", "false", "null", "undefined":
 		// carry the literal text so value-matching sees rejectUnauthorized=false etc.
@@ -530,10 +593,16 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "arrow_function", "function_expression", "function":
 		return nir.Lambda{Params: c.params(field(n, "parameters")), Body: c.body(field(n, "body")), Loc: L}
 	case "binary_expression":
-		if c.text(field(n, "operator")) == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		if op == "+" {
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L} // string concat / add
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "unary_expression":
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "argument")), Loc: L}
+	case "ternary_expression":
+		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	case "template_string":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
@@ -563,8 +632,6 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		return nir.Seq{Parts: parts, Loc: L}
-	case "ternary_expression":
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "consequence")), c.expr(field(n, "alternative"))}, Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {

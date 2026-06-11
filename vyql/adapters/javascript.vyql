@@ -259,6 +259,11 @@ adapter javascript {
   mark "createCipheriv" val "ecb" -> code.WeakCipher
   mark "createCipheriv" val "des" -> code.WeakCipher
 
+  // weak hash (CWE-328) — crypto.createHash('md5'|'sha1') (value-matched).
+  mark "createHash" val "md5" -> code.WeakHash
+  mark "createHash" val "sha1" -> code.WeakHash
+  mark "createHash" val "md4" -> code.WeakHash
+
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.
   mark "Math.random" -> code.WeakRandomValue
