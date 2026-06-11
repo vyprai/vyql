@@ -1,0 +1,9 @@
+// Android app. Trust boundary = IPC: intent extras, deep-link URIs, exported components,
+// content providers — plus responses from the network and on-device stored data. The
+// WebView bridge and local SQLite/file/log sinks are the high-risk surface.
+profile mobile_android {
+  title: "Mobile app — Android"
+  detect: ["file:AndroidManifest.xml", "file:app/src/main/AndroidManifest.xml",
+           "dep:com.android.tools.build", "dep:androidx", "dep:com.android.application"]
+  entrypoints: [IntentInput, ExternalApiResponse, DatabaseRead, SecretValue]
+}

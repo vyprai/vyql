@@ -19,12 +19,33 @@ adapter java {
   source ".getPathInfo" -> code.HttpInput
   source ".getRequestURI" -> code.HttpInput
   source ".getPart" -> code.HttpInput
+  // Android intent / deep-link inputs (attacker-controlled IPC entry points)
+  source ".getStringExtra" -> code.IntentInput
+  source ".getStringArrayExtra" -> code.IntentInput
+  source ".getCharSequenceExtra" -> code.IntentInput
+  source ".getBundleExtra" -> code.IntentInput
+  source ".getDataString" -> code.IntentInput
+  source ".getData" -> code.IntentInput
+  source ".getExtras" -> code.IntentInput
+  source ".getQueryParameter" -> code.IntentInput
+  source ".getQueryParameters" -> code.IntentInput
+  source ".getLastPathSegment" -> code.IntentInput
 
-  // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate
+  // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
   sink method "executeUpdate" -> code.SqlExecution
   sink method "execute" -> code.SqlExecution
   sink method "executeBatch" -> code.SqlExecution
+  sink method "rawQuery" -> code.SqlExecution
+  sink method "execSQL" -> code.SqlExecution
+  // Android WebView: tainted URL/JS loaded or evaluated (CWE-749)
+  sink method "loadUrl" -> code.WebViewLoad
+  sink method "loadData" -> code.WebViewLoad
+  sink method "loadDataWithBaseURL" arg 1 -> code.WebViewLoad
+  sink method "postUrl" -> code.WebViewLoad
+  sink method "evaluateJavascript" -> code.WebViewLoad
+  // exposing a native bridge to WebView content (presence)
+  mark "addJavascriptInterface" -> code.WebViewJsInterface
   sink method "executeLargeUpdate" -> code.SqlExecution
   sink method "prepareStatement" -> code.SqlExecution
   sink method "prepareCall" -> code.SqlExecution

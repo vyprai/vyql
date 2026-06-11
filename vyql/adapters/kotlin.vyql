@@ -8,10 +8,26 @@ adapter kotlin {
   source ".getParameter" -> code.HttpInput
   source ".getHeader" -> code.HttpInput
   source ".queryParameters" -> code.HttpInput
+  // Android intent / deep-link inputs
+  source ".getStringExtra" -> code.IntentInput
+  source ".getCharSequenceExtra" -> code.IntentInput
+  source ".getBundleExtra" -> code.IntentInput
+  source ".getDataString" -> code.IntentInput
+  source ".getData" -> code.IntentInput
+  source ".getExtras" -> code.IntentInput
+  source ".getQueryParameter" -> code.IntentInput
+  source ".getLastPathSegment" -> code.IntentInput
 
   // command execution
   sink method "exec" -> code.CommandExecution
   sink path "ProcessBuilder" -> code.CommandExecution
+
+  // Android WebView (CWE-749)
+  sink method "loadUrl" -> code.WebViewLoad
+  sink method "loadData" -> code.WebViewLoad
+  sink method "loadDataWithBaseURL" arg 1 -> code.WebViewLoad
+  sink method "evaluateJavascript" -> code.WebViewLoad
+  mark "addJavascriptInterface" -> code.WebViewJsInterface
 
   // SQL — JDBC + Android SQLite
   sink method "executeQuery" -> code.SqlExecution

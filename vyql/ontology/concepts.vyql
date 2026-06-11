@@ -134,6 +134,16 @@ concept InsecureCookie : sink {
   cwe: [CWE_614]
 }
 
+concept WebViewLoad : sink {
+  vulnerable_to: [mobile.WebViewInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_749]
+}
+concept WebViewJsInterface : sink {
+  vulnerable_to: [mobile.WebViewInjection]
+  cwe: [CWE_749]
+}
+
 concept ExternalCall : sink {
   vulnerable_to: [smartcontract.ExternalCallInjection]
   enabled_by: [taint.UntrustedData]
@@ -203,6 +213,11 @@ concept HttpInput : source {
   refines: core.UserControlledData
 }
 concept DomInput : source {
+  taint: [taint.UntrustedData]
+  cwe: [CWE_20]
+  refines: core.UserControlledData
+}
+concept IntentInput : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_20]
   refines: core.UserControlledData

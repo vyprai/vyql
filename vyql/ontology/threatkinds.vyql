@@ -106,3 +106,7 @@ threat ExternalCallInjection { cwe: [CWE_829], desc: "Untrusted address/value in
 threat PrivilegedDestruct { cwe: [CWE_284], desc: "Untrusted-reachable selfdestruct/privileged operation" }
 threat TxOriginAuth { cwe: [CWE_477], desc: "Authorization via tx.origin (phishing-vulnerable)" }
 
+
+package mobile;
+threat WebViewInjection { cwe: [CWE_749], desc: "Untrusted data loaded/evaluated in a WebView, or a native bridge exposed to it" }
+threat InsecureStorage { cwe: [CWE_922], desc: "Sensitive data stored without protection (plaintext prefs/defaults)" }

@@ -6,6 +6,6 @@
 profile generic {
   title: "Generic application (no archetype detected)"
   entrypoints: [HttpInput, HttpHeader, HttpRequest, Cookie, FileUpload, SecretValue,
-                DatabaseRead, ExternalApiResponse, MessageInput, UserControlledData,
+                DatabaseRead, ExternalApiResponse, MessageInput, UserControlledData, IntentInput,
                 CliArgument, EnvVariable, StdinInput, ConfigFileInput]
 }
