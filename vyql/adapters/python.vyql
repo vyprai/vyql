@@ -81,6 +81,22 @@ adapter python {
   sink method "fetch" -> code.SqlExecution
   sink method "fetchrow" -> code.SqlExecution
   sink method "fetchval" -> code.SqlExecution
+  // CSRF (CWE-352, RF-003) — security-sensitive state-changing operations. Scoped to
+  // high-impact mutations (not generic .save/.update) to stay low-FP. The guarded reject
+  // is a graph spec: linking a CSRF token check to its endpoint in code needs CFG analysis.
+  sink method "change_password" -> code.StateChangingOp
+  sink method "changePassword" -> code.StateChangingOp
+  sink method "update_password" -> code.StateChangingOp
+  sink method "reset_password" -> code.StateChangingOp
+  sink method "change_email" -> code.StateChangingOp
+  sink method "transfer_funds" -> code.StateChangingOp
+  sink method "transferFunds" -> code.StateChangingOp
+  sink method "delete_account" -> code.StateChangingOp
+  sink method "grant_role" -> code.StateChangingOp
+  sink method "make_admin" -> code.StateChangingOp
+  // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
+  control "validate_csrf_token" -> core.CsrfProtection
+  control "verify_authenticity_token" -> core.CsrfProtection
   // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
   // are a LogOutput sink (user data) AND a LogWrite mark (secret).
   sink path "logging.info" -> code.LogOutput

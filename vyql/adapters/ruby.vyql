@@ -44,6 +44,18 @@ adapter ruby {
   sink method "exec_update" -> code.SqlExecution
   sink method "exec_delete" -> code.SqlExecution
   sink method "exec_insert" -> code.SqlExecution
+  // CSRF (CWE-352, RF-003) — security-sensitive state-changing operations (low-FP scope)
+  sink method "change_password" -> code.StateChangingOp
+  sink method "update_password" -> code.StateChangingOp
+  sink method "reset_password" -> code.StateChangingOp
+  sink method "change_email" -> code.StateChangingOp
+  sink method "transfer_funds" -> code.StateChangingOp
+  sink method "delete_account" -> code.StateChangingOp
+  sink method "grant_role" -> code.StateChangingOp
+  sink method "make_admin" -> code.StateChangingOp
+  // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
+  control "verify_authenticity_token" -> core.CsrfProtection
+  control "validate_csrf_token" -> core.CsrfProtection
   // Sequel raw SQL (DB.fetch / DB.run / DB['...'])
   sink path "DB.fetch" -> code.SqlExecution
   sink path "DB.run" -> code.SqlExecution

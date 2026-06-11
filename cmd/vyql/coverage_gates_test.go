@@ -66,13 +66,8 @@ func ruleIDs(files map[string]string) map[string]string { // id -> file
 // the known-unspecced backlog (T1 burns it down); a NEW rule without a spec fails here.
 // As specs are added, allowlisted ids that gain coverage must be REMOVED (asserted below).
 func TestRuleFiresCoverageGate(t *testing.T) {
-	unspecced := map[string]bool{
-		// RF-003 (CSRF): StateChangingOp + CsrfProtection — needs a state-change/CSRF
-		// model (identify state-changing handlers + CSRF guards), not adapter-expressible
-		// as a plain taint sink. Documented-deferred (engine-gap-closure.md); kept here
-		// until that lands. This is the ONLY remaining un-specced rule.
-		"VYQL-RF-003": true,
-	}
+	// Every shipped rule now has an `expect` spec — the burn-down allowlist is empty.
+	unspecced := map[string]bool{}
 
 	rules := ruleIDs(readDataFiles(t, "packs", ".vyql"))
 	// every .test.vyql `expect` (code AND graph specs alike — both live in one format).
@@ -152,10 +147,8 @@ func conceptRefsIn(t *testing.T, sub string) map[string]bool {
 // the gate that catches dead sinks (e.g. the reflection/log/header sinks that shipped
 // referenced-but-unwired). The allowlist holds sinks for documented-deferred rules.
 func TestSinkConceptsWiredGate(t *testing.T) {
-	deferred := map[string]bool{
-		// RF-003 (CSRF) is documented-deferred — its sink/control are intentionally unwired.
-		"StateChangingOp": true, "CsrfProtection": true,
-	}
+	// no deferred sinks — every sink a rule consumes is adapter-wired.
+	deferred := map[string]bool{}
 	sinks := map[string]bool{}
 	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
 		for _, m := range conceptKind.FindAllStringSubmatch(c, -1) {

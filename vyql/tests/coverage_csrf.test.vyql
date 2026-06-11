@@ -1,0 +1,43 @@
+# RF-003 (CSRF, CWE-352) — user input reaching a security-sensitive state-changing
+# operation without CSRF protection. Code mode fires on the sensitive mutation; the
+# GUARDED reject is a graph spec (a CsrfProtection PROTECTS edge), since linking a CSRF
+# token check to its endpoint in code requires CFG/endpoint analysis.
+
+test "python: form data -> change_password is a CSRF-exposed state change"
+  lang python
+  expect VYQL-RF-003
+  code
+  ```
+  def change_pw():
+      pw = request.form['new_password']
+      account.change_password(pw)
+  ```
+
+test "python: a constant state change is clean (no user input)"
+  lang python
+  reject VYQL-RF-003
+  code
+  ```
+  def rotate():
+      account.change_password("system-generated")
+  ```
+
+test "graph: user input reaching a state-changing op without CSRF protection (RF-003)"
+  expect VYQL-RF-003
+  graph
+  ```
+  node src code.HttpInput
+  node op code.StateChangingOp
+  edge FLOWS src -> op
+  ```
+
+test "graph: a CSRF-protected state-changing op is clean (RF-003)"
+  reject VYQL-RF-003
+  graph
+  ```
+  node src code.HttpInput
+  node op code.StateChangingOp
+  node guard core.CsrfProtection
+  edge FLOWS src -> op
+  edge PROTECTS guard -> op
+  ```

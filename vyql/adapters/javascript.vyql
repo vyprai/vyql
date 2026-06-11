@@ -77,6 +77,18 @@ adapter javascript {
   sink path "mysql.query" -> code.SqlExecution
   sink path "pg.query" -> code.SqlExecution
   sink path "sql.query" -> code.SqlExecution
+  // CSRF (CWE-352, RF-003) — security-sensitive state-changing operations (low-FP scope)
+  sink method "changePassword" -> code.StateChangingOp
+  sink method "updatePassword" -> code.StateChangingOp
+  sink method "resetPassword" -> code.StateChangingOp
+  sink method "changeEmail" -> code.StateChangingOp
+  sink method "transferFunds" -> code.StateChangingOp
+  sink method "deleteAccount" -> code.StateChangingOp
+  sink method "grantRole" -> code.StateChangingOp
+  sink method "makeAdmin" -> code.StateChangingOp
+  // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
+  control "verifyCsrfToken" -> core.CsrfProtection
+  control "validateCsrfToken" -> core.CsrfProtection
   // Electron: shell.openExternal can launch arbitrary apps/protocols from a URL
   sink path "shell.openExternal" -> code.CommandExecution
   // Electron insecure renderer config (named-value on the BrowserWindow options)
