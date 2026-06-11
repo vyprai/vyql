@@ -210,7 +210,18 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			if right != nil {
 				val = c.expr(right)
 			}
-			return []nir.Stmt{nir.Assign{Targets: c.targets(field(inner, "left")), Value: val}}
+			left := field(inner, "left")
+			tgts := c.targets(left)
+			// subscript store `container[k] = v` (e.g. session[bar] = v, map[k] = param): no
+			// simple name target, so model it as a mutating setitem that taints the container
+			// from v — otherwise a later read `x = container[k]` loses the taint.
+			if len(tgts) == 0 && left != nil && left.Kind() == "subscript" {
+				base := c.expr(field(left, "value"))
+				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: base, Attr: "__setitem__", Loc: L},
+					Method: "__setitem__", Args: []nir.Expr{val}, Loc: L}}}
+			}
+			return []nir.Stmt{nir.Assign{Targets: tgts, Value: val}}
 		case "augmented_assignment":
 			left := field(inner, "left")
 			if left != nil && left.Kind() == "identifier" {

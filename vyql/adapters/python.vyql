@@ -321,9 +321,17 @@ adapter python {
   sink path "re.sub" -> code.RegexCompile
   sink path "re.findall" -> code.RegexCompile
 
-  // weak crypto (CWE-327) — presence marker on the call node
+  // weak crypto (CWE-327/328) — presence marker on the call node
   mark "hashlib.md5" -> code.WeakHash
   mark "hashlib.sha1" -> code.WeakHash
+  mark "hashlib.md4" -> code.WeakHash
+  mark "hashlib.md2" -> code.WeakHash
+  // hashlib.new("md5") — algorithm by name (value-matched). "sha1"/"md5"/… only, never the
+  // bare "sha" substring (it would match the strong sha224/256/384/512 family).
+  mark "hashlib.new" val "md5" -> code.WeakHash
+  mark "hashlib.new" val "md4" -> code.WeakHash
+  mark "hashlib.new" val "md2" -> code.WeakHash
+  mark "hashlib.new" val "sha1" -> code.WeakHash
 
   // insecure file permission (CWE-732) — world-writable / overly-broad mode. Restrictive
   // modes (0o600/0o640/0o644) are not matched. octal forms 0o777 and 0o666 are covered.

@@ -85,6 +85,9 @@ var mutatorMethods = map[string]bool{
 	"addElement": true, "addFirst": true, "addLast": true, "push": true, "offer": true,
 	"offerFirst": true, "offerLast": true, "put": true, "putAll": true, "putIfAbsent": true,
 	"set": true, "enqueue": true,
+	// __setitem__ models a subscript store `container[k] = v` (frontends lower it to this
+	// synthetic call) so the container inherits the stored value's taint.
+	"__setitem__": true,
 }
 
 // constStr returns the string value of a literal expression (unquoted), or "".
