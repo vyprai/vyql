@@ -353,6 +353,12 @@ adapter python {
   mark "ARC4.new" -> code.WeakCipher
   mark "Blowfish.new" -> code.WeakCipher
   mark "DES3.new" -> code.WeakCipher
+  // ECB mode (CWE-327) — pycryptodome AES.MODE_ECB constant or cryptography modes.ECB().
+  // The mode is a member access / call (not a string), so match the path on the Attr/Call.
+  mark "AES.MODE_ECB" -> code.WeakCipher
+  mark "DES.MODE_ECB" -> code.WeakCipher
+  mark "DES3.MODE_ECB" -> code.WeakCipher
+  mark "modes.ECB" -> code.WeakCipher
 
   // insecure temp file (CWE-377) — tempfile.mktemp is documented-insecure (race)
   mark "tempfile.mktemp" -> code.InsecureTempFile

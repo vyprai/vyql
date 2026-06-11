@@ -105,6 +105,8 @@ adapter csharp {
   mark "DESCryptoServiceProvider" -> code.WeakCipher
   mark "TripleDESCryptoServiceProvider" -> code.WeakCipher
   mark "RC2CryptoServiceProvider" -> code.WeakCipher
+  // ECB mode (CWE-327) — CipherMode.ECB assigned to a cipher's .Mode.
+  mark "CipherMode.ECB" -> code.WeakCipher
   mark "MD5.Create" -> code.WeakHash
   mark "SHA1.Create" -> code.WeakHash
   mark "MD5CryptoServiceProvider" -> code.WeakHash

@@ -140,6 +140,8 @@ adapter java {
   mark "Cipher.getInstance" val "RC2" -> code.WeakCipher
   mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
   mark "Cipher.getInstance" val "ECB" -> code.WeakCipher
+  // NullCipher (CWE-327) — a "cipher" that performs no encryption at all.
+  mark "NullCipher" -> code.WeakCipher
   // Weak hash: MD2/MD5/SHA-1 via MessageDigest.getInstance("MD5") etc.
   mark "MessageDigest.getInstance" val "MD2" -> code.WeakHash
   mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
