@@ -214,6 +214,47 @@ func (c *pyConv) stringInterps(n *tree_sitter.Node) []nir.Expr {
 	return interps
 }
 
+// matchPatternLabels classifies a match `case_clause`'s pattern: a wildcard `_` is the
+// default, literal patterns (and unions of literals) yield label expressions, and anything
+// else (capture, class, value, guard) returns literal=false so the match is left unprunable.
+func (c *pyConv) matchPatternLabels(caseClause *tree_sitter.Node) (labels []nir.Expr, isDefault, literal bool) {
+	for _, ch := range children(caseClause) {
+		if ch.Kind() == "case_pattern" {
+			if kids := namedChildren(ch); len(kids) > 0 {
+				return c.patternLabels(kids[0])
+			}
+			if strings.TrimSpace(c.text(ch)) == "_" {
+				return nil, true, false
+			}
+		}
+	}
+	return nil, false, false
+}
+
+func (c *pyConv) patternLabels(p *tree_sitter.Node) (labels []nir.Expr, isDefault, literal bool) {
+	switch p.Kind() {
+	case "_", "wildcard_pattern":
+		return nil, true, false
+	case "string", "integer", "float", "true", "false", "none", "concatenated_string":
+		return []nir.Expr{c.expr(p)}, false, true
+	case "union_pattern":
+		var labs []nir.Expr
+		for _, sub := range namedChildren(p) {
+			l, d, lit := c.patternLabels(sub)
+			if d || !lit {
+				return nil, false, false // a non-literal alternative — unprunable
+			}
+			labs = append(labs, l...)
+		}
+		return labs, false, len(labs) > 0
+	case "case_pattern":
+		if kids := namedChildren(p); len(kids) > 0 {
+			return c.patternLabels(kids[0])
+		}
+	}
+	return nil, false, false // capture / class / value pattern — could match anything
+}
+
 func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
@@ -369,31 +410,44 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
 	case "match_statement":
-		// Python 3.10 structural match — each case_clause body becomes a Switch branch so
-		// the (often tainted) assignments inside the cases are analysed (B1 gives each case
-		// its own region). Without this the whole match body was invisible.
+		// Python 3.10 structural match — each case becomes a Switch branch so the (often
+		// tainted) assignments inside are analysed. Literal-only matches (`case 'A':` /
+		// `case 'C' | 'D':` / `case _:`) also capture subject + labels so a constant subject
+		// prunes to the matching case. A capture/class/guard pattern (which could match
+		// anything) makes the whole match NON-prunable — sound, never a false negative.
 		var cases [][]nir.Stmt
-		var walk func(node *tree_sitter.Node)
-		walk = func(node *tree_sitter.Node) {
-			for _, ch := range children(node) {
-				switch ch.Kind() {
-				case "case_clause":
-					if b := field(ch, "consequence"); b != nil {
-						cases = append(cases, c.block(b))
-					} else {
-						for _, cc := range children(ch) {
-							if cc.Kind() == "block" {
-								cases = append(cases, c.block(cc))
-							}
-						}
-					}
-				case "block":
-					walk(ch)
-				}
+		var labels [][]nir.Expr
+		var deflt []nir.Stmt
+		prunable := true
+		body := field(n, "body")
+		if body == nil {
+			body = n
+		}
+		for _, cl := range children(body) {
+			if cl.Kind() != "case_clause" {
+				continue
+			}
+			var stmts []nir.Stmt
+			if b := field(cl, "consequence"); b != nil {
+				stmts = c.block(b)
+			}
+			labs, isDefault, literal := c.matchPatternLabels(cl)
+			switch {
+			case isDefault:
+				deflt = append(deflt, stmts...)
+			case literal:
+				cases = append(cases, stmts)
+				labels = append(labels, labs)
+			default:
+				prunable = false
+				cases = append(cases, stmts)
+				labels = append(labels, nil)
 			}
 		}
-		walk(n)
-		return []nir.Stmt{nir.Switch{Cases: cases}}
+		if prunable {
+			return []nir.Stmt{nir.Switch{Subject: c.expr(field(n, "subject")), Cases: cases, Labels: labels, Default: deflt}}
+		}
+		return []nir.Stmt{nir.Switch{Cases: append(cases, deflt)}} // unprunable: bodies only
 	}
 	return nil
 }

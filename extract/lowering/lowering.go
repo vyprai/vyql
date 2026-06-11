@@ -224,6 +224,12 @@ func (l *lowerer) constStrVal(e nir.Expr, sc *scope) (string, bool) {
 		}
 	case nir.Thru:
 		return l.constStrVal(v.Inner, sc)
+	case nir.Index:
+		if base, ok := l.constStrVal(v.Base, sc); ok { // s[i] on a constant string
+			if idx, ok := l.constInt(v.Key, sc); ok && idx >= 0 && int(idx) < len(base) {
+				return string(base[idx]), true
+			}
+		}
 	case nir.Call:
 		if v.Method == "charAt" && len(v.Args) == 1 {
 			if attr, ok := v.Callee.(nir.Attr); ok {
