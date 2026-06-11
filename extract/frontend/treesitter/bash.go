@@ -98,12 +98,14 @@ func (c *shConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: c.command(n)}}
 	case "pipeline", "list", "subshell", "compound_statement", "negated_command":
 		return c.block(n)
-	// branch-structured (B1); Cond nil (bash did not evaluate the predicate) -> byte-identical.
+	// branch-structured with predicate attached so constant-false arms are pruned.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		return []nir.Stmt{c.shIf(n)}
 	case "for_statement", "while_statement", "c_style_for_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
-	case "case_statement", "redirected_statement":
+	case "case_statement":
+		return []nir.Stmt{c.shCase(n)}
+	case "redirected_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
@@ -189,12 +191,113 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Seq{Parts: parts, Loc: L}
 	case "command":
 		return c.command(n)
+	case "test_command":
+		// `[ expr ]` / `[[ expr ]]` — unwrap to the inner comparison.
+		if k := namedChildren(n); len(k) > 0 {
+			return c.expr(k[0])
+		}
+	case "binary_expression":
+		op := c.text(field(n, "operator"))
+		if m, ok := shTestOp[op]; ok { // map `-gt`/`-eq`/… so const-eval can fold
+			op = m
+		}
+		return nir.BinOp{Op: op, Left: c.expr(field(n, "left")), Right: c.expr(field(n, "right")), Loc: L}
+	case "unary_expression":
+		if k := namedChildren(n); len(k) > 0 {
+			op := "?"
+			for i := uint(0); i < n.ChildCount(); i++ {
+				if ch := n.Child(i); !ch.IsNamed() {
+					op = c.text(ch)
+					break
+				}
+			}
+			return nir.Unary{Op: op, Operand: c.expr(k[len(k)-1]), Loc: L}
+		}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// shTestOp maps bash test operators to C-style symbols const-eval understands.
+var shTestOp = map[string]string{
+	"-gt": ">", "-lt": "<", "-ge": ">=", "-le": "<=", "-eq": "==", "-ne": "!=",
+}
+
+// shIf lowers an if with its predicate so a constant-false arm is pruned. The then-body
+// statements are direct children between the condition and the else/elif clauses.
+func (c *shConv) shIf(n *tree_sitter.Node) nir.Stmt {
+	it := nir.If{Loc: c.loc(n)}
+	seenCond := false
+	for i := uint(0); i < n.ChildCount(); i++ {
+		ch := n.Child(i)
+		if n.FieldNameForChild(uint32(i)) == "condition" {
+			if it.Cond == nil {
+				it.Cond = c.expr(ch)
+			}
+			seenCond = true
+			continue
+		}
+		if !ch.IsNamed() {
+			continue
+		}
+		switch ch.Kind() {
+		case "else_clause":
+			for _, e := range namedChildren(ch) {
+				it.Else = append(it.Else, c.stmt(e)...)
+			}
+		case "elif_clause":
+			it.Else = append(it.Else, c.shIf(ch))
+		default:
+			if seenCond {
+				it.Then = append(it.Then, c.stmt(ch)...)
+			}
+		}
+	}
+	return it
+}
+
+// shCase lowers a case to a subject+labelled Switch so a constant subject prunes arms.
+func (c *shConv) shCase(n *tree_sitter.Node) nir.Stmt {
+	sw := nir.Switch{Loc: c.loc(n)}
+	if v := field(n, "value"); v != nil {
+		sw.Subject = c.expr(v)
+	}
+	for _, ci := range namedChildren(n) {
+		if ci.Kind() != "case_item" {
+			continue
+		}
+		var labs []nir.Expr
+		var stmts []nir.Stmt
+		isDefault := false
+		for i := uint(0); i < ci.ChildCount(); i++ {
+			ch := ci.Child(i)
+			if !ch.IsNamed() {
+				continue
+			}
+			if ci.FieldNameForChild(uint32(i)) == "value" {
+				if c.text(ch) == "*" || ch.Kind() == "extglob_pattern" {
+					isDefault = true
+				} else {
+					labs = append(labs, c.expr(ch))
+				}
+				continue
+			}
+			if ch.Kind() == "termination" {
+				continue
+			}
+			stmts = append(stmts, c.stmt(ch)...)
+		}
+		if isDefault || len(labs) == 0 {
+			sw.Default = append(sw.Default, stmts...)
+		} else {
+			sw.Cases = append(sw.Cases, stmts)
+			sw.Labels = append(sw.Labels, labs)
+		}
+	}
+	return sw
 }
 
 // expansionVar extracts the variable name from $x or ${x...}.
