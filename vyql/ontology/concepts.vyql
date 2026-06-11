@@ -139,6 +139,10 @@ concept WebViewLoad : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_749]
 }
+concept ElectronNodeIntegration : sink {
+  vulnerable_to: [desktop.InsecureElectronConfig]
+  cwe: [CWE_829]
+}
 concept WebViewJsInterface : sink {
   vulnerable_to: [mobile.WebViewInjection]
   cwe: [CWE_749]

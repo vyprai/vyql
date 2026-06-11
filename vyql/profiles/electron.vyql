@@ -1,0 +1,9 @@
+// Desktop app (Electron). Trust boundary = IPC from the renderer, files opened, custom
+// protocols, and the auto-update channel. The renderer's webPreferences config and any
+// renderer->main shell/child_process path are the high-risk surface.
+profile electron {
+  title: "Desktop app (Electron)"
+  detect: ["dep:electron", "dep:electron-builder", "file:electron.js", "file:main.js"]
+  entrypoints: [HttpInput, IntentInput, ExternalApiResponse, SecretValue, EnvVariable,
+                CliArgument, StdinInput]
+}

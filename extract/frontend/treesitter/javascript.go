@@ -376,6 +376,20 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			method = path[i+1:]
 		}
 		return nir.Call{Callee: c.expr(fn), Args: arglist, Path: path, Method: method, Loc: L}
+	case "new_expression":
+		ctor := field(n, "constructor")
+		path := c.dotted(ctor)
+		var arglist []nir.Expr
+		if args := field(n, "arguments"); args != nil {
+			for _, a := range namedChildren(args) {
+				arglist = append(arglist, c.expr(a))
+			}
+		}
+		method := path
+		if i := strings.LastIndex(path, "."); i >= 0 {
+			method = path[i+1:]
+		}
+		return nir.Call{Callee: c.expr(ctor), Args: arglist, Path: path, Method: method, Loc: L}
 	case "await_expression", "parenthesized_expression", "non_null_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}

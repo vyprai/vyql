@@ -1,0 +1,10 @@
+// Desktop (Electron) weakness rules.
+package vypr.desktop;
+
+// A BrowserWindow renderer configured with nodeIntegration enabled or
+// contextIsolation disabled — untrusted web content can then execute Node /
+// reach the main process (CWE-829). Named-value presence rule.
+rule InsecureElectronConfig {
+  meta { id: "VYQL-DSK-001", severity: high, cwe: [CWE_829] }
+  match code.ElectronNodeIntegration as c
+}

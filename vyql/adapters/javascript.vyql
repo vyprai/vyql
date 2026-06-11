@@ -63,6 +63,13 @@ adapter javascript {
   sink path "mysql.query" -> code.SqlExecution
   sink path "pg.query" -> code.SqlExecution
   sink path "sql.query" -> code.SqlExecution
+  // Electron: shell.openExternal can launch arbitrary apps/protocols from a URL
+  sink path "shell.openExternal" -> code.CommandExecution
+  // Electron insecure renderer config (named-value on the BrowserWindow options)
+  mark "BrowserWindow" val "nodeIntegration=true" -> code.ElectronNodeIntegration
+  mark "BrowserWindow" val "contextIsolation=false" -> code.ElectronNodeIntegration
+  mark "webPreferences" val "nodeIntegration=true" -> code.ElectronNodeIntegration
+
   sink path "child_process.exec" -> code.CommandExecution
   sink path "child_process.execSync" -> code.CommandExecution
   sink path "child_process.spawn" -> code.CommandExecution
