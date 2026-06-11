@@ -204,29 +204,57 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 	case *ast.BlockStmt:
 		return nir.Block{Stmts: c.stmts(st.List)}
 	case *ast.IfStmt:
-		var inner []nir.Stmt
-		if st.Init != nil {
-			if s := c.stmt(st.Init); s != nil {
-				inner = append(inner, s)
-			}
-		}
-		inner = append(inner, c.stmts(st.Body.List)...)
+		// branch-structured (B1): Then/Else are distinct branches; an `if x := …; cond`
+		// Init runs before the branch. Cond is left nil — the Go frontend did not evaluate
+		// it before B1, so omitting it keeps the flattened node set byte-identical (branch
+		// STRUCTURE is what the CFG/dominance pass needs, not the predicate expression).
+		ifn := nir.If{Then: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 		if st.Else != nil {
 			if s := c.stmt(st.Else); s != nil {
-				inner = append(inner, s)
+				ifn.Else = []nir.Stmt{s}
 			}
 		}
-		return nir.Block{Stmts: inner}
+		if st.Init != nil {
+			if s := c.stmt(st.Init); s != nil {
+				return nir.Block{Stmts: []nir.Stmt{s, ifn}}
+			}
+		}
+		return ifn
 	case *ast.ForStmt:
-		return nir.Block{Stmts: c.stmts(st.Body.List)}
+		return nir.Loop{Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 	case *ast.RangeStmt:
-		return nir.Block{Stmts: c.stmts(st.Body.List)}
+		return nir.Loop{Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 	case *ast.SwitchStmt:
-		return nir.Block{Stmts: c.stmts(st.Body.List)}
+		return c.switchStmt(st.Body)
+	// NOTE: *ast.TypeSwitchStmt is intentionally left to the nil default (it was a no-op
+	// before B1 — converting it would lower previously-ignored bodies and shift baselines).
 	case *ast.CaseClause:
 		return nir.Block{Stmts: c.stmts(st.Body)}
 	}
 	return nil
+}
+
+// switchStmt converts a switch body to a branch-structured nir.Switch. Each case clause
+// body becomes a branch; a default clause (nil case list) is the Default branch. Flatten-
+// lowering lowers every branch body in turn — the same node set the prior Block produced.
+func (c *conv) switchStmt(body *ast.BlockStmt) nir.Stmt {
+	if body == nil {
+		return nil
+	}
+	var sw nir.Switch
+	for _, clause := range body.List {
+		cc, ok := clause.(*ast.CaseClause)
+		if !ok {
+			continue
+		}
+		b := c.stmts(cc.Body)
+		if cc.List == nil {
+			sw.Default = b
+		} else {
+			sw.Cases = append(sw.Cases, b)
+		}
+	}
+	return sw
 }
 
 func (c *conv) declStmt(st *ast.DeclStmt) nir.Stmt {

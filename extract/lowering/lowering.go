@@ -276,8 +276,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.Block:
 		l.block(st.Stmts, sc)
 	// Structured control flow (B1). Until the CFG lowering lands (B1.2), these flatten
-	// exactly as the frontends do today: evaluate the condition/subject for taint and
-	// lower every branch body sequentially — fully behaviour-preserving.
+	// like the frontends did before. l.eval is nil-safe, so a frontend that captured the
+	// condition (python evaluated it) stays byte-identical, and one that did NOT (go) sets
+	// Cond=nil and the eval is a no-op — each frontend keeps its exact prior node set.
 	case nir.If:
 		l.eval(st.Cond, sc)
 		l.block(st.Then, sc)

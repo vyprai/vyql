@@ -227,22 +227,30 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.Return{}}
 	case "if_statement", "while_statement":
-		var inner []nir.Stmt
-		if cond := field(n, "condition"); cond != nil {
-			inner = append(inner, nir.ExprStmt{Value: c.expr(cond)})
+		// branch-structured (B1). Cond carries the predicate (python evaluated it before,
+		// and the flatten lowering still does, so this is byte-identical). collectBlocks
+		// already gathers the then/elif/else bodies; keep them as the then-branch so the
+		// flattened node set is unchanged.
+		var cond nir.Expr
+		if cn := field(n, "condition"); cn != nil {
+			cond = c.expr(cn)
 		}
-		inner = append(inner, c.collectBlocks(n)...)
-		return []nir.Stmt{nir.Block{Stmts: inner}}
+		if n.Kind() == "while_statement" {
+			return []nir.Stmt{nir.Loop{Cond: cond, Body: c.collectBlocks(n)}}
+		}
+		return []nir.Stmt{nir.If{Cond: cond, Then: c.collectBlocks(n)}}
 	case "for_statement":
 		var inner []nir.Stmt
 		left, right := field(n, "left"), field(n, "right")
 		if left != nil && left.Kind() == "identifier" && right != nil {
 			inner = append(inner, nir.Assign{Targets: []string{c.text(left)}, Value: c.expr(right)})
 		}
-		inner = append(inner, c.collectBlocks(n)...)
-		return []nir.Stmt{nir.Block{Stmts: inner}}
-	case "with_statement", "try_statement":
+		// the loop-var assign runs before the loop body; flatten lowers assign then body.
+		return []nir.Stmt{nir.Block{Stmts: append(inner, nir.Loop{Body: c.collectBlocks(n)})}}
+	case "with_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+	case "try_statement":
+		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
 	}
 	return nil
 }
