@@ -51,6 +51,7 @@ var primaryExt = map[string]string{
 	// mobile config files — specs supply the real filename via `file <name>` blocks.
 	"config":  ".xml",
 	"elixir":  ".ex",
+	"dart":    ".dart",
 }
 
 func parseSpecFile(t *testing.T, path string) []vyqlSpec {

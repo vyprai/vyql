@@ -1,0 +1,36 @@
+// dart framework adapter (docs/07) — Flutter / dart:io / sqflite / shelf.
+// Method calls are selector chains normalized to dotted paths (db.rawQuery).
+adapter dart {
+  meta { fidelity: resolved }
+
+  // untrusted input
+  source "Platform.environment" -> code.EnvVariable
+  source "stdin.readLineSync" -> code.StdinInput
+  source ".queryParameters" -> code.HttpInput
+  source "request.params" -> code.HttpInput
+  source ".requestedUri" -> code.HttpInput
+
+  // SQL — sqflite raw queries
+  sink method "rawQuery" -> code.SqlExecution
+  sink method "rawInsert" -> code.SqlExecution
+  sink method "rawUpdate" -> code.SqlExecution
+  sink method "rawDelete" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+
+  // SSRF — package:http / dio (tainted URL)
+  sink path "http.get" -> code.UrlFetch
+  sink path "http.post" -> code.UrlFetch
+  sink path "http.put" -> code.UrlFetch
+  sink path "http.head" -> code.UrlFetch
+  sink path "http.read" -> code.UrlFetch
+  sink path "http.delete" -> code.UrlFetch
+
+  // command execution — dart:io Process (the executable is arg0)
+  sink path "Process.run" -> code.CommandExecution
+  sink path "Process.runSync" -> code.CommandExecution
+  sink path "Process.start" -> code.CommandExecution
+
+  // path / file — dart:io (the path is the constructor arg0)
+  sink path "File" -> code.FilePathAccess
+  sink path "Directory" -> code.FilePathAccess
+}
