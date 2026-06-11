@@ -1,0 +1,20 @@
+[
+  {
+    "name": "a vulnerable dependency is flagged (SCA-001)",
+    "expect": ["VYQL-SCA-001"],
+    "reject": ["VYQL-SCA-002"],
+    "nodes": [{"id": "dep", "type": "sbom.Package", "props": {"loc": "lodash@4.17.4"}}],
+    "edges": [],
+    "labels": [{"node": "dep", "concept": "sbom.VulnerableDependency"}]
+  },
+  {
+    "name": "a reachable vulnerable dependency is higher severity (SCA-002)",
+    "expect": ["VYQL-SCA-001", "VYQL-SCA-002"],
+    "nodes": [{"id": "dep", "type": "sbom.Package", "props": {"loc": "log4j@2.14.0"}}],
+    "edges": [],
+    "labels": [
+      {"node": "dep", "concept": "sbom.VulnerableDependency"},
+      {"node": "dep", "concept": "sbom.ReachableSymbol"}
+    ]
+  }
+]

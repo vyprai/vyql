@@ -1,0 +1,42 @@
+[
+  {
+    "name": "connection to a known mining pool (RTM-001)",
+    "expect": ["VYQL-RTM-001"],
+    "nodes": [
+      {"id": "pool", "type": "cloud.Internet"},
+      {"id": "conn", "type": "runtime.Connection", "props": {"dst": "pool"}}
+    ],
+    "edges": [],
+    "labels": [
+      {"node": "pool", "concept": "threat.MiningPool"},
+      {"node": "conn", "concept": "runtime.Connection"}
+    ]
+  },
+  {
+    "name": "process running an undeclared image is workload drift (RTM-002)",
+    "expect": ["VYQL-RTM-002"],
+    "nodes": [{"id": "proc", "type": "runtime.Process", "props": {"image": "xmrig"}}],
+    "edges": [],
+    "labels": [{"node": "proc", "concept": "runtime.Process"}]
+  },
+  {
+    "name": "process running a declared image is clean (RTM-002)",
+    "reject": ["VYQL-RTM-002"],
+    "nodes": [{"id": "proc", "type": "runtime.Process", "props": {"image": "nginx"}}],
+    "edges": [],
+    "labels": [{"node": "proc", "concept": "runtime.Process"}]
+  },
+  {
+    "name": "runtime http request reaches shell execution (RTM-003)",
+    "expect": ["VYQL-RTM-003"],
+    "nodes": [
+      {"id": "req", "type": "runtime.X", "props": {"loc": "trace:1"}},
+      {"id": "sh", "type": "runtime.X", "props": {"loc": "trace:2"}}
+    ],
+    "edges": [{"type": "FLOWS", "src": "req", "dst": "sh"}],
+    "labels": [
+      {"node": "req", "concept": "runtime.HttpRequest"},
+      {"node": "sh", "concept": "runtime.ShellExecution"}
+    ]
+  }
+]

@@ -1,0 +1,60 @@
+[
+  {
+    "name": "external principal escalates to admin (IDN-001)",
+    "expect": ["VYQL-IDN-001"],
+    "nodes": [
+      {"id": "ext", "type": "identity.User", "props": {"loc": "external-user"}},
+      {"id": "admin", "type": "identity.Role", "props": {"priv_level": "ADMIN"}}
+    ],
+    "edges": [{"type": "STEP", "src": "ext", "dst": "admin", "props": {"ability": "sts:AssumeRole"}}],
+    "labels": [
+      {"node": "ext", "concept": "identity.ExternalPrincipal"},
+      {"node": "admin", "concept": "identity.AdminPrivilege"}
+    ]
+  },
+  {
+    "name": "anonymous escalates to admin (IDN-002)",
+    "expect": ["VYQL-IDN-002"],
+    "nodes": [
+      {"id": "anon", "type": "identity.User", "props": {"loc": "anonymous"}},
+      {"id": "admin", "type": "identity.Role", "props": {"priv_level": "ADMIN"}}
+    ],
+    "edges": [{"type": "STEP", "src": "anon", "dst": "admin", "props": {"ability": "iam:PassRole"}}],
+    "labels": [
+      {"node": "anon", "concept": "identity.Anonymous"},
+      {"node": "admin", "concept": "identity.AdminPrivilege"}
+    ]
+  },
+  {
+    "name": "CI principal escalates to super-admin (IDN-003)",
+    "expect": ["VYQL-IDN-003"],
+    "nodes": [
+      {"id": "ci", "type": "identity.Role", "props": {"loc": "ci-runner"}},
+      {"id": "sadmin", "type": "identity.Role", "props": {"priv_level": "SUPERADMIN"}}
+    ],
+    "edges": [{"type": "STEP", "src": "ci", "dst": "sadmin", "props": {"ability": "iam:PutRolePolicy"}}],
+    "labels": [
+      {"node": "ci", "concept": "identity.CiPrincipal"},
+      {"node": "sadmin", "concept": "identity.SuperAdminPrivilege"}
+    ]
+  },
+  {
+    "name": "internet-reachable workload that can escalate to admin (IDN-004 toxic combo)",
+    "expect": ["VYQL-IDN-004"],
+    "nodes": [
+      {"id": "internet", "type": "cloud.Internet", "props": {"loc": "0.0.0.0/0"}},
+      {"id": "pod", "type": "cloud.Container", "props": {"loc": "pod/orders"}},
+      {"id": "wid", "type": "identity.ServiceAccount", "props": {"loc": "sa/orders", "workload": "pod"}},
+      {"id": "admin", "type": "identity.Role", "props": {"priv_level": "ADMIN"}}
+    ],
+    "edges": [
+      {"type": "NET", "src": "internet", "dst": "pod", "props": {"rule": "sg-pub:8080", "proto": "tcp", "port": "8080"}},
+      {"type": "STEP", "src": "wid", "dst": "admin", "props": {"ability": "create-pod+mount-sa-token"}}
+    ],
+    "labels": [
+      {"node": "internet", "concept": "cloud.Internet"},
+      {"node": "wid", "concept": "identity.WorkloadIdentity"},
+      {"node": "admin", "concept": "identity.AdminPrivilege"}
+    ]
+  }
+]

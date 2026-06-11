@@ -67,13 +67,10 @@ func ruleIDs(files map[string]string) map[string]string { // id -> file
 // As specs are added, allowlisted ids that gain coverage must be REMOVED (asserted below).
 func TestRuleFiresCoverageGate(t *testing.T) {
 	unspecced := map[string]bool{
-		// graph/solver rules covered via the graph-fixture harness (T0.6) as fixtures land:
-		"VYQL-BIZ-001": true, "VYQL-BIZ-002": true,
-		"VYQL-IDN-001": true, "VYQL-IDN-002": true, "VYQL-IDN-003": true, "VYQL-IDN-004": true,
-		"VYQL-RTM-001": true, "VYQL-RTM-002": true, "VYQL-RTM-003": true,
-		"VYQL-SCA-001": true, "VYQL-SCA-002": true,
 		// RF-003 (CSRF): StateChangingOp + CsrfProtection — needs a state-change/CSRF
-		// model; tracked separately, kept here until that lands.
+		// model (identify state-changing handlers + CSRF guards), not adapter-expressible
+		// as a plain taint sink. Documented-deferred (engine-gap-closure.md); kept here
+		// until that lands. This is the ONLY remaining un-specced rule.
 		"VYQL-RF-003": true,
 	}
 
