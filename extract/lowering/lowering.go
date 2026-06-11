@@ -1168,6 +1168,14 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		if f := l.funcQual[l.curModule+"::"+nm]; f != nil {
 			return []*funcInfo{f}
 		}
+		// a bare call inside a class resolves to the enclosing class's own method (e.g. a
+		// `private static String doSomething(...)` called as `doSomething(...)`). Without this
+		// the call is unresolved and the conservative arg→result edge over-taints the result.
+		if l.curClass != "" {
+			if f := l.funcQual[l.curModule+"::"+l.curClass+"."+nm]; f != nil {
+				return []*funcInfo{f}
+			}
+		}
 		infos := l.funcShort[nm]
 		if len(infos) == 1 { // guarded fallback
 			return infos
