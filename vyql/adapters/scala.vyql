@@ -50,4 +50,8 @@ adapter scala {
 
   // XSS — Play Twirl Html(...) emits unescaped markup.
   sink path "Html" -> code.HtmlRender
+
+  // sanitizer — Apache Commons Text HTML escaping.
+  control "escapeHtml4" -> core.HtmlEscape
+  control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
 }

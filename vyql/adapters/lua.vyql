@@ -41,4 +41,7 @@ adapter lua {
   // weak hash — OpenResty ngx.md5 / ngx.sha1_bin.
   mark "ngx.md5" -> code.WeakHash
   mark "ngx.sha1_bin" -> code.WeakHash
+
+  // sanitizer — OpenResty SQL quoting.
+  control "ngx.quote_sql_str" -> core.SqlParameterization
 }
