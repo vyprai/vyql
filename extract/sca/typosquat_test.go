@@ -34,7 +34,7 @@ func TestAnalyzeReputation(t *testing.T) {
 		{"flesk", "1.0.0"},     // typosquat of flask -> suspicious
 		{"my-internal", "1.0"}, // unknown, no malware history, no near match -> clean
 	}
-	if err := BuildSBOM(g, deps, nil); err != nil {
+	if err := BuildSBOM(g, "pypi", deps, ""); err != nil {
 		t.Fatal(err)
 	}
 	vuln, mal, susp, err := Analyze(g, "pypi")
@@ -69,7 +69,7 @@ func TestAnalyzeReputation(t *testing.T) {
 func TestFlagTyposquatsStandalone(t *testing.T) {
 	fixtures(t)
 	g := usg.NewInMemStore()
-	_ = BuildSBOM(g, []Dep{{"requests", "9.9"}, {"flesk", "1.0"}, {"numpyy", "1.0"}}, nil)
+	_ = BuildSBOM(g, "pypi", []Dep{{"requests", "9.9"}, {"flesk", "1.0"}, {"numpyy", "1.0"}}, "")
 	n, err := FlagTyposquats(g, "pypi")
 	if err != nil {
 		t.Fatal(err)

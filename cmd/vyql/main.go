@@ -120,6 +120,9 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	if _, _, err := adapters.Apply(g, ads, nil); err != nil {
 		return nil, stats, err
 	}
+	// dependency/SBOM pass — add package nodes + reputation labels to the same graph so
+	// the SCA rules (SCA-001..004) evaluate alongside the SAST rules.
+	applySCA(g, paths)
 	onto := ontology.Seed()
 	decls, err := parser.Parse(rulesSrc)
 	if err != nil {

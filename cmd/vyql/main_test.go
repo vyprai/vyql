@@ -121,3 +121,38 @@ func TestLoadRulesDefault(t *testing.T) {
 		t.Fatalf("default rules should load from vyql/packs, got %q err=%v", src, err)
 	}
 }
+
+// SCA is wired into the live scan: a project with a dependency manifest produces
+// reputation findings (malicious / vulnerable) from the shipped JSON data, alongside
+// SAST findings, evaluated against the same graph.
+func TestScanPathsWiresSCA(t *testing.T) {
+	dir := t.TempDir()
+	// a source file so the scan has SAST content too, plus a pypi manifest.
+	os.WriteFile(filepath.Join(dir, "app.py"), []byte("import flask\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "requirements.txt"),
+		[]byte("flask==0.12.2\ncolourama==0.1\nrequests==2.31.0\n"), 0o644)
+
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	byRule := map[string]int{}
+	for _, f := range fs {
+		byRule[f.RuleID]++
+	}
+	if byRule["VYQL-SCA-004"] == 0 {
+		t.Errorf("expected a MaliciousDependency finding for colourama, got %v", byRule)
+	}
+	if byRule["VYQL-SCA-001"] == 0 {
+		t.Errorf("expected a VulnerableDependency finding for flask@0.12.2, got %v", byRule)
+	}
+	// the trusted version of requests must NOT add a reputation finding.
+	for _, f := range fs {
+		for _, b := range f.Bindings {
+			if strings.Contains(b.Loc, "requests") {
+				t.Errorf("trusted requests should not be flagged: %s @ %s", f.RuleID, b.Loc)
+			}
+		}
+	}
+}

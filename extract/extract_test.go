@@ -195,7 +195,10 @@ func TestReachabilityGatedSCA(t *testing.T) {
 		{Name: "requests", Version: "2.19.0"}: "CVE-2018-18074",
 		{Name: "leftpad", Version: "1.0.0"}:   "GHSA-leftpad-xxxx",
 	}
-	if err := sca.BuildSBOM(g, deps, advisories); err != nil {
+	if err := sca.BuildSBOM(g, "pypi", deps, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := sca.MarkVulnerable(g, advisories); err != nil {
 		t.Fatal(err)
 	}
 	if err := sca.LinkReachability(g); err != nil {
@@ -261,7 +264,10 @@ func TestVulnerableEntrypointExploitabilityFunnel(t *testing.T) {
 	if _, _, err := adapters.Apply(g, frontend.PythonAdapters(), nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := sca.BuildSBOM(g, []sca.Dep{{Name: "pyyaml", Version: "3.12"}},
+	if err := sca.BuildSBOM(g, "pypi", []sca.Dep{{Name: "pyyaml", Version: "3.12"}}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := sca.MarkVulnerable(g,
 		map[sca.PkgKey]string{{Name: "pyyaml", Version: "3.12"}: "CVE-2017-18342"}); err != nil {
 		t.Fatal(err)
 	}

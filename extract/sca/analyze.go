@@ -27,6 +27,10 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 		if nd.Type != "sbom.PackageVersion" {
 			continue
 		}
+		// process only this ecosystem's nodes (a project may have both pypi and npm).
+		if e := nd.Prop("eco"); e != "" && e != eco {
+			continue
+		}
 		name, version := nd.Prop("name"), nd.Prop("version")
 		if name == "" {
 			continue

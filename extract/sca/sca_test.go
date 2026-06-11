@@ -37,7 +37,10 @@ func TestBuildSBOMAdvisoryMatch(t *testing.T) {
 		{"lodash", "4.17.4"}:  "CVE-2019-10744", // vulnerable
 		{"lodash", "4.17.21"}: "",               // patched version not present
 	}
-	if err := BuildSBOM(g, deps, advisories); err != nil {
+	if err := BuildSBOM(g, "npm", deps, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := MarkVulnerable(g, advisories); err != nil {
 		t.Fatal(err)
 	}
 	vuln := hasConcept(t, g, "sbom.VulnerableDependency")
@@ -57,7 +60,10 @@ func TestBuildSBOMPatchedIsClean(t *testing.T) {
 	// same package, PATCHED version → not in the advisory map → no finding.
 	deps := []Dep{{"lodash", "4.17.21"}}
 	advisories := map[PkgKey]string{{"lodash", "4.17.4"}: "CVE-2019-10744"}
-	if err := BuildSBOM(g, deps, advisories); err != nil {
+	if err := BuildSBOM(g, "npm", deps, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := MarkVulnerable(g, advisories); err != nil {
 		t.Fatal(err)
 	}
 	if v := hasConcept(t, g, "sbom.VulnerableDependency"); len(v) != 0 {
@@ -68,7 +74,7 @@ func TestBuildSBOMPatchedIsClean(t *testing.T) {
 func TestLinkReachability(t *testing.T) {
 	g := usg.NewInMemStore()
 	// two packages; only `requests` is actually called.
-	_ = BuildSBOM(g, []Dep{{"requests", "2.0.0"}, {"unused", "1.0.0"}}, nil)
+	_ = BuildSBOM(g, "pypi", []Dep{{"requests", "2.0.0"}, {"unused", "1.0.0"}}, "")
 	// a call site rooted at the requests package.
 	_ = g.AddNode(usg.Node{ID: "c1", Type: "code.Call", Props: map[string]string{"callee_path": "requests.get", "loc": "a.py:1"}})
 

@@ -8,6 +8,7 @@
 package sca
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/vyprai/vyql/usg"
@@ -48,20 +49,75 @@ func ParseRequirements(content string) []Dep {
 	return out
 }
 
-// BuildSBOM adds sbom.PackageVersion nodes and labels VulnerableDependency per
-// the advisories map ((name,version) -> advisory id, e.g. a CVE).
-func BuildSBOM(g usg.Store, deps []Dep, advisories map[PkgKey]string) error {
-	for _, d := range deps {
-		nid := "pkg:pypi/" + d.Name + "@" + d.Version
-		if err := g.AddNode(usg.Node{ID: nid, Type: "sbom.PackageVersion",
-			Props: map[string]string{"loc": "requirements.txt:" + d.Name, "name": d.Name, "version": d.Version}}); err != nil {
-			return err
+// ParsePackageJSON reads an npm package.json's dependencies + devDependencies into
+// Deps, normalizing the version range ("^4.17.4" -> "4.17.4") for exact matching.
+func ParsePackageJSON(content string) []Dep {
+	var pkg struct {
+		Dependencies    map[string]string `json:"dependencies"`
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if json.Unmarshal([]byte(content), &pkg) != nil {
+		return nil
+	}
+	var out []Dep
+	for _, m := range []map[string]string{pkg.Dependencies, pkg.DevDependencies} {
+		for name, ver := range m {
+			out = append(out, Dep{name, normalizeVersion(ver)})
 		}
-		if adv := advisories[PkgKey{d.Name, d.Version}]; adv != "" {
-			if err := g.AddLabel(nid, usg.Label{Concept: "sbom.VulnerableDependency",
+	}
+	return out
+}
+
+// normalizeVersion strips an npm/semver range prefix (^ ~ >= <= > < =, whitespace) to a
+// bare version for exact advisory/malware/trusted matching; "*"/"" /"latest" -> "*".
+func normalizeVersion(v string) string {
+	v = strings.TrimSpace(v)
+	v = strings.TrimLeft(v, "^~>=< v")
+	if v == "" || v == "*" || strings.EqualFold(v, "latest") || strings.Contains(v, "*") {
+		return "*"
+	}
+	// take the first token of a range like "1.2.0 - 2.0.0" / "1.2 || 1.3".
+	if i := strings.IndexAny(v, " |,"); i >= 0 {
+		v = v[:i]
+	}
+	return v
+}
+
+// MarkVulnerable labels sbom.PackageVersion nodes that match the explicit advisories map
+// ((name,version)->advisory id) as sbom.VulnerableDependency. Used where advisories come
+// from an explicit set rather than the loaded JSON feed (the entrypoint projector, tests).
+func MarkVulnerable(g usg.Store, advisories map[PkgKey]string) error {
+	nodes, err := g.AllNodes()
+	if err != nil {
+		return err
+	}
+	for _, n := range nodes {
+		if n.Type != "sbom.PackageVersion" {
+			continue
+		}
+		if adv := advisories[PkgKey{n.Prop("name"), n.Prop("version")}]; adv != "" {
+			if err := g.AddLabel(n.ID, usg.Label{Concept: "sbom.VulnerableDependency",
 				Provenance: usg.Provenance{Adapter: "sbom.osv"}, Detail: map[string]string{"advisory": adv}}); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+// BuildSBOM adds one sbom.PackageVersion node per dependency, tagged with its
+// ecosystem ("pypi"/"npm"/…). Reputation labeling (vulnerable/malicious/suspicious) is
+// done separately by Analyze, which joins these nodes against the loaded reference data.
+func BuildSBOM(g usg.Store, eco string, deps []Dep, manifest string) error {
+	if manifest == "" {
+		manifest = eco + "-manifest"
+	}
+	for _, d := range deps {
+		nid := "pkg:" + eco + "/" + d.Name + "@" + d.Version
+		if err := g.AddNode(usg.Node{ID: nid, Type: "sbom.PackageVersion",
+			Props: map[string]string{"loc": manifest + ":" + d.Name, "name": d.Name,
+				"version": d.Version, "eco": eco}}); err != nil {
+			return err
 		}
 	}
 	return nil
