@@ -203,8 +203,10 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "identifier", "this", "super":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "decimal_integer_literal", "hex_integer_literal", "decimal_floating_point_literal",
-		"true", "false", "null_literal", "character_literal":
+		"null_literal", "character_literal":
 		return nir.Const{Loc: L}
+	case "true", "false":
+		return nir.Const{Loc: L, Value: c.text(n)} // boolean value for `val` matching
 	case "string_literal":
 		// pick up interpolation in text blocks if any; otherwise constant
 		return nir.Const{Loc: L, Value: c.text(n)}

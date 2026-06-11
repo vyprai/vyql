@@ -146,4 +146,9 @@ adapter ruby {
   mark "Digest.SHA1" -> code.WeakHash
   mark "OpenSSL.Digest.MD5" -> code.WeakHash
   mark "OpenSSL.Digest.SHA1" -> code.WeakHash
+
+  // JWT signature not verified (CWE-347) — JWT.decode(token, nil, false) / algorithm "none"
+  mark "JWT.decode" val "false" -> code.JwtUnverified
+  mark "JWT.decode" val "algorithm=none" -> code.JwtUnverified
+  mark "JWT.encode" val "algorithm=none" -> code.JwtUnverified
 }

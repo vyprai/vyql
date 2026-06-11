@@ -358,7 +358,11 @@ func nirKind(e nir.Expr) string {
 	case nir.Seq:
 		return "Seq"
 	case nir.Pair:
-		return nirKind(ex.Value)
+		// A keyword/hash/struct entry is a collection-shaped arg, like Seq — sinks must
+		// treat it as a safe parameterized condition (e.g. Rails where(id: params[:id])),
+		// NOT a raw value. Value-matching still sees it via str_args, and taint still
+		// flows through eval(Pair)->eval(Value); only arg-slot sink selection is affected.
+		return "Seq"
 	case nir.Const:
 		return "Const"
 	case nir.Call:

@@ -160,8 +160,10 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "constant", "instance_variable", "global_variable":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer", "float", "true", "false", "nil", "simple_symbol", "hash_key_symbol":
+	case "integer", "float", "nil", "simple_symbol", "hash_key_symbol":
 		return nir.Const{Loc: L}
+	case "true", "false":
+		return nir.Const{Loc: L, Value: c.text(n)} // boolean value for `val` matching
 	case "string":
 		return c.string(n, L)
 	case "call", "method_call", "command", "command_call":
@@ -184,10 +186,13 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "pair" {
-				parts = append(parts, c.expr(field(ch, "value")))
+				parts = append(parts, nir.Pair{Key: c.keyName(field(ch, "key")), Value: c.expr(field(ch, "value")), Loc: L})
 			}
 		}
 		return nir.Seq{Parts: parts, Loc: L}
+	case "pair":
+		// a keyword argument (foo(k: v)) appearing directly in an argument_list
+		return nir.Pair{Key: c.keyName(field(n, "key")), Value: c.expr(field(n, "value")), Loc: L}
 	case "scope_resolution":
 		// A::B → treat as a Name on the dotted path
 		return nir.Name{ID: c.dotted(n), Loc: L}
@@ -197,6 +202,26 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// keyName returns the bare name of a hash/keyword key — a symbol (verify:, :verify)
+// with its colon stripped, or a string key with quotes stripped.
+func (c *rbConv) keyName(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	t := c.text(n)
+	switch n.Kind() {
+	case "hash_key_symbol":
+		return t // already bare, e.g. "verify"
+	case "simple_symbol":
+		return strings.TrimPrefix(t, ":")
+	case "string":
+		if len(t) >= 2 {
+			return t[1 : len(t)-1]
+		}
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(t, ":"), ":")
 }
 
 func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {

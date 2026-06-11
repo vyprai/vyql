@@ -210,8 +210,10 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "variable_name", "name":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer", "float", "boolean", "null", "shell_command_expression":
+	case "integer", "float", "null", "shell_command_expression":
 		return nir.Const{Loc: L}
+	case "boolean":
+		return nir.Const{Loc: L, Value: c.text(n)} // true/false value for `val` matching
 	case "string":
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "encapsed_string", "heredoc", "string_value":
@@ -272,8 +274,12 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "array_element_initializer" {
-				if k := namedChildren(ch); len(k) > 0 {
-					parts = append(parts, c.expr(k[len(k)-1]))
+				k := namedChildren(ch)
+				switch {
+				case len(k) >= 2: // key => value (named-value matching)
+					parts = append(parts, nir.Pair{Key: c.keyName(k[0]), Value: c.expr(k[len(k)-1]), Loc: L})
+				case len(k) == 1:
+					parts = append(parts, c.expr(k[0]))
 				}
 			}
 		}
@@ -286,6 +292,19 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// keyName returns the bare name of an array key — a string literal with quotes
+// stripped (e.g. 'httponly'), or a constant/name as-is (e.g. CURLOPT_SSL_VERIFYPEER).
+func (c *phConv) keyName(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	t := c.text(n)
+	if (n.Kind() == "string" || n.Kind() == "encapsed_string") && len(t) >= 2 {
+		t = t[1 : len(t)-1]
+	}
+	return t
 }
 
 func (c *phConv) dotted(n *tree_sitter.Node) string {

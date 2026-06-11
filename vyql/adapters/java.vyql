@@ -117,4 +117,8 @@ adapter java {
   // permissive CORS (CWE-942) — setHeader("Access-Control-Allow-Origin", "*")
   mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "addHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+
+  // insecure cookie (CWE-614) — a flag EXPLICITLY disabled: cookie.setHttpOnly(false)
+  mark "setHttpOnly" val "false" -> code.InsecureCookie
+  mark "setSecure" val "false" -> code.InsecureCookie
 }

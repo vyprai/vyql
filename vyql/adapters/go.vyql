@@ -110,4 +110,8 @@ adapter go {
   // permissive CORS (CWE-942) — w.Header().Set("Access-Control-Allow-Origin", "*")
   mark "Header.Set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "Header.Add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+
+  // insecure cookie (CWE-614) — http.Cookie{HttpOnly: false} / {Secure: false} explicit
+  mark "http.Cookie" val "HttpOnly=false" -> code.InsecureCookie
+  mark "http.Cookie" val "Secure=false" -> code.InsecureCookie
 }

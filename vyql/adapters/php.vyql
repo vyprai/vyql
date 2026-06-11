@@ -105,4 +105,16 @@ adapter php {
   mark "hash" val "md5" -> code.WeakHash
   mark "hash" val "sha1" -> code.WeakHash
   mark "hash_hmac" val "md5" -> code.WeakHash
+
+  // insecure cookie (CWE-614) — setcookie options array EXPLICITLY disabling a flag
+  mark "setcookie" val "httponly=false" -> code.InsecureCookie
+  mark "setcookie" val "secure=false" -> code.InsecureCookie
+  mark "setrawcookie" val "httponly=false" -> code.InsecureCookie
+
+  // JWT signature not verified (CWE-347) — firebase/php-jwt decode allowing alg "none"
+  mark "JWT.decode" val "none" -> code.JwtUnverified
+
+  // TLS cert validation disabled (CWE-295) — curl_setopt_array([CURLOPT_SSL_VERIFYPEER => false])
+  mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYPEER=false" -> code.CertValidationDisabled
+  mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYHOST=0" -> code.CertValidationDisabled
 }
