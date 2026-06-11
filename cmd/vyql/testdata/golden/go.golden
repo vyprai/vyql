@@ -1,0 +1,4 @@
+attr r.URL
+call db.Query
+call r.URL.Query
+call r.URL.Query.Get

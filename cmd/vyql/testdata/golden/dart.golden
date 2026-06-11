@@ -1,0 +1,3 @@
+attr Platform.environment
+attr Platform.environment.
+call db.rawQuery

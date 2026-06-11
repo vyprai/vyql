@@ -1,0 +1,3 @@
+attr request.args
+call cursor.execute
+call request.args.get

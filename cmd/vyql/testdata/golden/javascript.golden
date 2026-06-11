@@ -1,0 +1,3 @@
+attr req.query
+attr req.query.q
+call db.query
