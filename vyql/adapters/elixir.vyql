@@ -1,0 +1,43 @@
+// elixir framework adapter (docs/07) — framework→concept content.
+// frameworks: phoenix, plug, ecto. Module calls normalize to dotted paths
+// (System.cmd); Phoenix actions `def a(conn, params)` seed params as http_input.
+adapter elixir {
+  meta { fidelity: resolved }
+
+  // request input — seeded action params + explicit Plug.Conn accessors
+  source "http_input" -> code.HttpInput
+  source "conn.params" -> code.HttpInput
+  source "conn.body_params" -> code.HttpInput
+  source "conn.query_params" -> code.HttpInput
+  source "conn.path_params" -> code.HttpInput
+  source "conn.cookies" -> code.HttpInput
+  source "conn.req_headers" -> code.HttpInput
+
+  // command execution
+  sink path "System.cmd" -> code.CommandExecution
+  sink path "System.shell" -> code.CommandExecution
+  sink path "os.cmd" -> code.CommandExecution
+  sink method "cmd" -> code.CommandExecution
+
+  // SQL — Ecto raw query / fragment (SQL.query takes Repo as arg0, query as arg1)
+  sink path "Ecto.Adapters.SQL.query" arg 1 -> code.SqlExecution
+  sink path "Ecto.Adapters.SQL.query!" arg 1 -> code.SqlExecution
+  sink method "query" -> code.SqlExecution
+  sink method "query!" -> code.SqlExecution
+  sink method "fragment" -> code.SqlExecution
+
+  // code evaluation / dynamic (CWE-95) + deserialization (CWE-502)
+  sink path "Code.eval_string" -> code.CodeEval
+  sink path "Code.eval_quoted" -> code.CodeEval
+  sink path "Code.compile_string" -> code.CodeEval
+  sink path "erlang.binary_to_term" -> code.Deserialization
+  sink path ":erlang.binary_to_term" -> code.Deserialization
+
+  // path / file
+  sink path "File.read" -> code.FilePathAccess
+  sink path "File.read!" -> code.FilePathAccess
+  sink path "File.write" -> code.FilePathAccess
+  sink path "File.open" -> code.FilePathAccess
+  sink path "File.rm" -> code.FilePathAccess
+  sink path "File.stream!" -> code.FilePathAccess
+}

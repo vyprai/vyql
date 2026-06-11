@@ -44,6 +44,7 @@ var languages = []language{
 	{"perl", map[string]bool{".pl": true, ".pm": true, ".cgi": true}, treesitter.ExtractPerl, frontend.PerlAdapters},
 	{"solidity", map[string]bool{".sol": true}, treesitter.ExtractSolidity, frontend.SolidityAdapters},
 	{"objc", map[string]bool{".m": true}, treesitter.ExtractObjC, frontend.ObjCAdapters},
+	{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, frontend.ElixirAdapters},
 	// mobile config files (AndroidManifest.xml / Info.plist) — a non-tree-sitter
 	// frontend; non-manifest XML yields no nodes so other repos are unaffected.
 	{"config", map[string]bool{".xml": true, ".plist": true}, cfgfront.Extract, frontend.ConfigAdapters},
