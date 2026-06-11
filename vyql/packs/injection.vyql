@@ -26,6 +26,16 @@ rule Xss {
   unless sanitized_by core.HtmlEscape
 }
 
+// Stored / second-order XSS — data read back from the database (assumed attacker-
+// influenced) rendered WITHOUT escaping (Markup/mark_safe/html_safe/raw). Auto-escaped
+// renders (render_template / Jinja default) are not sinks, so they don't fire. Medium
+// severity: the DB source is an over-approximation (store-then-read isn't flow-tracked).
+rule StoredXss {
+  meta { id: "VYQL-INJ-018", severity: medium, cwe: [CWE_79] }
+  taint code.DatabaseRead -> code.HtmlRender
+  unless sanitized_by core.HtmlEscape
+}
+
 rule Ldap {
   meta { id: "VYQL-INJ-005", severity: high, cwe: [CWE_90] }
   taint core.UserControlledData -> code.LdapQuery

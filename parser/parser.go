@@ -437,9 +437,14 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 		switch {
 		case p.atWord("source"):
 			p.next()
+			kind := "source"
+			if p.atWord("method") { // receiver-agnostic source: match the call method name
+				p.next()
+				kind = "source_method"
+			}
 			pat := p.parsePattern()
 			p.expect(tArrow, "->")
-			a.Mappings = append(a.Mappings, AdapterMapping{Kind: "source", Pattern: pat, Concept: p.parseQName()})
+			a.Mappings = append(a.Mappings, AdapterMapping{Kind: kind, Pattern: pat, Concept: p.parseQName()})
 		case p.atWord("sink"):
 			p.next()
 			kind := "sink_path"

@@ -1,0 +1,36 @@
+# A5 — stored / second-order XSS (CWE-79, VYQL-INJ-018). Data read back from the database
+# (DatabaseRead source) rendered WITHOUT escaping is a finding; auto-escaped renders
+# (render_template / Jinja default) are not sinks, so they're clean.
+
+test "stored-xss: DB read rendered via Markup is flagged (python)"
+  lang python
+  expect VYQL-INJ-018
+  code
+  ```
+  from markupsafe import Markup
+  def view(cursor):
+      rows = cursor.execute("SELECT bio FROM users").fetchall()
+      return Markup(rows[0])
+  ```
+
+test "stored-xss: DB read auto-escaped via render_template is clean (python)"
+  lang python
+  reject VYQL-INJ-018
+  code
+  ```
+  from flask import render_template
+  def view(cursor):
+      rows = cursor.execute("SELECT * FROM posts").fetchall()
+      return render_template("posts.html", posts=rows)
+  ```
+
+test "stored-xss: AR read rendered via raw is flagged (ruby)"
+  lang ruby
+  expect VYQL-INJ-018
+  code
+  ```
+  def show
+    bio = User.find_by(id: 1).bio
+    render html: raw(bio)
+  end
+  ```

@@ -18,7 +18,8 @@ import (
 type inputSpec struct {
 	Concept string
 	Paths   []string
-	Match   string // "prefix" (default) | "contains"
+	Methods []string // receiver-agnostic: match the call's `method` prop (last segment)
+	Match   string   // "prefix" (default) | "contains"
 }
 
 type sinkSpec struct {
@@ -145,6 +146,14 @@ func loadSpec(tech string) adapterSpec {
 				srcByConcept[mp.Concept] = i
 			}
 			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
+		case "source_method":
+			i, ok := srcByConcept[mp.Concept]
+			if !ok {
+				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode})
+				i = len(s.Inputs) - 1
+				srcByConcept[mp.Concept] = i
+			}
+			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
 		case "sink_method":
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "sink_path":
@@ -176,15 +185,16 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 			nodes, _ := s.AllNodes()
 			var out []adapters.Mapping
 			for _, n := range nodes {
-				path := n.Prop("callee_path")
-				if path == "" {
+				path, method := n.Prop("callee_path"), n.Prop("method")
+				if path == "" && method == "" {
 					continue
 				}
 				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
 					continue // only label this language's nodes
 				}
 				for _, in := range spec.Inputs {
-					if matchPath(path, in.Paths, in.Match) {
+					if (path != "" && matchPath(path, in.Paths, in.Match)) ||
+						(method != "" && containsStr(in.Methods, method)) {
 						// trust-boundary gating: an active profile restricts which
 						// source families count as attacker-controlled.
 						if activeSources == nil || activeSources[in.Concept] {
@@ -443,3 +453,13 @@ func SwiftAdapters() []adapters.Adapter  { return AdaptersFor("swift") }
 func PerlAdapters() []adapters.Adapter    { return AdaptersFor("perl") }
 func SolidityAdapters() []adapters.Adapter { return AdaptersFor("solidity") }
 func ObjCAdapters() []adapters.Adapter    { return AdaptersFor("objc") }
+
+// containsStr reports whether xs contains v.
+func containsStr(xs []string, v string) bool {
+	for _, x := range xs {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}

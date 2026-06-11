@@ -20,6 +20,13 @@ adapter ruby {
   source "request.path_parameters" -> code.HttpInput
   source "request.raw_post" -> code.HttpInput
   source "request.query_string" -> code.HttpInput
+
+  // stored / second-order data — ActiveRecord reads (CWE-79 stored XSS when rendered
+  // via raw/html_safe). AR-specific finders only (bare .find/.first hit Array too).
+  source method "find_by" -> code.DatabaseRead
+  source method "find_by_sql" -> code.DatabaseRead
+  source method "where" -> code.DatabaseRead
+  source method "pluck" -> code.DatabaseRead
   source "ENV" -> code.SecretValue
   source "Rails.application.secrets" -> code.SecretValue
   source "credentials" -> code.SecretValue

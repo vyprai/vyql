@@ -64,6 +64,13 @@ adapter python {
   source "config.get" -> code.SecretValue
   source "settings.SECRET_KEY" -> code.SecretValue
 
+  // stored / second-order data — DB cursor reads (CWE-79 stored XSS when later rendered
+  // unescaped). Only unambiguous cursor fetch methods are marked (bare .get/.all/.first
+  // are too common on dicts/lists to mark without heavy FP).
+  source method "fetchall" -> code.DatabaseRead
+  source method "fetchone" -> code.DatabaseRead
+  source method "fetchmany" -> code.DatabaseRead
+
   sink method "execute" -> code.SqlExecution
   sink method "executemany" -> code.SqlExecution
   sink method "executescript" -> code.SqlExecution
