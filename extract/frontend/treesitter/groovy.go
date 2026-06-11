@@ -103,15 +103,15 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 	case "closure", "block":
 		return c.block(n)
-	// branch-structured (B1); Cond nil (Groovy did not evaluate the predicate) -> byte-identical.
+	// branch-structured with predicate attached so constant-false arms are pruned.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectGvBlocks(n)}}
+		return []nir.Stmt{c.gvIf(n)}
 	case "for_statement", "while_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectGvBlocks(n)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectGvBlocks(n)}}
 	case "switch_statement":
-		return []nir.Stmt{nir.Block{Stmts: c.collectGvBlocks(n)}}
+		return []nir.Stmt{c.gvSwitch(n)}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 }
@@ -128,6 +128,88 @@ func (c *gvConv) block(n *tree_sitter.Node) []nir.Stmt {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
+}
+
+// gvOp returns a binary/unary operator symbol (first non-named child token).
+func (c *gvConv) gvOp(n *tree_sitter.Node) string {
+	for i := uint(0); i < n.ChildCount(); i++ {
+		if ch := n.Child(i); !ch.IsNamed() {
+			return c.text(ch)
+		}
+	}
+	return "?"
+}
+
+// gvStmts lowers a closure/block body, or a single statement (e.g. `else if`).
+func (c *gvConv) gvStmts(n *tree_sitter.Node) []nir.Stmt {
+	if n == nil {
+		return nil
+	}
+	if k := n.Kind(); k == "closure" || k == "block" {
+		return c.block(n)
+	}
+	return c.stmt(n)
+}
+
+// gvIf lowers an if with its predicate attached so a constant-false arm is pruned.
+func (c *gvConv) gvIf(n *tree_sitter.Node) nir.Stmt {
+	it := nir.If{Loc: c.loc(n)}
+	if cond := field(n, "condition"); cond != nil {
+		it.Cond = c.expr(cond)
+	}
+	it.Then = c.gvStmts(field(n, "body"))
+	if eb := field(n, "else_body"); eb != nil {
+		it.Else = c.gvStmts(eb)
+	}
+	return it
+}
+
+// gvSwitch lowers a switch to subject+labelled branches so dead arms are pruned
+// (and so case bodies are no longer dropped — closing a latent FN).
+func (c *gvConv) gvSwitch(n *tree_sitter.Node) nir.Stmt {
+	sw := nir.Switch{Loc: c.loc(n)}
+	if v := field(n, "value"); v != nil {
+		sw.Subject = c.expr(v)
+	}
+	body := field(n, "body")
+	if body == nil {
+		return sw
+	}
+	for _, cs := range namedChildren(body) {
+		if cs.Kind() != "case" {
+			continue
+		}
+		var labelExpr nir.Expr
+		var stmts []nir.Stmt
+		seenColon, isDefault := false, false
+		for i := uint(0); i < cs.ChildCount(); i++ {
+			ch := cs.Child(i)
+			if !ch.IsNamed() {
+				switch c.text(ch) {
+				case ":":
+					seenColon = true
+				case "default":
+					isDefault = true
+				}
+				continue
+			}
+			if !seenColon {
+				labelExpr = c.expr(ch) // the case label, before the colon
+				continue
+			}
+			if k := ch.Kind(); k == "break" || k == "continue" {
+				continue
+			}
+			stmts = append(stmts, c.stmt(ch)...)
+		}
+		if isDefault || labelExpr == nil {
+			sw.Default = append(sw.Default, stmts...)
+		} else {
+			sw.Cases = append(sw.Cases, stmts)
+			sw.Labels = append(sw.Labels, []nir.Expr{labelExpr})
+		}
+	}
+	return sw
 }
 
 func (c *gvConv) collectGvBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -155,8 +237,8 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "integer", "decimal", "float", "boolean", "null":
-		return nir.Const{Loc: L}
+	case "number_literal", "integer", "decimal", "float", "boolean", "null":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string", "gstring":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
@@ -180,20 +262,40 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Name{ID: c.dotted(n), Loc: L}
 	case "binary_op":
-		// `+` (and GString building) propagate taint; model any binary as a union.
+		kids := namedChildren(n)
+		if len(kids) == 2 {
+			op := c.gvOp(n)
+			if op == "+" {
+				// `+` (string concat / GString building / numeric add) — taint-propagating union.
+				return nir.Format{Parts: []nir.Expr{c.expr(kids[0]), c.expr(kids[1])}, Loc: L}
+			}
+			return nir.BinOp{Op: op, Left: c.expr(kids[0]), Right: c.expr(kids[1]), Loc: L}
+		}
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range kids {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Format{Parts: parts, Loc: L}
 	case "index", "subscript":
 		kids := namedChildren(n)
 		var base nir.Expr = nir.Const{Loc: L}
+		var key nir.Expr
 		if len(kids) > 0 {
 			base = c.expr(kids[0])
 		}
-		return nir.Index{Base: base, Path: c.dotted(n), Loc: L}
-	case "parenthesized_expression", "ternary_op", "unary_op":
+		if len(kids) > 1 {
+			key = c.expr(kids[1])
+		}
+		return nir.Index{Base: base, Key: key, Path: c.dotted(n), Loc: L}
+	case "ternary_op":
+		return nir.Ternary{Cond: c.expr(field(n, "condition")),
+			Then: c.expr(field(n, "then")), Else: c.expr(field(n, "else")), Loc: L}
+	case "unary_op":
+		if k := namedChildren(n); len(k) > 0 {
+			return nir.Unary{Op: c.gvOp(n), Operand: c.expr(k[len(k)-1]), Loc: L}
+		}
+		return nir.Const{Loc: L}
+	case "parenthesized_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
