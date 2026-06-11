@@ -141,9 +141,9 @@ func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: val}}
 	case "command":
 		return []nir.Stmt{nir.ExprStmt{Value: c.command(n)}}
-	// branch-structured (B1); Cond nil (PowerShell did not evaluate the predicate) -> byte-identical.
+	// branch-structured with predicate attached so constant-false arms are pruned.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		return []nir.Stmt{c.psIf(n)}
 	case "while_statement", "for_statement", "foreach_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement":
@@ -159,6 +159,72 @@ func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+// psCmpMap maps PowerShell word-operators to C-style symbols const-eval understands.
+var psCmpMap = map[string]string{
+	"-gt": ">", "-lt": "<", "-ge": ">=", "-le": "<=", "-eq": "==", "-ne": "!=",
+	"-and": "&&", "-or": "||",
+}
+
+// psCmpToken finds the operator of a comparison/logical node (a word-op token or a
+// C-style symbol), normalising `-gt`→`>` etc.
+func (c *psConv) psCmpToken(n *tree_sitter.Node) string {
+	for i := uint(0); i < n.ChildCount(); i++ {
+		t := strings.ToLower(c.text(n.Child(i)))
+		if m, ok := psCmpMap[t]; ok {
+			return m
+		}
+		switch t {
+		case ">", "<", ">=", "<=", "==", "!=", "&&", "||":
+			return t
+		}
+	}
+	return "?"
+}
+
+// psIf lowers an if with its predicate so a constant-false arm is pruned, recursing into
+// the then/else statement_block (which collectBlocks did not descend — a latent FN).
+func (c *psConv) psIf(n *tree_sitter.Node) nir.Stmt {
+	it := nir.If{Loc: c.loc(n)}
+	if cond := field(n, "condition"); cond != nil {
+		it.Cond = c.expr(cond)
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "statement_block":
+			if it.Then == nil {
+				it.Then = c.psBlock(ch)
+			}
+		case "else_clause":
+			for _, e := range namedChildren(ch) {
+				if e.Kind() == "statement_block" {
+					it.Else = append(it.Else, c.psBlock(e)...)
+				}
+			}
+		case "elseif_clause":
+			it.Else = append(it.Else, c.stmt(ch)...)
+		}
+	}
+	return it
+}
+
+// psBlock lowers the statements inside a statement_block.
+func (c *psConv) psBlock(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		for _, ch := range namedChildren(m) {
+			switch ch.Kind() {
+			case "statement_block", "statement_list", "named_block", "script_block", "script_block_body":
+				walk(ch)
+			default:
+				out = append(out, c.stmt(ch)...)
+			}
+		}
+	}
+	walk(n)
+	return out
 }
 
 func (c *psConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -276,6 +342,26 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Format{Parts: parts, Loc: L}
+	case "comparison_expression", "logical_expression", "bitwise_expression":
+		// reached only with 2 operands (single-child wrappers are peeled by psUnwrap);
+		// map PowerShell's `-gt`/`-lt`/… to C-style operators so const-eval can fold.
+		// The operator may itself be a named child, so take the first and last operands.
+		k := namedChildren(n)
+		if len(k) >= 2 {
+			return nir.BinOp{Op: c.psCmpToken(n), Left: c.expr(k[0]), Right: c.expr(k[len(k)-1]), Loc: L}
+		}
+	case "unary_expression":
+		k := namedChildren(n)
+		if len(k) >= 1 {
+			op := "?"
+			for i := uint(0); i < n.ChildCount(); i++ {
+				if ch := n.Child(i); !ch.IsNamed() {
+					op = c.text(ch)
+					break
+				}
+			}
+			return nir.Unary{Op: op, Operand: c.expr(k[len(k)-1]), Loc: L}
+		}
 	case "command":
 		return c.command(n)
 	case "command_invokation_operator", "sub_expression", "parenthesized_expression":
