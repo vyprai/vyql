@@ -28,6 +28,7 @@ type funcInfo struct {
 	cls        string
 	name       string
 	validator  bool // a `# vyql: validator` function: its result clears trust-boundary taint
+	abstract   bool // an interface/abstract method (empty body) — dispatch to concrete impls
 }
 
 type importEntry struct {
@@ -316,6 +317,9 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
 				module:     modkey, cls: cls, name: st.Name,
 				validator: st.IsValidator,
+				// an empty body marks an interface/abstract method: a call typed to it must
+				// dispatch to the concrete implementations (whose bodies carry the taint).
+				abstract: len(st.Body) == 0,
 			}
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
@@ -677,13 +681,18 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
-	for _, a := range args {
-		l.flow(a, result)
-	}
-	for _, target := range l.resolveTargets(call.Callee, sc) {
+	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
+	// function's body (arg → param → … → ret → result), so a sanitizer applied INSIDE the
+	// callee is honoured — `bar = my_wrapper(p)` where my_wrapper escapes p is clean. Only an
+	// arg NOT mapped to any resolved param keeps the conservative direct `arg → result` edge
+	// (unknown/library callee, or a vararg beyond the param list), preserving recall there.
+	targets := l.resolveTargets(call.Callee, sc)
+	mapped := make([]bool, len(args))
+	for _, target := range targets {
 		for i, a := range args {
 			if i < len(target.paramNames) {
 				l.flow(a, target.params[target.paramNames[i]])
+				mapped[i] = true
 			}
 		}
 		l.flow(target.ret, result)
@@ -692,6 +701,11 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		if target.validator {
 			l.g.AddLabel(result, usg.Label{Concept: "core.InputValidation",
 				Provenance: usg.Provenance{Adapter: "vyql.validator", Fidelity: "resolved", Confidence: "high"}})
+		}
+	}
+	for i, a := range args {
+		if !mapped[i] {
+			l.flow(a, result)
 		}
 	}
 	return result
@@ -758,6 +772,14 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		}
 		if typ, ok := sc.typ[obj]; ok { // instance/self method
 			if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
+				if m.abstract {
+					// interface/abstract method — the concrete runtime target is unknown, so
+					// don't route through this empty body (which would sink the taint). Return
+					// unresolved: the conservative direct arg→result edge then carries taint
+					// through the call (over-approximate, recall-safe), while concrete callees
+					// still route through their real body so in-body sanitizers are honoured.
+					return nil
+				}
 				return []*funcInfo{m}
 			}
 		}
