@@ -1,0 +1,22 @@
+# Bash CLI SQL sink coverage (mysql/psql/sqlite3).
+
+test "bash: positional arg -> mysql is SQLi"
+  lang bash
+  expect VYQL-INJ-001
+  code
+  ```
+  h() {
+    q=$1
+    mysql -e $q
+  }
+  ```
+
+test "bash: tainted arg -> psql is SQLi"
+  lang bash
+  expect VYQL-INJ-001
+  code
+  ```
+  h() {
+    psql -c $1
+  }
+  ```

@@ -34,4 +34,9 @@ adapter bash {
   // weak hash — md5sum / sha1sum utilities.
   mark "md5sum" -> code.WeakHash
   mark "sha1sum" -> code.WeakHash
+
+  // SQL via CLI clients (-e/-c queries)
+  sink path "mysql" arg all -> code.SqlExecution
+  sink path "psql" arg all -> code.SqlExecution
+  sink path "sqlite3" arg all -> code.SqlExecution
 }
