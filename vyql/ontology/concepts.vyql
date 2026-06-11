@@ -297,6 +297,12 @@ concept MissingFrameProtection : sink {
   vulnerable_to: [access_control.Clickjacking]
   cwe: [CWE_1021]
 }
+// Personally-identifiable / regulated data read from a field or getter (SSN, credit
+// card, passport, DOB…). A taint SOURCE: a finding when it reaches a log/output sink
+// (GDPR / CWE-532 sensitive-data exposure). Scoped to high-signal identifiers only.
+concept PiiValue : source {
+  taint: [taint.PiiData]
+}
 concept MessageInput : source {
   taint: [taint.UntrustedData]
 }

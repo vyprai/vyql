@@ -295,7 +295,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return l.eval(ex.Inner, sc)
 	case nir.Attr:
 		base := l.eval(ex.Base, sc)
-		n := l.node("Attr", ex.Loc, map[string]string{"callee_path": ex.Path})
+		// `method` carries the attribute NAME (last segment) so `source method "ssn"`
+		// matches a field read like `user.ssn` regardless of receiver. Golden-neutral
+		// (the NIR golden serializes callee_path, not method).
+		n := l.node("Attr", ex.Loc, map[string]string{"callee_path": ex.Path, "method": ex.Attr})
 		l.flow(base, n)
 		return n
 	case nir.Index:
