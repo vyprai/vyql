@@ -218,10 +218,10 @@ func (l *lowerer) constBool(e nir.Expr, sc *scope) (bool, bool) {
 	case nir.Thru:
 		return l.constBool(v.Inner, sc)
 	case nir.Const:
-		if v.Value == "true" {
+		switch v.Value {
+		case "true", "True":
 			return true, true
-		}
-		if v.Value == "false" {
+		case "false", "False":
 			return false, true
 		}
 	case nir.Name:

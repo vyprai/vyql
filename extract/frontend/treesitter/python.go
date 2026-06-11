@@ -619,10 +619,27 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	case "binary_operator":
 		op := c.text(field(n, "operator"))
+		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
 		if op == "%" || op == "+" {
-			return nir.Format{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+			// `%` (string-format / modulo) and `+` (concat / add) stay taint-propagating Formats.
+			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(field(n, "left")), c.expr(field(n, "right"))}, Loc: L}
+		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "comparison_operator":
+		kids := namedChildren(n)
+		if len(kids) == 2 { // simple `a OP b` (chained comparisons keep their Seq fallback)
+			return nir.BinOp{Op: c.text(field(n, "operators")), Left: c.expr(kids[0]), Right: c.expr(kids[1]), Loc: L}
+		}
+		return nir.Seq{Parts: []nir.Expr{c.expr(kids[0])}, Loc: L}
+	case "boolean_operator":
+		return nir.BinOp{Op: c.text(field(n, "operator")), Left: c.expr(field(n, "left")), Right: c.expr(field(n, "right")), Loc: L}
+	case "not_operator":
+		return nir.Unary{Op: "not", Operand: c.expr(field(n, "argument")), Loc: L}
+	case "conditional_expression":
+		kids := namedChildren(n) // [then, cond, else]
+		if len(kids) >= 3 {
+			return nir.Ternary{Then: c.expr(kids[0]), Cond: c.expr(kids[1]), Else: c.expr(kids[2]), Loc: L}
+		}
 	case "string":
 		if interps := c.stringInterps(n); len(interps) > 0 {
 			return nir.Format{Parts: interps, Loc: L}
