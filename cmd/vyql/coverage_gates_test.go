@@ -192,6 +192,81 @@ func countWired(sinks, wired map[string]bool) int {
 	return n
 }
 
+// conceptsByKind returns the set of concept names of the given kind (sink/source/control).
+func conceptsByKind(t *testing.T, kind string) map[string]bool {
+	out := map[string]bool{}
+	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
+		for _, m := range conceptKind.FindAllStringSubmatch(c, -1) {
+			if m[2] == kind {
+				out[m[1]] = true
+			}
+		}
+	}
+	return out
+}
+
+// T2.1 — every SOURCE concept is wired in an adapter (something produces it) OR is in the
+// documented "reserved vocabulary" set (defined ahead of wiring; the input is currently
+// subsumed by a broader source like HttpInput, or belongs to an archetype not yet wired).
+// A NEW source concept must be wired or explicitly reserved here.
+func TestSourceConceptsWiredGate(t *testing.T) {
+	reserved := map[string]bool{
+		"UserControlledData": true, "SecretValue": true, // base taint roots
+		// reserved vocabulary — inputs presently subsumed by HttpInput, or archetype
+		// sources not yet wired (worker/library/second-order). Wire or remove when used.
+		"Cookie": true, "HttpHeader": true, "FileUpload": true, "HttpRequest": true,
+		"ConfigFileInput": true, "DatabaseRead": true, "ExternalApiResponse": true,
+		"MessageInput": true,
+	}
+	sources := conceptsByKind(t, "source")
+	wired := conceptRefsIn(t, "adapters")
+	var unwired []string
+	for s := range sources {
+		if reserved[s] || wired[s] {
+			continue
+		}
+		unwired = append(unwired, s)
+	}
+	sort.Strings(unwired)
+	for _, s := range unwired {
+		t.Errorf("source concept %q is wired in NO adapter and not reserved — wire it or add to the reserved set", s)
+	}
+	// keep the reserved set honest: a reserved source that got wired should be removed from it.
+	for s := range reserved {
+		if wired[s] && s != "UserControlledData" && s != "SecretValue" {
+			t.Errorf("source %q is now adapter-wired — remove it from the reserved set", s)
+		}
+	}
+	t.Logf("source concepts: %d defined, %d reserved-vocabulary", len(sources), len(reserved)-2)
+}
+
+// T2.3 — every CONTROL concept WIRED in an adapter must be consumed by some rule's
+// `unless sanitized_by`/`guarded_by`; a wired control no rule reads is INERT (neutralizes
+// nothing). This is the gate that catches the OutputEncoding-style mistake. (A control
+// defined-but-not-wired is just unused vocabulary and is fine.)
+func TestControlsWiredAreConsumedGate(t *testing.T) {
+	controls := conceptsByKind(t, "control")
+	wired := conceptRefsIn(t, "adapters")
+	consumed := map[string]bool{}
+	re := regexp.MustCompile(`(?:sanitized_by|guarded_by)\s+(?:core|code)\.([A-Za-z0-9_]+)`)
+	for _, c := range readDataFiles(t, "packs", ".vyql") {
+		for _, m := range re.FindAllStringSubmatch(c, -1) {
+			consumed[m[1]] = true
+		}
+	}
+	var inert []string
+	for ctrl := range controls {
+		if wired[ctrl] && !consumed[ctrl] {
+			inert = append(inert, ctrl)
+		}
+	}
+	sort.Strings(inert)
+	for _, ctrl := range inert {
+		t.Errorf("control %q is wired in an adapter but consumed by NO rule — inert wiring", ctrl)
+	}
+	t.Logf("control concepts: %d defined, %d consumed by rules", len(controls), len(consumed))
+}
+
 // T0.3 — every threat reference (vulnerable_to/neutralizes) resolves to a defined threat
 // in the correct package.
 func TestThreatRefsResolveGate(t *testing.T) {
