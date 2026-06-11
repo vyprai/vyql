@@ -7,6 +7,7 @@ import (
 
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/extract/frontend"
+	cfgfront "github.com/vyprai/vyql/extract/frontend/config"
 	"github.com/vyprai/vyql/extract/frontend/golang"
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/nir"
@@ -43,6 +44,9 @@ var languages = []language{
 	{"perl", map[string]bool{".pl": true, ".pm": true, ".cgi": true}, treesitter.ExtractPerl, frontend.PerlAdapters},
 	{"solidity", map[string]bool{".sol": true}, treesitter.ExtractSolidity, frontend.SolidityAdapters},
 	{"objc", map[string]bool{".m": true}, treesitter.ExtractObjC, frontend.ObjCAdapters},
+	// mobile config files (AndroidManifest.xml / Info.plist) — a non-tree-sitter
+	// frontend; non-manifest XML yields no nodes so other repos are unaffected.
+	{"config", map[string]bool{".xml": true, ".plist": true}, cfgfront.Extract, frontend.ConfigAdapters},
 }
 
 // scanStats reports per-language file counts for the run summary.

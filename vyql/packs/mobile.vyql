@@ -16,3 +16,24 @@ rule WebViewJsBridge {
   meta { id: "VYQL-MOB-002", severity: medium, cwe: [CWE_749] }
   match code.WebViewJsInterface as w
 }
+
+// Android component exported to other apps without a permission (CWE-926) — an
+// attack surface other installed apps can invoke (AndroidManifest android:exported).
+rule ExportedComponent {
+  meta { id: "VYQL-MOB-003", severity: medium, cwe: [CWE_926] }
+  match code.ExportedComponent as e
+}
+
+// Cleartext network allowed by configuration (CWE-319) — Android
+// usesCleartextTraffic="true" or iOS ATS NSAllowsArbitraryLoads.
+rule CleartextConfig {
+  meta { id: "VYQL-MOB-004", severity: medium, cwe: [CWE_319] }
+  match code.CleartextConfig as c
+}
+
+// Debuggable production build (CWE-489) — android:debuggable="true" exposes the
+// app to runtime tampering / data extraction.
+rule DebuggableApp {
+  meta { id: "VYQL-MOB-005", severity: medium, cwe: [CWE_489] }
+  match code.DebuggableApp as d
+}

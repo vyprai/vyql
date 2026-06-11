@@ -147,6 +147,20 @@ concept WebViewJsInterface : sink {
   vulnerable_to: [mobile.WebViewInjection]
   cwe: [CWE_749]
 }
+// Mobile config presence concepts (AndroidManifest.xml / iOS Info.plist) — flagged
+// by the config frontend, no taint flow required.
+concept ExportedComponent : sink {
+  vulnerable_to: [mobile.ExportedComponent]
+  cwe: [CWE_926]
+}
+concept CleartextConfig : sink {
+  vulnerable_to: [crypto.CleartextTransmission]
+  cwe: [CWE_319]
+}
+concept DebuggableApp : sink {
+  vulnerable_to: [mobile.DebuggableBuild]
+  cwe: [CWE_489]
+}
 
 concept ExternalCall : sink {
   vulnerable_to: [smartcontract.ExternalCallInjection]

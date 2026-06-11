@@ -1,0 +1,15 @@
+// config "framework" adapter — mobile app configuration files. The config
+// frontend (AndroidManifest.xml / Info.plist) emits a bare call per insecure
+// setting; these marks label each with its presence concept.
+adapter config {
+  meta { fidelity: resolved }
+
+  // Android: android:exported="true" on an activity/service/receiver/provider
+  mark "android_exported" -> code.ExportedComponent
+  // Android: <application android:usesCleartextTraffic="true">
+  mark "android_cleartext" -> code.CleartextConfig
+  // Android: <application android:debuggable="true">
+  mark "android_debuggable" -> code.DebuggableApp
+  // iOS Info.plist: ATS NSAllowsArbitraryLoads(/InWebContent/ForMedia) = <true/>
+  mark "ats_arbitrary_loads" -> code.CleartextConfig
+}

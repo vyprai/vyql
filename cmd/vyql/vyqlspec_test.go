@@ -48,6 +48,8 @@ var primaryExt = map[string]string{
 	"java": ".java", "php": ".php", "csharp": ".cs", "c": ".c", "cpp": ".cpp",
 	"rust": ".rs", "bash": ".sh", "scala": ".scala", "lua": ".lua", "kotlin": ".kt",
 	"powershell": ".ps1", "swift": ".swift", "perl": ".pl", "solidity": ".sol", "objc": ".m",
+	// mobile config files — specs supply the real filename via `file <name>` blocks.
+	"config": ".xml",
 }
 
 func parseSpecFile(t *testing.T, path string) []vyqlSpec {

@@ -104,8 +104,14 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	if err != nil {
 		return nil, stats, err
 	}
+	// Error only when NO recognized file was found at all. A recognized file that
+	// produces no NIR (e.g. a hardened config with nothing to flag) is a valid
+	// 0-finding scan, not an error.
+	if len(stats.files) == 0 {
+		return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
+	}
 	if len(prog.Modules) == 0 {
-		return nil, stats, fmt.Errorf("no supported source (.go/.py/.js/.rb) found under %s", strings.Join(paths, ", "))
+		return nil, stats, nil // recognized files, but nothing to analyze
 	}
 	g, err := lowering.LowerTyped(prog, true, ctorTypes)
 	if err != nil {

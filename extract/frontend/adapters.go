@@ -314,6 +314,7 @@ var extTech = map[string]string{
 	".rb": "ruby", ".java": "java", ".php": "php", ".phtml": "php", ".cs": "csharp",
 	".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
 	".rs": "rust", ".sh": "bash", ".bash": "bash", ".scala": "scala", ".sc": "scala", ".lua": "lua", ".kt": "kotlin", ".kts": "kotlin", ".ps1": "powershell", ".psm1": "powershell", ".swift": "swift", ".pl": "perl", ".pm": "perl", ".cgi": "perl", ".sol": "solidity", ".m": "objc",
+	".xml": "config", ".plist": "config",
 }
 
 // nodeTech returns the language technology of a node from its loc ("file.ext:line").
@@ -405,6 +406,7 @@ func matchPath(path string, patterns []string, mode string) bool {
 }
 
 // Per-language adapter sets (loaded from vyql/adapters/*.vyql).
+func ConfigAdapters() []adapters.Adapter { return AdaptersFor("config") }
 func PythonAdapters() []adapters.Adapter { return AdaptersFor("python") }
 func JsAdapters() []adapters.Adapter     { return AdaptersFor("javascript") }
 func RubyAdapters() []adapters.Adapter   { return AdaptersFor("ruby") }
