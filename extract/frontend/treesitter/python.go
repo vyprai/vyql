@@ -177,6 +177,23 @@ func (c *pyConv) hasValidatorComment(fn *tree_sitter.Node) bool {
 	return scan(fn) || scan(field(fn, "body"))
 }
 
+// firstIdent returns the first identifier at or under n (e.g. the target name inside a
+// with-statement `as` alias, which may be wrapped in an as_pattern_target).
+func firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if n.Kind() == "identifier" {
+		return n
+	}
+	for _, ch := range children(n) {
+		if r := firstIdent(ch); r != nil {
+			return r
+		}
+	}
+	return nil
+}
+
 func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
@@ -293,7 +310,42 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// the loop-var assign runs before the loop body; flatten lowers assign then body.
 		return []nir.Stmt{nir.Block{Stmts: append(inner, nir.Loop{Body: c.collectBlocks(n)})}}
 	case "with_statement":
-		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+		// `with EXPR as VAR:` — lower each context-manager EXPR (commonly an open()/file sink)
+		// and bind VAR to it, then the body. Previously the with-clause expression was dropped,
+		// so `with open(tainted) as fd:` had no sink node.
+		var pre []nir.Stmt
+		var walkWith func(node *tree_sitter.Node)
+		walkWith = func(node *tree_sitter.Node) {
+			for _, ch := range children(node) {
+				switch ch.Kind() {
+				case "with_clause":
+					walkWith(ch)
+				case "with_item":
+					val := field(ch, "value")
+					if val == nil {
+						continue
+					}
+					if val.Kind() == "as_pattern" {
+						kids := namedChildren(val)
+						if len(kids) == 0 {
+							continue
+						}
+						expr := c.expr(kids[0])
+						if alias := field(val, "alias"); alias != nil {
+							if id := firstIdent(alias); id != nil {
+								pre = append(pre, nir.Assign{Targets: []string{c.text(id)}, Value: expr})
+								continue
+							}
+						}
+						pre = append(pre, nir.ExprStmt{Value: expr})
+					} else {
+						pre = append(pre, nir.ExprStmt{Value: c.expr(val)})
+					}
+				}
+			}
+		}
+		walkWith(n)
+		return []nir.Stmt{nir.Block{Stmts: append(pre, c.collectBlocks(n)...)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
 	case "match_statement":

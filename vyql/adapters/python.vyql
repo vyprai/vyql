@@ -276,6 +276,30 @@ adapter python {
   sink path "zipfile.ZipFile.extractall" -> code.FilePathAccess
   sink path "tarfile.open" -> code.FilePathAccess
   sink path "pathlib.Path" -> code.FilePathAccess
+  // os.path predicates/normalizers fed a tainted path (CWE-22): the path is arg 0.
+  sink path "os.path.exists" -> code.FilePathAccess
+  sink path "os.path.isfile" -> code.FilePathAccess
+  sink path "os.path.isdir" -> code.FilePathAccess
+  sink path "os.path.islink" -> code.FilePathAccess
+  sink path "os.path.getsize" -> code.FilePathAccess
+  sink path "os.path.abspath" -> code.FilePathAccess
+  sink path "os.path.realpath" -> code.FilePathAccess
+  sink path "os.stat" -> code.FilePathAccess
+  sink path "os.lstat" -> code.FilePathAccess
+  sink path "os.scandir" -> code.FilePathAccess
+  sink path "os.listdir" -> code.FilePathAccess
+  sink path "fileinput.FileInput" -> code.FilePathAccess
+  // pathlib operations on a tainted Path object — the path is the RECEIVER, so the call
+  // node carries the taint (e.g. `(Path(DIR)/userinput).exists()` / `.read_text()`).
+  sink receiver "exists" -> code.FilePathAccess
+  sink receiver "is_file" -> code.FilePathAccess
+  sink receiver "is_dir" -> code.FilePathAccess
+  sink receiver "read_text" -> code.FilePathAccess
+  sink receiver "read_bytes" -> code.FilePathAccess
+  sink receiver "write_text" -> code.FilePathAccess
+  sink receiver "write_bytes" -> code.FilePathAccess
+  sink receiver "iterdir" -> code.FilePathAccess
+  sink receiver "unlink" -> code.FilePathAccess
   sink path "render_template_string" -> code.HtmlRender
   sink path "flask.render_template_string" -> code.HtmlRender
   // the response BODY reflected to the browser (Flask make_response / Response / HttpResponse).
