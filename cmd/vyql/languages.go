@@ -128,5 +128,57 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 	if len(prog.Modules) > 0 {
 		ads = append(ads, frontend.PiiAdapters()...)
 	}
+	// bundled .properties config — resolved key→value so a `getProperty("hashAlg1")`
+	// read folds to its real value during lowering (CWE-327/328 via config indirection).
+	if props := collectProperties(paths); len(props) > 0 {
+		prog.Properties = props
+	}
 	return prog, ads, ctorTypes, stats, nil
+}
+
+// collectProperties parses every `.properties` file reachable from the scan paths into a
+// flat key→value map. Last value wins on duplicate keys (a coarse but adequate model;
+// values are only used for const-folding config reads, not for precise per-file scoping).
+func collectProperties(paths []string) map[string]string {
+	out := map[string]string{}
+	parse := func(file string) {
+		b, err := os.ReadFile(file)
+		if err != nil {
+			return
+		}
+		for _, line := range strings.Split(string(b), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "!") {
+				continue
+			}
+			eq := strings.IndexAny(line, "=:")
+			if eq <= 0 {
+				continue
+			}
+			k := strings.TrimSpace(line[:eq])
+			v := strings.TrimSpace(line[eq+1:])
+			if k != "" {
+				out[k] = v
+			}
+		}
+	}
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		if !info.IsDir() {
+			if strings.HasSuffix(p, ".properties") {
+				parse(p)
+			}
+			continue
+		}
+		filepath.WalkDir(p, func(path string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() && strings.HasSuffix(path, ".properties") {
+				parse(path)
+			}
+			return nil
+		})
+	}
+	return out
 }

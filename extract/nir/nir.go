@@ -217,6 +217,10 @@ type Module struct {
 type Program struct {
 	Modules  []Module
 	SelfName string
+	// Properties holds resolved key→value pairs from bundled config files
+	// (.properties, etc.), so a config-read like `getProperty("hashAlg1")` can be
+	// const-folded to its real value during lowering.
+	Properties map[string]string
 }
 
 // Self returns the configured receiver name, defaulting to "self".

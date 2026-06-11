@@ -94,6 +94,30 @@ func constStr(e nir.Expr) string {
 	return ""
 }
 
+// propConst const-folds a config-property read — `props.getProperty("key" [, default])` —
+// to the bundled property value (or the literal default when the key is unset). Only
+// `getProperty` is resolved: user-input readers (getParameter/getHeader/…) must stay
+// tainted sources, never folded to constants. Returns ("", false) when undeterminable.
+func (l *lowerer) propConst(e nir.Expr) (string, bool) {
+	call, ok := e.(nir.Call)
+	if !ok || call.Method != "getProperty" || len(call.Args) == 0 {
+		return "", false
+	}
+	key := constStr(call.Args[0])
+	if key == "" {
+		return "", false
+	}
+	if v, ok := l.prog.Properties[key]; ok {
+		return v, true
+	}
+	if len(call.Args) >= 2 { // fall back to the inline default argument, if literal
+		if d := constStr(call.Args[1]); d != "" {
+			return d, true
+		}
+	}
+	return "", false
+}
+
 func cloneStrMap(m map[string]string) map[string]string {
 	out := make(map[string]string, len(m))
 	for k, v := range m {
@@ -352,6 +376,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		cv := constStr(st.Value)
+		if cv == "" { // config read folded to its real value (e.g. getProperty("hashAlg1") -> "MD5")
+			if pv, ok := l.propConst(st.Value); ok {
+				cv = pv
+			}
+		}
 		for _, t := range st.Targets {
 			sc.node[t] = val
 			if hasTyp {
