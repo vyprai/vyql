@@ -77,6 +77,10 @@ adapter python {
   sink path "cursor.execute" -> code.SqlExecution
   sink path "RawSQL" -> code.SqlExecution
   sink path "django.db.connection.cursor" -> code.SqlExecution
+  // asyncpg raw query methods (CWE-89)
+  sink method "fetch" -> code.SqlExecution
+  sink method "fetchrow" -> code.SqlExecution
+  sink method "fetchval" -> code.SqlExecution
   sink path "os.system" -> code.CommandExecution
   sink path "os.popen" -> code.CommandExecution
   sink path "os.popen2" -> code.CommandExecution

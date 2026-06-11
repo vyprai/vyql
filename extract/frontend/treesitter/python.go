@@ -158,12 +158,15 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "function_definition":
-		return []nir.Stmt{nir.FuncDef{
-			Name:   c.text(field(n, "name")),
-			Params: c.params(field(n, "parameters")),
-			Body:   c.block(field(n, "body")),
-			Loc:    L,
-		}}
+		name := c.text(field(n, "name"))
+		params := c.params(field(n, "parameters"))
+		body := c.block(field(n, "body"))
+		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
+		// the args after self/info/root/parent are the query's user-supplied inputs.
+		if strings.HasPrefix(name, "resolve_") {
+			body = append(c.seedResolverParams(params, L), body...)
+		}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -273,6 +276,21 @@ func (c *pyConv) block(block *tree_sitter.Node) []nir.Stmt {
 var pyRouteMethods = map[string]bool{
 	"get": true, "post": true, "put": true, "delete": true, "patch": true,
 	"head": true, "options": true, "route": true, "websocket": true, "api_route": true,
+}
+
+// seedResolverParams seeds a GraphQL resolver's query-argument params (those
+// after the conventional self/info/root/parent positions) as http_input.
+func (c *pyConv) seedResolverParams(params []string, L string) []nir.Stmt {
+	skip := map[string]bool{"self": true, "cls": true, "info": true, "root": true, "parent": true, "_": true}
+	var seed []nir.Stmt
+	for _, p := range params {
+		if skip[p] {
+			continue
+		}
+		seed = append(seed, nir.Assign{Targets: []string{p},
+			Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+	}
+	return seed
 }
 
 // hasRouteDecorator reports whether a decorated_definition carries a route
