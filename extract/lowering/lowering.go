@@ -577,6 +577,9 @@ func (s *scope) clone() *scope {
 	for k, v := range s.typ {
 		c.typ[k] = v
 	}
+	for k, v := range s.cnst {
+		c.cnst[k] = v
+	}
 	return c
 }
 
@@ -738,7 +741,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		qual := l.curModule + "::" + prefix + st.Name
 		info := l.funcQual[qual]
-		inner := newScope()
+		// closure capture: a nested function sees the enclosing scope's bindings, so a free
+		// variable's taint flows into the body. Params are reseeded below, shadowing.
+		inner := sc.clone()
 		if info != nil {
 			for name, id := range info.params {
 				inner.node[name] = id
@@ -975,7 +980,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// object property holding user input).
 		return l.eval(ex.Value, sc)
 	case nir.Lambda:
-		inner := newScope()
+		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
+		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
+		// thunk, .then, event handler) thus fires with the captured taint.
+		inner := sc.clone()
 		for _, p := range ex.Params {
 			inner.node[p] = l.node("Param", ex.Loc, map[string]string{"name": p})
 		}

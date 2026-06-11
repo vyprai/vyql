@@ -599,15 +599,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 	case "arrow_function", "function_expression", "function":
-		// A zero-param "thunk" with an EXPRESSION body (e.g. res.format({html: () => res.send(x)}))
-		// is evaluated in place so its sinks fire with the enclosing scope's taint — vyql has no
-		// closure capture, and a thunk is assumed to run (FN-safe; parameterised callbacks keep
-		// the opaque Lambda form so their params aren't mis-bound).
-		body := field(n, "body")
-		if len(c.params(field(n, "parameters"))) == 0 && body != nil && body.Kind() != "statement_block" {
-			return c.expr(body)
-		}
-		return nir.Lambda{Params: c.params(field(n, "parameters")), Body: c.body(body), Loc: L}
+		return nir.Lambda{Params: c.params(field(n, "parameters")), Body: c.body(field(n, "body")), Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
