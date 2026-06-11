@@ -113,9 +113,9 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
 		}
 		return []nir.Stmt{nir.Return{}}
-	// branch-structured (B1); Cond nil (Solidity did not evaluate the predicate) -> byte-identical.
+	// branch-structured with predicate attached so constant-false arms are pruned.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Then: c.collectBlocks(n)}}
+		return []nir.Stmt{c.solIf(n)}
 	case "for_statement", "while_statement", "do_while_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement":
@@ -178,6 +178,53 @@ func (c *solConv) block(body *tree_sitter.Node) []nir.Stmt {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
+}
+
+// solIf lowers an if with its predicate so a constant-false arm is pruned. Solidity
+// labels both the consequence and alternative blocks with the field name "body", so
+// the first body-fielded child is the then-branch and the second is the else-branch.
+func (c *solConv) solIf(n *tree_sitter.Node) nir.Stmt {
+	it := nir.If{Loc: c.loc(n)}
+	if cond := field(n, "condition"); cond != nil {
+		it.Cond = c.expr(cond)
+	}
+	afterElse := false
+	for i := uint(0); i < n.ChildCount(); i++ {
+		ch := n.Child(i)
+		if !ch.IsNamed() {
+			if c.text(ch) == "else" {
+				afterElse = true
+			}
+			continue
+		}
+		switch ch.Kind() {
+		case "block_statement", "unchecked_block", "if_statement", "statement",
+			"expression_statement", "variable_declaration_statement", "return_statement":
+			if afterElse {
+				it.Else = append(it.Else, c.solStmts(ch)...)
+			} else if it.Then == nil {
+				it.Then = c.solStmts(ch)
+			}
+		}
+	}
+	return it
+}
+
+// solStmts lowers a branch body: a block's contained statements, or a single
+// (possibly brace-less or else-if) statement.
+func (c *solConv) solStmts(n *tree_sitter.Node) []nir.Stmt {
+	if n == nil {
+		return nil
+	}
+	switch n.Kind() {
+	case "block_statement", "unchecked_block":
+		var out []nir.Stmt
+		for _, ch := range namedChildren(n) {
+			out = append(out, c.stmt(ch)...)
+		}
+		return out
+	}
+	return c.stmt(n)
 }
 
 func (c *solConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -255,7 +302,19 @@ func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
-	case "parenthesized_expression", "type_cast_expression", "unary_expression":
+	case "ternary_expression":
+		if k := namedChildren(n); len(k) == 3 {
+			return nir.Ternary{Cond: c.expr(k[0]), Then: c.expr(k[1]), Else: c.expr(k[2]), Loc: L}
+		}
+	case "unary_expression":
+		arg := field(n, "argument")
+		if arg == nil {
+			if k := namedChildren(n); len(k) > 0 {
+				arg = k[len(k)-1]
+			}
+		}
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(arg), Loc: L}
+	case "parenthesized_expression", "type_cast_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
