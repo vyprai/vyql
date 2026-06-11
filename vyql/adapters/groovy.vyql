@@ -31,4 +31,10 @@ adapter groovy {
 
   // path / file
   sink path "File" -> code.FilePathAccess
+
+  // weak hash (CWE-328).
+  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
+  mark "DigestUtils.md5Hex" -> code.WeakHash
+  mark "DigestUtils.sha1Hex" -> code.WeakHash
 }

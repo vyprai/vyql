@@ -40,4 +40,8 @@ adapter elixir {
   sink path "File.open" -> code.FilePathAccess
   sink path "File.rm" -> code.FilePathAccess
   sink path "File.stream!" -> code.FilePathAccess
+
+  // weak hash — :crypto.hash(:md5|:sha, …).
+  mark ":crypto.hash" val ":md5" -> code.WeakHash
+  mark ":crypto.hash" val ":sha" -> code.WeakHash
 }

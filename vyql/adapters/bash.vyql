@@ -30,4 +30,8 @@ adapter bash {
   // file inclusion (sourcing an untrusted path)
   sink path "source" -> code.FileInclude
   sink path "." -> code.FileInclude
+
+  // weak hash — md5sum / sha1sum utilities.
+  mark "md5sum" -> code.WeakHash
+  mark "sha1sum" -> code.WeakHash
 }

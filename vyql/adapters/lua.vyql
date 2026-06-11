@@ -37,4 +37,8 @@ adapter lua {
   // SSRF — luasocket http.request / resty.http request_uri
   sink path "http.request" -> code.UrlFetch
   sink method "request_uri" -> code.UrlFetch
+
+  // weak hash — OpenResty ngx.md5 / ngx.sha1_bin.
+  mark "ngx.md5" -> code.WeakHash
+  mark "ngx.sha1_bin" -> code.WeakHash
 }

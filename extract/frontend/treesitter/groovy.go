@@ -241,17 +241,21 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string", "gstring":
 		var parts []nir.Expr
+		var content string
 		for _, ch := range namedChildren(n) {
-			if ch.Kind() == "interpolation" {
+			switch ch.Kind() {
+			case "interpolation":
 				for _, e := range namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
+			case "string_content":
+				content += c.text(ch) // carry the literal value for `val`-matched marks
 			}
 		}
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: content}
 	case "function_call":
 		return c.callExpr(n)
 	case "dotted_identifier":

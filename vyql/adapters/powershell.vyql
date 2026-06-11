@@ -42,4 +42,5 @@ adapter powershell {
   sink path "Out-File" -> code.FilePathAccess
   sink path "Remove-Item" -> code.FilePathAccess
   sink path "Import-Module" -> code.FilePathAccess
+
 }
