@@ -143,7 +143,20 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	switch n.Kind() {
 	case "function_declaration", "generator_function_declaration", "method_definition":
 		name := c.text(field(n, "name"))
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: c.params(field(n, "parameters")), Body: c.body(field(n, "body")), Loc: L}}
+		params := c.params(field(n, "parameters"))
+		body := c.body(field(n, "body"))
+		// NestJS route handler (`@Get()/@Post() find(@Query() q, @Param() id)`): the
+		// method's parameters are request-bound (@Body/@Query/@Param/@Headers), so seed
+		// each as http_input. Detected by the HTTP-method decorator on the method.
+		if n.Kind() == "method_definition" && c.jsHasRouteDecorator(n) {
+			var seed []nir.Stmt
+			for _, p := range params {
+				seed = append(seed, nir.Assign{Targets: []string{p},
+					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+			}
+			body = append(seed, body...)
+		}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
 	case "class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "lexical_declaration", "variable_declaration":
@@ -312,11 +325,56 @@ func (c *jsConv) body(n *tree_sitter.Node) []nir.Stmt {
 	if n == nil {
 		return nil
 	}
-	if n.Kind() == "statement_block" {
+	// statement_block (function body) and class_body (members) are both lists of
+	// statements/definitions — extract each (so class methods become FuncDefs).
+	if n.Kind() == "statement_block" || n.Kind() == "class_body" {
 		return c.blockChildren(n)
 	}
 	// expression-bodied arrow: treat as a return
 	return []nir.Stmt{nir.Return{Value: c.expr(n)}}
+}
+
+// jsRouteDecorators are NestJS HTTP-method decorators that mark a request handler.
+var jsRouteDecorators = map[string]bool{
+	"Get": true, "Post": true, "Put": true, "Delete": true, "Patch": true,
+	"Options": true, "Head": true, "All": true,
+}
+
+// jsHasRouteDecorator reports whether a method_definition carries a NestJS route
+// decorator (`@Get()`, `@Post(':id')`, …) — a `decorator` child whose callee name
+// (identifier of the call, or a bare identifier) is an HTTP-method decorator.
+func (c *jsConv) jsHasRouteDecorator(n *tree_sitter.Node) bool {
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "decorator" {
+			continue
+		}
+		var name string
+		var walk func(m *tree_sitter.Node)
+		walk = func(m *tree_sitter.Node) {
+			if m == nil || name != "" {
+				return
+			}
+			switch m.Kind() {
+			case "identifier":
+				name = c.text(m)
+			case "call_expression":
+				walk(field(m, "function"))
+			case "member_expression":
+				if p := field(m, "property"); p != nil {
+					name = c.text(p)
+				}
+			default:
+				for _, k := range namedChildren(m) {
+					walk(k)
+				}
+			}
+		}
+		walk(ch)
+		if jsRouteDecorators[name] {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *jsConv) params(params *tree_sitter.Node) []string {

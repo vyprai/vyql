@@ -4,6 +4,8 @@ adapter javascript {
   meta { fidelity: resolved }
 
   source "process.argv" -> code.CliArgument
+  // NestJS route-handler params (@Body/@Query/@Param/@Headers), seeded by the frontend.
+  source "http_input" -> code.HttpInput
   source "req.body" -> code.HttpInput
   source "req.query" -> code.HttpInput
   source "req.params" -> code.HttpInput
