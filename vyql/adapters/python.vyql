@@ -277,4 +277,10 @@ adapter python {
   // not flagged (too many false positives from framework defaults / cookie deletions).
   mark "set_cookie" val "httponly=False" -> code.InsecureCookie
   mark "set_cookie" val "secure=False" -> code.InsecureCookie
+
+  // permissive CORS (CWE-942) — headers.add("Access-Control-Allow-Origin", "*")
+  // or flask-cors CORS(app, origins="*") / cross_origin(origins="*").
+  mark "headers.add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "CORS" val "origins=*" -> code.PermissiveCors
+  mark "cross_origin" val "origins=*" -> code.PermissiveCors
 }

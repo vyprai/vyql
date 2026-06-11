@@ -106,4 +106,8 @@ adapter go {
 
   // TLS cert validation disabled (CWE-295) — tls.Config{InsecureSkipVerify: true}
   mark "tls.Config" val "InsecureSkipVerify=true" -> code.CertValidationDisabled
+
+  // permissive CORS (CWE-942) — w.Header().Set("Access-Control-Allow-Origin", "*")
+  mark "Header.Set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "Header.Add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
 }

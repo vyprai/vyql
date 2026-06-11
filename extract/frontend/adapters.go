@@ -27,21 +27,37 @@ type sinkSpec struct {
 	ByMethod   bool   // match the bare method name vs the dotted callee path
 	Constraint string // optional `on <type>` receiver-type constraint
 	ArgIndex   int    // which argument is the dangerous one (default 0)
-	ValMatch   string // optional `val "substr"` — require an arg/option literal to contain substr
-	ValAbsent  string // optional `nval "substr"` — require NO arg/option literal to contain substr
+	ValMatches []string // `val "substr"` (AND) — every substr must be in some arg/option literal
+	ValAbsents []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
 }
 
 type controlSpec struct {
-	Concept   string
-	Pattern   string
-	ValMatch  string // optional `val "substr"` (marks)
-	ValAbsent string // optional `nval "substr"` (marks)
+	Concept    string
+	Pattern    string
+	ValMatches []string // `val "substr"` (AND, marks)
+	ValAbsents []string // `nval "substr"` (AND, marks)
 }
 
-// valContains reports whether any value token in the NUL-joined str_args prop
-// contains sub, case-insensitively. Used by `val`/`nval` matching.
+// valContains reports whether the NUL-joined str_args prop contains sub,
+// case-insensitively. Used by `val`/`nval` matching.
 func valContains(tokens, sub string) bool {
 	return strings.Contains(strings.ToLower(tokens), strings.ToLower(sub))
+}
+
+// valConds reports whether every `val` substring is present (AND) and every
+// `nval` substring is absent among the value tokens. Empty lists pass.
+func valConds(tokens string, vals, nvals []string) bool {
+	for _, v := range vals {
+		if !valContains(tokens, v) {
+			return false
+		}
+	}
+	for _, nv := range nvals {
+		if valContains(tokens, nv) {
+			return false
+		}
+	}
+	return true
 }
 
 type adapterSpec struct {
@@ -121,13 +137,13 @@ func loadSpec(tech string) adapterSpec {
 			}
 			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatch: mp.ValMatch, ValAbsent: mp.ValAbsent})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatch: mp.ValMatch, ValAbsent: mp.ValAbsent})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, ValMatch: mp.ValMatch, ValAbsent: mp.ValAbsent})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		}
 	}
 	return s
@@ -196,12 +212,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 				for i, sk := range spec.Sinks {
 					hit := sk.ByMethod && method == sk.Pattern ||
 						!sk.ByMethod && matchSinkPath(path, sk.Pattern)
-					// value-matched sink: a literal arg/option must (val) or must not
-					// (nval) contain the substring (case-insensitive).
-					if hit && sk.ValMatch != "" && !valContains(strArgs, sk.ValMatch) {
-						hit = false
-					}
-					if hit && sk.ValAbsent != "" && valContains(strArgs, sk.ValAbsent) {
+					// value-matched sink: every `val` must be present and every `nval`
+					// absent among the literal arg/option tokens (case-insensitive).
+					if hit && !valConds(strArgs, sk.ValMatches, sk.ValAbsents) {
 						hit = false
 					}
 					if !hit {
@@ -311,10 +324,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 					if !matchSinkPath(path, m.Pattern) {
 						continue
 					}
-					if m.ValMatch != "" && !valContains(strArgs, m.ValMatch) {
-						continue
-					}
-					if m.ValAbsent != "" && valContains(strArgs, m.ValAbsent) {
+					if !valConds(strArgs, m.ValMatches, m.ValAbsents) {
 						continue
 					}
 					out = append(out, adapters.Mapping{NodeID: id, Concept: m.Concept})

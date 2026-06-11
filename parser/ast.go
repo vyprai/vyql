@@ -81,8 +81,8 @@ type AdapterMapping struct {
 	Concept    string // the concept it maps to (qualified); for "type", the type name
 	Constraint string // optional `on <type>` receiver-type constraint for sinks
 	ArgIndex   int    // which argument is the dangerous one (default 0; `arg N`)
-	ValMatch   string // optional `val "substr"` — fire only when an arg/option literal contains substr
-	ValAbsent  string // optional `nval "substr"` — fire only when NO arg/option literal contains substr
+	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
+	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
 }
 
 // ThreatDecl is a `threat <ns>.<Name> { cwe: [...] }` weakness-class declaration

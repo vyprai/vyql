@@ -445,13 +445,13 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 					m.Constraint = p.parseQName()
 				}
 			}
-			if p.atWord("val") { // fire only when an arg/option literal contains this substring
+			for p.atWord("val") { // every `val` must match some arg/option literal (AND)
 				p.next()
-				m.ValMatch = p.parsePattern()
+				m.ValMatches = append(m.ValMatches, p.parsePattern())
 			}
-			if p.atWord("nval") { // fire only when NO arg/option literal contains this substring
+			for p.atWord("nval") { // no arg/option literal may contain any `nval`
 				p.next()
-				m.ValAbsent = p.parsePattern()
+				m.ValAbsents = append(m.ValAbsents, p.parsePattern())
 			}
 			p.expect(tArrow, "->")
 			m.Concept = p.parseQName()
@@ -467,13 +467,13 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 			p.next()
 			pat := p.parsePattern()
 			mk := AdapterMapping{Kind: "mark", Pattern: pat}
-			if p.atWord("val") {
+			for p.atWord("val") {
 				p.next()
-				mk.ValMatch = p.parsePattern()
+				mk.ValMatches = append(mk.ValMatches, p.parsePattern())
 			}
-			if p.atWord("nval") {
+			for p.atWord("nval") {
 				p.next()
-				mk.ValAbsent = p.parsePattern()
+				mk.ValAbsents = append(mk.ValAbsents, p.parsePattern())
 			}
 			p.expect(tArrow, "->")
 			mk.Concept = p.parseQName()

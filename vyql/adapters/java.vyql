@@ -113,4 +113,8 @@ adapter java {
   // literal-template, Groovy SimpleTemplateEngine. Tainted template arg -> SSTI.
   sink path "Velocity.evaluate" arg 3 -> code.TemplateRender
   sink method "getLiteralTemplate" -> code.TemplateRender
+
+  // permissive CORS (CWE-942) — setHeader("Access-Control-Allow-Origin", "*")
+  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "addHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
 }

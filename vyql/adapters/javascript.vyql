@@ -203,4 +203,9 @@ adapter javascript {
   // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled (omission not flagged).
   mark "res.cookie" val "httpOnly=false" -> code.InsecureCookie
   mark "res.cookie" val "secure=false" -> code.InsecureCookie
+
+  // permissive CORS (CWE-942) — ACAO header set to "*" (multi-val: name AND wildcard)
+  mark "res.header" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "res.set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "res.setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
 }
