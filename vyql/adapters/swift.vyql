@@ -4,12 +4,21 @@ adapter swift {
   meta { match: contains, fidelity: resolved }
 
   // untrusted input
-  source "CommandLine.arguments" -> code.HttpInput
+  source "CommandLine.arguments" -> code.CliArgument
   source ".environment" -> code.EnvVariable
-  source "readLine" -> code.HttpInput
+  source "readLine" -> code.StdinInput
   source ".query" -> code.HttpInput
   source ".parameters" -> code.HttpInput
   source ".queryParameters" -> code.HttpInput
+  // iOS clipboard (any app can seed the pasteboard)
+  source "UIPasteboard.general.string" -> code.PasteboardInput
+  source "UIPasteboard.general.strings" -> code.PasteboardInput
+  source ".generalPasteboard.string" -> code.PasteboardInput
+
+  // iOS WKWebView: tainted JS/HTML evaluated or loaded (CWE-749)
+  sink method "evaluateJavaScript" -> code.WebViewLoad
+  sink method "loadHTMLString" -> code.WebViewLoad
+  sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
 
   // SQL — sqlite3 C API (query is arg1)
   sink path "sqlite3_exec" arg 1 -> code.SqlExecution

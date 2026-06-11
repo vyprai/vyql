@@ -6,6 +6,14 @@ adapter objc {
   source "getenv" -> code.EnvVariable
   source "argv" -> code.CliArgument
   source ".environment" -> code.EnvVariable
+  // iOS clipboard
+  source ".generalPasteboard.string" -> code.PasteboardInput
+  source "UIPasteboard.generalPasteboard.string" -> code.PasteboardInput
+
+  // iOS WKWebView / UIWebView (CWE-749)
+  sink method "evaluateJavaScript" -> code.WebViewLoad
+  sink method "loadHTMLString" -> code.WebViewLoad
+  sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
 
   // command execution
   sink path "system" -> code.CommandExecution

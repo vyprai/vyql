@@ -1,0 +1,59 @@
+# Mobile / iOS threat model: inter-app input is the trust boundary. The pasteboard (any
+# app can seed it) and network responses reach local SQLite and — the iOS-specific surface
+# — the WKWebView. (URL-scheme delegate-param sourcing is deferred; see the checklist.)
+
+test "ios (swift): pasteboard -> sqlite3_exec is SQLi"
+  lang swift
+  expect VYQL-INJ-001
+  code
+  ```
+  func run(db: OpaquePointer) {
+    let s = UIPasteboard.general.string ?? ""
+    sqlite3_exec(db, "SELECT * FROM users WHERE name = '" + s + "'", nil, nil, nil)
+  }
+  ```
+
+test "ios (swift): pasteboard -> WKWebView.evaluateJavaScript is WebView injection"
+  lang swift
+  expect VYQL-MOB-001
+  code
+  ```
+  func run(webView: WKWebView) {
+    let s = UIPasteboard.general.string ?? ""
+    webView.evaluateJavaScript("show('" + s + "')")
+  }
+  ```
+
+test "ios (swift): pasteboard -> loadHTMLString is WebView injection"
+  lang swift
+  expect VYQL-MOB-001
+  code
+  ```
+  func run(webView: WKWebView) {
+    let s = UIPasteboard.general.string ?? ""
+    webView.loadHTMLString("<div>" + s + "</div>", baseURL: nil)
+  }
+  ```
+
+test "ios (objc): pasteboard -> evaluateJavaScript is WebView injection"
+  lang objc
+  expect VYQL-MOB-001
+  code
+  ```
+  @implementation V
+  - (void)run:(WKWebView *)webView {
+    NSString *s = UIPasteboard.generalPasteboard.string;
+    [webView evaluateJavaScript:s completionHandler:nil];
+  }
+  @end
+  ```
+
+test "ios (swift): a constant WKWebView script is clean"
+  lang swift
+  reject VYQL-MOB-001
+  code
+  ```
+  func run(webView: WKWebView) {
+    webView.evaluateJavaScript("init()")
+  }
+  ```

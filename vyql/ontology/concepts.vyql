@@ -222,6 +222,16 @@ concept IntentInput : source {
   cwe: [CWE_20]
   refines: core.UserControlledData
 }
+concept PasteboardInput : source {
+  taint: [taint.UntrustedData]
+  cwe: [CWE_20]
+  refines: core.UserControlledData
+}
+concept URLSchemeInput : source {
+  taint: [taint.UntrustedData]
+  cwe: [CWE_20]
+  refines: core.UserControlledData
+}
 concept LdapQuery : sink {
   vulnerable_to: [injection.LdapInjection]
   enabled_by: [taint.UntrustedData]
