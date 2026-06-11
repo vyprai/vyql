@@ -297,6 +297,21 @@ func (l *lowerer) constStrVal(e nir.Expr, sc *scope) (string, bool) {
 				return string(base[idx]), true
 			}
 		}
+		// array-literal index: ['sha1'][0]  → the i-th element if constant.
+		if seq, ok := l.seqOf(v.Base); ok {
+			if idx, ok := l.constInt(v.Key, sc); ok && idx >= 0 && int(idx) < len(seq) {
+				return l.constStrVal(seq[idx], sc)
+			}
+		}
+	case nir.Attr:
+		// object-literal property: { name: 'md5' }.name  → the matching pair's value.
+		if seq, ok := l.seqOf(v.Base); ok {
+			for _, p := range seq {
+				if pr, ok := p.(nir.Pair); ok && pr.Key == v.Attr {
+					return l.constStrVal(pr.Value, sc)
+				}
+			}
+		}
 	case nir.Call:
 		if v.Method == "charAt" && len(v.Args) == 1 {
 			if attr, ok := v.Callee.(nir.Attr); ok {
@@ -314,6 +329,17 @@ func (l *lowerer) constStrVal(e nir.Expr, sc *scope) (string, bool) {
 // constBool evaluates a boolean-constant expression (comparisons of integer/string
 // constants, !/&&/||, and true/false). Returns ok=false when not compile-time constant —
 // the caller then keeps both branches (sound, never prunes a live branch).
+// seqOf returns the elements of an array/object literal expression (peeling Thru).
+func (l *lowerer) seqOf(e nir.Expr) ([]nir.Expr, bool) {
+	switch v := e.(type) {
+	case nir.Seq:
+		return v.Parts, true
+	case nir.Thru:
+		return l.seqOf(v.Inner)
+	}
+	return nil, false
+}
+
 func (l *lowerer) constBool(e nir.Expr, sc *scope) (bool, bool) {
 	switch v := e.(type) {
 	case nir.Thru:
@@ -1061,12 +1087,11 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		l.flow(av, an)
 		args = append(args, an)
 		collectValTokens(a, "", &valToks)
-		// const-prop: a variable holding a string literal contributes that literal to the
-		// value tokens, so `algo = "MD5"; getInstance(algo)` value-matches like the inline form.
-		if nm, ok := a.(nir.Name); ok {
-			if cv := sc.cnst[nm.ID]; cv != "" {
-				valToks = append(valToks, cv)
-			}
+		// value-flow: fold a const-propped variable, an array-literal index (['sha1'][0]),
+		// or an object-literal property ({name:'md5'}.name) to its string so it value-matches
+		// like the inline literal — `getInstance(algo)`, `createHash(['sha1'][0])`, etc.
+		if sv, ok := l.constStrVal(a, sc); ok {
+			valToks = append(valToks, sv)
 		}
 	}
 	// A bare call to a `from mod import sym` alias is matched by adapters under its

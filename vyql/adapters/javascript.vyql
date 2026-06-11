@@ -230,6 +230,14 @@ adapter javascript {
   sink path "mapReduce" -> code.NosqlQuery
 
   // controls (sanitizers/validators) — neutralize a flow that passes through them
+  // numeric coercion bounds output to digits/sign/dot/exponent — no HTML/SQL metachar can
+  // survive, so it neutralizes injection (sound; FN-safe — only the coerced flow is killed).
+  control "Number" -> core.HtmlEscape
+  control "Number" -> core.SqlParameterization
+  control "parseInt" -> core.HtmlEscape
+  control "parseInt" -> core.SqlParameterization
+  control "parseFloat" -> core.HtmlEscape
+  control "parseFloat" -> core.SqlParameterization
   control "escape-html" -> core.HtmlEscape
   control "he.encode" -> core.HtmlEscape
   control "validator.escape" -> core.HtmlEscape
@@ -263,9 +271,14 @@ adapter javascript {
   mark "createCipheriv" nval "gcm" nval "chacha" nval "poly1305" -> code.WeakCipher
 
   // weak hash (CWE-328) — crypto.createHash('md5'|'sha1') (value-matched).
-  // weak hash (CWE-328): fire unless a strong (>=sha224) algorithm literal is present
-  // (catches md5/sha1/md4/ripemd + dynamic algorithm vars; accepts FP on dynamic-strong).
-  mark "createHash" nval "sha224" nval "sha256" nval "sha384" nval "sha512" nval "sha3" nval "blake2" nval "shake" -> code.WeakHash
+  // weak hash (CWE-328): value-match the weak algorithm on the createHash node. Precise —
+  // resolves indirection too (createHash(['sha1'][0]) / const-propped vars put the literal in
+  // the args) and does NOT mis-fire on the chained .update()/.digest() nodes.
+  mark "createHash" val "md5" -> code.WeakHash
+  mark "createHash" val "md4" -> code.WeakHash
+  mark "createHash" val "md2" -> code.WeakHash
+  mark "createHash" val "sha1" -> code.WeakHash
+  mark "createHash" val "ripemd" -> code.WeakHash
 
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.
