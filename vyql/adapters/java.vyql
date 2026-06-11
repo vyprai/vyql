@@ -83,8 +83,10 @@ adapter java {
   sink method "parse" -> code.XmlParse
   sink method "newDocumentBuilder" -> code.XmlParse
 
-  // Path / file
-  sink path "File" -> code.FilePathAccess
+  // Path / file. `new File(parent, child)` puts the tainted child path at arg 1, and
+  // Paths.get(first, …more) / Files.write(path, …) likewise vary the path position — arg all.
+  sink path "File" arg all -> code.FilePathAccess
+  sink path "Paths.get" arg all -> code.FilePathAccess
   sink path "FileInputStream" -> code.FilePathAccess
   sink path "FileOutputStream" -> code.FilePathAccess
   sink path "FileReader" -> code.FilePathAccess
