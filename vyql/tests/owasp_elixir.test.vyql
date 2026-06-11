@@ -1,0 +1,42 @@
+# OWASP-replica coverage for Elixir — true positive plus opaque-predicate pruning.
+
+test "elixir: Phoenix params -> System.shell is command injection"
+  lang elixir
+  expect VYQL-INJ-002
+  code
+  ```
+  defmodule H do
+    def h(conn, params) do
+      name = params["q"]
+      System.shell(name)
+    end
+  end
+  ```
+
+test "elixir: if selecting the tainted arm is still cmdi (no FN)"
+  lang elixir
+  expect VYQL-INJ-002
+  code
+  ```
+  defmodule H do
+    def h(conn, params) do
+      name = params["q"]
+      c = if 1 < 100, do: name, else: "ls"
+      System.shell(c)
+    end
+  end
+  ```
+
+test "elixir: opaque-false if selects the clean arm — clean cmdi"
+  lang elixir
+  reject VYQL-INJ-002
+  code
+  ```
+  defmodule H do
+    def h(conn, params) do
+      name = params["q"]
+      c = if 1 > 100, do: name, else: "ls"
+      System.shell(c)
+    end
+  end
+  ```

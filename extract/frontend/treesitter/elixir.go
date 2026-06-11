@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	elixir "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/elixir"
 
@@ -199,22 +201,26 @@ func (c *exConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(kids) > 0 {
 			base = c.expr(kids[0])
 		}
-		return nir.Index{Base: base, Path: c.dotted(n), Loc: L}
+		return nir.Index{Base: base, Key: c.expr(field(n, "key")), Path: c.dotted(n), Loc: L}
 	case "binary_operator":
 		op := c.text(field(n, "operator"))
 		l, r := field(n, "left"), field(n, "right")
 		switch op {
-		case "<>", "+", "<<>>":
+		case "<>", "+", "<<>>", "++", "--":
+			// string/list concatenation and numeric `+` — taint-propagating union.
 			return nir.Format{Parts: []nir.Expr{c.expr(l), c.expr(r)}, Loc: L}
 		case "|>":
 			// a |> f(b…)  ==  f(a, b…): the LHS flows in as the first argument.
 			return c.pipe(l, r, L)
 		}
-		return nir.Seq{Parts: []nir.Expr{c.expr(l), c.expr(r)}, Loc: L}
+		// comparison / arithmetic / boolean operators carry their op for constant folding.
+		return nir.BinOp{Op: op, Left: c.expr(l), Right: c.expr(r), Loc: L}
 	case "unary_operator":
+		op := c.text(field(n, "operator"))
 		if kids := namedChildren(n); len(kids) > 0 {
-			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
+			return nir.Unary{Op: op, Operand: c.expr(kids[len(kids)-1]), Loc: L}
 		}
+		return nir.Const{Loc: L}
 	case "list", "tuple", "bitstring":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
@@ -239,12 +245,21 @@ func (c *exConv) expr(n *tree_sitter.Node) nir.Expr {
 	return nir.Seq{Parts: parts, Loc: L}
 }
 
-// callExpr lowers a function/module call to nir.Call with a dotted path.
+// callExpr lowers a function/module call to nir.Call with a dotted path. The macro
+// calls `if`/`unless` are modeled as a Ternary so a constant predicate prunes an arm.
 func (c *exConv) callExpr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
 	kids := namedChildren(n)
 	if len(kids) == 0 {
 		return nir.Const{Loc: L}
+	}
+	if kids[0].Kind() == "identifier" {
+		switch c.text(kids[0]) {
+		case "if":
+			return c.exIf(n, false)
+		case "unless":
+			return c.exIf(n, true)
+		}
 	}
 	fn := kids[0]
 	path := c.dotted(fn)
@@ -255,6 +270,67 @@ func (c *exConv) callExpr(n *tree_sitter.Node) nir.Expr {
 		}
 	}
 	return nir.Call{Callee: c.expr(fn), Args: args, Path: path, Method: lastSeg(path), Loc: L}
+}
+
+// exIf models `if cond, do: A, else: B` (keyword form) and `if cond do A else B end`
+// (block form) as a Ternary. `unless` inverts the predicate, which we don't fold, so it
+// over-approximates (both arms flow) — FN-safe.
+func (c *exConv) exIf(n *tree_sitter.Node, unless bool) nir.Expr {
+	L := c.loc(n)
+	var cond, thenE, elseE nir.Expr = nir.Const{Loc: L}, nir.Const{Loc: L}, nir.Const{Loc: L}
+	if args := lastChildKind(n, "arguments"); args != nil {
+		ak := namedChildren(args)
+		if len(ak) > 0 {
+			cond = c.expr(ak[0])
+		}
+		for _, a := range ak[1:] {
+			if a.Kind() == "keywords" {
+				c.exDoElse(a, &thenE, &elseE)
+			}
+		}
+	}
+	if do := lastChildKind(n, "do_block"); do != nil {
+		c.exDoBlock(do, &thenE, &elseE)
+	}
+	if unless {
+		return nir.Seq{Parts: []nir.Expr{thenE, elseE}, Loc: L}
+	}
+	return nir.Ternary{Cond: cond, Then: thenE, Else: elseE, Loc: L}
+}
+
+// exDoElse reads do:/else: pairs from a keyword list.
+func (c *exConv) exDoElse(kw *tree_sitter.Node, thenE, elseE *nir.Expr) {
+	for _, pr := range namedChildren(kw) {
+		if pr.Kind() != "pair" {
+			continue
+		}
+		key := c.text(field(pr, "key"))
+		val := c.expr(field(pr, "value"))
+		switch {
+		case strings.HasPrefix(key, "do"):
+			*thenE = val
+		case strings.HasPrefix(key, "else"):
+			*elseE = val
+		}
+	}
+}
+
+// exDoBlock takes the tail value of a do-block's then-part and its else_block.
+func (c *exConv) exDoBlock(do *tree_sitter.Node, thenE, elseE *nir.Expr) {
+	var thenVals []nir.Expr
+	for _, ch := range namedChildren(do) {
+		if ch.Kind() == "else_block" {
+			ek := namedChildren(ch)
+			if len(ek) > 0 {
+				*elseE = c.expr(ek[len(ek)-1])
+			}
+			continue
+		}
+		thenVals = append(thenVals, c.expr(ch))
+	}
+	if len(thenVals) > 0 {
+		*thenE = thenVals[len(thenVals)-1]
+	}
 }
 
 // pipe rewrites `left |> right` so the left value flows into the right call as its
