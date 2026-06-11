@@ -25,4 +25,16 @@ adapter lua {
   sink path "io.lines" -> code.FilePathAccess
   sink path "os.remove" -> code.FilePathAccess
   sink path "os.rename" -> code.FilePathAccess
+
+  // SQL — luasql conn:execute / resty.mysql db:query (raw query string)
+  sink method "query" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+
+  // XSS — OpenResty response writers reflect tainted output
+  sink path "ngx.say" -> code.HtmlRender
+  sink path "ngx.print" -> code.HtmlRender
+
+  // SSRF — luasocket http.request / resty.http request_uri
+  sink path "http.request" -> code.UrlFetch
+  sink method "request_uri" -> code.UrlFetch
 }
