@@ -1,0 +1,34 @@
+// groovy framework adapter (docs/07) — Jenkins pipelines / Gradle / groovy.sql.
+// Member access is dotted (sql.execute); `+` and GString interpolation build
+// tainted strings. Jenkins build params (params.X) and env (env.X) are inputs.
+adapter groovy {
+  meta { fidelity: resolved }
+
+  // untrusted input — Jenkins build parameters + environment
+  source "params" -> code.HttpInput
+  source "env" -> code.EnvVariable
+  source "request.getParameter" -> code.HttpInput
+
+  // command execution — Jenkins sh/bat steps + Runtime.exec
+  sink path "sh" -> code.CommandExecution
+  sink path "bat" -> code.CommandExecution
+  sink path "Runtime.exec" -> code.CommandExecution
+  sink method "exec" -> code.CommandExecution
+
+  // code evaluation (CWE-95) — Eval / GroovyShell
+  sink path "Eval.me" -> code.CodeEval
+  sink path "Eval.x" -> code.CodeEval
+  sink path "Eval.xy" -> code.CodeEval
+  sink method "evaluate" -> code.CodeEval
+
+  // SQL — groovy.sql.Sql raw queries
+  sink method "execute" -> code.SqlExecution
+  sink method "executeInsert" -> code.SqlExecution
+  sink method "executeUpdate" -> code.SqlExecution
+  sink method "rows" -> code.SqlExecution
+  sink method "eachRow" -> code.SqlExecution
+  sink method "firstRow" -> code.SqlExecution
+
+  // path / file
+  sink path "File" -> code.FilePathAccess
+}

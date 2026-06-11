@@ -317,6 +317,7 @@ var extTech = map[string]string{
 	".xml": "config", ".plist": "config",
 	".ex": "elixir", ".exs": "elixir",
 	".dart": "dart",
+	".groovy": "groovy", ".gradle": "groovy",
 }
 
 // nodeTech returns the language technology of a node from its loc ("file.ext:line").
@@ -411,6 +412,7 @@ func matchPath(path string, patterns []string, mode string) bool {
 func ConfigAdapters() []adapters.Adapter { return AdaptersFor("config") }
 func ElixirAdapters() []adapters.Adapter { return AdaptersFor("elixir") }
 func DartAdapters() []adapters.Adapter   { return AdaptersFor("dart") }
+func GroovyAdapters() []adapters.Adapter { return AdaptersFor("groovy") }
 func PythonAdapters() []adapters.Adapter { return AdaptersFor("python") }
 func JsAdapters() []adapters.Adapter     { return AdaptersFor("javascript") }
 func RubyAdapters() []adapters.Adapter   { return AdaptersFor("ruby") }

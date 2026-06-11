@@ -52,6 +52,7 @@ var primaryExt = map[string]string{
 	"config":  ".xml",
 	"elixir":  ".ex",
 	"dart":    ".dart",
+	"groovy":  ".groovy",
 }
 
 func parseSpecFile(t *testing.T, path string) []vyqlSpec {
