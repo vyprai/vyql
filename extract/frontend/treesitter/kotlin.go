@@ -135,10 +135,53 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_expression":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
-	case "when_expression", "statements", "control_structure_body":
+	case "when_expression":
+		return []nir.Stmt{c.ktWhen(n)}
+	case "statements", "control_structure_body":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
+}
+
+// ktWhen lowers a `when` to a subject+labelled nir.Switch so a constant subject prunes
+// the non-matching arms (instead of flattening, which let a later arm's clean
+// reassignment mask a live arm's taint).
+func (c *ktConv) ktWhen(n *tree_sitter.Node) nir.Stmt {
+	sw := nir.Switch{Loc: c.loc(n)}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "when_subject":
+			if k := namedChildren(ch); len(k) > 0 {
+				sw.Subject = c.expr(k[len(k)-1])
+			}
+		case "when_entry":
+			var labs []nir.Expr
+			var stmts []nir.Stmt
+			hasCond := false
+			for i := uint(0); i < ch.ChildCount(); i++ {
+				e := ch.Child(i)
+				if !e.IsNamed() {
+					continue
+				}
+				if ch.FieldNameForChild(uint32(i)) == "condition" {
+					hasCond = true
+					labs = append(labs, c.expr(e))
+					continue
+				}
+				switch e.Kind() {
+				case "block", "control_structure_body", "statements":
+					stmts = append(stmts, c.collectBlocks(e)...)
+				}
+			}
+			if !hasCond { // the `else` arm
+				sw.Default = append(sw.Default, stmts...)
+			} else {
+				sw.Cases = append(sw.Cases, stmts)
+				sw.Labels = append(sw.Labels, labs)
+			}
+		}
+	}
+	return sw
 }
 
 // opToken returns the operator symbol of a binary node (the first non-named child).
@@ -333,7 +376,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "boolean_literal", "null_literal":
 		return nir.Const{Loc: L, Value: c.text(n)}
-	case "integer_literal", "real_literal", "character_literal", "long_literal", "hex_literal":
+	case "integer_literal", "real_literal", "character_literal", "long_literal", "hex_literal", "number_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "comparison_expression", "equality_expression":
 		k := namedChildren(n)
@@ -365,11 +408,14 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(c.valueArgs(n)), Path: path, Method: lastSeg(path), Loc: L}
 	case "indexing_expression":
 		k := namedChildren(n)
-		var base nir.Expr = nir.Const{Loc: L}
+		var base, key nir.Expr = nir.Const{Loc: L}, nil
 		if len(k) > 0 {
 			base = c.expr(k[0])
 		}
-		return nir.Index{Base: base, Path: c.dotted(n), Loc: L}
+		if len(k) > 1 {
+			key = c.expr(k[len(k)-1])
+		}
+		return nir.Index{Base: base, Key: key, Path: c.dotted(n), Loc: L}
 	case "binary_expression", "additive_expression":
 		l := field(n, "left")
 		r := field(n, "right")
@@ -381,10 +427,16 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		// "+" string concat (and Kotlin has no other taint-relevant binary) → Format
 		return nir.Format{Parts: []nir.Expr{c.expr(l), c.expr(r)}, Loc: L}
-	case "parenthesized_expression", "as_expression", "postfix_expression", "prefix_expression":
+	case "parenthesized_expression", "as_expression", "postfix_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
+	case "prefix_expression":
+		var operand nir.Expr = nir.Const{Loc: L}
+		if k := namedChildren(n); len(k) > 0 {
+			operand = c.expr(k[len(k)-1])
+		}
+		return nir.Unary{Op: c.opToken(n), Operand: operand, Loc: L}
 	case "elvis_expression", "if_expression", "when_expression":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {

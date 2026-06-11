@@ -24,3 +24,35 @@ test "kotlin: opaque if/else assigns constant on the live branch — clean SQLi"
     st.executeQuery("SELECT * FROM u WHERE id='" + bar + "'")
   }
   ```
+
+test "kotlin: opaque when routes taint to a dead arm — clean SQLi"
+  lang kotlin
+  reject VYQL-INJ-001
+  code
+  ```
+  fun h(req: HttpServletRequest, st: Statement) {
+    val p = req.getParameter("id")
+    var bar = "ok"
+    when (1) {
+      9 -> { bar = p }
+      else -> { bar = "safe" }
+    }
+    st.executeQuery("SELECT * FROM u WHERE id='" + bar + "'")
+  }
+  ```
+
+test "kotlin: tainted assign in a live when arm is still SQLi (no FN)"
+  lang kotlin
+  expect VYQL-INJ-001
+  code
+  ```
+  fun h(req: HttpServletRequest, st: Statement) {
+    val p = req.getParameter("id")
+    var bar = "ok"
+    when (1) {
+      1 -> { bar = p }
+      else -> { bar = "safe" }
+    }
+    st.executeQuery("SELECT * FROM u WHERE id='" + bar + "'")
+  }
+  ```
