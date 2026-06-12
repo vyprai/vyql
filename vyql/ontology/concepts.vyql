@@ -444,6 +444,11 @@ concept LdapEscape : control {
   cwe: [CWE_90]
   applies: path
 }
+concept XpathEscape : control {
+  neutralizes: [injection.XpathInjection]
+  cwe: [CWE_643]
+  applies: path
+}
 concept MfaRequirement : control {
   neutralizes: [authentication.ImproperAuthentication]
   cwe: [CWE_287]

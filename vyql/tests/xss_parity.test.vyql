@@ -1,8 +1,8 @@
 # XSS (CWE-79) coverage for web languages that lacked an HtmlRender sink.
 
-test "go: query param -> template.HTML is template injection (already covered)"
+test "go: query param -> template.HTML is reflected XSS (CWE-79)"
   lang go
-  expect VYQL-INJ-008
+  expect VYQL-INJ-004
   code
   ```
   package m

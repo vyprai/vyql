@@ -45,6 +45,7 @@ rule Ldap {
 rule Xpath {
   meta { id: "VYQL-INJ-006", severity: high, cwe: [CWE_643] }
   taint core.UserControlledData -> code.XpathQuery
+  unless sanitized_by core.XpathEscape
 }
 
 rule Nosql {

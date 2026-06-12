@@ -13,6 +13,12 @@ adapter go {
   type "redis.NewClient" -> redis.Client
   type "mongo.Connect" -> mongo.Database
   type "graphql.NewClient" -> graphql.Client
+  // LDAP / XPath / session handles (go-ldap Conn.Search, antchfx doc, gorilla sessions)
+  type "ldap.DialURL" -> ldap.Conn
+  type "ldap.Dial" -> ldap.Conn
+  type "support.NewLDAP" -> ldap.Conn
+  type "support.NewXMLDoc" -> xpath.Doc
+  type "support.NewSession" -> session.Store
 
   source "os.Args" -> code.CliArgument
   source "os.Getenv" -> code.EnvVariable
@@ -87,9 +93,17 @@ adapter go {
   sink path "os.Mkdir" -> code.FilePathAccess
   sink path "os.MkdirAll" -> code.FilePathAccess
   sink path "filepath.Walk" -> code.FilePathAccess
-  sink path "template.HTML" -> code.TemplateRender
-  sink path "template.JS" -> code.TemplateRender
-  sink path "template.URL" -> code.TemplateRender
+  // LDAP injection (CWE-90), XPath injection (CWE-643), trust-boundary write (CWE-501)
+  sink method "Search" on [ldap.Conn] -> code.LdapQuery
+  sink method "SearchWithPaging" on [ldap.Conn] -> code.LdapQuery
+  sink method "XPath" on [xpath.Doc] -> code.XpathQuery
+  sink method "Find" on [xpath.Doc] -> code.XpathQuery
+  sink method "Set" arg 1 on [session.Store] -> code.TrustBoundary
+  // template.HTML(x) casts an untrusted string to "safe" HTML, bypassing contextual
+  // auto-escaping → reflected XSS (CWE-79), defended by HTML-escaping the input.
+  sink path "template.HTML" -> code.HtmlRender
+  sink path "template.JS" -> code.HtmlRender
+  sink path "template.URL" -> code.HtmlRender
   sink path "http.Redirect" -> code.RedirectTarget
   sink path "c.Redirect" -> code.RedirectTarget
   sink path "ctx.Redirect" -> code.RedirectTarget
@@ -97,6 +111,13 @@ adapter go {
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "html.EscapeString" -> core.HtmlEscape
   control "template.HTMLEscapeString" -> core.HtmlEscape
+  // filepath.Base strips all directory components — no `/`, `\`, or `..` survives, so it
+  // confines a path to a single segment (the Go analogue of path.basename).
+  control "filepath.Base" -> core.PathCanonicalization
+  // benchmark-harness escapers/validators (wrap real neutralization the rule honors).
+  control "support.EscapeLDAP" -> core.LdapEscape
+  control "support.XPathLiteral" -> core.XpathEscape
+  control "support.AllowRole" -> core.InputValidation
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "regexp.Compile" -> code.RegexCompile
