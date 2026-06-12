@@ -15,6 +15,7 @@ adapter go {
   type "graphql.NewClient" -> graphql.Client
 
   source "os.Args" -> code.CliArgument
+  source "os.Getenv" -> code.EnvVariable
   source "flag.Arg" -> code.CliArgument
   source "flag.Args" -> code.CliArgument
   source ".URL.Query" -> code.HttpInput
@@ -105,6 +106,22 @@ adapter go {
   // weak crypto (CWE-327) — presence marker on the call node
   mark "md5.New" -> code.WeakHash
   mark "sha1.New" -> code.WeakHash
+  // one-shot digests: md5.Sum(b) / sha1.Sum(b) are the common Go idiom alongside .New().
+  mark "md5.Sum" -> code.WeakHash
+  mark "sha1.Sum" -> code.WeakHash
+
+  // insecure randomness (CWE-330) — math/rand. The math/rand-only methods (Intn/Int31/
+  // Int63/Float64/Perm/Shuffle) disambiguate from crypto/rand (which has Read/Int/Prime).
+  mark "rand.Intn" -> code.WeakRandomValue
+  mark "rand.Int31" -> code.WeakRandomValue
+  mark "rand.Int31n" -> code.WeakRandomValue
+  mark "rand.Int63" -> code.WeakRandomValue
+  mark "rand.Int63n" -> code.WeakRandomValue
+  mark "rand.Float64" -> code.WeakRandomValue
+  mark "rand.Float32" -> code.WeakRandomValue
+  mark "rand.Perm" -> code.WeakRandomValue
+  mark "rand.Shuffle" -> code.WeakRandomValue
+  mark "rand.NewSource" -> code.WeakRandomValue
 
   // weak cipher (CWE-327) — named broken ciphers
   mark "des.NewCipher" -> code.WeakCipher

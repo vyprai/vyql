@@ -19,12 +19,67 @@ import (
 	"github.com/vyprai/vyql/extract/nir"
 )
 
+// modCache memoizes go.mod lookups by directory: dir -> (module path, module root dir).
+type modInfo struct{ path, dir string }
+
+// pkgKeyFor returns the module key for a .go file's package. When a go.mod is found by
+// walking up from the file, the key is the real Go IMPORT PATH (module path + dir relative to
+// the module root) — so a cross-package call like `support.Run(x)` resolves to that package's
+// functions (imports record import paths, not directory names). Without a go.mod it falls
+// back to the directory path, preserving the prior same-package-only behavior.
+func pkgKeyFor(fileAbs, fallback string, cache map[string]*modInfo) string {
+	dir := filepath.Dir(fileAbs)
+	d := dir
+	for {
+		if mi, ok := cache[d]; ok {
+			if mi == nil {
+				return fallback
+			}
+			return importPath(mi, dir)
+		}
+		if data, err := os.ReadFile(filepath.Join(d, "go.mod")); err == nil {
+			mi := &modInfo{path: modulePath(data), dir: d}
+			cache[d] = mi
+			if mi.path != "" {
+				return importPath(mi, dir)
+			}
+			return fallback
+		}
+		parent := filepath.Dir(d)
+		if parent == d { // reached filesystem root with no go.mod
+			cache[dir] = nil
+			return fallback
+		}
+		d = parent
+	}
+}
+
+func importPath(mi *modInfo, fileDir string) string {
+	rel, err := filepath.Rel(mi.dir, fileDir)
+	if err != nil || rel == "." || rel == "" {
+		return mi.path
+	}
+	return mi.path + "/" + filepath.ToSlash(rel)
+}
+
+// modulePath extracts the module path from go.mod's `module <path>` directive.
+func modulePath(gomod []byte) string {
+	for _, line := range strings.Split(string(gomod), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "module ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "module "))
+		}
+	}
+	return ""
+}
+
 // ExtractDir parses every .go file under root (recursively, skipping vendor,
 // testdata, and _test.go files) and returns one NIR Program. Files are grouped
-// into modules by their package directory (relative to root), so same-package
-// calls resolve interprocedurally.
+// into modules by their Go import path (from the enclosing go.mod) so BOTH same-package and
+// cross-package (imported-helper) calls resolve interprocedurally.
 func ExtractDir(root string) (nir.Program, error) {
 	byPkg := map[string]*nir.Module{}
+	modCache := map[string]*modInfo{}
 	fset := token.NewFileSet()
 
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -44,7 +99,11 @@ func ExtractDir(root string) (nir.Program, error) {
 		if rerr != nil {
 			rel = path
 		}
-		pkgKey := filepath.Dir(rel)
+		abs, aerr := filepath.Abs(path)
+		if aerr != nil {
+			abs = path
+		}
+		pkgKey := pkgKeyFor(abs, filepath.Dir(rel), modCache)
 		f, perr := parser.ParseFile(fset, path, nil, 0)
 		if perr != nil {
 			return nil // skip unparseable files (robustness, docs/20)
@@ -79,6 +138,7 @@ func ExtractFiles(files []string) (nir.Program, error) { return Extract(files, "
 // frontend signature the CLI dispatcher calls for every language.
 func Extract(files []string, root string) (nir.Program, error) {
 	byPkg := map[string]*nir.Module{}
+	modCache := map[string]*modInfo{}
 	fset := token.NewFileSet()
 	for _, path := range files {
 		f, err := parser.ParseFile(fset, path, nil, 0)
@@ -91,7 +151,11 @@ func Extract(files []string, root string) (nir.Program, error) {
 				display = rel
 			}
 		}
-		pkgKey := filepath.Dir(display)
+		abs, aerr := filepath.Abs(path)
+		if aerr != nil {
+			abs = path
+		}
+		pkgKey := pkgKeyFor(abs, filepath.Dir(display), modCache)
 		mod := byPkg[pkgKey]
 		if mod == nil {
 			mod = &nir.Module{Key: pkgKey, File: display}

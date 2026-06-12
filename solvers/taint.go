@@ -115,9 +115,26 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	for src := range sourceNodes {
 		var livePaths [][]string
 		var killed [][2]string
+		// Memoize (node, sanitized-state) within this source's traversal. Without it the DFS
+		// ENUMERATES every distinct path; a diamond-shaped graph — which a shared helper
+		// (one callee reached from N call sites and feeding N results) produces — has an
+		// exponential number of paths, so a few hundred call sites take minutes. Each (node,
+		// sanitized) pair is explored once: the sinks reachable below a node depend only on the
+		// node and whether the prefix was already sanitized, not on which prefix reached it, and
+		// only one witness per sink is reported anyway. A node first seen sanitized can still be
+		// re-explored unsanitized (the more permissive state) — the bool is part of the key.
+		visited := map[string]bool{}
 
 		var dfs func(nodeID string, path []string, sanitized bool, killers [][2]string)
 		dfs = func(nodeID string, path []string, sanitized bool, killers [][2]string) {
+			vkey := nodeID + "\x00f"
+			if sanitized {
+				vkey = nodeID + "\x00t"
+			}
+			if visited[vkey] {
+				return
+			}
+			visited[vkey] = true
 			concepts := nodeConcepts(store, nodeID)
 			nowSan := sanitized
 			local := killers
