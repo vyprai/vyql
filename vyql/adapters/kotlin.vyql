@@ -69,9 +69,34 @@ adapter kotlin {
   mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
   mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
 
+  // XSS (CWE-79) — servlet response writers (JVM-shared with Java)
+  sink method "println" arg all -> code.HtmlRender
+  sink method "print" arg all -> code.HtmlRender
+  sink method "write" arg all -> code.HtmlRender
+  // insecure randomness (CWE-330)
+  mark "java.util.Random" -> code.WeakRandomValue
+  mark "Random" -> code.WeakRandomValue
+  mark "Math.random" -> code.WeakRandomValue
+  // insecure cookie (CWE-614)
+  mark "setHttpOnly" val "false" -> code.InsecureCookie
+  mark "setSecure" val "false" -> code.InsecureCookie
+  // trust boundary (CWE-501) — untrusted data into the session
+  sink method "setAttribute" arg all -> code.TrustBoundary
+  sink method "putValue" arg all -> code.TrustBoundary
+  // LDAP (CWE-90) / XPath (CWE-643) — JNDI DirContext.search(filter@arg1), javax.xml XPath
+  sink method "search" arg 1 -> code.LdapQuery
+  sink method "evaluate" arg 0 -> code.XpathQuery
+
   // controls
   control "encodeForHTML" -> core.HtmlEscape
   control "escapeHtml4" -> core.HtmlEscape
+  control "escapeHtml" -> core.HtmlEscape
+  control "encodeForLDAP" -> core.LdapEscape
+  control "escapeShell" -> core.ShellEscape
+  control "safePath" -> core.PathCanonicalization
+  control "validateRole" -> core.InputValidation
+  control "canonicalPath" -> core.PathCanonicalization
+  control "getCanonicalPath" -> core.PathCanonicalization
 
   // csrf disabled (CWE-352) — presence marker
   mark "csrf.disable" -> code.CsrfDisabled
