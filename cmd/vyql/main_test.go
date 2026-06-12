@@ -221,6 +221,42 @@ func TestScanPythonInOperatorIdioms(t *testing.T) {
 	}
 }
 
+// vulnReplaceInsert interpolates user input as the REPLACEMENT argument of .replace() —
+// `template.replace('{{value}}', payload)`. The payload is inserted verbatim, NOT filtered,
+// so this is a CONFIDENT XSS finding, not a char-filter assumption.
+const vulnReplaceInsert = `function handler(req, res) {
+  const payload = req.query.value;
+  const html = '<article>{{value}}</article>'.replace('{{value}}', payload);
+  res.type('html').send(html);
+}
+`
+
+func TestScanReplaceReplacementNotFiltered(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "x.js"), []byte(vulnReplaceInsert), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var xss *findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-INJ-004" {
+			xss = f
+		}
+	}
+	if xss == nil {
+		t.Fatalf("expected an XSS finding for replace-inserted payload, got %d findings", len(fs))
+	}
+	for _, ne := range xss.NegationEvidence {
+		if strings.Contains(ne.Clause, "char-filter") {
+			t.Fatalf("payload is the .replace() REPLACEMENT (inserted verbatim), not filtered — must NOT carry a char-filter assumption; got %q", ne.Detail)
+		}
+	}
+}
+
 func TestScanPathsNoSource(t *testing.T) {
 	rules, _ := loadRules("")
 	if _, _, err := scanPaths([]string{t.TempDir()}, rules); err == nil {

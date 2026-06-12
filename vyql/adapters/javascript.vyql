@@ -279,9 +279,11 @@ adapter javascript {
   assume guard method "endsWith"     -> code.FilePathAccess
   assume guard method "includes"     -> code.FilePathAccess
   assume guard method "startsWith"   -> code.TrustBoundary
-  // path.normalize / path.resolve canonicalize but do NOT confine to a base dir.
-  assume sanitizer path "path.normalize" -> code.FilePathAccess
-  assume sanitizer path "path.resolve"   -> code.FilePathAccess
+  // NB: path.normalize / path.resolve are NOT listed as assume-sanitizers. They canonicalize
+  // but make no attempt to confine to a base dir (path.resolve('/files','../../etc')='/etc'),
+  // so they are not even *plausible* neutralizers — a flow through them is a confident finding,
+  // not an assumption. What makes a path case safe is a containment guard (startsWith, above)
+  // or path.basename (a sound control), each handled on its own.
   // Custom / library LDAP & XPath escapers we cannot verify are complete for the sink grammar.
   assume sanitizer method "ldapEscape"      -> code.LdapQuery
   assume sanitizer path   "ldap.escapeFilter" -> code.LdapQuery

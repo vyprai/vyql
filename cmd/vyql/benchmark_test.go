@@ -63,11 +63,23 @@ func TestOWASPBenchmark(t *testing.T) {
 	// bucket) — this measures "zero FP without assumption": every FP an unsound neutralizer
 	// explains drops out, leaving the near-zero-FP confident scorecard.
 	confidentOnly := os.Getenv("BENCH_CONFIDENT") != ""
+	noteCat := os.Getenv("BENCH_NOTE_CAT") // print the assumption note of each noted finding in this category
 	detected := map[string]map[string]bool{}
 	for _, f := range fs {
 		cat := ruleCategory[f.RuleID]
 		if cat == "" {
 			continue
+		}
+		if noteCat != "" && cat == noteCat && hasAssumptionNote(f) {
+			for _, ne := range f.NegationEvidence {
+				if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+					tn := ""
+					if len(f.Bindings) > 0 {
+						tn = testNameOf(f.Bindings[len(f.Bindings)-1].Loc)
+					}
+					fmt.Printf("NOTE %s [%s] %s\n", tn, ne.Clause, ne.Detail)
+				}
+			}
 		}
 		if confidentOnly && hasAssumptionNote(f) {
 			continue

@@ -260,11 +260,24 @@ func intersect(a, b map[string]bool) bool {
 // live taint path — meaning vyql could NOT prove it neutralizes this sink's dangerous
 // chars (a sound allowlist filter would have killed the flow already).
 func (e *Engine) weakCharFilter(path []string, dangerous string) string {
+	onPath := make(map[string]bool, len(path))
+	for _, id := range path {
+		onPath[id] = true
+	}
 	for _, id := range path {
 		labels, _ := e.Store.Labels(id)
 		for _, l := range labels {
 			if l.Concept != "core.CharFilter" {
 				continue
+			}
+			// A replace FILTERS its subject but emits its REPLACEMENT verbatim (arg1, in both
+			// `s.replace(pat,repl)` and `re.sub(pat,repl,s)`). If the taint entered through the
+			// replacement, the filter never touched it — it is template insertion, not
+			// sanitization — so this is a confident finding, not an assumption.
+			if n, ok, _ := e.Store.GetNode(id); ok {
+				if a1 := n.Prop("arg1"); a1 != "" && onPath[a1] {
+					continue
+				}
 			}
 			pat := l.Detail["pattern"]
 			if dangerous == "" {
