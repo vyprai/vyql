@@ -69,6 +69,11 @@ type lowerer struct {
 	// keys/indices, so `m.put("kB", tainted); m.get("kA")` reads a clean element rather
 	// than the whole (over-approximated) container. Keyed by container node id.
 	containers map[string]*containerInfo
+
+	// lambdaParams maps a lowered function-value node (a passed callback) to its parameter
+	// node ids, so a higher-order call (arr.map(cb), p.then(cb)) can route the receiver's
+	// taint into the callback's parameters.
+	lambdaParams map[string][]string
 }
 
 type containerInfo struct {
@@ -105,6 +110,14 @@ var mutatorMethods = map[string]bool{
 
 // keyedMutators map a key/value position: `m.put(key, val)` / `list.set(i, val)`.
 var keyedMutators = map[string]bool{"put": true, "putIfAbsent": true, "set": true}
+
+// elementCallbackMethods invoke their callback with a value derived from the receiver
+// (array element / resolved promise value), so the receiver's taint flows into the
+// callback's first parameter.
+var elementCallbackMethods = map[string]bool{
+	"forEach": true, "map": true, "filter": true, "find": true, "findIndex": true,
+	"some": true, "every": true, "flatMap": true, "then": true, "catch": true, "finally": true,
+}
 
 // appendMutators add at the next sequence index: `list.add(val)` / `sb.append(val)`.
 var appendMutators = map[string]bool{
@@ -608,6 +621,7 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		classFields:    map[string]map[string]string{},
 		importTables:   map[string]map[string]importEntry{},
 		containers:     map[string]*containerInfo{},
+		lambdaParams:   map[string][]string{},
 	}
 	if err := l.run(); err != nil {
 		return nil, err
@@ -989,11 +1003,16 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
 		// thunk, .then, event handler) thus fires with the captured taint.
 		inner := sc.clone()
+		var paramNodes []string
 		for _, p := range ex.Params {
-			inner.node[p] = l.node("Param", ex.Loc, map[string]string{"name": p})
+			pn := l.node("Param", ex.Loc, map[string]string{"name": p})
+			inner.node[p] = pn
+			paramNodes = append(paramNodes, pn)
 		}
 		l.block(ex.Body, inner)
-		return l.node("Func", ex.Loc, nil)
+		fn := l.node("Func", ex.Loc, nil)
+		l.lambdaParams[fn] = paramNodes // for higher-order callback dispatch
+		return fn
 	}
 	return l.node("Const", "?:0", nil)
 }
@@ -1089,9 +1108,11 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// label an arg position as a sink even when the value is itself a source —
 	// e.g. yaml.load(request_input).
 	var args []string
+	var argVals []string // the eval'd value node per arg (a Func node for a callback)
 	var valToks []string // literal value tokens for value-matching sinks (`val`/`nval`)
 	for _, a := range call.Args {
 		av := l.eval(a, sc)
+		argVals = append(argVals, av)
 		// Record the argument's NIR kind on the slot, so sink adapters can
 		// distinguish a raw-SQL string position (Format/Const/Name/…) from a
 		// collection literal (Seq — e.g. Rails `where(id: params[:id])`, which is
@@ -1173,6 +1194,17 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		if call.Method == "" && len(args) > 0 {
 			if attr, ok := call.Callee.(nir.Attr); ok && attr.Attr != "" {
 				l.flow(args[0], l.elemNode(recvNode, attr.Attr, call.Loc))
+			}
+		}
+		// higher-order callback dispatch: `recv.forEach(cb)` / `arr.map(cb)` / `p.then(cb)`
+		// invoke cb with a value derived from the receiver, so route the receiver's taint into
+		// the callback's first parameter (cb's body was lowered with that param node, so the
+		// existing edges carry it onward). FN-safe over-approximation.
+		if elementCallbackMethods[call.Method] {
+			for _, av := range argVals {
+				if ps := l.lambdaParams[av]; len(ps) > 0 {
+					l.flow(recvNode, ps[0])
+				}
 			}
 		}
 	}
