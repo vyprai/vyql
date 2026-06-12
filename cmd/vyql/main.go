@@ -36,22 +36,10 @@ import (
 const version = "0.1.0"
 
 func main() {
-	if len(os.Args) < 2 || os.Args[1] != "scan" {
+	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
 	}
-	fs := flag.NewFlagSet("scan", flag.ExitOnError)
-	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
-	format := fs.String("format", "text", "output format: text | sarif")
-	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
-	dump := fs.String("dump", "", "debug: dump the analysis graph instead of scanning (graph | taint)")
-	_ = fs.Parse(os.Args[2:])
-	paths := fs.Args()
-	if len(paths) == 0 {
-		usage()
-		os.Exit(2)
-	}
-
 	// the data dir (ontology/taxonomy/packs) is required; a missing one panics
 	// deep in loading — recover into a clean message rather than a stack trace.
 	defer func() {
@@ -61,19 +49,51 @@ func main() {
 		}
 	}()
 
-	if *dump != "" {
-		applyProfile(paths, *profileName)
-		if err := dumpGraph(paths, *dump); err != nil {
-			fmt.Fprintln(os.Stderr, "vyql: "+err.Error())
-			os.Exit(1)
-		}
-		return
+	cmd, args := os.Args[1], os.Args[2:]
+	var err error
+	switch cmd {
+	case "scan":
+		err = cmdScan(args)
+	case "trace":
+		err = cmdTrace(args)
+	case "explain":
+		err = cmdExplain(args)
+	case "match":
+		err = cmdMatch(args)
+	case "resolve":
+		err = cmdResolve(args)
+	case "query":
+		err = cmdQuery(args)
+	case "graph":
+		err = cmdGraph(args)
+	case "adapters":
+		err = cmdAdapters(args)
+	case "diff":
+		err = cmdDiff(args)
+	default:
+		usage()
+		os.Exit(2)
 	}
-
-	if err := run(paths, *rulesPath, *format, *profileName); err != nil {
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "vyql: "+err.Error())
 		os.Exit(1)
 	}
+}
+
+// cmdScan is the primary `vyql scan` command: full pipeline → findings report.
+func cmdScan(args []string) error {
+	fs := flag.NewFlagSet("scan", flag.ExitOnError)
+	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
+	format := fs.String("format", "text", "output format: text | sarif | json")
+	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
+	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
+	_ = fs.Parse(args)
+	paths := fs.Args()
+	if len(paths) == 0 {
+		usage()
+		os.Exit(2)
+	}
+	return run(paths, *rulesPath, *format, *profileName, *stats)
 }
 
 // applyProfile selects the threat-model profile (explicit name or auto-detected),
@@ -139,7 +159,7 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	return all, stats, nil
 }
 
-func run(paths []string, rulesPath, format, profileName string) error {
+func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
 	prof := applyProfile(paths, profileName)
 	src, err := loadRules(rulesPath)
 	if err != nil {
@@ -156,10 +176,16 @@ func run(paths []string, rulesPath, format, profileName string) error {
 		doc := sarif.ToSARIF(all, version, nil)
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
+	case "json":
+		b, _ := json.MarshalIndent(findingsJSON(all), "", "  ")
+		fmt.Println(string(b))
 	default:
 		fmt.Printf("threat model: %s (%s)\n\n", prof.Title, prof.Name)
 		printReport(all)
 		printSummary(stats, len(all))
+	}
+	if showStats {
+		printScanStats(paths)
 	}
 	return nil
 }
@@ -236,5 +262,16 @@ func printSummary(stats scanStats, n int) {
 func usage() {
 	fmt.Fprintln(os.Stderr, "vyql "+version+" — Vypr Query Language scanner")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "usage: vyql scan [-rules <file|dir>] [-format text|sarif] <path>...")
+	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "commands:")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats]")
+	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
+	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
+	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")
+	fmt.Fprintln(os.Stderr, "  match      list every node an adapter labelled (what matched which concept)")
+	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
+	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
+	fmt.Fprintln(os.Stderr, "  adapters   list an adapter's source/sink/control/mark/assume vocabulary   [-lang go]")
+	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }

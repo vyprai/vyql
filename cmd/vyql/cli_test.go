@@ -22,7 +22,7 @@ func writeTaintedPy(t *testing.T) string {
 func TestRunOutputFormats(t *testing.T) {
 	dir := writeTaintedPy(t)
 	for _, format := range []string{"text", "sarif"} {
-		if err := run([]string{dir}, "", format, "auto"); err != nil {
+		if err := run([]string{dir}, "", format, "auto", false); err != nil {
 			t.Errorf("run(format=%s) errored: %v", format, err)
 		}
 	}
@@ -31,7 +31,7 @@ func TestRunOutputFormats(t *testing.T) {
 func TestRunWithExplicitProfile(t *testing.T) {
 	dir := writeTaintedPy(t)
 	for _, prof := range []string{"auto", "generic", "web", "cli"} {
-		if err := run([]string{dir}, "", "text", prof); err != nil {
+		if err := run([]string{dir}, "", "text", prof, false); err != nil {
 			t.Errorf("run(--profile %s) errored: %v", prof, err)
 		}
 	}
@@ -39,14 +39,14 @@ func TestRunWithExplicitProfile(t *testing.T) {
 
 func TestRunInvalidRulesErrors(t *testing.T) {
 	dir := writeTaintedPy(t)
-	if err := run([]string{dir}, "/no/such/rules.vyql", "text", "auto"); err == nil {
+	if err := run([]string{dir}, "/no/such/rules.vyql", "text", "auto", false); err == nil {
 		t.Error("run with a nonexistent --rules path should error, not panic or pass")
 	}
 }
 
 func TestRunNoSourceErrors(t *testing.T) {
 	dir := t.TempDir() // empty — nothing to scan
-	if err := run([]string{dir}, "", "text", "auto"); err == nil {
+	if err := run([]string{dir}, "", "text", "auto", false); err == nil {
 		t.Error("run on a dir with no recognized source should error")
 	}
 }

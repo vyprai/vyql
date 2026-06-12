@@ -1,0 +1,753 @@
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/usg"
+)
+
+// ── vyql trace ──────────────────────────────────────────────────────────────────────
+// Trace taint from sources to sinks. For each source it prints the shortest FLOWS path to a
+// reachable sink (the flow vyql sees), or — when a source reaches NO sink — the frontier:
+// where the taint stopped, so a broken chain (an unresolved/cross-package call, a missing sink
+// label, a sanitizer kill) is visible at a glance. This is the "why is this (not) flagged?"
+// tool; it works on the same graph the engine evaluates, no rules needed.
+
+func cmdTrace(args []string) error {
+	fs := flag.NewFlagSet("trace", flag.ExitOnError)
+	from := fs.String("from", "", "only trace sources whose concept contains this substring (e.g. HttpInput)")
+	to := fs.String("to", "", "only count sinks whose concept contains this substring (e.g. SqlExecution)")
+	profileName := fs.String("profile", "auto", "threat-model profile")
+	_ = fs.Parse(args)
+	paths := fs.Args()
+	if len(paths) == 0 {
+		return fmt.Errorf("usage: vyql trace [-from CONCEPT] [-to CONCEPT] <path>...")
+	}
+	applyProfile(paths, *profileName)
+	g, _, err := buildGraph(paths)
+	if err != nil {
+		return err
+	}
+	if g == nil {
+		fmt.Println("(no analyzable source)")
+		return nil
+	}
+	nodes, _ := g.AllNodes()
+	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+
+	connected, dead := 0, 0
+	for _, n := range nodes {
+		if !isSource(g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
+			continue
+		}
+		path, sink := shortestToSink(g, n.ID, *to)
+		fmt.Printf("\nSOURCE %s @ %s {%s}\n", n.ID, n.Prop("loc"), conceptsOf(g, n.ID))
+		if sink != "" {
+			connected++
+			fmt.Printf("  ✓ reaches SINK %s @ %s {%s}\n", sink, locOf(g, sink), conceptsOf(g, sink))
+			for _, step := range path {
+				fmt.Printf("      → %s\n", traceNode(g, step))
+			}
+			continue
+		}
+		dead++
+		fmt.Printf("  ✗ reaches no %ssink — taint stops at:\n", toLabel(*to))
+		for _, f := range frontier(g, n.ID) {
+			fmt.Printf("      ⊣ %s\n", traceNode(g, f))
+		}
+	}
+	fmt.Printf("\n%d source(s): %d reach a sink, %d dead-end\n", connected+dead, connected, dead)
+	return nil
+}
+
+func toLabel(to string) string {
+	if to == "" {
+		return ""
+	}
+	return to + " "
+}
+
+// shortestToSink BFSes FLOWS edges and returns the shortest path (excluding the source) to the
+// first reachable sink-labelled node, or ("",[]) if none. `to` filters the sink concept.
+func shortestToSink(g usg.Store, src, to string) ([]string, string) {
+	type item struct{ id, prev string }
+	prev := map[string]string{src: ""}
+	queue := []string{src}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if cur != src && isSink(g, cur) && (to == "" || conceptMatch(g, cur, to)) {
+			var rev []string
+			for x := cur; x != "" && x != src; x = prev[x] {
+				rev = append([]string{x}, rev...)
+			}
+			return rev, cur
+		}
+		es, _ := g.OutEdges(cur, "FLOWS")
+		for _, e := range es {
+			if _, seen := prev[e.Dst]; !seen {
+				prev[e.Dst] = cur
+				queue = append(queue, e.Dst)
+			}
+		}
+	}
+	return nil, ""
+}
+
+// frontier returns the nodes where taint stopped: reachable Call nodes whose taint goes no
+// further toward a labelled node, plus any control (sanitizer/guard/assumption) that was hit.
+// These are the candidate "broken edges" — most often an unresolved or cross-package call.
+func frontier(g usg.Store, src string) []string {
+	seen := map[string]bool{src: true}
+	queue := []string{src}
+	var order []string
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		es, _ := g.OutEdges(cur, "FLOWS")
+		for _, e := range es {
+			if !seen[e.Dst] {
+				seen[e.Dst] = true
+				queue = append(queue, e.Dst)
+				order = append(order, e.Dst)
+			}
+		}
+	}
+	var out []string
+	for _, id := range order {
+		n, ok, _ := g.GetNode(id)
+		if !ok {
+			continue
+		}
+		// a terminal Call (taint reaches it but it has no outgoing FLOWS) is a likely
+		// unresolved/external callee — the classic cross-package dead-end.
+		es, _ := g.OutEdges(id, "FLOWS")
+		isControl := conceptsOf(g, id) != "" && !isSource(g, id)
+		if (n.Type == "code.Call" && len(es) == 0) || isControl {
+			out = append(out, id)
+		}
+		if len(out) >= 12 {
+			break
+		}
+	}
+	return out
+}
+
+func traceNode(g usg.Store, id string) string {
+	n, ok, _ := g.GetNode(id)
+	if !ok {
+		return id
+	}
+	s := fmt.Sprintf("%-8s %-13s %s", id, n.Type, n.Prop("loc"))
+	if p := n.Prop("callee_path"); p != "" {
+		s += "  call=" + p
+	} else if m := n.Prop("method"); m != "" {
+		s += "  method=" + m
+	}
+	if c := conceptsOf(g, id); c != "" {
+		s += "  {" + c + "}"
+	}
+	if n.Type == "code.Call" {
+		if es, _ := g.OutEdges(id, "FLOWS"); len(es) == 0 {
+			s += "  ⟂ no outgoing flow (callee not traced — external or cross-package)"
+		}
+	}
+	return s
+}
+
+func conceptMatch(g usg.Store, id, sub string) bool {
+	for _, l := range labelsOf(g, id) {
+		if strings.Contains(l, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+func labelsOf(g usg.Store, id string) []string {
+	labels, _ := g.Labels(id)
+	var cs []string
+	for _, l := range labels {
+		cs = append(cs, l.Concept)
+	}
+	return cs
+}
+
+func locOf(g usg.Store, id string) string {
+	if n, ok, _ := g.GetNode(id); ok {
+		return n.Prop("loc")
+	}
+	return "?"
+}
+
+// isSink reports whether a node carries a sink concept label (a `code.*` sink, i.e. not a
+// source and not a bare control).
+func isSink(g usg.Store, id string) bool {
+	for _, l := range labelsOf(g, id) {
+		if sinkConceptName(l) {
+			return true
+		}
+	}
+	return false
+}
+
+func sinkConceptName(c string) bool {
+	for _, s := range []string{"Execution", "Eval", "Render", "PathAccess", "Query", "Redirect",
+		"UrlFetch", "Deserial", "TemplateRender", "TrustBoundary", "RegexCompile", "MassAssign",
+		"ProtoPollute", "ExpressionEval", "WeakHash", "WeakCipher", "WeakRandom", "InsecureCookie"} {
+		if strings.Contains(c, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// ── vyql explain ────────────────────────────────────────────────────────────────────
+// Run the rules and print each finding's FULL proof: source/sink bindings (with the adapter
+// that labelled them), the witness path, and every negation-evidence clause (sanitizer/guard/
+// assumption notes) — the "why did this fire, and what almost stopped it" view.
+
+func cmdExplain(args []string) error {
+	fs := flag.NewFlagSet("explain", flag.ExitOnError)
+	rulesPath := fs.String("rules", "", "rule file/dir (default: vyql/packs)")
+	profileName := fs.String("profile", "auto", "threat-model profile")
+	_ = fs.Parse(args)
+	paths := fs.Args()
+	if len(paths) == 0 {
+		return fmt.Errorf("usage: vyql explain [-rules ...] <path>...")
+	}
+	applyProfile(paths, *profileName)
+	src, err := loadRules(*rulesPath)
+	if err != nil {
+		return err
+	}
+	all, _, err := scanPaths(paths, src)
+	if err != nil {
+		return err
+	}
+	if len(all) == 0 {
+		fmt.Println("No findings.")
+		return nil
+	}
+	fmt.Printf("%d finding(s):\n", len(all))
+	for _, f := range all {
+		fmt.Printf("\n[%s] %s  (fp=%s)\n", f.Severity, f.RuleID, f.Fingerprint())
+		for _, b := range f.Bindings {
+			fmt.Printf("  %-6s %-22s @ %s  ← %s\n", b.Name+":", b.Concept, b.Loc, b.LabelProvenance)
+		}
+		if len(f.Witness) > 0 {
+			fmt.Printf("  witness: %s\n", strings.Join(f.Witness, " → "))
+		}
+		for _, ne := range f.NegationEvidence {
+			mark := "✗"
+			if ne.Satisfied {
+				mark = "✓"
+			}
+			fmt.Printf("  %s %s: %s\n", mark, ne.Clause, ne.Detail)
+		}
+	}
+	return nil
+}
+
+// ── vyql match ──────────────────────────────────────────────────────────────────────
+// Show every node an adapter labelled — what matched which concept, and via which adapter.
+// Groups by concept role (source/sink/control/other) so a missing sink (e.g. md5.Sum before a
+// mark exists) shows up as absent.
+
+func cmdMatch(args []string) error {
+	fs := flag.NewFlagSet("match", flag.ExitOnError)
+	profileName := fs.String("profile", "auto", "threat-model profile")
+	_ = fs.Parse(args)
+	paths := fs.Args()
+	if len(paths) == 0 {
+		return fmt.Errorf("usage: vyql match <path>...")
+	}
+	applyProfile(paths, *profileName)
+	g, _, err := buildGraph(paths)
+	if err != nil {
+		return err
+	}
+	if g == nil {
+		fmt.Println("(no analyzable source)")
+		return nil
+	}
+	nodes, _ := g.AllNodes()
+	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+	type row struct{ role, line string }
+	var rows []row
+	for _, n := range nodes {
+		labels, _ := g.Labels(n.ID)
+		for _, l := range labels {
+			role := "control/other"
+			switch {
+			case isSourceConcept(l.Concept):
+				role = "source"
+			case sinkConceptName(l.Concept):
+				role = "sink"
+			}
+			prov := l.Provenance.Adapter
+			if prov == "" {
+				prov = "?"
+			}
+			rows = append(rows, row{role, fmt.Sprintf("  %-14s %-26s %s  ← %s (%s)",
+				calleeKey(n), l.Concept, n.Prop("loc"), prov, l.Provenance.Fidelity)})
+		}
+	}
+	for _, role := range []string{"source", "sink", "control/other"} {
+		fmt.Printf("\n== %s ==\n", role)
+		n := 0
+		for _, r := range rows {
+			if r.role == role {
+				fmt.Println(r.line)
+				n++
+			}
+		}
+		if n == 0 {
+			fmt.Println("  (none)")
+		}
+	}
+	return nil
+}
+
+func calleeKey(n usg.Node) string {
+	if p := n.Prop("callee_path"); p != "" {
+		return p
+	}
+	if m := n.Prop("method"); m != "" {
+		return "." + m
+	}
+	return n.Type
+}
+
+func isSourceConcept(c string) bool {
+	return strings.Contains(c, "Input") || strings.Contains(c, "UserControlled") ||
+		strings.Contains(c, "Argument") || strings.Contains(c, "DatabaseRead") ||
+		strings.Contains(c, "EnvVariable") || strings.Contains(c, "Cookie")
+}
+
+// ── vyql resolve ────────────────────────────────────────────────────────────────────
+// Report interprocedural call resolution: every call site and whether vyql found a body for
+// it (so cross-package / unresolved calls — where taint silently dies — are explicit).
+
+func cmdResolve(args []string) error {
+	fs := flag.NewFlagSet("resolve", flag.ExitOnError)
+	profileName := fs.String("profile", "auto", "threat-model profile")
+	_ = fs.Parse(args)
+	paths := fs.Args()
+	if len(paths) == 0 {
+		return fmt.Errorf("usage: vyql resolve <path>...")
+	}
+	applyProfile(paths, *profileName)
+	g, _, err := buildGraph(paths)
+	if err != nil {
+		return err
+	}
+	if g == nil {
+		fmt.Println("(no analyzable source)")
+		return nil
+	}
+	nodes, _ := g.AllNodes()
+	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+	res, unres := 0, 0
+	var unresolved []string
+	for _, n := range nodes {
+		if n.Type != "code.Call" {
+			continue
+		}
+		key := calleeKey(n)
+		if key == "" || strings.HasPrefix(key, ".") && n.Prop("callee_path") == "" {
+			// method-only call with no path — receiver-dispatched, treat as library
+		}
+		// a call is "resolved into a body" iff it has an outgoing FLOWS edge to a node OTHER
+		// than its own arg slots — i.e. the lowering wired a callee ret → result. Calls with no
+		// outgoing flow are library/external/cross-package (taint stops unless the engine treats
+		// the call itself as a source/sink/control).
+		es, _ := g.OutEdges(n.ID, "FLOWS")
+		labelled := conceptsOf(g, n.ID) != ""
+		if len(es) > 0 || labelled {
+			res++
+		} else {
+			unres++
+			unresolved = append(unresolved, fmt.Sprintf("  %-30s %s", key, n.Prop("loc")))
+		}
+	}
+	fmt.Printf("call sites: %d resolved/recognized, %d unresolved (taint terminates)\n", res, unres)
+	if len(unresolved) > 0 {
+		fmt.Println("\nUNRESOLVED (no callee body, not a known source/sink/control):")
+		sort.Strings(unresolved)
+		for i, u := range unresolved {
+			if i >= 40 {
+				fmt.Printf("  … and %d more\n", len(unresolved)-40)
+				break
+			}
+			fmt.Println(u)
+		}
+	}
+	return nil
+}
+
+// ── vyql graph ──────────────────────────────────────────────────────────────────────
+// Dump the USG (nodes + edges), or the per-source taint reachability with -taint.
+
+func cmdGraph(args []string) error {
+	fs := flag.NewFlagSet("graph", flag.ExitOnError)
+	taint := fs.Bool("taint", false, "show per-source FLOWS reachability instead of the full graph")
+	profileName := fs.String("profile", "auto", "threat-model profile")
+	_ = fs.Parse(args)
+	paths := fs.Args()
+	if len(paths) == 0 {
+		return fmt.Errorf("usage: vyql graph [-taint] <path>...")
+	}
+	applyProfile(paths, *profileName)
+	g, _, err := buildGraph(paths)
+	if err != nil {
+		return err
+	}
+	if g == nil {
+		fmt.Println("(no analyzable source)")
+		return nil
+	}
+	if *taint {
+		return printTaint(g)
+	}
+	return printUSG(g)
+}
+
+// ── vyql adapters ───────────────────────────────────────────────────────────────────
+// List the source/sink/control/mark/filter/assume vocabulary an adapter recognizes, so you
+// don't have to grep the .vyql — and can see at a glance whether an API is modelled.
+
+func cmdAdapters(args []string) error {
+	fs := flag.NewFlagSet("adapters", flag.ExitOnError)
+	lang := fs.String("lang", "", "technology/adapter to list (e.g. go, javascript, java, python)")
+	_ = fs.Parse(args)
+	if *lang == "" {
+		fmt.Println("usage: vyql adapters -lang <go|javascript|java|python|...>")
+		fmt.Println("available adapters:")
+		for _, n := range adapterNames() {
+			fmt.Println("  " + n)
+		}
+		return nil
+	}
+	data, err := datadir.Read("adapters/" + *lang + ".vyql")
+	if err != nil {
+		return fmt.Errorf("no adapter for %q (%v)", *lang, err)
+	}
+	decls, err := parser.Parse(string(data))
+	if err != nil {
+		return fmt.Errorf("adapter parse: %w", err)
+	}
+	byKind := map[string][]string{}
+	for _, d := range decls {
+		ad, ok := d.(*parser.AdapterDecl)
+		if !ok {
+			continue
+		}
+		for _, m := range ad.Mappings {
+			kind := strings.SplitN(m.Kind, "_", 2)[0]
+			arrow := ""
+			if m.Concept != "" {
+				arrow = " → " + m.Concept
+			}
+			if m.About != "" {
+				arrow += " (about " + m.About + ")"
+			}
+			byKind[kind] = append(byKind[kind], fmt.Sprintf("    %q%s", m.Pattern, arrow))
+		}
+	}
+	for _, kind := range []string{"source", "sink", "control", "mark", "filter", "assume", "type"} {
+		rows := byKind[kind]
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Printf("\n== %s (%d) ==\n", kind, len(rows))
+		sort.Strings(rows)
+		for _, r := range rows {
+			fmt.Println(r)
+		}
+	}
+	return nil
+}
+
+func adapterNames() []string {
+	var out []string
+	for _, l := range []string{"go", "javascript", "java", "python", "ruby", "php", "csharp",
+		"rust", "kotlin", "scala", "swift", "c", "cpp"} {
+		if _, err := datadir.Read("adapters/" + l + ".vyql"); err == nil {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// ── vyql diff ───────────────────────────────────────────────────────────────────────
+// Diff two `scan -format json` outputs by fingerprint: which findings appeared / disappeared.
+// Use to PROVE a change is finding-preserving (e.g. an engine optimization) without eyeballing
+// scorecards.
+
+type jsonFinding struct {
+	RuleID   string `json:"rule"`
+	Severity string `json:"severity"`
+	FP       string `json:"fp"`
+	Source   string `json:"source"`
+	Sink     string `json:"sink"`
+	Noted    bool   `json:"assumption_noted"`
+}
+
+func findingsJSON(all []*findings.Finding) []jsonFinding {
+	out := make([]jsonFinding, 0, len(all))
+	for _, f := range all {
+		jf := jsonFinding{RuleID: f.RuleID, Severity: f.Severity, FP: f.Fingerprint()}
+		for _, b := range f.Bindings {
+			if b.Name == "source" {
+				jf.Source = b.Loc
+			}
+			if b.Name == "sink" {
+				jf.Sink = b.Loc
+			}
+		}
+		for _, ne := range f.NegationEvidence {
+			if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+				jf.Noted = true
+			}
+		}
+		out = append(out, jf)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].FP < out[j].FP })
+	return out
+}
+
+func cmdDiff(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: vyql diff <before.json> <after.json>  (each from `vyql scan -format json`)")
+	}
+	a, err := readFindingsJSON(args[0])
+	if err != nil {
+		return err
+	}
+	b, err := readFindingsJSON(args[1])
+	if err != nil {
+		return err
+	}
+	bySet := func(fs []jsonFinding) map[string]jsonFinding {
+		m := map[string]jsonFinding{}
+		for _, f := range fs {
+			m[f.FP] = f
+		}
+		return m
+	}
+	am, bm := bySet(a), bySet(b)
+	var removed, added []jsonFinding
+	for fp, f := range am {
+		if _, ok := bm[fp]; !ok {
+			removed = append(removed, f)
+		}
+	}
+	for fp, f := range bm {
+		if _, ok := am[fp]; !ok {
+			added = append(added, f)
+		}
+	}
+	fmt.Printf("before: %d findings   after: %d findings\n", len(a), len(b))
+	fmt.Printf("- removed: %d   + added: %d   (= %d unchanged)\n", len(removed), len(added), len(a)-len(removed))
+	for _, f := range removed {
+		fmt.Printf("  - [%s] %s → %s\n", f.RuleID, f.Source, f.Sink)
+	}
+	for _, f := range added {
+		fmt.Printf("  + [%s] %s → %s\n", f.RuleID, f.Source, f.Sink)
+	}
+	if len(removed) == 0 && len(added) == 0 {
+		fmt.Println("  (identical — finding-set preserved)")
+	}
+	return nil
+}
+
+func readFindingsJSON(path string) ([]jsonFinding, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var out []jsonFinding
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, fmt.Errorf("%s: %w (expected `vyql scan -format json` output)", path, err)
+	}
+	return out, nil
+}
+
+// ── vyql query ──────────────────────────────────────────────────────────────────────
+// Ad-hoc graph queries: select nodes by predicate (type / concept / callee / loc substrings),
+// then list them, count them, or show their edges. The general "grep the analysis graph" tool
+// the other commands specialize. Predicates AND together; all are substring matches.
+//
+//	vyql query -type code.Call -call db.Query <path>...        # nodes
+//	vyql query -concept HttpInput -edges <path>...             # + outgoing FLOWS
+//	vyql query -concept SqlExecution -count <path>...          # just the count
+//	vyql query -from HttpInput -to SqlExecution <path>...      # reachability (source→sink)
+
+func cmdQuery(args []string) error {
+	fs := flag.NewFlagSet("query", flag.ExitOnError)
+	typ := fs.String("type", "", "match node type (substring, e.g. code.Call)")
+	concept := fs.String("concept", "", "match a concept label (substring, e.g. HttpInput)")
+	call := fs.String("call", "", "match callee_path/method (substring, e.g. db.Query)")
+	loc := fs.String("loc", "", "match location (substring, e.g. .go or a filename)")
+	from := fs.String("from", "", "reachability mode: source concept (with -to)")
+	to := fs.String("to", "", "reachability mode: sink concept (with -from)")
+	edges := fs.Bool("edges", false, "also print each matching node's outgoing edges")
+	count := fs.Bool("count", false, "print only the number of matches")
+	profileName := fs.String("profile", "auto", "threat-model profile")
+	_ = fs.Parse(args)
+	paths := fs.Args()
+	if len(paths) == 0 {
+		return fmt.Errorf("usage: vyql query [-type T] [-concept C] [-call P] [-loc L] [-edges] [-count] <path>...\n" +
+			"          vyql query -from SRC -to SINK <path>...   (reachability)")
+	}
+	applyProfile(paths, *profileName)
+	g, _, err := buildGraph(paths)
+	if err != nil {
+		return err
+	}
+	if g == nil {
+		fmt.Println("(no analyzable source)")
+		return nil
+	}
+	nodes, _ := g.AllNodes()
+	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
+
+	// reachability mode: every -from source that reaches a -to sink (path-aware, like trace
+	// but terse — one line per connected pair).
+	if *from != "" || *to != "" {
+		pairs := 0
+		for _, n := range nodes {
+			if !isSource(g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
+				continue
+			}
+			if path, sink := shortestToSink(g, n.ID, *to); sink != "" {
+				pairs++
+				if !*count {
+					fmt.Printf("%s @ %s  →[%d hops]→  %s @ %s {%s}\n",
+						n.ID, n.Prop("loc"), len(path), sink, locOf(g, sink), conceptsOf(g, sink))
+				}
+			}
+		}
+		fmt.Printf("%d reachable source→sink pair(s)\n", pairs)
+		return nil
+	}
+
+	matched := 0
+	for _, n := range nodes {
+		if *typ != "" && !strings.Contains(n.Type, *typ) {
+			continue
+		}
+		if *call != "" && !strings.Contains(calleeKey(n), *call) {
+			continue
+		}
+		if *loc != "" && !strings.Contains(n.Prop("loc"), *loc) {
+			continue
+		}
+		if *concept != "" && !conceptMatch(g, n.ID, *concept) {
+			continue
+		}
+		matched++
+		if *count {
+			continue
+		}
+		fmt.Println(nodeLine(g, n))
+		if *edges {
+			for _, et := range edgeTypes {
+				es, _ := g.OutEdges(n.ID, et)
+				for _, e := range es {
+					fmt.Printf("      --%s--> %s @ %s\n", et, e.Dst, locOf(g, e.Dst))
+				}
+			}
+		}
+	}
+	if *count {
+		fmt.Printf("%d\n", matched)
+	} else {
+		fmt.Printf("\n%d node(s) matched\n", matched)
+	}
+	return nil
+}
+
+// ── scan -stats profiler ──────────────────────────────────────────────────────────────
+
+// printScanStats re-runs the pipeline with per-phase timing and reports graph size plus
+// taint-hub warnings (high FLOWS in/out-degree nodes — the shared callees that cause
+// super-linear blowup). Flag-driven, no env var.
+func printScanStats(paths []string) {
+	t0 := time.Now()
+	g, stats, err := buildGraph(paths)
+	tBuild := time.Since(t0)
+	if err != nil || g == nil {
+		fmt.Println("\n[stats] no graph built")
+		return
+	}
+	nodes, _ := g.AllNodes()
+	edges, srcCount, sinkCount := 0, 0, 0
+	type deg struct {
+		id        string
+		in, out   int
+		loc, path string
+	}
+	indeg := map[string]int{}
+	var nodeDeg []deg
+	for _, n := range nodes {
+		out := 0
+		for _, et := range edgeTypes {
+			es, _ := g.OutEdges(n.ID, et)
+			out += len(es)
+			for _, e := range es {
+				if et == "FLOWS" {
+					indeg[e.Dst]++
+				}
+			}
+		}
+		edges += out
+		if isSource(g, n.ID) {
+			srcCount++
+		}
+		if isSink(g, n.ID) {
+			sinkCount++
+		}
+		nodeDeg = append(nodeDeg, deg{id: n.ID, out: out, loc: n.Prop("loc"), path: calleeKey(n)})
+	}
+	for i := range nodeDeg {
+		nodeDeg[i].in = indeg[nodeDeg[i].id]
+	}
+	fmt.Printf("\n[stats] build %s | files %d | nodes %d | edges %d | sources %d | sinks %d\n",
+		tBuild.Round(time.Millisecond), totalFiles(stats), len(nodes), edges, srcCount, sinkCount)
+
+	// taint hubs: high FLOWS in-degree = a callee shared by many call sites; the cross-product
+	// of in×out paths through such a node is what makes path-enumeration blow up.
+	sort.Slice(nodeDeg, func(i, j int) bool { return nodeDeg[i].in > nodeDeg[j].in })
+	shown := false
+	for _, d := range nodeDeg {
+		if d.in >= 8 {
+			if !shown {
+				fmt.Println("[stats] taint hubs (FLOWS in-degree ≥ 8 — shared callees, blowup risk):")
+				shown = true
+			}
+			fmt.Printf("  in=%-4d out=%-3d %-26s %s\n", d.in, d.out, d.path, d.loc)
+		}
+	}
+	if !shown {
+		fmt.Println("[stats] no taint hubs (max in-degree below 8) — graph is well-isolated")
+	}
+}
+
+func totalFiles(s scanStats) int {
+	n := 0
+	for _, c := range s.files {
+		n += c
+	}
+	return n
+}
