@@ -928,6 +928,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// (the NIR golden serializes callee_path, not method).
 		n := l.node("Attr", ex.Loc, map[string]string{"callee_path": ex.Path, "method": ex.Attr})
 		l.flow(base, n)
+		// field-sensitive read: if obj.field was written element-sensitively (directly or via
+		// an alias sharing this base node), pull that slot's taint too.
+		if ci := l.containers[base]; ci != nil && ci.elems[ex.Attr] != "" {
+			l.flow(ci.elems[ex.Attr], n)
+		}
 		return n
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
@@ -1160,6 +1165,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.containerWrite(call, args, recvNode, sc)
 		} else if ci := l.containers[recvNode]; ci != nil && !modeledContainerMethod(call.Method) {
 			l.containerInvalidate(call, recvNode, sc) // precise index-shift where unambiguous, else dirty
+		}
+		// field write `obj.field = v` (the frontend models it as a Method-less call on the
+		// base): store into the per-field slot so a read of obj.field — or of an ALIAS that
+		// shares obj's node (const a = obj; a.field = v) — sees the taint. Field-sensitive:
+		// sibling fields stay clean.
+		if call.Method == "" && len(args) > 0 {
+			if attr, ok := call.Callee.(nir.Attr); ok && attr.Attr != "" {
+				l.flow(args[0], l.elemNode(recvNode, attr.Attr, call.Loc))
+			}
 		}
 	}
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
