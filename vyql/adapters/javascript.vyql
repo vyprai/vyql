@@ -238,6 +238,15 @@ adapter javascript {
   control "parseInt" -> core.SqlParameterization
   control "parseFloat" -> core.HtmlEscape
   control "parseFloat" -> core.SqlParameterization
+  // SOUND path neutralizer: path.basename(x) strips all directory components -> no `/` or
+  // `..` can survive (a boundary check like target.startsWith(base) is NOT added — it is
+  // unsound alone, e.g. "/tmp/../etc" startsWith "/tmp", which would create false negatives).
+  control "path.basename" -> core.PathCanonicalization
+  // format validators provably constrain the value (membership/format) -> validated input.
+  control "validator.isUUID" -> core.InputValidation
+  control "validator.isAlphanumeric" -> core.InputValidation
+  control "validator.isInt" -> core.InputValidation
+  control "validator.isNumeric" -> core.InputValidation
   control "escape-html" -> core.HtmlEscape
   control "he.encode" -> core.HtmlEscape
   control "validator.escape" -> core.HtmlEscape
