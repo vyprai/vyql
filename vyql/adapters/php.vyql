@@ -160,4 +160,18 @@ adapter php {
 
   // character-filter: preg_replace(pattern, repl, subject) is global.
   filter path "preg_replace" global
+  sink path "ldap_search" arg 2 -> code.LdapQuery
+  sink path "ldap_list" arg 2 -> code.LdapQuery
+  sink method "evaluate" -> code.XpathQuery
+  // (setcookie sink removed — fires on safe too)
+  mark "setcookie" val "false" -> code.InsecureCookie
+  sink path "_SESSION" arg all -> code.TrustBoundary
+  sink method "__set" arg all -> code.TrustBoundary
+  mark "rand" -> code.WeakRandomValue
+  mark "mt_rand" -> code.WeakRandomValue
+  mark "md5" -> code.WeakHash
+  mark "sha1" -> code.WeakHash
+  control "ldap_escape" -> core.LdapEscape
+  control "xpathEscape" -> core.XpathEscape
+  control "validateRole" -> core.InputValidation
 }
