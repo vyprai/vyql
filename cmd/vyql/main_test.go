@@ -257,6 +257,57 @@ func TestScanReplaceReplacementNotFiltered(t *testing.T) {
 	}
 }
 
+// javaAssumeIdioms exercises Java parity for the assumption engine: an unsound `.contains()`
+// substring blocklist guard (note, not suppress) and a SOUND `Arrays.asList(consts).contains`
+// allowlist ternary (suppress). The blocklist case must carry a guard assumption note; the
+// allowlist case must not be reported at all.
+const javaAssumeIdioms = `import java.io.File;
+import java.util.Arrays;
+public class T {
+  void blocklist(javax.servlet.http.HttpServletRequest req) throws Exception {
+    String p = req.getParameter("f");
+    if (p.contains("..")) return;
+    java.nio.file.Files.readAllBytes(new File(p).toPath());
+  }
+  void allowlist(javax.servlet.http.HttpServletRequest req) throws Exception {
+    String p = req.getParameter("g");
+    String safe = Arrays.asList("a.txt", "b.txt").contains(p) ? p : "a.txt";
+    java.nio.file.Files.readAllBytes(new File(safe).toPath());
+  }
+}
+`
+
+func TestScanJavaAssumeIdioms(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "T.java"), []byte(javaAssumeIdioms), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var paths []*findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-PATH-001" {
+			paths = append(paths, f)
+		}
+	}
+	// the sound allowlist ternary is suppressed → exactly the one blocklist-guarded finding.
+	if len(paths) != 1 {
+		t.Fatalf("expected exactly 1 path finding (allowlist suppressed, blocklist noted), got %d", len(paths))
+	}
+	noted := false
+	for _, ne := range paths[0].NegationEvidence {
+		if strings.Contains(ne.Clause, "assumption") {
+			noted = true
+		}
+	}
+	if !noted {
+		t.Fatalf("blocklist `p.contains(\"..\")` must carry a guard assumption note, got NE=%+v", paths[0].NegationEvidence)
+	}
+}
+
 func TestScanPathsNoSource(t *testing.T) {
 	rules, _ := loadRules("")
 	if _, _, err := scanPaths([]string{t.TempDir()}, rules); err == nil {

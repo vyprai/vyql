@@ -1098,18 +1098,46 @@ func unsoundContainmentGuard(cond nir.Expr) (string, bool) {
 	return b.Op + " <const>", true
 }
 
-// constSeqVar confirms set is a non-empty literal Seq of constants and returns varID,true.
+// constSeqVar confirms set is a fixed literal set of constants and returns varID,true. A set
+// is either a collection literal (`[a,b]`, JS/Python) or a JVM constant-set factory call
+// (`Arrays.asList(a,b)`, `List.of(a,b)`, `Set.of(a,b)`) — in every case with all-constant
+// elements, so the attacker cannot influence the membership domain.
 func constSeqVar(set nir.Expr, varID string) (string, bool) {
-	seq, ok := set.(nir.Seq)
-	if !ok || len(seq.Parts) == 0 {
-		return "", false
-	}
-	for _, p := range seq.Parts {
-		if _, ok := p.(nir.Const); !ok {
+	switch s := set.(type) {
+	case nir.Seq:
+		if len(s.Parts) == 0 || !allConst(s.Parts) {
 			return "", false
 		}
+		return varID, true
+	case nir.Call:
+		if len(s.Args) == 0 || !constSetFactory(s.Path, s.Method) || !allConst(s.Args) {
+			return "", false
+		}
+		return varID, true
 	}
-	return varID, true
+	return "", false
+}
+
+func allConst(xs []nir.Expr) bool {
+	for _, x := range xs {
+		if _, ok := x.(nir.Const); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// constSetFactory matches the standard JVM immutable-collection constructors. `of` is matched
+// only on a List/Set/Map receiver path so an unrelated `Foo.of(...)` is not mistaken for a set.
+func constSetFactory(path, method string) bool {
+	switch method {
+	case "asList", "newHashSet", "newArrayList", "singletonList":
+		return true
+	case "of", "copyOf":
+		return strings.HasSuffix(path, "List."+method) || strings.HasSuffix(path, "Set."+method) ||
+			strings.HasSuffix(path, "Map."+method) || path == method
+	}
+	return false
 }
 
 // collectValTokens walks an argument expression and accumulates literal value

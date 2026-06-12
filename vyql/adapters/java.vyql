@@ -294,4 +294,26 @@ adapter java {
 
   // character-filter: String.replaceAll(regex, repl) is always global.
   filter method "replaceAll" global
+
+  // ── UNSOUND neutralizers (`assume`) ───────────────────────────────────────────────
+  // Never suppress; emit an assumption note (the confident bucket stays near-zero-FP, the
+  // noted bucket is the review queue). guard = must DOMINATE the sink (a boundary check);
+  // sanitizer = must lie ON the path. Mirrors the JS/Python `assume` sets in Java idioms.
+
+  // String boundary/containment checks used as path or trust filters: "/tmp/../etc"
+  // .startsWith("/tmp") passes yet escapes; bar.contains("../") is a substring blocklist —
+  // each is bypassable (absolute paths, encodings, alternate separators).
+  assume guard method "startsWith" -> code.FilePathAccess
+  assume guard method "endsWith"   -> code.FilePathAccess
+  assume guard method "contains"   -> code.FilePathAccess
+  assume guard method "matches"    -> code.FilePathAccess
+  assume guard method "startsWith" -> code.TrustBoundary
+  // Path canonicalizers normalize but do NOT confine to a base dir on their own.
+  assume sanitizer method "normalize"        -> code.FilePathAccess
+  assume sanitizer method "getCanonicalPath" -> code.FilePathAccess
+  // LDAP/XPath escapers we cannot verify are complete for the sink grammar.
+  assume sanitizer method "encodeForLDAP"   -> code.LdapQuery
+  assume sanitizer method "encodeForDN"     -> code.LdapQuery
+  assume sanitizer method "escapeLDAPSearchFilter" -> code.LdapQuery
+  assume sanitizer method "encodeForXPath"  -> code.XpathQuery
 }
