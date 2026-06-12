@@ -240,7 +240,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 	case "integer_literal", "floating_point_literal", "character_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "boolean_literal", "null_literal", "unit":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for marks (setSecure(false))
 	case "string", "symbol_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // literal text for `val` matching
 	case "interpolated_string_expression":

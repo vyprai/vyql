@@ -373,6 +373,11 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "identifier", "simple_identifier", "this_expression", "super_expression":
+		// tree-sitter-kotlin parses the boolean/null literals as bare identifiers; carry their
+		// value so value-matching marks (e.g. setSecure(false) → InsecureCookie) fire.
+		if t := c.text(n); t == "true" || t == "false" || t == "null" {
+			return nir.Const{Loc: L, Value: t}
+		}
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "boolean_literal", "null_literal":
 		return nir.Const{Loc: L, Value: c.text(n)}
