@@ -75,7 +75,9 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 		case "import_statement":
 			// import x from 'm'  /  import {a,b} from 'm'  /  import * as x from 'm'
 			src := c.text(field(n, "source"))
-			mod := strings.Trim(src, "'\"`")
+			// normalize the specifier to the module key the lowering registers (the same path
+			// resolution require() uses) — otherwise a relative ES import never resolves.
+			mod := c.resolveRequire(strings.Trim(src, "'\"`"))
 			clause := field(n, "import_clause")
 			if clause == nil {
 				clause = n

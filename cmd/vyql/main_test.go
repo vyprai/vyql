@@ -308,6 +308,45 @@ func TestScanJavaAssumeIdioms(t *testing.T) {
 	}
 }
 
+// tsEsmLib/tsEsmHandler exercise ES-module `import { x } from './y'` resolution (the modern
+// TS/JS idiom) — taint must flow from the source inside the imported helper, through the
+// import, to the sink in the handler. (CommonJS require() already resolved; ES imports did
+// not, because the specifier was not path-normalized.)
+const tsEsmLib = `export function readInput(req, key) {
+  return req.query[key];
+}
+`
+const tsEsmHandler = `import { readInput } from './lib';
+export function handler(req, res) {
+  const raw = readInput(req, 'q');
+  res.send('<div>' + raw + '</div>');
+}
+`
+
+func TestScanESModuleImportResolution(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "lib.js"), []byte(tsEsmLib), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "handler.js"), []byte(tsEsmHandler), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	found := false
+	for _, f := range fs {
+		if f.RuleID == "VYQL-INJ-004" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected an XSS finding: taint via ES `import { readInput } from './lib'` must resolve, got %d findings", len(fs))
+	}
+}
+
 func TestScanPathsNoSource(t *testing.T) {
 	rules, _ := loadRules("")
 	if _, _, err := scanPaths([]string{t.TempDir()}, rules); err == nil {
