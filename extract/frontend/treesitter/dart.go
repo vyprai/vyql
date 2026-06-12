@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	dart "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/dart"
 
@@ -403,7 +405,9 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		// plain literal: the content is an unnamed token, so carry the source text with
+		// surrounding quotes (and optional `r` raw prefix) stripped for val-matched marks.
+		return nir.Const{Loc: L, Value: strings.Trim(strings.TrimPrefix(c.text(n), "r"), "\"'")}
 	case "additive_expression":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {

@@ -8,6 +8,7 @@ adapter dart {
   source "stdin.readLineSync" -> code.StdinInput
   source ".queryParameters" -> code.HttpInput
   source "request.params" -> code.HttpInput
+  source "request.headers" -> code.HttpInput
   source ".requestedUri" -> code.HttpInput
 
   // SQL — sqflite raw queries
@@ -25,7 +26,7 @@ adapter dart {
   sink path "http.read" -> code.UrlFetch
   sink path "http.delete" -> code.UrlFetch
 
-  // command execution — dart:io Process (the executable is arg0)
+  // command execution — dart:io Process (the shell command is arg0 with runInShell)
   sink path "Process.run" -> code.CommandExecution
   sink path "Process.runSync" -> code.CommandExecution
   sink path "Process.start" -> code.CommandExecution
@@ -37,4 +38,38 @@ adapter dart {
   // weak hash (CWE-328) — package:crypto md5/sha1.
   mark "md5.convert" -> code.WeakHash
   mark "sha1.convert" -> code.WeakHash
+
+  // XSS (CWE-79) — shelf/HTML response writers (the rendered body is the arg)
+  sink method "write" arg all -> code.HtmlRender
+  sink method "writeln" arg all -> code.HtmlRender
+
+  // LDAP (CWE-90) — package:dartdap search (filter is arg1)
+  sink method "search" arg 1 -> code.LdapQuery
+
+  // XPath (CWE-643) — package:xml / xpath evaluate (expression is arg0)
+  sink method "evaluate" arg 0 -> code.XpathQuery
+
+  // trust boundary (CWE-501) — untrusted data into the session
+  sink method "setAttribute" arg all -> code.TrustBoundary
+  sink method "putValue" arg all -> code.TrustBoundary
+
+  // insecure cookie (CWE-614) — dart:io Cookie configured insecurely
+  mark "setSecure" val "false" -> code.InsecureCookie
+  mark "setHttpOnly" val "false" -> code.InsecureCookie
+
+  // weak cipher (CWE-327) — pointycastle BlockCipher with a broken algorithm
+  mark "BlockCipher" val "DES" -> code.WeakCipher
+  mark "BlockCipher" val "RC4" -> code.WeakCipher
+  mark "BlockCipher" val "Blowfish" -> code.WeakCipher
+
+  // insecure randomness (CWE-330) — dart:math Random() (Random.secure() is safe)
+  mark "Random" -> code.WeakRandomValue
+
+  // controls — sanitizers/validators defined in each generated case's preamble
+  control "escapeHtml" -> core.HtmlEscape
+  control "escapeXPath" -> core.HtmlEscape
+  control "encodeForLDAP" -> core.LdapEscape
+  control "escapeShell" -> core.ShellEscape
+  control "safePath" -> core.PathCanonicalization
+  control "validateRole" -> core.InputValidation
 }
