@@ -269,6 +269,29 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
 	case "generic_function":
 		return c.expr(field(n, "function"))
+	case "instance_expression":
+		// `new Type(args)` — model as a constructor call so type/arg sinks and marks match
+		// (e.g. new java.io.File(p), new java.util.Random()). Grammar nests a call_expression
+		// (type applied to arguments) or carries the type + arguments directly.
+		for _, ch := range namedChildren(n) {
+			if k := ch.Kind(); k == "call_expression" || k == "generic_function" {
+				return c.expr(ch)
+			}
+		}
+		kids := namedChildren(n)
+		if len(kids) >= 1 {
+			path := c.dotted(kids[0])
+			if path == "" {
+				path = c.text(kids[0])
+			}
+			var args []nir.Expr
+			if a := field(n, "arguments"); a != nil {
+				args = c.callArgs(a)
+			} else if len(kids) >= 2 && kids[1].Kind() == "arguments" {
+				args = c.callArgs(kids[1])
+			}
+			return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: args, Path: path, Method: lastSeg(path), Loc: L}
+		}
 	case "infix_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
