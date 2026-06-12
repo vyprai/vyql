@@ -206,7 +206,12 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Name{ID: c.plVarName(n), Loc: L}
 	case "number", "boolean":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
-	case "string_literal", "bareword", "heredoc_content":
+	case "string_literal":
+		// plain single/double-quoted literal with no interpolation: carry the
+		// quote-stripped source text so val-matched marks (e.g. Cipher "DES",
+		// cookie "false") can match the literal VALUE. q/qq strings handled below.
+		return nir.Const{Loc: L, Value: strings.Trim(c.text(n), "\"'")}
+	case "bareword", "heredoc_content":
 		return nir.Const{Loc: L}
 	case "interpolated_string_literal", "qq_string", "command_string":
 		var parts []nir.Expr
@@ -224,7 +229,9 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		// no interpolation: a constant double-quoted/qq string. Carry the quote-
+		// stripped text so val-matched marks (Cipher "DES", cookie "false") match.
+		return nir.Const{Loc: L, Value: strings.Trim(c.text(n), "\"'")}
 	case "method_call_expression":
 		inv := field(n, "invocant")
 		method := c.text(field(n, "method"))

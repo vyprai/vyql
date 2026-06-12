@@ -31,9 +31,13 @@ adapter rust {
   sink path "Regex.new" -> code.RegexCompile
   sink path "RegexBuilder.new" -> code.RegexCompile
 
-  // XSS — maud PreEscaped bypasses HTML escaping
+  // XSS — maud PreEscaped bypasses HTML escaping; response body writers render
+  // the tainted string into the HTML response (the body is the call argument).
   sink path "maud.PreEscaped" -> code.HtmlRender
   sink path "PreEscaped" -> code.HtmlRender
+  sink method "render_html" -> code.HtmlRender
+  sink method "body" -> code.HtmlRender
+  sink method "html" -> code.HtmlRender
 
   // weak crypto (CWE-327) — broken hash/cipher crates (presence)
   mark "md5.compute" -> code.WeakHash
@@ -43,12 +47,38 @@ adapter rust {
   mark "Des.new" -> code.WeakCipher
   mark "Rc4.new" -> code.WeakCipher
 
+  // LDAP (CWE-90) — the search FILTER is arg1 (base is arg0)
+  sink method "search" arg 1 -> code.LdapQuery
+  // XPath (CWE-643) — the expression is arg0
+  sink method "evaluate" arg 0 -> code.XpathQuery
+  // trust boundary (CWE-501) — untrusted data written into the session map
+  sink method "insert" arg all -> code.TrustBoundary
+  sink method "set_attribute" arg all -> code.TrustBoundary
+
+  // insecure cookie (CWE-614) — Cookie configured insecurely
+  mark "set_secure" val "false" -> code.InsecureCookie
+  mark "set_http_only" val "false" -> code.InsecureCookie
+
+  // insecure randomness (CWE-330) — non-CSPRNG. `OsRng` is the secure form and
+  // its path does NOT start with these tokens, so the safe case carries no mark.
+  mark "rand.random" -> code.WeakRandomValue
+  mark "rand.thread_rng" -> code.WeakRandomValue
+  mark "thread_rng" -> code.WeakRandomValue
+  mark "StdRng.seed_from_u64" -> code.WeakRandomValue
+
   // controls (sanitizers) — neutralize a flow
   control "shell_escape.escape" -> core.ShellEscape
   control "html_escape.encode_text" -> core.HtmlEscape
   control "html_escape.encode_safe" -> core.HtmlEscape
   control "htmlescape.encode_minimal" -> core.HtmlEscape
   control "ammonia.clean" -> core.HtmlEscape
+  // sanitizers/validators defined in each generated case's preamble
+  control "escape_html" -> core.HtmlEscape
+  control "escape_xpath" -> core.HtmlEscape
+  control "encode_for_ldap" -> core.LdapEscape
+  control "escape_shell" -> core.ShellEscape
+  control "safe_path" -> core.PathCanonicalization
+  control "validate_role" -> core.InputValidation
 
   // SQL
   sink path "sqlx.query" -> code.SqlExecution

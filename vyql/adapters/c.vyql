@@ -42,6 +42,18 @@ adapter c {
   // dynamic loading (untrusted path -> code load)
   sink path "dlopen" -> code.FilePathAccess
 
+  // XSS (CWE-79) — writing untrusted HTML to a response/output stream (arg0 is the text)
+  sink path "fputs" -> code.HtmlRender
+  sink path "fwrite" -> code.HtmlRender
+
+  // LDAP injection (CWE-90) — OpenLDAP search (the filter is arg3)
+  sink path "ldap_search_ext_s" arg 3 -> code.LdapQuery
+  sink path "ldap_search_s" arg 3 -> code.LdapQuery
+
+  // XPath injection (CWE-643) — libxml2 (the expression is arg0)
+  sink path "xmlXPathEvalExpression" -> code.XpathQuery
+  sink path "xmlXPathEval" -> code.XpathQuery
+
   // insecure temp file (CWE-377) — predictable-name / race-prone temp APIs
   mark "mktemp" -> code.InsecureTempFile
   mark "tmpnam" -> code.InsecureTempFile
@@ -66,7 +78,7 @@ adapter c {
   sink path "xmlParseFile" -> code.XmlParse
   sink path "xmlParseMemory" -> code.XmlParse
 
-  // weak crypto (CWE-327) — OpenSSL MD4/MD5/SHA1 (presence)
+  // weak hash (CWE-328) — OpenSSL MD4/MD5/SHA1 (presence); SHA-256 is safe
   mark "MD5_Init" -> code.WeakHash
   mark "MD5" -> code.WeakHash
   mark "MD4" -> code.WeakHash
@@ -75,6 +87,23 @@ adapter c {
   mark "EVP_md5" -> code.WeakHash
   mark "EVP_sha1" -> code.WeakHash
 
-  // controls (sanitizers) — realpath canonicalizes a path
+  // weak cipher (CWE-327) — OpenSSL DES (presence); AES is safe
+  mark "DES_ecb_encrypt" -> code.WeakCipher
+  mark "DES_ncbc_encrypt" -> code.WeakCipher
+  mark "DES_set_key" -> code.WeakCipher
+  mark "RC4" -> code.WeakCipher
+  mark "BF_set_key" -> code.WeakCipher
+
+  // insecure randomness (CWE-330) — rand()/random() (presence); getrandom()/RAND_bytes safe
+  mark "rand" -> code.WeakRandomValue
+  mark "random" -> code.WeakRandomValue
+  mark "rand_r" -> code.WeakRandomValue
+
+  // controls (sanitizers) — realpath canonicalizes a path; preamble defines the rest
   control "realpath" -> core.PathCanonicalization
+  control "safe_path" -> core.PathCanonicalization
+  control "escape_shell" -> core.ShellEscape
+  control "escape_html" -> core.HtmlEscape
+  control "encode_for_ldap" -> core.LdapEscape
+  control "escape_xpath" -> core.XpathEscape
 }

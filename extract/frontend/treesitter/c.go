@@ -192,7 +192,14 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "declaration":
 		var out []nir.Stmt
 		// the constructed/declared type (e.g. `File` in `File f(p)` / `File g = File(p)`).
+		// C++ qualified types (std::ifstream) come through the declaration's `type`
+		// field as a qualified_identifier; use its last dotted segment.
 		typeName := c.text(lastChildKind(n, "type_identifier"))
+		if typeName == "" {
+			if t := field(n, "type"); t != nil {
+				typeName = lastSeg(c.dotted(t))
+			}
+		}
 		for _, d := range namedChildren(n) {
 			switch d.Kind() {
 			case "init_declarator":
@@ -450,7 +457,10 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "number_literal", "char_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "concatenated_string", "raw_string_literal":
-		return nir.Const{Loc: L}
+		// carry the quote-stripped literal text so val-matched marks/sinks
+		// (Cipher "DES", setSecure "false", algorithm strings) can value-match;
+		// unquoteLit in lowering strips the surrounding delimiters.
+		return nir.Const{Loc: L, Value: cStringText(c.text(n))}
 	case "new_expression": // C++
 		typ := c.text(field(n, "type"))
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
@@ -506,6 +516,39 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// cStringText returns a quoted string literal whose surrounding delimiters wrap only
+// the de-prefixed content, so downstream unquoteLit yields the inner text. It strips
+// C/C++/ObjC literal prefixes (L, u, U, u8, @) and joins adjacent quoted runs
+// (concatenated_string / "a" "b"), keeping a single pair of double quotes so the
+// value still reads as a string literal for val-matching.
+func cStringText(raw string) string {
+	var b []byte
+	i := 0
+	for i < len(raw) {
+		ch := raw[i]
+		if ch == '"' || ch == '\'' {
+			q := ch
+			i++
+			for i < len(raw) && raw[i] != q {
+				if raw[i] == '\\' && i+1 < len(raw) {
+					b = append(b, raw[i+1])
+					i += 2
+					continue
+				}
+				b = append(b, raw[i])
+				i++
+			}
+			if i < len(raw) {
+				i++ // closing quote
+			}
+			continue
+		}
+		// skip prefix chars / whitespace between adjacent literals (L, u, U, 8, @, space)
+		i++
+	}
+	return "\"" + string(b) + "\""
 }
 
 func (c *ccConv) dotted(n *tree_sitter.Node) string {

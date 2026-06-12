@@ -10,6 +10,7 @@ adapter swift {
   source ".query" -> code.HttpInput
   source ".parameters" -> code.HttpInput
   source ".queryParameters" -> code.HttpInput
+  source ".headers" -> code.HttpInput
   // iOS deep-link / WKScriptMessage entry-point params, seeded by the frontend:
   // application(_:open:) url and userContentController(_:didReceive:) message.
   source "url_scheme_input" -> code.URLSchemeInput
@@ -23,14 +24,14 @@ adapter swift {
   sink method "loadHTMLString" -> code.WebViewLoad
   sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
 
-  // SQL — sqlite3 C API (query is arg1)
+  // SQL — sqlite3 C API (query is arg1) + ORM execute (raw query is arg0)
   sink path "sqlite3_exec" arg 1 -> code.SqlExecution
   sink path "sqlite3_prepare_v2" arg 1 -> code.SqlExecution
   sink path "sqlite3_prepare" arg 1 -> code.SqlExecution
   sink method "execute" -> code.SqlExecution
   sink method "run" -> code.SqlExecution
 
-  // command execution
+  // command execution — Process + libc system/popen (the command string is arg0)
   sink path "Process" -> code.CommandExecution
   sink method "launch" -> code.CommandExecution
   sink path "system" -> code.CommandExecution
@@ -48,11 +49,46 @@ adapter swift {
   // regex compile (ReDoS) — tainted PATTERN
   sink path "NSRegularExpression" -> code.RegexCompile
 
-  // weak crypto (CWE-327) — CryptoKit Insecure.* + CommonCrypto CC_MD5/CC_SHA1
+  // XSS (CWE-79) — Vapor/HTML response writers (the rendered body is the arg)
+  sink method "write" arg all -> code.HtmlRender
+  sink method "send" arg all -> code.HtmlRender
+
+  // LDAP (CWE-90) — directory search (filter is arg1)
+  sink method "search" arg 1 -> code.LdapQuery
+
+  // XPath (CWE-643) — XML/XPath evaluate (expression is arg0)
+  sink method "evaluate" arg 0 -> code.XpathQuery
+
+  // trust boundary (CWE-501) — untrusted data into the session
+  sink method "setAttribute" arg all -> code.TrustBoundary
+  sink method "putValue" arg all -> code.TrustBoundary
+
+  // weak hash (CWE-328) — CryptoKit Insecure.* + CommonCrypto CC_MD5/CC_SHA1
   mark "Insecure.MD5" -> code.WeakHash
   mark "Insecure.SHA1" -> code.WeakHash
   mark "CC_MD5" -> code.WeakHash
   mark "CC_SHA1" -> code.WeakHash
+
+  // weak cipher (CWE-327) — broken block cipher selected by algorithm name
+  mark "Cipher" val "DES" -> code.WeakCipher
+  mark "Cipher" val "RC4" -> code.WeakCipher
+  mark "Cipher" val "Blowfish" -> code.WeakCipher
+
+  // insecure randomness (CWE-330) — arc4random / Int.random (SecRandomCopyBytes is safe)
+  mark "arc4random" -> code.WeakRandomValue
+  mark "arc4random_uniform" -> code.WeakRandomValue
+
+  // insecure cookie (CWE-614) — cookie configured insecurely (setter-method idiom)
+  mark "setSecure" val "false" -> code.InsecureCookie
+  mark "setHttpOnly" val "false" -> code.InsecureCookie
+
+  // controls — sanitizers/validators defined in each generated case's preamble
+  control "escapeHtml" -> core.HtmlEscape
+  control "escapeXPath" -> core.XpathEscape
+  control "encodeForLDAP" -> core.LdapEscape
+  control "escapeShell" -> core.ShellEscape
+  control "safePath" -> core.PathCanonicalization
+  control "validateRole" -> core.InputValidation
 
   // NOTE: addingPercentEncoding maps to no wired neutralizer (OutputEncoding is unused
   // by any rule and percent-encoding doesn't neutralize cmd/SQL/HTML) — omitted.

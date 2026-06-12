@@ -381,7 +381,7 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)} // literal text for `val` matching (e.g. Cipher("DES"))
 	case "navigation_expression":
 		tgt := field(n, "target")
 		suf := field(n, "suffix")

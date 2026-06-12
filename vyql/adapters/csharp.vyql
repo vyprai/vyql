@@ -122,6 +122,28 @@ adapter csharp {
   // LDAP injection (CWE-90) — new DirectorySearcher(filter) constructor (filter arg 0)
   sink path "DirectorySearcher" -> code.LdapQuery
 
+  // trust boundary (CWE-501) — untrusted data into the HTTP session
+  sink method "SetAttribute" arg all -> code.TrustBoundary
+  sink method "Add" arg all -> code.TrustBoundary
+
+  // insecure cookie (CWE-614) — HttpCookie configured insecurely (setter idiom,
+  // val-matched; property-write `c.Secure = false` is not modeled as a call)
+  mark "SetSecure" val "false" -> code.InsecureCookie
+  mark "SetHttpOnly" val "false" -> code.InsecureCookie
+
+  // insecure randomness (CWE-330) — System.Random is not cryptographically secure.
+  // The secure API RandomNumberGenerator.Create() does NOT path-collide with "Random"
+  // (segment "RandomNumberGenerator" != "Random").
+  mark "Random" -> code.WeakRandomValue
+
+  // controls — sanitizers/validators defined in each generated case's preamble
+  control "escapeHtml" -> core.HtmlEscape
+  control "escapeXPath" -> core.HtmlEscape
+  control "encodeForLDAP" -> core.LdapEscape
+  control "escapeShell" -> core.ShellEscape
+  control "safePath" -> core.PathCanonicalization
+  control "validateRole" -> core.InputValidation
+
   // cleartext channel (CWE-319) — http:// URL to a client (loopback excluded; low sev)
   mark "Uri" val "http://" nval "127.0" -> code.CleartextChannel
   mark "GetStringAsync" val "http://" nval "127.0" -> code.CleartextChannel

@@ -1,5 +1,5 @@
 // lua framework adapter (docs/07) — framework→concept content.
-// frameworks: openresty/nginx-lua, kong, redis, cgilua
+// frameworks: openresty/nginx-lua, kong, luasql, lualdap, lua-resty-*
 adapter lua {
   meta { fidelity: resolved }
 
@@ -10,7 +10,7 @@ adapter lua {
   source "ngx.req.get_headers" -> code.HttpInput
   source "ngx.req.get_body_data" -> code.HttpInput
 
-  // command execution
+  // command execution (the shell command is arg0)
   sink path "os.execute" -> code.CommandExecution
   sink path "io.popen" -> code.CommandExecution
 
@@ -20,28 +20,57 @@ adapter lua {
   sink path "loadfile" -> code.CodeEval
   sink path "dofile" -> code.CodeEval
 
-  // path / file
+  // path / file (the path is arg0)
   sink path "io.open" -> code.FilePathAccess
   sink path "io.lines" -> code.FilePathAccess
   sink path "os.remove" -> code.FilePathAccess
   sink path "os.rename" -> code.FilePathAccess
 
-  // SQL — luasql conn:execute / resty.mysql db:query (raw query string)
+  // SQL — luasql conn:execute / resty.mysql db:query (raw query string is arg0)
   sink method "query" -> code.SqlExecution
   sink method "execute" -> code.SqlExecution
 
-  // XSS — OpenResty response writers reflect tainted output
-  sink path "ngx.say" -> code.HtmlRender
-  sink path "ngx.print" -> code.HtmlRender
+  // XSS — OpenResty response writers reflect tainted output (any arg)
+  sink path "ngx.say" arg all -> code.HtmlRender
+  sink path "ngx.print" arg all -> code.HtmlRender
 
   // SSRF — luasocket http.request / resty.http request_uri
   sink path "http.request" -> code.UrlFetch
   sink method "request_uri" -> code.UrlFetch
 
-  // weak hash — OpenResty ngx.md5 / ngx.sha1_bin.
+  // LDAP (CWE-90) — lualdap ld:search (filter is arg1)
+  sink method "search" arg 1 -> code.LdapQuery
+
+  // XPath (CWE-643) — luaexpat/xmlua evaluate (expression is arg0)
+  sink method "evaluate" arg 0 -> code.XpathQuery
+
+  // trust boundary (CWE-501) — untrusted data into the session (any arg)
+  sink method "set" arg all -> code.TrustBoundary
+
+  // weak hash (CWE-328) — md5/sha1 digests (sha256 is safe; distinct path = no collision)
+  mark "md5.sum" -> code.WeakHash
+  mark "sha1.sum" -> code.WeakHash
   mark "ngx.md5" -> code.WeakHash
   mark "ngx.sha1_bin" -> code.WeakHash
 
-  // sanitizer — OpenResty SQL quoting.
+  // weak cipher (CWE-327) — val-matched on the algorithm string (AES is safe)
+  mark "crypto.cipher" val "DES" -> code.WeakCipher
+  mark "crypto.cipher" val "RC4" -> code.WeakCipher
+  mark "crypto.cipher" val "Blowfish" -> code.WeakCipher
+
+  // insecure randomness (CWE-330) — math.random (resty.random.bytes is safe)
+  mark "math.random" -> code.WeakRandomValue
+
+  // insecure cookie (CWE-614) — cookie flags set to false
+  mark "set_secure" val "false" -> code.InsecureCookie
+  mark "set_httponly" val "false" -> code.InsecureCookie
+
+  // controls — sanitizers/validators defined in each generated case's preamble
+  control "escapeHtml" -> core.HtmlEscape
+  control "escapeXPath" -> core.XpathEscape
+  control "encodeForLDAP" -> core.LdapEscape
+  control "escapeShell" -> core.ShellEscape
+  control "safePath" -> core.PathCanonicalization
+  control "validateRole" -> core.InputValidation
   control "ngx.quote_sql_str" -> core.SqlParameterization
 }

@@ -6,6 +6,13 @@ adapter objc {
   source "getenv" -> code.EnvVariable
   source "argv" -> code.CliArgument
   source ".environment" -> code.EnvVariable
+  // request accessors — [request param:@"x"] / [request header:@"x"]
+  source method "param" -> code.HttpInput
+  source method "header" -> code.HttpInput
+  source method "queryParameter" -> code.HttpInput
+  // C-style readers (taint their dest buffer)
+  source "fgets" -> code.StdinInput
+  source "fread" -> code.HttpInput
   // iOS clipboard
   source ".generalPasteboard.string" -> code.PasteboardInput
   source "UIPasteboard.generalPasteboard.string" -> code.PasteboardInput
@@ -28,6 +35,20 @@ adapter objc {
   // path / file
   sink path "fopen" -> code.FilePathAccess
   sink method "contentsOfFile" -> code.FilePathAccess
+  sink method "dataWithContentsOfFile" -> code.FilePathAccess
+  sink method "stringWithContentsOfFile" -> code.FilePathAccess
+
+  // XSS (CWE-79) — writing untrusted HTML to an output stream (arg0 is the text)
+  sink path "fputs" -> code.HtmlRender
+  sink path "fwrite" -> code.HtmlRender
+
+  // XPath injection (CWE-643) — NSXMLNode/NSXMLDocument (the expression is arg0)
+  sink method "nodesForXPath" -> code.XpathQuery
+  sink method "objectsForXQuery" -> code.XpathQuery
+
+  // LDAP injection (CWE-90) — OpenLDAP C API (ObjC is a C superset; filter is arg3)
+  sink path "ldap_search_ext_s" arg 3 -> code.LdapQuery
+  sink path "ldap_search_s" arg 3 -> code.LdapQuery
 
   // format string (CWE-134) — tainted FORMAT argument
   sink path "printf" arg 0 -> code.FormatString
@@ -43,8 +64,28 @@ adapter objc {
   // regex compile (ReDoS) — tainted PATTERN
   sink method "regularExpressionWithPattern" -> code.RegexCompile
 
-  // weak crypto (CWE-327) — CommonCrypto CC_MD5 / CC_SHA1
+  // weak hash (CWE-328) — CommonCrypto CC_MD5 / CC_SHA1 (presence); CC_SHA256 is safe
   mark "CC_MD5" -> code.WeakHash
   mark "CC_MD2" -> code.WeakHash
   mark "CC_SHA1" -> code.WeakHash
+
+  // weak cipher (CWE-327) — CommonCrypto CCCrypt with a broken algorithm (val-matched)
+  mark "CCCrypt" val "DES" -> code.WeakCipher
+  mark "CCCrypt" val "RC4" -> code.WeakCipher
+  mark "CCCrypt" val "Blowfish" -> code.WeakCipher
+  mark "CCCryptorCreate" val "DES" -> code.WeakCipher
+
+  // insecure randomness (CWE-330) — arc4random/rand/random (presence); SecRandomCopyBytes safe
+  mark "arc4random" -> code.WeakRandomValue
+  mark "arc4random_uniform" -> code.WeakRandomValue
+  mark "rand" -> code.WeakRandomValue
+  mark "random" -> code.WeakRandomValue
+
+  // controls (sanitizers) — defined in each generated case's preamble
+  control "realpath" -> core.PathCanonicalization
+  control "safe_path" -> core.PathCanonicalization
+  control "escape_shell" -> core.ShellEscape
+  control "escape_html" -> core.HtmlEscape
+  control "escape_xpath" -> core.XpathEscape
+  control "encode_for_ldap" -> core.LdapEscape
 }

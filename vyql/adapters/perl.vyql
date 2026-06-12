@@ -6,6 +6,7 @@ adapter perl {
   // untrusted input
   source ".param" -> code.HttpInput
   source ".url_param" -> code.HttpInput
+  source ".http" -> code.HttpInput
   source "ENV" -> code.EnvVariable
   source "ARGV" -> code.CliArgument
   source "STDIN" -> code.HttpInput
@@ -27,10 +28,12 @@ adapter perl {
   sink method "selectrow_arrayref" -> code.SqlExecution
   sink method "selectall_hashref" -> code.SqlExecution
 
-  // path / file
-  sink path "open" -> code.FilePathAccess
-  sink path "opendir" -> code.FilePathAccess
-  sink path "unlink" -> code.FilePathAccess
+  // path / file — perl `open(my $fh, '<', PATH)` puts the path in a later arg,
+  // so flag ANY tainted argument (the filehandle/mode args are constant).
+  sink path "open" arg all -> code.FilePathAccess
+  sink path "opendir" arg all -> code.FilePathAccess
+  sink path "unlink" arg all -> code.FilePathAccess
+  sink path "sysopen" arg all -> code.FilePathAccess
 
   // SSRF — LWP::Simple / LWP::UserAgent / HTTP::Tiny (URL is the call argument)
   sink path "getstore" -> code.UrlFetch
@@ -38,12 +41,41 @@ adapter perl {
   sink path "mirror" -> code.UrlFetch
   sink method "request" -> code.UrlFetch
 
-  // weak crypto (CWE-327) — Digest::MD5 / Digest::SHA1 (`::` normalized to `.`)
+  // XSS (CWE-79) — print to the response filehandle / CGI writers
+  sink path "print" arg all -> code.HtmlRender
+  sink path "printf" arg all -> code.HtmlRender
+  sink path "say" arg all -> code.HtmlRender
+
+  // LDAP (CWE-90) — Net::LDAP search (filter is a named arg; flag any tainted arg)
+  sink method "search" arg all -> code.LdapQuery
+
+  // XPath (CWE-643) — XML::XPath find/findnodes (expression is the arg)
+  sink method "find" -> code.XpathQuery
+  sink method "findnodes" -> code.XpathQuery
+  sink method "findvalue" -> code.XpathQuery
+
+  // trust boundary (CWE-501) — untrusted data written into the session
+  sink method "param" arg all -> code.TrustBoundary
+
+  // insecure cookie (CWE-614) — cookie secure/httponly setter turned off
+  mark "secure" val "false" -> code.InsecureCookie
+  mark "httponly" val "false" -> code.InsecureCookie
+
+  // weak hash (CWE-328/327) — Digest::MD5 / Digest::SHA1 (`::` normalized to `.`)
   mark "md5_hex" -> code.WeakHash
   mark "md5_base64" -> code.WeakHash
   mark "Digest.MD5" -> code.WeakHash
   mark "sha1_hex" -> code.WeakHash
   mark "Digest.SHA1" -> code.WeakHash
+
+  // weak cipher (CWE-327) — Crypt::CBC / Crypt::DES with a broken algorithm.
+  mark "Crypt.CBC.new" val "DES" -> code.WeakCipher
+  mark "Crypt.CBC.new" val "RC4" -> code.WeakCipher
+  mark "Crypt.CBC.new" val "Blowfish" -> code.WeakCipher
+  mark "Crypt.DES" -> code.WeakCipher
+
+  // insecure randomness (CWE-330) — perl builtin rand() (Crypt::URandom is safe)
+  mark "rand" -> code.WeakRandomValue
 
   // deserialization (CWE-502) — Storable
   sink path "Storable.thaw" -> code.Deserialization
@@ -55,8 +87,14 @@ adapter perl {
   sink method "parse_file" -> code.XmlParse
   sink method "load_xml" -> code.XmlParse
 
-  // controls (sanitizers)
+  // controls (sanitizers) — defined in each generated case's preamble
   control "quotemeta" -> core.ShellEscape
   control "encode_entities" -> core.HtmlEscape
   control "escapeHTML" -> core.HtmlEscape
+  control "escapeHtml" -> core.HtmlEscape
+  control "escapeXPath" -> core.XpathEscape
+  control "encodeForLDAP" -> core.LdapEscape
+  control "escapeShell" -> core.ShellEscape
+  control "safePath" -> core.PathCanonicalization
+  control "validateRole" -> core.InputValidation
 }

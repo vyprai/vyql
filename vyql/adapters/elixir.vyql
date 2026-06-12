@@ -13,17 +13,20 @@ adapter elixir {
   source "conn.cookies" -> code.HttpInput
   source "conn.req_headers" -> code.HttpInput
 
-  // command execution
+  // command execution — System.shell takes the shell string as arg0 (tainted);
+  // System.cmd("sh", ["-c", cmd]) buries the command in an args list, so prefer
+  // the shell-string form so the tainted payload lands in arg0.
   sink path "System.cmd" -> code.CommandExecution
   sink path "System.shell" -> code.CommandExecution
   sink path "os.cmd" -> code.CommandExecution
   sink method "cmd" -> code.CommandExecution
+  sink method "shell" -> code.CommandExecution
 
   // SQL — Ecto raw query / fragment (SQL.query takes Repo as arg0, query as arg1)
   sink path "Ecto.Adapters.SQL.query" arg 1 -> code.SqlExecution
   sink path "Ecto.Adapters.SQL.query!" arg 1 -> code.SqlExecution
-  sink method "query" -> code.SqlExecution
-  sink method "query!" -> code.SqlExecution
+  sink method "query" arg 1 -> code.SqlExecution
+  sink method "query!" arg 1 -> code.SqlExecution
   sink method "fragment" -> code.SqlExecution
 
   // code evaluation / dynamic (CWE-95) + deserialization (CWE-502)
@@ -33,7 +36,7 @@ adapter elixir {
   sink path "erlang.binary_to_term" -> code.Deserialization
   sink path ":erlang.binary_to_term" -> code.Deserialization
 
-  // path / file
+  // path / file — the tainted path is the first argument.
   sink path "File.read" -> code.FilePathAccess
   sink path "File.read!" -> code.FilePathAccess
   sink path "File.write" -> code.FilePathAccess
@@ -41,11 +44,47 @@ adapter elixir {
   sink path "File.rm" -> code.FilePathAccess
   sink path "File.stream!" -> code.FilePathAccess
 
-  // weak hash — :crypto.hash(:md5|:sha, …).
+  // weak hash (CWE-328) — :crypto.hash(:md5|:sha, …). `:sha` is SHA-1; exclude
+  // :sha224/:sha256/:sha384/:sha512 (safe) via nval so they don't substring-match.
   mark ":crypto.hash" val ":md5" -> code.WeakHash
-  mark ":crypto.hash" val ":sha" -> code.WeakHash
+  mark ":crypto.hash" val ":sha" nval ":sha2" nval ":sha3" nval ":sha5" -> code.WeakHash
 
-  // XSS — Phoenix.HTML.raw bypasses auto-escaping.
+  // weak cipher (CWE-327) — :crypto.crypto_one_time(:des_*|:rc4|:blowfish_*, …); AES safe.
+  mark ":crypto.crypto_one_time" val ":des" -> code.WeakCipher
+  mark ":crypto.crypto_one_time" val ":rc4" -> code.WeakCipher
+  mark ":crypto.crypto_one_time" val ":blowfish" -> code.WeakCipher
+  mark ":crypto.block_encrypt" val ":des" -> code.WeakCipher
+  mark ":crypto.block_encrypt" val ":blowfish" -> code.WeakCipher
+
+  // insecure randomness (CWE-330) — :rand.uniform / :random.uniform; the secure form
+  // :crypto.strong_rand_bytes does NOT start with `:rand`, so no path collision.
+  mark ":rand.uniform" -> code.WeakRandomValue
+  mark ":rand.normal" -> code.WeakRandomValue
+  mark ":random.uniform" -> code.WeakRandomValue
+
+  // insecure cookie (CWE-614) — Plug.Conn.put_resp_cookie(conn, name, val, secure: false).
+  mark "put_resp_cookie" val "false" -> code.InsecureCookie
+
+  // trust boundary (CWE-501) — untrusted data written into the session (arg2 = value).
+  sink method "put_session" arg 2 -> code.TrustBoundary
+  sink path "Plug.Conn.put_session" arg 2 -> code.TrustBoundary
+
+  // LDAP (CWE-90) — :eldap / ldap search, the filter is arg1.
+  sink method "search" arg 1 -> code.LdapQuery
+
+  // XPath (CWE-643) — SweetXml.xpath(doc, expr): the expression is arg1.
+  sink path "SweetXml.xpath" arg 1 -> code.XpathQuery
+  sink method "xpath" arg 1 -> code.XpathQuery
+
+  // XSS — Phoenix.HTML.raw bypasses auto-escaping; send_resp body is arg2.
   sink path "raw" -> code.HtmlRender
   sink path "Phoenix.HTML.raw" -> code.HtmlRender
+
+  // controls — sanitizers/validators defined in each generated case's preamble
+  control "escape_html" -> core.HtmlEscape
+  control "escape_xpath" -> core.HtmlEscape
+  control "encode_for_ldap" -> core.LdapEscape
+  control "escape_shell" -> core.ShellEscape
+  control "safe_path" -> core.PathCanonicalization
+  control "validate_role" -> core.InputValidation
 }

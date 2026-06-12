@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tslua "github.com/tree-sitter-grammars/tree-sitter-lua/bindings/go"
 
@@ -220,7 +222,9 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "number":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string":
-		return nir.Const{Loc: L}
+		// carry the quote-stripped literal text so value-matched marks/sinks
+		// (e.g. crypto.cipher("DES")) can read the algorithm string via str_args.
+		return nir.Const{Loc: L, Value: luaStringValue(c.text(n))}
 	case "dot_index_expression":
 		return nir.Attr{Base: c.expr(field(n, "table")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "bracket_index_expression":
@@ -255,6 +259,21 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// luaStringValue strips the surrounding delimiters of a Lua string literal so the
+// inner text is carried as the Const value (for `val`-matched marks/sinks). Handles
+// "..." / '...' short strings and [[...]] / [=[...]=] long-bracket strings.
+func luaStringValue(s string) string {
+	if len(s) >= 2 {
+		if q := s[0]; (q == '"' || q == '\'') && s[len(s)-1] == q {
+			return s[1 : len(s)-1]
+		}
+		if strings.HasPrefix(s, "[[") && strings.HasSuffix(s, "]]") {
+			return s[2 : len(s)-2]
+		}
+	}
+	return s
 }
 
 func (c *luaConv) dotted(n *tree_sitter.Node) string {
