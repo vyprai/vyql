@@ -6,8 +6,10 @@
 package profile
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/vyprai/vyql/datadir"
@@ -30,7 +32,11 @@ func (p Profile) ActiveSources() map[string]bool {
 	}
 	out := map[string]bool{}
 	for _, e := range p.Entrypoints {
-		if !strings.HasPrefix(e, "code.") {
+		if strings.Contains(e, ".") {
+			// already qualified
+		} else if e == "UserControlledData" {
+			e = "core." + e
+		} else {
 			e = "code." + e
 		}
 		out[e] = true
@@ -101,12 +107,18 @@ func Detect(paths []string, profiles []Profile) Profile {
 			kind, val, _ := strings.Cut(d, ":")
 			switch kind {
 			case "dep":
-				if strings.Contains(manifests, val) {
+				if depMatch(manifests, val) {
 					score++
 				}
 			case "file":
 				if fileExists(paths, val) {
 					score++
+				}
+			case "npm":
+				if val == "library" && npmLibrary(paths) {
+					// A publishable package manifest is a stronger archetype signal than
+					// incidental docs/demo frontend files inside the same repository.
+					score += 2
 				}
 			case "ext":
 				if exts[strings.ToLower(val)] {
@@ -119,6 +131,52 @@ func Detect(paths []string, profiles []Profile) Profile {
 		}
 	}
 	return best
+}
+
+func depMatch(manifests, dep string) bool {
+	pat := `(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(dep) + `($|[^A-Za-z0-9_])`
+	return regexp.MustCompile(pat).FindStringIndex(manifests) != nil
+}
+
+func npmLibrary(paths []string) bool {
+	for _, root := range roots(paths) {
+		found := false
+		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil || found {
+				return nil
+			}
+			if d.IsDir() {
+				if path != root && (d.Name() == "node_modules" || strings.HasPrefix(d.Name(), ".")) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if d.Name() != "package.json" {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil
+			}
+			var pkg struct {
+				Private bool            `json:"private"`
+				Main    string          `json:"main"`
+				Module  string          `json:"module"`
+				Exports json.RawMessage `json:"exports"`
+			}
+			if json.Unmarshal(data, &pkg) != nil || pkg.Private {
+				return nil
+			}
+			if pkg.Main != "" || pkg.Module != "" || len(pkg.Exports) > 0 {
+				found = true
+			}
+			return nil
+		})
+		if found {
+			return true
+		}
+	}
+	return false
 }
 
 // readManifests concatenates the text of common dependency manifests under the

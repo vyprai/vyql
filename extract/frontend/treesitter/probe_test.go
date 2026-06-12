@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	adapterapply "github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/nir"
@@ -17,7 +19,8 @@ import (
 // TestFrontendCapabilityMatrix probes every frontend with security-critical snippets and
 // reports, per (language × capability), whether the frontend produces the expected graph
 // evidence. java/python/javascript are the reference (most complete). Run with:
-//   go test ./extract/frontend/treesitter -run TestFrontendCapabilityMatrix -v
+//
+//	go test ./extract/frontend/treesitter -run TestFrontendCapabilityMatrix -v
 func TestFrontendCapabilityMatrix(t *testing.T) {
 	type lang struct {
 		name    string
@@ -130,56 +133,56 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 
 	caps := []cap{
 		{"call(method)", hasCall("exec"), map[string]string{
-			"java":   "class T { void r(String p){ db.exec(p); } }",
-			"python": "def r(p):\n    db.exec(p)",
+			"java":       "class T { void r(String p){ db.exec(p); } }",
+			"python":     "def r(p):\n    db.exec(p)",
 			"javascript": "function r(p){ db.exec(p); }",
-			"csharp": "class T { void R(string p){ db.exec(p); } }",
-			"php":    "<?php function r($p){ $db->exec($p); }",
-			"ruby":   "def r(p)\n  db.exec(p)\nend",
-			"rust":   "fn r(p: &str){ db.exec(p); }",
-			"kotlin": "fun r(p: String){ db.exec(p) }",
-			"scala":  "object T { def r(p: String): Unit = { db.exec(p) } }",
-			"swift":  "func r(p: String){ db.exec(p) }",
-			"dart":   "void r(String p){ db.exec(p); }",
-			"groovy": "void r(p){ db.exec(p) }",
-			"elixir": "defmodule T do\n  def r(p), do: Db.exec(p)\nend",
-			"lua":    "function r(p)\n  db.exec(p)\nend",
-			"perl":   "sub r { my $p=shift; $db->exec($p); }",
-			"c":      "void r(char* p){ exec(p); }",
-			"cpp":    "void r(char* p){ db.exec(p); }",
-			"objc":   "void r(NSString* p){ [db exec:p]; }",
+			"csharp":     "class T { void R(string p){ db.exec(p); } }",
+			"php":        "<?php function r($p){ $db->exec($p); }",
+			"ruby":       "def r(p)\n  db.exec(p)\nend",
+			"rust":       "fn r(p: &str){ db.exec(p); }",
+			"kotlin":     "fun r(p: String){ db.exec(p) }",
+			"scala":      "object T { def r(p: String): Unit = { db.exec(p) } }",
+			"swift":      "func r(p: String){ db.exec(p) }",
+			"dart":       "void r(String p){ db.exec(p); }",
+			"groovy":     "void r(p){ db.exec(p) }",
+			"elixir":     "defmodule T do\n  def r(p), do: Db.exec(p)\nend",
+			"lua":        "function r(p)\n  db.exec(p)\nend",
+			"perl":       "sub r { my $p=shift; $db->exec($p); }",
+			"c":          "void r(char* p){ exec(p); }",
+			"cpp":        "void r(char* p){ db.exec(p); }",
+			"objc":       "void r(NSString* p){ [db exec:p]; }",
 		}},
 		{"concat taint", flowToSink("p", "sink"), map[string]string{
-			"java":   `class T { void r(String p){ String q = "a" + p; sink(q); } }`,
-			"python": "def r(p):\n    q = 'a' + p\n    sink(q)",
+			"java":       `class T { void r(String p){ String q = "a" + p; sink(q); } }`,
+			"python":     "def r(p):\n    q = 'a' + p\n    sink(q)",
 			"javascript": `function r(p){ var q = "a" + p; sink(q); }`,
-			"csharp": `class T { void R(string p){ var q = "a" + p; sink(q); } }`,
-			"php":    `<?php function r($p){ $q = "a" . $p; sink($q); }`,
-			"ruby":   "def r(p)\n  q = 'a' + p\n  sink(q)\nend",
-			"rust":   `fn r(p: &str){ let q = format!("a{}", p); sink(q); }`,
-			"kotlin": `fun r(p: String){ val q = "a" + p; sink(q) }`,
-			"scala":  `object T { def r(p: String): Unit = { val q = "a" + p; sink(q) } }`,
-			"swift":  `func r(p: String){ let q = "a" + p; sink(q) }`,
-			"dart":   `void r(String p){ var q = "a" + p; sink(q); }`,
-			"groovy": `void r(p){ def q = "a" + p; sink(q) }`,
-			"elixir": "defmodule T do\n  def r(p), do: sink(\"a\" <> p)\nend",
-			"lua":    "function r(p)\n  local q = 'a' .. p\n  sink(q)\nend",
-			"perl":   `sub r { my $p=shift; my $q = "a" . $p; sink($q); }`,
-			"c":      `void r(char* p){ char* q = strcat("a", p); sink(q); }`,
-			"cpp":    `void r(std::string p){ auto q = "a" + p; sink(q); }`,
-			"objc":   `void r(NSString* p){ NSString* q = [@"a" stringByAppendingString:p]; sink(q); }`,
+			"csharp":     `class T { void R(string p){ var q = "a" + p; sink(q); } }`,
+			"php":        `<?php function r($p){ $q = "a" . $p; sink($q); }`,
+			"ruby":       "def r(p)\n  q = 'a' + p\n  sink(q)\nend",
+			"rust":       `fn r(p: &str){ let q = format!("a{}", p); sink(q); }`,
+			"kotlin":     `fun r(p: String){ val q = "a" + p; sink(q) }`,
+			"scala":      `object T { def r(p: String): Unit = { val q = "a" + p; sink(q) } }`,
+			"swift":      `func r(p: String){ let q = "a" + p; sink(q) }`,
+			"dart":       `void r(String p){ var q = "a" + p; sink(q); }`,
+			"groovy":     `void r(p){ def q = "a" + p; sink(q) }`,
+			"elixir":     "defmodule T do\n  def r(p), do: sink(\"a\" <> p)\nend",
+			"lua":        "function r(p)\n  local q = 'a' .. p\n  sink(q)\nend",
+			"perl":       `sub r { my $p=shift; my $q = "a" . $p; sink($q); }`,
+			"c":          `void r(char* p){ char* q = strcat("a", p); sink(q); }`,
+			"cpp":        `void r(std::string p){ auto q = "a" + p; sink(q); }`,
+			"objc":       `void r(NSString* p){ NSString* q = [@"a" stringByAppendingString:p]; sink(q); }`,
 		}},
 		{"new T(x)→Call", hasCall("File"), map[string]string{
-			"java":   `class T { void r(String p){ new File(p); } }`,
+			"java":       `class T { void r(String p){ new File(p); } }`,
 			"javascript": `function r(p){ new File(p); }`,
-			"csharp": `class T { void R(string p){ new File(p); } }`,
-			"rust":   "", // no `new`
-			"kotlin": `fun r(p: String){ File(p) }`,
-			"scala":  `object T { def r(p: String): Unit = { new File(p) } }`,
-			"swift":  `func r(p: String){ File(p) }`,
-			"dart":   `void r(String p){ new File(p); }`,
-			"groovy": `void r(p){ new File(p) }`,
-			"cpp":    `void r(char* p){ File f(p); }`,
+			"csharp":     `class T { void R(string p){ new File(p); } }`,
+			"rust":       "", // no `new`
+			"kotlin":     `fun r(p: String){ File(p) }`,
+			"scala":      `object T { def r(p: String): Unit = { new File(p) } }`,
+			"swift":      `func r(p: String){ File(p) }`,
+			"dart":       `void r(String p){ new File(p); }`,
+			"groovy":     `void r(p){ new File(p) }`,
+			"cpp":        `void r(char* p){ File f(p); }`,
 		}},
 		{"member/subscript write", func(g usg.Store) bool {
 			// the assignment value is captured in a write node (a code.Call with an incoming
@@ -192,38 +195,38 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			}
 			return false
 		}, map[string]string{
-			"java":   `class T { void r(String p){ obj.role = p; } }`,
-			"python": "def r(p):\n    s = {}\n    s['role'] = p",
+			"java":       `class T { void r(String p){ obj.role = p; } }`,
+			"python":     "def r(p):\n    s = {}\n    s['role'] = p",
 			"javascript": `function r(p){ obj.role = p; }`,
-			"csharp": `class T { void R(string p){ obj.role = p; } }`,
-			"php":    `<?php function r($p){ $obj->role = $p; }`,
-			"ruby":   "def r(p)\n  obj.role = p\nend",
-			"kotlin": `fun r(p: String){ obj.role = p }`,
-			"scala":  `object T { def r(p: String): Unit = { obj.role = p } }`,
+			"csharp":     `class T { void R(string p){ obj.role = p; } }`,
+			"php":        `<?php function r($p){ $obj->role = $p; }`,
+			"ruby":       "def r(p)\n  obj.role = p\nend",
+			"kotlin":     `fun r(p: String){ obj.role = p }`,
+			"scala":      `object T { def r(p: String): Unit = { obj.role = p } }`,
 		}},
 		{"bool literal token", hasStrArg("false"), map[string]string{
-			"java":   `class T { void r(){ c.setSecure(false); } }`,
-			"python": "def r():\n    c.set_cookie('x', secure=False)",
+			"java":       `class T { void r(){ c.setSecure(false); } }`,
+			"python":     "def r():\n    c.set_cookie('x', secure=False)",
 			"javascript": `function r(){ c.setSecure(false); }`,
-			"csharp": `class T { void R(){ c.SetSecure(false); } }`,
-			"php":    `<?php function r(){ setcookie('x', 'v', false); }`,
-			"ruby":   "def r()\n  set_cookie('x', secure: false)\nend",
-			"kotlin": `fun r(){ c.setSecure(false) }`,
-			"scala":  `object T { def r(): Unit = { c.setSecure(false) } }`,
-			"swift":  `func r(){ c.setSecure(false) }`,
-			"dart":   `void r(){ c.setSecure(false); }`,
-			"groovy": `void r(){ c.setSecure(false) }`,
+			"csharp":     `class T { void R(){ c.SetSecure(false); } }`,
+			"php":        `<?php function r(){ setcookie('x', 'v', false); }`,
+			"ruby":       "def r()\n  set_cookie('x', secure: false)\nend",
+			"kotlin":     `fun r(){ c.setSecure(false) }`,
+			"scala":      `object T { def r(): Unit = { c.setSecure(false) } }`,
+			"swift":      `func r(){ c.setSecure(false) }`,
+			"dart":       `void r(){ c.setSecure(false); }`,
+			"groovy":     `void r(){ c.setSecure(false) }`,
 		}},
 		{"interproc src→sink", flowToSink("p", "sink"), map[string]string{
-			"java":   `class T { String wrap(String p){ return p; } void r(String p){ sink(wrap(p)); } }`,
-			"python": "def wrap(p):\n    return p\ndef r(p):\n    sink(wrap(p))",
+			"java":       `class T { String wrap(String p){ return p; } void r(String p){ sink(wrap(p)); } }`,
+			"python":     "def wrap(p):\n    return p\ndef r(p):\n    sink(wrap(p))",
 			"javascript": `function wrap(p){ return p; } function r(p){ sink(wrap(p)); }`,
-			"csharp": `class T { string wrap(string p){ return p; } void R(string p){ sink(wrap(p)); } }`,
-			"php":    `<?php function wrap($p){ return $p; } function r($p){ sink(wrap($p)); }`,
-			"ruby":   "def wrap(p)\n  p\nend\ndef r(p)\n  sink(wrap(p))\nend",
-			"kotlin": `fun wrap(p: String): String { return p }` + "\n" + `fun r(p: String){ sink(wrap(p)) }`,
-			"scala":  `object T { def wrap(p: String): String = p; def r(p: String): Unit = { sink(wrap(p)) } }`,
-			"go":     "",
+			"csharp":     `class T { string wrap(string p){ return p; } void R(string p){ sink(wrap(p)); } }`,
+			"php":        `<?php function wrap($p){ return $p; } function r($p){ sink(wrap($p)); }`,
+			"ruby":       "def wrap(p)\n  p\nend\ndef r(p)\n  sink(wrap(p))\nend",
+			"kotlin":     `fun wrap(p: String): String { return p }` + "\n" + `fun r(p: String){ sink(wrap(p)) }`,
+			"scala":      `object T { def wrap(p: String): String = p; def r(p: String): Unit = { sink(wrap(p)) } }`,
+			"go":         "",
 		}},
 		{"if→CFG region", func(g usg.Store) bool {
 			all, _ := g.AllNodes()
@@ -234,63 +237,63 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			}
 			return false
 		}, map[string]string{
-			"java":   `class T { void r(String p){ if (p.length() > 0) { sink(p); } } }`,
-			"python": "def r(p):\n    if len(p) > 0:\n        sink(p)",
+			"java":       `class T { void r(String p){ if (p.length() > 0) { sink(p); } } }`,
+			"python":     "def r(p):\n    if len(p) > 0:\n        sink(p)",
 			"javascript": `function r(p){ if (p.length > 0) { sink(p); } }`,
-			"csharp": `class T { void R(string p){ if (p.Length > 0) { sink(p); } } }`,
-			"php":    `<?php function r($p){ if (strlen($p) > 0) { sink($p); } }`,
-			"ruby":   "def r(p)\n  if p.length > 0\n    sink(p)\n  end\nend",
-			"kotlin": `fun r(p: String){ if (p.length > 0) { sink(p) } }`,
-			"scala":  `object T { def r(p: String): Unit = { if (p.length > 0) { sink(p) } } }`,
-			"swift":  `func r(p: String){ if p.count > 0 { sink(p) } }`,
-			"dart":   `void r(String p){ if (p.length > 0) { sink(p); } }`,
+			"csharp":     `class T { void R(string p){ if (p.Length > 0) { sink(p); } } }`,
+			"php":        `<?php function r($p){ if (strlen($p) > 0) { sink($p); } }`,
+			"ruby":       "def r(p)\n  if p.length > 0\n    sink(p)\n  end\nend",
+			"kotlin":     `fun r(p: String){ if (p.length > 0) { sink(p) } }`,
+			"scala":      `object T { def r(p: String): Unit = { if (p.length > 0) { sink(p) } } }`,
+			"swift":      `func r(p: String){ if p.count > 0 { sink(p) } }`,
+			"dart":       `void r(String p){ if (p.length > 0) { sink(p); } }`,
 		}},
 		{"index read a[k]", hasNodeType("code.Index"), map[string]string{
-			"java":   `class T { void r(String[] a){ sink(a[0]); } }`,
-			"python": "def r(a):\n    sink(a[0])",
+			"java":       `class T { void r(String[] a){ sink(a[0]); } }`,
+			"python":     "def r(a):\n    sink(a[0])",
 			"javascript": `function r(a){ sink(a[0]); }`,
-			"php":    `<?php function r($a){ sink($a[0]); }`,
-			"ruby":   "def r(a)\n  sink(a[0])\nend",
-			"kotlin": `fun r(a: List<String>){ sink(a[0]) }`,
-			"scala":  `object T { def r(a: Array[String]): Unit = { sink(a(0)) } }`,
+			"php":        `<?php function r($a){ sink($a[0]); }`,
+			"ruby":       "def r(a)\n  sink(a[0])\nend",
+			"kotlin":     `fun r(a: List<String>){ sink(a[0]) }`,
+			"scala":      `object T { def r(a: Array[String]): Unit = { sink(a(0)) } }`,
 		}},
 		{"lambda/closure", hasNodeType("code.Func"), map[string]string{
-			"java":   `class T { void r(){ run(() -> sink(1)); } }`,
-			"python": "def r():\n    run(lambda: sink(1))",
+			"java":       `class T { void r(){ run(() -> sink(1)); } }`,
+			"python":     "def r():\n    run(lambda: sink(1))",
 			"javascript": `function r(){ run(() => sink(1)); }`,
-			"csharp": `class T { void R(){ run(() => sink(1)); } }`,
-			"php":    `<?php function r(){ run(function(){ sink(1); }); }`,
-			"ruby":   "def r()\n  run { sink(1) }\nend",
-			"kotlin": `fun r(){ run { sink(1) } }`,
-			"scala":  `object T { def r(): Unit = { run(() => sink(1)) } }`,
-			"swift":  `func r(){ run({ sink(1) }) }`,
-			"dart":   `void r(){ run(() => sink(1)); }`,
+			"csharp":     `class T { void R(){ run(() => sink(1)); } }`,
+			"php":        `<?php function r(){ run(function(){ sink(1); }); }`,
+			"ruby":       "def r()\n  run { sink(1) }\nend",
+			"kotlin":     `fun r(){ run { sink(1) } }`,
+			"scala":      `object T { def r(): Unit = { run(() => sink(1)) } }`,
+			"swift":      `func r(){ run({ sink(1) }) }`,
+			"dart":       `void r(){ run(() => sink(1)); }`,
 		}},
 		{"ternary→Phi", hasNodeType("code.Phi"), map[string]string{
-			"java":   `class T { String r(String p){ return p != null ? p : "x"; } }`,
-			"python": "def r(p):\n    return p if p else 'x'",
+			"java":       `class T { String r(String p){ return p != null ? p : "x"; } }`,
+			"python":     "def r(p):\n    return p if p else 'x'",
 			"javascript": `function r(p){ return p ? p : "x"; }`,
-			"csharp": `class T { string R(string p){ return p != null ? p : "x"; } }`,
-			"php":    `<?php function r($p){ return $p ? $p : "x"; }`,
-			"ruby":   "def r(p)\n  p ? p : 'x'\nend",
-			"kotlin": `fun r(p: String): String { return if (p.isEmpty()) "x" else p }`,
-			"scala":  `object T { def r(p: String): String = if (p.isEmpty) "x" else p }`,
+			"csharp":     `class T { string R(string p){ return p != null ? p : "x"; } }`,
+			"php":        `<?php function r($p){ return $p ? $p : "x"; }`,
+			"ruby":       "def r(p)\n  p ? p : 'x'\nend",
+			"kotlin":     `fun r(p: String): String { return if (p.isEmpty()) "x" else p }`,
+			"scala":      `object T { def r(p: String): String = if (p.isEmpty) "x" else p }`,
 		}},
 		{"field-sensitivity", flowToSink("p", "sink"), map[string]string{
-			"java":   `class T { void r(String p){ o.f = p; sink(o.f); } }`,
-			"python": "def r(p):\n    o.f = p\n    sink(o.f)",
+			"java":       `class T { void r(String p){ o.f = p; sink(o.f); } }`,
+			"python":     "def r(p):\n    o.f = p\n    sink(o.f)",
 			"javascript": `function r(p){ var o = {}; o.f = p; sink(o.f); }`,
-			"csharp": `class T { void R(string p){ o.f = p; sink(o.f); } }`,
-			"php":    `<?php function r($p){ $o->f = $p; sink($o->f); }`,
-			"ruby":   "def r(p)\n  o.f = p\n  sink(o.f)\nend",
-			"kotlin": `fun r(p: String){ o.f = p; sink(o.f) }`,
+			"csharp":     `class T { void R(string p){ o.f = p; sink(o.f); } }`,
+			"php":        `<?php function r($p){ $o->f = $p; sink($o->f); }`,
+			"ruby":       "def r(p)\n  o.f = p\n  sink(o.f)\nend",
+			"kotlin":     `fun r(p: String){ o.f = p; sink(o.f) }`,
 		}},
 		{"callback taint flow", flowToSink("a", "sink"), map[string]string{
 			"javascript": `function r(a){ a.forEach(function(v){ sink(v); }); }`,
-			"python": "def r(a):\n    for v in a:\n        sink(v)",
-			"java":   `class T { void r(java.util.List a){ a.forEach(v -> sink(v)); } }`,
-			"kotlin": `fun r(a: List<String>){ a.forEach { sink(it) } }`,
-			"ruby":   "def r(a)\n  a.each { |v| sink(v) }\nend",
+			"python":     "def r(a):\n    for v in a:\n        sink(v)",
+			"java":       `class T { void r(java.util.List a){ a.forEach(v -> sink(v)); } }`,
+			"kotlin":     `fun r(a: List<String>){ a.forEach { sink(it) } }`,
+			"ruby":       "def r(a)\n  a.each { |v| sink(v) }\nend",
 		}},
 		{"regex char-filter", func(g usg.Store) bool {
 			ns, _ := g.NodesOfType("code.Call")
@@ -303,18 +306,18 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			return false
 		}, map[string]string{
 			"javascript": `function r(p){ return p.replace(/[<>]/g, ""); }`,
-			"python": "def r(p):\n    return re.sub('[<>]', '', p)",
-			"ruby":   "def r(p)\n  p.gsub(/[<>]/, '')\nend",
-			"java":   `class T { String r(String p){ return p.replaceAll("[<>]", ""); } }`,
+			"python":     "def r(p):\n    return re.sub('[<>]', '', p)",
+			"ruby":       "def r(p)\n  p.gsub(/[<>]/, '')\nend",
+			"java":       `class T { String r(String p){ return p.replaceAll("[<>]", ""); } }`,
 		}},
 		{"chain a().b(x)", hasCall("exec"), map[string]string{
-			"java":   `class T { void r(String p){ Runtime.getRuntime().exec(p); } }`,
+			"java":       `class T { void r(String p){ Runtime.getRuntime().exec(p); } }`,
 			"javascript": `function r(p){ obj.get().exec(p); }`,
-			"kotlin": `fun r(p: String){ Runtime.getRuntime().exec(p) }`,
-			"scala":  `object T { def r(p: String): Unit = { Runtime.getRuntime().exec(p) } }`,
-			"groovy": `void r(p){ Runtime.getRuntime().exec(p) }`,
-			"swift":  `func r(p: String){ obj.get().exec(p) }`,
-			"dart":   `void r(String p){ obj.get().exec(p); }`,
+			"kotlin":     `fun r(p: String){ Runtime.getRuntime().exec(p) }`,
+			"scala":      `object T { def r(p: String): Unit = { Runtime.getRuntime().exec(p) } }`,
+			"groovy":     `void r(p){ Runtime.getRuntime().exec(p) }`,
+			"swift":      `func r(p: String){ obj.get().exec(p) }`,
+			"dart":       `void r(String p){ obj.get().exec(p); }`,
 		}},
 	}
 
@@ -357,6 +360,176 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 	// gap summary
 	fmt.Println("\n== GAPS (MISS, excluding N/A) ==")
 	_ = sort.Strings
+}
+
+func TestJavaScriptIIFELowersBody(t *testing.T) {
+	cases := map[string]string{
+		"postfix_call": `(function($) {
+  $(document).on('nested:fieldAdded', 'form', function(content) {
+    nav.append('<li>' + content.field.children('.object-infos').data('object-label') + '</li>');
+  });
+})(jQuery);`,
+		"paren_call": `(function($) {
+  $(document).on('nested:fieldAdded', 'form', function(content) {
+    nav.append('<li>' + content.field.children('.object-infos').data('object-label') + '</li>');
+  });
+}(jQuery));`,
+	}
+	for name, code := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			src := filepath.Join(dir, "wrapped.js")
+			if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			prog, err := treesitter.ExtractJavaScript([]string{src}, dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			g, err := lowering.Lower(prog, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !func() bool {
+				nodes, _ := g.AllNodes()
+				for _, n := range nodes {
+					if n.Prop("method") == "append" && strings.Contains(n.Prop("callee_path"), "nav.append") {
+						return true
+					}
+				}
+				return false
+			}() {
+				t.Fatalf("expected jQuery IIFE body to be lowered through nav.append")
+			}
+		})
+	}
+}
+
+func TestJavaScriptCommonJSExportSeedsPublicAPI(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "index.js")
+	code := `const cp = require('child_process');
+module.exports = function killport(port) {
+  cp.exec('lsof -i:' + port);
+};`
+	if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{src}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sources, sinks []string
+	nodes, _ := g.AllNodes()
+	for _, n := range nodes {
+		if n.Prop("callee_path") == "public_api_input" {
+			sources = append(sources, n.ID)
+		}
+		if n.Prop("callee_path") == "child_process.exec" || n.Prop("callee_path") == "cp.exec" {
+			if arg := n.Prop("arg0"); arg != "" {
+				sinks = append(sinks, arg)
+			}
+		}
+	}
+	if len(sources) == 0 || len(sinks) == 0 {
+		t.Fatalf("expected public API source and exec arg sink, got %d sources / %d sinks", len(sources), len(sinks))
+	}
+	if !reachable(g, sources, sinks) {
+		t.Fatalf("expected exported parameter source to flow into cp.exec argument")
+	}
+}
+
+func TestJavaScriptPrototypeOptionReadSink(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "template.js")
+	code := `exports.compile = function compile(template, optsParam) {
+  var opts = optsParam || {};
+  var options = {};
+  options.outputFunctionName = opts.outputFunctionName;
+};`
+	if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{src}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := adapterapply.Apply(g, frontend.JsAdapters(), nil); err != nil {
+		t.Fatal(err)
+	}
+	srcs, _ := g.NodesWithConcept("core.UserControlledData")
+	sinks, _ := g.NodesWithConcept("code.ProtoPollute")
+	if len(srcs) == 0 || len(sinks) == 0 {
+		t.Fatalf("expected public API source and ProtoPollute option-read sink, got %d sources / %d sinks", len(srcs), len(sinks))
+	}
+	if !reachable(g, srcs, sinks) {
+		t.Fatalf("expected public API option object to flow into polluted option read")
+	}
+}
+
+func TestJavaScriptDestructuringKeepsTaint(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "destructure.js")
+	code := `module.exports = function launch(file, specifiedEditor) {
+  const parsed = parseFile(file);
+  let { fileName } = parsed;
+  const [editor, ...args] = guessEditor(specifiedEditor);
+  args.push(fileName);
+  childProcess.spawn('cmd.exe', ['/C', editor].concat(args), {});
+};`
+	if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{src}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := adapterapply.Apply(g, frontend.JsAdapters(), nil); err != nil {
+		t.Fatal(err)
+	}
+	srcs, _ := g.NodesWithConcept("core.UserControlledData")
+	sinks, _ := g.NodesWithConcept("code.CommandExecution")
+	if !reachable(g, srcs, sinks) {
+		t.Fatalf("expected exported destructured values to flow into cmd.exe spawn args")
+	}
+}
+
+func reachable(g usg.Store, sources, sinks []string) bool {
+	sink := map[string]bool{}
+	for _, s := range sinks {
+		sink[s] = true
+	}
+	for _, s := range sources {
+		seen := map[string]bool{s: true}
+		q := []string{s}
+		for len(q) > 0 {
+			cur := q[0]
+			q = q[1:]
+			if sink[cur] {
+				return true
+			}
+			es, _ := g.OutEdges(cur, "FLOWS")
+			for _, e := range es {
+				if !seen[e.Dst] {
+					seen[e.Dst] = true
+					q = append(q, e.Dst)
+				}
+			}
+		}
+	}
+	return false
 }
 
 func pad(s, col string) string {

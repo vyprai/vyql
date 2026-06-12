@@ -14,10 +14,11 @@ import (
 // covers JSX and most of TS surface; for TS we parse with the JS grammar (type
 // annotations are skipped as unknown nodes), which is enough for taint.
 type jsConv struct {
-	src  []byte
-	root string
-	file string
-	key  string
+	src      []byte
+	root     string
+	file     string
+	key      string
+	exported map[string]bool
 }
 
 // ExtractJavaScript parses JS/TS files into one NIR Program.
@@ -40,11 +41,82 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 		rel := relPath(root, f)
 		c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, f)}
 		root0 := tree.RootNode()
+		c.exported = c.exportedNames(root0)
 		mod := nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}
 		prog.Modules = append(prog.Modules, mod)
 		tree.Close()
 	}
 	return prog, nil
+}
+
+func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
+	out := map[string]bool{}
+	var markObjectExports func(*tree_sitter.Node)
+	markObjectExports = func(obj *tree_sitter.Node) {
+		if obj == nil || obj.Kind() != "object" {
+			return
+		}
+		for _, pr := range namedChildren(obj) {
+			switch pr.Kind() {
+			case "pair":
+				v := field(pr, "value")
+				if v != nil && v.Kind() == "identifier" {
+					out[c.text(v)] = true
+				} else if isJsFuncNode(v) {
+					if name := c.keyName(field(pr, "key")); name != "" {
+						out[name] = true
+					}
+				}
+			case "shorthand_property_identifier":
+				out[c.text(pr)] = true
+			}
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "export_statement":
+			for _, ch := range namedChildren(n) {
+				if ch.Kind() == "function_declaration" || ch.Kind() == "generator_function_declaration" {
+					if name := c.text(field(ch, "name")); name != "" {
+						out[name] = true
+					}
+				}
+			}
+		case "assignment_expression":
+			left, rhs := field(n, "left"), field(n, "right")
+			if left != nil && left.Kind() == "member_expression" {
+				if c.isModuleExports(left) {
+					if rhs != nil && rhs.Kind() == "identifier" {
+						out[c.text(rhs)] = true
+					}
+					markObjectExports(rhs)
+				} else if name := c.exportFuncName(left); name != "" {
+					out[name] = true
+					if rhs != nil && rhs.Kind() == "identifier" {
+						out[c.text(rhs)] = true
+					}
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func publicAPISeeds(params []string, L string) []nir.Stmt {
+	var seed []nir.Stmt
+	for _, p := range params {
+		seed = append(seed, nir.Assign{Targets: []string{p},
+			Value: nir.Call{Callee: nir.Name{ID: "public_api_input", Loc: L}, Path: "public_api_input", Method: "public_api_input", Loc: L}})
+	}
+	return seed
 }
 
 func jsModuleKey(root, f string) string {
@@ -145,8 +217,8 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	switch n.Kind() {
 	case "function_declaration", "generator_function_declaration", "method_definition":
 		name := c.text(field(n, "name"))
-		params := c.params(field(n, "parameters"))
-		body := c.body(field(n, "body"))
+		params := c.funcParams(n)
+		body := c.funcBody(n)
 		// NestJS route handler (`@Get()/@Post() find(@Query() q, @Param() id)`): the
 		// method's parameters are request-bound (@Body/@Query/@Param/@Headers), so seed
 		// each as http_input. Detected by the HTTP-method decorator on the method.
@@ -158,6 +230,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
+		if c.exported[name] {
+			body = append(publicAPISeeds(params, L), body...)
+		}
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
 	case "class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
@@ -167,12 +242,29 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			if d.Kind() == "variable_declarator" {
 				name := field(d, "name")
 				val := field(d, "value")
+				if name != nil && name.Kind() == "identifier" && (isJsFuncNode(val) || c.isFunctionLikeDeclarator(d)) {
+					fnName := c.text(name)
+					params := c.funcParams(val)
+					if len(params) == 0 {
+						params = c.paramsFromFunctionText(d)
+					}
+					body := c.funcBody(val)
+					if c.exported[fnName] {
+						body = append(publicAPISeeds(params, L), body...)
+					}
+					out = append(out, nir.FuncDef{Name: fnName, Params: params, Body: body, Loc: L})
+					continue
+				}
 				var v nir.Expr = nir.Const{Loc: L}
 				if val != nil {
 					v = c.expr(val)
 				}
 				if name != nil && name.Kind() == "identifier" {
 					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v})
+				} else if targets := c.bindingNames(name); len(targets) > 0 {
+					for _, target := range targets {
+						out = append(out, nir.Assign{Targets: []string{target}, Value: v})
+					}
 				} else {
 					out = append(out, nir.ExprStmt{Value: v})
 				}
@@ -274,15 +366,44 @@ func (c *jsConv) exportFuncName(left *tree_sitter.Node) string {
 
 func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 	switch inner.Kind() {
+	case "parenthesized_expression":
+		if kids := namedChildren(inner); len(kids) > 0 && kids[0].Kind() == "call_expression" {
+			if body := c.iife(kids[0], L); len(body) > 0 {
+				return body
+			}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+	case "call_expression":
+		if body := c.iife(inner, L); len(body) > 0 {
+			return body
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 	case "assignment_expression":
 		left := field(inner, "left")
 		rhs := field(inner, "right")
 		// CommonJS function exports become named FuncDefs so cross-file calls
 		// resolve: `exports.f = function…`, `module.exports.f = …`, and
 		// `module.exports = { f: function… }`.
+		if left != nil && c.isModuleExports(left) && isJsFuncNode(rhs) {
+			name := c.text(field(rhs, "name"))
+			if name == "" {
+				name = "__default_export__"
+			}
+			params := c.funcParams(rhs)
+			if len(params) == 0 {
+				params = c.paramsFromFunctionText(inner)
+			}
+			body := append(publicAPISeeds(params, L), c.funcBody(rhs)...)
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+		}
 		if left != nil && left.Kind() == "member_expression" && isJsFuncNode(rhs) {
 			if name := c.exportFuncName(left); name != "" {
-				return []nir.Stmt{nir.FuncDef{Name: name, Params: c.params(field(rhs, "parameters")), Body: c.body(field(rhs, "body")), Loc: L}}
+				params := c.funcParams(rhs)
+				if len(params) == 0 {
+					params = c.paramsFromFunctionText(inner)
+				}
+				body := append(publicAPISeeds(params, L), c.funcBody(rhs)...)
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
 			}
 		}
 		if left != nil && c.isModuleExports(left) && rhs != nil && rhs.Kind() == "object" {
@@ -290,7 +411,12 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 			for _, pr := range namedChildren(rhs) {
 				if pr.Kind() == "pair" && isJsFuncNode(field(pr, "value")) {
 					v := field(pr, "value")
-					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: c.params(field(v, "parameters")), Body: c.body(field(v, "body")), Loc: L})
+					params := c.funcParams(v)
+					if len(params) == 0 {
+						params = c.paramsFromFunctionText(pr)
+					}
+					body := append(publicAPISeeds(params, L), c.funcBody(v)...)
+					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, Body: body, Loc: L})
 				}
 			}
 			if len(out) > 0 {
@@ -312,7 +438,13 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		// same path sinks (trust-context, DOM) fire as for a dotted member write.
 		if left != nil && left.Kind() == "subscript_expression" {
 			base := field(left, "object")
-			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right}, Path: c.dotted(base), Method: "", Loc: L}}}
+			key := field(left, "index")
+			return []nir.Stmt{
+				// Dynamic property names can mutate Object.prototype when the key is
+				// attacker-controlled ("__proto__", "constructor", etc.).
+				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{c.expr(key)}, Path: "__js_dynamic_property_write", Method: "", Loc: L}},
+				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right}, Path: c.dotted(base), Method: "", Loc: L}},
+			}
 		}
 		// other assignment: still evaluate RHS for effect
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
@@ -324,6 +456,31 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(field(inner, "right"))}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+func (c *jsConv) iife(call *tree_sitter.Node, L string) []nir.Stmt {
+	fn := field(call, "function")
+	if fn != nil && fn.Kind() == "parenthesized_expression" {
+		if kids := namedChildren(fn); len(kids) > 0 {
+			fn = kids[0]
+		}
+	}
+	if !isJsFuncNode(fn) {
+		return nil
+	}
+	body := c.funcBody(fn)
+	ps := c.funcParams(fn)
+	var as []*tree_sitter.Node
+	if args := field(call, "arguments"); args != nil {
+		as = namedChildren(args)
+	}
+	for i, p := range ps {
+		if i >= len(as) {
+			break
+		}
+		body = append([]nir.Stmt{nir.Assign{Targets: []string{p}, Value: c.expr(as[i])}}, body...)
+	}
+	return body
 }
 
 // branchBody flattens one if-branch body: a `{}` block, an else_clause wrapper, or a
@@ -442,6 +599,116 @@ func (c *jsConv) body(n *tree_sitter.Node) []nir.Stmt {
 	}
 	// expression-bodied arrow: treat as a return
 	return []nir.Stmt{nir.Return{Value: c.expr(n)}}
+}
+
+func (c *jsConv) funcParams(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	params := field(n, "parameters")
+	if params == nil {
+		params = field(n, "parameter")
+	}
+	if params == nil {
+		for _, ch := range children(n) {
+			switch ch.Kind() {
+			case "formal_parameters", "parameters":
+				params = ch
+			}
+			if params != nil {
+				break
+			}
+		}
+	}
+	if out := c.params(params); len(out) > 0 {
+		return out
+	}
+	return c.paramsFromFunctionText(n)
+}
+
+func (c *jsConv) funcBody(n *tree_sitter.Node) []nir.Stmt {
+	if n == nil {
+		return nil
+	}
+	body := field(n, "body")
+	if body == nil {
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "statement_block" {
+				body = ch
+				break
+			}
+		}
+	}
+	return c.body(body)
+}
+
+func (c *jsConv) isFunctionLikeDeclarator(n *tree_sitter.Node) bool {
+	txt := c.text(n)
+	if i := strings.IndexByte(txt, '='); i >= 0 {
+		txt = strings.TrimSpace(txt[i+1:])
+	}
+	return strings.HasPrefix(txt, "function") ||
+		strings.HasPrefix(txt, "async function") ||
+		strings.HasPrefix(txt, "async (") ||
+		strings.HasPrefix(txt, "(") && strings.Contains(txt, "=>") ||
+		isJSIdentPrefixArrow(txt)
+}
+
+func (c *jsConv) paramsFromFunctionText(n *tree_sitter.Node) []string {
+	txt := c.text(n)
+	start := strings.IndexByte(txt, '(')
+	if start < 0 {
+		return nil
+	}
+	depth, end := 0, -1
+	for i := start; i < len(txt); i++ {
+		switch txt[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				end = i
+				i = len(txt)
+			}
+		}
+	}
+	if end <= start {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(txt[start+1:end], ",") {
+		p = strings.TrimSpace(p)
+		p = strings.TrimPrefix(p, "...")
+		if i := strings.IndexByte(p, '='); i >= 0 {
+			p = strings.TrimSpace(p[:i])
+		}
+		if isJSIdent(p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func isJSIdentPrefixArrow(s string) bool {
+	i := strings.Index(s, "=>")
+	if i < 0 {
+		return false
+	}
+	return isJSIdent(strings.TrimSpace(s[:i]))
+}
+
+func isJSIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		if r == '_' || r == '$' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || i > 0 && r >= '0' && r <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // jsRouteDecorators are NestJS HTTP-method decorators that mark a request handler.
@@ -602,11 +869,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	case "arrow_function", "function_expression", "function":
 		// a single bare arrow param `v => …` is under the `parameter` field, not `parameters`.
-		params := field(n, "parameters")
-		if params == nil {
-			params = field(n, "parameter")
-		}
-		return nir.Lambda{Params: c.params(params), Body: c.body(field(n, "body")), Loc: L}
+		return nir.Lambda{Params: c.funcParams(n), Body: c.funcBody(n), Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
@@ -662,6 +925,29 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *jsConv) bindingNames(n *tree_sitter.Node) []string {
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		switch cur.Kind() {
+		case "identifier", "shorthand_property_identifier_pattern":
+			name := c.text(cur)
+			if name != "" {
+				out = append(out, name)
+			}
+			return
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
 }
 
 // keyName returns the bare name of an object-pair key — an identifier as-is, or a

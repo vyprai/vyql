@@ -515,6 +515,9 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 				jf.Sink = b.Loc
 			}
 		}
+		if jf.Source == "" && jf.Sink == "" && len(f.Bindings) == 1 {
+			jf.Sink = f.Bindings[0].Loc
+		}
 		for _, ne := range f.NegationEvidence {
 			if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
 				jf.Noted = true

@@ -31,6 +31,10 @@ func TestProfileAutoDetect(t *testing.T) {
 		{"worker", map[string]string{"requirements.txt": "celery==5.3\n"}},
 		{"api", map[string]string{"requirements.txt": "fastapi==0.110\n"}},
 		{"library", map[string]string{"setup.py": "from setuptools import setup\n"}},
+		{"library", map[string]string{"package.json": `{"name":"pkg","main":"index.js"}`}},
+		{"library", map[string]string{"package.json": `{"name":"pkg","author":"Matthew <m@example.test>","main":"index.js"}`}},
+		{"library", map[string]string{"package.json": `{"name":"pkg","main":"index.js"}`, "website/src/App.tsx": "export default function App() { return null }\n"}},
+		{"library", map[string]string{"package.json": `{"private":true,"workspaces":["packages/*"]}`, "packages/lib/package.json": `{"name":"lib","main":"index.js"}`}},
 		{"generic", map[string]string{"hello.txt": "no fingerprints here"}},
 	}
 
@@ -50,6 +54,60 @@ func TestProfileAutoDetect(t *testing.T) {
 				t.Errorf("Detect = %q, want %q (fingerprint did not select the right archetype)", got.Name, c.name)
 			}
 		})
+	}
+}
+
+func TestLibraryActivatesPublicAPIInputs(t *testing.T) {
+	profiles, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	p, ok := ByName(profiles, "library")
+	if !ok {
+		t.Fatal("library profile not loaded")
+	}
+	if !p.ActiveSources()["core.UserControlledData"] {
+		t.Fatalf("library profile should activate core.UserControlledData")
+	}
+}
+
+func TestElectronActivatesBuildEnvironmentInputs(t *testing.T) {
+	profiles, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	p, ok := ByName(profiles, "electron")
+	if !ok {
+		t.Fatal("electron profile not loaded")
+	}
+	if !p.ActiveSources()["core.UserControlledData"] {
+		t.Fatalf("electron profile should activate core.UserControlledData for build/CI config inputs")
+	}
+}
+
+func TestNpmLibraryDetectsDotRoot(t *testing.T) {
+	profiles, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"pkg","main":"index.js"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(wd); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	if got := Detect([]string{"."}, profiles); got.Name != "library" {
+		t.Fatalf("Detect('.') = %q, want library", got.Name)
 	}
 }
 

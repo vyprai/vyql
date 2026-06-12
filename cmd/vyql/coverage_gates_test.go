@@ -207,7 +207,7 @@ func TestSourceConceptsWiredGate(t *testing.T) {
 		"UserControlledData": true, "SecretValue": true, // base taint roots
 		// reserved vocabulary — inputs presently subsumed by HttpInput, or archetype
 		// sources not yet wired (worker/library/second-order). Wire or remove when used.
-		"Cookie": true, "HttpHeader": true, "FileUpload": true, "HttpRequest": true,
+		"Cookie": true, "HttpHeader": true, "HttpRequest": true,
 		"ConfigFileInput": true, "ExternalApiResponse": true,
 		"MessageInput": true,
 	}

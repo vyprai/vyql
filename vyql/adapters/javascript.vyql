@@ -4,6 +4,13 @@ adapter javascript {
   meta { fidelity: resolved }
 
   source "process.argv" -> code.CliArgument
+  // Public JS package APIs: callers can pass attacker-controlled values into exported funcs.
+  source "public_api_input" -> core.UserControlledData
+  // Library option bags are caller-controlled under the library profile. These option
+  // fields have appeared in code-generation CVEs where the public API reaches an internal
+  // compiler callback through a cache/helper the analyzer cannot inline.
+  source "options.timezone" -> core.UserControlledData
+  source "config.timezone" -> core.UserControlledData
   // NestJS route-handler params (@Body/@Query/@Param/@Headers), seeded by the frontend.
   source "http_input" -> code.HttpInput
   source "req.body" -> code.HttpInput
@@ -16,6 +23,8 @@ adapter javascript {
   source "req.header" -> code.HttpInput
   source "req.param" -> code.HttpInput
   source "req.files" -> code.HttpInput
+  source "req.file" -> code.FileUpload
+  source "req.files" -> code.FileUpload
   source "req.rawBody" -> code.HttpInput
   source "req.url" -> code.HttpInput
   source "req.originalUrl" -> code.HttpInput
@@ -23,6 +32,7 @@ adapter javascript {
   source "request.query" -> code.HttpInput
   source "request.params" -> code.HttpInput
   source "request.headers" -> code.HttpInput
+  source "err.message" -> code.HttpInput
   source "request.payload" -> code.HttpInput
   source "request.state" -> code.HttpInput
   source "request.cookies" -> code.HttpInput
@@ -34,7 +44,13 @@ adapter javascript {
   source "ctx.headers" -> code.HttpInput
   source "ctx.request.headers" -> code.HttpInput
   source "ctx.request.querystring" -> code.HttpInput
+  // Build/CI environment variables are operator-controlled input; when concatenated
+  // into shell-plugin script strings they become command injection input.
+  source "process.env.NODE_ENV" -> core.UserControlledData
   source "process.env" -> code.SecretValue
+  // vm2-style bridge boundary: arguments crossing from sandbox realm into host
+  // function application are attacker-controlled by sandbox code.
+  source "otherFromThisArguments" -> core.UserControlledData
 
   // Browser / SPA DOM entry points (attacker-controlled URL / storage / window state)
   source "location.search" -> code.DomInput
@@ -52,6 +68,14 @@ adapter javascript {
   source "localStorage.getItem" -> code.DomInput
   source "sessionStorage.getItem" -> code.DomInput
   source "document.cookie" -> code.DomInput
+  source "queryParams" -> code.DomInput
+  // jQuery data-* reads can carry server/user-controlled DOM content into client-side HTML.
+  source method "data" -> code.DomInput
+  // Browser UI helper option bags can be populated from attacker-controlled markup/URLs.
+  source "opt.title" -> code.DomInput
+  // Parsed browser XML/HTML often comes from network responses; values extracted from it
+  // are attacker-controlled unless independently verified.
+  source method "parseFromString" -> core.UserControlledData
   // Next.js App Router — searchParams (page prop / destructured) + nextUrl query
   source "searchParams" -> code.HttpInput
   source "req.nextUrl" -> code.HttpInput
@@ -110,20 +134,27 @@ adapter javascript {
   sink path "child_process.exec" -> code.CommandExecution
   sink path "child_process.execSync" -> code.CommandExecution
   sink path "child_process.spawn" -> code.CommandExecution
+  sink path "child_process.spawn" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "child_process.spawnSync" -> code.CommandExecution
+  sink path "child_process.spawnSync" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "child_process.execFile" -> code.CommandExecution
   sink path "child_process.execFileSync" -> code.CommandExecution
   sink path "child_process.fork" -> code.CommandExecution
   sink path "cp.exec" -> code.CommandExecution
   sink path "cp.execSync" -> code.CommandExecution
   sink path "cp.spawn" -> code.CommandExecution
+  sink path "cp.spawn" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "exec" -> code.CommandExecution
   sink path "execSync" -> code.CommandExecution
   sink path "spawn" -> code.CommandExecution
+  sink path "spawn" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "spawnSync" -> code.CommandExecution
+  sink path "spawnSync" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "execFile" -> code.CommandExecution
   sink path "shelljs.exec" -> code.CommandExecution
   sink path "shell.exec" -> code.CommandExecution
+  sink path "webpack-shell-plugin-next" -> code.CommandExecution
+  sink path "WebpackShellPlugin" -> code.CommandExecution
   sink path "eval" -> code.CodeEval
   sink path "Function" -> code.CodeEval
   sink path "vm.runInNewContext" -> code.CodeEval
@@ -132,6 +163,13 @@ adapter javascript {
   sink path "vm.compileFunction" -> code.CodeEval
   sink path "vm2.run" -> code.CodeEval
   sink path "globalEval" -> code.CodeEval
+  // vm2-style bridge boundary: applying a host function with sandbox-provided args
+  // can expose host Function constructors when callback args are not sanitized.
+  sink path "otherReflectApply" arg 2 -> code.CodeEval
+  // `generate-function` style builders append source snippets via calls like
+  // `parserFn("return " + user)` before `parserFn.toFunction()` compiles them.
+  sink path "parserFn" arg all -> code.CodeEval
+  sink method "toFunction" -> code.CodeEval
   sink path "serialize.unserialize" -> code.Deserialization
   sink path "node-serialize.unserialize" -> code.Deserialization
   sink path "unserialize" -> code.Deserialization
@@ -164,6 +202,9 @@ adapter javascript {
   sink path "got.post" -> code.UrlFetch
   sink path "undici.request" -> code.UrlFetch
   sink path "fetch.default" -> code.UrlFetch
+  sink path "fs.writeFile" -> code.UnsafeUpload
+  sink path "fs.writeFileSync" -> code.UnsafeUpload
+  sink path "fs.createWriteStream" -> code.UnsafeUpload
   sink path "fs.readFile" -> code.FilePathAccess
   sink path "fs.readFileSync" -> code.FilePathAccess
   sink path "fs.writeFile" -> code.FilePathAccess
@@ -179,10 +220,18 @@ adapter javascript {
   sink path "fs.openSync" -> code.FilePathAccess
   sink path "fs.rename" -> code.FilePathAccess
   sink path "fs.mkdir" -> code.FilePathAccess
+  sink path "existsSync" -> code.FilePathAccess
+  sink path "lstatSync" -> code.FilePathAccess
+  sink path "readdirSync" -> code.FilePathAccess
+  sink path "unlinkSync" -> code.FilePathAccess
+  sink path "mkdirSync" -> code.FilePathAccess
   sink path "fsPromises.readFile" -> code.FilePathAccess
   sink path "fse.readFile" -> code.FilePathAccess
   sink path "res.sendFile" -> code.FilePathAccess
   sink path "res.download" -> code.FilePathAccess
+  // Client-side handoff of an uploaded object key/path into a hidden form field that the
+  // server later opens from storage.
+  sink path "hiddenFileInput.value" -> code.FilePathAccess
   sink path "res.send" -> code.HtmlRender
   // chained / callback emit: res.type("html").send(x), res.format({html:()=>res.send(x)})
   sink method "send" -> code.HtmlRender
@@ -195,6 +244,23 @@ adapter javascript {
   sink path "insertAdjacentHTML" arg 1 -> code.HtmlRender
   sink path "$.html" -> code.HtmlRender
   sink path "el.html" -> code.HtmlRender
+  sink method "html" -> code.HtmlRender
+  sink method "append" -> code.HtmlRender
+  sink method "prepend" -> code.HtmlRender
+  // Contao/SimpleModal-style modal helpers render the `title` field as HTML.
+  sink path "M.show" arg 0 collection val "title" -> code.HtmlRender
+  // Stored XSS: writing attacker-controlled markup into high-signal HTML-bearing
+  // fields. Kept field-qualified so generic Mongo writes remain NoSQL/proto checks.
+  sink method "findOneAndUpdate" arg 1 collection val "hypertext" -> code.HtmlRender
+  sink method "findOneAndUpdate" arg 1 collection val "html" -> code.HtmlRender
+  sink method "updateOne" arg 1 collection val "hypertext" -> code.HtmlRender
+  sink method "updateOne" arg 1 collection val "html" -> code.HtmlRender
+  sink method "updateMany" arg 1 collection val "hypertext" -> code.HtmlRender
+  sink method "updateMany" arg 1 collection val "html" -> code.HtmlRender
+  sink method "create" arg 0 collection val "hypertext" -> code.HtmlRender
+  sink method "create" arg 0 collection val "html" -> code.HtmlRender
+  sink method "insertOne" arg 0 collection val "hypertext" -> code.HtmlRender
+  sink method "insertOne" arg 0 collection val "html" -> code.HtmlRender
   // Angular: bypassSecurityTrust* defeats the sanitizer (untrusted -> trusted HTML/URL)
   sink method "bypassSecurityTrustHtml" -> code.HtmlRender
   sink method "bypassSecurityTrustUrl" -> code.HtmlRender
@@ -217,9 +283,11 @@ adapter javascript {
   sink path "response.redirect" -> code.RedirectTarget
   // DOM open-redirect: writing a tainted URL to location (property-write sinks)
   sink path "location.href" -> code.RedirectTarget
+  sink path "location.href" -> code.HtmlRender
   sink path "location.assign" -> code.RedirectTarget
   sink path "location.replace" -> code.RedirectTarget
   sink path "window.location.href" -> code.RedirectTarget
+  sink path "window.location.href" -> code.HtmlRender
   sink path "window.location" -> code.RedirectTarget
   sink path "collection.find" -> code.NosqlQuery
   sink path "collection.findOne" -> code.NosqlQuery
@@ -253,12 +321,15 @@ adapter javascript {
   control "validator.isAlphanumeric" -> core.InputValidation
   control "validator.isInt" -> core.InputValidation
   control "validator.isNumeric" -> core.InputValidation
+  control "encode" -> core.HtmlEscape
   control "escape-html" -> core.HtmlEscape
   control "he.encode" -> core.HtmlEscape
   control "validator.escape" -> core.HtmlEscape
   control "lodash.escape" -> core.HtmlEscape
   control "_.escape" -> core.HtmlEscape
   control "DOMPurify.sanitize" -> core.HtmlEscape
+  control "sanitize-html" -> core.HtmlEscape
+  control "sanitizeHtml" -> core.HtmlEscape
   control "xss" -> core.HtmlEscape
   control "mysql.escape" -> core.SqlParameterization
   control "sqlstring.escape" -> core.SqlParameterization
@@ -306,6 +377,15 @@ adapter javascript {
   sink path "deepmerge" arg 1 -> code.ProtoPollute
   sink path "$.extend" arg 2 -> code.ProtoPollute
   sink path "jQuery.extend" arg 2 -> code.ProtoPollute
+  sink path "__js_dynamic_property_write" -> code.ProtoPollute
+  // Polluted inherited option reads in template/compiler APIs can control generated code.
+  sink path "opts.client" -> code.ProtoPollute
+  sink path "opts.escape" -> code.ProtoPollute
+  sink path "opts.escapeFunction" -> code.ProtoPollute
+  sink path "opts.outputFunctionName" -> code.ProtoPollute
+  sink path "opts.localsName" -> code.ProtoPollute
+  sink path "opts.destructuredLocals" -> code.ProtoPollute
+  sink path "opts._with" -> code.ProtoPollute
 
   // weak cipher (CWE-327) value-matched
   // weak cipher (CWE-327): fire unless a strong AEAD/256-bit algorithm literal is present
@@ -321,6 +401,18 @@ adapter javascript {
   mark "createHash" val "md2" -> code.WeakHash
   mark "createHash" val "sha1" -> code.WeakHash
   mark "createHash" val "ripemd" -> code.WeakHash
+
+  // Package managers and monorepo tools execute project-controlled lifecycle
+  // scripts during install/sync. Treat explicit installer invocations as code
+  // execution even when the command string itself is constant.
+  mark "spawnSync" val "install" -> code.PackageInstallExecution
+  mark "spawnSync" val "sync" -> code.PackageInstallExecution
+  mark "child_process.spawnSync" val "install" -> code.PackageInstallExecution
+  mark "child_process.spawnSync" val "sync" -> code.PackageInstallExecution
+  mark "execFileSync" val "install" -> code.PackageInstallExecution
+  mark "execFileSync" val "sync" -> code.PackageInstallExecution
+  mark "child_process.execFileSync" val "install" -> code.PackageInstallExecution
+  mark "child_process.execFileSync" val "sync" -> code.PackageInstallExecution
 
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.

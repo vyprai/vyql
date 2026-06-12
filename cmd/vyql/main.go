@@ -185,6 +185,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		printSummary(stats, len(all))
 	}
 	if showStats {
+		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
 		printScanStats(paths)
 	}
 	return nil

@@ -755,6 +755,24 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		qual := l.curModule + "::" + prefix + st.Name
 		info := l.funcQual[qual]
+		if info == nil {
+			params := map[string]string{}
+			var order []string
+			for _, p := range st.Params {
+				params[p] = l.node("Param", st.Loc, map[string]string{"name": p, "func": st.Name})
+				order = append(order, p)
+			}
+			info = &funcInfo{
+				paramNames: order,
+				params:     params,
+				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
+				module:     l.curModule, cls: l.curClass, name: st.Name,
+				validator: st.IsValidator,
+				abstract:  len(st.Body) == 0,
+			}
+			l.funcQual[qual] = info
+			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
+		}
 		// closure capture: a nested function sees the enclosing scope's bindings, so a free
 		// variable's taint flows into the body. Params are reseeded below, shadowing.
 		inner := sc.clone()
@@ -1146,7 +1164,10 @@ func constSetFactory(path, method string) bool {
 // struct field) — also a "key=value" token. Lists/objects are walked so nested
 // literals are reached, e.g. jwt(algorithms=["none"]) yields "none" and
 // "algorithms=none"; requests.get(url, verify=False) yields "False" and
-// "verify=False". Frontends that don't emit nir.Pair simply contribute bare values.
+// "verify=False". Pair keys are also emitted on their own so adapters can
+// recognize structured-field sinks even when the field value is non-literal
+// (`{ hypertext: userInput }`). Frontends that don't emit nir.Pair simply
+// contribute bare values.
 func collectValTokens(e nir.Expr, key string, out *[]string) {
 	switch ex := e.(type) {
 	case nir.Const:
@@ -1157,6 +1178,9 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 			}
 		}
 	case nir.Pair:
+		if ex.Key != "" {
+			*out = append(*out, ex.Key)
+		}
 		collectValTokens(ex.Value, ex.Key, out)
 	case nir.Seq:
 		for _, p := range ex.Parts {

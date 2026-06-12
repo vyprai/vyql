@@ -4,6 +4,7 @@
 // permissive source set approximates it.)
 profile library {
   title: "Library / SDK"
-  detect: ["file:setup.py", "file:pyproject.toml", "dep:rollup", "dep:tsup"]
-  entrypoints: [UserControlledData, ExternalApiResponse, HttpInput, DatabaseRead, SecretValue]
+  detect: ["file:setup.py", "file:pyproject.toml", "npm:library",
+           "dep:rollup", "dep:tsup"]
+  entrypoints: [UserControlledData, DomInput, ExternalApiResponse, HttpInput, DatabaseRead, SecretValue]
 }

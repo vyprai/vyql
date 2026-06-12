@@ -20,6 +20,11 @@ rule Code {
   taint core.UserControlledData -> code.CodeEval
 }
 
+rule PackageInstallCodeExecution {
+  meta { id: "VYQL-INJ-019", severity: critical, cwe: [CWE_94] }
+  match code.PackageInstallExecution as sink
+}
+
 rule Xss {
   meta { id: "VYQL-INJ-004", severity: high, cwe: [CWE_79] }
   taint core.UserControlledData -> code.HtmlRender
@@ -110,4 +115,3 @@ rule EmailHeaderInjection {
   meta { id: "VYQL-INJ-017", severity: medium, cwe: [CWE_93] }
   taint core.UserControlledData -> code.MailHeaderWrite
 }
-

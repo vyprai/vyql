@@ -27,10 +27,10 @@ type inputSpec struct {
 type sinkSpec struct {
 	Concept    string
 	Pattern    string
-	ByMethod   bool   // match the bare method name vs the dotted callee path
-	Receiver   bool   // tainted data is the RECEIVER, not an arg — label the call node
-	Constraint string // optional `on <type>` receiver-type constraint
-	ArgIndex   int    // which argument is the dangerous one (default 0)
+	ByMethod   bool     // match the bare method name vs the dotted callee path
+	Receiver   bool     // tainted data is the RECEIVER, not an arg — label the call node
+	Constraint string   // optional `on <type>` receiver-type constraint
+	ArgIndex   int      // which argument is the dangerous one (default 0)
 	ValMatches []string // `val "substr"` (AND) — every substr must be in some arg/option literal
 	ValAbsents []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
 	Collection bool     // also flag a Seq/collection-literal arg (e.g. ldap options {filter})
@@ -370,19 +370,26 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
+			attrs, _ := s.NodesOfType("code.Attr")
+			ids = append(ids, attrs...)
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
 					continue // only label this language's nodes
 				}
+				isAttr := n.Type == "code.Attr"
 				method, path, recvType := n.Prop("method"), n.Prop("callee_path"), n.Prop("recv_type")
-				// Pick the MOST SPECIFIC matching sink (longest pattern) so e.g.
-				// "re.compile" (RegexCompile) wins over "compile" (CodeEval) and a
-				// node gets exactly one sink concept.
-				best := -1
+				// Pick the MOST SPECIFIC matching sink (longest pattern) per concept, so
+				// e.g. "re.compile" wins over "compile" for CodeEval/RegexCompile-style
+				// overlaps, while one call can still carry genuinely distinct concepts
+				// such as FilePathAccess and UnsafeUpload.
+				bestByConcept := map[string]int{}
 				strArgs := n.Prop("str_args")
 				for i, sk := range spec.Sinks {
+					if isAttr && sk.Concept != "code.ProtoPollute" {
+						continue
+					}
 					hit := sk.ByMethod && method == sk.Pattern ||
 						!sk.ByMethod && matchSinkPath(path, sk.Pattern)
 					// value-matched sink: every `val` must be present and every `nval`
@@ -396,15 +403,26 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					// Most specific wins: longer pattern, then more value constraints
 					// (a `val`-matched sink like exec.Command arg2 val "-c" is more
 					// specific than the plain exec.Command arg0 form).
-					if best < 0 {
-						best = i
-					} else if cur := spec.Sinks[best]; len(sk.Pattern) > len(cur.Pattern) ||
+					if curIdx, ok := bestByConcept[sk.Concept]; !ok {
+						bestByConcept[sk.Concept] = i
+					} else if cur := spec.Sinks[curIdx]; len(sk.Pattern) > len(cur.Pattern) ||
 						(len(sk.Pattern) == len(cur.Pattern) && len(sk.ValMatches) > len(cur.ValMatches)) {
-						best = i
+						bestByConcept[sk.Concept] = i
 					}
 				}
-				if best >= 0 {
-					sk := spec.Sinks[best]
+				for i, sk := range spec.Sinks {
+					best, ok := bestByConcept[sk.Concept]
+					if !ok || best != i {
+						continue
+					}
+					if isAttr {
+						if sk.ByMethod {
+							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic"})
+						} else {
+							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "resolved"})
+						}
+						continue
+					}
 					// receiver-sink: the tainted data is the receiver; the call node
 					// carries that taint, so label the node itself rather than an arg.
 					if sk.Receiver {
@@ -496,7 +514,7 @@ var extTech = map[string]string{
 	".rs": "rust", ".sh": "bash", ".bash": "bash", ".scala": "scala", ".sc": "scala", ".lua": "lua", ".kt": "kotlin", ".kts": "kotlin", ".ps1": "powershell", ".psm1": "powershell", ".swift": "swift", ".pl": "perl", ".pm": "perl", ".cgi": "perl", ".sol": "solidity", ".m": "objc",
 	".xml": "config", ".plist": "config",
 	".ex": "elixir", ".exs": "elixir",
-	".dart": "dart",
+	".dart":   "dart",
 	".groovy": "groovy", ".gradle": "groovy",
 }
 
@@ -597,29 +615,29 @@ func SecretscanAdapters() []adapters.Adapter { return AdaptersFor("secretscan") 
 
 // PiiAdapters is the cross-language PII taxonomy (adapters/pii.vyql). It labels nodes
 // in every language, so it is applied once per scan rather than per present frontend.
-func PiiAdapters() []adapters.Adapter { return AdaptersFor("pii") }
-func ElixirAdapters() []adapters.Adapter { return AdaptersFor("elixir") }
-func DartAdapters() []adapters.Adapter   { return AdaptersFor("dart") }
-func GroovyAdapters() []adapters.Adapter { return AdaptersFor("groovy") }
-func PythonAdapters() []adapters.Adapter { return AdaptersFor("python") }
-func JsAdapters() []adapters.Adapter     { return AdaptersFor("javascript") }
-func RubyAdapters() []adapters.Adapter   { return AdaptersFor("ruby") }
-func GoAdapters() []adapters.Adapter     { return AdaptersFor("go") }
-func JavaAdapters() []adapters.Adapter   { return AdaptersFor("java") }
-func PHPAdapters() []adapters.Adapter    { return AdaptersFor("php") }
-func CSharpAdapters() []adapters.Adapter { return AdaptersFor("csharp") }
-func CAdapters() []adapters.Adapter      { return AdaptersFor("c") }
-func CPPAdapters() []adapters.Adapter    { return AdaptersFor("cpp") }
-func RustAdapters() []adapters.Adapter   { return AdaptersFor("rust") }
-func BashAdapters() []adapters.Adapter   { return AdaptersFor("bash") }
-func ScalaAdapters() []adapters.Adapter  { return AdaptersFor("scala") }
-func LuaAdapters() []adapters.Adapter    { return AdaptersFor("lua") }
-func KotlinAdapters() []adapters.Adapter { return AdaptersFor("kotlin") }
+func PiiAdapters() []adapters.Adapter        { return AdaptersFor("pii") }
+func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }
+func DartAdapters() []adapters.Adapter       { return AdaptersFor("dart") }
+func GroovyAdapters() []adapters.Adapter     { return AdaptersFor("groovy") }
+func PythonAdapters() []adapters.Adapter     { return AdaptersFor("python") }
+func JsAdapters() []adapters.Adapter         { return AdaptersFor("javascript") }
+func RubyAdapters() []adapters.Adapter       { return AdaptersFor("ruby") }
+func GoAdapters() []adapters.Adapter         { return AdaptersFor("go") }
+func JavaAdapters() []adapters.Adapter       { return AdaptersFor("java") }
+func PHPAdapters() []adapters.Adapter        { return AdaptersFor("php") }
+func CSharpAdapters() []adapters.Adapter     { return AdaptersFor("csharp") }
+func CAdapters() []adapters.Adapter          { return AdaptersFor("c") }
+func CPPAdapters() []adapters.Adapter        { return AdaptersFor("cpp") }
+func RustAdapters() []adapters.Adapter       { return AdaptersFor("rust") }
+func BashAdapters() []adapters.Adapter       { return AdaptersFor("bash") }
+func ScalaAdapters() []adapters.Adapter      { return AdaptersFor("scala") }
+func LuaAdapters() []adapters.Adapter        { return AdaptersFor("lua") }
+func KotlinAdapters() []adapters.Adapter     { return AdaptersFor("kotlin") }
 func PowerShellAdapters() []adapters.Adapter { return AdaptersFor("powershell") }
-func SwiftAdapters() []adapters.Adapter  { return AdaptersFor("swift") }
-func PerlAdapters() []adapters.Adapter    { return AdaptersFor("perl") }
-func SolidityAdapters() []adapters.Adapter { return AdaptersFor("solidity") }
-func ObjCAdapters() []adapters.Adapter    { return AdaptersFor("objc") }
+func SwiftAdapters() []adapters.Adapter      { return AdaptersFor("swift") }
+func PerlAdapters() []adapters.Adapter       { return AdaptersFor("perl") }
+func SolidityAdapters() []adapters.Adapter   { return AdaptersFor("solidity") }
+func ObjCAdapters() []adapters.Adapter       { return AdaptersFor("objc") }
 
 // containsStr reports whether xs contains v.
 func containsStr(xs []string, v string) bool {

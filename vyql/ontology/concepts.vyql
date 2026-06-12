@@ -25,6 +25,10 @@ concept CodeEval : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_94]
 }
+concept PackageInstallExecution : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94]
+}
 concept CommandExecution : sink {
   vulnerable_to: [injection.CommandInjection]
   enabled_by: [taint.UntrustedData]

@@ -270,6 +270,113 @@ test "js: _.merge with a constant source is clean"
   }
   ```
 
+test "js: tainted dynamic object key is prototype pollution"
+  lang javascript
+  expect VYQL-INJ-013
+  code
+  ```
+  exports.parse = function parse(key, value) {
+    const obj = {};
+    obj[key] = value;
+    return obj;
+  }
+  ```
+
+test "js: taint enters function-expression assigned to a variable"
+  lang javascript
+  expect VYQL-INJ-013
+  code
+  ```
+  var build = function build(key, value) {
+    const obj = {};
+    obj[key] = value;
+    return obj;
+  };
+  exports.parse = function parse(input) {
+    return build(input, 'x');
+  }
+  ```
+
+# --- Stored XSS writes (VYQL-INJ-004) ---
+test "js: tainted Mongo hypertext update is stored XSS"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  async function updateComment(req, Document) {
+    const text = req.body.text;
+    return Document.findOneAndUpdate({ _id: req.body.id }, {
+      $set: {
+        "comments.$.hypertext": text
+      }
+    });
+  }
+  ```
+
+test "js: sanitize-html neutralizes stored XSS update"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  const sanitizeHtml = require('sanitize-html');
+  async function updateComment(req, Document) {
+    const text = sanitizeHtml(req.body.text);
+    return Document.findOneAndUpdate({ _id: req.body.id }, {
+      $set: {
+        "comments.$.hypertext": text
+      }
+    });
+  }
+  ```
+
+test "js: nested async Mongo helper preserves stored XSS taint"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  module.exports = function buildRouter(Document) {
+    var updateComment = async function (doc_id, text) {
+      return Document.findOneAndUpdate({ _id: doc_id }, {
+        $set: {
+          "comments.$.hypertext": text
+        }
+      });
+    };
+    router.post('/comment', async function (req, res) {
+      await updateComment(req.body.id, req.body.text);
+    });
+  };
+  ```
+
+test "js: SimpleModal title option is browser XSS"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  function openModalImage(options) {
+    var opt = options || {};
+    var M = new SimpleModal({});
+    M.show({
+      'title': opt.title,
+      'contents': '<img src="' + opt.url + '" alt="">'
+    });
+  }
+  ```
+
+test "js: SimpleModal constant title is clean"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  function openModalImage() {
+    var M = new SimpleModal({});
+    M.show({
+      'title': 'Preview',
+      'contents': '<img src="/safe.png" alt="">'
+    });
+  }
+  ```
+
 # --- ReDoS (VYQL-DOS-001) ---
 test "python: re.compile of a tainted pattern is ReDoS"
   lang python
@@ -312,6 +419,242 @@ test "php: a fixed upload destination is clean"
   function upload() {
     move_uploaded_file($_FILES['f']['tmp_name'], "uploads/fixed.dat");
   }
+  ```
+
+test "javascript: uploaded filename written with createWriteStream is unrestricted upload"
+  lang javascript
+  expect VYQL-INJ-015
+  code
+  ```
+  const fs = require('fs');
+  const path = require('path');
+  function upload(req) {
+    const file = req.file;
+    const dest = fs.createWriteStream(path.join('public/uploads', file.originalname));
+    fs.createReadStream(file.path).pipe(dest);
+  }
+  ```
+
+test "javascript: fixed write stream destination is clean for unrestricted upload"
+  lang javascript
+  reject VYQL-INJ-015
+  code
+  ```
+  const fs = require('fs');
+  function upload(req) {
+    const dest = fs.createWriteStream('public/uploads/fixed.dat');
+    fs.createReadStream(req.file.path).pipe(dest);
+  }
+  ```
+
+test "javascript: parsed XML key written to hidden file input is path traversal handoff"
+  lang javascript
+  expect VYQL-PATH-001
+  code
+  ```
+  function parseURL(text) {
+    var xml = new window.DOMParser().parseFromString(text, 'text/xml');
+    var tag = xml.getElementsByTagName('Key')[0];
+    return decodeURI(tag.childNodes[0].nodeValue);
+  }
+  function store(result, form) {
+    var hiddenFileInput = document.createElement('input');
+    hiddenFileInput.type = 'hidden';
+    hiddenFileInput.value = parseURL(result);
+    form.appendChild(hiddenFileInput);
+  }
+  ```
+
+test "javascript: constant hidden file input value is clean for path traversal"
+  lang javascript
+  reject VYQL-PATH-001
+  code
+  ```
+  function store(form) {
+    var hiddenFileInput = document.createElement('input');
+    hiddenFileInput.type = 'hidden';
+    hiddenFileInput.value = 'tmp/s3file/fixed.txt';
+    form.appendChild(hiddenFileInput);
+  }
+  ```
+
+test "javascript: destructured readdirSync with request param path is traversal"
+  lang javascript
+  expect VYQL-PATH-001
+  code
+  ```
+  const { join } = require('path');
+  const { readdirSync } = require('fs');
+  module.exports = (request, response) => {
+    const path = request.params[0] || '';
+    return readdirSync(join('/var/media', path));
+  };
+  ```
+
+test "javascript: destructured mkdirSync with request body path is traversal"
+  lang javascript
+  expect VYQL-PATH-001
+  code
+  ```
+  const { join } = require('path');
+  const { mkdirSync } = require('fs');
+  module.exports = (request, response) => {
+    const { path } = request.body;
+    mkdirSync(join('/var/media', path), { recursive: true });
+  };
+  ```
+
+test "javascript: error message sent as HTML is XSS"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  module.exports = (err, request, response) => {
+    response.status(500).send(err.message);
+  };
+  ```
+
+test "javascript: encoded error message sent as HTML is clean"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  const { encode } = require('html-entities');
+  module.exports = (err, request, response) => {
+    response.status(500).send(encode(err.message));
+  };
+  ```
+
+test "javascript: generate-function builder receives tainted source"
+  lang javascript
+  expect VYQL-INJ-003
+  code
+  ```
+  const genFunc = require('generate-function');
+  exports.compile = function compile(timezone) {
+    const parserFn = genFunc();
+    parserFn(`return packet.parseDate('${timezone}')`);
+    return parserFn.toFunction();
+  }
+  ```
+
+test "javascript: caller-controlled timezone option reaches generated parser source"
+  lang javascript
+  expect VYQL-INJ-003
+  code
+  ```
+  const genFunc = require('generate-function');
+  function readCodeFor(options, config) {
+    const timezone = options.timezone || config.timezone;
+    return `packet.parseDate('${timezone}')`;
+  }
+  function compile(fields, options, config) {
+    const parserFn = genFunc();
+    const readCode = readCodeFor(options, config);
+    parserFn(`${fields[0].name} = ${readCode};`);
+    return parserFn.toFunction();
+  }
+  ```
+
+test "javascript: sandbox bridge args applied to host function are code execution"
+  lang javascript
+  expect VYQL-INJ-003
+  code
+  ```
+  function apply(target, context, args) {
+    args = otherFromThisArguments(args);
+    return otherReflectApply(target, context, args);
+  }
+  ```
+
+test "javascript: fixed host apply with constant args is clean for code execution"
+  lang javascript
+  reject VYQL-INJ-003
+  code
+  ```
+  function apply(target, context) {
+    return otherReflectApply(target, context, []);
+  }
+  ```
+
+test "javascript: package manager install execution is code execution"
+  lang javascript
+  expect VYQL-INJ-019
+  code
+  ```
+  const { spawnSync } = require('node:child_process');
+  function install(path) {
+    return spawnSync('rush', ['install', '--no-link'], { cwd: path });
+  }
+  ```
+
+test "javascript: package manager version probe is not code execution"
+  lang javascript
+  reject VYQL-INJ-019
+  code
+  ```
+  const { spawnSync } = require('node:child_process');
+  function version(path) {
+    return spawnSync('rush', ['--version'], { cwd: path });
+  }
+  ```
+
+test "javascript: return_url query assigned to location href is DOM XSS"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  function Karma(location) {
+    var queryParams = util.parseQueryParams(location.search);
+    var returnUrl = queryParams['return_url' + ''] || null;
+    if (returnUrl) {
+      location.href = returnUrl;
+    }
+  }
+  ```
+
+test "javascript: constant location href navigation is clean for DOM XSS"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  function done(location) {
+    location.href = '/dashboard';
+  }
+  ```
+
+test "javascript: environment value in webpack shell plugin script is command injection"
+  lang javascript
+  expect VYQL-INJ-002
+  code
+  ```
+  const WebpackShellPlugin = require('webpack-shell-plugin-next');
+  const shellPluginConfig = {
+    onBuildStart: {
+      scripts: [
+        'set NODE_ENV=' + process.env.NODE_ENV,
+        'webpack --config webpack-main.config.js'
+      ]
+    }
+  };
+  new WebpackShellPlugin(shellPluginConfig);
+  ```
+
+test "javascript: constant webpack shell plugin scripts are clean"
+  lang javascript
+  reject VYQL-INJ-002
+  code
+  ```
+  const WebpackShellPlugin = require('webpack-shell-plugin-next');
+  const shellPluginConfig = {
+    onBuildStart: {
+      scripts: [
+        'set NODE_ENV=production',
+        'webpack --config webpack-main.config.js'
+      ]
+    }
+  };
+  new WebpackShellPlugin(shellPluginConfig);
   ```
 
 # --- Format string (VYQL-INJ-011) ---
