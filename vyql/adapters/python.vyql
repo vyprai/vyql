@@ -377,6 +377,9 @@ adapter python {
 
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "shlex.quote" -> core.ShellEscape
+  // os.path.basename strips all directory components (the Python basename canonicalizer).
+  control "os.path.basename" -> core.PathCanonicalization
+  control "xpath_literal" -> core.XpathEscape
   control "pipes.quote" -> core.ShellEscape
   control "html.escape" -> core.HtmlEscape
   control "cgi.escape" -> core.HtmlEscape
