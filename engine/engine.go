@@ -307,15 +307,30 @@ func (e *Engine) weakAssumptions(path []string, sinkID string, sinkConcepts map[
 			}
 		}
 	}
-	// guard-style: a core.Assumption label that DOMINATES the sink (path-sensitive, CFG).
+	// guard-style: a core.Assumption guard that DOMINATES the sink. A guard inspecting THIS
+	// tainted value is, by construction, a direct FLOWS out-neighbour of a node on the path
+	// (the tainted operand flows into it), so we scan those neighbours LOCALLY rather than the
+	// whole store — O(path · out-degree), not O(store · findings). Found nothing globally is
+	// the same as found nothing here, but cheap on large corpora.
 	if hasCFG(e.Store, sinkID) {
-		ids, _ := e.Store.NodesWithConcept("core.Assumption")
-		for _, gid := range ids {
-			if gid == sinkID || !hasCFG(e.Store, gid) {
-				continue
-			}
-			for _, l := range e.labels(gid) {
-				if l.Concept == "core.Assumption" && l.Detail["mode"] == "guard" && sinkConcepts[l.Detail["about"]] {
+		guarded := map[string]bool{}
+		for _, pid := range path {
+			edges, _ := e.Store.OutEdges(pid, "FLOWS")
+			for _, ed := range edges {
+				gid := ed.Dst
+				if gid == sinkID || guarded[gid] || !hasCFG(e.Store, gid) {
+					continue
+				}
+				guarded[gid] = true
+				for _, l := range e.labels(gid) {
+					if l.Concept != "core.Assumption" || l.Detail["mode"] != "guard" {
+						continue
+					}
+					// about=="*" is a structural guard (a `<const> in tainted` blocklist) that
+					// applies to any threat; a named about must match this sink's concept.
+					if about := l.Detail["about"]; about != "*" && !sinkConcepts[about] {
+						continue
+					}
 					if solvers.Dominates(e.Store, gid, sinkID) {
 						add("guard", l.Detail["pattern"])
 					}

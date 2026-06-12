@@ -845,7 +845,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	// condition (python evaluated it) stays byte-identical, and one that did NOT (go) sets
 	// Cond=nil and the eval is a no-op — each frontend keeps its exact prior node set.
 	case nir.If:
-		l.eval(st.Cond, sc)
+		condNode := l.eval(st.Cond, sc)
+		// Unsound blocklist guard: `if '<bad>' in tainted: <reject>` (the Python/Ruby OWASP
+		// idiom). A substring/containment filter cannot be proven complete (absolute paths,
+		// encodings, alternate separators bypass it), so it NEVER suppresses — label the
+		// condition core.Assumption(guard) and the engine notes any sink it dominates. The
+		// allowlist form `tainted in (consts)` is the SOUND ternary case, handled separately.
+		if pat, ok := unsoundContainmentGuard(st.Cond); ok && condNode != "" {
+			l.g.AddLabel(condNode, usg.Label{Concept: "core.Assumption",
+				Detail: map[string]string{"mode": "guard", "about": "*", "pattern": pat}})
+		}
 		// opaque-predicate pruning: a compile-time-constant condition has a dead branch that
 		// never executes — lower ONLY the live branch (no Phi join), so `if (const) x = src();
 		// else x = "safe";` doesn't taint x from the dead arm. Only fires when the whole
@@ -1035,27 +1044,63 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 // allowlist (sound). The receiver must be a literal Seq of Consts so the attacker cannot
 // influence the set.
 func allowlistMembershipVar(cond nir.Expr) (string, bool) {
-	call, ok := cond.(nir.Call)
-	if !ok {
+	switch c := cond.(type) {
+	case nir.Call:
+		// method form: `["a","b"].includes(x)` / `.contains(x)` / `.has(x)` (JS/Java/C#…)
+		switch c.Method {
+		case "includes", "contains", "has":
+		default:
+			return "", false
+		}
+		if len(c.Args) != 1 {
+			return "", false
+		}
+		arg, ok := c.Args[0].(nir.Name)
+		if !ok {
+			return "", false
+		}
+		at, ok := c.Callee.(nir.Attr)
+		if !ok {
+			return "", false
+		}
+		return constSeqVar(at.Base, arg.ID)
+	case nir.BinOp:
+		// operator form: `x in ("a","b")` (Python/Ruby membership). Left is the tested
+		// variable, Right is the literal set.
+		if c.Op != "in" {
+			return "", false
+		}
+		arg, ok := c.Left.(nir.Name)
+		if !ok {
+			return "", false
+		}
+		return constSeqVar(c.Right, arg.ID)
+	}
+	return "", false
+}
+
+// unsoundContainmentGuard recognizes a substring/containment BLOCKLIST guard condition —
+// `'<const>' in <var>` / `<const> not in <var>` (Python/Ruby) — which filters by rejecting a
+// bad substring and cannot be proven complete. It deliberately does NOT match the allowlist
+// shape `<var> in <literal-set>` (that is the sound membership ternary): here the constant is
+// the LEFT operand (the needle) and the variable the right (the haystack).
+func unsoundContainmentGuard(cond nir.Expr) (string, bool) {
+	b, ok := cond.(nir.BinOp)
+	if !ok || (b.Op != "in" && b.Op != "not in") {
 		return "", false
 	}
-	switch call.Method {
-	case "includes", "contains", "has":
-	default:
+	if _, lc := b.Left.(nir.Const); !lc {
 		return "", false
 	}
-	if len(call.Args) != 1 {
+	if _, rn := b.Right.(nir.Name); !rn {
 		return "", false
 	}
-	arg, ok := call.Args[0].(nir.Name)
-	if !ok {
-		return "", false
-	}
-	at, ok := call.Callee.(nir.Attr)
-	if !ok {
-		return "", false
-	}
-	seq, ok := at.Base.(nir.Seq)
+	return b.Op + " <const>", true
+}
+
+// constSeqVar confirms set is a non-empty literal Seq of constants and returns varID,true.
+func constSeqVar(set nir.Expr, varID string) (string, bool) {
+	seq, ok := set.(nir.Seq)
 	if !ok || len(seq.Parts) == 0 {
 		return "", false
 	}
@@ -1064,7 +1109,7 @@ func allowlistMembershipVar(cond nir.Expr) (string, bool) {
 			return "", false
 		}
 	}
-	return arg.ID, true
+	return varID, true
 }
 
 // collectValTokens walks an argument expression and accumulates literal value

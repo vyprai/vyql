@@ -172,6 +172,55 @@ func TestScanGuardAssumptionNote(t *testing.T) {
 	}
 }
 
+// pyBlocklistGuard guards a path sink with an UNSOUND substring blocklist `if '../' in bar:
+// return` (the Python OWASP idiom) — bypassable via an absolute path or encoding. The flow
+// must NOT be suppressed; it carries a guard assumption note. pyAllowlist uses the sound
+// `x if x in (consts) else d` membership ternary — that one IS suppressed.
+const pyBlocklistGuard = `def handler():
+    bar = request.cookies.get("x", "")
+    if '../' in bar:
+        return "bad"
+    fd = open(f'/data/{bar}', 'rb')
+    return fd
+
+def allow():
+    raw = request.cookies.get("y", "")
+    safe = raw if raw in ('a', 'b', 'c') else 'a'
+    return open(f'/data/{safe}', 'rb')
+`
+
+func TestScanPythonInOperatorIdioms(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "files.py"), []byte(pyBlocklistGuard), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	// the sound allowlist ternary must be suppressed → exactly ONE path finding (the blocklist).
+	var pathFs []*findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-PATH-001" {
+			pathFs = append(pathFs, f)
+		}
+	}
+	if len(pathFs) != 1 {
+		t.Fatalf("expected exactly 1 path finding (allowlist ternary suppressed, blocklist kept), got %d", len(pathFs))
+	}
+	noted := false
+	for _, ne := range pathFs[0].NegationEvidence {
+		if strings.Contains(ne.Clause, "assumption") {
+			noted = true
+			t.Logf("py guard note: %s — %s", ne.Clause, ne.Detail)
+		}
+	}
+	if !noted {
+		t.Fatalf("blocklist `if '../' in bar` must carry a guard assumption note, got NE=%+v", pathFs[0].NegationEvidence)
+	}
+}
+
 func TestScanPathsNoSource(t *testing.T) {
 	rules, _ := loadRules("")
 	if _, _, err := scanPaths([]string{t.TempDir()}, rules); err == nil {

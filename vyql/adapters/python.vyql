@@ -388,6 +388,16 @@ adapter python {
   control "ldap.filter.escape_filter_chars" -> core.LdapEscape
   control "ldap3.utils.conv.escape_filter_chars" -> core.LdapEscape
 
+  // UNSOUND neutralizers (`assume`) — never suppress; emit an assumption note. The dominant
+  // Python OWASP idiom is the `if '<bad>' in tainted:` substring blocklist, recognized
+  // structurally in the lowering (an operator, not a call). These cover the method/path forms:
+  // prefix/suffix checks and path canonicalizers that do NOT confine to a base directory.
+  assume guard method "startswith" -> code.FilePathAccess
+  assume guard method "endswith"   -> code.FilePathAccess
+  assume sanitizer path "os.path.normpath" -> code.FilePathAccess
+  assume sanitizer path "os.path.realpath" -> code.FilePathAccess
+  assume sanitizer path "posixpath.normpath" -> code.FilePathAccess
+
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "re.compile" -> code.RegexCompile
   sink path "re.match" -> code.RegexCompile
