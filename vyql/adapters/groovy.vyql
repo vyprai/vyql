@@ -37,4 +37,32 @@ adapter groovy {
   mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
   mark "DigestUtils.md5Hex" -> code.WeakHash
   mark "DigestUtils.sha1Hex" -> code.WeakHash
+  sink method "println" arg all -> code.HtmlRender
+  sink method "print" arg all -> code.HtmlRender
+  sink method "write" arg all -> code.HtmlRender
+  sink method "executeQuery" -> code.SqlExecution
+  sink method "executeUpdate" -> code.SqlExecution
+  sink method "execute" -> code.SqlExecution
+  sink method "exec" -> code.CommandExecution
+  sink path "File" -> code.FilePathAccess
+  sink method "readText" -> code.FilePathAccess
+  sink method "setAttribute" arg all -> code.TrustBoundary
+  sink method "search" arg 1 -> code.LdapQuery
+  sink method "evaluate" arg 0 -> code.XpathQuery
+  mark "java.util.Random" -> code.WeakRandomValue
+  mark "Random" -> code.WeakRandomValue
+  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
+  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
+  mark "Cipher.getInstance" val "DES" -> code.WeakCipher
+  mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
+  mark "setHttpOnly" val "false" -> code.InsecureCookie
+  mark "setSecure" val "false" -> code.InsecureCookie
+  source ".getParameter" -> code.HttpInput
+  source ".getHeader" -> code.HttpInput
+  control "escapeHtml" -> core.HtmlEscape
+  control "escapeShell" -> core.ShellEscape
+  control "safePath" -> core.PathCanonicalization
+  control "validateRole" -> core.InputValidation
+  control "encodeForLDAP" -> core.LdapEscape
+  control "xpathEscape" -> core.XpathEscape
 }
