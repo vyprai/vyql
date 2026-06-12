@@ -462,8 +462,18 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 				kind = "source_method"
 			}
 			pat := p.parsePattern()
+			sm := AdapterMapping{Kind: kind, Pattern: pat}
+			for p.atWord("val") { // value-constrained source: getenv("HTTP_*") (AND)
+				p.next()
+				sm.ValMatches = append(sm.ValMatches, p.parsePattern())
+			}
+			for p.atWord("nval") {
+				p.next()
+				sm.ValAbsents = append(sm.ValAbsents, p.parsePattern())
+			}
 			p.expect(tArrow, "->")
-			a.Mappings = append(a.Mappings, AdapterMapping{Kind: kind, Pattern: pat, Concept: p.parseQName()})
+			sm.Concept = p.parseQName()
+			a.Mappings = append(a.Mappings, sm)
 		case p.atWord("sink"):
 			p.next()
 			kind := "sink_path"

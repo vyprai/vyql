@@ -402,6 +402,11 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 	}
 
 	var out []*findings.Finding
+	// One finding per (rule, sink): a vulnerable sink reachable from N sources is ONE
+	// issue, not N. Reporting per source→sink path inflated real-world scans ~6× (e.g.
+	// a single `echo` reachable from 25 request reads). Keep the highest-confidence
+	// source as the representative witness; bySink maps sinkID → index in `out`.
+	bySink := map[string]int{}
 	for _, fl := range flows {
 		var ne []findings.NegationEvidence
 		if sanitizer != "" {
@@ -454,6 +459,15 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			Confidence:       e.conf(fl.SourceID, fl.SinkID),
 			Context:          e.crossDomainContext(fl.SinkID),
 		}
+		if idx, seen := bySink[fl.SinkID]; seen {
+			// same sink already reported for this rule — keep whichever source gives the
+			// higher-confidence witness (strict, so ties keep the earlier/deterministic one).
+			if confOrder[f.Confidence] > confOrder[out[idx].Confidence] {
+				out[idx] = f
+			}
+			continue
+		}
+		bySink[fl.SinkID] = len(out)
 		out = append(out, f)
 	}
 	return out, nil

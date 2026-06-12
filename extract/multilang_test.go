@@ -96,11 +96,13 @@ func TestCrossLanguageOneRule(t *testing.T) {
 			t.Fatal(err)
 		}
 		bad := runRule(t, sqliRule, gBad)
-		if len(bad) < 2 {
-			t.Fatalf("%s: expected >=2 interprocedural SQLi findings, got %d", l.name, len(bad))
+		// the routes share one DB-API sink; findings dedup to one per sink, so the
+		// cross-file SQLi is a single finding (not one per source route).
+		if len(bad) != 1 {
+			t.Fatalf("%s: expected 1 deduped interprocedural SQLi finding, got %d", l.name, len(bad))
 		}
 		if !crossesFile(bad) {
-			t.Fatalf("%s: a finding should cross the file boundary", l.name)
+			t.Fatalf("%s: the finding should cross the file boundary", l.name)
 		}
 
 		gGood, err := lowering.Lower(buildSQLiProgram(l, false), true)

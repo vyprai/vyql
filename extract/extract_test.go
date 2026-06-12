@@ -130,28 +130,22 @@ func TestImportResolutionRemovesNameCollisionFP(t *testing.T) {
 	nameBased, nbCount := run(false)
 	resolved, rvCount := run(true)
 
-	// name-based over-connects to exactly 2 findings (1 real + 1 FP); import
-	// resolution keeps exactly 1 (the true positive) — matching the Python oracle.
-	if nbCount != 2 {
-		t.Fatalf("name-based should produce exactly 2 findings (1 a FP), got %d", nbCount)
+	// Findings are deduped to one per vulnerable sink, so the shared vuln_lib.query
+	// sink yields exactly one finding either way — but import resolution corrects WHICH
+	// caller is blamed. Name-based over-connection lets safe_lib's caller (app_safe)
+	// "reach" the real sink via the name collision, so the lone finding is mis-attributed
+	// to the SAFE app (a false positive in disguise); resolution pins the true caller.
+	if nbCount != 1 {
+		t.Fatalf("name-based should produce 1 finding (the shared sink), got %d", nbCount)
 	}
 	if rvCount != 1 {
 		t.Fatalf("import-resolved should produce exactly 1 finding, got %d", rvCount)
 	}
-	if len(nameBased) != 2 {
-		t.Fatalf("name-based should over-connect to 2 source files (1 a FP), got %v", nameBased)
-	}
-	hasSafe := false
-	for _, f := range nameBased {
-		if f == "app_safe.py" {
-			hasSafe = true
-		}
-	}
-	if !hasSafe {
-		t.Fatalf("name-based should raise a FALSE POSITIVE in app_safe.py, got %v", nameBased)
+	if len(nameBased) != 1 || nameBased[0] != "app_safe.py" {
+		t.Fatalf("name-based should mis-attribute the witness to app_safe.py (collision FP), got %v", nameBased)
 	}
 	if len(resolved) != 1 || resolved[0] != "app_vuln.py" {
-		t.Fatalf("import-resolved should keep only app_vuln.py, got %v", resolved)
+		t.Fatalf("import-resolved should attribute the witness to app_vuln.py, got %v", resolved)
 	}
 }
 
@@ -415,10 +409,12 @@ func TestInterproceduralCrossFileSQLi(t *testing.T) {
 	}
 
 	fs := runRule(t, sqliRule, g)
-	if len(fs) != 3 {
-		t.Fatalf("expected 3 interprocedural SQLi findings, got %d", len(fs))
+	// the three routes share one DB-API sink in db.py; findings dedup to one per sink,
+	// so the cross-file SQLi surfaces as a single finding (not one per source route).
+	if len(fs) != 1 {
+		t.Fatalf("expected 1 deduped interprocedural SQLi finding, got %d", len(fs))
 	}
-	// every finding crosses the file boundary (routes.py -> db.py)
+	// the finding crosses the file boundary (routes.py -> db.py)
 	for _, f := range fs {
 		srcFile := strings.Split(f.Bindings[0].Loc, ":")[0]
 		sinkFile := strings.Split(f.Bindings[1].Loc, ":")[0]

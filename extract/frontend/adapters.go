@@ -16,10 +16,12 @@ import (
 )
 
 type inputSpec struct {
-	Concept string
-	Paths   []string
-	Methods []string // receiver-agnostic: match the call's `method` prop (last segment)
-	Match   string   // "prefix" (default) | "contains"
+	Concept    string
+	Paths      []string
+	Methods    []string // receiver-agnostic: match the call's `method` prop (last segment)
+	Match      string   // "prefix" (default) | "contains"
+	ValMatches []string // `val "substr"` (AND) — only a source when an arg literal matches (e.g. getenv("HTTP_*"))
+	ValAbsents []string // `nval "substr"` (AND) — not a source if any arg literal contains a substr
 }
 
 type sinkSpec struct {
@@ -250,6 +252,13 @@ func loadSpec(tech string) adapterSpec {
 	for _, mp := range d.Mappings {
 		switch mp.Kind {
 		case "source":
+			// a value-constrained source (e.g. getenv("HTTP_*")) gets its own spec so the
+			// val/nval filter is not shared with other patterns mapping to the same concept.
+			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 {
+				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
+					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+				break
+			}
 			i, ok := srcByConcept[mp.Concept]
 			if !ok {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode})
@@ -258,6 +267,11 @@ func loadSpec(tech string) adapterSpec {
 			}
 			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
 		case "source_method":
+			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 {
+				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
+					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+				break
+			}
 			i, ok := srcByConcept[mp.Concept]
 			if !ok {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode})
@@ -321,6 +335,12 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				for _, in := range spec.Inputs {
 					if (path != "" && matchPath(path, in.Paths, in.Match)) ||
 						(method != "" && containsStr(in.Methods, method)) {
+						// value-constrained source: only a source when an arg literal matches
+						// (e.g. getenv("HTTP_X_FORWARDED_FOR") yes, getenv("PATH") no).
+						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&
+							!valConds(n.Prop("str_args"), in.ValMatches, in.ValAbsents) {
+							continue
+						}
 						// trust-boundary gating: an active profile restricts which
 						// source families count as attacker-controlled.
 						if activeSources == nil || activeSources[in.Concept] {
