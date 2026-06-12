@@ -88,11 +88,30 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "assignment":
 		left := field(n, "left")
-		var targets []string
+		right := c.expr(field(n, "right"))
 		if left != nil && (left.Kind() == "identifier" || left.Kind() == "constant" || left.Kind() == "instance_variable") {
-			targets = []string{c.text(left)}
+			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		return []nir.Stmt{nir.Assign{Targets: targets, Value: c.expr(field(n, "right"))}}
+		// subscript write (session['role'] = v) — model as a write to the base's path so a
+		// trust-context path sink fires (CWE-501). Method empty → no method-sink collision.
+		if left != nil && left.Kind() == "element_reference" {
+			base := field(left, "object")
+			if base == nil {
+				if kids := namedChildren(left); len(kids) > 0 {
+					base = kids[0]
+				}
+			}
+			if base != nil {
+				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right},
+					Path: c.dotted(base), Method: "", Loc: L}}}
+			}
+		}
+		// attribute/setter write (obj.role = v) — model as a path-sink Call on the target path.
+		if left != nil && left.Kind() == "call" {
+			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
+				Path: c.dotted(left), Method: "", Loc: L}}}
+		}
+		return []nir.Stmt{nir.Assign{Value: right}}
 	case "operator_assignment":
 		left := field(n, "left")
 		if left != nil && left.Kind() == "identifier" {

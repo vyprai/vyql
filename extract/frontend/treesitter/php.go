@@ -123,6 +123,21 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			}
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
+		// member-property write ($obj->role = v) — model as a PATH-sink Call (Method empty so
+		// it never collides with method-name sinks) so trust-context / DOM path sinks fire.
+		if left != nil && left.Kind() == "member_access_expression" {
+			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
+				Path: c.dotted(left), Method: "", Loc: c.loc(inner)}}}
+		}
+		// subscript write ($_SESSION['role'] = v) — model as a write to the base's path
+		// ($_SESSION → "_SESSION") so the trust-boundary path sink fires (CWE-501).
+		if left != nil && left.Kind() == "subscript_expression" {
+			if kids := namedChildren(left); len(kids) > 0 {
+				base := kids[0]
+				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right},
+					Path: c.dotted(base), Method: "", Loc: c.loc(inner)}}}
+			}
+		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
 		// model include/require as a file-inclusion sink call
