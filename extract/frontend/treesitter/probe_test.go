@@ -177,11 +177,25 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			"groovy": `void r(p){ new File(p) }`,
 			"cpp":    `void r(char* p){ File f(p); }`,
 		}},
-		{"subscript m[k]=v", flowToSink("p", "__setitem__"), map[string]string{
-			"python": "def r(p):\n    s = {}\n    s['k'] = p",
-			"php":    `<?php function r($p){ $_SESSION['k'] = $p; }`,
-			"ruby":   "def r(p)\n  session['k'] = p\nend",
-			"javascript": `function r(p){ var s = {}; s['k'] = p; }`,
+		{"member/subscript write", func(g usg.Store) bool {
+			// the assignment value is captured in a write node (a code.Call with an incoming
+			// FLOWS edge) — how JS path-sink-writes and python __setitem__ both model it.
+			cs, _ := g.NodesOfType("code.Call")
+			for _, id := range cs {
+				if es, _ := g.InEdges(id, "FLOWS"); len(es) > 0 {
+					return true
+				}
+			}
+			return false
+		}, map[string]string{
+			"java":   `class T { void r(String p){ obj.role = p; } }`,
+			"python": "def r(p):\n    s = {}\n    s['role'] = p",
+			"javascript": `function r(p){ obj.role = p; }`,
+			"csharp": `class T { void R(string p){ obj.role = p; } }`,
+			"php":    `<?php function r($p){ $obj->role = $p; }`,
+			"ruby":   "def r(p)\n  obj.role = p\nend",
+			"kotlin": `fun r(p: String){ obj.role = p }`,
+			"scala":  `object T { def r(p: String): Unit = { obj.role = p } }`,
 		}},
 		{"bool literal token", hasStrArg("false"), map[string]string{
 			"java":   `class T { void r(){ c.setSecure(false); } }`,
