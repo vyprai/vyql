@@ -263,6 +263,23 @@ concept HtmlRender : sink {
   cwe: [CWE_79]
   dangerous_chars: "<>&\"'"
 }
+concept UnsafeEmbeddableAllowlist : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
+concept MarkdownNegotiationBypass : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
+concept PdfJsEvalSupported : source {
+  taint: [taint.UntrustedData]
+  cwe: [CWE_79]
+}
+concept PdfJsDocumentLoad : sink {
+  vulnerable_to: [injection.Xss]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_79]
+}
 concept HttpHeader : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
@@ -471,6 +488,11 @@ concept PathCanonicalization : control {
   neutralizes: [path.PathTraversal]
   cwe: [CWE_22]
   applies: path
+}
+concept PathAccessCheck : control {
+  neutralizes: [path.PathTraversal]
+  cwe: [CWE_22]
+  applies: endpoint
 }
 concept RateLimit : control {
   neutralizes: [dos.UncontrolledResourceConsumption]

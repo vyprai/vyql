@@ -992,7 +992,13 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		}
 		return n
 	case nir.Seq:
-		n := l.node("Seq", ex.Loc, nil)
+		props := map[string]string{"callee_path": "__object_literal"}
+		var valToks []string
+		collectValTokens(ex, "", &valToks)
+		if len(valToks) > 0 {
+			props["str_args"] = strings.Join(valToks, "\x00")
+		}
+		n := l.node("Seq", ex.Loc, props)
 		for _, p := range ex.Parts {
 			l.flow(l.eval(p, sc), n)
 		}

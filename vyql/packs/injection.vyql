@@ -31,6 +31,21 @@ rule Xss {
   unless sanitized_by core.HtmlEscape
 }
 
+rule UnsafeEmbeddableAllowlist {
+  meta { id: "VYQL-INJ-020", severity: high, cwe: [CWE_79] }
+  match code.UnsafeEmbeddableAllowlist as sink
+}
+
+rule MarkdownNegotiationBypass {
+  meta { id: "VYQL-INJ-021", severity: high, cwe: [CWE_79] }
+  match code.MarkdownNegotiationBypass as sink
+}
+
+rule PdfJsEvalSupported {
+  meta { id: "VYQL-INJ-022", severity: high, cwe: [CWE_79] }
+  taint code.PdfJsEvalSupported -> code.PdfJsDocumentLoad
+}
+
 // Stored / second-order XSS — data read back from the database (assumed attacker-
 // influenced) rendered WITHOUT escaping (Markup/mark_safe/html_safe/raw). Auto-escaped
 // renders (render_template / Jinja default) are not sinks, so they don't fire. Medium

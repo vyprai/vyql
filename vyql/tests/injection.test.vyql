@@ -504,6 +504,110 @@ test "javascript: destructured mkdirSync with request body path is traversal"
   };
   ```
 
+test "javascript: weakly filtered zip entry filename is path traversal"
+  lang javascript
+  expect VYQL-PATH-001
+  code
+  ```
+  function pack(file, zip) {
+    const safeName = sanitizeFilename(file.filename)
+      ?? file.filename
+        .split("/")
+        .filter(segment => segment !== ".." && segment !== ".")
+        .join("/")
+        .replace(/^\/+/, "");
+    if (safeName) {
+      zip.file(safeName, file.content);
+    }
+  }
+  ```
+
+test "javascript: sanitized zip entry filename is clean for path traversal"
+  lang javascript
+  reject VYQL-PATH-001
+  code
+  ```
+  function pack(file, zip) {
+    const candidate = file.filename
+      .replace(/\\/g, "/")
+      .split("/")
+      .filter(segment => segment && segment !== "." && segment !== "..")
+      .join("/");
+    const safeName = sanitizeFilename(candidate);
+    if (!safeName) return;
+    zip.file(safeName, file.content);
+  }
+  ```
+
+test "javascript: html request path read without access check is traversal"
+  lang javascript
+  expect VYQL-PATH-001
+  code
+  ```
+  async function viteIndexHtmlMiddleware(req, res, next) {
+    const url = req.url && cleanUrl(req.url);
+    if (url?.endsWith('.html')) {
+      const filePath = path.join(root, decodeURIComponent(url));
+      if (fs.existsSync(filePath)) {
+        const html = await fsp.readFile(filePath, 'utf-8');
+        return send(req, res, html, 'html');
+      }
+    }
+    next();
+  }
+  ```
+
+test "javascript: html request path guarded by access check is clean"
+  lang javascript
+  reject VYQL-PATH-001
+  code
+  ```
+  async function viteIndexHtmlMiddleware(req, res, next) {
+    const url = req.url && cleanUrl(req.url);
+    if (url?.endsWith('.html')) {
+      const filePath = normalizePath(
+        path.resolve(path.join(root, decodeURIComponent(url))),
+      );
+      const servingAccessResult = checkLoadingAccess(server.config, filePath);
+      if (servingAccessResult === 'denied') {
+        return respondWithAccessDenied(filePath, server, res);
+      }
+      if (servingAccessResult === 'fallback') {
+        return next();
+      }
+      if (fs.existsSync(filePath)) {
+        const html = await fsp.readFile(filePath, 'utf-8');
+        return send(req, res, html, 'html');
+      }
+    }
+    next();
+  }
+  ```
+
+test "javascript: decoded request path read from asset storage is traversal"
+  lang javascript
+  expect VYQL-PATH-001
+  code
+  ```
+  async function sendAsset(req, res, next) {
+    const decodedReqPath = decodeURIComponent(req.path);
+    const file = await AssetServerPlugin.assetStorage.readFileToBuffer(decodedReqPath);
+    res.send(file);
+  }
+  ```
+
+test "javascript: sanitized request path read from asset storage is clean"
+  lang javascript
+  reject VYQL-PATH-001
+  code
+  ```
+  async function sendAsset(req, res, next) {
+    const decodedReqPath = this.sanitizeFilePath(req.path);
+    const file = await AssetServerPlugin.assetStorage.readFileToBuffer(decodedReqPath);
+    res.send(file);
+  }
+  ```
+
 test "javascript: error message sent as HTML is XSS"
   lang javascript
   expect VYQL-INJ-004
@@ -620,6 +724,96 @@ test "javascript: constant location href navigation is clean for DOM XSS"
   ```
   function done(location) {
     location.href = '/dashboard';
+  }
+  ```
+
+test "javascript: embeddable allowlist includes attacker-hostable domain"
+  lang javascript
+  expect VYQL-INJ-020
+  code
+  ```
+  const ALLOWED_DOMAINS = new Set([
+    "youtube.com",
+    "dddice.com",
+  ]);
+  ```
+
+test "javascript: embeddable allowlist without attacker-hostable domain is clean"
+  lang javascript
+  reject VYQL-INJ-020
+  code
+  ```
+  const ALLOWED_DOMAINS = new Set([
+    "youtube.com",
+    "figma.com",
+  ]);
+  ```
+
+test "javascript: markdown accept predicate can bypass html negotiation"
+  lang javascript
+  expect VYQL-INJ-021
+  code
+  ```
+  export function middleware(request) {
+    const accept = request.headers.get('accept') ?? '';
+    if (acceptsMarkdown(accept)) {
+      return NextResponse.rewrite(new URL('/api/md', request.url));
+    }
+    return NextResponse.next();
+  }
+  ```
+
+test "javascript: explicit markdown negotiation helper is clean"
+  lang javascript
+  reject VYQL-INJ-021
+  code
+  ```
+  export function middleware(request) {
+    const result = negotiate(request.headers.get('accept') ?? '');
+    if (result === 'markdown') {
+      return NextResponse.rewrite(new URL('/api/md', request.url));
+    }
+    return NextResponse.next();
+  }
+  ```
+
+test "javascript: pdfjs getDocument with eval support is XSS"
+  lang javascript
+  expect VYQL-INJ-022
+  code
+  ```
+  function load(source, options) {
+    const optionsWithModifiedIsEvalSupported = { ...options, isEvalSupported: true };
+    const documentInitParams = {
+      ...source,
+      ...optionsWithModifiedIsEvalSupported,
+    };
+    return pdfjs.getDocument(documentInitParams);
+  }
+  ```
+
+test "javascript: pdfjs getDocument with eval disabled is clean"
+  lang javascript
+  reject VYQL-INJ-022
+  code
+  ```
+  function load(source, options) {
+    const optionsWithModifiedIsEvalSupported = { ...options, isEvalSupported: false };
+    const documentInitParams = {
+      ...source,
+      ...optionsWithModifiedIsEvalSupported,
+    };
+    return pdfjs.getDocument(documentInitParams);
+  }
+  ```
+
+test "javascript: unrelated eval support option is clean for pdfjs eval"
+  lang javascript
+  reject VYQL-INJ-022
+  code
+  ```
+  function configure(options) {
+    return { ...options, isEvalSupported: true };
   }
   ```
 

@@ -19,6 +19,7 @@ adapter javascript {
   source "req.headers" -> code.HttpInput
   source "req.cookies" -> code.HttpInput
   source "req.signedCookies" -> code.HttpInput
+  source "file.filename" -> code.FileUpload
   source "req.get" -> code.HttpInput
   source "req.header" -> code.HttpInput
   source "req.param" -> code.HttpInput
@@ -27,6 +28,7 @@ adapter javascript {
   source "req.files" -> code.FileUpload
   source "req.rawBody" -> code.HttpInput
   source "req.url" -> code.HttpInput
+  source "req.path" -> code.HttpInput
   source "req.originalUrl" -> code.HttpInput
   source "request.body" -> code.HttpInput
   source "request.query" -> code.HttpInput
@@ -163,6 +165,7 @@ adapter javascript {
   sink path "vm.compileFunction" -> code.CodeEval
   sink path "vm2.run" -> code.CodeEval
   sink path "globalEval" -> code.CodeEval
+  sink path "pdfjs.getDocument" -> code.PdfJsDocumentLoad
   // vm2-style bridge boundary: applying a host function with sandbox-provided args
   // can expose host Function constructors when callback args are not sanitized.
   sink path "otherReflectApply" arg 2 -> code.CodeEval
@@ -226,9 +229,13 @@ adapter javascript {
   sink path "unlinkSync" -> code.FilePathAccess
   sink path "mkdirSync" -> code.FilePathAccess
   sink path "fsPromises.readFile" -> code.FilePathAccess
+  sink path "fsp.readFile" -> code.FilePathAccess
   sink path "fse.readFile" -> code.FilePathAccess
   sink path "res.sendFile" -> code.FilePathAccess
   sink path "res.download" -> code.FilePathAccess
+  sink path "zip.file" -> code.FilePathAccess
+  sink path "readFileToBuffer" -> code.FilePathAccess
+  sink path "writeFileFromBuffer" -> code.FilePathAccess
   // Client-side handoff of an uploaded object key/path into a hidden form field that the
   // server later opens from storage.
   sink path "hiddenFileInput.value" -> code.FilePathAccess
@@ -355,6 +362,11 @@ adapter javascript {
   // so they are not even *plausible* neutralizers — a flow through them is a confident finding,
   // not an assumption. What makes a path case safe is a containment guard (startsWith, above)
   // or path.basename (a sound control), each handled on its own.
+  control "sanitizeFilename" -> core.PathCanonicalization
+  control "sanitizeFilePath" -> core.PathCanonicalization
+  control method "sanitizeFilePath" -> core.PathCanonicalization
+  control "checkLoadingAccess" -> core.PathAccessCheck
+  control "isParentDirectory" -> core.PathAccessCheck
   // Custom / library LDAP & XPath escapers we cannot verify are complete for the sink grammar.
   assume sanitizer method "ldapEscape"      -> code.LdapQuery
   assume sanitizer path   "ldap.escapeFilter" -> code.LdapQuery
@@ -413,6 +425,15 @@ adapter javascript {
   mark "execFileSync" val "sync" -> code.PackageInstallExecution
   mark "child_process.execFileSync" val "install" -> code.PackageInstallExecution
   mark "child_process.execFileSync" val "sync" -> code.PackageInstallExecution
+
+  // Embeddable iframe allowlists that include domains able to host attacker content
+  // become XSS when paired with same-origin sandboxing/srcdoc embed behavior.
+  mark "Set" val "dddice.com" -> code.UnsafeEmbeddableAllowlist
+  // Next.js middleware that rewrites to markdown solely on an acceptsMarkdown()
+  // predicate can serve markdown to clients that also prefer HTML.
+  mark "acceptsMarkdown" -> code.MarkdownNegotiationBypass
+  // PDF.js eval support allows malicious PDFs to execute embedded JavaScript.
+  mark "__object_literal" val "isEvalSupported=true" -> code.PdfJsEvalSupported
 
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.

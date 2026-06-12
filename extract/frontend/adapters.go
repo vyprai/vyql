@@ -543,7 +543,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			// cross-language adapters (secretscan, …) label nodes in source files of
 			// every language, so the per-language tech filter doesn't apply.
 			crossLang := spec.crossLang
-			for _, nodeType := range []string{"code.Call", "code.Attr"} {
+			for _, nodeType := range []string{"code.Call", "code.Attr", "code.Seq"} {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
 					n, _, _ := s.GetNode(id)
