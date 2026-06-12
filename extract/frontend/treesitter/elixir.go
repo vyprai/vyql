@@ -142,6 +142,20 @@ func (c *exConv) funcDef(n *tree_sitter.Node) []nir.Stmt {
 	body := []nir.Stmt{}
 	if do := lastChildKind(n, "do_block"); do != nil {
 		body = c.decls(do)
+	} else if args != nil {
+		// keyword-shorthand body: `def f(x), do: expr` — the body is the `do:` pair's value
+		// in the call's keyword arguments (no do_block). Extremely common in Elixir.
+		for _, a := range namedChildren(args) {
+			if a.Kind() != "keywords" {
+				continue
+			}
+			for _, pr := range namedChildren(a) {
+				kids := namedChildren(pr)
+				if len(kids) >= 2 && strings.TrimRight(strings.TrimSpace(c.text(kids[0])), ":") == "do" {
+					body = append(body, c.stmt(kids[len(kids)-1])...)
+				}
+			}
+		}
 	}
 	// Phoenix controller action / Plug: first param `conn` → the rest are request data.
 	if len(params) > 1 && (params[0] == "conn" || params[0] == "_conn") {

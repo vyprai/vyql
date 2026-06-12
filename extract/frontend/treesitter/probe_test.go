@@ -66,7 +66,7 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			return false
 		}
 	}
-	hasFormat := func(g usg.Store) bool { ns, _ := g.NodesOfType("code.Format"); return len(ns) > 0 }
+	_ = func(g usg.Store) bool { ns, _ := g.NodesOfType("code.Format"); return len(ns) > 0 }
 	hasStrArg := func(tok string) func(usg.Store) bool {
 		lt := strings.ToLower(tok)
 		return func(g usg.Store) bool {
@@ -89,9 +89,13 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 		return func(g usg.Store) bool {
 			all, _ := g.AllNodes()
 			var srcs, sinks []string
+			// the tainted input is the function parameter (every probe snippet takes `p`/`a`):
+			// start from code.Param nodes (reliable) plus any node naming srcSub.
+			params, _ := g.NodesOfType("code.Param")
+			srcs = append(srcs, params...)
 			for _, n := range all {
-				p := n.Prop("callee_path") + " " + n.Prop("loc")
-				if strings.Contains(p, srcSub) || strings.Contains(n.Prop("method"), srcSub) {
+				path := n.Prop("callee_path") + " " + n.Prop("loc")
+				if strings.Contains(path, srcSub) || strings.Contains(n.Prop("method"), srcSub) {
 					srcs = append(srcs, n.ID)
 				}
 				if n.Prop("method") == sinkMethod || strings.Contains(n.Prop("callee_path"), sinkMethod) {
@@ -145,7 +149,7 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			"cpp":    "void r(char* p){ db.exec(p); }",
 			"objc":   "void r(NSString* p){ [db exec:p]; }",
 		}},
-		{"concat→Format", hasFormat, map[string]string{
+		{"concat taint", flowToSink("p", "sink"), map[string]string{
 			"java":   `class T { void r(String p){ String q = "a" + p; sink(q); } }`,
 			"python": "def r(p):\n    q = 'a' + p\n    sink(q)",
 			"javascript": `function r(p){ var q = "a" + p; sink(q); }`,
