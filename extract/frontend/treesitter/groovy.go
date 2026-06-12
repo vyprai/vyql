@@ -242,8 +242,9 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Const{Loc: L, Value: t}
 		}
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "number_literal", "integer", "decimal", "float", "boolean", "null":
-		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
+	case "number_literal", "integer", "decimal", "float", "boolean", "null",
+		"boolean_literal", "null_literal":
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding (setSecure(false))
 	case "string", "gstring":
 		var parts []nir.Expr
 		var content string
