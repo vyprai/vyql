@@ -10,6 +10,16 @@ cannot opt in or out, so evidence is uniform across the entire rule corpus.
 (Earlier drafts had `explain { show source; show path; ... }`; removed —
 presentation choices belong to renderers, not rules.)
 
+## One finding per sink
+
+Findings are deduplicated to **one per (rule, sink)**: a vulnerable sink reachable
+from N sources is a single issue, not N. The flow evaluator keeps the
+highest-confidence source as the representative witness (ties resolve to the first,
+deterministically). This is presentation only — recall is unchanged, and the
+suppressed sources remain available as alternate witnesses. Without it, real-world
+scans inflate badly (a single logged/echoed value reachable from 25 request reads
+became 25 findings).
+
 ## The proof tree
 
 Stratified Datalog gives every derived tuple a well-defined derivation. The
