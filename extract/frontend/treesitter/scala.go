@@ -280,8 +280,10 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		kids := namedChildren(n)
 		if len(kids) >= 1 {
+			// the type may be a stable_type_identifier (`java.io.File`) that c.dotted can't
+			// resolve (returns "?"); fall back to its source text for the constructor path.
 			path := c.dotted(kids[0])
-			if path == "" {
+			if path == "" || path == "?" {
 				path = c.text(kids[0])
 			}
 			var args []nir.Expr
