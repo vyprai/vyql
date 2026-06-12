@@ -191,11 +191,24 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return c.decls(n)
 	case "declaration":
 		var out []nir.Stmt
+		// the constructed/declared type (e.g. `File` in `File f(p)` / `File g = File(p)`).
+		typeName := c.text(lastChildKind(n, "type_identifier"))
 		for _, d := range namedChildren(n) {
-			if d.Kind() == "init_declarator" {
+			switch d.Kind() {
+			case "init_declarator":
 				name := c.declName(field(d, "declarator"))
 				if val := field(d, "value"); name != "" && val != nil {
 					out = append(out, nir.Assign{Targets: []string{name}, Value: c.expr(val)})
+				}
+			case "function_declarator":
+				// C++ "most vexing parse": `File f(p)` parses as a function declaration,
+				// but when the args are bare value identifiers (not typed parameters) it is
+				// really a stack-allocated constructor call. Lower it so type/arg sinks match.
+				if args, ok := c.vexingCtorArgs(field(d, "parameters")); ok && typeName != "" {
+					out = append(out, nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: typeName, Loc: L}, Args: args,
+						Path: typeName, Method: typeName, Loc: L,
+					}})
 				}
 			}
 		}
@@ -223,6 +236,41 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
+}
+
+// vexingCtorArgs decides whether a function_declarator's parameter_list is really a
+// constructor argument list (most-vexing-parse). It returns the arguments as value
+// references only when EVERY parameter is a bare identifier/expression with no parameter
+// name — a genuine prototype like `File f(int x)` or `File f(Foo x)` has a typed,
+// named parameter and is left as a declaration (returns ok=false).
+func (c *ccConv) vexingCtorArgs(params *tree_sitter.Node) ([]nir.Expr, bool) {
+	if params == nil || params.Kind() != "parameter_list" {
+		return nil, false
+	}
+	var args []nir.Expr
+	for _, p := range namedChildren(params) {
+		if p.Kind() != "parameter_declaration" {
+			return nil, false // variadic, optional, etc. — not a clear ctor
+		}
+		kids := namedChildren(p)
+		// a real parameter has a type plus a declarator (name); a vexing arg is a single
+		// bare identifier/type_identifier standing in for a value reference.
+		if len(kids) != 1 {
+			return nil, false
+		}
+		switch kids[0].Kind() {
+		case "identifier", "type_identifier":
+			args = append(args, nir.Name{ID: c.text(kids[0]), Loc: c.loc(kids[0])})
+		case "number_literal", "string_literal", "char_literal":
+			args = append(args, nir.Const{Loc: c.loc(kids[0]), Value: c.text(kids[0])})
+		default:
+			return nil, false
+		}
+	}
+	if len(args) == 0 {
+		return nil, false
+	}
+	return args, true
 }
 
 func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {

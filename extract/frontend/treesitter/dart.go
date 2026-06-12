@@ -443,6 +443,30 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
+	case "new_expression", "const_object_expression":
+		// `new File(p)` / `const File(p)` — model as a constructor call so type/arg
+		// sinks and marks match (e.g. new File(userPath)). The grammar nests the type
+		// (type_identifier, possibly with type_arguments) plus an `arguments` node
+		// directly, NOT a selector/argument_part chain.
+		path := "?"
+		var args []nir.Expr
+		for _, ch := range namedChildren(n) {
+			switch ch.Kind() {
+			case "type_identifier", "identifier", "scoped_identifier":
+				if path == "?" {
+					path = c.text(ch)
+				}
+			case "arguments":
+				for _, arg := range namedChildren(ch) {
+					if arg.Kind() == "argument" {
+						args = append(args, c.foldChain(namedChildren(arg)))
+					} else {
+						args = append(args, c.expr(arg))
+					}
+				}
+			}
+		}
+		return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: args, Path: path, Method: lastSeg(path), Loc: L}
 	case "argument":
 		return c.foldChain(namedChildren(n))
 	case "expression_statement":
