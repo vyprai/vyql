@@ -7,6 +7,7 @@ import (
 	"github.com/vyprai/vyql/extract/nir"
 )
 
+
 // ktConv walks a tree-sitter Kotlin CST into NIR.
 type ktConv struct {
 	src          []byte
@@ -117,7 +118,10 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		var cond nir.Expr
 		var bodies []*tree_sitter.Node
 		for _, ch := range namedChildren(n) {
-			if ch.Kind() == "control_structure_body" {
+			// a then/else body is a `{…}` block or a brace-less control_structure_body; the
+			// first remaining child is the condition. (Only control_structure_body was matched
+			// before, so braced `if (c) { sink(x) }` dropped its body → no CFG region.)
+			if k := ch.Kind(); k == "control_structure_body" || k == "block" {
 				bodies = append(bodies, ch)
 			} else if cond == nil {
 				cond = c.expr(ch)
