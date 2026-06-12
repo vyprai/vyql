@@ -193,4 +193,13 @@ adapter ruby {
 
   // character-filter: gsub is always global.
   filter method "gsub" global
+  sink path "search" arg 1 -> code.LdapQuery
+  sink path "Net::LDAP" arg 1 -> code.LdapQuery
+  sink method "search" arg 1 -> code.LdapQuery
+  mark "Random.rand" -> code.WeakRandomValue
+  mark "rand" -> code.WeakRandomValue
+  mark "set_cookie" val "false" -> code.InsecureCookie
+  control "validate_role" -> core.InputValidation
+  control "xpath_escape" -> core.XpathEscape
+  control "File.basename" -> core.PathCanonicalization
 }
