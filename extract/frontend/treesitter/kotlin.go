@@ -102,13 +102,25 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 		right := c.lastExpr(n)
-		if left != nil && left.Kind() == "identifier" {
-			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+		if left != nil {
+			switch left.Kind() {
+			case "identifier", "simple_identifier":
+				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+			case "navigation_expression", "indexing_expression":
+				// member/subscript write `obj.role = p` / `a[k] = p` — model as a path-sink
+				// Call (Method="") so the assigned value flows into a write node, matching how
+				// JS path-sink-writes and python __setitem__ are modeled.
+				L := c.loc(n)
+				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+					Callee: c.expr(left), Args: []nir.Expr{right},
+					Path: c.dotted(left), Method: "", Loc: L,
+				}}}
+			}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	case "call_expression", "navigation_expression":
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
-	case "jump_expression":
+	case "jump_expression", "return_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
 		}
@@ -223,7 +235,7 @@ func isKtStmt(k string) bool {
 	switch k {
 	case "property_declaration", "assignment", "call_expression", "navigation_expression",
 		"function_declaration", "class_declaration", "if_expression", "when_expression",
-		"for_statement", "while_statement", "jump_expression":
+		"for_statement", "while_statement", "jump_expression", "return_expression":
 		return true
 	}
 	return false
@@ -323,6 +335,25 @@ func (c *ktConv) lastExpr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: c.loc(n)}
 	}
 	return c.expr(k[len(k)-1])
+}
+
+// branchValue yields the value an if/when branch evaluates to — the last expression of
+// a `{…}` block / control_structure_body, unwrapping nested block layers.
+func (c *ktConv) branchValue(n *tree_sitter.Node) nir.Expr {
+	cur := n
+	for cur != nil {
+		k := namedChildren(cur)
+		if len(k) == 0 {
+			return nir.Const{Loc: c.loc(cur)}
+		}
+		last := k[len(k)-1]
+		if kind := last.Kind(); kind == "block" || kind == "control_structure_body" || kind == "statements" {
+			cur = last
+			continue
+		}
+		return c.expr(last)
+	}
+	return nir.Const{Loc: c.loc(n)}
 }
 
 // hasHandlerAnn reports whether a class/function carries a Spring handler
@@ -446,7 +477,39 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 			operand = c.expr(k[len(k)-1])
 		}
 		return nir.Unary{Op: c.opToken(n), Operand: operand, Loc: L}
-	case "elvis_expression", "if_expression", "when_expression":
+	case "if_expression":
+		// if-as-expression `if (c) a else b` → Ternary so the engine merges both branch
+		// values into a Phi (a tainted branch then taints the result).
+		var cond nir.Expr
+		var branches []nir.Expr
+		for _, ch := range namedChildren(n) {
+			switch ch.Kind() {
+			case "control_structure_body", "block", "statements":
+				branches = append(branches, c.branchValue(ch))
+			default:
+				if cond == nil {
+					cond = c.expr(ch)
+				} else {
+					branches = append(branches, c.expr(ch))
+				}
+			}
+		}
+		if len(branches) >= 1 {
+			t := nir.Ternary{Cond: cond, Then: branches[0], Else: nir.Const{Loc: L}, Loc: L}
+			if len(branches) >= 2 {
+				t.Else = branches[1]
+			}
+			return t
+		}
+		return nir.Seq{Parts: []nir.Expr{cond}, Loc: L}
+	case "elvis_expression":
+		// `a ?: b` — value is `a` unless null, else `b`; merge both as a Phi.
+		k := namedChildren(n)
+		if len(k) == 2 {
+			return nir.Ternary{Cond: c.expr(k[0]), Then: c.expr(k[0]), Else: c.expr(k[1]), Loc: L}
+		}
+		fallthrough
+	case "when_expression":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
 			parts = append(parts, c.expr(ch))

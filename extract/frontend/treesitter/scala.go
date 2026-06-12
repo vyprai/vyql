@@ -84,8 +84,18 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "assignment_expression":
 		left := field(n, "left")
 		right := c.expr(field(n, "right"))
-		if left != nil && left.Kind() == "identifier" {
-			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+		if left != nil {
+			switch left.Kind() {
+			case "identifier":
+				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+			case "field_expression", "indexed_expression":
+				// member/subscript write `obj.role = p` / `a(k) = p` — model as a path-sink
+				// Call (Method="") so the assigned value flows into a write node.
+				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+					Callee: c.expr(left), Args: []nir.Expr{right},
+					Path: c.dotted(left), Method: "", Loc: L,
+				}}}
+			}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	// branch-structured (B1); Cond nil (Scala did not evaluate the predicate) -> byte-identical.
@@ -312,7 +322,18 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 			operand = c.expr(kids[len(kids)-1])
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
-	case "if_expression", "match_expression", "block":
+	case "if_expression":
+		// if-as-expression `if (c) a else b` → Ternary so the engine merges both branch
+		// values into a Phi (a tainted branch then taints the result).
+		t := nir.Ternary{Cond: c.expr(field(n, "condition")), Loc: L}
+		t.Then = c.blockTail(field(n, "consequence"))
+		if alt := field(n, "alternative"); alt != nil {
+			t.Else = c.blockTail(alt)
+		} else {
+			t.Else = nir.Const{Loc: L}
+		}
+		return t
+	case "match_expression", "block":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
 			parts = append(parts, c.expr(ch))
@@ -324,6 +345,22 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// blockTail yields the value a branch evaluates to — for a `{…}` block / indented_block
+// the last expression, otherwise the expression itself.
+func (c *scConvScala) blockTail(n *tree_sitter.Node) nir.Expr {
+	if n == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	if k := n.Kind(); k == "block" || k == "indented_block" {
+		kids := namedChildren(n)
+		if len(kids) == 0 {
+			return nir.Const{Loc: c.loc(n)}
+		}
+		return c.expr(kids[len(kids)-1])
+	}
+	return c.expr(n)
 }
 
 func (c *scConvScala) dotted(n *tree_sitter.Node) string {
