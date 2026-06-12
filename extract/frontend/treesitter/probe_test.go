@@ -250,6 +250,59 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			"kotlin": `fun r(a: List<String>){ sink(a[0]) }`,
 			"scala":  `object T { def r(a: Array[String]): Unit = { sink(a(0)) } }`,
 		}},
+		{"lambda/closure", hasNodeType("code.Func"), map[string]string{
+			"java":   `class T { void r(){ run(() -> sink(1)); } }`,
+			"python": "def r():\n    run(lambda: sink(1))",
+			"javascript": `function r(){ run(() => sink(1)); }`,
+			"csharp": `class T { void R(){ run(() => sink(1)); } }`,
+			"php":    `<?php function r(){ run(function(){ sink(1); }); }`,
+			"ruby":   "def r()\n  run { sink(1) }\nend",
+			"kotlin": `fun r(){ run { sink(1) } }`,
+			"scala":  `object T { def r(): Unit = { run(() => sink(1)) } }`,
+			"swift":  `func r(){ run({ sink(1) }) }`,
+			"dart":   `void r(){ run(() => sink(1)); }`,
+		}},
+		{"ternary→Phi", hasNodeType("code.Phi"), map[string]string{
+			"java":   `class T { String r(String p){ return p != null ? p : "x"; } }`,
+			"python": "def r(p):\n    return p if p else 'x'",
+			"javascript": `function r(p){ return p ? p : "x"; }`,
+			"csharp": `class T { string R(string p){ return p != null ? p : "x"; } }`,
+			"php":    `<?php function r($p){ return $p ? $p : "x"; }`,
+			"ruby":   "def r(p)\n  p ? p : 'x'\nend",
+			"kotlin": `fun r(p: String): String { return if (p.isEmpty()) "x" else p }`,
+			"scala":  `object T { def r(p: String): String = if (p.isEmpty) "x" else p }`,
+		}},
+		{"field-sensitivity", flowToSink("p", "sink"), map[string]string{
+			"java":   `class T { void r(String p){ o.f = p; sink(o.f); } }`,
+			"python": "def r(p):\n    o.f = p\n    sink(o.f)",
+			"javascript": `function r(p){ var o = {}; o.f = p; sink(o.f); }`,
+			"csharp": `class T { void R(string p){ o.f = p; sink(o.f); } }`,
+			"php":    `<?php function r($p){ $o->f = $p; sink($o->f); }`,
+			"ruby":   "def r(p)\n  o.f = p\n  sink(o.f)\nend",
+			"kotlin": `fun r(p: String){ o.f = p; sink(o.f) }`,
+		}},
+		{"callback taint flow", flowToSink("a", "sink"), map[string]string{
+			"javascript": `function r(a){ a.forEach(function(v){ sink(v); }); }`,
+			"python": "def r(a):\n    for v in a:\n        sink(v)",
+			"java":   `class T { void r(java.util.List a){ a.forEach(v -> sink(v)); } }`,
+			"kotlin": `fun r(a: List<String>){ a.forEach { sink(it) } }`,
+			"ruby":   "def r(a)\n  a.each { |v| sink(v) }\nend",
+		}},
+		{"regex char-filter", func(g usg.Store) bool {
+			ns, _ := g.NodesOfType("code.Call")
+			for _, id := range ns {
+				n, _, _ := g.GetNode(id)
+				if (n.Prop("method") == "replace" || strings.Contains(n.Prop("callee_path"), "sub")) && strings.Contains(n.Prop("lit0"), "<") {
+					return true
+				}
+			}
+			return false
+		}, map[string]string{
+			"javascript": `function r(p){ return p.replace(/[<>]/g, ""); }`,
+			"python": "def r(p):\n    return re.sub('[<>]', '', p)",
+			"ruby":   "def r(p)\n  p.gsub(/[<>]/, '')\nend",
+			"java":   `class T { String r(String p){ return p.replaceAll("[<>]", ""); } }`,
+		}},
 		{"chain a().b(x)", hasCall("exec"), map[string]string{
 			"java":   `class T { void r(String p){ Runtime.getRuntime().exec(p); } }`,
 			"javascript": `function r(p){ obj.get().exec(p); }`,
