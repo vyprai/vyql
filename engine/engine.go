@@ -276,6 +276,56 @@ func (e *Engine) weakCharFilter(path []string, dangerous string) string {
 	return ""
 }
 
+// weakAssumptions surfaces UNSOUND neutralizers (core.Assumption) that bear on a finding:
+// a guard that DOMINATES the sink, or a sanitizer ON the taint path, whose declared `about`
+// concept matches this sink's threat. Each yields an assumption note — the flow is NEVER
+// suppressed (vyql cannot prove the neutralizer sound), but is flagged as a false positive
+// IF it works. This generalizes the regex-CharFilter mechanism (weakCharFilter) to arbitrary
+// neutralizers: the confident bucket (findings with no assumption note) is near-zero-FP, and
+// the noted bucket is the human review queue. Which calls are unsound neutralizers is data
+// (the `assume` adapter directive); this engine logic is threat-agnostic.
+func (e *Engine) weakAssumptions(path []string, sinkID string, sinkConcepts map[string]bool) []findings.NegationEvidence {
+	var out []findings.NegationEvidence
+	seen := map[string]bool{}
+	add := func(mode, pat string) {
+		key := mode + "|" + pat
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		detail := "an unsound sanitizer " + pat + " is on the path but is not provably complete for this sink (e.g. an escaper/encoder vyql cannot verify); false positive if it neutralizes correctly"
+		if mode == "guard" {
+			detail = "an unsound guard " + pat + " dominates the sink but does not provably exclude the attack (e.g. a prefix/normalize check a crafted input can bypass); false positive if it actually blocks the threat"
+		}
+		out = append(out, findings.NegationEvidence{Clause: mode + " (assumption)", Satisfied: false, Detail: detail})
+	}
+	// sanitizer-style: a core.Assumption label lying ON the taint path.
+	for _, id := range path {
+		for _, l := range e.labels(id) {
+			if l.Concept == "core.Assumption" && l.Detail["mode"] == "sanitizer" && sinkConcepts[l.Detail["about"]] {
+				add("sanitizer", l.Detail["pattern"])
+			}
+		}
+	}
+	// guard-style: a core.Assumption label that DOMINATES the sink (path-sensitive, CFG).
+	if hasCFG(e.Store, sinkID) {
+		ids, _ := e.Store.NodesWithConcept("core.Assumption")
+		for _, gid := range ids {
+			if gid == sinkID || !hasCFG(e.Store, gid) {
+				continue
+			}
+			for _, l := range e.labels(gid) {
+				if l.Concept == "core.Assumption" && l.Detail["mode"] == "guard" && sinkConcepts[l.Detail["about"]] {
+					if solvers.Dominates(e.Store, gid, sinkID) {
+						add("guard", l.Detail["pattern"])
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
 func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.FlowStmt)
 	srcConcepts := e.Onto.Descendants(body.Src.Concept)
@@ -345,6 +395,9 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		if wf := e.weakCharFilter(fl.Path, dangerous); wf != "" {
 			ne = append(ne, findings.NegationEvidence{Clause: "char-filter (assumption)", Satisfied: false, Detail: wf})
 		}
+		// Unsound guards/sanitizers (declared via the `assume` directive) likewise never kill
+		// the flow — they annotate it as assumption-gated.
+		ne = append(ne, e.weakAssumptions(fl.Path, fl.SinkID, sinkConcepts)...)
 		suppressed := false
 		for _, g := range guards {
 			ok := e.endpointGuarded(fl.SinkID, g)

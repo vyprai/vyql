@@ -551,3 +551,10 @@ concept MiningPool : indicator { }
 // treats it as a sound sanitizer for any sink whose dangerous_chars it excludes.
 concept CharFilter : control {
 }
+
+// An UNSOUND neutralizer — a guard or sanitizer that *might* defuse a threat but cannot be
+// proven to (a prefix/normalize check, an escaper vyql can't verify). Never suppresses a
+// flow; the engine attaches an assumption note so the finding lands in the review queue
+// rather than the confident bucket. Declared via the `assume` adapter directive.
+concept Assumption : control {
+}

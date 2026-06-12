@@ -238,6 +238,12 @@ adapter javascript {
   control "parseInt" -> core.SqlParameterization
   control "parseFloat" -> core.HtmlEscape
   control "parseFloat" -> core.SqlParameterization
+  // numeric coercion is also INPUT VALIDATION: the value is confined to a number, so it
+  // cannot carry a forged identity/role into a trust context (CWE-501). FN-safe — real
+  // trust-boundary violations write the raw string, with no Number()/parseInt() coercion.
+  control "Number" -> core.InputValidation
+  control "parseInt" -> core.InputValidation
+  control "parseFloat" -> core.InputValidation
   // SOUND path neutralizer: path.basename(x) strips all directory components -> no `/` or
   // `..` can survive (a boundary check like target.startsWith(base) is NOT added — it is
   // unsound alone, e.g. "/tmp/../etc" startsWith "/tmp", which would create false negatives).
@@ -258,6 +264,31 @@ adapter javascript {
   control "sqlstring.escape" -> core.SqlParameterization
   control "shell-quote.quote" -> core.ShellEscape
   control "shellQuote.quote" -> core.ShellEscape
+
+  // ── UNSOUND neutralizers (`assume`) ───────────────────────────────────────────────
+  // These MIGHT defuse the threat but cannot be proven to, so they NEVER suppress a flow.
+  // Instead the engine emits the finding WITH an assumption note: the confident bucket
+  // (no note) stays near-zero-FP, the noted bucket is the human review queue. This is the
+  // regex-CharFilter mechanism generalized to arbitrary guards/escapers.
+  //
+  // guard = must DOMINATE the sink (a boundary check); sanitizer = must lie ON the path.
+
+  // Prefix/suffix/containment boundary checks: "/tmp/../etc".startsWith("/tmp") passes yet
+  // escapes the dir — sound enough to flag-with-assumption, unsound to suppress on.
+  assume guard method "startsWith"   -> code.FilePathAccess
+  assume guard method "endsWith"     -> code.FilePathAccess
+  assume guard method "includes"     -> code.FilePathAccess
+  assume guard method "startsWith"   -> code.TrustBoundary
+  // path.normalize / path.resolve canonicalize but do NOT confine to a base dir.
+  assume sanitizer path "path.normalize" -> code.FilePathAccess
+  assume sanitizer path "path.resolve"   -> code.FilePathAccess
+  // Custom / library LDAP & XPath escapers we cannot verify are complete for the sink grammar.
+  assume sanitizer method "ldapEscape"      -> code.LdapQuery
+  assume sanitizer path   "ldap.escapeFilter" -> code.LdapQuery
+  assume sanitizer path   "ldapEscape"      -> code.LdapQuery
+  assume sanitizer method "escapeXPath"     -> code.XpathQuery
+  assume sanitizer method "xpathLiteral"    -> code.XpathQuery
+  assume sanitizer method "encodeXPath"     -> code.XpathQuery
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "RegExp" -> code.RegexCompile

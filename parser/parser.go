@@ -570,6 +570,41 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 				fm.Constraint = "global"
 			}
 			a.Mappings = append(a.Mappings, fm)
+		case p.atWord("assume"):
+			// `assume guard method "startsWith" -> core.FilePathAccess` /
+			// `assume sanitizer path "ldapEscape" -> core.LdapQuery` declares an UNSOUND
+			// neutralizer: a guard or escaper that *might* defuse the threat but cannot be
+			// proven to. The engine never suppresses on it — instead it labels the node
+			// core.Assumption and, when that node guards/sanitizes a finding, attaches an
+			// assumption note (the regex-CharFilter pattern, generalized to any neutralizer).
+			p.next()
+			mode := "guard"
+			if p.atWord("sanitizer") {
+				p.next()
+				mode = "sanitizer"
+			} else if p.atWord("guard") {
+				p.next()
+			}
+			kind := "assume_" + mode + "_path"
+			if p.atWord("method") {
+				p.next()
+				kind = "assume_" + mode + "_method"
+			} else if p.atWord("path") {
+				p.next()
+			}
+			pat := p.parsePattern()
+			am := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.Assumption"}
+			for p.atWord("val") {
+				p.next()
+				am.ValMatches = append(am.ValMatches, p.parsePattern())
+			}
+			for p.atWord("nval") {
+				p.next()
+				am.ValAbsents = append(am.ValAbsents, p.parsePattern())
+			}
+			p.expect(tArrow, "->")
+			am.About = p.parseQName()
+			a.Mappings = append(a.Mappings, am)
 		case p.atWord("type"):
 			p.next()
 			pat := p.parsePattern()

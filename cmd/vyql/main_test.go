@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/engine"
+	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 )
@@ -82,6 +83,92 @@ func TestScanPathsPythonDispatch(t *testing.T) {
 	}
 	if stats.files["python"] != 2 {
 		t.Fatalf("dispatcher should report 2 python files, got %d", stats.files["python"])
+	}
+}
+
+// vulnLdapAssume runs user input through an UNSOUND sanitizer (a custom ldapEscape that
+// vyql cannot prove complete) before an LDAP sink. The flow is NOT suppressed — it is
+// emitted WITH an assumption note (the generalized regex-CharFilter mechanism).
+const vulnLdapAssume = `const ldap = require('ldapjs');
+function handler(req, res) {
+  const name = req.query.name;
+  const safe = ldapEscape(name);
+  const client = ldap.createClient();
+  client.search('ou=users', { filter: '(uid=' + safe + ')' }, function (err, r) {});
+}
+`
+
+func TestScanAssumptionNote(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "ldap.js"), []byte(vulnLdapAssume), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var ldapF *findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-INJ-005" {
+			ldapF = f
+		}
+	}
+	if ldapF == nil {
+		t.Fatalf("expected an LDAP-injection finding (flow must NOT be suppressed by an unsound sanitizer), got %d findings", len(fs))
+	}
+	noted := false
+	for _, ne := range ldapF.NegationEvidence {
+		if strings.Contains(ne.Clause, "assumption") {
+			noted = true
+			t.Logf("assumption note: %s — %s", ne.Clause, ne.Detail)
+		}
+	}
+	if !noted {
+		t.Fatalf("LDAP finding through ldapEscape must carry an assumption note, got NE=%+v", ldapF.NegationEvidence)
+	}
+}
+
+// vulnPathGuard guards a path-traversal sink with an UNSOUND prefix check
+// (p.startsWith('/safe/')) that a crafted "/safe/../etc/passwd" bypasses. The guard
+// dominates the sink, so it must NOT be suppressed — it is emitted WITH an assumption note.
+const vulnPathGuard = `const fs = require('fs');
+function handler(req, res) {
+  const p = req.query.file;
+  if (p.startsWith('/safe/')) {
+    fs.readFile(p, function (e, d) {});
+  }
+}
+`
+
+func TestScanGuardAssumptionNote(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "read.js"), []byte(vulnPathGuard), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var pathF *findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-PATH-001" {
+			pathF = f
+		}
+	}
+	if pathF == nil {
+		t.Fatalf("expected a path-traversal finding (unsound prefix guard must NOT suppress), got %d findings", len(fs))
+	}
+	noted := false
+	for _, ne := range pathF.NegationEvidence {
+		if strings.Contains(ne.Clause, "assumption") {
+			noted = true
+			t.Logf("guard assumption note: %s — %s", ne.Clause, ne.Detail)
+		}
+	}
+	if !noted {
+		t.Fatalf("path finding behind startsWith must carry a guard assumption note, got NE=%+v", pathF.NegationEvidence)
 	}
 }
 

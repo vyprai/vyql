@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/findings"
 )
 
 // TestOWASPBenchmark scores VyQL against an OWASP Benchmark suite (Java or Python) and
@@ -57,10 +59,17 @@ func TestOWASPBenchmark(t *testing.T) {
 	}
 
 	// detected[testname][category] = VyQL reported that category in that test file.
+	// With BENCH_CONFIDENT=1 only findings WITHOUT an assumption note count (the confident
+	// bucket) — this measures "zero FP without assumption": every FP an unsound neutralizer
+	// explains drops out, leaving the near-zero-FP confident scorecard.
+	confidentOnly := os.Getenv("BENCH_CONFIDENT") != ""
 	detected := map[string]map[string]bool{}
 	for _, f := range fs {
 		cat := ruleCategory[f.RuleID]
 		if cat == "" {
+			continue
+		}
+		if confidentOnly && hasAssumptionNote(f) {
 			continue
 		}
 		for _, b := range f.Bindings {
@@ -74,6 +83,17 @@ func TestOWASPBenchmark(t *testing.T) {
 	}
 
 	score(t, expected, detected)
+}
+
+// hasAssumptionNote reports whether a finding is assumption-gated — an unsound neutralizer
+// (regex char-filter, prefix guard, unverifiable escaper) lies on or dominates its flow.
+func hasAssumptionNote(f *findings.Finding) bool {
+	for _, ne := range f.NegationEvidence {
+		if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+			return true
+		}
+	}
+	return false
 }
 
 type expRow struct {

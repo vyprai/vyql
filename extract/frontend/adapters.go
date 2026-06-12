@@ -78,6 +78,19 @@ type filterSpec struct {
 	Global   bool // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
 }
 
+// assumeSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
+// *might* defuse a threat but cannot be proven to. Labelled core.Assumption; never kills a
+// flow — the engine attaches an assumption note instead. (The regex-CharFilter pattern,
+// generalized to arbitrary neutralizers via the `assume` directive.)
+type assumeSpec struct {
+	Pattern    string
+	ByMethod   bool
+	Mode       string // "guard" (must dominate the sink) | "sanitizer" (must lie on the path)
+	About      string // the sink concept it purports to cover
+	ValMatches []string
+	ValAbsents []string
+}
+
 type adapterSpec struct {
 	Name          string
 	Technology    string
@@ -88,6 +101,7 @@ type adapterSpec struct {
 	Controls      []controlSpec
 	Marks         []controlSpec // presence markers (label the call node with a concept)
 	Filters       []filterSpec  // character-filtering replaces (core.CharFilter)
+	Assumes       []assumeSpec  // unsound neutralizers (core.Assumption)
 }
 
 // AdaptersFor loads the framework adapters for a technology from
@@ -110,7 +124,45 @@ func AdaptersFor(tech string) []adapters.Adapter {
 	if len(spec.Filters) > 0 {
 		out = append(out, spec.filterAdapter())
 	}
+	if len(spec.Assumes) > 0 {
+		out = append(out, spec.assumeAdapter())
+	}
 	return out
+}
+
+// assumeAdapter labels unsound-neutralizer calls (guards/escapers that cannot be proven
+// sound) with core.Assumption, recording the mode (guard|sanitizer) and the sink concept it
+// purports to cover. The engine never suppresses a flow on this label; when such a node
+// guards/sanitizes a finding it attaches an assumption note — generalizing the regex
+// CharFilter mechanism to any neutralizer whose soundness vyql cannot establish.
+func (spec adapterSpec) assumeAdapter() adapters.Adapter {
+	return adapters.Adapter{
+		Name: spec.Name + ".assumptions", Technology: spec.Technology, Specificity: 2,
+		Fidelity: "syntactic", Origin: "human",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			ids, _ := s.NodesOfType("code.Call")
+			var out []adapters.Mapping
+			for _, id := range ids {
+				n, _, _ := s.GetNode(id)
+				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
+					continue
+				}
+				method, path := n.Prop("method"), n.Prop("callee_path")
+				for _, as := range spec.Assumes {
+					if !(as.ByMethod && method == as.Pattern || !as.ByMethod && matchSinkPath(path, as.Pattern)) {
+						continue
+					}
+					if !valConds(n.Prop("str_args"), as.ValMatches, as.ValAbsents) {
+						continue
+					}
+					out = append(out, adapters.Mapping{NodeID: id, Concept: "core.Assumption",
+						Detail: map[string]string{"mode": as.Mode, "about": as.About, "pattern": as.Pattern}})
+					break
+				}
+			}
+			return out
+		},
+	}
 }
 
 // filterAdapter labels character-filtering replace(pattern, repl) calls with
@@ -233,6 +285,13 @@ func loadSpec(tech string) adapterSpec {
 			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global"})
 		case "filter_path":
 			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global"})
+		case "assume_guard_method", "assume_guard_path", "assume_sanitizer_method", "assume_sanitizer_path":
+			mode := "guard"
+			if strings.Contains(mp.Kind, "sanitizer") {
+				mode = "sanitizer"
+			}
+			s.Assumes = append(s.Assumes, assumeSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
+				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		}
 	}
 	return s
@@ -393,10 +452,11 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				strArgs := n.Prop("str_args")
 				for _, c := range spec.Controls {
+					// no break: a single call can be MULTIPLE controls (e.g. numeric coercion
+					// neutralizes HTML, SQL, AND trust-boundary), so attach every match.
 					hit := c.ByMethod && method == c.Pattern || !c.ByMethod && matchPath(path, []string{c.Pattern}, "prefix")
 					if hit && valConds(strArgs, c.ValMatches, c.ValAbsents) {
 						out = append(out, adapters.Mapping{NodeID: id, Concept: c.Concept})
-						break
 					}
 				}
 			}

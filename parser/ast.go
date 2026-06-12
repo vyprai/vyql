@@ -84,6 +84,7 @@ type AdapterMapping struct {
 	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
 	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
 	Collection bool     // `collection` — also flag a Seq/collection-literal arg (e.g. ldap search options {filter})
+	About      string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
 }
 
 // ThreatDecl is a `threat <ns>.<Name> { cwe: [...] }` weakness-class declaration

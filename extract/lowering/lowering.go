@@ -989,6 +989,18 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 			return l.eval(ex.Else, sc)
 		}
+		// Allowlist-membership guard: `LIT_SET.includes(x) ? x : default`. The true arm
+		// returns a value provably drawn from a CONSTANT set (the attacker cannot escape the
+		// fixed allowlist), so x's taint does NOT survive into the result — a SOUND kill, not
+		// an assumption. FN-safe: fires only when the tested value and the then-arm are the
+		// same variable and the receiver is a literal of constants.
+		if v, ok := allowlistMembershipVar(ex.Cond); ok {
+			if tn, ok := ex.Then.(nir.Name); ok && tn.ID == v {
+				n := l.node("Phi", ex.Loc, nil)
+				l.flow(l.eval(ex.Else, sc), n) // only the bounded default arm carries through
+				return n
+			}
+		}
 		n := l.node("Phi", ex.Loc, nil)
 		l.flow(l.eval(ex.Then, sc), n)
 		l.flow(l.eval(ex.Else, sc), n)
@@ -1015,6 +1027,44 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return fn
 	}
 	return l.node("Const", "?:0", nil)
+}
+
+// allowlistMembershipVar recognizes a constant-set membership test — `["a","b"].includes(x)`,
+// `.contains(x)`, `.has(x)` — over a LITERAL set of constants, returning the tested variable.
+// Such a guard, when it gates the same variable in a ternary, bounds the value to the fixed
+// allowlist (sound). The receiver must be a literal Seq of Consts so the attacker cannot
+// influence the set.
+func allowlistMembershipVar(cond nir.Expr) (string, bool) {
+	call, ok := cond.(nir.Call)
+	if !ok {
+		return "", false
+	}
+	switch call.Method {
+	case "includes", "contains", "has":
+	default:
+		return "", false
+	}
+	if len(call.Args) != 1 {
+		return "", false
+	}
+	arg, ok := call.Args[0].(nir.Name)
+	if !ok {
+		return "", false
+	}
+	at, ok := call.Callee.(nir.Attr)
+	if !ok {
+		return "", false
+	}
+	seq, ok := at.Base.(nir.Seq)
+	if !ok || len(seq.Parts) == 0 {
+		return "", false
+	}
+	for _, p := range seq.Parts {
+		if _, ok := p.(nir.Const); !ok {
+			return "", false
+		}
+	}
+	return arg.ID, true
 }
 
 // collectValTokens walks an argument expression and accumulates literal value
