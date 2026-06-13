@@ -20,6 +20,11 @@ rule Code {
   taint core.UserControlledData -> code.CodeEval
 }
 
+rule DynamicCodeLoad {
+  meta { id: "VYQL-INJ-023", severity: high, cwe: [CWE_829] }
+  taint core.UserControlledData -> code.DynamicCodeLoad
+}
+
 rule PackageInstallCodeExecution {
   meta { id: "VYQL-INJ-019", severity: critical, cwe: [CWE_94] }
   match code.PackageInstallExecution as sink

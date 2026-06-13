@@ -302,6 +302,7 @@ adapter java {
 
   // unsafe reflection (CWE-470) — tainted class/method name dynamically invoked
   sink path "Class.forName" -> code.ReflectionInvoke
+  sink path "Class.forName" -> code.DynamicCodeLoad
   sink method "newInstance" -> code.ReflectionInvoke
   sink method "getDeclaredMethod" -> code.ReflectionInvoke
   sink method "getMethod" -> code.ReflectionInvoke

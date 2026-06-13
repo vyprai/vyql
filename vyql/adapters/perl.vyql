@@ -19,6 +19,7 @@ adapter perl {
 
   // code evaluation
   sink path "eval" -> code.CodeEval
+  sink path "require" arg all -> code.DynamicCodeLoad
 
   // SQL — DBI
   sink method "do" -> code.SqlExecution

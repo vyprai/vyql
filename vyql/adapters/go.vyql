@@ -97,6 +97,7 @@ adapter go {
   sink path "os.Mkdir" -> code.FilePathAccess
   sink path "os.MkdirAll" -> code.FilePathAccess
   sink path "filepath.Walk" -> code.FilePathAccess
+  sink path "plugin.Open" -> code.DynamicCodeLoad
   sink path "extractEntry" -> code.ArchiveEntryWrite
   sink path "writeArchiveEntry" -> code.ArchiveEntryWrite
   // LDAP injection (CWE-90), XPath injection (CWE-643), trust-boundary write (CWE-501)

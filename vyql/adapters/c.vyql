@@ -40,7 +40,7 @@ adapter c {
   sink path "opendir" -> code.FilePathAccess
 
   // dynamic loading (untrusted path -> code load)
-  sink path "dlopen" -> code.FilePathAccess
+  sink path "dlopen" -> code.DynamicCodeLoad
 
   // XSS (CWE-79) — writing untrusted HTML to a response/output stream (arg0 is the text)
   sink path "fputs" -> code.HtmlRender

@@ -149,6 +149,8 @@ adapter ruby {
   sink path "Dir.entries" -> code.FilePathAccess
   sink path "send_file" -> code.FilePathAccess
   sink path "send_data" -> code.FilePathAccess
+  sink path "require" -> code.DynamicCodeLoad
+  sink path "load" -> code.DynamicCodeLoad
   // unrestricted upload (CWE-434) — common uploaded file helpers and direct writes.
   sink path "uploaded_file.save" -> code.UnsafeUpload
   sink path "file.save" -> code.UnsafeUpload

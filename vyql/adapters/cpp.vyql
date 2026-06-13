@@ -37,7 +37,7 @@ adapter cpp {
   sink path "unlink" -> code.FilePathAccess
 
   // dynamic loading
-  sink path "dlopen" -> code.FilePathAccess
+  sink path "dlopen" -> code.DynamicCodeLoad
 
   // memory safety (exploitability-aware)
   sink path "strcpy" arg 1 -> code.UnboundedCopy

@@ -253,6 +253,14 @@ func exploitDetail(concept, pattern string) (map[string]string, string) {
 			"exploit_confidence": "low",
 		}
 		conf = "low"
+	case "code.DynamicCodeLoad":
+		detail = map[string]string{
+			"exploit_category":   "code_loading",
+			"exploit_condition":  "attacker-controlled module or library name reaches a dynamic code loader",
+			"exploit_evidence":   "dynamic loader " + pattern + " receives tainted input",
+			"exploit_assumption": "the resolved module/library path or search path can be influenced by the attacker",
+			"exploit_confidence": "medium",
+		}
 	}
 	return detailWithPattern(detail, pattern), conf
 }

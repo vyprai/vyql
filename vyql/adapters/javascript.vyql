@@ -181,6 +181,8 @@ adapter javascript {
   sink path "vm.compileFunction" -> code.CodeEval
   sink path "vm2.run" -> code.CodeEval
   sink path "globalEval" -> code.CodeEval
+  sink path "require" -> code.DynamicCodeLoad
+  sink path "import" -> code.DynamicCodeLoad
   sink path "pdfjs.getDocument" -> code.PdfJsDocumentLoad
   // vm2-style bridge boundary: applying a host function with sandbox-provided args
   // can expose host Function constructors when callback args are not sanitized.

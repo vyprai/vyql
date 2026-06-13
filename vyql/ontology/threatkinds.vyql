@@ -55,6 +55,7 @@ threat CodeInjection { cwe: [CWE_94], desc: "Untrusted data evaluated as code" }
 threat CommandInjection { cwe: [CWE_78], desc: "Untrusted data in an OS command" }
 threat MassAssignment { cwe: [CWE_915], desc: "Untrusted request body bulk-bound to object attributes (mass assignment)" }
 threat CsvInjection { cwe: [CWE_1236], desc: "Untrusted data written to a spreadsheet/CSV cell (formula injection)" }
+threat UnsafeDynamicLoading { cwe: [CWE_829], desc: "Untrusted data selecting a module, package, or native library to load dynamically" }
 threat UnrestrictedUpload { cwe: [CWE_434], desc: "Untrusted filename/destination when saving an uploaded file" }
 threat PrototypePollution { cwe: [CWE_1321], desc: "Untrusted object recursively merged, polluting Object.prototype" }
 threat FormatString { cwe: [CWE_134], desc: "Untrusted data used as a format string" }

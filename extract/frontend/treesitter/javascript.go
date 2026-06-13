@@ -829,6 +829,9 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "call_expression":
 		fn := field(n, "function")
 		path := c.dotted(fn)
+		if path == "?" && strings.HasPrefix(strings.TrimSpace(c.text(n)), "import(") {
+			path = "import"
+		}
 		var arglist []nir.Expr
 		if args := field(n, "arguments"); args != nil {
 			for _, a := range namedChildren(args) {
@@ -848,7 +851,11 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		if i := strings.LastIndex(path, "."); i >= 0 {
 			method = path[i+1:]
 		}
-		return nir.Call{Callee: c.expr(fn), Args: arglist, Path: path, Method: method, Loc: L}
+		callee := c.expr(fn)
+		if fn == nil && path == "import" {
+			callee = nir.Name{ID: "import", Loc: L}
+		}
+		return nir.Call{Callee: callee, Args: arglist, Path: path, Method: method, Loc: L}
 	case "new_expression":
 		ctor := field(n, "constructor")
 		path := c.dotted(ctor)

@@ -19,6 +19,9 @@ adapter lua {
   sink path "load" -> code.CodeEval
   sink path "loadfile" -> code.CodeEval
   sink path "dofile" -> code.CodeEval
+  sink path "require" -> code.DynamicCodeLoad
+  sink path "loadfile" -> code.DynamicCodeLoad
+  sink path "dofile" -> code.DynamicCodeLoad
 
   // path / file (the path is arg0)
   sink path "io.open" -> code.FilePathAccess

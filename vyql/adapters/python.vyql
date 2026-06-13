@@ -308,6 +308,10 @@ adapter python {
   sink path "io.open" -> code.FilePathAccess
   sink path "os.open" -> code.FilePathAccess
   sink path "codecs.open" -> code.FilePathAccess
+  sink path "__import__" -> code.DynamicCodeLoad
+  sink path "importlib.import_module" -> code.DynamicCodeLoad
+  sink path "imp.load_source" -> code.DynamicCodeLoad
+  sink path "SourceFileLoader" -> code.DynamicCodeLoad
   sink path "os.remove" -> code.FilePathAccess
   sink path "os.unlink" -> code.FilePathAccess
   sink path "os.rename" -> code.FilePathAccess

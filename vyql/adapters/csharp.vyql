@@ -68,6 +68,9 @@ adapter csharp {
   sink path "File.Move" -> code.FilePathAccess
   sink path "FileStream" -> code.FilePathAccess
   sink path "StreamReader" -> code.FilePathAccess
+  sink path "Assembly.Load" -> code.DynamicCodeLoad
+  sink path "Assembly.LoadFrom" -> code.DynamicCodeLoad
+  sink path "Assembly.LoadFile" -> code.DynamicCodeLoad
   sink path "ExtractToFile" -> code.ArchiveEntryWrite
 
   // SSRF
