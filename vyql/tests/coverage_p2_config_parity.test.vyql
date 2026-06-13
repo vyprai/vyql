@@ -566,3 +566,87 @@ test "python: NamedTemporaryFile is clean"
   def f():
       tempfile.NamedTemporaryFile()
   ```
+
+test "java: fixed file create under tmp is insecure temp file"
+  lang java
+  expect VYQL-PATH-003
+  code
+  ```
+  class C {
+    void f() throws Exception {
+      Files.createFile(Paths.get("/tmp/vyql-fixed-name"));
+    }
+  }
+  ```
+
+test "java: createTempFile is clean"
+  lang java
+  reject VYQL-PATH-003
+  code
+  ```
+  class C {
+    void f() throws Exception {
+      Files.createTempFile("vyql", ".tmp");
+    }
+  }
+  ```
+
+test "go: fixed os.Create under tmp is insecure temp file"
+  lang go
+  expect VYQL-PATH-003
+  code
+  ```
+  package p
+  import "os"
+  func f() {
+    os.Create("/tmp/vyql-fixed-name")
+  }
+  ```
+
+test "go: CreateTemp is clean"
+  lang go
+  reject VYQL-PATH-003
+  code
+  ```
+  package p
+  import "os"
+  func f() {
+    os.CreateTemp("", "vyql-*")
+  }
+  ```
+
+test "php: fixed fopen write under tmp is insecure temp file"
+  lang php
+  expect VYQL-PATH-003
+  code
+  ```
+  <?php function f(){ fopen("/tmp/vyql-fixed-name", "w"); }
+  ```
+
+test "php: tmpfile is clean"
+  lang php
+  reject VYQL-PATH-003
+  code
+  ```
+  <?php function f(){ tmpfile(); }
+  ```
+
+test "ruby: fixed File.open write under tmp is insecure temp file"
+  lang ruby
+  expect VYQL-PATH-003
+  code
+  ```
+  def f
+    File.open("/tmp/vyql-fixed-name", "w")
+  end
+  ```
+
+test "ruby: Tempfile.new is clean"
+  lang ruby
+  reject VYQL-PATH-003
+  code
+  ```
+  def f
+    Tempfile.new("vyql")
+  end
+  ```

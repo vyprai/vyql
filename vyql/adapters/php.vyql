@@ -182,6 +182,7 @@ adapter php {
   mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYHOST=0" -> code.CertValidationDisabled
   mark "chmod" val "0777" -> code.InsecurePermission
   mark "chmod" val "0666" -> code.InsecurePermission
+  mark "fopen" val "/tmp/" val "w" -> code.InsecureTempFile
   mark "fopen" -> code.ResourceHandle
   mark "fsockopen" -> code.ResourceHandle
   control "fclose" -> core.ResourceRelease

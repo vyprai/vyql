@@ -200,6 +200,7 @@ adapter go {
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission
+  mark "os.Create" val "/tmp/" -> code.InsecureTempFile
 
   // TLS cert validation disabled (CWE-295) — tls.Config{InsecureSkipVerify: true}
   mark "tls.Config" val "InsecureSkipVerify=true" -> code.CertValidationDisabled
