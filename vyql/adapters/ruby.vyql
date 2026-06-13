@@ -228,6 +228,7 @@ adapter ruby {
   mark "JWT.decode" val "false" -> code.JwtUnverified
   mark "JWT.decode" val "algorithm=none" -> code.JwtUnverified
   mark "JWT.encode" val "algorithm=none" -> code.JwtUnverified
+  mark "skip_before_action" val "verify_authenticity_token" -> code.CsrfDisabled
   mark "File.chmod" val "0777" -> code.InsecurePermission
   mark "File.chmod" val "0666" -> code.InsecurePermission
   mark "File.open" val "/tmp/" val "w" -> code.InsecureTempFile

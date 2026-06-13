@@ -420,7 +420,13 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
 	case "object_creation_expression":
 		typ := c.text(field(n, "type"))
-		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
+		args := c.callArgs(field(n, "arguments"))
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "initializer_expression" {
+				args = append(args, c.expr(ch))
+			}
+		}
+		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: args, Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
@@ -443,7 +449,17 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "assignment_expression":
+		left := field(n, "left")
+		if left != nil {
+			return nir.Pair{Key: lastSeg(c.dotted(left)), Value: c.expr(field(n, "right")), Loc: L}
+		}
 		return c.expr(field(n, "right"))
+	case "initializer_expression":
+		var parts []nir.Expr
+		for _, ch := range namedChildren(n) {
+			parts = append(parts, c.expr(ch))
+		}
+		return nir.Seq{Parts: parts, Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {

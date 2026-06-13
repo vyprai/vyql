@@ -156,6 +156,8 @@ adapter csharp {
   mark "AesGcm" val "000000000000" -> code.StaticIv
   mark "DangerousAcceptAnyServerCertificateValidator" -> code.CertValidationDisabled
   mark "ServerCertificateCustomValidationCallback" val "true" -> code.CertValidationDisabled
+  mark "TokenValidationParameters" val "RequireSignedTokens=false" -> code.JwtUnverified
+  mark "TokenValidationParameters" val "ValidateIssuerSigningKey=false" -> code.JwtUnverified
   mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
   mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
   mark "File.Open" -> code.ResourceHandle

@@ -253,8 +253,10 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "constant", "instance_variable", "global_variable":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "nil", "simple_symbol", "hash_key_symbol":
+	case "nil":
 		return nir.Const{Loc: L}
+	case "simple_symbol", "hash_key_symbol":
+		return nir.Const{Loc: L, Value: strings.TrimSuffix(strings.TrimPrefix(c.text(n), ":"), ":")}
 	case "integer", "float":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "true", "false":

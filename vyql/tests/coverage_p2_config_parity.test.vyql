@@ -248,6 +248,26 @@ test "kotlin: csrf configured without disable is clean"
   }
   ```
 
+test "ruby: skipping verify_authenticity_token disables CSRF"
+  lang ruby
+  expect VYQL-CFG-001
+  code
+  ```
+  class ApplicationController
+    skip_before_action :verify_authenticity_token
+  end
+  ```
+
+test "ruby: skipping unrelated callback is clean for CSRF disabled"
+  lang ruby
+  reject VYQL-CFG-001
+  code
+  ```
+  class ApplicationController
+    skip_before_action :set_locale
+  end
+  ```
+
 # --- JWT signature not verified (VYQL-CFG-005) ---
 test "java: Algorithm.none is unverified JWT"
   lang java
@@ -371,6 +391,54 @@ test "ruby: verify true is clean for JWT verification"
   def f(token)
     JWT.decode(token, "k", true)
   end
+  ```
+
+test "csharp: RequireSignedTokens false is unverified JWT"
+  lang csharp
+  expect VYQL-CFG-005
+  code
+  ```
+  class C {
+    void F() {
+      var p = new TokenValidationParameters { RequireSignedTokens = false };
+    }
+  }
+  ```
+
+test "csharp: RequireSignedTokens true is clean for JWT verification"
+  lang csharp
+  reject VYQL-CFG-005
+  code
+  ```
+  class C {
+    void F() {
+      var p = new TokenValidationParameters { RequireSignedTokens = true };
+    }
+  }
+  ```
+
+test "csharp: ValidateIssuerSigningKey false is unverified JWT"
+  lang csharp
+  expect VYQL-CFG-005
+  code
+  ```
+  class C {
+    void F() {
+      var p = new TokenValidationParameters { ValidateIssuerSigningKey = false };
+    }
+  }
+  ```
+
+test "csharp: ValidateIssuerSigningKey true is clean for JWT verification"
+  lang csharp
+  reject VYQL-CFG-005
+  code
+  ```
+  class C {
+    void F() {
+      var p = new TokenValidationParameters { ValidateIssuerSigningKey = true };
+    }
+  }
   ```
 
 # --- Insecure permissions (VYQL-CFG-008) ---
