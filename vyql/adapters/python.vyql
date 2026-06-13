@@ -293,6 +293,16 @@ adapter python {
   // InputValidation controls below), which is the legitimate `session['user'] = login(...)`
   // pattern. The TrustBoundary rule's `unless sanitized_by core.InputValidation` clears it.
   sink path "session.__setitem__" arg all -> code.TrustBoundary
+  // HTTP response splitting / header injection (CWE-113).
+  sink path "headers.add" arg 1 -> code.ResponseHeaderWrite
+  sink path "headers.setdefault" arg 1 -> code.ResponseHeaderWrite
+  sink path "set_header" arg 1 -> code.ResponseHeaderWrite
+  sink path "response.set_header" arg 1 -> code.ResponseHeaderWrite
+  // mass assignment (CWE-915) — framework/model bulk bind from request data.
+  sink path "User.update" -> code.MassAssign
+  sink path "User.objects.create" arg all -> code.MassAssign
+  sink path "Model.objects.create" arg all -> code.MassAssign
+  sink path "serializer.save" arg all -> code.MassAssign
 
   sink path "open" -> code.FilePathAccess
   sink path "io.open" -> code.FilePathAccess
@@ -330,6 +340,10 @@ adapter python {
   sink path "os.scandir" -> code.FilePathAccess
   sink path "os.listdir" -> code.FilePathAccess
   sink path "fileinput.FileInput" -> code.FilePathAccess
+  // unrestricted upload (CWE-434) — uploaded-file save/copy destination or filename.
+  sink path "uploaded_file.save" -> code.UnsafeUpload
+  sink path "file.save" -> code.UnsafeUpload
+  sink path "werkzeug.datastructures.FileStorage.save" -> code.UnsafeUpload
   // pathlib operations on a tainted Path object — the path is the RECEIVER, so the call
   // node carries the taint (e.g. `(Path(DIR)/userinput).exists()` / `.read_text()`).
   sink receiver "exists" -> code.FilePathAccess

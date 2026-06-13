@@ -77,6 +77,11 @@ adapter php {
   // SSRF
   sink path "curl_exec" -> code.UrlFetch
 
+  // HTTP response splitting / header injection (CWE-113) and log injection (CWE-117).
+  sink path "header" -> code.ResponseHeaderWrite
+  sink path "error_log" arg all -> code.LogOutput
+  mark "error_log" -> code.LogWrite
+
   // reflected XSS — echo/print modeled as calls
   sink path "echo" -> code.HtmlRender
   sink path "print" -> code.HtmlRender

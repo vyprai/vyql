@@ -60,6 +60,7 @@ adapter csharp {
   sink path "File.ReadAllBytes" -> code.FilePathAccess
   sink path "File.ReadAllLines" -> code.FilePathAccess
   sink path "File.WriteAllText" -> code.FilePathAccess
+  sink path "File.WriteAllBytes" -> code.UnsafeUpload
   sink path "File.Delete" -> code.FilePathAccess
   sink path "File.Open" -> code.FilePathAccess
   sink path "File.OpenRead" -> code.FilePathAccess
@@ -92,6 +93,23 @@ adapter csharp {
   sink path "Response.Write" -> code.HtmlRender
   sink method "Raw" -> code.HtmlRender
   sink path "MarkupString" -> code.HtmlRender
+  // HTTP response splitting / header injection (CWE-113).
+  sink path "Response.Headers.Add" arg 1 -> code.ResponseHeaderWrite
+  sink path "Response.Headers.Append" arg 1 -> code.ResponseHeaderWrite
+  // log injection (CWE-117) + secret-in-log (CWE-532).
+  sink method "LogInformation" arg all -> code.LogOutput
+  sink method "LogWarning" arg all -> code.LogOutput
+  sink method "LogError" arg all -> code.LogOutput
+  sink method "LogDebug" arg all -> code.LogOutput
+  mark "LogInformation" -> code.LogWrite
+  mark "LogWarning" -> code.LogWrite
+  mark "LogError" -> code.LogWrite
+  mark "LogDebug" -> code.LogWrite
+  // CSV/formula injection (CWE-1236) and ASP.NET MVC mass assignment (CWE-915).
+  sink method "WriteField" arg all -> code.CsvCell
+  sink method "WriteRecords" arg all -> code.CsvCell
+  sink method "TryUpdateModelAsync" arg all -> code.MassAssign
+  sink method "UpdateModel" arg all -> code.MassAssign
 
   // XXE (CWE-611) — legacy parsers that resolve external entities by default
   // (XmlDocument/XmlReader/XPathDocument). LINQ-to-XML (XDocument/XElement) prohibits

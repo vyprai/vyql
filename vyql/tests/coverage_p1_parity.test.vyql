@@ -1,0 +1,502 @@
+# P1 parity: header/log/CSV/upload/mass-assignment coverage across core server languages.
+
+# --- HTTP response splitting / header injection (VYQL-INJ-010) ---
+test "javascript: request value written to response header is header injection"
+  lang javascript
+  expect VYQL-INJ-010
+  code
+  ```
+  function h(req, res) {
+    res.setHeader("X-Trace", req.query.trace);
+  }
+  ```
+
+test "python: request value written to response header is header injection"
+  lang python
+  expect VYQL-INJ-010
+  code
+  ```
+  def h(response):
+      response.headers.add("X-Trace", request.args["trace"])
+  ```
+
+test "php: request value passed to header() is header injection"
+  lang php
+  expect VYQL-INJ-010
+  code
+  ```
+  <?php header($_GET['header']);
+  ```
+
+test "ruby: request value written to response header is header injection"
+  lang ruby
+  expect VYQL-INJ-010
+  code
+  ```
+  def h(response)
+    response.set_header("X-Trace", params[:trace])
+  end
+  ```
+
+test "go: request value written to response header is header injection"
+  lang go
+  expect VYQL-INJ-010
+  code
+  ```
+  package p
+  import "net/http"
+  func h(w http.ResponseWriter, r *http.Request) {
+    v := r.URL.Query().Get("trace")
+    w.Header().Set("X-Trace", v)
+  }
+  ```
+
+test "csharp: request value written to response header is header injection"
+  lang csharp
+  expect VYQL-INJ-010
+  code
+  ```
+  class C { void H() { Response.Headers.Append("X-Trace", Request.Query["trace"]); } }
+  ```
+
+# --- Log injection (VYQL-INJ-009) ---
+test "javascript: request value logged is log injection"
+  lang javascript
+  expect VYQL-INJ-009
+  code
+  ```
+  function h(req, logger) {
+    logger.info("login " + req.query.name);
+  }
+  ```
+
+test "php: request value sent to error_log is log injection"
+  lang php
+  expect VYQL-INJ-009
+  code
+  ```
+  <?php error_log($_GET['msg']);
+  ```
+
+test "ruby: request value logged is log injection"
+  lang ruby
+  expect VYQL-INJ-009
+  code
+  ```
+  def h
+    Rails.logger.info("login #{params[:name]}")
+  end
+  ```
+
+test "go: request value logged is log injection"
+  lang go
+  expect VYQL-INJ-009
+  code
+  ```
+  package p
+  import (
+    "log"
+    "net/http"
+  )
+  func h(w http.ResponseWriter, r *http.Request) {
+    log.Println(r.URL.Query().Get("name"))
+  }
+  ```
+
+test "csharp: request value logged is log injection"
+  lang csharp
+  expect VYQL-INJ-009
+  code
+  ```
+  class C { void H(ILogger logger) { logger.LogInformation(Request.Query["name"]); } }
+  ```
+
+# --- CSV/formula injection (VYQL-INJ-014) ---
+test "javascript: request value written to CSV cell is CSV injection"
+  lang javascript
+  expect VYQL-INJ-014
+  code
+  ```
+  function exportCsv(req, csv) {
+    csv.write(req.body.name);
+  }
+  ```
+
+test "java: request value written to CSV cell is CSV injection"
+  lang java
+  expect VYQL-INJ-014
+  code
+  ```
+  class C {
+    void export(HttpServletRequest req, CSVWriter writer) {
+      writer.writeNext(new String[] { req.getParameter("name") });
+    }
+  }
+  ```
+
+test "ruby: request value written to CSV cell is CSV injection"
+  lang ruby
+  expect VYQL-INJ-014
+  code
+  ```
+  def export(csv)
+    csv.write_row(params[:name])
+  end
+  ```
+
+test "go: request value written to CSV cell is CSV injection"
+  lang go
+  expect VYQL-INJ-014
+  code
+  ```
+  package p
+  import (
+    "encoding/csv"
+    "net/http"
+  )
+  func h(w http.ResponseWriter, r *http.Request) {
+    writer := csv.NewWriter(w)
+    writer.Write([]string{r.URL.Query().Get("name")})
+  }
+  ```
+
+test "csharp: request value written to CSV cell is CSV injection"
+  lang csharp
+  expect VYQL-INJ-014
+  code
+  ```
+  class C { void H(CsvWriter csv) { csv.WriteField(Request.Query["name"]); } }
+  ```
+
+# --- Unrestricted upload / tainted upload destination (VYQL-INJ-015) ---
+test "python: uploaded filename saved as destination is unrestricted upload"
+  lang python
+  expect VYQL-INJ-015
+  code
+  ```
+  def upload(uploaded_file):
+      uploaded_file.save(request.files["f"].filename)
+  ```
+
+test "java: request filename used in transferTo destination is unrestricted upload"
+  lang java
+  expect VYQL-INJ-015
+  code
+  ```
+  class C {
+    void upload(HttpServletRequest req, MultipartFile file) throws Exception {
+      file.transferTo(new File(req.getParameter("name")));
+    }
+  }
+  ```
+
+test "ruby: request filename saved as upload destination is unrestricted upload"
+  lang ruby
+  expect VYQL-INJ-015
+  code
+  ```
+  def upload(uploaded_file)
+    uploaded_file.save(params[:name])
+  end
+  ```
+
+test "go: request filename used for upload destination is unrestricted upload"
+  lang go
+  expect VYQL-INJ-015
+  code
+  ```
+  package p
+  import (
+    "net/http"
+    "os"
+  )
+  func h(w http.ResponseWriter, r *http.Request) {
+    os.Create(r.URL.Query().Get("name"))
+  }
+  ```
+
+test "csharp: request filename used for upload destination is unrestricted upload"
+  lang csharp
+  expect VYQL-INJ-015
+  code
+  ```
+  class C { void H(byte[] data) { File.WriteAllBytes(Request.Query["name"], data); } }
+  ```
+
+# --- Mass assignment (VYQL-INJ-012) ---
+test "python: request body bulk update is mass assignment"
+  lang python
+  expect VYQL-INJ-012
+  code
+  ```
+  def update():
+      User.update(request.get_json())
+  ```
+
+test "java: request parameter map copied into bean is mass assignment"
+  lang java
+  expect VYQL-INJ-012
+  code
+  ```
+  class C {
+    void update(HttpServletRequest req, User user) {
+      BeanUtils.copyProperties(req.getParameterMap(), user);
+    }
+  }
+  ```
+
+test "csharp: request form used to update model is mass assignment"
+  lang csharp
+  expect VYQL-INJ-012
+  code
+  ```
+  class C { void H(User user) { TryUpdateModelAsync(user, "", Request.Form); } }
+  ```
+
+# --- Constant-input rejects for the same P1 parity pairs ---
+test "javascript: constant response header value is clean"
+  lang javascript
+  reject VYQL-INJ-010
+  code
+  ```
+  function h(res) {
+    res.setHeader("X-Trace", "fixed");
+  }
+  ```
+
+test "python: constant response header value is clean"
+  lang python
+  reject VYQL-INJ-010
+  code
+  ```
+  def h(response):
+      response.headers.add("X-Trace", "fixed")
+  ```
+
+test "php: constant header value is clean"
+  lang php
+  reject VYQL-INJ-010
+  code
+  ```
+  <?php header("X-Trace: fixed");
+  ```
+
+test "ruby: constant response header value is clean"
+  lang ruby
+  reject VYQL-INJ-010
+  code
+  ```
+  def h(response)
+    response.set_header("X-Trace", "fixed")
+  end
+  ```
+
+test "go: constant response header value is clean"
+  lang go
+  reject VYQL-INJ-010
+  code
+  ```
+  package p
+  import "net/http"
+  func h(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("X-Trace", "fixed")
+  }
+  ```
+
+test "csharp: constant response header value is clean"
+  lang csharp
+  reject VYQL-INJ-010
+  code
+  ```
+  class C { void H() { Response.Headers.Append("X-Trace", "fixed"); } }
+  ```
+
+test "javascript: constant log message is clean"
+  lang javascript
+  reject VYQL-INJ-009
+  code
+  ```
+  function h(logger) {
+    logger.info("login fixed");
+  }
+  ```
+
+test "php: constant error_log message is clean"
+  lang php
+  reject VYQL-INJ-009
+  code
+  ```
+  <?php error_log("fixed");
+  ```
+
+test "ruby: constant log message is clean"
+  lang ruby
+  reject VYQL-INJ-009
+  code
+  ```
+  def h
+    Rails.logger.info("login fixed")
+  end
+  ```
+
+test "go: constant log message is clean"
+  lang go
+  reject VYQL-INJ-009
+  code
+  ```
+  package p
+  import (
+    "log"
+    "net/http"
+  )
+  func h(w http.ResponseWriter, r *http.Request) {
+    log.Println("fixed")
+  }
+  ```
+
+test "csharp: constant log message is clean"
+  lang csharp
+  reject VYQL-INJ-009
+  code
+  ```
+  class C { void H(ILogger logger) { logger.LogInformation("fixed"); } }
+  ```
+
+test "javascript: constant CSV cell is clean"
+  lang javascript
+  reject VYQL-INJ-014
+  code
+  ```
+  function exportCsv(csv) {
+    csv.write("fixed");
+  }
+  ```
+
+test "java: constant CSV cell is clean"
+  lang java
+  reject VYQL-INJ-014
+  code
+  ```
+  class C {
+    void export(CSVWriter writer) {
+      writer.writeNext(new String[] { "fixed" });
+    }
+  }
+  ```
+
+test "ruby: constant CSV cell is clean"
+  lang ruby
+  reject VYQL-INJ-014
+  code
+  ```
+  def export(csv)
+    csv.write_row("fixed")
+  end
+  ```
+
+test "go: constant CSV cell is clean"
+  lang go
+  reject VYQL-INJ-014
+  code
+  ```
+  package p
+  import (
+    "encoding/csv"
+    "net/http"
+  )
+  func h(w http.ResponseWriter, r *http.Request) {
+    writer := csv.NewWriter(w)
+    writer.Write([]string{"fixed"})
+  }
+  ```
+
+test "csharp: constant CSV cell is clean"
+  lang csharp
+  reject VYQL-INJ-014
+  code
+  ```
+  class C { void H(CsvWriter csv) { csv.WriteField("fixed"); } }
+  ```
+
+test "python: fixed upload destination is clean"
+  lang python
+  reject VYQL-INJ-015
+  code
+  ```
+  def upload(uploaded_file):
+      uploaded_file.save("uploads/fixed.dat")
+  ```
+
+test "java: fixed transferTo destination is clean"
+  lang java
+  reject VYQL-INJ-015
+  code
+  ```
+  class C {
+    void upload(MultipartFile file) throws Exception {
+      file.transferTo(new File("uploads/fixed.dat"));
+    }
+  }
+  ```
+
+test "ruby: fixed upload destination is clean"
+  lang ruby
+  reject VYQL-INJ-015
+  code
+  ```
+  def upload(uploaded_file)
+    uploaded_file.save("uploads/fixed.dat")
+  end
+  ```
+
+test "go: fixed upload destination is clean"
+  lang go
+  reject VYQL-INJ-015
+  code
+  ```
+  package p
+  import (
+    "net/http"
+    "os"
+  )
+  func h(w http.ResponseWriter, r *http.Request) {
+    os.Create("uploads/fixed.dat")
+  }
+  ```
+
+test "csharp: fixed upload destination is clean"
+  lang csharp
+  reject VYQL-INJ-015
+  code
+  ```
+  class C { void H(byte[] data) { File.WriteAllBytes("uploads/fixed.dat", data); } }
+  ```
+
+test "python: static bulk update is clean"
+  lang python
+  reject VYQL-INJ-012
+  code
+  ```
+  def update():
+      User.update({"name": "fixed"})
+  ```
+
+test "java: static bean copy is clean"
+  lang java
+  reject VYQL-INJ-012
+  code
+  ```
+  class C {
+    void update(User user, Map defaults) {
+      BeanUtils.copyProperties(defaults, user);
+    }
+  }
+  ```
+
+test "csharp: static model update input is clean"
+  lang csharp
+  reject VYQL-INJ-012
+  code
+  ```
+  class C { void H(User user, object defaults) { TryUpdateModelAsync(user, "", defaults); } }
+  ```

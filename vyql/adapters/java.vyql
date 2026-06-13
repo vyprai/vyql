@@ -39,6 +39,7 @@ adapter java {
   type "StringWriter" -> StringWriter
   type "CharArrayWriter" -> CharArrayWriter
   type "ByteArrayOutputStream" -> ByteArrayOutputStream
+  type "CSVWriter" -> CSVWriter
 
   // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
@@ -115,6 +116,7 @@ adapter java {
   sink path "Files.copy" -> code.FilePathAccess
   sink path "Paths.get" -> code.FilePathAccess
   sink method "extractEntry" -> code.ArchiveEntryWrite
+  sink method "transferTo" -> code.UnsafeUpload
 
   // SSRF
   sink path "URL" -> code.UrlFetch
@@ -294,6 +296,11 @@ adapter java {
   // HTTP response splitting / header injection (CWE-113) — the header VALUE is arg1
   sink method "setHeader" arg 1 -> code.ResponseHeaderWrite
   sink method "addHeader" arg 1 -> code.ResponseHeaderWrite
+  // CSV/formula injection (CWE-1236), unrestricted upload (CWE-434), and mass assignment (CWE-915).
+  sink method "writeNext" arg all collection -> code.CsvCell
+  sink method "writeAll" arg all collection -> code.CsvCell
+  sink path "BeanUtils.copyProperties" arg all -> code.MassAssign
+  sink method "bind" arg all -> code.MassAssign
 
   // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
   // are a LogOutput sink (user data → log injection) AND a LogWrite mark (secret → leak).

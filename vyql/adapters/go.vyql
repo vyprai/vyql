@@ -19,6 +19,7 @@ adapter go {
   type "support.NewLDAP" -> ldap.Conn
   type "support.NewXMLDoc" -> xpath.Doc
   type "support.NewSession" -> session.Store
+  type "csv.NewWriter" -> csv.Writer
 
   source "os.Args" -> code.CliArgument
   source "os.Getenv" -> code.EnvVariable
@@ -85,10 +86,13 @@ adapter go {
   sink path "os.OpenFile" -> code.FilePathAccess
   sink path "os.ReadFile" -> code.FilePathAccess
   sink path "os.Create" -> code.FilePathAccess
+  sink path "os.Create" -> code.UnsafeUpload
   sink path "os.Remove" -> code.FilePathAccess
   sink path "os.RemoveAll" -> code.FilePathAccess
   sink path "ioutil.ReadFile" -> code.FilePathAccess
   sink path "ioutil.WriteFile" -> code.FilePathAccess
+  sink path "os.WriteFile" -> code.UnsafeUpload
+  sink path "ioutil.WriteFile" -> code.UnsafeUpload
   sink path "http.ServeFile" -> code.FilePathAccess
   sink path "os.Mkdir" -> code.FilePathAccess
   sink path "os.MkdirAll" -> code.FilePathAccess
@@ -122,6 +126,20 @@ adapter go {
   mark "DeleteAccount" -> code.AuthenticationRequiredOp
   mark "GrantRole" -> code.AuthenticationRequiredOp
   mark "MakeAdmin" -> code.AuthenticationRequiredOp
+  // HTTP response splitting / header injection (CWE-113).
+  sink path "Header.Set" arg 1 -> code.ResponseHeaderWrite
+  sink path "Header.Add" arg 1 -> code.ResponseHeaderWrite
+  // log injection (CWE-117) + secret-in-log (CWE-532).
+  sink path "log.Print" arg all -> code.LogOutput
+  sink path "log.Printf" arg all -> code.LogOutput
+  sink path "log.Println" arg all -> code.LogOutput
+  mark "log.Print" -> code.LogWrite
+  mark "log.Printf" -> code.LogWrite
+  mark "log.Println" -> code.LogWrite
+  // CSV/formula injection (CWE-1236).
+  sink path "writer.Write" arg all collection -> code.CsvCell
+  sink path "csvWriter.Write" arg all collection -> code.CsvCell
+  sink path "csvw.Write" arg all collection -> code.CsvCell
 
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "html.EscapeString" -> core.HtmlEscape

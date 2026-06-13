@@ -266,6 +266,37 @@ adapter javascript {
   // server later opens from storage.
   sink path "hiddenFileInput.value" -> code.FilePathAccess
   sink path "res.send" -> code.HtmlRender
+  // HTTP response splitting / header injection (CWE-113) — Express/Koa header value is arg1.
+  sink path "res.setHeader" arg 1 -> code.ResponseHeaderWrite
+  sink path "res.header" arg 1 -> code.ResponseHeaderWrite
+  sink path "res.set" arg 1 -> code.ResponseHeaderWrite
+  sink path "ctx.set" arg 1 -> code.ResponseHeaderWrite
+  sink path "reply.header" arg 1 -> code.ResponseHeaderWrite
+  // log injection (CWE-117) + secret-in-log (CWE-532).
+  sink path "console.log" arg all -> code.LogOutput
+  sink path "console.warn" arg all -> code.LogOutput
+  sink path "console.error" arg all -> code.LogOutput
+  sink path "logger.info" arg all -> code.LogOutput
+  sink path "logger.warn" arg all -> code.LogOutput
+  sink path "logger.error" arg all -> code.LogOutput
+  sink path "logger.debug" arg all -> code.LogOutput
+  sink path "log.info" arg all -> code.LogOutput
+  sink path "log.error" arg all -> code.LogOutput
+  mark "console.log" -> code.LogWrite
+  mark "console.warn" -> code.LogWrite
+  mark "console.error" -> code.LogWrite
+  mark "logger.info" -> code.LogWrite
+  mark "logger.warn" -> code.LogWrite
+  mark "logger.error" -> code.LogWrite
+  mark "logger.debug" -> code.LogWrite
+  mark "log.info" -> code.LogWrite
+  mark "log.error" -> code.LogWrite
+  // CSV/formula injection (CWE-1236) — common csv-stringify/fast-csv writer APIs.
+  sink path "csv.write" arg all -> code.CsvCell
+  sink path "csvStream.write" arg all -> code.CsvCell
+  sink path "stringifier.write" arg all -> code.CsvCell
+  sink path "csvStringify.write" arg all -> code.CsvCell
+  sink method "writeRecords" arg all -> code.CsvCell
   // chained / callback emit: res.type("html").send(x), res.format({html:()=>res.send(x)})
   sink method "send" -> code.HtmlRender
   sink path "res.write" -> code.HtmlRender

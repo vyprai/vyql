@@ -149,6 +149,10 @@ adapter ruby {
   sink path "Dir.entries" -> code.FilePathAccess
   sink path "send_file" -> code.FilePathAccess
   sink path "send_data" -> code.FilePathAccess
+  // unrestricted upload (CWE-434) — common uploaded file helpers and direct writes.
+  sink path "uploaded_file.save" -> code.UnsafeUpload
+  sink path "file.save" -> code.UnsafeUpload
+  sink path "File.write" -> code.UnsafeUpload
   sink method "extract" -> code.ArchiveEntryWrite
   sink path "Zip.File.extract" -> code.ArchiveEntryWrite
   sink path "raw" -> code.HtmlRender
@@ -164,6 +168,26 @@ adapter ruby {
   sink path "Tilt.new" -> code.TemplateRender
   sink path "redirect_to" -> code.RedirectTarget
   sink path "redirect" -> code.RedirectTarget
+  // HTTP response splitting / header injection (CWE-113).
+  sink path "response.set_header" arg 1 -> code.ResponseHeaderWrite
+  sink path "headers.__setitem__" arg 1 -> code.ResponseHeaderWrite
+  // log injection (CWE-117) + secret-in-log (CWE-532).
+  sink path "Rails.logger.info" arg all -> code.LogOutput
+  sink path "Rails.logger.warn" arg all -> code.LogOutput
+  sink path "Rails.logger.error" arg all -> code.LogOutput
+  sink path "logger.info" arg all -> code.LogOutput
+  sink path "logger.warn" arg all -> code.LogOutput
+  sink path "logger.error" arg all -> code.LogOutput
+  mark "Rails.logger.info" -> code.LogWrite
+  mark "Rails.logger.warn" -> code.LogWrite
+  mark "Rails.logger.error" -> code.LogWrite
+  mark "logger.info" -> code.LogWrite
+  mark "logger.warn" -> code.LogWrite
+  mark "logger.error" -> code.LogWrite
+  // CSV/formula injection (CWE-1236).
+  sink path "csv.write_row" arg all -> code.CsvCell
+  sink path "CSV.generate_line" arg all -> code.CsvCell
+  sink path "CSV.open" arg all -> code.CsvCell
 
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "CGI.escapeHTML" -> core.HtmlEscape
