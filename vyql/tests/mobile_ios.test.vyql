@@ -57,3 +57,27 @@ test "ios (swift): a constant WKWebView script is clean"
     webView.evaluateJavaScript("init()")
   }
   ```
+
+test "ios (objc): addScriptMessageHandler exposes a native bridge"
+  lang objc
+  expect VYQL-MOB-002
+  code
+  ```
+  @implementation V
+  - (void)run:(WKUserContentController *)controller {
+    [controller addScriptMessageHandler:self name:@"bridge"];
+  }
+  @end
+  ```
+
+test "ios (objc): removing a script message handler is clean"
+  lang objc
+  reject VYQL-MOB-002
+  code
+  ```
+  @implementation V
+  - (void)run:(WKUserContentController *)controller {
+    [controller removeScriptMessageHandlerForName:@"bridge"];
+  }
+  @end
+  ```

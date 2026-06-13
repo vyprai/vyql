@@ -21,6 +21,7 @@ adapter objc {
   sink method "evaluateJavaScript" -> code.WebViewLoad
   sink method "loadHTMLString" -> code.WebViewLoad
   sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
+  mark "addScriptMessageHandler" -> code.WebViewJsInterface
 
   // command execution
   sink path "system" -> code.CommandExecution
