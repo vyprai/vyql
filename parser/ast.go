@@ -9,7 +9,7 @@ package parser
 type Decl interface{ isDecl() }
 
 // Rule is a `rule`/`query` declaration. Name is the short PascalCase rule name;
-// Package is the enclosing `package <namespace>` (if any). QualifiedName joins
+// Package is the enclosing `module <namespace>` (if any). QualifiedName joins
 // them (vendor.category.RuleName).
 type Rule struct {
 	Name    string
@@ -43,7 +43,7 @@ func containsDot(s string) bool {
 // ConceptDecl is an ontology concept declaration. The kind is a type
 // annotation in the header — `concept Deserialization : sink { … }` — not a
 // redundant body field. Name is the short PascalCase name; Package is the
-// enclosing `package <namespace>` (or the prefix if the header name is dotted).
+// enclosing `module <namespace>` (or the prefix if the header name is dotted).
 // Fields holds the kind-dependent typing/standards attributes (values are
 // string or []string), e.g. vulnerable_to, neutralizes, refines, cwe.
 type ConceptDecl struct {
@@ -83,6 +83,7 @@ type AdapterMapping struct {
 	ArgIndex   int      // which argument is the dangerous one (default 0; `arg N`)
 	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
 	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
+	Packages   []string // inherited from `package "name" { ... }` — fire only when import/SBOM package evidence is present
 	Collection bool     // `collection` — also flag a Seq/collection-literal arg (e.g. ldap search options {filter})
 	Exact      bool     // exact path match (currently used by `mark exact`)
 	About      string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)

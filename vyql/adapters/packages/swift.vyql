@@ -1,0 +1,60 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter swift {
+  package "vapor" {
+    source method "query" -> HttpInput
+    source method "content" -> HttpInput
+    control "String.htmlEscaped" -> HtmlEscape
+    control method "requireAuthenticated" -> AuthenticationCheck
+    control method "authorize" -> AuthorizationCheck
+    control "CSRF" -> CsrfProtection
+  }
+  package "kitura" {
+    source method "parameters" -> HttpInput
+  }
+  package "Foundation" {
+    source "ProcessInfo.processInfo.environment" -> SecretValue
+    sink path "Process" -> CommandExecution
+    sink path "JSONDecoder.decode" -> Deserialization
+    sink path "PropertyListDecoder.decode" -> Deserialization
+    sink path "FileManager.default.contents" -> FilePathAccess
+    sink path "URLSession.shared.dataTask" -> UrlFetch
+    sink path "XMLDocument" -> XmlParse
+    sink method "nodesForXPath" -> XpathQuery
+    sink path "NSRegularExpression" -> RegexCompile
+    control "URL.resolvingSymlinksInPath" -> PathCanonicalization
+    control "XMLParser.shouldResolveExternalEntities" val "false" -> XmlHardening
+    control "JSONDecoder.decode" -> SafeDeserialization
+    control "addingPercentEncoding" -> RedirectAllowlist
+  }
+  package "alamofire" {
+    source method "responseDecodable" -> ExternalApiResponse
+    sink method "request" -> UrlFetch
+  }
+  package "fluent" {
+    sink method "raw" -> SqlExecution
+  }
+  package "postgres-nio" {
+    sink method "query" -> SqlExecution
+    control method "bind" -> SqlParameterization
+  }
+  package "JavaScriptCore" {
+    sink method "evaluateScript" -> CodeEval
+  }
+  package "zipfoundation" {
+    sink method "unzipItem" -> ArchiveEntryWrite
+  }
+  package "swift-ldap" {
+    sink method "search" arg 1 -> LdapQuery
+  }
+  package "leaf" {
+    sink method "render" -> TemplateRender
+  }
+  package "swift-html-entities" {
+    control "HTMLEscape" -> HtmlEscape
+  }
+  package "ShellOut" {
+    control "ShellOut.shellOut" -> ShellEscape
+  }
+}

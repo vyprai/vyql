@@ -1,7 +1,7 @@
 // Mobile weakness rules. Intent/deep-link data flowing to OS/SQL/file sinks reuses
 // the injection rules (IntentInput refines core.UserControlledData); these cover the
 // mobile-specific WebView surface.
-package vypr.mobile;
+module vypr.mobile;
 
 // Untrusted data loaded or evaluated in a WebView — loadUrl/loadData/evaluateJavascript
 // (CWE-749). A tainted URL can be `javascript:` (XSS) or a phishing/redirect target.

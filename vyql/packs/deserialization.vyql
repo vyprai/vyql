@@ -1,5 +1,5 @@
 // Deserialization family — unsafe deserialization, XXE, unsafe reflection.
-package vypr.deserialization;
+module vypr.deserialization;
 
 rule Unsafe {
   meta { id: "VYQL-DESER-001", severity: critical, cwe: [CWE_502] }

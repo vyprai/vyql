@@ -1,7 +1,7 @@
 // Memory-safety weakness rules. These are exploitability-aware: taint rules mean
 // attacker-controlled data reaches a memory-sensitive operand; match rules are
 // assumption-gated smells with exploit conditions attached by adapters.
-package vypr.memory;
+module vypr.memory;
 
 rule TaintedUnboundedCopy {
   meta { id: "VYQL-MEM-001", severity: high, cwe: [CWE_787, CWE_120] }

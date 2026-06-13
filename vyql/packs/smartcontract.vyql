@@ -1,5 +1,5 @@
 // Smart-contract weakness rules (Solidity). docs/05 rule packs.
-package vypr.smartcontract;
+module vypr.smartcontract;
 
 // An attacker-controlled address/value reaching a low-level external call —
 // arbitrary external call / value transfer (CWE-829).

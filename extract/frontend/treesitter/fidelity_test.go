@@ -15,7 +15,7 @@ import (
 )
 
 const twoSinkRules = `
-package vypr.injection;
+module vypr.injection;
 rule Sql {
   meta { id: "VYQL-INJ-001", severity: high }
   taint code.HttpInput -> code.SqlExecution
@@ -65,4 +65,3 @@ func TestFidelityDowngradesMethodMatch(t *testing.T) {
 		t.Fatalf("command-injection via dotted-path match should be high (resolved), got %q", conf["VYQL-INJ-002"])
 	}
 }
-

@@ -1,6 +1,6 @@
 // Concurrency / race rules. These are temporal or assumption-gated findings, not
 // pure taint flows.
-package vypr.concurrency;
+module vypr.concurrency;
 
 rule FileToctou {
   meta { id: "VYQL-RACE-001", severity: medium, cwe: [CWE_367] }

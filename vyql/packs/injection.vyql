@@ -1,7 +1,7 @@
 // Injection family — untrusted data reaching an interpreter/sink (OWASP A03).
 // Source is core.UserControlledData (the parent of HttpInput/Cookie/FileUpload/
 // HttpHeader/CliArgument), so each rule fires on any user-input refinement.
-package vypr.injection;
+module vypr.injection;
 
 rule Sql {
   meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89] }

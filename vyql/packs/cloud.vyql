@@ -1,5 +1,5 @@
 // Cloud posture — public exposure of sensitive data stores (docs/09).
-package vypr.cloud;
+module vypr.cloud;
 
 rule PublicSensitiveDatabase {
   meta { id: "VYQL-CLD-001", severity: critical }

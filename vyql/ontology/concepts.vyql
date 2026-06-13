@@ -1,12 +1,12 @@
 // VyQL ontology — the curated analysis vocabulary (docs/06).
 
-package business;
+module business;
 
 concept Order : asset { }
 concept PaymentSystem : asset { }
 concept Refund : action { }
 
-package cloud;
+module cloud;
 
 concept Database : asset { }
 concept Internet : exposure { }
@@ -14,7 +14,7 @@ concept ObjectStore : asset { }
 concept PublicStorage : exposure { }
 concept SecretStore : asset { }
 
-package code;
+module code;
 
 concept CliArgument : source {
   taint: [taint.UntrustedData]
@@ -505,7 +505,7 @@ concept XpathQuery : sink {
   cwe: [CWE_643]
 }
 
-package core;
+module core;
 
 concept ResourceRelease : control {
   neutralizes: [resource.ResourceLeak]
@@ -634,7 +634,7 @@ concept XmlHardening : control {
   applies: path
 }
 
-package identity;
+module identity;
 
 concept AdminPrivilege : privilege { }
 concept Anonymous : principal { }
@@ -644,7 +644,7 @@ concept ExternalPrincipal : principal { }
 concept SuperAdminPrivilege : privilege { }
 concept WorkloadIdentity : principal { }
 
-package runtime;
+module runtime;
 
 concept Connection : observation { }
 concept HttpRequest : source {
@@ -656,7 +656,7 @@ concept ShellExecution : sink {
   enabled_by: [taint.UntrustedData]
 }
 
-package sbom;
+module sbom;
 
 concept ReachableSymbol : exposure { }
 concept VulnerableDependency : asset { }
@@ -666,7 +666,7 @@ concept SuspiciousDependency : asset { }
 // A dependency on a confirmed-malicious package version (CWE-506 embedded malicious code).
 concept MaliciousDependency : asset { }
 
-package threat;
+module threat;
 
 concept MiningPool : indicator { }
 

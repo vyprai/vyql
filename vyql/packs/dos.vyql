@@ -1,5 +1,5 @@
 // Denial-of-service weakness rules. docs/05 rule packs.
-package vypr.dos;
+module vypr.dos;
 
 // Untrusted data compiled as a regex pattern — ReDoS (CWE-1333).
 rule ReDoS {

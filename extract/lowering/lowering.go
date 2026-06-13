@@ -665,6 +665,9 @@ func (l *lowerer) flow(a, b string) {
 func (l *lowerer) run() error {
 	for _, m := range l.prog.Modules {
 		l.importTables[m.Key] = importTable(m)
+		for _, imp := range m.Imports {
+			l.importNode(m, imp)
+		}
 		l.register(m.Key, m.Body, "")
 	}
 	for _, m := range l.prog.Modules {
@@ -672,6 +675,23 @@ func (l *lowerer) run() error {
 		l.block(m.Body, newScope())
 	}
 	return nil
+}
+
+func (l *lowerer) importNode(m nir.Module, imp nir.Import) {
+	props := map[string]string{
+		"local":   imp.Local,
+		"module":  imp.Module,
+		"package": importPackageRoot(imp.Module),
+	}
+	if imp.Symbol != "" {
+		props["symbol"] = imp.Symbol
+	}
+	if imp.IsModule {
+		props["is_module"] = "true"
+	} else {
+		props["is_module"] = "false"
+	}
+	l.node("Import", m.File, props)
 }
 
 func importTable(m nir.Module) map[string]importEntry {
@@ -684,6 +704,23 @@ func importTable(m nir.Module) map[string]importEntry {
 		}
 	}
 	return out
+}
+
+func importPackageRoot(module string) string {
+	module = strings.TrimSpace(module)
+	if module == "" {
+		return ""
+	}
+	if strings.HasPrefix(module, "@") {
+		parts := strings.Split(module, "/")
+		if len(parts) >= 2 {
+			return parts[0] + "/" + parts[1]
+		}
+	}
+	if i := strings.IndexByte(module, '/'); i > 0 {
+		return module[:i]
+	}
+	return module
 }
 
 // --- pass 1: registration ----------------------------------------------

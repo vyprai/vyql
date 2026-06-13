@@ -1,6 +1,6 @@
 // Numeric and size-computation weakness rules. These are partial by design: the
 // finding states the exploit condition rather than claiming full range proof.
-package vypr.numeric;
+module vypr.numeric;
 
 rule TaintedSizeComputation {
   meta { id: "VYQL-NUM-001", severity: medium, cwe: [CWE_190] }

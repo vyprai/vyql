@@ -3,11 +3,11 @@ package parser
 import "testing"
 
 // Mirrors the Python parser smoke test: every docs/05 rule form parses.
-// VyQL conventions: `package <ns>;` declares the namespace (Go-style), rule
-// names are short PascalCase, concepts are qualified cross-package refs,
+// VyQL conventions: `module <ns>;` declares the namespace, rule
+// names are short PascalCase, concepts are qualified cross-module refs,
 // CWE refs are CWE_NNN, states are PascalCase.
 const program = `
-package vypr.injection;
+module vypr.injection;
 
 rule Sql {
   meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89], owasp: ["A03:2021"] }
@@ -15,7 +15,7 @@ rule Sql {
   unless sanitized_by core.SqlParameterization
 }
 
-package vypr.cloud;
+module vypr.cloud;
 
 rule PublicDatabase {
   meta { id: "VYQL-CLD-003", severity: critical }
@@ -28,7 +28,7 @@ rule UnencryptedStorage {
   unless guarded_by core.CompensatingEncryption
 }
 
-package vypr.identity;
+module vypr.identity;
 
 rule ExternalToAdmin { assume identity.ExternalPrincipal -> identity.AdminPrivilege }
 rule ToxicCombinationLateral {
@@ -36,7 +36,7 @@ rule ToxicCombinationLateral {
   where reach(cloud.Internet, w.workload) and assume(w, identity.AdminPrivilege)
 }
 
-package vypr.bizlogic;
+module vypr.bizlogic;
 
 rule UnauthorizedRefund {
   match business.Refund as a
@@ -127,11 +127,11 @@ func TestParseAllForms(t *testing.T) {
 	}
 }
 
-// Namespacing via a `package` declaration (Go-style): short rule names within
-// the package; cross-package concept refs stay qualified.
-func TestPackageDecl(t *testing.T) {
+// Namespacing via a `module` declaration: short rule names within the module;
+// cross-module concept refs stay qualified.
+func TestModuleDecl(t *testing.T) {
 	src := `
-package vypr.injection;
+module vypr.injection;
 
 rule Sql {
   meta { id: "VYQL-INJ-001" }
@@ -178,7 +178,7 @@ func TestParseErrors(t *testing.T) {
 // The adapter + threat declarations (docs/05/07) parse into the right AST.
 func TestParseAdapterAndThreatDecls(t *testing.T) {
 	src := `
-package injection;
+module injection;
 threat SqlInjection { cwe: [CWE_89], desc: "Untrusted data in a SQL command" }
 
 adapter python {
@@ -226,6 +226,69 @@ adapter python {
 	}
 	if ad.Mappings[5].Kind != "mark" || !ad.Mappings[5].Exact || ad.Mappings[5].Pattern != "Random" {
 		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[5])
+	}
+}
+
+func TestConceptImportsResolveInRulesAndAdapters(t *testing.T) {
+	src := `
+import code.{HttpInput, SqlExecution, FilePathAccess};
+import core.SqlParameterization as SqlParam;
+import core.*;
+
+adapter python {
+  source "request.form" -> HttpInput
+  sink method "execute" -> SqlExecution
+  package "pg" {
+    sink method "raw" -> SqlExecution
+  }
+  control "bind" -> SqlParam
+  assume guard method "startsWith" -> FilePathAccess
+}
+
+rule Sql {
+  taint HttpInput -> SqlExecution
+  unless sanitized_by SqlParam
+}
+
+rule Storage {
+  match Storage as s
+  unless guarded_by EncryptionAtRest
+}
+`
+	decls, err := Parse(src)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	ad := decls[0].(*AdapterDecl)
+	if got := ad.Mappings[0].Concept; got != "code.HttpInput" {
+		t.Fatalf("source import = %q", got)
+	}
+	if got := ad.Mappings[1].Concept; got != "code.SqlExecution" {
+		t.Fatalf("sink import = %q", got)
+	}
+	if got := ad.Mappings[2].Packages; len(got) != 1 || got[0] != "pg" {
+		t.Fatalf("package gate = %#v", got)
+	}
+	if got := ad.Mappings[3].Concept; got != "core.SqlParameterization" {
+		t.Fatalf("alias import = %q", got)
+	}
+	if got := ad.Mappings[4].About; got != "code.FilePathAccess" {
+		t.Fatalf("assume target import = %q", got)
+	}
+	sql := decls[1].(*Rule)
+	fs := sql.Body.(*FlowStmt)
+	if fs.Src.Concept != "code.HttpInput" || fs.Dst.Concept != "code.SqlExecution" {
+		t.Fatalf("rule endpoint imports wrong: %+v", fs)
+	}
+	if sb := sql.Clauses[0].Unless.(SanitizedBy); sb.Concept != "core.SqlParameterization" {
+		t.Fatalf("rule alias import wrong: %+v", sb)
+	}
+	storage := decls[2].(*Rule)
+	if m := storage.Body.(*MatchStmt); m.Concept != "core.Storage" {
+		t.Fatalf("wildcard match import wrong: %+v", m)
+	}
+	if gb := storage.Clauses[0].Unless.(GuardedBy); gb.Concept != "core.EncryptionAtRest" {
+		t.Fatalf("wildcard guard import wrong: %+v", gb)
 	}
 }
 

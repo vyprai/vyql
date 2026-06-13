@@ -1,6 +1,6 @@
 // Business logic — declared-model Mode 1 (docs/12): unauthorized actions and
 // invalid state transitions.
-package vypr.business;
+module vypr.business;
 
 rule UnauthorizedRefund {
   meta { id: "VYQL-BIZ-001", severity: high }

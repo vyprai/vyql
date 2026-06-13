@@ -7,9 +7,11 @@ import (
 )
 
 type parser struct {
-	toks []tok
-	i    int
-	pkg  string // current `package <namespace>` context
+	toks            []tok
+	i               int
+	pkg             string // current `module <namespace>` context
+	imports         map[string]string
+	wildcardImports []string
 }
 
 type parseError struct{ msg string }
@@ -22,7 +24,7 @@ func Parse(src string) (decls []Decl, err error) {
 	if lerr != nil {
 		return nil, lerr
 	}
-	p := &parser{toks: toks}
+	p := &parser{toks: toks, imports: map[string]string{}}
 	defer func() {
 		if r := recover(); r != nil {
 			if pe, ok := r.(parseError); ok {
@@ -70,11 +72,21 @@ func (p *parser) parseProgram() []Decl {
 			p.next()
 			continue
 		}
-		// `package <namespace>;` sets the namespace for following declarations
-		// (Go-style); definitions are short-named, cross-package refs qualified.
-		if p.atWord("package") {
+		// `module <namespace>;` sets the namespace for following declarations;
+		// definitions are short-named, cross-module refs qualified.
+		if p.atWord("module") || p.atWord("package") {
 			p.next()
 			p.pkg = p.parseQName()
+			if p.at(tSemi) {
+				p.next()
+			}
+			continue
+		}
+		// `import code.HttpInput;`, `import code.*;`, and
+		// `import code.{HttpInput, SqlExecution};` make concept references shorter
+		// in rule/adapter bodies without changing declaration namespaces.
+		if p.atWord("import") {
+			p.parseImportDecl()
 			if p.at(tSemi) {
 				p.next()
 			}
@@ -113,6 +125,73 @@ func (p *parser) parseQName() string {
 		name += "." + p.expect(tWord, "word").val
 	}
 	return name
+}
+
+func (p *parser) parseImportDecl() {
+	p.next() // 'import'
+	prefix := p.expect(tWord, "word").val
+	for p.at(tDot) {
+		p.next()
+		switch {
+		case p.at(tStar):
+			p.next()
+			p.wildcardImports = append(p.wildcardImports, prefix)
+			return
+		case p.at(tLBrace):
+			p.next()
+			for !p.at(tRBrace) {
+				name := p.parseQName()
+				p.imports[lastSeg(name)] = prefix + "." + name
+				if p.at(tComma) {
+					p.next()
+				}
+			}
+			p.expect(tRBrace, "}")
+			return
+		default:
+			prefix += "." + p.expect(tWord, "word").val
+		}
+	}
+	alias := lastSeg(prefix)
+	if p.atWord("as") {
+		p.next()
+		alias = p.expect(tWord, "word").val
+	}
+	p.imports[alias] = prefix
+}
+
+func (p *parser) parseConceptRef() string {
+	return p.resolveConceptRef(p.parseQName())
+}
+
+func (p *parser) resolveConceptRef(name string) string {
+	if strings.Contains(name, ".") {
+		return name
+	}
+	if fq := p.imports[name]; fq != "" {
+		return fq
+	}
+	switch len(p.wildcardImports) {
+	case 0:
+		return name
+	case 1:
+		return p.wildcardImports[0] + "." + name
+	default:
+		p.fail("ambiguous imported concept %q: multiple wildcard imports in scope", name)
+	}
+	return name
+}
+
+func (p *parser) parseSolverArgRef() Ref {
+	ref := p.parseRef()
+	if len(ref.Parts) != 1 {
+		return ref
+	}
+	resolved := p.resolveConceptRef(ref.Parts[0])
+	if resolved == ref.Parts[0] {
+		return ref
+	}
+	return Ref{Parts: strings.Split(resolved, ".")}
 }
 
 func (p *parser) parseRule(isQuery bool) *Rule {
@@ -201,7 +280,7 @@ func (p *parser) parseFlowStmt() *FlowStmt {
 }
 
 func (p *parser) parseEndpoint() Endpoint {
-	e := Endpoint{Concept: p.parseQName()} // concepts are namespaced (dotted)
+	e := Endpoint{Concept: p.parseConceptRef()} // concepts are namespaced (dotted)
 	if p.atWord("as") {
 		p.next()
 		e.Binding = p.expect(tWord, "word").val
@@ -233,7 +312,7 @@ func (p *parser) parseMatchStmt() *MatchStmt {
 	// `match <concept> as id` — any concept, including action concepts. The
 	// concept's `kind` (e.g. action) comes from the ontology, so no redundant
 	// `action` keyword in the rule.
-	m := &MatchStmt{TargetKind: "concept", Concept: p.parseQName()}
+	m := &MatchStmt{TargetKind: "concept", Concept: p.parseConceptRef()}
 	if p.atWord("as") {
 		p.next()
 		m.Binding = p.expect(tWord, "word").val
@@ -270,15 +349,15 @@ func (p *parser) parseClause() Clause {
 func (p *parser) parseException() Exception {
 	if p.atWord("sanitized_by") {
 		p.next()
-		return SanitizedBy{Concept: p.parseQName()}
+		return SanitizedBy{Concept: p.parseConceptRef()}
 	}
 	if p.atWord("guarded_by") {
 		p.next()
-		return GuardedBy{Concept: p.parseQName()}
+		return GuardedBy{Concept: p.parseConceptRef()}
 	}
 	if p.atWord("closed_by") {
 		p.next()
-		return ClosedBy{Concept: p.parseQName()}
+		return ClosedBy{Concept: p.parseConceptRef()}
 	}
 	return ExprException{Expr: p.parseExpr()}
 }
@@ -310,7 +389,7 @@ func (p *parser) parseAtom() Expr {
 		p.expect(tLBrack, "[")
 		var kinds []string
 		for !p.at(tRBrack) {
-			kinds = append(kinds, p.parseQName())
+			kinds = append(kinds, p.parseConceptRef())
 			if p.at(tComma) {
 				p.next()
 			}
@@ -320,13 +399,13 @@ func (p *parser) parseAtom() Expr {
 	}
 	if p.atWord("has") {
 		p.next()
-		return Has{Ref: ref, Concept: p.parseQName()}
+		return Has{Ref: ref, Concept: p.parseConceptRef()}
 	}
 	// `labeled <Concept>` — the node the ref resolves to carries the concept
 	// (docs/11: `c.dst labeled threat.MiningPool`). Same semantics as `has`.
 	if p.atWord("labeled") {
 		p.next()
-		return Has{Ref: ref, Concept: p.parseQName()}
+		return Has{Ref: ref, Concept: p.parseConceptRef()}
 	}
 	// `[not] in [<set>]` — scalar set membership (docs/11: workload drift).
 	if p.atWord("not") && p.peek2().kind == tWord && p.peek2().val == "in" {
@@ -340,7 +419,7 @@ func (p *parser) parseAtom() Expr {
 	}
 	if p.atWord("is") {
 		p.next()
-		return Is{Ref: ref, Concept: p.parseQName()}
+		return Is{Ref: ref, Concept: p.parseConceptRef()}
 	}
 	if p.at(tEq) || p.at(tNe) {
 		op := p.next().val
@@ -353,7 +432,7 @@ func (p *parser) parseSolverCall() SolverCall {
 	call := SolverCall{Verb: p.next().val}
 	p.expect(tLParen, "(")
 	for !p.at(tRParen) {
-		a := p.parseRef()
+		a := p.parseSolverArgRef()
 		if p.atWord("as") {
 			p.next()
 			binding := p.expect(tWord, "word").val
@@ -399,7 +478,7 @@ func (p *parser) parseRef() Ref {
 
 // parseConceptDecl parses `concept <QName> : <kind> { key: value … }`. The kind
 // is the type annotation after the colon; the name takes the enclosing
-// `package` namespace (or, if the header name is dotted, the dotted prefix).
+// `module` namespace (or, if the header name is dotted, the dotted prefix).
 func (p *parser) parseConceptDecl() *ConceptDecl {
 	p.next() // 'concept'
 	name := p.parseQName()
@@ -453,191 +532,199 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 		a.Meta = p.parseMeta()
 	}
 	for !p.at(tRBrace) {
-		switch {
-		case p.atWord("source"):
-			p.next()
-			kind := "source"
-			if p.atWord("method") { // receiver-agnostic source: match the call method name
-				p.next()
-				kind = "source_method"
-			}
-			pat := p.parsePattern()
-			sm := AdapterMapping{Kind: kind, Pattern: pat}
-			for p.atWord("val") { // value-constrained source: getenv("HTTP_*") (AND)
-				p.next()
-				sm.ValMatches = append(sm.ValMatches, p.parsePattern())
-			}
-			for p.atWord("nval") {
-				p.next()
-				sm.ValAbsents = append(sm.ValAbsents, p.parsePattern())
-			}
-			p.expect(tArrow, "->")
-			sm.Concept = p.parseQName()
-			a.Mappings = append(a.Mappings, sm)
-		case p.atWord("sink"):
-			p.next()
-			kind := "sink_path"
-			if p.atWord("method") {
-				p.next()
-				kind = "sink_method"
-			} else if p.atWord("receiver") {
-				p.next()
-				kind = "sink_receiver"
-			} else if p.atWord("path") {
-				p.next()
-			}
-			pat := p.parsePattern()
-			m := AdapterMapping{Kind: kind, Pattern: pat}
-			if p.atWord("arg") { // which argument is dangerous (default 0; `arg all` = every arg)
-				p.next()
-				if p.atWord("all") {
-					p.next()
-					m.ArgIndex = -1
-				} else if n, err := strconv.Atoi(p.expect(tWord, "arg index").val); err == nil {
-					m.ArgIndex = n
-				}
-			}
-			if p.atWord("collection") { // also flag a Seq/collection-literal arg (ldap options {filter})
-				p.next()
-				m.Collection = true
-			}
-			if p.atWord("on") { // optional receiver-type constraint (one type or [list])
-				p.next()
-				if p.at(tLBrack) {
-					m.Constraint = strings.Join(p.parseWordList(), ",")
-				} else {
-					m.Constraint = p.parseQName()
-				}
-			}
-			for p.atWord("val") { // every `val` must match some arg/option literal (AND)
-				p.next()
-				m.ValMatches = append(m.ValMatches, p.parsePattern())
-			}
-			for p.atWord("nval") { // no arg/option literal may contain any `nval`
-				p.next()
-				m.ValAbsents = append(m.ValAbsents, p.parsePattern())
-			}
-			p.expect(tArrow, "->")
-			m.Concept = p.parseQName()
-			a.Mappings = append(a.Mappings, m)
-		case p.atWord("control"):
-			// `control "fn" [val "x"] [nval "y"] -> concept` labels a sanitizer/validator on
-			// the matching CALL node so `unless sanitized_by` can kill a flow through it. The
-			// optional val/nval gate value-based hardening (e.g. resolve_entities=False).
-			p.next()
-			kind := "control"
-			if p.atWord("method") { // receiver-agnostic: match the call method name (e.g. .close())
-				p.next()
-				kind = "control_method"
-			}
-			pat := p.parsePattern()
-			ctl := AdapterMapping{Kind: kind, Pattern: pat}
-			for p.atWord("val") {
-				p.next()
-				ctl.ValMatches = append(ctl.ValMatches, p.parsePattern())
-			}
-			for p.atWord("nval") {
-				p.next()
-				ctl.ValAbsents = append(ctl.ValAbsents, p.parsePattern())
-			}
-			p.expect(tArrow, "->")
-			ctl.Concept = p.parseQName()
-			a.Mappings = append(a.Mappings, ctl)
-		case p.atWord("mark"):
-			// `mark "fn" [val "x"] -> concept` labels the matching CALL node with a
-			// presence concept (for `match`-style rules — no taint flow).
-			// `mark method "fn"` is receiver-agnostic, matching the bare method name.
-			p.next()
-			kind := "mark"
-			exact := false
-			if p.atWord("method") {
-				p.next()
-				kind = "mark_method"
-			} else if p.atWord("exact") {
-				p.next()
-				exact = true
-			} else if p.atWord("path") {
-				p.next()
-			}
-			pat := p.parsePattern()
-			mk := AdapterMapping{Kind: kind, Pattern: pat, Exact: exact}
-			for p.atWord("val") {
-				p.next()
-				mk.ValMatches = append(mk.ValMatches, p.parsePattern())
-			}
-			for p.atWord("nval") {
-				p.next()
-				mk.ValAbsents = append(mk.ValAbsents, p.parsePattern())
-			}
-			p.expect(tArrow, "->")
-			mk.Concept = p.parseQName()
-			a.Mappings = append(a.Mappings, mk)
-		case p.atWord("filter"):
-			// `filter method "replace"` / `filter path "preg_replace"` marks a
-			// character-filtering replace(pattern, repl). The engine analyzes the
-			// pattern's output alphabet and labels the result core.CharFilter — a
-			// threat-aware sanitizer (sound for sinks whose dangerous chars it excludes).
-			p.next()
-			kind := "filter_path"
-			if p.atWord("method") {
-				p.next()
-				kind = "filter_method"
-			} else if p.atWord("path") {
-				p.next()
-			}
-			pat := p.parsePattern()
-			fm := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.CharFilter"}
-			if p.atWord("global") { // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
-				p.next()
-				fm.Constraint = "global"
-			}
-			a.Mappings = append(a.Mappings, fm)
-		case p.atWord("assume"):
-			// `assume guard method "startsWith" -> core.FilePathAccess` /
-			// `assume sanitizer path "ldapEscape" -> core.LdapQuery` declares an UNSOUND
-			// neutralizer: a guard or escaper that *might* defuse the threat but cannot be
-			// proven to. The engine never suppresses on it — instead it labels the node
-			// core.Assumption and, when that node guards/sanitizes a finding, attaches an
-			// assumption note (the regex-CharFilter pattern, generalized to any neutralizer).
-			p.next()
-			mode := "guard"
-			if p.atWord("sanitizer") {
-				p.next()
-				mode = "sanitizer"
-			} else if p.atWord("guard") {
-				p.next()
-			}
-			kind := "assume_" + mode + "_path"
-			if p.atWord("method") {
-				p.next()
-				kind = "assume_" + mode + "_method"
-			} else if p.atWord("path") {
-				p.next()
-			}
-			pat := p.parsePattern()
-			am := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.Assumption"}
-			for p.atWord("val") {
-				p.next()
-				am.ValMatches = append(am.ValMatches, p.parsePattern())
-			}
-			for p.atWord("nval") {
-				p.next()
-				am.ValAbsents = append(am.ValAbsents, p.parsePattern())
-			}
-			p.expect(tArrow, "->")
-			am.About = p.parseQName()
-			a.Mappings = append(a.Mappings, am)
-		case p.atWord("type"):
-			p.next()
-			pat := p.parsePattern()
-			p.expect(tArrow, "->")
-			a.Mappings = append(a.Mappings, AdapterMapping{Kind: "type", Pattern: pat, Concept: p.parseQName()})
-		default:
-			p.fail("bad adapter member %q at %d", p.peek().val, p.peek().pos)
-		}
+		a.Mappings = append(a.Mappings, p.parseAdapterMember()...)
 	}
 	p.expect(tRBrace, "}")
 	return a
+}
+
+func (p *parser) parseAdapterMember() []AdapterMapping {
+	switch {
+	case p.atWord("package"):
+		return p.parseAdapterPackageGroup()
+	case p.atWord("source"):
+		p.next()
+		kind := "source"
+		if p.atWord("method") { // receiver-agnostic source: match the call method name
+			p.next()
+			kind = "source_method"
+		}
+		pat := p.parsePattern()
+		sm := AdapterMapping{Kind: kind, Pattern: pat}
+		p.parseAdapterGuards(&sm, true)
+		p.expect(tArrow, "->")
+		sm.Concept = p.parseConceptRef()
+		return []AdapterMapping{sm}
+	case p.atWord("sink"):
+		p.next()
+		kind := "sink_path"
+		if p.atWord("method") {
+			p.next()
+			kind = "sink_method"
+		} else if p.atWord("receiver") {
+			p.next()
+			kind = "sink_receiver"
+		} else if p.atWord("path") {
+			p.next()
+		}
+		pat := p.parsePattern()
+		m := AdapterMapping{Kind: kind, Pattern: pat}
+		if p.atWord("arg") { // which argument is dangerous (default 0; `arg all` = every arg)
+			p.next()
+			if p.atWord("all") {
+				p.next()
+				m.ArgIndex = -1
+			} else if n, err := strconv.Atoi(p.expect(tWord, "arg index").val); err == nil {
+				m.ArgIndex = n
+			}
+		}
+		if p.atWord("collection") { // also flag a Seq/collection-literal arg (ldap options {filter})
+			p.next()
+			m.Collection = true
+		}
+		if p.atWord("on") { // optional receiver-type constraint (one type or [list])
+			p.next()
+			if p.at(tLBrack) {
+				m.Constraint = strings.Join(p.parseWordList(), ",")
+			} else {
+				m.Constraint = p.parseQName()
+			}
+		}
+		p.parseAdapterGuards(&m, true)
+		p.expect(tArrow, "->")
+		m.Concept = p.parseConceptRef()
+		return []AdapterMapping{m}
+	case p.atWord("control"):
+		// `control "fn" [val "x"] [nval "y"] -> concept` labels a sanitizer/validator on
+		// the matching CALL node so `unless sanitized_by` can kill a flow through it. The
+		// optional val/nval gate value-based hardening (e.g. resolve_entities=False).
+		p.next()
+		kind := "control"
+		if p.atWord("method") { // receiver-agnostic: match the call method name (e.g. .close())
+			p.next()
+			kind = "control_method"
+		}
+		pat := p.parsePattern()
+		ctl := AdapterMapping{Kind: kind, Pattern: pat}
+		p.parseAdapterGuards(&ctl, true)
+		p.expect(tArrow, "->")
+		ctl.Concept = p.parseConceptRef()
+		return []AdapterMapping{ctl}
+	case p.atWord("mark"):
+		// `mark "fn" [val "x"] -> concept` labels the matching CALL node with a
+		// presence concept (for `match`-style rules — no taint flow).
+		// `mark method "fn"` is receiver-agnostic, matching the bare method name.
+		p.next()
+		kind := "mark"
+		exact := false
+		if p.atWord("method") {
+			p.next()
+			kind = "mark_method"
+		} else if p.atWord("exact") {
+			p.next()
+			exact = true
+		} else if p.atWord("path") {
+			p.next()
+		}
+		pat := p.parsePattern()
+		mk := AdapterMapping{Kind: kind, Pattern: pat, Exact: exact}
+		p.parseAdapterGuards(&mk, true)
+		p.expect(tArrow, "->")
+		mk.Concept = p.parseConceptRef()
+		return []AdapterMapping{mk}
+	case p.atWord("filter"):
+		// `filter method "replace"` / `filter path "preg_replace"` marks a
+		// character-filtering replace(pattern, repl). The engine analyzes the
+		// pattern's output alphabet and labels the result core.CharFilter — a
+		// threat-aware sanitizer (sound for sinks whose dangerous chars it excludes).
+		p.next()
+		kind := "filter_path"
+		if p.atWord("method") {
+			p.next()
+			kind = "filter_method"
+		} else if p.atWord("path") {
+			p.next()
+		}
+		pat := p.parsePattern()
+		fm := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.CharFilter"}
+		if p.atWord("global") { // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
+			p.next()
+			fm.Constraint = "global"
+		}
+		p.parseAdapterGuards(&fm, false)
+		return []AdapterMapping{fm}
+	case p.atWord("assume"):
+		// `assume guard method "startsWith" -> core.FilePathAccess` /
+		// `assume sanitizer path "ldapEscape" -> core.LdapQuery` declares an UNSOUND
+		// neutralizer: a guard or escaper that *might* defuse the threat but cannot be
+		// proven to. The engine never suppresses on it — instead it labels the node
+		// core.Assumption and, when that node guards/sanitizes a finding, attaches an
+		// assumption note (the regex-CharFilter pattern, generalized to any neutralizer).
+		p.next()
+		mode := "guard"
+		if p.atWord("sanitizer") {
+			p.next()
+			mode = "sanitizer"
+		} else if p.atWord("guard") {
+			p.next()
+		}
+		kind := "assume_" + mode + "_path"
+		if p.atWord("method") {
+			p.next()
+			kind = "assume_" + mode + "_method"
+		} else if p.atWord("path") {
+			p.next()
+		}
+		pat := p.parsePattern()
+		am := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.Assumption"}
+		p.parseAdapterGuards(&am, true)
+		p.expect(tArrow, "->")
+		am.About = p.parseConceptRef()
+		return []AdapterMapping{am}
+	case p.atWord("type"):
+		p.next()
+		pat := p.parsePattern()
+		p.expect(tArrow, "->")
+		return []AdapterMapping{{Kind: "type", Pattern: pat, Concept: p.parseQName()}}
+	default:
+		p.fail("bad adapter member %q at %d", p.peek().val, p.peek().pos)
+		return nil
+	}
+}
+
+func (p *parser) parseAdapterPackageGroup() []AdapterMapping {
+	p.next() // 'package'
+	pkg := p.parsePattern()
+	p.expect(tLBrace, "{")
+	var mappings []AdapterMapping
+	for !p.at(tRBrace) {
+		if p.atWord("package") {
+			p.fail("nested package adapter group %q at %d", p.peek().val, p.peek().pos)
+		}
+		for _, m := range p.parseAdapterMember() {
+			m.Packages = append([]string{pkg}, m.Packages...)
+			mappings = append(mappings, m)
+		}
+	}
+	p.expect(tRBrace, "}")
+	return mappings
+}
+
+// parseAdapterGuards reads optional per-mapping gates. val/nval are ANDed against
+// literal call arguments.
+func (p *parser) parseAdapterGuards(m *AdapterMapping, allowValues bool) {
+	for {
+		switch {
+		case allowValues && p.atWord("val"):
+			p.next()
+			m.ValMatches = append(m.ValMatches, p.parsePattern())
+		case allowValues && p.atWord("nval"):
+			p.next()
+			m.ValAbsents = append(m.ValAbsents, p.parsePattern())
+		default:
+			return
+		}
+	}
 }
 
 // parsePattern reads a callee-path/method pattern: a string literal (preferred,
@@ -686,7 +773,7 @@ func (p *parser) parseConceptValue() any {
 			if p.at(tString) {
 				items = append(items, p.next().val)
 			} else {
-				items = append(items, p.parseQName())
+				items = append(items, p.parseConceptRef())
 			}
 			if p.at(tComma) {
 				p.next()
@@ -695,7 +782,7 @@ func (p *parser) parseConceptValue() any {
 		p.expect(tRBrack, "]")
 		return items
 	}
-	return p.parseQName()
+	return p.parseConceptRef()
 }
 
 func lastDot(s string) int {
@@ -705,6 +792,13 @@ func lastDot(s string) int {
 		}
 	}
 	return -1
+}
+
+func lastSeg(s string) string {
+	if i := lastDot(s); i >= 0 {
+		return s[i+1:]
+	}
+	return s
 }
 
 func (p *parser) parseStateMachine() *StateMachine {

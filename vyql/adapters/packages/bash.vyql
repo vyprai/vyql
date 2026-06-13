@@ -1,0 +1,66 @@
+import code.{HttpInput, SecretValue, SqlExecution, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, RedirectAllowlist}
+
+adapter bash {
+  package "bash" {
+    source "shell_input" -> HttpInput
+    sink path "bash" arg all -> CommandExecution
+    sink path "eval" arg 0 -> CodeEval
+    control "printf" -> ShellEscape
+  }
+  package "cgi" {
+    source "$QUERY_STRING" -> HttpInput
+    source "$HTTP_COOKIE" -> HttpInput
+  }
+  package "aws-cli" {
+    source "$AWS_SECRET_ACCESS_KEY" -> SecretValue
+  }
+  package "mysql-client" {
+    sink path "mysql" arg all -> SqlExecution
+  }
+  package "postgresql-client" {
+    sink path "psql" arg all -> SqlExecution
+    control "psql" -> SqlParameterization
+  }
+  package "sqlite" {
+    sink path "sqlite3" arg all -> SqlExecution
+  }
+  package "dash" {
+    sink path "sh" arg all -> CommandExecution
+  }
+  package "python" {
+    sink path "python" arg 1 -> CodeEval
+  }
+  package "jq" {
+    sink path "jq" arg all -> Deserialization
+    control "jq" -> HtmlEscape
+  }
+  package "coreutils" {
+    sink path "cat" arg all -> FilePathAccess
+    control "realpath" -> PathCanonicalization
+    control "readlink" -> PathCanonicalization
+  }
+  package "tar" {
+    sink path "tar" arg all -> ArchiveEntryWrite
+  }
+  package "unzip" {
+    sink path "unzip" arg all -> ArchiveEntryWrite
+  }
+  package "curl" {
+    sink path "curl" -> UrlFetch
+    control "curl" -> RedirectAllowlist
+  }
+  package "wget" {
+    sink path "wget" -> UrlFetch
+  }
+  package "libxml2" {
+    sink path "xmllint" -> XmlParse
+    sink path "xmllint" arg all -> XpathQuery
+  }
+  package "openldap" {
+    sink path "ldapsearch" arg all -> LdapQuery
+  }
+  package "grep" {
+    sink path "grep" arg all -> RegexCompile
+  }
+}

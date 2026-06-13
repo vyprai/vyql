@@ -11,7 +11,7 @@ and compatibility guarantees — not a header file.
 ## Concept anatomy
 
 ```vyql
-package code;
+module code;
 
 concept SqlExecution : sink {
   vulnerable_to: [injection.SqlInjection]
@@ -25,13 +25,13 @@ concept SqlExecution : sink {
 
 The **kind is a type annotation in the header** (`concept SqlExecution : sink`),
 not a redundant body field — the same "say it once" rule that drops the `action`
-keyword from `match`. The name is short and PascalCase inside its `package`
-namespace; the qualified id is `code.SqlExecution`. Cross-package references
+keyword from `match`. The name is short and PascalCase inside its `module`
+namespace; the qualified id is `code.SqlExecution`. Cross-module references
 (`vulnerable_to`, `neutralizes`, `refines`, …) and CWE ids (`CWE_89`) are
 written qualified, never bare. A dotted header (`concept code.SqlExecution : sink`)
-is also accepted when no `package` is in scope.
+is also accepted when no `module` is in scope.
 
-Required: the header kind, `domain` (implied by the `package`), `description`,
+Required: the header kind, `domain` (implied by the `module`), `description`,
 `since`. Typing fields (`taint`, `vulnerable_to`, `neutralizes`, `grants`,
 `holds`) depend on kind.
 Standards mappings (`cwe`, `capec`, `attack`, `d3fend`, `owasp`) are required

@@ -1,7 +1,7 @@
 // Authentication and object-ownership coverage. These rules intentionally stay
 // explicit about what is observed: a sensitive operation without an auth guard,
 // or user-controlled object identifiers flowing into direct lookups.
-package vypr.auth;
+module vypr.auth;
 
 rule MissingAuthentication {
   meta { id: "VYQL-AUTH-001", severity: high, cwe: [CWE_306], confidence_floor: low }

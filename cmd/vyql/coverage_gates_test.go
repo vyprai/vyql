@@ -47,7 +47,7 @@ var (
 	conceptKind = regexp.MustCompile(`(?m)^concept\s+([A-Za-z0-9_]+)\s*:\s*(sink|source|control)`)
 	conceptRef  = regexp.MustCompile(`(?:code|core)\.([A-Z][A-Za-z0-9_]+)`)
 	quoted      = regexp.MustCompile(`"[^"]*"`)
-	pkgLine     = regexp.MustCompile(`(?m)^package\s+([A-Za-z0-9_.]+)\s*;`)
+	pkgLine     = regexp.MustCompile(`(?m)^(?:module|package)\s+([A-Za-z0-9_.]+)\s*;`)
 	threatDef   = regexp.MustCompile(`(?m)^threat\s+([A-Za-z0-9_]+)`)
 	threatRef   = regexp.MustCompile(`(?:vulnerable_to|neutralizes):\s*\[([^\]]+)\]`)
 )

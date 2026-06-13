@@ -1,5 +1,5 @@
 // Security-misconfiguration rules (presence/config). docs/05 rule packs.
-package vypr.misconfig;
+module vypr.misconfig;
 
 // CSRF protection explicitly disabled / exempted (CWE-352) — a PRESENCE rule.
 rule CsrfDisabled {

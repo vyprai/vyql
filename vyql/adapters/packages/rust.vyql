@@ -1,0 +1,103 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter rust {
+  package "actix-web" {
+    source method "query" -> HttpInput
+    source method "form" -> HttpInput
+  }
+  package "axum" {
+    source method "path" -> HttpInput
+    source method "query" -> HttpInput
+  }
+  package "rocket" {
+    source method "param" -> HttpInput
+  }
+  package "std" {
+    source "std.env.var" -> SecretValue
+  }
+  package "reqwest" {
+    source method "text" -> ExternalApiResponse
+    source method "json" -> ExternalApiResponse
+    sink method "get" -> UrlFetch
+  }
+  package "sqlx" {
+    sink method "query" -> SqlExecution
+    sink method "execute" -> SqlExecution
+    control method "bind" -> SqlParameterization
+  }
+  package "diesel" {
+    sink method "query" -> SqlExecution
+    sink method "sql_query" -> SqlExecution
+    control method "filter" -> SqlParameterization
+  }
+  package "mongodb" {
+    sink method "find" -> NosqlQuery
+  }
+  package "std::process" {
+    sink path "Command.new" -> CommandExecution
+  }
+  package "rhai" {
+    sink path "rhai.Engine.eval" -> CodeEval
+  }
+  package "serde_json" {
+    sink path "serde_json.from_str" -> Deserialization
+  }
+  package "serde_yaml" {
+    sink path "serde_yaml.from_str" -> Deserialization
+    control "serde_yaml.from_str" -> SafeDeserialization
+  }
+  package "bincode" {
+    sink path "bincode.deserialize" -> Deserialization
+  }
+  package "std::fs" {
+    sink path "fs.read_to_string" -> FilePathAccess
+    control "canonicalize" -> PathCanonicalization
+  }
+  package "tar" {
+    sink method "unpack" -> ArchiveEntryWrite
+  }
+  package "zip" {
+    sink method "extract" -> ArchiveEntryWrite
+  }
+  package "roxmltree" {
+    sink path "roxmltree.Document.parse" -> XmlParse
+  }
+  package "sxd-xpath" {
+    sink method "evaluate" -> XpathQuery
+  }
+  package "ldap3" {
+    sink method "streaming_search" arg 1 -> LdapQuery
+    control "ldap3.escape_filter" -> LdapEscape
+  }
+  package "askama" {
+    sink method "render" -> TemplateRender
+  }
+  package "regex" {
+    sink path "Regex.new" -> RegexCompile
+  }
+  package "ammonia" {
+    control "ammonia.clean" -> HtmlEscape
+  }
+  package "html-escape" {
+    control "html_escape.encode_text" -> HtmlEscape
+  }
+  package "shell-escape" {
+    control "shell_escape.escape" -> ShellEscape
+  }
+  package "quick-xml" {
+    control "quick_xml.Reader" -> XmlHardening
+  }
+  package "validator" {
+    control method "validate" -> RedirectAllowlist
+  }
+  package "actix-identity" {
+    control method "from_request" -> AuthenticationCheck
+  }
+  package "casbin" {
+    control method "check" -> AuthorizationCheck
+  }
+  package "actix-csrf" {
+    control "CsrfToken" -> CsrfProtection
+  }
+}

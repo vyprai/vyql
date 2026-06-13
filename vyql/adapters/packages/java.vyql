@@ -1,0 +1,115 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter java {
+  package "javax.servlet" {
+    source ".getParameter" -> HttpInput
+  }
+  package "jakarta.servlet" {
+    source ".getParameter" -> HttpInput
+  }
+  package "org.springframework" {
+    source ".getHeader" -> HttpInput
+  }
+  package "io.javalin" {
+    source ".queryParam" -> HttpInput
+  }
+  package "io.vertx" {
+    source ".pathParam" -> HttpInput
+  }
+  package "java.lang" {
+    source "System.getenv" -> SecretValue
+    sink path "Runtime.exec" -> CommandExecution
+    sink path "ProcessBuilder" -> CommandExecution
+  }
+  package "okhttp3" {
+    source method "body" -> ExternalApiResponse
+  }
+  package "java.sql" {
+    sink method "executeQuery" -> SqlExecution
+    sink method "executeUpdate" -> SqlExecution
+    control "PreparedStatement" -> SqlParameterization
+  }
+  package "hibernate-core" {
+    sink method "createNativeQuery" -> SqlExecution
+  }
+  package "org.hibernate" {
+    sink method "createQuery" -> SqlExecution
+  }
+  package "spring-jdbc" {
+    sink method "queryForList" -> SqlExecution
+  }
+  package "mongodb-driver-sync" {
+    sink method "find" -> NosqlQuery
+  }
+  package "javax.script" {
+    sink path "ScriptEngine.eval" -> CodeEval
+  }
+  package "java.io" {
+    sink method "readObject" -> Deserialization
+  }
+  package "jackson-databind" {
+    sink method "readValue" -> Deserialization
+  }
+  package "snakeyaml" {
+    sink path "Yaml.load" -> Deserialization
+    control "Yaml.safeLoad" -> SafeDeserialization
+  }
+  package "java.nio.file" {
+    sink path "Files.readAllBytes" -> FilePathAccess
+    control "Paths.get" -> PathCanonicalization
+  }
+  package "commons-compress" {
+    sink method "extractEntry" -> ArchiveEntryWrite
+  }
+  package "okhttp" {
+    sink path "OkHttpClient.newCall" -> UrlFetch
+  }
+  package "java.net.http" {
+    sink path "HttpClient.send" -> UrlFetch
+  }
+  package "dom4j" {
+    sink method "parse" -> XmlParse
+  }
+  package "javax.xml.xpath" {
+    sink method "evaluate" -> XpathQuery
+  }
+  package "spring-ldap" {
+    sink path "LdapTemplate.search" arg 1 -> LdapQuery
+    control "LdapEncoder.filterEncode" -> LdapEscape
+  }
+  package "thymeleaf" {
+    sink method "process" -> TemplateRender
+  }
+  package "java.util.regex" {
+    sink path "Pattern.compile" -> RegexCompile
+  }
+  package "commons-text" {
+    control "StringEscapeUtils.escapeHtml4" -> HtmlEscape
+  }
+  package "owasp-java-encoder" {
+    control "Encode.forHtml" -> HtmlEscape
+    control "Encode.forJavaScriptBlock" -> HtmlEscape
+    control "Encode.forXPath" -> XpathEscape
+  }
+  package "spring-web" {
+    control "HtmlUtils.htmlEscape" -> HtmlEscape
+  }
+  package "java.persistence" {
+    control method "setParameter" -> SqlParameterization
+  }
+  package "commons-io" {
+    control "FilenameUtils.normalize" -> PathCanonicalization
+  }
+  package "javax.xml.parsers" {
+    control "DocumentBuilderFactory.setFeature" -> XmlHardening
+  }
+  package "spring-security" {
+    control "SecurityContextHolder.getContext" -> AuthenticationCheck
+    control "PreAuthorize" -> AuthorizationCheck
+    control "CsrfToken" -> CsrfProtection
+  }
+  package "commons-validator" {
+    control "UrlValidator.isValid" -> RedirectAllowlist
+  }
+}

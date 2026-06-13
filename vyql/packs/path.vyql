@@ -1,5 +1,5 @@
 // Path/file family — traversal and remote/local file inclusion.
-package vypr.path;
+module vypr.path;
 
 rule Traversal {
   meta { id: "VYQL-PATH-001", severity: high, cwe: [CWE_22] }

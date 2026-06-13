@@ -1,0 +1,68 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter lua {
+  package "openresty" {
+    source "ngx.var.arg" -> HttpInput
+    source "ngx.req.get_uri_args" -> HttpInput
+    sink path "ngx.location.capture" -> UrlFetch
+    sink path "ngx.re.match" -> RegexCompile
+    control "ngx.escape_uri" -> RedirectAllowlist
+    control "ngx.quote_sql_str" -> SqlParameterization
+  }
+  package "lapis" {
+    source "lapis.params" -> HttpInput
+    control "lapis.util.escape" -> HtmlEscape
+    control "ensure_authenticated" -> AuthenticationCheck
+    control "csrf.assert_token" -> CsrfProtection
+  }
+  package "lua" {
+    source "os.getenv" -> SecretValue
+    sink path "os.execute" -> CommandExecution
+    sink path "io.popen" -> CommandExecution
+    sink path "loadstring" -> CodeEval
+    sink path "load" -> CodeEval
+    sink path "io.open" -> FilePathAccess
+  }
+  package "lua-resty-http" {
+    source method "body" -> ExternalApiResponse
+    sink path "resty.http.request_uri" -> UrlFetch
+  }
+  package "lua-resty-mysql" {
+    sink path "db.query" -> SqlExecution
+  }
+  package "pgmoon" {
+    sink path "pg.query" -> SqlExecution
+  }
+  package "lua-cjson" {
+    sink path "cjson.decode" -> Deserialization
+  }
+  package "lyaml" {
+    sink path "lyaml.load" -> Deserialization
+  }
+  package "lua-zip" {
+    sink method "extract" -> ArchiveEntryWrite
+  }
+  package "luaexpat" {
+    sink path "xml.parse" -> XmlParse
+  }
+  package "lua-xml" {
+    sink method "xpath" -> XpathQuery
+  }
+  package "lua-ldap" {
+    sink method "search" arg 1 -> LdapQuery
+    control "encode_for_ldap" -> LdapEscape
+  }
+  package "lustache" {
+    sink method "render" -> TemplateRender
+  }
+  package "lua-htmlparser" {
+    control "html.escape" -> HtmlEscape
+  }
+  package "lua-shell-games" {
+    control "shellescape" -> ShellEscape
+  }
+  package "luafilesystem" {
+    control "lfs.abspath" -> PathCanonicalization
+  }
+}

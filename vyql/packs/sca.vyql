@@ -1,5 +1,5 @@
 // Supply chain — vulnerable dependencies, reachability-gated (docs/11).
-package vypr.sca;
+module vypr.sca;
 
 rule VulnerableDependency {
   meta { id: "VYQL-SCA-001", severity: medium }

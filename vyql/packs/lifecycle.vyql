@@ -1,5 +1,5 @@
 // Lifecycle / typestate rules beyond generic resource leaks.
-package vypr.lifecycle;
+module vypr.lifecycle;
 
 rule LockNotReleased {
   meta { id: "VYQL-LIFE-001", severity: medium, cwe: [CWE_667] }

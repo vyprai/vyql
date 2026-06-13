@@ -1,0 +1,90 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter csharp {
+  package "Microsoft.AspNetCore.Http" {
+    source "Request.Query" -> HttpInput
+    source "Request.Form" -> HttpInput
+    source "Request.Headers" -> HttpInput
+  }
+  package "Microsoft.Extensions.Configuration" {
+    source "Configuration.GetValue" -> SecretValue
+  }
+  package "System.Net.Http" {
+    source method "ReadAsStringAsync" -> ExternalApiResponse
+    sink method "GetAsync" -> UrlFetch
+  }
+  package "Microsoft.EntityFrameworkCore" {
+    sink method "ExecuteSqlRaw" -> SqlExecution
+    sink method "FromSqlRaw" -> SqlExecution
+  }
+  package "Dapper" {
+    sink method "Query" -> SqlExecution
+    sink method "Execute" -> SqlExecution
+  }
+  package "System.Data.SqlClient" {
+    sink path "SqlCommand" -> SqlExecution
+    control method "Parameters.Add" -> SqlParameterization
+  }
+  package "MongoDB.Driver" {
+    sink method "Find" -> NosqlQuery
+  }
+  package "System.Diagnostics.Process" {
+    sink path "Process.Start" -> CommandExecution
+  }
+  package "Microsoft.CodeAnalysis.CSharp.Scripting" {
+    sink path "CSharpScript.EvaluateAsync" -> CodeEval
+  }
+  package "Newtonsoft.Json" {
+    sink method "DeserializeObject" -> Deserialization
+  }
+  package "System.Text.Json" {
+    sink method "Deserialize" -> Deserialization
+  }
+  package "System.IO" {
+    sink path "File.ReadAllText" -> FilePathAccess
+    control "Path.GetFullPath" -> PathCanonicalization
+  }
+  package "System.IO.Compression" {
+    sink method "ExtractToDirectory" -> ArchiveEntryWrite
+  }
+  package "System.Xml" {
+    sink path "XmlDocument.LoadXml" -> XmlParse
+    control "XmlReaderSettings" val "DtdProcessing=Prohibit" -> XmlHardening
+  }
+  package "System.Xml.XPath" {
+    sink method "SelectNodes" -> XpathQuery
+  }
+  package "System.DirectoryServices" {
+    sink path "DirectorySearcher" -> LdapQuery
+    control "LdapFilterEscape" -> LdapEscape
+  }
+  package "Microsoft.AspNetCore.Html" {
+    sink method "Raw" -> HtmlRender
+  }
+  package "System.Text.RegularExpressions" {
+    sink path "Regex" -> RegexCompile
+  }
+  package "System.Text.Encodings.Web" {
+    control "HtmlEncoder.Encode" -> HtmlEscape
+  }
+  package "System.Web" {
+    control "HttpUtility.HtmlEncode" -> HtmlEscape
+  }
+  package "Microsoft.Security.Application" {
+    control "AntiXssEncoder.HtmlEncode" -> HtmlEscape
+  }
+  package "System.Security" {
+    control "SecurityElement.Escape" -> HtmlEscape
+  }
+  package "Microsoft.AspNetCore.Mvc" {
+    control "Url.IsLocalUrl" -> RedirectAllowlist
+    control "ValidateAntiForgeryToken" -> CsrfProtection
+  }
+  package "Microsoft.AspNetCore.Authorization" {
+    control "AuthorizeAttribute" -> AuthorizationCheck
+  }
+  package "System.Security.Claims" {
+    control method "IsAuthenticated" -> AuthenticationCheck
+  }
+}

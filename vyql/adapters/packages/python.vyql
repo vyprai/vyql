@@ -1,0 +1,145 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter python {
+  package "flask" {
+    source "request.args" -> HttpInput
+    source "request.form" -> HttpInput
+    source "request.json" -> HttpInput
+  }
+  package "django" {
+    source "request.GET" -> HttpInput
+    source "request.POST" -> HttpInput
+    sink method "raw" -> SqlExecution
+    sink method "extra" -> SqlExecution
+    control "django.utils.http.url_has_allowed_host_and_scheme" -> RedirectAllowlist
+    control method "login_required" -> AuthenticationCheck
+    control method "permission_required" -> AuthorizationCheck
+    control "csrf_protect" -> CsrfProtection
+  }
+  package "djangorestframework" {
+    source "request.query_params" -> HttpInput
+  }
+  package "fastapi" {
+    source "http_input" -> HttpInput
+  }
+  package "starlette" {
+    source "http_input" -> HttpInput
+  }
+  package "tornado" {
+    source "self.get_argument" -> HttpInput
+  }
+  package "pyramid" {
+    source "request.matchdict" -> HttpInput
+  }
+  package "falcon" {
+    source "req.media" -> HttpInput
+  }
+  package "python-dotenv" {
+    source "os.environ" -> SecretValue
+  }
+  package "requests" {
+    source method "json" -> ExternalApiResponse
+    sink path "requests.get" -> UrlFetch
+  }
+  package "httpx" {
+    source method "json" -> ExternalApiResponse
+    sink path "httpx.get" -> UrlFetch
+  }
+  package "aiohttp" {
+    source method "json" -> ExternalApiResponse
+  }
+  package "sqlalchemy" {
+    sink path "sqlalchemy.text" -> SqlExecution
+    control "sqlalchemy.text" -> SqlParameterization
+    control method "bindparams" -> SqlParameterization
+  }
+  package "psycopg2" {
+    sink method "execute" -> SqlExecution
+  }
+  package "psycopg" {
+    sink method "execute" -> SqlExecution
+  }
+  package "mysqlclient" {
+    sink method "execute" -> SqlExecution
+  }
+  package "pymysql" {
+    sink method "execute" -> SqlExecution
+  }
+  package "sqlite3" {
+    sink method "execute" -> SqlExecution
+  }
+  package "pymongo" {
+    sink method "aggregate_raw_batches" -> NosqlQuery
+    sink method "find" -> NosqlQuery
+  }
+  package "os" {
+    sink path "os.system" -> CommandExecution
+  }
+  package "subprocess" {
+    sink path "subprocess.run" -> CommandExecution
+  }
+  package "jinja2" {
+    sink path "jinja2.Template" -> TemplateRender
+    sink method "render" -> HtmlRender
+  }
+  package "pyyaml" {
+    sink path "yaml.load" -> Deserialization
+    control "yaml.safe_load" -> SafeDeserialization
+  }
+  package "pickle" {
+    sink path "pickle.loads" -> Deserialization
+  }
+  package "dill" {
+    sink path "dill.loads" -> Deserialization
+  }
+  package "jsonpickle" {
+    sink path "jsonpickle.decode" -> Deserialization
+  }
+  package "marshal" {
+    sink path "marshal.loads" -> Deserialization
+  }
+  package "zipfile" {
+    sink path "zipfile.ZipFile.extract" -> ArchiveEntryWrite
+  }
+  package "tarfile" {
+    sink path "tarfile.TarFile.extract" -> ArchiveEntryWrite
+  }
+  package "urllib" {
+    sink path "urllib.request.urlopen" -> UrlFetch
+  }
+  package "lxml" {
+    sink path "lxml.etree.fromstring" -> XmlParse
+    sink method "xpath" -> XpathQuery
+    control "lxml.etree.XMLParser" val "resolve_entities=False" -> XmlHardening
+    control "escapeXPath" -> XpathEscape
+  }
+  package "ldap3" {
+    sink method "search" arg 1 -> LdapQuery
+    control "escape_filter_chars" -> LdapEscape
+  }
+  package "re" {
+    sink path "re.compile" -> RegexCompile
+  }
+  package "builtins" {
+    sink path "eval" -> CodeEval
+  }
+  package "markupsafe" {
+    control "markupsafe.escape" -> HtmlEscape
+  }
+  package "html" {
+    control "html.escape" -> HtmlEscape
+  }
+  package "bleach" {
+    control "bleach.clean" -> HtmlEscape
+  }
+  package "shlex" {
+    control "shlex.quote" -> ShellEscape
+  }
+  package "werkzeug" {
+    control "werkzeug.utils.safe_join" -> PathCanonicalization
+  }
+  package "defusedxml" {
+    control "defusedxml.ElementTree.fromstring" -> XmlHardening
+  }
+}
