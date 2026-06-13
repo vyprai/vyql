@@ -1,0 +1,344 @@
+# Swift language-gap narrowing: exhaustive coverage for adapter-claimed idioms.
+
+test "swift exhaustive: environment input reaches sqlite and raw query methods"
+  lang swift
+  expect VYQL-INJ-001
+  code
+  ```
+  func handler(db: OpaquePointer, conn: Conn) {
+    let q = ProcessInfo.processInfo.environment["Q"]!
+    sqlite3_exec(db, q, nil, nil, nil)
+    sqlite3_prepare_v2(db, q, -1, nil, nil)
+    conn.execute(q)
+    conn.run(q)
+  }
+  ```
+
+test "swift exhaustive: constant sqlite and raw query calls are clean"
+  lang swift
+  reject VYQL-INJ-001
+  code
+  ```
+  func handler(db: OpaquePointer, conn: Conn) {
+    sqlite3_exec(db, "select 1", nil, nil, nil)
+    conn.execute("select 1")
+  }
+  ```
+
+test "swift exhaustive: command strings reach libc command execution"
+  lang swift
+  expect VYQL-INJ-002
+  code
+  ```
+  func handler() {
+    let cmd = ProcessInfo.processInfo.environment["CMD"]!
+    system(cmd)
+    popen(cmd, "r")
+  }
+  ```
+
+test "swift exhaustive: shell escaping suppresses command injection"
+  lang swift
+  reject VYQL-INJ-002
+  code
+  ```
+  func handler() {
+    let cmd = escapeShell(ProcessInfo.processInfo.environment["CMD"]!)
+    system(cmd)
+  }
+  ```
+
+test "swift exhaustive: file APIs access tainted paths"
+  lang swift
+  expect VYQL-PATH-001
+  code
+  ```
+  func handler() {
+    let p = ProcessInfo.processInfo.environment["PATH_INFO"]!
+    String(contentsOfFile: p)
+    FileHandle(forReadingAtPath: p)
+  }
+  ```
+
+test "swift exhaustive: safePath suppresses file traversal"
+  lang swift
+  reject VYQL-PATH-001
+  code
+  ```
+  func handler() {
+    let p = safePath(ProcessInfo.processInfo.environment["PATH_INFO"]!)
+    String(contentsOfFile: p)
+  }
+  ```
+
+test "swift exhaustive: archive extraction receives tainted entry paths"
+  lang swift
+  expect VYQL-PATH-004
+  code
+  ```
+  func handler(archive: Archive) {
+    let entry = ProcessInfo.processInfo.environment["ENTRY"]!
+    archive.extractEntry(entry)
+  }
+  ```
+
+test "swift exhaustive: safe archive entry paths are clean"
+  lang swift
+  reject VYQL-PATH-004
+  code
+  ```
+  func handler(archive: Archive) {
+    let entry = safePath(ProcessInfo.processInfo.environment["ENTRY"]!)
+    archive.extractEntry(entry)
+  }
+  ```
+
+test "swift exhaustive: URL and URLRequest fetch tainted URLs"
+  lang swift
+  expect VYQL-RF-001
+  code
+  ```
+  func handler() {
+    let u = ProcessInfo.processInfo.environment["URL"]!
+    URL(string: u)
+    URLRequest(url: URL(string: u)!)
+  }
+  ```
+
+test "swift exhaustive: constant URLs are clean for SSRF"
+  lang swift
+  reject VYQL-RF-001
+  code
+  ```
+  func handler() {
+    URL(string: "https://example.com")
+    URLRequest(url: URL(string: "https://example.com")!)
+  }
+  ```
+
+test "swift exhaustive: cleartext URL and URLRequest are reported"
+  lang swift
+  expect VYQL-CFG-006
+  code
+  ```
+  func handler() {
+    URL(string: "http://example.com")
+    URLRequest(url: URL(string: "http://example.com")!)
+  }
+  ```
+
+test "swift exhaustive: HTTPS and localhost URLs are clean for cleartext"
+  lang swift
+  reject VYQL-CFG-006
+  code
+  ```
+  func handler() {
+    URL(string: "https://example.com")
+    URLRequest(url: URL(string: "http://127.0.0.1:8080")!)
+  }
+  ```
+
+test "swift exhaustive: regex builders compile tainted patterns"
+  lang swift
+  expect VYQL-DOS-001
+  code
+  ```
+  func handler() {
+    let p = ProcessInfo.processInfo.environment["PATTERN"]!
+    let _ = try! NSRegularExpression(pattern: p)
+  }
+  ```
+
+test "swift exhaustive: constant regex patterns are clean"
+  lang swift
+  reject VYQL-DOS-001
+  code
+  ```
+  func handler() {
+    let _ = try! NSRegularExpression(pattern: "^[a-z]+$")
+  }
+  ```
+
+test "swift exhaustive: WebView and response writers render tainted HTML"
+  lang swift
+  expect VYQL-MOB-001
+  expect VYQL-INJ-004
+  code
+  ```
+  func handler(webView: WKWebView, response: Response) {
+    let html = UIPasteboard.general.string ?? ""
+    webView.evaluateJavaScript(html)
+    webView.loadHTMLString(html, baseURL: nil)
+    response.write(html)
+    response.send(html)
+  }
+  ```
+
+test "swift exhaustive: escaped response HTML and constant WebView script are clean"
+  lang swift
+  reject VYQL-MOB-001
+  reject VYQL-INJ-004
+  code
+  ```
+  func handler(webView: WKWebView, response: Response) {
+    let html = escapeHtml(UIPasteboard.general.string ?? "")
+    webView.evaluateJavaScript("init()")
+    response.write(html)
+  }
+  ```
+
+test "swift exhaustive: WKUserContentController bridge registration is reported"
+  lang swift
+  expect VYQL-MOB-002
+  code
+  ```
+  func handler(controller: WKUserContentController) {
+    controller.add(self, name: "bridge")
+  }
+  ```
+
+test "swift exhaustive: removing a script handler is clean"
+  lang swift
+  reject VYQL-MOB-002
+  code
+  ```
+  func handler(controller: WKUserContentController) {
+    controller.removeScriptMessageHandler(forName: "bridge")
+  }
+  ```
+
+test "swift exhaustive: LDAP XPath and trust-boundary sinks receive tainted data"
+  lang swift
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  expect VYQL-CFG-014
+  code
+  ```
+  func handler(directory: Directory, xpath: XPath, session: Session) {
+    let filter = ProcessInfo.processInfo.environment["FILTER"]!
+    let xp = ProcessInfo.processInfo.environment["XPATH"]!
+    let role = ProcessInfo.processInfo.environment["ROLE"]!
+    directory.search("dc=example", filter)
+    xpath.evaluate(xp)
+    session.setAttribute("role", role)
+  }
+  ```
+
+test "swift exhaustive: LDAP XPath and trust-boundary controls suppress findings"
+  lang swift
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  reject VYQL-CFG-014
+  code
+  ```
+  func handler(directory: Directory, xpath: XPath, session: Session) {
+    let filter = encodeForLDAP(ProcessInfo.processInfo.environment["FILTER"]!)
+    let xp = escapeXPath(ProcessInfo.processInfo.environment["XPATH"]!)
+    let role = validateRole(ProcessInfo.processInfo.environment["ROLE"]!)
+    directory.search("dc=example", filter)
+    xpath.evaluate(xp)
+    session.setAttribute("role", role)
+  }
+  ```
+
+test "swift exhaustive: auth and IDOR findings are reported"
+  lang swift
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  func handler(request: Request, repo: Repo) {
+    changePassword(request.query["password"])
+    repo.findById(request.query["id"])
+  }
+  ```
+
+test "swift exhaustive: auth and ownership guards suppress findings"
+  lang swift
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-002
+  code
+  ```
+  func handler(request: Request, repo: Repo) {
+    requireAuth(request)
+    changePassword(request.query["password"])
+    checkOwnership(request.query["id"])
+    repo.findById(request.query["id"])
+  }
+  ```
+
+test "swift exhaustive: weak crypto random static IV cert cookie CORS and frame config are reported"
+  lang swift
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  expect VYQL-CRY-003
+  expect VYQL-CRY-004
+  expect VYQL-CFG-003
+  expect VYQL-CFG-004
+  expect VYQL-CFG-007
+  expect VYQL-CFG-009
+  code
+  ```
+  func handler(response: Response) {
+    Insecure.MD5.hash(data: Data())
+    CC_SHA1(ptr, len, out)
+    Cipher("DES")
+    Cipher("RC4")
+    Cipher("0000000000000000")
+    AES.GCM.Nonce(data: "000000000000")
+    arc4random()
+    setSecure(false)
+    setHttpOnly(false)
+    allowsAnyHTTPSCertificate(true)
+    serverTrustPolicy("disableEvaluation")
+    response.setHeader("Access-Control-Allow-Origin", "*")
+    response.setHeader("X-Frame-Options", "ALLOWALL")
+  }
+  ```
+
+test "swift exhaustive: stronger crypto and secure config are clean"
+  lang swift
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  reject VYQL-CFG-003
+  reject VYQL-CFG-004
+  reject VYQL-CFG-007
+  reject VYQL-CFG-009
+  code
+  ```
+  func handler(response: Response) {
+    SHA256.hash(data: Data())
+    Cipher("AES")
+    AES.GCM.Nonce()
+    SecRandomCopyBytes(nil, 16, out)
+    setSecure(true)
+    setHttpOnly(true)
+    allowsAnyHTTPSCertificate(false)
+    response.setHeader("Access-Control-Allow-Origin", "https://example.com")
+    response.setHeader("X-Frame-Options", "DENY")
+  }
+  ```
+
+test "swift exhaustive: resource handles closed are clean"
+  lang swift
+  reject VYQL-RES-001
+  code
+  ```
+  func handler() {
+    let h = FileHandle.forReadingAtPath("data.txt")
+    h.closeFile()
+  }
+  ```
+
+test "swift exhaustive: resource handles leak"
+  lang swift
+  expect VYQL-RES-001
+  code
+  ```
+  func handler() {
+    let h = FileHandle.forReadingAtPath("data.txt")
+    h.readDataToEndOfFile()
+  }
+  ```

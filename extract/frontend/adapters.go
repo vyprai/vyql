@@ -40,6 +40,7 @@ type controlSpec struct {
 	Concept    string
 	Pattern    string
 	ByMethod   bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
+	Exact      bool     // exact path match instead of segment-prefix path matching
 	ValMatches []string // `val "substr"` (AND — marks AND controls)
 	ValAbsents []string // `nval "substr"` (AND — marks AND controls)
 }
@@ -485,7 +486,7 @@ func loadSpec(tech string) adapterSpec {
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "mark_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
@@ -760,7 +761,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 							continue
 						}
 						hit := m.ByMethod && method == m.Pattern ||
-							!m.ByMethod && matchSinkPath(path, m.Pattern)
+							!m.ByMethod && ((m.Exact && path == m.Pattern) || (!m.Exact && matchSinkPath(path, m.Pattern)))
 						if !hit {
 							continue
 						}

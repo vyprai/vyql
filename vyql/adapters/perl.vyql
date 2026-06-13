@@ -44,6 +44,10 @@ adapter perl {
   sink path "getprint" -> code.UrlFetch
   sink path "mirror" -> code.UrlFetch
   sink method "request" -> code.UrlFetch
+  mark "getstore" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "getprint" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "mirror" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "request" val "http://" nval "127.0" -> code.CleartextChannel
 
   // XSS (CWE-79) — print to the response filehandle / CGI writers
   sink path "print" arg all -> code.HtmlRender
@@ -94,6 +98,8 @@ adapter perl {
   mark "rand" -> code.WeakRandomValue
   mark "chmod" val "0777" -> code.InsecurePermission
   mark "chmod" val "0666" -> code.InsecurePermission
+  mark "tmpnam" -> code.InsecureTempFile
+  mark "POSIX.tmpnam" -> code.InsecureTempFile
   mark "open" -> code.ResourceHandle
   mark "IO.Socket.INET.new" -> code.ResourceHandle
   control "close" -> core.ResourceRelease

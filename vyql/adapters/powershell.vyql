@@ -47,6 +47,11 @@ adapter powershell {
   sink path "Add-Content" -> code.FilePathAccess
   sink path "Out-File" -> code.FilePathAccess
   sink path "Remove-Item" -> code.FilePathAccess
+  sink path "Copy-Item" -> code.FilePathAccess
+  sink path "Move-Item" -> code.FilePathAccess
+  sink path "Rename-Item" -> code.FilePathAccess
+  sink path "New-Item" -> code.FilePathAccess
+  sink path "Test-Path" -> code.FilePathAccess
   sink path "Import-Module" -> code.DynamicCodeLoad
 
 }

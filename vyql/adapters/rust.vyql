@@ -26,6 +26,15 @@ adapter rust {
   sink path "ureq.request" -> code.UrlFetch
   sink path "surf.get" -> code.UrlFetch
   sink path "surf.post" -> code.UrlFetch
+  mark "reqwest.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "reqwest.post" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "reqwest.Client.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "reqwest.Client.post" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "ureq.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "ureq.post" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "ureq.request" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "surf.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "surf.post" val "http://" nval "127.0" -> code.CleartextChannel
 
   // regex compile (ReDoS) — tainted PATTERN
   sink path "Regex.new" -> code.RegexCompile
@@ -75,7 +84,7 @@ adapter rust {
   control "ammonia.clean" -> core.HtmlEscape
   // sanitizers/validators defined in each generated case's preamble
   control "escape_html" -> core.HtmlEscape
-  control "escape_xpath" -> core.HtmlEscape
+  control "escape_xpath" -> core.XpathEscape
   control "encode_for_ldap" -> core.LdapEscape
   control "escape_shell" -> core.ShellEscape
   control "safe_path" -> core.PathCanonicalization

@@ -16,10 +16,10 @@ adapter elixir {
   // command execution — System.shell takes the shell string as arg0 (tainted);
   // System.cmd("sh", ["-c", cmd]) buries the command in an args list, so prefer
   // the shell-string form so the tainted payload lands in arg0.
-  sink path "System.cmd" -> code.CommandExecution
+  sink path "System.cmd" arg all -> code.CommandExecution
   sink path "System.shell" -> code.CommandExecution
   sink path "os.cmd" -> code.CommandExecution
-  sink method "cmd" -> code.CommandExecution
+  sink method "cmd" arg all -> code.CommandExecution
   sink method "shell" -> code.CommandExecution
 
   // SQL — Ecto raw query / fragment (SQL.query takes Repo as arg0, query as arg1)
@@ -54,9 +54,22 @@ adapter elixir {
   sink path "File.read" -> code.FilePathAccess
   sink path "File.read!" -> code.FilePathAccess
   sink path "File.write" -> code.FilePathAccess
+  sink path "File.write!" -> code.FilePathAccess
   sink path "File.open" -> code.FilePathAccess
+  sink path "File.open!" -> code.FilePathAccess
   sink path "File.rm" -> code.FilePathAccess
+  sink path "File.rm!" -> code.FilePathAccess
   sink path "File.stream!" -> code.FilePathAccess
+  sink path "File.cp" -> code.FilePathAccess
+  sink path "File.cp!" -> code.FilePathAccess
+  sink path "File.rename" -> code.FilePathAccess
+  sink path "File.rename!" -> code.FilePathAccess
+  sink path "File.chmod" -> code.FilePathAccess
+  sink path "File.chmod!" -> code.FilePathAccess
+  mark "File.chmod" val "0o777" -> code.InsecurePermission
+  mark "File.chmod!" val "0o777" -> code.InsecurePermission
+  mark "File.chmod" val "511" -> code.InsecurePermission
+  mark "File.chmod!" val "511" -> code.InsecurePermission
 
   // weak hash (CWE-328) — :crypto.hash(:md5|:sha, …). `:sha` is SHA-1; exclude
   // :sha224/:sha256/:sha384/:sha512 (safe) via nval so they don't substring-match.
@@ -103,7 +116,7 @@ adapter elixir {
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escape_html" -> core.HtmlEscape
-  control "escape_xpath" -> core.HtmlEscape
+  control "escape_xpath" -> core.XpathEscape
   control "encode_for_ldap" -> core.LdapEscape
   control "escape_shell" -> core.ShellEscape
   control "safe_path" -> core.PathCanonicalization

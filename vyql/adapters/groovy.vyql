@@ -31,6 +31,10 @@ adapter groovy {
 
   // path / file
   sink path "File" -> code.FilePathAccess
+  sink path "URL" -> code.UrlFetch
+  sink path "URI" -> code.UrlFetch
+  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "URI" val "http://" nval "127.0" -> code.CleartextChannel
   sink method "extractEntry" -> code.ArchiveEntryWrite
   sink path "ZipFile.extract" arg all -> code.ArchiveEntryWrite
 
@@ -67,7 +71,7 @@ adapter groovy {
   sink method "search" arg 1 -> code.LdapQuery
   sink method "evaluate" arg 0 -> code.XpathQuery
   mark "java.util.Random" -> code.WeakRandomValue
-  mark "Random" -> code.WeakRandomValue
+  mark exact "Random" -> code.WeakRandomValue
   mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
   mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
   mark "Cipher.getInstance" val "DES" -> code.WeakCipher

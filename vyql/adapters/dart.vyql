@@ -27,9 +27,9 @@ adapter dart {
   sink path "http.delete" -> code.UrlFetch
 
   // command execution — dart:io Process (the shell command is arg0 with runInShell)
-  sink path "Process.run" -> code.CommandExecution
-  sink path "Process.runSync" -> code.CommandExecution
-  sink path "Process.start" -> code.CommandExecution
+  sink path "Process.run" arg all collection -> code.CommandExecution
+  sink path "Process.runSync" arg all collection -> code.CommandExecution
+  sink path "Process.start" arg all collection -> code.CommandExecution
 
   // path / file — dart:io (the path is the constructor arg0)
   sink path "File" -> code.FilePathAccess
@@ -76,7 +76,10 @@ adapter dart {
   mark "setHttpOnly" val "false" -> code.InsecureCookie
   mark "http.get" val "http://" nval "127.0" -> code.CleartextChannel
   mark "http.post" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "http.put" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "http.head" val "http://" nval "127.0" -> code.CleartextChannel
   mark "http.read" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "http.delete" val "http://" nval "127.0" -> code.CleartextChannel
   mark "badCertificateCallback" val "true" -> code.CertValidationDisabled
   mark "Socket.connect" -> code.ResourceHandle
   mark "File.open" -> code.ResourceHandle
@@ -90,7 +93,7 @@ adapter dart {
   mark "BlockCipher" val "Blowfish" -> code.WeakCipher
 
   // insecure randomness (CWE-330) — dart:math Random() (Random.secure() is safe)
-  mark "Random" -> code.WeakRandomValue
+  mark exact "Random" -> code.WeakRandomValue
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape

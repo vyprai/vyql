@@ -35,9 +35,27 @@ adapter bash {
   sink path "source" -> code.FileInclude
   sink path "." -> code.FileInclude
 
+  // file/path access through common shell utilities
+  sink path "cat" arg all -> code.FilePathAccess
+  sink path "less" arg all -> code.FilePathAccess
+  sink path "head" arg all -> code.FilePathAccess
+  sink path "tail" arg all -> code.FilePathAccess
+  sink path "rm" arg all -> code.FilePathAccess
+  sink path "cp" arg all -> code.FilePathAccess
+  sink path "mv" arg all -> code.FilePathAccess
+  sink path "chmod" arg all -> code.FilePathAccess
+  sink path "chown" arg all -> code.FilePathAccess
+  sink path "tar" arg all -> code.FilePathAccess
+
   // weak hash — md5sum / sha1sum utilities.
   mark "md5sum" -> code.WeakHash
   mark "sha1sum" -> code.WeakHash
+
+  // unsafe permission/temp-file idioms.
+  mark "chmod" val "777" -> code.InsecurePermission
+  mark "chmod" val "666" -> code.InsecurePermission
+  mark "chmod" val "a+w" -> code.InsecurePermission
+  mark "mktemp" val "-u" -> code.InsecureTempFile
 
   // SQL via CLI clients (-e/-c queries)
   sink path "mysql" arg all -> code.SqlExecution

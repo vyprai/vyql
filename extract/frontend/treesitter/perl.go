@@ -251,6 +251,10 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		return nir.Call{Callee: nir.Name{ID: fn, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: fn, Method: fn, Loc: L}
+	case "eval_expression":
+		return nir.Call{Callee: nir.Name{ID: "eval", Loc: L}, Args: c.childArgs(n), Path: "eval", Method: "eval", Loc: L}
+	case "require_expression":
+		return nir.Call{Callee: nir.Name{ID: "require", Loc: L}, Args: c.childArgs(n), Path: "require", Method: "require", Loc: L}
 	case "binary_expression", "relational_expression", "equality_expression", "comparison_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
@@ -308,6 +312,14 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 	return nir.Seq{Parts: parts, Loc: L}
 }
 
+func (c *plConv) childArgs(n *tree_sitter.Node) []nir.Expr {
+	var out []nir.Expr
+	for _, ch := range namedChildren(n) {
+		out = append(out, c.expr(ch))
+	}
+	return out
+}
+
 func (c *plConv) plVarName(n *tree_sitter.Node) string {
 	if v := field(n, "name"); v != nil {
 		return c.text(v)
@@ -348,7 +360,8 @@ func (c *plConv) dotted(n *tree_sitter.Node) string {
 func isPlExpr(k string) bool {
 	switch k {
 	case "function_call_expression", "method_call_expression", "assignment_expression",
-		"func0op_call_expression", "func1op_call_expression", "ambiguous_function_call_expression":
+		"func0op_call_expression", "func1op_call_expression", "ambiguous_function_call_expression",
+		"eval_expression", "require_expression":
 		return true
 	}
 	return false

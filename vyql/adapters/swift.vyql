@@ -99,6 +99,7 @@ adapter swift {
   mark "allowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
   mark "serverTrustPolicy" val "disableEvaluation" -> code.CertValidationDisabled
   mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "URLRequest" val "http://" nval "127.0" -> code.CleartextChannel
   mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
   mark "FileHandle.forReadingAtPath" -> code.ResourceHandle

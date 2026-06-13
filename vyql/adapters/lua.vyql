@@ -28,6 +28,12 @@ adapter lua {
   sink path "io.lines" -> code.FilePathAccess
   sink path "os.remove" -> code.FilePathAccess
   sink path "os.rename" -> code.FilePathAccess
+  sink path "lfs.attributes" -> code.FilePathAccess
+  sink path "lfs.chdir" -> code.FilePathAccess
+  sink path "lfs.mkdir" -> code.FilePathAccess
+  sink path "lfs.rmdir" -> code.FilePathAccess
+  sink path "lfs.touch" -> code.FilePathAccess
+  sink path "lfs.chmod" -> code.FilePathAccess
   sink method "extractEntry" -> code.ArchiveEntryWrite
   sink method "extract" -> code.ArchiveEntryWrite
 
@@ -86,6 +92,9 @@ adapter lua {
   // insecure cookie (CWE-614) — cookie flags set to false
   mark "set_secure" val "false" -> code.InsecureCookie
   mark "set_httponly" val "false" -> code.InsecureCookie
+  mark "lfs.chmod" val "777" -> code.InsecurePermission
+  mark "lfs.chmod" val "666" -> code.InsecurePermission
+  mark "os.tmpname" -> code.InsecureTempFile
   mark "io.open" -> code.ResourceHandle
   mark "socket.tcp" -> code.ResourceHandle
   control method "close" -> core.ResourceRelease

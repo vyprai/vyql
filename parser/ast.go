@@ -76,14 +76,15 @@ func (*AdapterDecl) isDecl() {}
 
 // AdapterMapping is one `source`/`sink`/`type`/`control` line in an adapter.
 type AdapterMapping struct {
-	Kind       string // "source" | "sink_method" | "sink_path" | "type" | "control"
-	Pattern    string // the callee path / method token (a string literal or dotted name)
-	Concept    string // the concept it maps to (qualified); for "type", the type name
-	Constraint string // optional `on <type>` receiver-type constraint for sinks
-	ArgIndex   int    // which argument is the dangerous one (default 0; `arg N`)
+	Kind       string   // "source" | "sink_method" | "sink_path" | "type" | "control"
+	Pattern    string   // the callee path / method token (a string literal or dotted name)
+	Concept    string   // the concept it maps to (qualified); for "type", the type name
+	Constraint string   // optional `on <type>` receiver-type constraint for sinks
+	ArgIndex   int      // which argument is the dangerous one (default 0; `arg N`)
 	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
 	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
 	Collection bool     // `collection` — also flag a Seq/collection-literal arg (e.g. ldap search options {filter})
+	Exact      bool     // exact path match (currently used by `mark exact`)
 	About      string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
 }
 

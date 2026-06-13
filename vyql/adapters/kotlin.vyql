@@ -89,7 +89,7 @@ adapter kotlin {
   sink method "write" arg all -> code.HtmlRender
   // insecure randomness (CWE-330)
   mark "java.util.Random" -> code.WeakRandomValue
-  mark "Random" -> code.WeakRandomValue
+  mark exact "Random" -> code.WeakRandomValue
   mark "Math.random" -> code.WeakRandomValue
   // insecure cookie (CWE-614)
   mark "setHttpOnly" val "false" -> code.InsecureCookie
@@ -106,6 +106,7 @@ adapter kotlin {
   control "escapeHtml4" -> core.HtmlEscape
   control "escapeHtml" -> core.HtmlEscape
   control "encodeForLDAP" -> core.LdapEscape
+  control "escapeXPath" -> core.XpathEscape
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization
   control "validateRole" -> core.InputValidation

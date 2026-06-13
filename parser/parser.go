@@ -549,14 +549,18 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 			// `mark method "fn"` is receiver-agnostic, matching the bare method name.
 			p.next()
 			kind := "mark"
+			exact := false
 			if p.atWord("method") {
 				p.next()
 				kind = "mark_method"
+			} else if p.atWord("exact") {
+				p.next()
+				exact = true
 			} else if p.atWord("path") {
 				p.next()
 			}
 			pat := p.parsePattern()
-			mk := AdapterMapping{Kind: kind, Pattern: pat}
+			mk := AdapterMapping{Kind: kind, Pattern: pat, Exact: exact}
 			for p.atWord("val") {
 				p.next()
 				mk.ValMatches = append(mk.ValMatches, p.parsePattern())

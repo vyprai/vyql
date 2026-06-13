@@ -104,7 +104,7 @@ adapter scala {
   sink method "search" arg 1 -> code.LdapQuery
   sink method "evaluate" arg 0 -> code.XpathQuery
   mark "java.util.Random" -> code.WeakRandomValue
-  mark "Random" -> code.WeakRandomValue
+  mark exact "Random" -> code.WeakRandomValue
   mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
   mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
   mark "Cipher.getInstance" val "DES" -> code.WeakCipher

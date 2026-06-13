@@ -188,6 +188,7 @@ adapter python {
   sink path "os.system" -> code.CommandExecution
   sink receiver "openConnection" -> code.UrlFetch
   mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
+  mark exact "Random" -> code.WeakRandomValue
 }
 `
 	decls, err := Parse(src)
@@ -207,7 +208,7 @@ adapter python {
 	if th == nil || th.QualifiedName() != "injection.SqlInjection" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 5 {
+	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 6 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "code.HttpInput" {
@@ -222,6 +223,9 @@ adapter python {
 	if ad.Mappings[4].Kind != "mark_method" || ad.Mappings[4].Pattern != "setAllowsAnyHTTPSCertificate" ||
 		ad.Mappings[4].Concept != "code.CertValidationDisabled" || len(ad.Mappings[4].ValMatches) != 1 {
 		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[4])
+	}
+	if ad.Mappings[5].Kind != "mark" || !ad.Mappings[5].Exact || ad.Mappings[5].Pattern != "Random" {
+		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[5])
 	}
 }
 
