@@ -106,6 +106,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 	switch n.Kind() {
 	case "function_item":
 		params := c.params(field(n, "parameters"))
+		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		if handler {
 			var seed []nir.Stmt
@@ -115,7 +116,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "impl_item", "mod_item", "trait_item":
 		return c.decls(field(n, "body"))
 	case "struct_item", "enum_item", "use_declaration", "const_item", "static_item":
@@ -206,6 +207,21 @@ func (c *rsConv) params(params *tree_sitter.Node) []string {
 		if ch.Kind() == "parameter" {
 			if nm := c.patName(field(ch, "pattern")); nm != "" {
 				out = append(out, nm)
+			}
+		}
+	}
+	return out
+}
+
+func (c *rsConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() == "parameter" {
+			if nm := c.patName(field(ch, "pattern")); nm != "" {
+				putParamType(out, nm, paramTypeFromField(c, ch))
 			}
 		}
 	}

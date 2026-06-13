@@ -8,7 +8,7 @@ adapter groovy {
     control "withForm" -> CsrfProtection
   }
   package "javax.servlet" {
-    source "request.getParameter" -> HttpInput
+    source receiver "getParameter" on "HttpServletRequest" -> HttpInput
   }
   package "groovy" {
     source "System.getenv" -> SecretValue

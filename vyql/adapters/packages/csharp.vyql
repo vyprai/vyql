@@ -3,9 +3,9 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter csharp {
   package "Microsoft.AspNetCore.Http" {
-    source "Request.Query" -> HttpInput
-    source "Request.Form" -> HttpInput
-    source "Request.Headers" -> HttpInput
+    source receiver "Query" on "HttpRequest" -> HttpInput
+    source receiver "Form" on "HttpRequest" -> HttpInput
+    source receiver "Headers" on "HttpRequest" -> HttpInput
   }
   package "Microsoft.Extensions.Configuration" {
     source "Configuration.GetValue" -> SecretValue

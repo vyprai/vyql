@@ -66,6 +66,7 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "function_definition", "method_definition":
 		var name string
 		var params []string
+		paramTypes := map[string]string{}
 		for _, ch := range namedChildren(n) {
 			switch ch.Kind() {
 			case "identifier":
@@ -74,14 +75,15 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				}
 			case "parameter_list":
 				for _, p := range namedChildren(ch) {
-					if id := lastChildKind(p, "identifier"); id != nil {
-						params = append(params, c.text(id))
+					if name := c.paramName(p); name != "" {
+						params = append(params, name)
+						putParamType(paramTypes, name, paramTypeFromField(c, p))
 					}
 				}
 			}
 		}
 		body := c.block(lastChildKind(n, "closure"))
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "declaration":
 		kids := namedChildren(n)
 		if len(kids) >= 2 && kids[0].Kind() == "identifier" {
@@ -128,6 +130,16 @@ func (c *gvConv) block(n *tree_sitter.Node) []nir.Stmt {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
+}
+
+func (c *gvConv) paramName(n *tree_sitter.Node) string {
+	var name string
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "identifier" {
+			name = c.text(ch)
+		}
+	}
+	return name
 }
 
 // gvOp returns a binary/unary operator symbol (first non-named child token).

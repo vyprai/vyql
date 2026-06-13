@@ -99,6 +99,7 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration", "local_function_statement", "operator_declaration":
 		params := c.params(field(n, "parameters"))
+		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		// ASP.NET Core MVC: an action's parameters are model-bound from the request
 		// (route/query/body), so they are user input. Seed each as an HttpInput
@@ -111,7 +112,7 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "property_declaration":
 		// accessor bodies may hold logic
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
@@ -352,6 +353,21 @@ func (c *csConv) params(params *tree_sitter.Node) []string {
 		if ch.Kind() == "parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
+			}
+		}
+	}
+	return out
+}
+
+func (c *csConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() == "parameter" {
+			if nm := field(ch, "name"); nm != nil {
+				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
 			}
 		}
 	}

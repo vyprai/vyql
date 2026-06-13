@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsc "github.com/tree-sitter/tree-sitter-c/bindings/go"
 	tscpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
@@ -159,11 +161,23 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	switch n.Kind() {
 	case "function_definition":
 		decl := field(n, "declarator")
+		params := c.params(decl)
+		if len(params) == 0 {
+			params = c.params(n)
+		}
+		paramTypes := c.paramTypes(decl)
+		if len(paramTypes) == 0 {
+			paramTypes = c.paramTypes(n)
+		}
+		if len(params) == 0 {
+			params, paramTypes = c.paramsFromSignatureText(c.text(n))
+		}
 		return []nir.Stmt{nir.FuncDef{
-			Name:   c.declName(decl),
-			Params: c.params(decl),
-			Body:   c.block(field(n, "body")),
-			Loc:    L,
+			Name:       c.declName(decl),
+			Params:     params,
+			ParamTypes: paramTypes,
+			Body:       c.block(field(n, "body")),
+			Loc:        L,
 		}}
 	case "struct_specifier", "union_specifier", "enum_specifier":
 		return nil
@@ -177,7 +191,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return out
 	case "method_definition", "method_declaration": // ObjC method
 		name, params, body := c.objcMethod(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: c.block(body), Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: c.objcParamTypes(n, params), Body: c.block(body), Loc: L}}
 	case "namespace_definition", "linkage_specification", "declaration_list": // C++
 		if b := field(n, "body"); b != nil {
 			return c.decls(b)
@@ -424,19 +438,142 @@ func (c *ccConv) block(block *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *ccConv) params(decl *tree_sitter.Node) []string {
-	pl := field(decl, "parameters")
+	pl := c.paramList(decl)
 	if pl == nil {
 		return nil
 	}
 	var out []string
 	for _, ch := range namedChildren(pl) {
-		if ch.Kind() == "parameter_declaration" {
+		if isCParamDecl(ch.Kind()) {
 			if nm := c.declName(field(ch, "declarator")); nm != "" {
 				out = append(out, nm)
 			}
 		}
 	}
 	return out
+}
+
+func (c *ccConv) paramTypes(decl *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	pl := c.paramList(decl)
+	if pl == nil {
+		return out
+	}
+	for _, ch := range namedChildren(pl) {
+		if isCParamDecl(ch.Kind()) {
+			if nm := c.declName(field(ch, "declarator")); nm != "" {
+				putParamType(out, nm, paramTypeFromField(c, ch))
+			}
+		}
+	}
+	return out
+}
+
+func (c *ccConv) paramList(decl *tree_sitter.Node) *tree_sitter.Node {
+	if pl := field(decl, "parameters"); pl != nil {
+		return pl
+	}
+	for _, ch := range namedChildren(decl) {
+		if ch.Kind() == "parameter_list" {
+			return ch
+		}
+		if pl := c.paramList(ch); pl != nil {
+			return pl
+		}
+	}
+	return nil
+}
+
+func (c *ccConv) paramsFromSignatureText(s string) ([]string, map[string]string) {
+	out := map[string]string{}
+	body := strings.Index(s, "{")
+	if body >= 0 {
+		s = s[:body]
+	}
+	start := strings.LastIndex(s, "(")
+	end := strings.LastIndex(s, ")")
+	if start < 0 || end <= start {
+		return nil, out
+	}
+	var params []string
+	for _, part := range strings.Split(s[start+1:end], ",") {
+		part = strings.TrimSpace(part)
+		if part == "" || part == "void" {
+			continue
+		}
+		if eq := strings.Index(part, "="); eq >= 0 {
+			part = strings.TrimSpace(part[:eq])
+		}
+		spaced := strings.NewReplacer("*", " * ", "&", " & ").Replace(part)
+		fields := strings.Fields(spaced)
+		if len(fields) == 0 {
+			continue
+		}
+		name := fields[len(fields)-1]
+		typeFields := fields[:len(fields)-1]
+		for len(typeFields) > 0 && (typeFields[len(typeFields)-1] == "*" || typeFields[len(typeFields)-1] == "&") {
+			typeFields = typeFields[:len(typeFields)-1]
+		}
+		typ := strings.Join(typeFields, " ")
+		params = append(params, name)
+		putParamType(out, name, typ)
+	}
+	return params, out
+}
+
+func isCParamDecl(kind string) bool {
+	switch kind {
+	case "parameter_declaration", "optional_parameter_declaration":
+		return true
+	}
+	return false
+}
+
+func (c *ccConv) objcParamTypes(n *tree_sitter.Node, params []string) map[string]string {
+	out := map[string]string{}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "method_parameter" {
+			name := ""
+			if nm := field(ch, "name"); nm != nil {
+				name = c.text(nm)
+			}
+			typ := paramTypeFromField(c, ch)
+			if typ == "" {
+				typ = objcMethodParamType(c.text(ch))
+			}
+			putParamType(out, name, typ)
+		}
+	}
+	for _, name := range params {
+		if _, ok := out[name]; ok {
+			continue
+		}
+		putParamType(out, name, objcMethodParamTypeForName(c.text(n), name))
+	}
+	return out
+}
+
+func objcMethodParamType(s string) string {
+	start := strings.Index(s, "(")
+	end := strings.Index(s, ")")
+	if start < 0 || end <= start {
+		return ""
+	}
+	return s[start+1 : end]
+}
+
+func objcMethodParamTypeForName(s, name string) string {
+	idx := strings.Index(s, name)
+	if idx < 0 {
+		return ""
+	}
+	prefix := s[:idx]
+	start := strings.LastIndex(prefix, "(")
+	end := strings.LastIndex(prefix, ")")
+	if start < 0 || end <= start {
+		return ""
+	}
+	return prefix[start+1 : end]
 }
 
 func (c *ccConv) callArgs(args *tree_sitter.Node) []nir.Expr {

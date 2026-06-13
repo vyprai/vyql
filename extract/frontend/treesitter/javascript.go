@@ -218,6 +218,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "function_declaration", "generator_function_declaration", "method_definition":
 		name := c.text(field(n, "name"))
 		params := c.funcParams(n)
+		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
 		// NestJS route handler (`@Get()/@Post() find(@Query() q, @Param() id)`): the
 		// method's parameters are request-bound (@Body/@Query/@Param/@Headers), so seed
@@ -233,7 +234,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if c.exported[name] {
 			body = append(publicAPISeeds(params, L), body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "lexical_declaration", "variable_declaration":
@@ -245,6 +246,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				if name != nil && name.Kind() == "identifier" && (isJsFuncNode(val) || c.isFunctionLikeDeclarator(d)) {
 					fnName := c.text(name)
 					params := c.funcParams(val)
+					paramTypes := c.funcParamTypes(val)
 					if len(params) == 0 {
 						params = c.paramsFromFunctionText(d)
 					}
@@ -252,7 +254,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					if c.exported[fnName] {
 						body = append(publicAPISeeds(params, L), body...)
 					}
-					out = append(out, nir.FuncDef{Name: fnName, Params: params, Body: body, Loc: L})
+					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L})
 					continue
 				}
 				var v nir.Expr = nir.Const{Loc: L}
@@ -390,20 +392,22 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				name = "__default_export__"
 			}
 			params := c.funcParams(rhs)
+			paramTypes := c.funcParamTypes(rhs)
 			if len(params) == 0 {
 				params = c.paramsFromFunctionText(inner)
 			}
 			body := append(publicAPISeeds(params, L), c.funcBody(rhs)...)
-			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 		}
 		if left != nil && left.Kind() == "member_expression" && isJsFuncNode(rhs) {
 			if name := c.exportFuncName(left); name != "" {
 				params := c.funcParams(rhs)
+				paramTypes := c.funcParamTypes(rhs)
 				if len(params) == 0 {
 					params = c.paramsFromFunctionText(inner)
 				}
 				body := append(publicAPISeeds(params, L), c.funcBody(rhs)...)
-				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 			}
 		}
 		if left != nil && c.isModuleExports(left) && rhs != nil && rhs.Kind() == "object" {
@@ -412,11 +416,12 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				if pr.Kind() == "pair" && isJsFuncNode(field(pr, "value")) {
 					v := field(pr, "value")
 					params := c.funcParams(v)
+					paramTypes := c.funcParamTypes(v)
 					if len(params) == 0 {
 						params = c.paramsFromFunctionText(pr)
 					}
 					body := append(publicAPISeeds(params, L), c.funcBody(v)...)
-					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, Body: body, Loc: L})
+					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L})
 				}
 			}
 			if len(out) > 0 {
@@ -626,6 +631,32 @@ func (c *jsConv) funcParams(n *tree_sitter.Node) []string {
 	return c.paramsFromFunctionText(n)
 }
 
+func (c *jsConv) funcParamTypes(n *tree_sitter.Node) map[string]string {
+	if n == nil {
+		return nil
+	}
+	params := field(n, "parameters")
+	if params == nil {
+		params = field(n, "parameter")
+	}
+	if params == nil {
+		for _, ch := range children(n) {
+			switch ch.Kind() {
+			case "formal_parameters", "parameters":
+				params = ch
+			}
+			if params != nil {
+				break
+			}
+		}
+	}
+	out := c.paramTypes(params)
+	if len(out) == 0 {
+		return jsParamTypesFromText(c.text(n))
+	}
+	return out
+}
+
 func (c *jsConv) funcBody(n *tree_sitter.Node) []nir.Stmt {
 	if n == nil {
 		return nil
@@ -805,6 +836,87 @@ func (c *jsConv) params(params *tree_sitter.Node) []string {
 	return out
 }
 
+func (c *jsConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	if params.Kind() == "identifier" {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		switch ch.Kind() {
+		case "identifier":
+			if typ := jsTypeAnnotationAfter(c, params, ch); typ != "" {
+				putParamType(out, c.text(ch), typ)
+			}
+		case "required_parameter", "optional_parameter":
+			if pat := field(ch, "pattern"); pat != nil && pat.Kind() == "identifier" {
+				putParamType(out, c.text(pat), paramTypeFromField(c, ch))
+			}
+		case "assignment_pattern":
+			if l := field(ch, "left"); l != nil && l.Kind() == "identifier" {
+				putParamType(out, c.text(l), paramTypeFromField(c, ch))
+			}
+		}
+	}
+	return out
+}
+
+func jsTypeAnnotationAfter(c *jsConv, parent, id *tree_sitter.Node) string {
+	if parent == nil || id == nil {
+		return ""
+	}
+	seen := false
+	for _, ch := range namedChildren(parent) {
+		if sameTSNode(ch, id) {
+			seen = true
+			continue
+		}
+		if !seen {
+			continue
+		}
+		switch ch.Kind() {
+		case "type_annotation":
+			return c.text(ch)
+		case "identifier", "required_parameter", "optional_parameter", "assignment_pattern":
+			return ""
+		}
+	}
+	return ""
+}
+
+func jsParamTypesFromText(s string) map[string]string {
+	out := map[string]string{}
+	start := strings.Index(s, "(")
+	end := strings.Index(s, ")")
+	if start < 0 || end <= start {
+		return out
+	}
+	for _, part := range strings.Split(s[start+1:end], ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if eq := strings.Index(part, "="); eq >= 0 {
+			part = strings.TrimSpace(part[:eq])
+		}
+		colon := strings.Index(part, ":")
+		if colon < 0 {
+			continue
+		}
+		name := strings.TrimSpace(part[:colon])
+		name = strings.TrimPrefix(name, "...")
+		typ := strings.TrimSpace(part[colon+1:])
+		putParamType(out, name, typ)
+	}
+	return out
+}
+
+func sameTSNode(a, b *tree_sitter.Node) bool {
+	return a != nil && b != nil && a.StartByte() == b.StartByte() && a.EndByte() == b.EndByte()
+}
+
 func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	if n == nil {
 		return nir.Const{Loc: "?:0"}
@@ -883,7 +995,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	case "arrow_function", "function_expression", "function":
 		// a single bare arrow param `v => …` is under the `parameter` field, not `parameters`.
-		return nir.Lambda{Params: c.funcParams(n), Body: c.funcBody(n), Loc: L}
+		return nir.Lambda{Params: c.funcParams(n), ParamTypes: c.funcParamTypes(n), Body: c.funcBody(n), Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))

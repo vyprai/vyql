@@ -92,12 +92,17 @@ func (c *dartConv) funcDef(sig, body *tree_sitter.Node) nir.Stmt {
 	}
 	name := c.text(field(fs, "name"))
 	var params []string
+	paramTypes := map[string]string{}
 	if pl := lastChildKind(fs, "formal_parameter_list"); pl != nil {
 		for _, p := range namedChildren(pl) {
 			if nm := field(p, "name"); nm != nil {
-				params = append(params, c.text(nm))
+				name := c.text(nm)
+				params = append(params, name)
+				putParamType(paramTypes, name, paramTypeFromField(c, p))
 			} else if id := lastChildKind(p, "identifier"); id != nil {
-				params = append(params, c.text(id))
+				name := c.text(id)
+				params = append(params, name)
+				putParamType(paramTypes, name, paramTypeFromField(c, p))
 			}
 		}
 	}
@@ -105,7 +110,7 @@ func (c *dartConv) funcDef(sig, body *tree_sitter.Node) nir.Stmt {
 	if body != nil {
 		bstmts = c.block(body)
 	}
-	return nir.FuncDef{Name: name, Params: params, Body: bstmts, Loc: L}
+	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: bstmts, Loc: L}
 }
 
 func (c *dartConv) block(n *tree_sitter.Node) []nir.Stmt {

@@ -3,7 +3,7 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter scala {
   package "playframework" {
-    source ".getQueryString" -> HttpInput
+    source receiver "getQueryString" on "Request" -> HttpInput
     source ".body" -> HttpInput
     control "Security.Authenticated" -> AuthenticationCheck
     control "Security.WithPermissions" -> AuthorizationCheck

@@ -3,11 +3,11 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter dart {
   package "shelf" {
-    source ".queryParameters" -> HttpInput
+    source receiver "queryParameters" on "Request" -> HttpInput
     source ".readAsString" -> HttpInput
   }
   package "dart_frog" {
-    source ".params" -> HttpInput
+    source receiver "params" on "RequestContext" -> HttpInput
   }
   package "dart:io" {
     source "Platform.environment" -> SecretValue

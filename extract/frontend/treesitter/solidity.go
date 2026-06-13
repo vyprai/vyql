@@ -92,7 +92,7 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: c.paramTypes(n), Body: body, Loc: L}}
 	case "statement":
 		var out []nir.Stmt
 		for _, ch := range namedChildren(n) {
@@ -252,6 +252,18 @@ func (c *solConv) params(n *tree_sitter.Node) []string {
 		if ch.Kind() == "parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
+			}
+		}
+	}
+	return out
+}
+
+func (c *solConv) paramTypes(n *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "parameter" {
+			if nm := field(ch, "name"); nm != nil {
+				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
 			}
 		}
 	}

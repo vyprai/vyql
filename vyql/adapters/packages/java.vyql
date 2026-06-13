@@ -3,10 +3,12 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter java {
   package "javax.servlet" {
-    source ".getParameter" -> HttpInput
+    source receiver "getParameter" on "HttpServletRequest" -> HttpInput
+    source receiver "getHeader" on "HttpServletRequest" -> HttpInput
   }
   package "jakarta.servlet" {
-    source ".getParameter" -> HttpInput
+    source receiver "getParameter" on "HttpServletRequest" -> HttpInput
+    source receiver "getHeader" on "HttpServletRequest" -> HttpInput
   }
   package "org.springframework" {
     source ".getHeader" -> HttpInput

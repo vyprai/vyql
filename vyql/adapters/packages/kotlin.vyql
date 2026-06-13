@@ -3,14 +3,15 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter kotlin {
   package "javax.servlet" {
-    source ".getParameter" -> HttpInput
+    source receiver "getParameter" on "HttpServletRequest" -> HttpInput
+    source receiver "getHeader" on "HttpServletRequest" -> HttpInput
   }
   package "ktor-server-core" {
-    source ".queryParameters" -> HttpInput
-    source ".receive" -> HttpInput
+    source receiver "queryParameters" on "ApplicationRequest" -> HttpInput
+    source receiver "receive" on "ApplicationCall" -> HttpInput
   }
   package "spark-kotlin" {
-    source ".param" -> HttpInput
+    source receiver "param" on "Request" -> HttpInput
   }
   package "kotlin-stdlib" {
     source "System.getenv" -> SecretValue

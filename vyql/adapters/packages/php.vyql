@@ -18,10 +18,10 @@ adapter php {
     control "filter_var" -> RedirectAllowlist
   }
   package "symfony/http-foundation" {
-    source "$request.get" -> HttpInput
+    source receiver "get" on "Request" -> HttpInput
   }
   package "laravel/framework" {
-    source "$request.input" -> HttpInput
+    source receiver "input" on "Request" -> HttpInput
     sink method "raw" -> SqlExecution
     sink method "whereRaw" -> SqlExecution
     control "e" -> HtmlEscape

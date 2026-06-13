@@ -261,13 +261,14 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "function_definition":
 		name := c.text(field(n, "name"))
 		params := c.params(field(n, "parameters"))
+		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
 		// the args after self/info/root/parent are the query's user-supplied inputs.
 		if strings.HasPrefix(name, "resolve_") {
 			body = append(c.seedResolverParams(params, L), body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L, IsValidator: c.hasValidatorComment(n)}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, IsValidator: c.hasValidatorComment(n)}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -284,6 +285,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// (path/query/body), so seed each as http_input (like Java controllers).
 		if def.Kind() == "function_definition" && c.hasRouteDecorator(n) {
 			params := c.params(field(def, "parameters"))
+			paramTypes := c.paramTypes(field(def, "parameters"))
 			body := c.block(field(def, "body"))
 			var seed []nir.Stmt
 			for _, p := range params {
@@ -293,7 +295,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				seed = append(seed, nir.Assign{Targets: []string{p},
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
-			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, Body: append(seed, body...), Loc: L, IsRoute: true}}
+			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, ParamTypes: paramTypes, Body: append(seed, body...), Loc: L, IsRoute: true}}
 		}
 		return c.stmt(def)
 	case "class_definition":
@@ -586,6 +588,26 @@ func (c *pyConv) params(params *tree_sitter.Node) []string {
 			} else if kids := namedChildren(ch); len(kids) > 0 {
 				out = append(out, c.text(kids[0]))
 			}
+		}
+	}
+	return out
+}
+
+func (c *pyConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		switch ch.Kind() {
+		case "typed_parameter", "typed_default_parameter":
+			name := ""
+			if nm := field(ch, "name"); nm != nil {
+				name = c.text(nm)
+			} else if kids := namedChildren(ch); len(kids) > 0 {
+				name = c.text(kids[0])
+			}
+			putParamType(out, name, paramTypeFromField(c, ch))
 		}
 	}
 	return out

@@ -3,15 +3,15 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter rust {
   package "actix-web" {
-    source method "query" -> HttpInput
-    source method "form" -> HttpInput
+    source receiver "query" on "HttpRequest" -> HttpInput
+    source receiver "form" on "HttpRequest" -> HttpInput
   }
   package "axum" {
-    source method "path" -> HttpInput
-    source method "query" -> HttpInput
+    source receiver "path" on "Request" -> HttpInput
+    source receiver "query" on "Request" -> HttpInput
   }
   package "rocket" {
-    source method "param" -> HttpInput
+    source receiver "param" on "Request" -> HttpInput
   }
   package "std" {
     source "std.env.var" -> SecretValue

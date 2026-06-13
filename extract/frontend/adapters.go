@@ -915,7 +915,13 @@ func matchSinkPath(path, p string) bool {
 // single type or a comma-separated list from `on [a, b]`).
 func constraintAllows(constraint, recvType string) bool {
 	for _, t := range strings.Split(constraint, ",") {
-		if t == recvType {
+		t = strings.TrimSpace(t)
+		recvType = strings.TrimSpace(recvType)
+		if t == recvType ||
+			strings.HasSuffix(t, "."+recvType) ||
+			strings.HasSuffix(recvType, "."+t) ||
+			strings.HasSuffix(t, "::"+recvType) ||
+			strings.HasSuffix(recvType, "::"+t) {
 			return true
 		}
 	}

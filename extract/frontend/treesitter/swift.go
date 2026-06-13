@@ -73,6 +73,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		for _, p := range pairs {
 			params = append(params, p[1])
 		}
+		paramTypes := c.paramTypes(n)
 		body := c.block(c.swBody(n))
 		// iOS attacker-controlled entry points seeded as URL-scheme input:
 		//   application(_:open:) — deep-link URL param `open url:`
@@ -88,7 +89,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				Value: nir.Call{Callee: nir.Name{ID: "url_scheme_input", Loc: L}, Path: "url_scheme_input", Method: "url_scheme_input", Loc: L}}
 			body = append([]nir.Stmt{seed}, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "property_declaration":
 		v := field(n, "value")
 		if v == nil {
@@ -277,6 +278,25 @@ func (c *swConv) params(n *tree_sitter.Node) []string {
 	out := make([]string, 0, len(pairs))
 	for _, p := range pairs {
 		out = append(out, p[1]) // internal name (the body binding)
+	}
+	return out
+}
+
+func (c *swConv) paramTypes(n *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "parameter" {
+			continue
+		}
+		var ids []string
+		for _, id := range namedChildren(ch) {
+			if id.Kind() == "simple_identifier" {
+				ids = append(ids, c.text(id))
+			}
+		}
+		if len(ids) > 0 {
+			putParamType(out, ids[len(ids)-1], paramTypeFromField(c, ch))
+		}
 	}
 	return out
 }

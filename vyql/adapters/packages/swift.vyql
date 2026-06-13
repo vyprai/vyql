@@ -3,8 +3,8 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter swift {
   package "vapor" {
-    source method "query" -> HttpInput
-    source method "content" -> HttpInput
+    source receiver "query" on "Request" -> HttpInput
+    source receiver "content" on "Request" -> HttpInput
     control "String.htmlEscaped" -> HtmlEscape
     control method "requireAuthenticated" -> AuthenticationCheck
     control method "authorize" -> AuthorizationCheck

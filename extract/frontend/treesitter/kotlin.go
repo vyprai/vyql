@@ -1,12 +1,11 @@
 package treesitter
 
 import (
-	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tskotlin "github.com/tree-sitter-grammars/tree-sitter-kotlin/bindings/go"
+	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 
 	"github.com/vyprai/vyql/extract/nir"
 )
-
 
 // ktConv walks a tree-sitter Kotlin CST into NIR.
 type ktConv struct {
@@ -77,6 +76,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{cd}
 	case "function_declaration":
 		params := c.params(n)
+		paramTypes := c.paramTypes(n)
 		body := c.block(c.funcBody(n))
 		if c.inController || c.hasHandlerAnn(n) {
 			var seed []nir.Stmt
@@ -86,7 +86,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "property_declaration":
 		name := c.propName(n)
 		val := c.propValue(n)
@@ -299,6 +299,29 @@ func (c *ktConv) params(n *tree_sitter.Node) []string {
 					}
 				}
 			}
+		}
+	}
+	return out
+}
+
+func (c *ktConv) paramTypes(n *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "function_value_parameters" {
+			continue
+		}
+		for _, p := range namedChildren(ch) {
+			if p.Kind() != "parameter" {
+				continue
+			}
+			name := ""
+			for _, id := range namedChildren(p) {
+				if id.Kind() == "identifier" {
+					name = c.text(id)
+					break
+				}
+			}
+			putParamType(out, name, paramTypeFromField(c, p))
 		}
 	}
 	return out

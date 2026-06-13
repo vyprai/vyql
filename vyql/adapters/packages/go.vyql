@@ -3,19 +3,19 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter go {
   package "net/http" {
-    source ".URL.Query" -> HttpInput
-    source ".FormValue" -> HttpInput
+    source receiver "Query" on "http.Request" -> HttpInput
+    source receiver "FormValue" on "http.Request" -> HttpInput
     sink path "http.Get" -> UrlFetch
   }
   package "github.com/gin-gonic/gin" {
-    source ".Param" -> HttpInput
-    source ".Query" -> HttpInput
+    source receiver "Param" on "gin.Context" -> HttpInput
+    source receiver "Query" on "gin.Context" -> HttpInput
   }
   package "github.com/gofiber/fiber" {
-    source ".Params" -> HttpInput
+    source receiver "Params" on "fiber.Ctx" -> HttpInput
   }
   package "github.com/labstack/echo" {
-    source ".QueryParam" -> HttpInput
+    source receiver "QueryParam" on "echo.Context" -> HttpInput
   }
   package "os" {
     source "os.Getenv" -> SecretValue

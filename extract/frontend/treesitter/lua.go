@@ -3,8 +3,8 @@ package treesitter
 import (
 	"strings"
 
-	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tslua "github.com/tree-sitter-grammars/tree-sitter-lua/bindings/go"
+	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 
 	"github.com/vyprai/vyql/extract/nir"
 )
