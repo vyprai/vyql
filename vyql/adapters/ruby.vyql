@@ -256,6 +256,7 @@ adapter ruby {
   mark "rand" -> code.WeakRandomValue
   mark "set_cookie" val "false" -> code.InsecureCookie
   control "validate_role" -> core.InputValidation
+  control "ldap_escape" -> core.LdapEscape
   control "xpath_escape" -> core.XpathEscape
   control "File.basename" -> core.PathCanonicalization
 }

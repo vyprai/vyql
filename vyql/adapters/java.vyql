@@ -165,8 +165,9 @@ adapter java {
   control method "checkOwnership" -> core.OwnershipCheck
   control method "requireOwner" -> core.OwnershipCheck
   control method "isOwner" -> core.OwnershipCheck
-  mark "lock" -> code.LockAcquire
+  mark method "lock" -> code.LockAcquire
   control method "unlock" -> core.LockRelease
+  control "validateRole" -> core.InputValidation
   // XXE hardening — a parser factory configured to disallow DOCTYPE / external entities,
   // dominating the parse (value-matched feature flag).
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening

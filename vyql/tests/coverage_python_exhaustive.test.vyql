@@ -1,0 +1,280 @@
+# Python core-language exhaustive coverage for adapter-claimed framework idioms.
+
+test "python exhaustive: request input reaches SQL command code-eval and dynamic-load sinks"
+  lang python
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  expect VYQL-INJ-003
+  expect VYQL-INJ-023
+  code
+  ```
+  def handler(request, cursor):
+      q = request.args["q"]
+      cmd = request.args["cmd"]
+      mod = request.args["module"]
+      cursor.execute(q)
+      cursor.executemany(q, [])
+      os.system(cmd)
+      subprocess.run(cmd, shell=True)
+      eval(q)
+      exec(q)
+      __import__(mod)
+      importlib.import_module(mod)
+  ```
+
+test "python exhaustive: parameterization shell escaping constants and fixed imports are clean"
+  lang python
+  reject VYQL-INJ-001
+  reject VYQL-INJ-002
+  reject VYQL-INJ-003
+  reject VYQL-INJ-023
+  code
+  ```
+  def handler(request, cursor):
+      cursor.execute("select * from users where id = ?", [request.args["id"]])
+      subprocess.run(shlex.quote(request.args["cmd"]), shell=True)
+      eval("1 + 1")
+      importlib.import_module("safe.module")
+  ```
+
+test "python exhaustive: deserialization and XML parsers receive tainted data"
+  lang python
+  expect VYQL-DESER-001
+  expect VYQL-DESER-002
+  code
+  ```
+  def handler(request):
+      data = request.data
+      yaml.load(data)
+      pickle.loads(data)
+      etree.fromstring(data)
+      xml.dom.minidom.parseString(data)
+  ```
+
+test "python exhaustive: safe deserialization and hardened XML are clean"
+  lang python
+  reject VYQL-DESER-001
+  reject VYQL-DESER-002
+  code
+  ```
+  def handler(request):
+      data = request.data
+      yaml.safe_load(data)
+      parser = etree.XMLParser(resolve_entities=False, no_network=True)
+      etree.fromstring(data, parser)
+  ```
+
+test "python exhaustive: SSRF redirect file upload archive and path sinks receive taint"
+  lang python
+  expect VYQL-RF-001
+  expect VYQL-RF-002
+  expect VYQL-PATH-001
+  expect VYQL-INJ-015
+  expect VYQL-PATH-004
+  code
+  ```
+  def handler(request, uploaded_file, archive):
+      url = request.args["url"]
+      path = request.args["path"]
+      requests.get(url)
+      urllib.request.urlopen(url)
+      redirect(url)
+      open(path)
+      os.remove(path)
+      uploaded_file.save(path)
+      archive.extract(path)
+  ```
+
+test "python exhaustive: URL allowlist basename and safe archive path suppress findings"
+  lang python
+  reject VYQL-RF-001
+  reject VYQL-RF-002
+  reject VYQL-PATH-001
+  reject VYQL-INJ-015
+  reject VYQL-PATH-004
+  code
+  ```
+  def handler(request, uploaded_file, archive):
+      url = request.args["url"]
+      path = os.path.basename(request.args["path"])
+      if is_allowed_url(url):
+          requests.get(url)
+      if url_has_allowed_host_and_scheme(url):
+          redirect(url)
+      open(path)
+      uploaded_file.save("uploads/fixed.dat")
+      archive.extract(path)
+  ```
+
+test "python exhaustive: HTML template header log CSV mass assignment and NoSQL sinks receive taint"
+  lang python
+  expect VYQL-INJ-004
+  expect VYQL-INJ-008
+  expect VYQL-INJ-009
+  expect VYQL-INJ-010
+  expect VYQL-INJ-012
+  expect VYQL-INJ-014
+  expect VYQL-INJ-007
+  code
+  ```
+  def handler(request, response, writer, collection):
+      v = request.args["v"]
+      render_template_string("Hello {{ name }}", name=v)
+      jinja2.Template(v).render()
+      response.headers.add("X-Name", v)
+      logging.info(v)
+      writer.writerow([v])
+      User.update(request.get_json())
+      collection.find(request.get_json())
+      return make_response(v)
+  ```
+
+test "python exhaustive: escaping constants and numeric validation suppress web/output findings"
+  lang python
+  reject VYQL-INJ-004
+  reject VYQL-INJ-008
+  reject VYQL-INJ-009
+  reject VYQL-INJ-010
+  reject VYQL-INJ-012
+  reject VYQL-INJ-014
+  reject VYQL-INJ-007
+  code
+  ```
+  def handler(request, response, writer, collection):
+      v = html.escape(request.args["v"])
+      render_template_string("Hello {{ name }}", name=v)
+      response.headers.add("X-Name", "safe")
+      logging.info("safe")
+      writer.writerow(["safe"])
+      User.update({"name": "safe"})
+      collection.find({"active": True})
+      return make_response(v)
+  ```
+
+test "python exhaustive: LDAP XPath regex trust-boundary auth IDOR and CSRF findings are reported"
+  lang python
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  expect VYQL-DOS-001
+  expect VYQL-CFG-014
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  expect VYQL-RF-003
+  code
+  ```
+  def handler(request, ldap, tree, repo, session):
+      v = request.args["v"]
+      ldap.search(v)
+      tree.xpath(v)
+      re.compile(v)
+      session["role"] = v
+      change_password("system")
+      repo.find_by_id(request.args["id"])
+      transfer_funds(v)
+  ```
+
+test "python exhaustive: LDAP XPath regex trust auth ownership and CSRF controls suppress findings"
+  lang python
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  reject VYQL-DOS-001
+  reject VYQL-CFG-014
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-002
+  reject VYQL-RF-003
+  code
+  ```
+  def handler(request, ldap, tree, repo, session):
+      v = request.args["v"]
+      ldap.search(ldap.filter.escape_filter_chars(v))
+      tree.xpath(xpath_literal(v))
+      re.compile("^[a-z]+$")
+      session["role"] = authenticate_user(v)
+      require_auth()
+      change_password("system")
+      check_ownership(request.args["id"])
+      repo.find_by_id(request.args["id"])
+      transfer_funds("system")
+  ```
+
+test "python exhaustive: weak crypto config permissions temp files cookies CORS and frame settings are reported"
+  lang python
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  expect VYQL-CRY-003
+  expect VYQL-CRY-004
+  expect VYQL-CFG-003
+  expect VYQL-CFG-004
+  expect VYQL-CFG-005
+  expect VYQL-CFG-006
+  expect VYQL-CFG-007
+  expect VYQL-CFG-008
+  expect VYQL-CFG-009
+  expect VYQL-PATH-003
+  code
+  ```
+  def handler(response):
+      hashlib.md5(b"x")
+      hashlib.new("sha1")
+      DES.new(key)
+      AES.new(key, AES.MODE_CBC, "0000000000000000")
+      random.random()
+      os.chmod("/tmp/x", 0o777)
+      tempfile.mktemp()
+      requests.get("http://example.com")
+      requests.get("https://example.com", verify=False)
+      jwt.decode(token, options={"verify_signature": False})
+      response.set_cookie("sid", "1", httponly=False, secure=False)
+      response.headers.add("Access-Control-Allow-Origin", "*")
+      response.headers.add("X-Frame-Options", "ALLOWALL")
+  ```
+
+test "python exhaustive: stronger crypto secure config restrictive permissions and safe temp are clean"
+  lang python
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  reject VYQL-CFG-003
+  reject VYQL-CFG-004
+  reject VYQL-CFG-005
+  reject VYQL-CFG-006
+  reject VYQL-CFG-007
+  reject VYQL-CFG-008
+  reject VYQL-CFG-009
+  reject VYQL-PATH-003
+  code
+  ```
+  def handler(response, iv):
+      hashlib.sha256(b"x")
+      AES.new(key, AES.MODE_GCM, iv)
+      secrets.token_bytes(16)
+      os.chmod("/tmp/x", 0o600)
+      tempfile.NamedTemporaryFile()
+      requests.get("https://example.com")
+      requests.get("http://127.0.0.1:8080")
+      jwt.decode(token, key, algorithms=["RS256"])
+      response.set_cookie("sid", "1", httponly=True, secure=True)
+      response.headers.add("Access-Control-Allow-Origin", "https://example.com")
+      response.headers.add("X-Frame-Options", "DENY")
+  ```
+
+test "python exhaustive: socket resources closed are clean"
+  lang python
+  reject VYQL-RES-001
+  code
+  ```
+  def handler():
+      s = socket.socket()
+      s.close()
+  ```
+
+test "python exhaustive: socket resources leak"
+  lang python
+  expect VYQL-RES-001
+  code
+  ```
+  def handler():
+      s = socket.socket()
+      s.recv(10)
+  ```

@@ -196,7 +196,7 @@ adapter csharp {
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
-  control "escapeXPath" -> core.HtmlEscape
+  control "escapeXPath" -> core.XpathEscape
   control "encodeForLDAP" -> core.LdapEscape
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization

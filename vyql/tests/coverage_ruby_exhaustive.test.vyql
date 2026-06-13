@@ -1,0 +1,187 @@
+# Ruby core-language exhaustive coverage for adapter-claimed Rails/Sinatra idioms.
+
+test "ruby exhaustive: params reach SQL command eval deser dynamic-load SSRF path upload and archive sinks"
+  lang ruby
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  expect VYQL-INJ-003
+  expect VYQL-DESER-001
+  expect VYQL-INJ-023
+  expect VYQL-RF-001
+  expect VYQL-PATH-001
+  expect VYQL-INJ-015
+  expect VYQL-PATH-004
+  code
+  ```
+  def handler(uploaded_file, archive)
+    v = params[:v]
+    User.where(v)
+    system(v)
+    eval(v)
+    YAML.load(v)
+    require(v)
+    HTTParty.get(v)
+    File.read(v)
+    uploaded_file.save(v)
+    archive.extract(v)
+  end
+  ```
+
+test "ruby exhaustive: escapers constants basename and fixed paths suppress common findings"
+  lang ruby
+  reject VYQL-INJ-001
+  reject VYQL-INJ-002
+  reject VYQL-INJ-003
+  reject VYQL-DESER-001
+  reject VYQL-INJ-023
+  reject VYQL-RF-001
+  reject VYQL-PATH-001
+  reject VYQL-INJ-015
+  reject VYQL-PATH-004
+  code
+  ```
+  def handler(uploaded_file, archive)
+    v = File.basename(params[:v])
+    User.where("active = true")
+    system(Shellwords.escape(params[:v]))
+    eval("1 + 1")
+    YAML.load("name: safe")
+    require("safe")
+    HTTParty.get("https://example.com")
+    File.read(v)
+    uploaded_file.save("uploads/fixed.dat")
+    archive.extract(v)
+  end
+  ```
+
+test "ruby exhaustive: output template redirect header log CSV mass LDAP XPath regex auth IDOR and CSRF findings are reported"
+  lang ruby
+  expect VYQL-INJ-004
+  expect VYQL-INJ-008
+  expect VYQL-RF-002
+  expect VYQL-INJ-010
+  expect VYQL-INJ-009
+  expect VYQL-INJ-014
+  expect VYQL-INJ-012
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  expect VYQL-DOS-001
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  expect VYQL-RF-003
+  code
+  ```
+  def handler(csv, ldap, doc, repo)
+    v = params[:v]
+    raw(v)
+    ERB.new(v)
+    redirect_to(v)
+    response.set_header("X-Name", v)
+    Rails.logger.info(v)
+    csv.write_row(v)
+    user.update_attributes(params)
+    ldap.search("dc=x", v)
+    doc.xpath(v)
+    Regexp.new(v)
+    change_password(v)
+    repo.find(params[:id])
+    transfer_funds(v)
+  end
+  ```
+
+test "ruby exhaustive: encoders constants validators and fixed values suppress web trust and output findings"
+  lang ruby
+  reject VYQL-INJ-004
+  reject VYQL-INJ-008
+  reject VYQL-RF-002
+  reject VYQL-INJ-010
+  reject VYQL-INJ-009
+  reject VYQL-INJ-014
+  reject VYQL-INJ-012
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  reject VYQL-DOS-001
+  reject VYQL-RF-003
+  code
+  ```
+  def handler(csv, ldap, doc)
+    v = params[:v]
+    raw(CGI.escapeHTML(v))
+    ERB.new("Hello <%= name %>")
+    redirect_to("/home")
+    response.set_header("X-Name", "safe")
+    Rails.logger.info("safe")
+    csv.write_row("safe")
+    user.update_attributes({name: "safe"})
+    ldap.search("dc=x", ldap_escape(v))
+    doc.xpath(xpath_escape(v))
+    Regexp.new("^[a-z]+$")
+    transfer_funds("system")
+  end
+  ```
+
+test "ruby exhaustive: crypto config cleartext permission temp cookie CSRF JWT cert and resource findings are reported"
+  lang ruby
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  expect VYQL-CRY-003
+  expect VYQL-CRY-004
+  expect VYQL-CFG-001
+  expect VYQL-CFG-004
+  expect VYQL-CFG-005
+  expect VYQL-CFG-006
+  expect VYQL-CFG-007
+  expect VYQL-CFG-008
+  expect VYQL-PATH-003
+  expect VYQL-RES-001
+  code
+  ```
+  class ApplicationController
+    skip_before_action :verify_authenticity_token
+  end
+  def handler
+    Digest::MD5.hexdigest(data)
+    OpenSSL::Cipher.new("des-ecb")
+    cipher.iv = "0000000000000000"
+    Random.rand(10)
+    JWT.decode(token, nil, false)
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    HTTParty.get("http://example.com")
+    set_cookie("sid", false)
+    File.chmod(0777, "/tmp/x")
+    File.open("/tmp/fixed", "w")
+    TCPSocket.open("example.com", 443)
+  end
+  ```
+
+test "ruby exhaustive: stronger crypto secure config restrictive perms temp and closed resources are clean"
+  lang ruby
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  reject VYQL-CFG-004
+  reject VYQL-CFG-005
+  reject VYQL-CFG-006
+  reject VYQL-CFG-007
+  reject VYQL-CFG-008
+  reject VYQL-PATH-003
+  reject VYQL-RES-001
+  code
+  ```
+  def handler
+    Digest::SHA256.hexdigest(data)
+    OpenSSL::Cipher.new("aes-256-gcm")
+    cipher.iv = iv
+    SecureRandom.random_bytes(16)
+    JWT.decode(token, key, true, {algorithm: "RS256"})
+    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+    HTTParty.get("https://example.com")
+    HTTParty.get("http://127.0.0.1:8080")
+    set_cookie("sid", true)
+    File.chmod(0600, "/tmp/x")
+    Tempfile.create("safe")
+    s = TCPSocket.open("example.com", 443)
+    s.close
+  end
+  ```
