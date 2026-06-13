@@ -31,12 +31,29 @@ adapter groovy {
 
   // path / file
   sink path "File" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
+  sink path "ZipFile.extract" arg all -> code.ArchiveEntryWrite
 
   // weak hash (CWE-328).
   mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
   mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
   mark "DigestUtils.md5Hex" -> code.WeakHash
   mark "DigestUtils.sha1Hex" -> code.WeakHash
+  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
+  sink path "Pattern.compile" -> code.RegexCompile
+  sink method "readObject" -> code.Deserialization
+  sink method "deserialize" -> code.Deserialization
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
   sink method "println" arg all -> code.HtmlRender
   sink method "print" arg all -> code.HtmlRender
   sink method "write" arg all -> code.HtmlRender
@@ -55,14 +72,28 @@ adapter groovy {
   mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
   mark "Cipher.getInstance" val "DES" -> code.WeakCipher
   mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
+  mark "Algorithm.none" -> code.JwtUnverified
+  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
+  mark "csrf.disable" -> code.CsrfDisabled
+  mark "chmod" val "0777" -> code.InsecurePermission
+  mark "chmod" val "0666" -> code.InsecurePermission
   mark "setHttpOnly" val "false" -> code.InsecureCookie
   mark "setSecure" val "false" -> code.InsecureCookie
+  mark "Socket" -> code.ResourceHandle
+  mark "FileInputStream" -> code.ResourceHandle
+  mark "FileOutputStream" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
   source ".getParameter" -> code.HttpInput
   source ".getHeader" -> code.HttpInput
   control "escapeHtml" -> core.HtmlEscape
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization
   control "validateRole" -> core.InputValidation
+  control method "requireAuth" -> core.AuthenticationCheck
+  control method "ensureAuthenticated" -> core.AuthenticationCheck
+  control method "isAuthenticated" -> core.AuthenticationCheck
+  control method "checkOwnership" -> core.OwnershipCheck
+  control method "requireOwner" -> core.OwnershipCheck
   control "encodeForLDAP" -> core.LdapEscape
   control "xpathEscape" -> core.XpathEscape
 }

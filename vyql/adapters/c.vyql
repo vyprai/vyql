@@ -147,6 +147,8 @@ adapter c {
   mark "DES_set_key" -> code.WeakCipher
   mark "RC4" -> code.WeakCipher
   mark "BF_set_key" -> code.WeakCipher
+  mark "EVP_EncryptInit_ex" val "0000000000000000" -> code.StaticIv
+  mark "EVP_DecryptInit_ex" val "0000000000000000" -> code.StaticIv
 
   // insecure randomness (CWE-330) — rand()/random() (presence); getrandom()/RAND_bytes safe
   mark "rand" -> code.WeakRandomValue

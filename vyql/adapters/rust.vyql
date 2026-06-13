@@ -46,6 +46,7 @@ adapter rust {
   mark "sha1.Sha1" -> code.WeakHash
   mark "Des.new" -> code.WeakCipher
   mark "Rc4.new" -> code.WeakCipher
+  mark "new_from_slices" val "0000000000000000" -> code.StaticIv
 
   // LDAP (CWE-90) — the search FILTER is arg1 (base is arg0)
   sink method "search" arg 1 -> code.LdapQuery
@@ -95,8 +96,31 @@ adapter rust {
   sink path "fs.write" -> code.FilePathAccess
   sink path "fs.remove_file" -> code.FilePathAccess
   sink method "read_to_string" -> code.FilePathAccess
+  sink method "extract_entry" -> code.ArchiveEntryWrite
+  sink method "extract" -> code.ArchiveEntryWrite
 
   // deserialization
   sink path "serde_json.from_str" -> code.Deserialization
   sink path "serde_yaml.from_str" -> code.Deserialization
+  sink method "find_by_id" -> code.ObjectLookupByUserInput
+  sink method "get_user" -> code.ObjectLookupByUserInput
+  sink method "get_account" -> code.ObjectLookupByUserInput
+  mark "change_password" -> code.AuthenticationRequiredOp
+  mark "update_password" -> code.AuthenticationRequiredOp
+  mark "reset_password" -> code.AuthenticationRequiredOp
+  mark "change_email" -> code.AuthenticationRequiredOp
+  mark "transfer_funds" -> code.AuthenticationRequiredOp
+  mark "delete_account" -> code.AuthenticationRequiredOp
+  mark "grant_role" -> code.AuthenticationRequiredOp
+  mark "make_admin" -> code.AuthenticationRequiredOp
+  mark "danger_accept_invalid_certs" val "true" -> code.CertValidationDisabled
+  mark method "mode" val "0o777" -> code.InsecurePermission
+  mark method "mode" val "0o666" -> code.InsecurePermission
+  mark "File.create" val "/tmp/" -> code.InsecureTempFile
+  mark "__subscript" -> code.IndexAccess
+  mark "__unary.deref" -> code.NullableDeref
+  control "require_auth" -> core.AuthenticationCheck
+  control "ensure_authenticated" -> core.AuthenticationCheck
+  control "check_ownership" -> core.OwnershipCheck
+  control "require_owner" -> core.OwnershipCheck
 }

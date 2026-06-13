@@ -371,7 +371,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: psLiteralValue(c.text(n))}
 	case "additive_expression":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
@@ -423,6 +423,16 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		return parts[0]
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func psLiteralValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 2 {
+		if q := raw[0]; (q == '"' || q == '\'') && raw[len(raw)-1] == q {
+			return raw[1 : len(raw)-1]
+		}
+	}
+	return raw
 }
 
 func (c *psConv) psInvokeArgs(n *tree_sitter.Node) []nir.Expr {

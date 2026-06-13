@@ -1,0 +1,141 @@
+# Final high-signal parity closure for languages that remained narrow after P4.
+
+test "bash: tainted grep pattern is ReDoS"
+  lang bash
+  expect VYQL-DOS-001
+  code
+  ```
+  PATTERN="$QUERY_STRING"
+  grep -E "$PATTERN" data.txt
+  ```
+
+test "bash: curl http URL is cleartext"
+  lang bash
+  expect VYQL-CFG-006
+  code
+  ```
+  curl "http://example.com"
+  ```
+
+test "powershell: tainted Select-String pattern is ReDoS"
+  lang powershell
+  expect VYQL-DOS-001
+  code
+  ```
+  param($Pattern)
+  Select-String -Pattern $Pattern -Path data.txt
+  ```
+
+test "powershell: Invoke-WebRequest http URL is cleartext"
+  lang powershell
+  expect VYQL-CFG-006
+  code
+  ```
+  Invoke-WebRequest "http://example.com"
+  ```
+
+test "elixir: tainted Regex.compile! pattern is ReDoS"
+  lang elixir
+  expect VYQL-DOS-001
+  code
+  ```
+  def handler(conn) do
+    Regex.compile!(conn.params["pattern"])
+  end
+  ```
+
+test "elixir: HTTPoison http URL is cleartext"
+  lang elixir
+  expect VYQL-CFG-006
+  code
+  ```
+  def f() do
+    HTTPoison.get("http://example.com")
+  end
+  ```
+
+test "dart: package http cleartext URL is reported"
+  lang dart
+  expect VYQL-CFG-006
+  code
+  ```
+  void f() {
+    http.get("http://example.com");
+  }
+  ```
+
+test "dart: localhost cleartext URL is clean"
+  lang dart
+  reject VYQL-CFG-006
+  code
+  ```
+  void f() {
+    http.get("http://127.0.0.1:8080");
+  }
+  ```
+
+test "dart: badCertificateCallback true disables cert validation"
+  lang dart
+  expect VYQL-CFG-004
+  code
+  ```
+  void f() {
+    final client = HttpClient();
+    client.badCertificateCallback = true;
+  }
+  ```
+
+test "dart: badCertificateCallback false is clean"
+  lang dart
+  reject VYQL-CFG-004
+  code
+  ```
+  void f() {
+    final client = HttpClient();
+    client.badCertificateCallback = false;
+  }
+  ```
+
+test "lua: tainted ngx.re.match pattern is ReDoS"
+  lang lua
+  expect VYQL-DOS-001
+  code
+  ```
+  function f()
+    ngx.re.match("subject", ngx.var.pattern)
+  end
+  ```
+
+test "lua: http.request cleartext URL is reported"
+  lang lua
+  expect VYQL-CFG-006
+  code
+  ```
+  function f()
+    http.request("http://example.com")
+  end
+  ```
+
+test "javascript: fs.openSync resource handle closed is clean"
+  lang javascript
+  reject VYQL-RES-001
+  code
+  ```
+  const fs = require("fs");
+  function f() {
+    const fd = fs.openSync("data.txt", "r");
+    fs.closeSync(fd);
+  }
+  ```
+
+test "javascript: fs.openSync resource handle leaks"
+  lang javascript
+  expect VYQL-RES-001
+  code
+  ```
+  const fs = require("fs");
+  function f() {
+    const fd = fs.openSync("data.txt", "r");
+    fs.readSync(fd, Buffer.alloc(1), 0, 1, 0);
+  }
+  ```

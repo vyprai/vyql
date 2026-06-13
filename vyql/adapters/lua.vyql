@@ -28,6 +28,8 @@ adapter lua {
   sink path "io.lines" -> code.FilePathAccess
   sink path "os.remove" -> code.FilePathAccess
   sink path "os.rename" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
+  sink method "extract" -> code.ArchiveEntryWrite
 
   // SQL — luasql conn:execute / resty.mysql db:query (raw query string is arg0)
   sink method "query" -> code.SqlExecution
@@ -40,6 +42,11 @@ adapter lua {
   // SSRF — luasocket http.request / resty.http request_uri
   sink path "http.request" -> code.UrlFetch
   sink method "request_uri" -> code.UrlFetch
+  sink path "ngx.re.match" arg 1 -> code.RegexCompile
+  sink path "ngx.re.find" arg 1 -> code.RegexCompile
+  sink path "ngx.re.gsub" arg 1 -> code.RegexCompile
+  mark "http.request" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "request_uri" val "http://" nval "127.0" -> code.CleartextChannel
 
   // LDAP (CWE-90) — lualdap ld:search (filter is arg1)
   sink method "search" arg 1 -> code.LdapQuery
@@ -49,6 +56,17 @@ adapter lua {
 
   // trust boundary (CWE-501) — untrusted data into the session (any arg)
   sink method "set" arg all -> code.TrustBoundary
+  sink method "find_by_id" -> code.ObjectLookupByUserInput
+  sink method "get_user" -> code.ObjectLookupByUserInput
+  sink method "get_account" -> code.ObjectLookupByUserInput
+  mark "change_password" -> code.AuthenticationRequiredOp
+  mark "update_password" -> code.AuthenticationRequiredOp
+  mark "reset_password" -> code.AuthenticationRequiredOp
+  mark "change_email" -> code.AuthenticationRequiredOp
+  mark "transfer_funds" -> code.AuthenticationRequiredOp
+  mark "delete_account" -> code.AuthenticationRequiredOp
+  mark "grant_role" -> code.AuthenticationRequiredOp
+  mark "make_admin" -> code.AuthenticationRequiredOp
 
   // weak hash (CWE-328) — md5/sha1 digests (sha256 is safe; distinct path = no collision)
   mark "md5.sum" -> code.WeakHash
@@ -60,6 +78,7 @@ adapter lua {
   mark "crypto.cipher" val "DES" -> code.WeakCipher
   mark "crypto.cipher" val "RC4" -> code.WeakCipher
   mark "crypto.cipher" val "Blowfish" -> code.WeakCipher
+  mark "crypto.cipher" val "0000000000000000" -> code.StaticIv
 
   // insecure randomness (CWE-330) — math.random (resty.random.bytes is safe)
   mark "math.random" -> code.WeakRandomValue
@@ -67,6 +86,9 @@ adapter lua {
   // insecure cookie (CWE-614) — cookie flags set to false
   mark "set_secure" val "false" -> code.InsecureCookie
   mark "set_httponly" val "false" -> code.InsecureCookie
+  mark "io.open" -> code.ResourceHandle
+  mark "socket.tcp" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
@@ -75,5 +97,9 @@ adapter lua {
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization
   control "validateRole" -> core.InputValidation
+  control "require_auth" -> core.AuthenticationCheck
+  control "ensure_authenticated" -> core.AuthenticationCheck
+  control "check_ownership" -> core.OwnershipCheck
+  control "require_owner" -> core.OwnershipCheck
   control "ngx.quote_sql_str" -> core.SqlParameterization
 }

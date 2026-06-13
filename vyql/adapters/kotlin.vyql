@@ -53,6 +53,7 @@ adapter kotlin {
   sink path "FileInputStream" -> code.FilePathAccess
   sink method "readText" -> code.FilePathAccess
   sink method "readBytes" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
 
   // code eval / dynamic
   sink method "loadClass" -> code.CodeEval
@@ -121,6 +122,17 @@ adapter kotlin {
   // csrf disabled (CWE-352) — presence marker
   mark "csrf.disable" -> code.CsrfDisabled
   mark "NoopHostnameVerifier" -> code.CertValidationDisabled
+  mark "Algorithm.none" -> code.JwtUnverified
+  mark "setWritable" val "true" val "false" -> code.InsecurePermission
+  mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
+  mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
+  mark "Socket" -> code.ResourceHandle
+  mark "FileInputStream" -> code.ResourceHandle
+  mark "FileOutputStream" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
+  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval

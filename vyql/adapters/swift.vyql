@@ -64,6 +64,17 @@ adapter swift {
   // trust boundary (CWE-501) — untrusted data into the session
   sink method "setAttribute" arg all -> code.TrustBoundary
   sink method "putValue" arg all -> code.TrustBoundary
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // weak hash (CWE-328) — CryptoKit Insecure.* + CommonCrypto CC_MD5/CC_SHA1
   mark "Insecure.MD5" -> code.WeakHash
@@ -87,6 +98,12 @@ adapter swift {
   mark "setHttpOnly" val "false" -> code.InsecureCookie
   mark "allowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
   mark "serverTrustPolicy" val "disableEvaluation" -> code.CertValidationDisabled
+  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  mark "FileHandle.forReadingAtPath" -> code.ResourceHandle
+  mark "FileHandle.forWritingAtPath" -> code.ResourceHandle
+  control method "closeFile" -> core.ResourceRelease
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
@@ -95,6 +112,10 @@ adapter swift {
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization
   control "validateRole" -> core.InputValidation
+  control "requireAuth" -> core.AuthenticationCheck
+  control "ensureAuthenticated" -> core.AuthenticationCheck
+  control "checkOwnership" -> core.OwnershipCheck
+  control "requireOwner" -> core.OwnershipCheck
 
   // NOTE: addingPercentEncoding maps to no wired neutralizer (OutputEncoding is unused
   // by any rule and percent-encoding doesn't neutralize cmd/SQL/HTML) — omitted.

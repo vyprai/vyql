@@ -163,7 +163,7 @@ rule Command {
 
 func TestParseErrors(t *testing.T) {
 	bad := []string{
-		`rule x { taint A -> }`,            // missing endpoint
+		`rule x { taint A -> }`,             // missing endpoint
 		`rule x { meta { id "no-colon" } }`, // missing colon
 		`rule`,                              // truncated
 		`gibberish foo`,                     // bad top-level
@@ -187,6 +187,7 @@ adapter python {
   sink method "execute" -> code.SqlExecution
   sink path "os.system" -> code.CommandExecution
   sink receiver "openConnection" -> code.UrlFetch
+  mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
 }
 `
 	decls, err := Parse(src)
@@ -206,7 +207,7 @@ adapter python {
 	if th == nil || th.QualifiedName() != "injection.SqlInjection" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 4 {
+	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 5 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "code.HttpInput" {
@@ -218,6 +219,10 @@ adapter python {
 	if ad.Mappings[3].Kind != "sink_receiver" || ad.Mappings[3].Concept != "code.UrlFetch" {
 		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[3])
 	}
+	if ad.Mappings[4].Kind != "mark_method" || ad.Mappings[4].Pattern != "setAllowsAnyHTTPSCertificate" ||
+		ad.Mappings[4].Concept != "code.CertValidationDisabled" || len(ad.Mappings[4].ValMatches) != 1 {
+		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[4])
+	}
 }
 
 // String literals support backslash escapes: \" keeps a quote inside the string
@@ -225,12 +230,12 @@ adapter python {
 // The escape-free fast path must return the raw text unchanged.
 func TestLexStringEscapes(t *testing.T) {
 	cases := []struct{ src, want string }{
-		{`"plain"`, "plain"},                               // fast path, no escapes
-		{`"a=\"b\""`, `a="b"`},                             // escaped quotes don't terminate
-		{`"back\\slash"`, `back\slash`},                    // literal backslash
-		{`"tab\tend"`, "tab\tend"},                         // \t
-		{`"line\nbreak"`, "line\nbreak"},                   // \n
-		{`"x\qy"`, "xqy"},                                  // unknown escape → literal char
+		{`"plain"`, "plain"},             // fast path, no escapes
+		{`"a=\"b\""`, `a="b"`},           // escaped quotes don't terminate
+		{`"back\\slash"`, `back\slash`},  // literal backslash
+		{`"tab\tend"`, "tab\tend"},       // \t
+		{`"line\nbreak"`, "line\nbreak"}, // \n
+		{`"x\qy"`, "xqy"},                // unknown escape → literal char
 	}
 	for _, c := range cases {
 		toks, err := lex(c.src)

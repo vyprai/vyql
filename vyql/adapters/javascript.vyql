@@ -505,6 +505,10 @@ adapter javascript {
   mark "https.get" val "rejectUnauthorized=false" -> code.CertValidationDisabled
   mark "https.Agent" val "rejectUnauthorized=false" -> code.CertValidationDisabled
   mark "tls.connect" val "rejectUnauthorized=false" -> code.CertValidationDisabled
+  mark "fs.openSync" -> code.ResourceHandle
+  mark "fs.open" -> code.ResourceHandle
+  control "fs.closeSync" -> core.ResourceRelease
+  control "fs.close" -> core.ResourceRelease
 
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
   mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified

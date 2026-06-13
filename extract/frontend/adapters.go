@@ -486,6 +486,9 @@ func loadSpec(tech string) adapterSpec {
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "mark":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+		case "mark_method":
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
 		case "filter_method":
 			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global"})
 		case "filter_path":
@@ -749,13 +752,16 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 						continue
 					}
 					path := n.Prop("callee_path")
+					method := n.Prop("method")
 					strArgs := n.Prop("str_args")
 					seenConcept := map[string]bool{}
 					for _, m := range spec.Marks {
 						if seenConcept[m.Concept] {
 							continue
 						}
-						if !matchSinkPath(path, m.Pattern) {
+						hit := m.ByMethod && method == m.Pattern ||
+							!m.ByMethod && matchSinkPath(path, m.Pattern)
+						if !hit {
 							continue
 						}
 						if !valConds(strArgs, m.ValMatches, m.ValAbsents) {

@@ -1263,6 +1263,10 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		for _, p := range ex.Parts {
 			collectValTokens(p, key, out) // inherit key so list elements pair with it
 		}
+	case nir.Format:
+		for _, p := range ex.Parts {
+			collectValTokens(p, key, out)
+		}
 	case nir.Call:
 		collectValTokens(ex.Callee, key, out)
 		for _, a := range ex.Args {

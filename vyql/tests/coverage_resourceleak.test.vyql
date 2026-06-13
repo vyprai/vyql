@@ -230,3 +230,161 @@ test "resource-leak: a Ruby socket closed only in one branch leaks on the others
     end
   end
   ```
+
+test "resource-leak: a Kotlin socket closed on every path is clean"
+  lang kotlin
+  reject VYQL-RES-001
+  code
+  ```
+  fun f() {
+    val s = Socket("example.com", 443)
+    s.close()
+  }
+  ```
+
+test "resource-leak: a Kotlin socket never closed leaks"
+  lang kotlin
+  expect VYQL-RES-001
+  code
+  ```
+  fun f() {
+    val s = Socket("example.com", 443)
+    s.getInputStream()
+  }
+  ```
+
+test "resource-leak: a Scala socket closed on every path is clean"
+  lang scala
+  reject VYQL-RES-001
+  code
+  ```
+  object T {
+    def f() = {
+      val s = Socket("example.com", 443)
+      s.close()
+    }
+  }
+  ```
+
+test "resource-leak: a Scala socket never closed leaks"
+  lang scala
+  expect VYQL-RES-001
+  code
+  ```
+  object T {
+    def f() = {
+      val s = Socket("example.com", 443)
+      s.getInputStream()
+    }
+  }
+  ```
+
+test "resource-leak: a Swift file handle closed on every path is clean"
+  lang swift
+  reject VYQL-RES-001
+  code
+  ```
+  func f() {
+    let h = FileHandle.forReadingAtPath("data.txt")
+    h.closeFile()
+  }
+  ```
+
+test "resource-leak: a Swift file handle never closed leaks"
+  lang swift
+  expect VYQL-RES-001
+  code
+  ```
+  func f() {
+    let h = FileHandle.forReadingAtPath("data.txt")
+    h.readDataToEndOfFile()
+  }
+  ```
+
+test "resource-leak: a Dart socket closed on every path is clean"
+  lang dart
+  reject VYQL-RES-001
+  code
+  ```
+  void f() {
+    final s = Socket.connect("example.com", 443);
+    s.close();
+  }
+  ```
+
+test "resource-leak: a Dart socket never closed leaks"
+  lang dart
+  expect VYQL-RES-001
+  code
+  ```
+  void f() {
+    final s = Socket.connect("example.com", 443);
+    s.add([1]);
+  }
+  ```
+
+test "resource-leak: a Groovy stream closed on every path is clean"
+  lang groovy
+  reject VYQL-RES-001
+  code
+  ```
+  def f() {
+    def h = new FileInputStream("data.txt")
+    h.close()
+  }
+  ```
+
+test "resource-leak: a Groovy stream never closed leaks"
+  lang groovy
+  expect VYQL-RES-001
+  code
+  ```
+  def f() {
+    def h = new FileInputStream("data.txt")
+    h.read()
+  }
+  ```
+
+test "resource-leak: a Lua file handle closed on every path is clean"
+  lang lua
+  reject VYQL-RES-001
+  code
+  ```
+  function f()
+    local h = io.open("data.txt", "r")
+    h:close()
+  end
+  ```
+
+test "resource-leak: a Lua file handle never closed leaks"
+  lang lua
+  expect VYQL-RES-001
+  code
+  ```
+  function f()
+    local h = io.open("data.txt", "r")
+    h:read("*a")
+  end
+  ```
+
+test "resource-leak: a Perl file handle closed on every path is clean"
+  lang perl
+  reject VYQL-RES-001
+  code
+  ```
+  sub f {
+    open(my $fh, "<", "data.txt");
+    close($fh);
+  }
+  ```
+
+test "resource-leak: a Perl file handle never closed leaks"
+  lang perl
+  expect VYQL-RES-001
+  code
+  ```
+  sub f {
+    open(my $fh, "<", "data.txt");
+    print <$fh>;
+  }
+  ```

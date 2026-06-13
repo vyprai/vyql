@@ -47,6 +47,8 @@ adapter elixir {
   sink path "Code.compile_string" -> code.CodeEval
   sink path "erlang.binary_to_term" -> code.Deserialization
   sink path ":erlang.binary_to_term" -> code.Deserialization
+  sink path "Regex.compile" -> code.RegexCompile
+  sink path "Regex.compile!" -> code.RegexCompile
 
   // path / file — the tainted path is the first argument.
   sink path "File.read" -> code.FilePathAccess
@@ -78,6 +80,11 @@ adapter elixir {
 
   // insecure cookie (CWE-614) — Plug.Conn.put_resp_cookie(conn, name, val, secure: false).
   mark "put_resp_cookie" val "false" -> code.InsecureCookie
+  mark "HTTPoison.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "HTTPoison.post" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "HTTPoison.request" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "Req.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "Req.request" val "http://" nval "127.0" -> code.CleartextChannel
 
   // trust boundary (CWE-501) — untrusted data written into the session (arg2 = value).
   sink method "put_session" arg 2 -> code.TrustBoundary

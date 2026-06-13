@@ -211,6 +211,32 @@ func (c *dartConv) assignTargetName(left *tree_sitter.Node) string {
 	return ""
 }
 
+func (c *dartConv) assignTargetPath(left *tree_sitter.Node) string {
+	if left == nil {
+		return ""
+	}
+	ex := c.foldChain(namedChildren(left))
+	switch t := ex.(type) {
+	case nir.Attr:
+		return t.Path
+	case nir.Index:
+		return t.Path
+	case nir.Name:
+		if raw := dartAssignTargetText(c.text(left)); strings.Contains(raw, ".") {
+			return raw
+		}
+		return t.ID
+	}
+	return dartAssignTargetText(c.text(left))
+}
+
+func dartAssignTargetText(raw string) string {
+	raw = strings.TrimSpace(raw)
+	raw = strings.ReplaceAll(raw, "?.", ".")
+	raw = strings.ReplaceAll(raw, "!", "")
+	return raw
+}
+
 // dartBranch lowers an if branch: a block's statements, or a single/else-if statement.
 func (c *dartConv) dartBranch(n *tree_sitter.Node) []nir.Stmt {
 	if n == nil {
@@ -447,6 +473,13 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
+	case "assignment_expression":
+		path := c.assignTargetPath(field(n, "left"))
+		right := c.expr(field(n, "right"))
+		if path != "" {
+			return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: []nir.Expr{right}, Path: path, Method: lastSeg(path), Loc: L}
+		}
+		return right
 	case "new_expression", "const_object_expression":
 		// `new File(p)` / `const File(p)` — model as a constructor call so type/arg
 		// sinks and marks match (e.g. new File(userPath)). The grammar nests the type

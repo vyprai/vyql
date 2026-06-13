@@ -40,9 +40,9 @@ func (p *parser) fail(format string, a ...any) {
 	panic(parseError{fmt.Sprintf(format, a...)})
 }
 
-func (p *parser) peek() tok       { return p.toks[p.i] }
-func (p *parser) peek2() tok      { return p.toks[p.i+1] }
-func (p *parser) next() tok       { t := p.toks[p.i]; p.i++; return t }
+func (p *parser) peek() tok         { return p.toks[p.i] }
+func (p *parser) peek2() tok        { return p.toks[p.i+1] }
+func (p *parser) next() tok         { t := p.toks[p.i]; p.i++; return t }
 func (p *parser) at(k tokKind) bool { return p.peek().kind == k }
 func (p *parser) atWord(v string) bool {
 	t := p.peek()
@@ -546,9 +546,17 @@ func (p *parser) parseAdapterDecl() *AdapterDecl {
 		case p.atWord("mark"):
 			// `mark "fn" [val "x"] -> concept` labels the matching CALL node with a
 			// presence concept (for `match`-style rules — no taint flow).
+			// `mark method "fn"` is receiver-agnostic, matching the bare method name.
 			p.next()
+			kind := "mark"
+			if p.atWord("method") {
+				p.next()
+				kind = "mark_method"
+			} else if p.atWord("path") {
+				p.next()
+			}
 			pat := p.parsePattern()
-			mk := AdapterMapping{Kind: "mark", Pattern: pat}
+			mk := AdapterMapping{Kind: kind, Pattern: pat}
 			for p.atWord("val") {
 				p.next()
 				mk.ValMatches = append(mk.ValMatches, p.parsePattern())

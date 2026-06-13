@@ -120,7 +120,11 @@ adapter objc {
   mark "CCCrypt" val "DES" -> code.WeakCipher
   mark "CCCrypt" val "RC4" -> code.WeakCipher
   mark "CCCrypt" val "Blowfish" -> code.WeakCipher
+  mark "CCCrypt" val "0000000000000000" -> code.StaticIv
   mark "CCCryptorCreate" val "DES" -> code.WeakCipher
+  mark "CCCryptorCreate" val "0000000000000000" -> code.StaticIv
+  mark "NSURL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
 
   // insecure randomness (CWE-330) — arc4random/rand/random (presence); SecRandomCopyBytes safe
   mark "arc4random" -> code.WeakRandomValue

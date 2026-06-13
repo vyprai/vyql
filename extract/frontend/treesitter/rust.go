@@ -255,7 +255,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "integer_literal", "float_literal", "char_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "raw_string_literal":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: rustStringValue(c.text(n))}
 	case "field_expression":
 		return nir.Attr{Base: c.expr(field(n, "value")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "index_expression":
@@ -339,6 +339,52 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// rustStringValue returns a quoted string literal whose inner text reflects the
+// Rust literal payload. It covers normal, byte, raw, and byte-raw strings well
+// enough for adapter `val` matching; escape handling is intentionally simple
+// because security mappings match substrings such as "/tmp/" or static IV bytes.
+func rustStringValue(raw string) string {
+	s := raw
+	for len(s) > 0 {
+		switch s[0] {
+		case 'b':
+			s = s[1:]
+		case 'r':
+			hashes := 0
+			i := 1
+			for i < len(s) && s[i] == '#' {
+				hashes++
+				i++
+			}
+			if i < len(s) && s[i] == '"' {
+				start := i + 1
+				end := len(s) - 1 - hashes
+				if end >= start && end < len(s) {
+					return "\"" + s[start:end] + "\""
+				}
+			}
+			return "\"" + raw + "\""
+		default:
+			goto unquote
+		}
+	}
+unquote:
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		body := s[1 : len(s)-1]
+		out := make([]byte, 0, len(body))
+		for i := 0; i < len(body); i++ {
+			if body[i] == '\\' && i+1 < len(body) {
+				out = append(out, body[i+1])
+				i++
+				continue
+			}
+			out = append(out, body[i])
+		}
+		return "\"" + string(out) + "\""
+	}
+	return "\"" + raw + "\""
 }
 
 // rsIf lowers a statement-position if with its predicate so constant-false arms prune.

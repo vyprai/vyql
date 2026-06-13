@@ -34,6 +34,7 @@ adapter scala {
   // path / file
   sink path "Source.fromFile" -> code.FilePathAccess
   sink method "readAllBytes" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
 
   // SSRF — Play WS (ws.url), akka-http, sttp client
   sink path "ws.url" -> code.UrlFetch
@@ -56,6 +57,20 @@ adapter scala {
   mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
   mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
   mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
+  mark "GCMParameterSpec" val "000000000000" -> code.StaticIv
+  mark "csrf.disable" -> code.CsrfDisabled
+  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
+  mark "Algorithm.none" -> code.JwtUnverified
+  mark "setWritable" val "true" val "false" -> code.InsecurePermission
+  mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
+  mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
+  mark "Socket" -> code.ResourceHandle
+  mark "Files.newInputStream" -> code.ResourceHandle
+  mark "Files.newOutputStream" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
+  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval

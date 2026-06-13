@@ -457,8 +457,14 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "identifier", "field_identifier", "qualified_identifier", "namespace_identifier", "type_identifier":
+		if v, ok := cBoolValue(c.text(n)); ok {
+			return nir.Const{Loc: L, Value: v}
+		}
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "true", "false", "null", "nullptr":
+		if v, ok := cBoolValue(c.text(n)); ok {
+			return nir.Const{Loc: L, Value: v}
+		}
 		return nir.Const{Loc: L}
 	case "number_literal", "char_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
@@ -546,6 +552,16 @@ func (c *ccConv) unaryOp(n *tree_sitter.Node) string {
 		break
 	}
 	return ""
+}
+
+func cBoolValue(s string) (string, bool) {
+	switch s {
+	case "YES", "TRUE", "true":
+		return "true", true
+	case "NO", "FALSE", "false":
+		return "false", true
+	}
+	return "", false
 }
 
 // cStringText returns a quoted string literal whose surrounding delimiters wrap only

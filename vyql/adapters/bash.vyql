@@ -26,6 +26,10 @@ adapter bash {
   // SSRF — fetching a tainted URL (any argument position may carry it)
   sink path "curl" -> code.UrlFetch
   sink path "wget" -> code.UrlFetch
+  sink path "grep" arg all -> code.RegexCompile
+  sink path "egrep" arg all -> code.RegexCompile
+  mark "curl" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "wget" val "http://" nval "127.0" -> code.CleartextChannel
 
   // file inclusion (sourcing an untrusted path)
   sink path "source" -> code.FileInclude
