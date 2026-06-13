@@ -73,6 +73,96 @@ test "swift: rejecting arbitrary HTTPS certificates is clean"
   }
   ```
 
+test "javascript: rejectUnauthorized false disables cert validation"
+  lang javascript
+  expect VYQL-CFG-004
+  code
+  ```
+  const https = require("https");
+  function f() {
+    https.request({ rejectUnauthorized: false });
+  }
+  ```
+
+test "javascript: rejectUnauthorized true is clean"
+  lang javascript
+  reject VYQL-CFG-004
+  code
+  ```
+  const https = require("https");
+  function f() {
+    https.request({ rejectUnauthorized: true });
+  }
+  ```
+
+test "python: requests verify false disables cert validation"
+  lang python
+  expect VYQL-CFG-004
+  code
+  ```
+  import requests
+  def f():
+      requests.get("https://example.com", verify=False)
+  ```
+
+test "python: requests verify true is clean"
+  lang python
+  reject VYQL-CFG-004
+  code
+  ```
+  import requests
+  def f():
+      requests.get("https://example.com", verify=True)
+  ```
+
+test "php: curl verify peer false disables cert validation"
+  lang php
+  expect VYQL-CFG-004
+  code
+  ```
+  <?php
+  function f($ch) {
+      curl_setopt_array($ch, [CURLOPT_SSL_VERIFYPEER => false]);
+  }
+  ?>
+  ```
+
+test "php: curl verify peer true is clean"
+  lang php
+  reject VYQL-CFG-004
+  code
+  ```
+  <?php
+  function f($ch) {
+      curl_setopt_array($ch, [CURLOPT_SSL_VERIFYPEER => true]);
+  }
+  ?>
+  ```
+
+test "go: InsecureSkipVerify true disables cert validation"
+  lang go
+  expect VYQL-CFG-004
+  code
+  ```
+  package p
+  import "crypto/tls"
+  func f() {
+    _ = &tls.Config{InsecureSkipVerify: true}
+  }
+  ```
+
+test "go: InsecureSkipVerify false is clean"
+  lang go
+  reject VYQL-CFG-004
+  code
+  ```
+  package p
+  import "crypto/tls"
+  func f() {
+    _ = &tls.Config{InsecureSkipVerify: false}
+  }
+  ```
+
 # --- CSRF disabled (VYQL-CFG-001) ---
 test "javascript: lusca csrf false disables CSRF"
   lang javascript
@@ -122,6 +212,42 @@ test "csharp: ValidateAntiForgeryToken is clean"
   class C { void F() { ValidateAntiForgeryToken(); } }
   ```
 
+test "java: csrf disable is reported"
+  lang java
+  expect VYQL-CFG-001
+  code
+  ```
+  class C { void f(HttpSecurity http) { http.csrf().disable(); } }
+  ```
+
+test "java: csrf configured without disable is clean"
+  lang java
+  reject VYQL-CFG-001
+  code
+  ```
+  class C { void f(HttpSecurity http) { http.csrf(); } }
+  ```
+
+test "kotlin: csrf disable is reported"
+  lang kotlin
+  expect VYQL-CFG-001
+  code
+  ```
+  fun f(http: HttpSecurity) {
+    http.csrf().disable()
+  }
+  ```
+
+test "kotlin: csrf configured without disable is clean"
+  lang kotlin
+  reject VYQL-CFG-001
+  code
+  ```
+  fun f(http: HttpSecurity) {
+    http.csrf()
+  }
+  ```
+
 # --- JWT signature not verified (VYQL-CFG-005) ---
 test "java: Algorithm.none is unverified JWT"
   lang java
@@ -159,6 +285,92 @@ test "go: ParseWithClaims is clean for JWT verification"
   func f(token string, claims Claims) {
     jwt.ParseWithClaims(token, claims, keyfunc)
   }
+  ```
+
+test "javascript: algorithms none is unverified JWT"
+  lang javascript
+  expect VYQL-CFG-005
+  code
+  ```
+  const jwt = require("jsonwebtoken");
+  function f(token) {
+    jwt.verify(token, "k", { algorithms: ["none"] });
+  }
+  ```
+
+test "javascript: HS256 algorithm is clean for JWT verification"
+  lang javascript
+  reject VYQL-CFG-005
+  code
+  ```
+  const jwt = require("jsonwebtoken");
+  function f(token) {
+    jwt.verify(token, "k", { algorithms: ["HS256"] });
+  }
+  ```
+
+test "python: verify_signature false is unverified JWT"
+  lang python
+  expect VYQL-CFG-005
+  code
+  ```
+  import jwt
+  def f(token):
+      jwt.decode(token, options={"verify_signature": False})
+  ```
+
+test "python: verify_signature true is clean for JWT verification"
+  lang python
+  reject VYQL-CFG-005
+  code
+  ```
+  import jwt
+  def f(token):
+      jwt.decode(token, options={"verify_signature": True})
+  ```
+
+test "php: none algorithm is unverified JWT"
+  lang php
+  expect VYQL-CFG-005
+  code
+  ```
+  <?php
+  function f($token) {
+      JWT::decode($token, "k", ["none"]);
+  }
+  ?>
+  ```
+
+test "php: HS256 algorithm is clean for JWT verification"
+  lang php
+  reject VYQL-CFG-005
+  code
+  ```
+  <?php
+  function f($token) {
+      JWT::decode($token, "k", ["HS256"]);
+  }
+  ?>
+  ```
+
+test "ruby: verify false is unverified JWT"
+  lang ruby
+  expect VYQL-CFG-005
+  code
+  ```
+  def f(token)
+    JWT.decode(token, nil, false)
+  end
+  ```
+
+test "ruby: verify true is clean for JWT verification"
+  lang ruby
+  reject VYQL-CFG-005
+  code
+  ```
+  def f(token)
+    JWT.decode(token, "k", true)
+  end
   ```
 
 # --- Insecure permissions (VYQL-CFG-008) ---
@@ -258,6 +470,50 @@ test "csharp: UserRead unix file mode is clean"
   class C { void F() { File.SetUnixFileMode("/tmp/x", UnixFileMode.UserRead); } }
   ```
 
+test "go: Chmod 0777 is insecure permission"
+  lang go
+  expect VYQL-CFG-008
+  code
+  ```
+  package p
+  import "os"
+  func f() {
+    os.Chmod("/tmp/x", 0777)
+  }
+  ```
+
+test "go: Chmod 0600 is clean"
+  lang go
+  reject VYQL-CFG-008
+  code
+  ```
+  package p
+  import "os"
+  func f() {
+    os.Chmod("/tmp/x", 0600)
+  }
+  ```
+
+test "python: chmod 0o777 is insecure permission"
+  lang python
+  expect VYQL-CFG-008
+  code
+  ```
+  import os
+  def f():
+      os.chmod("/tmp/x", 0o777)
+  ```
+
+test "python: chmod 0o600 is clean"
+  lang python
+  reject VYQL-CFG-008
+  code
+  ```
+  import os
+  def f():
+      os.chmod("/tmp/x", 0o600)
+  ```
+
 # --- Insecure temp file (VYQL-PATH-003) ---
 test "cpp: mktemp is insecure temp file"
   lang cpp
@@ -273,4 +529,40 @@ test "cpp: mkstemp is clean"
   code
   ```
   int main(){ int fd = mkstemp("/tmp/fooXXXXXX"); return fd; }
+  ```
+
+test "c: mktemp is insecure temp file"
+  lang c
+  expect VYQL-PATH-003
+  code
+  ```
+  int main(){ char *p = mktemp("/tmp/fooXXXXXX"); return 0; }
+  ```
+
+test "c: mkstemp is clean"
+  lang c
+  reject VYQL-PATH-003
+  code
+  ```
+  int main(){ int fd = mkstemp("/tmp/fooXXXXXX"); return fd; }
+  ```
+
+test "python: tempfile.mktemp is insecure temp file"
+  lang python
+  expect VYQL-PATH-003
+  code
+  ```
+  import tempfile
+  def f():
+      tempfile.mktemp()
+  ```
+
+test "python: NamedTemporaryFile is clean"
+  lang python
+  reject VYQL-PATH-003
+  code
+  ```
+  import tempfile
+  def f():
+      tempfile.NamedTemporaryFile()
   ```

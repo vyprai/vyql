@@ -500,8 +500,8 @@ adapter python {
   mark "csrf_exempt" -> code.CsrfDisabled
 
   // CSV injection (CWE-1236)
-  sink method "writerow" -> code.CsvCell
-  sink method "writerows" -> code.CsvCell
+  sink method "writerow" collection -> code.CsvCell
+  sink method "writerows" collection -> code.CsvCell
 
   // weak cipher (CWE-327) — named broken ciphers
   mark "DES.new" -> code.WeakCipher

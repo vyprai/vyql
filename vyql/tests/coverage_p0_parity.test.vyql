@@ -79,6 +79,17 @@ test "p0 ruby: sensitive operation without auth is reported"
   end
   ```
 
+test "p0 ruby: auth guard suppresses sensitive operation"
+  lang ruby
+  reject VYQL-AUTH-001
+  code
+  ```
+  def handler
+    require_auth
+    change_password(params[:password])
+  end
+  ```
+
 test "p0 java: sensitive operation without auth is reported"
   lang java
   expect VYQL-AUTH-001

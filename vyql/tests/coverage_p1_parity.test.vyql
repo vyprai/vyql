@@ -59,6 +59,18 @@ test "csharp: request value written to response header is header injection"
   class C { void H() { Response.Headers.Append("X-Trace", Request.Query["trace"]); } }
   ```
 
+test "java: request value written to response header is header injection"
+  lang java
+  expect VYQL-INJ-010
+  code
+  ```
+  class C {
+    void h(HttpServletRequest req, HttpServletResponse res) {
+      res.setHeader("X-Trace", req.getParameter("trace"));
+    }
+  }
+  ```
+
 # --- Log injection (VYQL-INJ-009) ---
 test "javascript: request value logged is log injection"
   lang javascript
@@ -109,6 +121,28 @@ test "csharp: request value logged is log injection"
   code
   ```
   class C { void H(ILogger logger) { logger.LogInformation(Request.Query["name"]); } }
+  ```
+
+test "python: request value logged is log injection"
+  lang python
+  expect VYQL-INJ-009
+  code
+  ```
+  import logging
+  def h(request):
+      logging.info(request.args["name"])
+  ```
+
+test "java: request value logged is log injection"
+  lang java
+  expect VYQL-INJ-009
+  code
+  ```
+  class C {
+    void h(HttpServletRequest req, Logger logger) {
+      logger.info(req.getParameter("name"));
+    }
+  }
   ```
 
 # --- CSV/formula injection (VYQL-INJ-014) ---
@@ -168,6 +202,27 @@ test "csharp: request value written to CSV cell is CSV injection"
   class C { void H(CsvWriter csv) { csv.WriteField(Request.Query["name"]); } }
   ```
 
+test "python: request value written to CSV cell is CSV injection"
+  lang python
+  expect VYQL-INJ-014
+  code
+  ```
+  def export(request, writer):
+      writer.writerow([request.args["name"]])
+  ```
+
+test "php: request value written to CSV cell is CSV injection"
+  lang php
+  expect VYQL-INJ-014
+  code
+  ```
+  <?php
+  function exportCsv($fh) {
+      fputcsv($fh, [$_GET["name"]]);
+  }
+  ?>
+  ```
+
 # --- Unrestricted upload / tainted upload destination (VYQL-INJ-015) ---
 test "python: uploaded filename saved as destination is unrestricted upload"
   lang python
@@ -223,6 +278,29 @@ test "csharp: request filename used for upload destination is unrestricted uploa
   class C { void H(byte[] data) { File.WriteAllBytes(Request.Query["name"], data); } }
   ```
 
+test "javascript: request filename used for upload destination is unrestricted upload"
+  lang javascript
+  expect VYQL-INJ-015
+  code
+  ```
+  const fs = require("fs");
+  function upload(req, data) {
+    fs.writeFile(req.query.name, data, () => {});
+  }
+  ```
+
+test "php: request filename used for upload destination is unrestricted upload"
+  lang php
+  expect VYQL-INJ-015
+  code
+  ```
+  <?php
+  function upload() {
+      move_uploaded_file($_FILES["f"]["tmp_name"], $_GET["name"]);
+  }
+  ?>
+  ```
+
 # --- Mass assignment (VYQL-INJ-012) ---
 test "python: request body bulk update is mass assignment"
   lang python
@@ -251,6 +329,38 @@ test "csharp: request form used to update model is mass assignment"
   code
   ```
   class C { void H(User user) { TryUpdateModelAsync(user, "", Request.Form); } }
+  ```
+
+test "javascript: request body bulk create is mass assignment"
+  lang javascript
+  expect VYQL-INJ-012
+  code
+  ```
+  function update(req) {
+    User.bulkCreate(req.body);
+  }
+  ```
+
+test "php: request body fill is mass assignment"
+  lang php
+  expect VYQL-INJ-012
+  code
+  ```
+  <?php
+  function update($user) {
+      $user->fill($_POST);
+  }
+  ?>
+  ```
+
+test "ruby: request params bulk update is mass assignment"
+  lang ruby
+  expect VYQL-INJ-012
+  code
+  ```
+  def update(user)
+    user.update_attributes(params[:user])
+  end
   ```
 
 # --- Constant-input rejects for the same P1 parity pairs ---
@@ -311,6 +421,18 @@ test "csharp: constant response header value is clean"
   class C { void H() { Response.Headers.Append("X-Trace", "fixed"); } }
   ```
 
+test "java: constant response header value is clean"
+  lang java
+  reject VYQL-INJ-010
+  code
+  ```
+  class C {
+    void h(HttpServletResponse res) {
+      res.setHeader("X-Trace", "fixed");
+    }
+  }
+  ```
+
 test "javascript: constant log message is clean"
   lang javascript
   reject VYQL-INJ-009
@@ -360,6 +482,28 @@ test "csharp: constant log message is clean"
   code
   ```
   class C { void H(ILogger logger) { logger.LogInformation("fixed"); } }
+  ```
+
+test "python: constant log message is clean"
+  lang python
+  reject VYQL-INJ-009
+  code
+  ```
+  import logging
+  def h():
+      logging.info("fixed")
+  ```
+
+test "java: constant log message is clean"
+  lang java
+  reject VYQL-INJ-009
+  code
+  ```
+  class C {
+    void h(Logger logger) {
+      logger.info("fixed");
+    }
+  }
   ```
 
 test "javascript: constant CSV cell is clean"
@@ -418,6 +562,27 @@ test "csharp: constant CSV cell is clean"
   class C { void H(CsvWriter csv) { csv.WriteField("fixed"); } }
   ```
 
+test "python: constant CSV cell is clean"
+  lang python
+  reject VYQL-INJ-014
+  code
+  ```
+  def export(writer):
+      writer.writerow(["fixed"])
+  ```
+
+test "php: constant CSV cell is clean"
+  lang php
+  reject VYQL-INJ-014
+  code
+  ```
+  <?php
+  function exportCsv($fh) {
+      fputcsv($fh, ["fixed"]);
+  }
+  ?>
+  ```
+
 test "python: fixed upload destination is clean"
   lang python
   reject VYQL-INJ-015
@@ -472,6 +637,29 @@ test "csharp: fixed upload destination is clean"
   class C { void H(byte[] data) { File.WriteAllBytes("uploads/fixed.dat", data); } }
   ```
 
+test "javascript: fixed upload destination is clean"
+  lang javascript
+  reject VYQL-INJ-015
+  code
+  ```
+  const fs = require("fs");
+  function upload(data) {
+    fs.writeFile("uploads/fixed.dat", data, () => {});
+  }
+  ```
+
+test "php: fixed upload destination is clean"
+  lang php
+  reject VYQL-INJ-015
+  code
+  ```
+  <?php
+  function upload() {
+      move_uploaded_file($_FILES["f"]["tmp_name"], "uploads/fixed.dat");
+  }
+  ?>
+  ```
+
 test "python: static bulk update is clean"
   lang python
   reject VYQL-INJ-012
@@ -499,4 +687,36 @@ test "csharp: static model update input is clean"
   code
   ```
   class C { void H(User user, object defaults) { TryUpdateModelAsync(user, "", defaults); } }
+  ```
+
+test "javascript: static bulk create is clean"
+  lang javascript
+  reject VYQL-INJ-012
+  code
+  ```
+  function update() {
+    User.bulkCreate([{ name: "fixed" }]);
+  }
+  ```
+
+test "php: static fill input is clean"
+  lang php
+  reject VYQL-INJ-012
+  code
+  ```
+  <?php
+  function update($user) {
+      $user->fill(["name" => "fixed"]);
+  }
+  ?>
+  ```
+
+test "ruby: static bulk update input is clean"
+  lang ruby
+  reject VYQL-INJ-012
+  code
+  ```
+  def update(user)
+    user.update_attributes(name: "fixed")
+  end
   ```

@@ -144,6 +144,9 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Block{Stmts: c.collectBodies(n)}}
 	case "comment":
 		return nil
+	case "identifier", "constant":
+		name := c.text(n)
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: name, Loc: L}, Path: name, Method: name, Loc: L}}}
 	}
 	// any other expression used as a statement
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}

@@ -62,6 +62,21 @@ test "resource-leak: a Go connection never closed leaks"
   }
   ```
 
+test "resource-leak: a Go connection closed only in one branch leaks on the others"
+  lang go
+  expect VYQL-RES-001
+  code
+  ```
+  package p
+  import "net"
+  func f(cond bool) {
+    c, _ := net.Dial("tcp", "example.com:443")
+    if cond {
+      c.Close()
+    }
+  }
+  ```
+
 test "resource-leak: a Java socket closed on every path is clean"
   lang java
   reject VYQL-RES-001
@@ -84,6 +99,21 @@ test "resource-leak: a Java socket never closed leaks"
     void f() throws Exception {
       Socket s = new Socket("example.com", 443);
       s.getInputStream();
+    }
+  }
+  ```
+
+test "resource-leak: a Java socket closed only in one branch leaks on the others"
+  lang java
+  expect VYQL-RES-001
+  code
+  ```
+  class C {
+    void f(boolean cond) throws Exception {
+      Socket s = new Socket("example.com", 443);
+      if (cond) {
+        s.close();
+      }
     }
   }
   ```
@@ -114,6 +144,34 @@ test "resource-leak: a C# file handle never closed leaks"
   }
   ```
 
+test "resource-leak: a C# file handle closed only in one branch leaks on the others"
+  lang csharp
+  expect VYQL-RES-001
+  code
+  ```
+  class C {
+    void F(bool cond) {
+      var f = File.Open("data.txt", FileMode.Open);
+      if (cond) {
+        f.Close();
+      }
+    }
+  }
+  ```
+
+test "resource-leak: a C# file handle disposed on every path is clean"
+  lang csharp
+  reject VYQL-RES-001
+  code
+  ```
+  class C {
+    void F() {
+      var f = File.Open("data.txt", FileMode.Open);
+      f.Dispose();
+    }
+  }
+  ```
+
 test "resource-leak: a PHP file handle closed on every path is clean"
   lang php
   reject VYQL-RES-001
@@ -128,6 +186,14 @@ test "resource-leak: a PHP file handle never closed leaks"
   code
   ```
   <?php function f(){ $h = fopen("data.txt", "r"); fread($h, 1); }
+  ```
+
+test "resource-leak: a PHP file handle closed only in one branch leaks on the others"
+  lang php
+  expect VYQL-RES-001
+  code
+  ```
+  <?php function f($cond){ $h = fopen("data.txt", "r"); if ($cond) { fclose($h); } }
   ```
 
 test "resource-leak: a Ruby socket closed on every path is clean"
@@ -149,5 +215,18 @@ test "resource-leak: a Ruby socket never closed leaks"
   def f
     s = TCPSocket.open("example.com", 443)
     s.write("x")
+  end
+  ```
+
+test "resource-leak: a Ruby socket closed only in one branch leaks on the others"
+  lang ruby
+  expect VYQL-RES-001
+  code
+  ```
+  def f(cond)
+    s = TCPSocket.open("example.com", 443)
+    if cond
+      s.close
+    end
   end
   ```

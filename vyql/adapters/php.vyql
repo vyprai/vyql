@@ -134,7 +134,7 @@ adapter php {
   mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
-  sink path "fputcsv" arg 1 -> code.CsvCell
+  sink path "fputcsv" arg 1 collection -> code.CsvCell
   sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
   sink method "extractTo" arg all -> code.ArchiveEntryWrite
   sink path "ZipArchive.extractTo" arg all -> code.ArchiveEntryWrite

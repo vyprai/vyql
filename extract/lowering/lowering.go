@@ -957,7 +957,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
 		}
-		return l.node("Const", ex.Loc, nil)
+		return l.node("Name", ex.Loc, map[string]string{"callee_path": ex.ID, "method": ex.ID})
 	case nir.Const:
 		return l.node("Const", ex.Loc, nil)
 	case nir.Thru:
