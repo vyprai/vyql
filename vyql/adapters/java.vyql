@@ -114,12 +114,26 @@ adapter java {
   sink path "Files.delete" -> code.FilePathAccess
   sink path "Files.copy" -> code.FilePathAccess
   sink path "Paths.get" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
 
   // SSRF
   sink path "URL" -> code.UrlFetch
   sink method "openConnection" -> code.UrlFetch
   sink method "getForObject" -> code.UrlFetch
   sink method "getForEntity" -> code.UrlFetch
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getReferenceById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  sink method "getOrder" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // Code eval / scripting
   sink method "eval" -> code.CodeEval
@@ -142,6 +156,15 @@ adapter java {
   control "hasPermission" -> core.AuthorizationCheck
   control "hasAuthority" -> core.AuthorizationCheck
   control "hasRole" -> core.AuthorizationCheck
+  control method "requireAuth" -> core.AuthenticationCheck
+  control method "ensureAuthenticated" -> core.AuthenticationCheck
+  control method "isAuthenticated" -> core.AuthenticationCheck
+  control method "authenticate" -> core.AuthenticationCheck
+  control method "checkOwnership" -> core.OwnershipCheck
+  control method "requireOwner" -> core.OwnershipCheck
+  control method "isOwner" -> core.OwnershipCheck
+  mark "lock" -> code.LockAcquire
+  control method "unlock" -> core.LockRelease
   // XXE hardening — a parser factory configured to disallow DOCTYPE / external entities,
   // dominating the parse (value-matched feature flag).
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
@@ -223,6 +246,8 @@ adapter java {
   mark "Cipher.getInstance" val "RC2" -> code.WeakCipher
   mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
   mark "Cipher.getInstance" val "ECB" -> code.WeakCipher
+  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
+  mark "GCMParameterSpec" val "000000000000" -> code.StaticIv
   // NullCipher (CWE-327) — a "cipher" that performs no encryption at all.
   mark "NullCipher" -> code.WeakCipher
   // weak randomness (CWE-330) — java.util.Random / Math.random (presence). SecureRandom is

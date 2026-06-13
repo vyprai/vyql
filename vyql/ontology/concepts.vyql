@@ -209,6 +209,90 @@ concept ResourceHandle : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_772]
 }
+concept LockAcquire : sink {
+  vulnerable_to: [concurrency.Deadlock]
+  cwe: [CWE_667]
+}
+concept UnboundedCopy : sink {
+  vulnerable_to: [memory.OobWrite]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_787, CWE_120]
+}
+concept UnboundedCopySmell : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_787, CWE_120]
+}
+concept RawMemoryCopySize : sink {
+  vulnerable_to: [memory.OobWrite]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_787]
+}
+concept SizeComputation : sink {
+  vulnerable_to: [memory.IntegerOverflow]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_190]
+}
+concept StackAllocationSmell : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+}
+concept FileCheck : sink {
+  vulnerable_to: [concurrency.Toctou]
+  cwe: [CWE_367]
+}
+concept FileUse : sink {
+  vulnerable_to: [concurrency.Toctou]
+  cwe: [CWE_367]
+}
+concept LocklessSharedMutation : sink {
+  vulnerable_to: [concurrency.RaceCondition]
+  cwe: [CWE_362]
+}
+concept IndexAccess : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_125, CWE_787]
+}
+concept DivisionDenominator : sink {
+  vulnerable_to: [numeric.DivideByZero]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_369]
+}
+concept IntegerSizeArithmetic : sink {
+  vulnerable_to: [memory.IntegerOverflow]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_190]
+}
+concept PointerFree : sink {
+  vulnerable_to: [memory.UseAfterFree, memory.DoubleFree]
+  cwe: [CWE_416, CWE_415]
+}
+concept PointerUse : sink {
+  vulnerable_to: [memory.UseAfterFree]
+  cwe: [CWE_416]
+}
+concept NullableDeref : sink {
+  vulnerable_to: [memory.NullDereference]
+  cwe: [CWE_476]
+}
+concept AuthenticationRequiredOp : sink {
+  vulnerable_to: [authentication.MissingAuthentication]
+  cwe: [CWE_306]
+}
+concept ObjectLookupByUserInput : sink {
+  vulnerable_to: [access_control.Idor]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_639]
+}
+concept ArchiveEntryWrite : sink {
+  vulnerable_to: [path.PathTraversal, path.LinkFollowing]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_22, CWE_59]
+}
+concept StaticIv : sink {
+  vulnerable_to: [crypto.StaticIv]
+  cwe: [CWE_329]
+}
 concept TxOriginAuth : sink {
   vulnerable_to: [smartcontract.TxOriginAuth]
   cwe: [CWE_477]
@@ -422,6 +506,10 @@ concept ResourceRelease : control {
   neutralizes: [resource.ResourceLeak]
   cwe: [CWE_772]
 }
+concept LockRelease : control {
+  neutralizes: [concurrency.Deadlock]
+  cwe: [CWE_667]
+}
 concept AllowlistValidation : control {
   neutralizes: [injection.CommandInjection, request_forgery.Ssrf]
   applies: path
@@ -481,7 +569,7 @@ concept OutputEncoding : control {
   applies: path
 }
 concept OwnershipCheck : control {
-  neutralizes: [access_control.BrokenAccess]
+  neutralizes: [access_control.BrokenAccess, access_control.Idor]
   applies: endpoint
 }
 concept PathCanonicalization : control {

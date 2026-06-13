@@ -1,0 +1,94 @@
+# Memory-safety coverage: taint-proven memory operands plus assumption-gated smells.
+
+test "memory: argv reaches strcpy source and unbounded-copy smell is reported (c)"
+  lang c
+  expect VYQL-MEM-001
+  expect VYQL-MEM-002
+  code
+  ```
+  void f(int argc, char **argv) {
+      char dst[8];
+      strcpy(dst, argv[1]);
+  }
+  ```
+
+test "memory: constant strcpy is only the low-confidence smell (c)"
+  lang c
+  expect VYQL-MEM-002
+  reject VYQL-MEM-001
+  code
+  ```
+  void f() {
+      char dst[8];
+      strcpy(dst, "ok");
+  }
+  ```
+
+test "memory: attacker-controlled memcpy size is reported (c)"
+  lang c
+  expect VYQL-MEM-003
+  code
+  ```
+  int atoi(const char *);
+  void f(int argc, char **argv, char *dst, char *src) {
+      int n = atoi(argv[1]);
+      memcpy(dst, src, n);
+  }
+  ```
+
+test "memory: stack allocation smell is reported (c)"
+  lang c
+  expect VYQL-MEM-004
+  code
+  ```
+  void f(int n) {
+      char *buf = alloca(n);
+      (void)buf;
+  }
+  ```
+
+test "memory: attacker-controlled array index is reported (c)"
+  lang c
+  expect VYQL-MEM-005
+  code
+  ```
+  int atoi(const char *);
+  int f(int argc, char **argv, int *arr) {
+      int i = atoi(argv[1]);
+      return arr[i];
+  }
+  ```
+
+test "memory: pointer dereference is reported as nullable-deref smell (c)"
+  lang c
+  expect VYQL-MEM-006
+  code
+  ```
+  void f(int *p) {
+      *p = 1;
+  }
+  ```
+
+test "memory: free before dereference is reported as potential use-after-free (c)"
+  lang c
+  expect VYQL-MEM-007
+  code
+  ```
+  void free(void *);
+  void f(int *p) {
+      free(p);
+      *p = 1;
+  }
+  ```
+
+test "memory: repeated free is reported as potential double-free (c)"
+  lang c
+  expect VYQL-MEM-008
+  code
+  ```
+  void free(void *);
+  void f(int *p) {
+      free(p);
+      free(p);
+  }
+  ```

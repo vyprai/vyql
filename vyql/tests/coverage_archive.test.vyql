@@ -1,0 +1,100 @@
+# Archive extraction path coverage.
+
+test "path: archive entry name reaching extraction is reported (javascript)"
+  lang javascript
+  expect VYQL-PATH-004
+  code
+  ```
+  function extract(req, zip) {
+    zip.extractEntryTo(req.params.name);
+  }
+  ```
+
+test "path: canonicalized archive entry name is clean (javascript)"
+  lang javascript
+  reject VYQL-PATH-004
+  code
+  ```
+  function extract(req, zip) {
+    const name = path.basename(req.params.name);
+    zip.extractEntryTo(name);
+  }
+  ```
+
+test "path: python archive entry name reaching extraction is reported"
+  lang python
+  expect VYQL-PATH-004
+  code
+  ```
+  def handler(request, archive):
+      archive.extract(request.args["name"])
+  ```
+
+test "path: python canonicalized archive entry name is clean"
+  lang python
+  reject VYQL-PATH-004
+  code
+  ```
+  import os
+  def handler(request, archive):
+      name = os.path.basename(request.args["name"])
+      archive.extract(name)
+  ```
+
+test "path: php archive entry name reaching extraction is reported"
+  lang php
+  expect VYQL-PATH-004
+  code
+  ```
+  <?php
+  function handler($zip) {
+      $zip->extractTo("/tmp/out", $_GET["name"]);
+  }
+  ?>
+  ```
+
+test "path: ruby archive entry name reaching extraction is reported"
+  lang ruby
+  expect VYQL-PATH-004
+  code
+  ```
+  def handler(zip)
+    zip.extract(params[:name])
+  end
+  ```
+
+test "path: java archive entry name reaching extraction is reported"
+  lang java
+  expect VYQL-PATH-004
+  code
+  ```
+  class App {
+    void handler(Request req, Extractor extractor) {
+      extractor.extractEntry(req.getParameter("name"));
+    }
+  }
+  ```
+
+test "path: go archive entry name reaching extraction is reported"
+  lang go
+  expect VYQL-PATH-004
+  code
+  ```
+  package main
+  import "net/http"
+  func handler(r *http.Request) {
+      extractEntry(r.URL.Query().Get("name"))
+  }
+  ```
+
+test "path: csharp archive entry name reaching extraction is reported"
+  lang csharp
+  expect VYQL-PATH-004
+  code
+  ```
+  class App {
+    void Handler(dynamic Request, dynamic entry) {
+      entry.ExtractToFile(Request.Query["name"]);
+    }
+  }
+  ```

@@ -51,6 +51,9 @@ adapter ruby {
   sink method "exec_update" -> code.SqlExecution
   sink method "exec_delete" -> code.SqlExecution
   sink method "exec_insert" -> code.SqlExecution
+  sink method "find" -> code.ObjectLookupByUserInput
+  sink method "find_by_id" -> code.ObjectLookupByUserInput
+  sink method "find_by!" -> code.ObjectLookupByUserInput
   // CSRF (CWE-352, RF-003) — security-sensitive state-changing operations (low-FP scope)
   sink method "change_password" -> code.StateChangingOp
   sink method "update_password" -> code.StateChangingOp
@@ -60,12 +63,27 @@ adapter ruby {
   sink method "delete_account" -> code.StateChangingOp
   sink method "grant_role" -> code.StateChangingOp
   sink method "make_admin" -> code.StateChangingOp
+  mark "change_password" -> code.AuthenticationRequiredOp
+  mark "update_password" -> code.AuthenticationRequiredOp
+  mark "reset_password" -> code.AuthenticationRequiredOp
+  mark "change_email" -> code.AuthenticationRequiredOp
+  mark "transfer_funds" -> code.AuthenticationRequiredOp
+  mark "delete_account" -> code.AuthenticationRequiredOp
+  mark "grant_role" -> code.AuthenticationRequiredOp
+  mark "make_admin" -> code.AuthenticationRequiredOp
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verify_authenticity_token" -> core.CsrfProtection
   control "validate_csrf_token" -> core.CsrfProtection
+  control "authenticate_user!" -> core.AuthenticationCheck
+  control "require_auth" -> core.AuthenticationCheck
+  control "ensure_authenticated" -> core.AuthenticationCheck
+  control "signed_in?" -> core.AuthenticationCheck
   // authorization checks (guards BIZ-001) — Pundit/CanCan predicates (path-sensitive via B1).
   control "authorize" -> core.AuthorizationCheck
   control "authorize!" -> core.AuthorizationCheck
+  control "check_ownership" -> core.OwnershipCheck
+  control "require_owner" -> core.OwnershipCheck
+  control "owns_resource?" -> core.OwnershipCheck
   // Sequel raw SQL (DB.fetch / DB.run / DB['...'])
   sink path "DB.fetch" -> code.SqlExecution
   sink path "DB.run" -> code.SqlExecution
@@ -131,6 +149,8 @@ adapter ruby {
   sink path "Dir.entries" -> code.FilePathAccess
   sink path "send_file" -> code.FilePathAccess
   sink path "send_data" -> code.FilePathAccess
+  sink method "extract" -> code.ArchiveEntryWrite
+  sink path "Zip.File.extract" -> code.ArchiveEntryWrite
   sink path "raw" -> code.HtmlRender
   sink path "html_safe" -> code.HtmlRender
   sink path "render" -> code.HtmlRender
@@ -169,6 +189,8 @@ adapter ruby {
   mark "OpenSSL.Cipher.new" val "rc2" -> code.WeakCipher
   mark "OpenSSL.Cipher.new" val "bf" -> code.WeakCipher
   mark "OpenSSL.Cipher.new" val "ecb" -> code.WeakCipher
+  mark "OpenSSL.Cipher.new" val "0000000000000000" -> code.StaticIv
+  mark "cipher.iv" val "0000000000000000" -> code.StaticIv
 
   // weak hash (CWE-327) — MD5/SHA1 digests
   mark "Digest.MD5" -> code.WeakHash

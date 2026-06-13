@@ -24,3 +24,7 @@ rule WeakRandomness {
   match code.WeakRandomValue as r
 }
 
+rule StaticIvOrNonce {
+  meta { id: "VYQL-CRY-004", severity: medium, cwe: [CWE_329], confidence_floor: low }
+  match code.StaticIv as iv
+}

@@ -112,13 +112,29 @@ adapter javascript {
   sink method "deleteAccount" -> code.StateChangingOp
   sink method "grantRole" -> code.StateChangingOp
   sink method "makeAdmin" -> code.StateChangingOp
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verifyCsrfToken" -> core.CsrfProtection
   control "validateCsrfToken" -> core.CsrfProtection
+  control "requireAuth" -> core.AuthenticationCheck
+  control "ensureAuthenticated" -> core.AuthenticationCheck
+  control "isAuthenticated" -> core.AuthenticationCheck
+  control "authenticate" -> core.AuthenticationCheck
   // authorization checks (guards BIZ-001) — path-sensitive via B1.
   control "checkPermission" -> core.AuthorizationCheck
   control "hasPermission" -> core.AuthorizationCheck
   control "ability.can" -> core.AuthorizationCheck
+  control "checkOwnership" -> core.OwnershipCheck
+  control "requireOwner" -> core.OwnershipCheck
+  control "isOwner" -> core.OwnershipCheck
+  control "ownsResource" -> core.OwnershipCheck
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
   control "isSafeRedirect" -> core.RedirectAllowlist
   control "isValidRedirect" -> core.RedirectAllowlist
@@ -234,6 +250,16 @@ adapter javascript {
   sink path "res.sendFile" -> code.FilePathAccess
   sink path "res.download" -> code.FilePathAccess
   sink path "zip.file" -> code.FilePathAccess
+  sink path "extractEntryTo" -> code.ArchiveEntryWrite
+  sink path "zip.extractEntryTo" -> code.ArchiveEntryWrite
+  sink path "admZip.extractEntryTo" -> code.ArchiveEntryWrite
+  sink path "entry.pipe" -> code.ArchiveEntryWrite
+  sink path "User.findById" -> code.ObjectLookupByUserInput
+  sink path "Account.findById" -> code.ObjectLookupByUserInput
+  sink path "Order.findById" -> code.ObjectLookupByUserInput
+  sink path "findUserById" -> code.ObjectLookupByUserInput
+  sink path "findAccountById" -> code.ObjectLookupByUserInput
+  sink path "findOrderById" -> code.ObjectLookupByUserInput
   sink path "readFileToBuffer" -> code.FilePathAccess
   sink path "writeFileFromBuffer" -> code.FilePathAccess
   // Client-side handoff of an uploaded object key/path into a hidden form field that the
@@ -403,6 +429,8 @@ adapter javascript {
   // weak cipher (CWE-327): fire unless a strong AEAD/256-bit algorithm literal is present
   // (catches ecb/cbc/des/rc4/aes-128 + dynamic algorithm vars; accepts FP on dynamic-strong).
   mark "createCipheriv" nval "gcm" nval "chacha" nval "poly1305" -> code.WeakCipher
+  mark "createCipheriv" val "0000000000000000" -> code.StaticIv
+  mark "createCipheriv" val "000000000000" -> code.StaticIv
 
   // weak hash (CWE-328) — crypto.createHash('md5'|'sha1') (value-matched).
   // weak hash (CWE-328): value-match the weak algorithm on the createHash node. Precise —

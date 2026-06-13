@@ -1,0 +1,90 @@
+# Crypto protocol misuse coverage.
+
+test "crypto: static IV is reported (javascript)"
+  lang javascript
+  expect VYQL-CRY-004
+  code
+  ```
+  const crypto = require("crypto");
+  function enc(key, data) {
+    return crypto.createCipheriv("aes-128-cbc", key, "0000000000000000");
+  }
+  ```
+
+test "crypto: python static IV is reported"
+  lang python
+  expect VYQL-CRY-004
+  code
+  ```
+  from Crypto.Cipher import AES
+  def enc(key, data):
+      return AES.new(key, AES.MODE_CBC, "0000000000000000")
+  ```
+
+test "crypto: php static IV is reported"
+  lang php
+  expect VYQL-CRY-004
+  code
+  ```
+  <?php
+  function enc($key, $data) {
+      return openssl_encrypt($data, "AES-128-CBC", $key, 0, "0000000000000000");
+  }
+  ?>
+  ```
+
+test "crypto: ruby static IV is reported"
+  lang ruby
+  expect VYQL-CRY-004
+  code
+  ```
+  def enc
+    OpenSSL::Cipher.new("aes-128-cbc", "0000000000000000")
+  end
+  ```
+
+test "crypto: java static IV is reported"
+  lang java
+  expect VYQL-CRY-004
+  code
+  ```
+  class App {
+    void enc() {
+      new IvParameterSpec("0000000000000000".getBytes());
+    }
+  }
+  ```
+
+test "crypto: go static IV is reported"
+  lang go
+  expect VYQL-CRY-004
+  code
+  ```
+  package main
+  import "crypto/cipher"
+  func enc(block cipher.Block) {
+      cipher.NewCBCEncrypter(block, []byte("0000000000000000"))
+  }
+  ```
+
+test "crypto: csharp static IV is reported"
+  lang csharp
+  expect VYQL-CRY-004
+  code
+  ```
+  class App {
+    void Enc(dynamic aes, byte[] key) {
+      aes.CreateEncryptor(key, "0000000000000000");
+    }
+  }
+  ```
+
+test "crypto: swift static IV is reported"
+  lang swift
+  expect VYQL-CRY-004
+  code
+  ```
+  func enc() {
+    Cipher("AES-CBC", "0000000000000000")
+  }
+  ```

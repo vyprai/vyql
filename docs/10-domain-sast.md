@@ -1,6 +1,6 @@
 # 10 — Domain: Code Analysis (SAST)
 
-Status: `DRAFT` (Tier 2 — ships after the cloud/identity flagship)
+Status: `DRAFT` (Tier 2; the deterministic SAST slice is implemented in Go)
 
 SAST is where VyQL's universality claim is hardest to deliver and where the
 incumbents (CodeQL, Semgrep) are strongest. This document scopes a credible
@@ -9,22 +9,16 @@ but only if the underlying extractors and the taint solver
 ([08](08-dataflow-and-taint.md)) meet a real precision bar. The rule
 language is not the risk; extractor quality and adapter coverage are.
 
-> **Validated on real code, in three languages.** Prototype extractors for
-> Python (CPython `ast`), JavaScript (acorn/ESTree), and Ruby (Ripper
-> S-expressions) — three structurally unrelated parser frontends — each walk
-> source into the *same* USG schema, and the *single unchanged* SQLi rule runs
-> over all three (Flask, Express, Rails). Each finds genuine interprocedural
-> cross-file vulnerabilities (Python: a flow across three files; JS/Ruby:
-> controller→model) and stays clean on parameterized variants. Adding a language
-> or framework was an extractor + adapter set, never a rule change. All three
-> extractors use import + type resolution ([below](#call-resolution-normative)),
-> which removed real false positives that bare name matching produced. Every gap
-> found was a per-language extractor quirk (method-chain receivers, class/
-> singleton-method bodies, AST list-wrapper recursion, source-root-relative
-> module naming), never in the rule/concept layers — confirming the "extractor
-> quality is the risk, not the language" thesis. See `../poc/extract/` and
-> `poc/FINDINGS.md` §§"Real-repo extraction" / "Cross-language" / "Call
-> resolution".
+> **Validated and implemented across 22 source languages.** The current Go CLI
+> routes Go through `go/ast` and Python, JavaScript/TS, Ruby, Java, PHP, C#,
+> C, C++, Rust, Bash, Scala, Lua, Kotlin, PowerShell, Swift, Perl, Solidity,
+> Objective-C, Elixir, Dart, and Groovy through tree-sitter frontends. They all
+> lower into the same NIR and shared USG/dataflow model; rules remain written
+> against concepts. The original prototype proved the thesis on three unrelated
+> parsers (Python `ast`, acorn/ESTree, Ruby/Ripper), where the same SQLi rule
+> found real interprocedural vulnerabilities and stayed clean on parameterized
+> variants. The current implementation extends that model with shared lowering,
+> import/type resolution, named-value matching, SCA, config/IaC, and secrets.
 
 ## Pipeline
 
@@ -47,11 +41,13 @@ swappable and dependencies decoupled — is specified in
 translate to the normalized IR); resolution and dataflow are shared, not
 per-language.
 
-**v1 languages (in order):** JavaScript/TypeScript, Python, Java, Go.
-**Wave 2:** C#, PHP, Ruby, Kotlin.
+**Current source languages:** Go, Python, JavaScript/TypeScript, Ruby, Java,
+PHP, C#, C, C++, Rust, Bash, Scala, Lua, Kotlin, PowerShell, Swift, Perl,
+Solidity, Objective-C, Elixir, Dart, and Groovy.
 
-Build-free extraction is the default (tree-sitter + heuristic resolution);
-build-aware extraction (full type info) is an upgrade path per language.
+Build-free extraction is the default (tree-sitter plus shared IR resolution,
+with Go using the native parser); build-aware extraction (full type info) is an
+upgrade path per language.
 Extraction fidelity feeds label confidence ([07](07-adapters-and-patterns.md)
 §fidelity) — be honest in provenance about which mode produced a finding.
 
@@ -93,9 +89,10 @@ Unresolved targets are left unconnected (a bounded false negative) in preference
 to over-connecting (an unbounded false-positive source). Build-aware extraction
 ([above](#language-extractors)) supplies full type info and raises resolution
 from heuristic to `resolved`; resolution quality flows into finding confidence
-([14](14-findings-explainability-output.md)). The prototype implements all three
-steps for Python, JavaScript, and Ruby; on a real app this removed multiple
-false positives that name-based resolution produced (see `poc/FINDINGS.md`
+([14](14-findings-explainability-output.md)). The Go lowering layer implements
+this shared resolution model for the current frontends; the prototype first
+proved the approach for Python, JavaScript, and Ruby and removed multiple false
+positives that name-based resolution produced (see `poc/FINDINGS.md`
 §"Call resolution", `poc/cases/case_16`).
 
 ## Rule pack: the cross-language injection family
@@ -197,7 +194,10 @@ Tier 2 does not ship on vibes. Gates:
 
 - Path-sensitive analysis, symbolic execution, full implicit-flow tracking
   ([08](08-dataflow-and-taint.md) open questions).
-- Languages without SSA-capable extractors (C/C++ deferred — memory-safety
-  analysis is a different engine class).
+- Full symbolic memory/race proof. The current implementation includes
+  exploitability-aware C/C++/ObjC memory/numeric/TOCTOU/lifecycle findings
+  (tainted indexes, copy sizes, size arithmetic, potential UAF/double-free/null
+  deref, file TOCTOU, and lock lifecycle), but precise alias/lifetime/range/
+  interleaving proof remains a deeper engine class.
 - Autofix generation (post-v1; the witness path + control vocabulary is
   designed to make fixes derivable later).

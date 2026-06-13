@@ -25,10 +25,12 @@ threat ResourceLeak { cwe: [CWE_772], desc: "Missing release of a resource on so
 package concurrency;
 threat RaceCondition { cwe: [CWE_362], desc: "Concurrent execution using shared resource" }
 threat Toctou { cwe: [CWE_367], desc: "Time-of-check time-of-use race" }
+threat Deadlock { cwe: [CWE_667], desc: "Improper locking — acquired lock is not released on every path" }
 
 package crypto;
 threat WeakCipher { cwe: [CWE_327], desc: "Use of a broken/weak symmetric cipher (DES/RC4/Blowfish/RC2)" }
 threat WeakHash { cwe: [CWE_327], desc: "Use of a broken/weak cryptographic primitive (MD5/SHA1/DES/RC4/ECB)" }
+threat StaticIv { cwe: [CWE_329], desc: "Use of a static, predictable, or repeated IV/nonce in a mode that requires uniqueness" }
 threat CleartextStorage { cwe: [CWE_312], desc: "Cleartext storage of sensitive information" }
 threat CleartextTransmission { cwe: [CWE_319], desc: "Cleartext transmission of sensitive information" }
 threat HardcodedCryptoKey { cwe: [CWE_321], desc: "Use of a hard-coded cryptographic key" }
@@ -77,6 +79,9 @@ threat OobRead { cwe: [CWE_125], desc: "Out-of-bounds read" }
 threat OobWrite { cwe: [CWE_787], desc: "Out-of-bounds write (buffer overflow)" }
 threat TypeConfusion { cwe: [CWE_843], desc: "Type confusion" }
 threat UseAfterFree { cwe: [CWE_416], desc: "Use after free" }
+
+package numeric;
+threat DivideByZero { cwe: [CWE_369], desc: "Attacker-controlled denominator can reach division or modulo by zero" }
 
 package path;
 threat FileInclusion { cwe: [CWE_98], desc: "Untrusted data controlling an include/require path" }

@@ -1,0 +1,18 @@
+// Numeric and size-computation weakness rules. These are partial by design: the
+// finding states the exploit condition rather than claiming full range proof.
+package vypr.numeric;
+
+rule TaintedSizeComputation {
+  meta { id: "VYQL-NUM-001", severity: medium, cwe: [CWE_190] }
+  taint core.UserControlledData -> code.SizeComputation
+}
+
+rule TaintedDivisionDenominator {
+  meta { id: "VYQL-NUM-002", severity: medium, cwe: [CWE_369] }
+  taint core.UserControlledData -> code.DivisionDenominator
+}
+
+rule TaintedIntegerSizeArithmetic {
+  meta { id: "VYQL-NUM-003", severity: low, cwe: [CWE_190], confidence_floor: low }
+  taint core.UserControlledData -> code.IntegerSizeArithmetic
+}

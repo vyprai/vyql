@@ -93,6 +93,8 @@ adapter go {
   sink path "os.Mkdir" -> code.FilePathAccess
   sink path "os.MkdirAll" -> code.FilePathAccess
   sink path "filepath.Walk" -> code.FilePathAccess
+  sink path "extractEntry" -> code.ArchiveEntryWrite
+  sink path "writeArchiveEntry" -> code.ArchiveEntryWrite
   // LDAP injection (CWE-90), XPath injection (CWE-643), trust-boundary write (CWE-501)
   sink method "Search" on [ldap.Conn] -> code.LdapQuery
   sink method "SearchWithPaging" on [ldap.Conn] -> code.LdapQuery
@@ -107,6 +109,19 @@ adapter go {
   sink path "http.Redirect" -> code.RedirectTarget
   sink path "c.Redirect" -> code.RedirectTarget
   sink path "ctx.Redirect" -> code.RedirectTarget
+  sink method "FindByID" -> code.ObjectLookupByUserInput
+  sink method "FindById" -> code.ObjectLookupByUserInput
+  sink method "GetUser" -> code.ObjectLookupByUserInput
+  sink method "GetAccount" -> code.ObjectLookupByUserInput
+  sink method "GetOrder" -> code.ObjectLookupByUserInput
+  mark "ChangePassword" -> code.AuthenticationRequiredOp
+  mark "UpdatePassword" -> code.AuthenticationRequiredOp
+  mark "ResetPassword" -> code.AuthenticationRequiredOp
+  mark "ChangeEmail" -> code.AuthenticationRequiredOp
+  mark "TransferFunds" -> code.AuthenticationRequiredOp
+  mark "DeleteAccount" -> code.AuthenticationRequiredOp
+  mark "GrantRole" -> code.AuthenticationRequiredOp
+  mark "MakeAdmin" -> code.AuthenticationRequiredOp
 
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "html.EscapeString" -> core.HtmlEscape
@@ -118,6 +133,13 @@ adapter go {
   control "support.EscapeLDAP" -> core.LdapEscape
   control "support.XPathLiteral" -> core.XpathEscape
   control "support.AllowRole" -> core.InputValidation
+  control method "RequireAuth" -> core.AuthenticationCheck
+  control method "EnsureAuthenticated" -> core.AuthenticationCheck
+  control method "IsAuthenticated" -> core.AuthenticationCheck
+  control method "Authenticate" -> core.AuthenticationCheck
+  control method "CheckOwnership" -> core.OwnershipCheck
+  control method "RequireOwner" -> core.OwnershipCheck
+  control method "IsOwner" -> core.OwnershipCheck
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "regexp.Compile" -> code.RegexCompile
@@ -148,6 +170,8 @@ adapter go {
   mark "des.NewCipher" -> code.WeakCipher
   mark "des.NewTripleDESCipher" -> code.WeakCipher
   mark "rc4.NewCipher" -> code.WeakCipher
+  mark "cipher.NewCBCEncrypter" val "0000000000000000" -> code.StaticIv
+  mark "cipher.NewCBCDecrypter" val "0000000000000000" -> code.StaticIv
 
   // insecure file permission (CWE-732) — world-writable mode on chmod/WriteFile/MkdirAll.
   // octal literal text is carried by the frontend; restrictive modes are not matched.
@@ -178,6 +202,12 @@ adapter go {
   mark "http.Get" val "http://" nval "127.0" -> code.CleartextChannel
   mark "http.Post" val "http://" nval "127.0" -> code.CleartextChannel
   mark "http.NewRequest" val "http://" nval "127.0" -> code.CleartextChannel
+
+  // lifecycle / locking (CWE-667)
+  mark "Lock" -> code.LockAcquire
+  mark "RLock" -> code.LockAcquire
+  control method "Unlock" -> core.LockRelease
+  control method "RUnlock" -> core.LockRelease
 
 
   // character-filter: regexp (*Regexp).ReplaceAllString is global.

@@ -67,12 +67,26 @@ adapter csharp {
   sink path "File.Move" -> code.FilePathAccess
   sink path "FileStream" -> code.FilePathAccess
   sink path "StreamReader" -> code.FilePathAccess
+  sink path "ExtractToFile" -> code.ArchiveEntryWrite
 
   // SSRF
   sink method "DownloadString" -> code.UrlFetch
   sink method "DownloadData" -> code.UrlFetch
   sink method "GetAsync" -> code.UrlFetch
   sink path "WebClient" -> code.UrlFetch
+  sink method "FindAsync" -> code.ObjectLookupByUserInput
+  sink method "Find" -> code.ObjectLookupByUserInput
+  sink method "GetUser" -> code.ObjectLookupByUserInput
+  sink method "GetAccount" -> code.ObjectLookupByUserInput
+  sink method "GetOrder" -> code.ObjectLookupByUserInput
+  mark "ChangePassword" -> code.AuthenticationRequiredOp
+  mark "UpdatePassword" -> code.AuthenticationRequiredOp
+  mark "ResetPassword" -> code.AuthenticationRequiredOp
+  mark "ChangeEmail" -> code.AuthenticationRequiredOp
+  mark "TransferFunds" -> code.AuthenticationRequiredOp
+  mark "DeleteAccount" -> code.AuthenticationRequiredOp
+  mark "GrantRole" -> code.AuthenticationRequiredOp
+  mark "MakeAdmin" -> code.AuthenticationRequiredOp
 
   // reflected XSS — Response.Write, Razor @Html.Raw, Blazor MarkupString
   sink path "Response.Write" -> code.HtmlRender
@@ -94,6 +108,16 @@ adapter csharp {
   control "AntiXss.HtmlEncode" -> core.HtmlEscape
   control "Path.GetFullPath" -> core.PathCanonicalization
   control "Path.GetFileName" -> core.PathCanonicalization
+  control method "RequireAuth" -> core.AuthenticationCheck
+  control method "EnsureAuthenticated" -> core.AuthenticationCheck
+  control method "IsAuthenticated" -> core.AuthenticationCheck
+  control method "Authenticate" -> core.AuthenticationCheck
+  control method "CheckOwnership" -> core.OwnershipCheck
+  control method "RequireOwner" -> core.OwnershipCheck
+  control method "IsOwner" -> core.OwnershipCheck
+  mark "Monitor.Enter" -> code.LockAcquire
+  mark "lock" -> code.LockAcquire
+  control "Monitor.Exit" -> core.LockRelease
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "Regex" -> code.RegexCompile
@@ -107,6 +131,8 @@ adapter csharp {
   mark "RC2CryptoServiceProvider" -> code.WeakCipher
   // ECB mode (CWE-327) — CipherMode.ECB assigned to a cipher's .Mode.
   mark "CipherMode.ECB" -> code.WeakCipher
+  mark "CreateEncryptor" val "0000000000000000" -> code.StaticIv
+  mark "AesGcm" val "000000000000" -> code.StaticIv
   mark "MD5.Create" -> code.WeakHash
   mark "SHA1.Create" -> code.WeakHash
   mark "MD5CryptoServiceProvider" -> code.WeakHash

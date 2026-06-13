@@ -254,6 +254,22 @@ func cmdExplain(args []string) error {
 			}
 			fmt.Printf("  %s %s: %s\n", mark, ne.Clause, ne.Detail)
 		}
+		for _, ec := range f.ExploitConditions {
+			fmt.Printf("  exploit: %s", ec.Condition)
+			if ec.Category != "" {
+				fmt.Printf(" [%s]", ec.Category)
+			}
+			if ec.Evidence != "" {
+				fmt.Printf(" — evidence: %s", ec.Evidence)
+			}
+			if ec.Assumption != "" {
+				fmt.Printf(" — assumes: %s", ec.Assumption)
+			}
+			if ec.Confidence != "" {
+				fmt.Printf(" — conf=%s", ec.Confidence)
+			}
+			fmt.Println()
+		}
 	}
 	return nil
 }
@@ -495,12 +511,13 @@ func adapterNames() []string {
 // scorecards.
 
 type jsonFinding struct {
-	RuleID   string `json:"rule"`
-	Severity string `json:"severity"`
-	FP       string `json:"fp"`
-	Source   string `json:"source"`
-	Sink     string `json:"sink"`
-	Noted    bool   `json:"assumption_noted"`
+	RuleID            string                      `json:"rule"`
+	Severity          string                      `json:"severity"`
+	FP                string                      `json:"fp"`
+	Source            string                      `json:"source"`
+	Sink              string                      `json:"sink"`
+	Noted             bool                        `json:"assumption_noted"`
+	ExploitConditions []findings.ExploitCondition `json:"exploit_conditions,omitempty"`
 }
 
 func findingsJSON(all []*findings.Finding) []jsonFinding {
@@ -523,6 +540,7 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 				jf.Noted = true
 			}
 		}
+		jf.ExploitConditions = f.ExploitConditions
 		out = append(out, jf)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].FP < out[j].FP })

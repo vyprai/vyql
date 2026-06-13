@@ -28,6 +28,18 @@ adapter elixir {
   sink method "query" arg 1 -> code.SqlExecution
   sink method "query!" arg 1 -> code.SqlExecution
   sink method "fragment" -> code.SqlExecution
+  sink method "get_user" -> code.ObjectLookupByUserInput
+  sink method "get_account" -> code.ObjectLookupByUserInput
+  sink method "get_order" -> code.ObjectLookupByUserInput
+  sink method "get_by_id" -> code.ObjectLookupByUserInput
+  mark "change_password" -> code.AuthenticationRequiredOp
+  mark "update_password" -> code.AuthenticationRequiredOp
+  mark "reset_password" -> code.AuthenticationRequiredOp
+  mark "change_email" -> code.AuthenticationRequiredOp
+  mark "transfer_funds" -> code.AuthenticationRequiredOp
+  mark "delete_account" -> code.AuthenticationRequiredOp
+  mark "grant_role" -> code.AuthenticationRequiredOp
+  mark "make_admin" -> code.AuthenticationRequiredOp
 
   // code evaluation / dynamic (CWE-95) + deserialization (CWE-502)
   sink path "Code.eval_string" -> code.CodeEval
@@ -53,6 +65,7 @@ adapter elixir {
   mark ":crypto.crypto_one_time" val ":des" -> code.WeakCipher
   mark ":crypto.crypto_one_time" val ":rc4" -> code.WeakCipher
   mark ":crypto.crypto_one_time" val ":blowfish" -> code.WeakCipher
+  mark ":crypto.crypto_one_time" val "0000000000000000" -> code.StaticIv
   mark ":crypto.block_encrypt" val ":des" -> code.WeakCipher
   mark ":crypto.block_encrypt" val ":blowfish" -> code.WeakCipher
 
@@ -87,4 +100,10 @@ adapter elixir {
   control "escape_shell" -> core.ShellEscape
   control "safe_path" -> core.PathCanonicalization
   control "validate_role" -> core.InputValidation
+  control "require_auth" -> core.AuthenticationCheck
+  control "ensure_authenticated" -> core.AuthenticationCheck
+  control "authenticated?" -> core.AuthenticationCheck
+  control "check_ownership" -> core.OwnershipCheck
+  control "require_owner" -> core.OwnershipCheck
+  control "owner?" -> core.OwnershipCheck
 }

@@ -1,0 +1,29 @@
+# Race / concurrency coverage.
+
+test "race: access check before open is TOCTOU (c)"
+  lang c
+  expect VYQL-RACE-001
+  code
+  ```
+  int access(const char *, int);
+  int open(const char *, int);
+  void f(char *path) {
+      if (access(path, 0) == 0) {
+          open(path, 0);
+      }
+  }
+  ```
+
+test "race: thread creation is low-confidence shared-state review queue (c)"
+  lang c
+  expect VYQL-RACE-002
+  code
+  ```
+  typedef unsigned long pthread_t;
+  int pthread_create(pthread_t *, void *, void *(*)(void *), void *);
+  void *worker(void *p) { return p; }
+  void f() {
+      pthread_t t;
+      pthread_create(&t, 0, worker, 0);
+  }
+  ```

@@ -1,0 +1,16 @@
+// Authentication and object-ownership coverage. These rules intentionally stay
+// explicit about what is observed: a sensitive operation without an auth guard,
+// or user-controlled object identifiers flowing into direct lookups.
+package vypr.auth;
+
+rule MissingAuthentication {
+  meta { id: "VYQL-AUTH-001", severity: high, cwe: [CWE_306], confidence_floor: low }
+  match code.AuthenticationRequiredOp as op
+  unless guarded_by core.AuthenticationCheck
+}
+
+rule InsecureDirectObjectReference {
+  meta { id: "VYQL-AUTH-002", severity: high, cwe: [CWE_639] }
+  taint core.UserControlledData -> code.ObjectLookupByUserInput
+  unless guarded_by core.OwnershipCheck
+}

@@ -977,7 +977,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return n
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
-		n := l.node("Subscript", ex.Loc, map[string]string{"callee_path": ex.Path})
+		key := l.eval(ex.Key, sc)
+		n := l.node("Subscript", ex.Loc, map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key})
+		l.flow(key, n)
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
 			l.flow(base, n)
@@ -1004,13 +1006,24 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		}
 		return n
 	case nir.BinOp:
-		n := l.node("BinOp", ex.Loc, nil)
-		l.flow(l.eval(ex.Left, sc), n)
-		l.flow(l.eval(ex.Right, sc), n)
+		left := l.eval(ex.Left, sc)
+		right := l.eval(ex.Right, sc)
+		leftArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Left)})
+		rightArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Right)})
+		l.flow(left, leftArg)
+		l.flow(right, rightArg)
+		method := binopMethod(ex.Op)
+		n := l.node("BinOp", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg})
+		l.flow(leftArg, n)
+		l.flow(rightArg, n)
+		l.flow(left, n)
+		l.flow(right, n)
 		return n
 	case nir.Unary:
-		n := l.node("Unary", ex.Loc, nil)
-		l.flow(l.eval(ex.Operand, sc), n)
+		operand := l.eval(ex.Operand, sc)
+		method := unaryMethod(ex.Op)
+		n := l.node("Unary", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__unary." + method, "method": method, "arg0": operand})
+		l.flow(operand, n)
 		return n
 	case nir.Ternary:
 		// `cond ? then : else` — prune the dead arm when the condition is a compile-time
@@ -1060,6 +1073,64 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return fn
 	}
 	return l.node("Const", "?:0", nil)
+}
+
+func binopMethod(op string) string {
+	switch op {
+	case "+":
+		return "add"
+	case "-":
+		return "sub"
+	case "*":
+		return "mul"
+	case "/":
+		return "div"
+	case "%":
+		return "mod"
+	case "<<":
+		return "shl"
+	case ">>":
+		return "shr"
+	case "==":
+		return "eq"
+	case "!=":
+		return "ne"
+	case "<":
+		return "lt"
+	case "<=":
+		return "le"
+	case ">":
+		return "gt"
+	case ">=":
+		return "ge"
+	case "&&":
+		return "and"
+	case "||":
+		return "or"
+	}
+	if op == "" {
+		return "op"
+	}
+	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub").Replace(op)
+}
+
+func unaryMethod(op string) string {
+	switch op {
+	case "*":
+		return "deref"
+	case "&":
+		return "addr"
+	case "!":
+		return "not"
+	case "-":
+		return "neg"
+	case "+":
+		return "pos"
+	}
+	if op == "" {
+		return "op"
+	}
+	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "deref", "+", "pos", "-", "neg").Replace(op)
 }
 
 // allowlistMembershipVar recognizes a constant-set membership test — `["a","b"].includes(x)`,
@@ -1192,6 +1263,13 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		for _, p := range ex.Parts {
 			collectValTokens(p, key, out) // inherit key so list elements pair with it
 		}
+	case nir.Call:
+		collectValTokens(ex.Callee, key, out)
+		for _, a := range ex.Args {
+			collectValTokens(a, key, out)
+		}
+	case nir.Attr:
+		collectValTokens(ex.Base, key, out)
 	case nir.Thru:
 		collectValTokens(ex.Inner, key, out)
 	}

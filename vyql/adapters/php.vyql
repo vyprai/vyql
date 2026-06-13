@@ -89,6 +89,13 @@ adapter php {
   // authorization checks (guards BIZ-001) — Laravel Gate predicates (path-sensitive via B1).
   control "Gate.allows" -> core.AuthorizationCheck
   control "Gate.authorize" -> core.AuthorizationCheck
+  control "requireAuth" -> core.AuthenticationCheck
+  control "ensureAuthenticated" -> core.AuthenticationCheck
+  control "isAuthenticated" -> core.AuthenticationCheck
+  control "auth.check" -> core.AuthenticationCheck
+  control "checkOwnership" -> core.OwnershipCheck
+  control "requireOwner" -> core.OwnershipCheck
+  control "isOwner" -> core.OwnershipCheck
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape
@@ -107,10 +114,25 @@ adapter php {
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "fill" -> code.MassAssign
   sink method "forceFill" -> code.MassAssign
+  sink method "find" -> code.ObjectLookupByUserInput
+  sink method "findOrFail" -> code.ObjectLookupByUserInput
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
   sink path "fputcsv" arg 1 -> code.CsvCell
   sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
+  sink method "extractTo" arg all -> code.ArchiveEntryWrite
+  sink path "ZipArchive.extractTo" arg all -> code.ArchiveEntryWrite
 
   // session fixation (CWE-384) — user value as session id
   sink path "session_id" -> code.SessionId
@@ -134,6 +156,8 @@ adapter php {
   mark "openssl_encrypt" val "ecb" -> code.WeakCipher
   mark "mcrypt_encrypt" val "des" -> code.WeakCipher
   mark "mcrypt_encrypt" val "rc4" -> code.WeakCipher
+  mark "openssl_encrypt" val "0000000000000000" -> code.StaticIv
+  mark "openssl_decrypt" val "0000000000000000" -> code.StaticIv
   // Hash: explicit hash("md5"/"sha1", ...) — clearer security signal than bare md5().
   mark "hash" val "md5" -> code.WeakHash
   mark "hash" val "sha1" -> code.WeakHash

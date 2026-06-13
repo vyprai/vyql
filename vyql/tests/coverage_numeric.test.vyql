@@ -1,0 +1,39 @@
+# Numeric / size computation coverage.
+
+test "numeric: attacker-controlled allocation size is reported (c)"
+  lang c
+  expect VYQL-NUM-001
+  code
+  ```
+  int atoi(const char *);
+  void *malloc(unsigned long);
+  void f(int argc, char **argv) {
+      int n = atoi(argv[1]);
+      void *p = malloc(n * 32);
+      (void)p;
+  }
+  ```
+
+test "numeric: attacker-controlled division denominator is reported (c)"
+  lang c
+  expect VYQL-NUM-002
+  code
+  ```
+  int atoi(const char *);
+  int f(int argc, char **argv) {
+      int d = atoi(argv[1]);
+      return 100 / d;
+  }
+  ```
+
+test "numeric: attacker-controlled size arithmetic is reported (c)"
+  lang c
+  expect VYQL-NUM-003
+  code
+  ```
+  int atoi(const char *);
+  int f(int argc, char **argv) {
+      int n = atoi(argv[1]);
+      return n * 1024;
+  }
+  ```

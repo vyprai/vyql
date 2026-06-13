@@ -1,0 +1,52 @@
+# Lifecycle / typestate coverage.
+
+test "lifecycle: lock acquired without release is reported (c)"
+  lang c
+  expect VYQL-LIFE-001
+  code
+  ```
+  typedef int pthread_mutex_t;
+  void pthread_mutex_lock(pthread_mutex_t *);
+  void f(pthread_mutex_t *m) {
+      pthread_mutex_lock(m);
+  }
+  ```
+
+test "lifecycle: lock released on the same path is clean (c)"
+  lang c
+  reject VYQL-LIFE-001
+  code
+  ```
+  typedef int pthread_mutex_t;
+  void pthread_mutex_lock(pthread_mutex_t *);
+  void pthread_mutex_unlock(pthread_mutex_t *);
+  void f(pthread_mutex_t *m) {
+      pthread_mutex_lock(m);
+      pthread_mutex_unlock(m);
+  }
+  ```
+
+test "lifecycle: go mutex lock without unlock is reported"
+  lang go
+  expect VYQL-LIFE-001
+  code
+  ```
+  package main
+  import "sync"
+  func f(mu *sync.Mutex) {
+      mu.Lock()
+  }
+  ```
+
+test "lifecycle: go mutex lock with unlock is clean"
+  lang go
+  reject VYQL-LIFE-001
+  code
+  ```
+  package main
+  import "sync"
+  func f(mu *sync.Mutex) {
+      mu.Lock()
+      mu.Unlock()
+  }
+  ```

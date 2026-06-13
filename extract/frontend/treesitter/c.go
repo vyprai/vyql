@@ -288,6 +288,9 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
+		if left != nil {
+			return []nir.Stmt{nir.ExprStmt{Value: c.expr(left)}, nir.ExprStmt{Value: right}}
+		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	case "call_expression":
 		name := lastSeg(c.dotted(field(inner, "function")))
@@ -300,7 +303,10 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 					for _, a := range args[1:] {
 						parts = append(parts, c.expr(a))
 					}
-					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: nir.Format{Parts: parts, Loc: c.loc(inner)}}}
+					return []nir.Stmt{
+						nir.Assign{Targets: []string{dst}, Value: nir.Format{Parts: parts, Loc: c.loc(inner)}},
+						nir.ExprStmt{Value: c.expr(inner)},
+					}
 				}
 				if cReaders[name] {
 					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
@@ -500,11 +506,18 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	case "pointer_expression":
 		if arg := field(n, "argument"); arg != nil {
+			if c.unaryOp(n) == "*" {
+				return nir.Call{Callee: nir.Name{ID: "__deref", Loc: L}, Args: []nir.Expr{c.expr(arg)}, Path: "__deref", Method: "__deref", Loc: L}
+			}
 			return nir.Thru{Inner: c.expr(arg)}
 		}
 	case "unary_expression":
 		if arg := field(n, "argument"); arg != nil {
-			return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(arg), Loc: L}
+			op := c.unaryOp(n)
+			if op == "*" {
+				return nir.Call{Callee: nir.Name{ID: "__deref", Loc: L}, Args: []nir.Expr{c.expr(arg)}, Path: "__deref", Method: "__deref", Loc: L}
+			}
+			return nir.Unary{Op: op, Operand: c.expr(arg), Loc: L}
 		}
 	case "assignment_expression":
 		return c.expr(field(n, "right"))
@@ -516,6 +529,23 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *ccConv) unaryOp(n *tree_sitter.Node) string {
+	if op := field(n, "operator"); op != nil {
+		return c.text(op)
+	}
+	raw := c.text(n)
+	for i := 0; i < len(raw); i++ {
+		switch raw[i] {
+		case ' ', '\t', '\r', '\n':
+			continue
+		case '*', '&', '!', '+', '-':
+			return string(raw[i])
+		}
+		break
+	}
+	return ""
 }
 
 // cStringText returns a quoted string literal whose surrounding delimiters wrap only

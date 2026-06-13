@@ -1,8 +1,8 @@
 # 20 — Extraction Frontends, Resolution, and Dependencies
 
-Status: `DRAFT` — architecture proposed and prototyped across four parsers and
-three languages (`../poc/extract/`); resolution-tier choices per language are
-open and listed at the end.
+Status: `DRAFT` — architecture proposed in the prototype and now implemented in
+the Go CLI for 22 source languages; higher-precision resolution-tier choices per
+language remain open and are listed at the end.
 
 This document answers a recurring question — "tree-sitter or a different parser
 per language?" — and specifies how source becomes the `code.*` subgraph
@@ -17,13 +17,14 @@ connects to dependency/SBOM data ([11](11-domain-supply-chain-runtime.md)).
 2. **Resolution** — names, types, imports → a semantic model.
 3. **Coherence** — one representation the rule/adapter layers can target.
 
-The PoC settles the central confusion empirically: four structurally unrelated
+The PoC settled the central confusion empirically: four structurally unrelated
 parsers — CPython `ast` (Python objects), acorn (ESTree JSON), Ripper (Lisp
-S-expressions), and tree-sitter (CST) — all feed the **same** rule, because
+S-expressions), and tree-sitter (CST) — all fed the **same** rule, because
 coherence is engineered in a **normalized IR**, not inherited from any parser.
-And import/type resolution was built once *on top* of that IR — **no parser
-provided it**. Conclusion: choose the parser for parsing qualities; build/skin
-resolution separately; create coherence in your own IR.
+The current Go implementation extends this to Go plus 21 tree-sitter source
+frontends. Import/type/dataflow resolution is built once *on top* of NIR — no
+parser provides it. Conclusion: choose the parser for parsing qualities;
+build/skin resolution separately; create coherence in your own IR.
 
 ## The layered architecture
 
@@ -50,12 +51,12 @@ resolution separately; create coherence in your own IR.
         Universal Security Graph
 ```
 
-Adding a language = one **frontend** (parse + translate to NIR). Resolution,
-dataflow, and rules are untouched. Swapping a parser (tree-sitter → native →
-LSP) = swapping a frontend; everything downstream is unchanged. The PoC proves
-both: three languages share one lowering engine, and a tree-sitter frontend
-produces byte-identical findings to the `ast` frontend on the same code
-(`poc/cases/case_17`).
+Adding a language = one **frontend** (parse + translate to NIR) plus adapter
+content. Resolution, dataflow, and rules are untouched. Swapping a parser
+(tree-sitter → native → LSP) = swapping a frontend; everything downstream is
+unchanged. The PoC proved this on three languages and parser-swap parity
+(`poc/cases/case_17`); the Go implementation now applies the same architecture
+across the current 22-language source set.
 
 ### Tier 1 — Parsing: tree-sitter by default
 
@@ -165,7 +166,7 @@ durable, reusable engineering concentrates.
 
 ## Open questions
 
-- **Which languages graduate to SCIP/native in v1?** Leading candidates: Java
+- **Which languages should graduate to SCIP/native?** Leading candidates: Java
   and TypeScript (type-driven dispatch, mature indexers). Python/Ruby/JS stay on
   build-free resolvers initially.
 - **tree-sitter-stack-graphs vs hand-rolled resolvers** as the default

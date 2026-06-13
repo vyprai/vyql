@@ -35,16 +35,24 @@ func findingToNexus(f *findings.Finding) map[string]any {
 			"clause": ne.Clause, "satisfied": ne.Satisfied, "detail": ne.Detail,
 		})
 	}
+	var exploit []any
+	for _, ec := range f.ExploitConditions {
+		exploit = append(exploit, map[string]any{
+			"category": ec.Category, "condition": ec.Condition, "evidence": ec.Evidence,
+			"assumption": ec.Assumption, "confidence": ec.Confidence,
+		})
+	}
 	return map[string]any{
-		"ruleId":           f.RuleID,
-		"severity":         f.Severity,
-		"confidence":       f.Confidence,
-		"fingerprint":      f.Fingerprint(),
-		"witnessKind":      f.WitnessKind,
-		"witness":          f.Witness,
-		"bindings":         bindings,
-		"negationEvidence": negEv,
-		"context":          f.Context,
+		"ruleId":            f.RuleID,
+		"severity":          f.Severity,
+		"confidence":        f.Confidence,
+		"fingerprint":       f.Fingerprint(),
+		"witnessKind":       f.WitnessKind,
+		"witness":           f.Witness,
+		"bindings":          bindings,
+		"negationEvidence":  negEv,
+		"context":           f.Context,
+		"exploitConditions": exploit,
 	}
 }
 

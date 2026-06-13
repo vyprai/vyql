@@ -35,6 +35,18 @@ adapter kotlin {
   sink method "rawQuery" -> code.SqlExecution
   sink method "prepareStatement" -> code.SqlExecution
   sink method "createQuery" -> code.SqlExecution
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getReferenceById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // path / file
   sink path "File" -> code.FilePathAccess
@@ -68,6 +80,7 @@ adapter kotlin {
   mark "Cipher.getInstance" val "DES" -> code.WeakCipher
   mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
   mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
+  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
 
   // XSS (CWE-79) — servlet response writers (JVM-shared with Java)
   sink method "println" arg all -> code.HtmlRender
@@ -97,6 +110,13 @@ adapter kotlin {
   control "validateRole" -> core.InputValidation
   control "canonicalPath" -> core.PathCanonicalization
   control "getCanonicalPath" -> core.PathCanonicalization
+  control method "requireAuth" -> core.AuthenticationCheck
+  control method "ensureAuthenticated" -> core.AuthenticationCheck
+  control method "isAuthenticated" -> core.AuthenticationCheck
+  control method "authenticate" -> core.AuthenticationCheck
+  control method "checkOwnership" -> core.OwnershipCheck
+  control method "requireOwner" -> core.OwnershipCheck
+  control method "isOwner" -> core.OwnershipCheck
 
   // csrf disabled (CWE-352) — presence marker
   mark "csrf.disable" -> code.CsrfDisabled

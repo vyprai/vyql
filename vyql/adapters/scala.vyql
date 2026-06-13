@@ -19,6 +19,17 @@ adapter scala {
   sink method "execute" -> code.SqlExecution
   sink path "SQL" -> code.SqlExecution
   sink method "prepareStatement" -> code.SqlExecution
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // path / file
   sink path "Source.fromFile" -> code.FilePathAccess
@@ -44,6 +55,7 @@ adapter scala {
   mark "Cipher.getInstance" val "DES" -> code.WeakCipher
   mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
   mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
+  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval
@@ -54,6 +66,13 @@ adapter scala {
   // sanitizer — Apache Commons Text HTML escaping.
   control "escapeHtml4" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
+  control method "requireAuth" -> core.AuthenticationCheck
+  control method "ensureAuthenticated" -> core.AuthenticationCheck
+  control method "isAuthenticated" -> core.AuthenticationCheck
+  control method "authenticate" -> core.AuthenticationCheck
+  control method "checkOwnership" -> core.OwnershipCheck
+  control method "requireOwner" -> core.OwnershipCheck
+  control method "isOwner" -> core.OwnershipCheck
 
   // character-filter: replaceAll (java interop) is global.
   filter method "replaceAll" global

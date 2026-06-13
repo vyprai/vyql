@@ -21,10 +21,11 @@ var OriginRank = map[string]int{"community": 1, "ai_generated": 2, "ai_assisted"
 // Mapping is one node getting one concept label. A negative claim sets
 // Detail["negative"] to the concept it argues the node is NOT.
 type Mapping struct {
-	NodeID   string
-	Concept  string
-	Fidelity string // optional per-mapping fidelity; overrides the adapter's
-	Detail   map[string]string
+	NodeID     string
+	Concept    string
+	Fidelity   string // optional per-mapping fidelity; overrides the adapter's
+	Confidence string // optional per-mapping confidence; overrides the adapter's
+	Detail     map[string]string
 }
 
 func (m Mapping) negative() string {
@@ -171,6 +172,9 @@ func Apply(store usg.Store, ads []Adapter, tenantOverrides []Mapping) ([]Conflic
 func attach(store usg.Store, m Mapping, adapter, fidelity, confidence string) error {
 	if m.Fidelity != "" { // per-mapping fidelity overrides the adapter default
 		fidelity = m.Fidelity
+	}
+	if m.Confidence != "" { // per-mapping confidence overrides the adapter default
+		confidence = m.Confidence
 	}
 	if fidelity == "" {
 		fidelity = "resolved"
