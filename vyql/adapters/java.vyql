@@ -225,6 +225,12 @@ adapter java {
   mark "Algorithm.none" -> code.JwtUnverified
   mark "setWritable" val "true" val "false" -> code.InsecurePermission
   mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
+  mark "Socket" -> code.ResourceHandle
+  mark "Files.newInputStream" -> code.ResourceHandle
+  mark "Files.newOutputStream" -> code.ResourceHandle
+  mark "Files.newBufferedReader" -> code.ResourceHandle
+  mark "Files.newBufferedWriter" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval

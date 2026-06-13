@@ -155,6 +155,11 @@ adapter csharp {
   mark "ServerCertificateCustomValidationCallback" val "true" -> code.CertValidationDisabled
   mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
   mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
+  mark "File.Open" -> code.ResourceHandle
+  mark "File.OpenRead" -> code.ResourceHandle
+  mark "TcpClient" -> code.ResourceHandle
+  control method "Close" -> core.ResourceRelease
+  control method "Dispose" -> core.ResourceRelease
   mark "MD5.Create" -> code.WeakHash
   mark "SHA1.Create" -> code.WeakHash
   mark "MD5CryptoServiceProvider" -> code.WeakHash

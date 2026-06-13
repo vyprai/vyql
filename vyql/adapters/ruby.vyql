@@ -228,6 +228,9 @@ adapter ruby {
   mark "JWT.encode" val "algorithm=none" -> code.JwtUnverified
   mark "File.chmod" val "0777" -> code.InsecurePermission
   mark "File.chmod" val "0666" -> code.InsecurePermission
+  mark "TCPSocket.open" -> code.ResourceHandle
+  mark "File.open" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
 
   // XPath injection (CWE-643) — Nokogiri doc.xpath(expr) / at_xpath(expr) (distinctive)
   sink method "xpath" -> code.XpathQuery

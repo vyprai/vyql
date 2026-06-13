@@ -35,3 +35,119 @@ test "resource-leak: a socket closed only in one branch leaks on the others (pyt
       if cond:
           s.close()
   ```
+
+test "resource-leak: a Go connection closed on every path is clean"
+  lang go
+  reject VYQL-RES-001
+  code
+  ```
+  package p
+  import "net"
+  func f() {
+    c, _ := net.Dial("tcp", "example.com:443")
+    c.Close()
+  }
+  ```
+
+test "resource-leak: a Go connection never closed leaks"
+  lang go
+  expect VYQL-RES-001
+  code
+  ```
+  package p
+  import "net"
+  func f() {
+    c, _ := net.Dial("tcp", "example.com:443")
+    c.Write([]byte("x"))
+  }
+  ```
+
+test "resource-leak: a Java socket closed on every path is clean"
+  lang java
+  reject VYQL-RES-001
+  code
+  ```
+  class C {
+    void f() throws Exception {
+      Socket s = new Socket("example.com", 443);
+      s.close();
+    }
+  }
+  ```
+
+test "resource-leak: a Java socket never closed leaks"
+  lang java
+  expect VYQL-RES-001
+  code
+  ```
+  class C {
+    void f() throws Exception {
+      Socket s = new Socket("example.com", 443);
+      s.getInputStream();
+    }
+  }
+  ```
+
+test "resource-leak: a C# file handle closed on every path is clean"
+  lang csharp
+  reject VYQL-RES-001
+  code
+  ```
+  class C {
+    void F() {
+      var f = File.Open("data.txt", FileMode.Open);
+      f.Close();
+    }
+  }
+  ```
+
+test "resource-leak: a C# file handle never closed leaks"
+  lang csharp
+  expect VYQL-RES-001
+  code
+  ```
+  class C {
+    void F() {
+      var f = File.Open("data.txt", FileMode.Open);
+      f.ReadByte();
+    }
+  }
+  ```
+
+test "resource-leak: a PHP file handle closed on every path is clean"
+  lang php
+  reject VYQL-RES-001
+  code
+  ```
+  <?php function f(){ $h = fopen("data.txt", "r"); fclose($h); }
+  ```
+
+test "resource-leak: a PHP file handle never closed leaks"
+  lang php
+  expect VYQL-RES-001
+  code
+  ```
+  <?php function f(){ $h = fopen("data.txt", "r"); fread($h, 1); }
+  ```
+
+test "resource-leak: a Ruby socket closed on every path is clean"
+  lang ruby
+  reject VYQL-RES-001
+  code
+  ```
+  def f
+    s = TCPSocket.open("example.com", 443)
+    s.close
+  end
+  ```
+
+test "resource-leak: a Ruby socket never closed leaks"
+  lang ruby
+  expect VYQL-RES-001
+  code
+  ```
+  def f
+    s = TCPSocket.open("example.com", 443)
+    s.write("x")
+  end
+  ```

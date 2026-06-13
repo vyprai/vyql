@@ -205,6 +205,14 @@ adapter go {
   mark "tls.Config" val "InsecureSkipVerify=true" -> code.CertValidationDisabled
   mark "ParseUnverified" -> code.JwtUnverified
 
+  // resource lifecycle (CWE-772) — raw handles that must be closed.
+  mark "net.Dial" -> code.ResourceHandle
+  mark "net.DialTimeout" -> code.ResourceHandle
+  mark "os.Open" -> code.ResourceHandle
+  mark "os.OpenFile" -> code.ResourceHandle
+  mark "os.Create" -> code.ResourceHandle
+  control method "Close" -> core.ResourceRelease
+
   // permissive CORS (CWE-942) — w.Header().Set("Access-Control-Allow-Origin", "*")
   mark "Header.Set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "Header.Add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
