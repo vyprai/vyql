@@ -66,6 +66,7 @@ adapter elixir {
   mark ":crypto.crypto_one_time" val ":rc4" -> code.WeakCipher
   mark ":crypto.crypto_one_time" val ":blowfish" -> code.WeakCipher
   mark ":crypto.crypto_one_time" val "0000000000000000" -> code.StaticIv
+  mark "crypto_one_time" val "0000000000000000" -> code.StaticIv
   mark ":crypto.block_encrypt" val ":des" -> code.WeakCipher
   mark ":crypto.block_encrypt" val ":blowfish" -> code.WeakCipher
 

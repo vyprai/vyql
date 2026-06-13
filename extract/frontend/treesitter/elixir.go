@@ -207,7 +207,7 @@ func (c *exConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: exStringValue(c.text(n))}
 	case "call":
 		return c.callExpr(n)
 	case "dot":
@@ -506,4 +506,15 @@ func firstNamed(n *tree_sitter.Node) *tree_sitter.Node {
 		return nil
 	}
 	return n.NamedChild(0)
+}
+
+func exStringValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 2 {
+		first, last := raw[0], raw[len(raw)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			return raw[1 : len(raw)-1]
+		}
+	}
+	return raw
 }
