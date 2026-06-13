@@ -70,6 +70,26 @@ test "ios (objc): addScriptMessageHandler exposes a native bridge"
   @end
   ```
 
+test "ios (swift): WKUserContentController.add name exposes a native bridge"
+  lang swift
+  expect VYQL-MOB-002
+  code
+  ```
+  func run(controller: WKUserContentController) {
+    controller.add(self, name: "bridge")
+  }
+  ```
+
+test "ios (swift): removing a script message handler is clean"
+  lang swift
+  reject VYQL-MOB-002
+  code
+  ```
+  func run(controller: WKUserContentController) {
+    controller.removeScriptMessageHandler(forName: "bridge")
+  }
+  ```
+
 test "ios (objc): removing a script message handler is clean"
   lang objc
   reject VYQL-MOB-002

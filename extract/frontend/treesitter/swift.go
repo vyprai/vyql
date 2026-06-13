@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 
 	sw "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/swift"
@@ -347,6 +349,34 @@ func (c *swConv) callArgs(suffix *tree_sitter.Node) []nir.Expr {
 	return out
 }
 
+func (c *swConv) callArgLabels(suffix *tree_sitter.Node) []string {
+	var out []string
+	var va *tree_sitter.Node
+	for _, ch := range namedChildren(suffix) {
+		if ch.Kind() == "value_arguments" {
+			va = ch
+		}
+	}
+	if va == nil {
+		return nil
+	}
+	for _, a := range namedChildren(va) {
+		if a.Kind() != "value_argument" {
+			continue
+		}
+		for _, ch := range namedChildren(a) {
+			if ch.Kind() != "value_argument_label" {
+				continue
+			}
+			if ids := namedChildren(ch); len(ids) > 0 {
+				out = append(out, c.text(ids[0]))
+			}
+			break
+		}
+	}
+	return out
+}
+
 func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 	if n == nil {
 		return nir.Const{Loc: "?:0"}
@@ -389,13 +419,17 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "call_expression":
 		callee := c.swCallee(n)
 		path := c.dotted(callee)
+		method := lastSeg(path)
 		var args []nir.Expr
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "call_suffix" {
 				args = c.callArgs(ch)
+				if labels := c.callArgLabels(ch); len(labels) > 0 {
+					path += "." + strings.Join(labels, ".")
+				}
 			}
 		}
-		return nir.Call{Callee: c.expr(callee), Args: args, Path: path, Method: lastSeg(path), Loc: L}
+		return nir.Call{Callee: c.expr(callee), Args: args, Path: path, Method: method, Loc: L}
 	case "additive_expression":
 		l, r := c.expr(field(n, "lhs")), c.expr(field(n, "rhs"))
 		op := c.swOp(n)

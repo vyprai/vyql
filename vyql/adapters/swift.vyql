@@ -23,6 +23,7 @@ adapter swift {
   sink method "evaluateJavaScript" -> code.WebViewLoad
   sink method "loadHTMLString" -> code.WebViewLoad
   sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
+  mark "add.name" -> code.WebViewJsInterface
 
   // SQL — sqlite3 C API (query is arg1) + ORM execute (raw query is arg0)
   sink path "sqlite3_exec" arg 1 -> code.SqlExecution
