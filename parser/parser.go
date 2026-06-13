@@ -548,9 +548,16 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		if p.atWord("method") { // receiver-agnostic source: match the call method name
 			p.next()
 			kind = "source_method"
+		} else if p.atWord("receiver") { // receiver-typed source: match attr/method on a known receiver type
+			p.next()
+			kind = "source_receiver"
 		}
 		pat := p.parsePattern()
 		sm := AdapterMapping{Kind: kind, Pattern: pat}
+		if p.atWord("on") {
+			p.next()
+			sm.Constraint = p.parsePattern()
+		}
 		p.parseAdapterGuards(&sm, true)
 		p.expect(tArrow, "->")
 		sm.Concept = p.parseConceptRef()

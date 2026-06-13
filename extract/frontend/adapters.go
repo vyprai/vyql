@@ -21,6 +21,8 @@ type inputSpec struct {
 	Paths      []string
 	Methods    []string // receiver-agnostic: match the call's `method` prop (last segment)
 	Match      string   // "prefix" (default) | "contains"
+	Receiver   bool     // match a receiver attribute/method with a recv_type constraint
+	Constraint string   // optional `on <type>` receiver-type constraint
 	ValMatches []string // `val "substr"` (AND) — only a source when an arg literal matches (e.g. getenv("HTTP_*"))
 	ValAbsents []string // `nval "substr"` (AND) — not a source if any arg literal contains a substr
 	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
@@ -502,6 +504,10 @@ func loadSpec(tech string) adapterSpec {
 				srcByConcept[mp.Concept] = i
 			}
 			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
+		case "source_receiver":
+			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
+				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "sink_method":
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
 		case "sink_path":
@@ -563,8 +569,13 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 					if !packageAllowed(in.Packages, pkgs) {
 						continue
 					}
-					if (path != "" && matchPath(path, in.Paths, in.Match)) ||
-						(method != "" && containsStr(in.Methods, method)) {
+					matched := (path != "" && matchPath(path, in.Paths, in.Match)) ||
+						(method != "" && containsStr(in.Methods, method))
+					if in.Receiver {
+						matched = method != "" && containsStr(in.Methods, method) &&
+							constraintAllows(in.Constraint, n.Prop("recv_type"))
+					}
+					if matched {
 						// value-constrained source: only a source when an arg literal matches
 						// (e.g. getenv("HTTP_X_FORWARDED_FOR") yes, getenv("PATH") no).
 						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&

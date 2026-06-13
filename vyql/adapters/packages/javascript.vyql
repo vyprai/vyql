@@ -3,8 +3,10 @@ import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization,
 
 adapter javascript {
   package "express" {
-    source "req.body" -> HttpInput
-    source "req.query" -> HttpInput
+    source receiver "body" on "express.Request" -> HttpInput
+    source receiver "query" on "express.Request" -> HttpInput
+    source receiver "params" on "express.Request" -> HttpInput
+    source receiver "headers" on "express.Request" -> HttpInput
   }
   package "koa" {
     source "ctx.request.body" -> HttpInput

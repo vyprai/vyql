@@ -23,6 +23,7 @@ import (
 type funcInfo struct {
 	paramNames []string
 	params     map[string]string // name -> param node id
+	paramTypes map[string]string // name -> declared/inferred receiver type
 	ret        string            // return node id
 	module     string
 	cls        string
@@ -751,12 +752,17 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 			params := map[string]string{}
 			var order []string
 			for _, p := range st.Params {
-				params[p] = l.node("Param", st.Loc, map[string]string{"name": p, "func": st.Name})
+				props := map[string]string{"name": p, "func": st.Name}
+				if typ := st.ParamTypes[p]; typ != "" {
+					props["decl_type"] = typ
+				}
+				params[p] = l.node("Param", st.Loc, props)
 				order = append(order, p)
 			}
 			info := &funcInfo{
 				paramNames: order,
 				params:     params,
+				paramTypes: st.ParamTypes,
 				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
 				module:     modkey, cls: cls, name: st.Name,
 				validator: st.IsValidator,
@@ -796,12 +802,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			params := map[string]string{}
 			var order []string
 			for _, p := range st.Params {
-				params[p] = l.node("Param", st.Loc, map[string]string{"name": p, "func": st.Name})
+				props := map[string]string{"name": p, "func": st.Name}
+				if typ := st.ParamTypes[p]; typ != "" {
+					props["decl_type"] = typ
+				}
+				params[p] = l.node("Param", st.Loc, props)
 				order = append(order, p)
 			}
 			info = &funcInfo{
 				paramNames: order,
 				params:     params,
+				paramTypes: st.ParamTypes,
 				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
 				module:     l.curModule, cls: l.curClass, name: st.Name,
 				validator: st.IsValidator,
@@ -816,6 +827,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if info != nil {
 			for name, id := range info.params {
 				inner.node[name] = id
+				if typ := info.paramTypes[name]; typ != "" {
+					if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
+						inner.typ[name] = [2]string{cm, typ}
+					}
+				}
 			}
 			inner.node["__ret__"] = info.ret
 		}
@@ -1004,7 +1020,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// `method` carries the attribute NAME (last segment) so `source method "ssn"`
 		// matches a field read like `user.ssn` regardless of receiver. Golden-neutral
 		// (the NIR golden serializes callee_path, not method).
-		n := l.node("Attr", ex.Loc, map[string]string{"callee_path": ex.Path, "method": ex.Attr})
+		props := map[string]string{"callee_path": ex.Path, "method": ex.Attr}
+		if t := l.recvType(base); t != "" {
+			props["recv_type"] = t
+		}
+		n := l.node("Attr", ex.Loc, props)
 		l.flow(base, n)
 		// field-sensitive read: if obj.field was written element-sensitively (directly or via
 		// an alias sharing this base node), pull that slot's taint too.
@@ -1100,8 +1120,17 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		inner := sc.clone()
 		var paramNodes []string
 		for _, p := range ex.Params {
-			pn := l.node("Param", ex.Loc, map[string]string{"name": p})
+			props := map[string]string{"name": p}
+			if typ := ex.ParamTypes[p]; typ != "" {
+				props["decl_type"] = typ
+			}
+			pn := l.node("Param", ex.Loc, props)
 			inner.node[p] = pn
+			if typ := ex.ParamTypes[p]; typ != "" {
+				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
+					inner.typ[p] = [2]string{cm, typ}
+				}
+			}
 			paramNodes = append(paramNodes, pn)
 		}
 		l.block(ex.Body, inner)
@@ -1364,11 +1393,18 @@ func nirKind(e nir.Expr) string {
 // recvType returns the inferred type of a receiver node if it was produced by a
 // known constructor call (its callee path is in the constructor→type table).
 func (l *lowerer) recvType(nodeID string) string {
-	if len(l.ctorTypes) == 0 || nodeID == "" {
+	if nodeID == "" {
 		return ""
 	}
 	if n, ok, _ := l.g.GetNode(nodeID); ok {
-		return l.ctorTypes[n.Prop("callee_path")]
+		for _, key := range []string{"recv_type", "decl_type", "type"} {
+			if t := n.Prop(key); t != "" {
+				return t
+			}
+		}
+		if len(l.ctorTypes) > 0 {
+			return l.ctorTypes[n.Prop("callee_path")]
+		}
 	}
 	return ""
 }

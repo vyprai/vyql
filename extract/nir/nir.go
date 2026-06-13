@@ -84,9 +84,10 @@ type Pair struct {
 
 // Lambda is an inline anonymous function (e.g. an Express arrow handler).
 type Lambda struct {
-	Params []string
-	Body   []Stmt
-	Loc    string
+	Params     []string
+	ParamTypes map[string]string
+	Body       []Stmt
+	Loc        string
 }
 
 // Thru is a transparent wrapper (await, starred) that passes taint through.
@@ -115,14 +116,14 @@ type Ternary struct {
 	Loc              string
 }
 
-func (Name) isExpr()   {}
-func (Const) isExpr()  {}
-func (Attr) isExpr()   {}
-func (Index) isExpr()  {}
-func (Call) isExpr()   {}
-func (Format) isExpr() {}
-func (Seq) isExpr()    {}
-func (Pair) isExpr()   {}
+func (Name) isExpr()    {}
+func (Const) isExpr()   {}
+func (Attr) isExpr()    {}
+func (Index) isExpr()   {}
+func (Call) isExpr()    {}
+func (Format) isExpr()  {}
+func (Seq) isExpr()     {}
+func (Pair) isExpr()    {}
 func (Lambda) isExpr()  {}
 func (Thru) isExpr()    {}
 func (BinOp) isExpr()   {}
@@ -157,10 +158,11 @@ type ExprStmt struct{ Value Expr }
 
 // FuncDef is a function/method definition.
 type FuncDef struct {
-	Name   string
-	Params []string
-	Body   []Stmt
-	Loc    string
+	Name       string
+	Params     []string
+	ParamTypes map[string]string
+	Body       []Stmt
+	Loc        string
 	// IsRoute marks a web request handler (e.g. a Flask/FastAPI @app.route function).
 	// The lowering treats a returned freshly-built string (Concat/Format) as written to
 	// the HTTP response body — a reflected-XSS sink — since the framework does not escape

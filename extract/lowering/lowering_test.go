@@ -43,3 +43,37 @@ func TestLowerMaterializesImportNodes(t *testing.T) {
 		t.Fatalf("import props wrong: %+v", n.Props)
 	}
 }
+
+func TestLowerStampsReceiverTypeFromParamTypes(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.js",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Service", Body: []nir.Stmt{
+				nir.FuncDef{Name: "clean", Params: []string{"x"}, Body: []nir.Stmt{nir.Return{Value: nir.Name{ID: "x", Loc: "app.js:1"}}}, Loc: "app.js:1"},
+			}, Loc: "app.js:1"},
+			nir.FuncDef{Name: "handler", Params: []string{"svc"}, ParamTypes: map[string]string{"svc": "Service"}, Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "svc", Loc: "app.js:3"}, Attr: "clean", Path: "svc.clean", Loc: "app.js:3"},
+					Args:   []nir.Expr{nir.Const{Loc: "app.js:3"}},
+					Path:   "svc.clean", Method: "clean", Loc: "app.js:3",
+				}},
+			}, Loc: "app.js:2"},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "svc.clean" {
+			if got := n.Prop("recv_type"); got != "Service" {
+				t.Fatalf("recv_type = %q, want Service", got)
+			}
+			return
+		}
+	}
+	t.Fatalf("svc.clean call not found")
+}
