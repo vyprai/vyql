@@ -161,6 +161,10 @@ type FuncDef struct {
 	Params []string
 	Body   []Stmt
 	Loc    string
+	// EndLoc is the file:line of the function's last line (closing brace / dedent).
+	// With Loc it gives the full line range VyPr reconciles against its
+	// structural_functions rows. Empty if the frontend doesn't yet emit it.
+	EndLoc string
 	// IsRoute marks a web request handler (e.g. a Flask/FastAPI @app.route function).
 	// The lowering treats a returned freshly-built string (Concat/Format) as written to
 	// the HTTP response body — a reflected-XSS sink — since the framework does not escape

@@ -135,6 +135,15 @@ func nodeLine(g usg.Store, n usg.Node) string {
 	if r := n.Prop("region"); r != "" {
 		s += fmt.Sprintf("  [%s@%s]", r, n.Prop("order"))
 	}
+	if f := n.Prop("func"); f != "" {
+		s += "  func=" + f
+	}
+	if n.Type == "code.Function" {
+		s += "  name=" + n.Prop("name") + " end=" + n.Prop("end_loc")
+		if n.Prop("is_route") != "" {
+			s += " route"
+		}
+	}
 	if c := conceptsOf(g, n.ID); c != "" {
 		s += "  {" + c + "}"
 	}

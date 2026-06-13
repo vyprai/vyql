@@ -57,6 +57,13 @@ func (c *pyConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
+func (c *pyConv) endloc(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
+}
+
 func (c *pyConv) text(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
@@ -267,7 +274,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if strings.HasPrefix(name, "resolve_") {
 			body = append(c.seedResolverParams(params, L), body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L, IsValidator: c.hasValidatorComment(n)}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L, EndLoc: c.endloc(n), IsValidator: c.hasValidatorComment(n)}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -293,7 +300,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				seed = append(seed, nir.Assign{Targets: []string{p},
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
-			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, Body: append(seed, body...), Loc: L, IsRoute: true}}
+			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, Body: append(seed, body...), Loc: L, EndLoc: c.endloc(def), IsRoute: true}}
 		}
 		return c.stmt(def)
 	case "class_definition":

@@ -25,12 +25,14 @@ import (
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
+	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/profile"
 	"github.com/vyprai/vyql/risk"
 	"github.com/vyprai/vyql/sarif"
+	"github.com/vyprai/vyql/usg"
 )
 
 const version = "0.1.0"
@@ -84,15 +86,17 @@ func main() {
 func cmdScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
-	format := fs.String("format", "text", "output format: text | sarif | json")
+	format := fs.String("format", "text", "output format: text | sarif | json | graph-json")
 	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
+	exclude := fs.String("exclude", "", "comma-separated glob patterns to skip, layered on the built-in deps/build skips (e.g. test,examples,*.spec.js)")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
 		usage()
 		os.Exit(2)
 	}
+	treesitter.SetExcludes(strings.Split(*exclude, ","))
 	return run(paths, *rulesPath, *format, *profileName, *stats)
 }
 
@@ -128,35 +132,48 @@ func profileNames() string {
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework adapters.
 func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, error) {
+	all, _, _, stats, err := scanPathsFull(paths, rulesSrc)
+	return all, stats, err
+}
+
+// scanPathsFull is scanPaths plus the lowered graph and per-rule meta (keyed by the
+// finding's RuleID), which the graph-json export needs for node lookups and CWE.
+func scanPathsFull(paths []string, rulesSrc string) ([]*findings.Finding, usg.Store, map[string]map[string]any, scanStats, error) {
 	g, stats, err := buildGraph(paths)
 	if err != nil {
-		return nil, stats, err
+		return nil, nil, nil, stats, err
 	}
 	if g == nil {
-		return nil, stats, nil // recognized files, but nothing to analyze
+		return nil, nil, nil, stats, nil // recognized files, but nothing to analyze
 	}
 	onto := ontology.Seed()
 	decls, err := parser.Parse(rulesSrc)
 	if err != nil {
-		return nil, stats, fmt.Errorf("rule parse: %w", err)
+		return nil, nil, nil, stats, fmt.Errorf("rule parse: %w", err)
 	}
 	compiled, cerrs := engine.CompileRules(decls, onto)
 	if len(cerrs) != 0 {
 		for _, e := range cerrs {
 			fmt.Fprintln(os.Stderr, "rule error: "+e.Error())
 		}
-		return nil, stats, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
+		return nil, nil, nil, stats, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
 	}
 	eng := engine.New(onto, g)
 	var all []*findings.Finding
+	meta := map[string]map[string]any{}
 	for _, cr := range compiled {
+		id, _ := cr.Rule.Meta["id"].(string)
+		if id == "" {
+			id = cr.Rule.QualifiedName()
+		}
+		meta[id] = cr.Rule.Meta
 		got, err := eng.Evaluate(cr)
 		if err != nil {
-			return nil, stats, err
+			return nil, nil, nil, stats, err
 		}
 		all = append(all, got...)
 	}
-	return all, stats, nil
+	return all, g, meta, stats, nil
 }
 
 func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
@@ -165,7 +182,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	if err != nil {
 		return err
 	}
-	all, stats, err := scanPaths(paths, src)
+	all, g, ruleMeta, stats, err := scanPathsFull(paths, src)
 	if err != nil {
 		return err
 	}
@@ -178,6 +195,19 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		fmt.Println(string(b))
 	case "json":
 		b, _ := json.MarshalIndent(findingsJSON(all), "", "  ")
+		fmt.Println(string(b))
+	case "graph-json":
+		root := ""
+		if len(paths) > 0 {
+			root = paths[0]
+		}
+		var doc gjDocument
+		if g != nil {
+			doc = buildGraphJSON(g, all, ruleMeta, root)
+		} else {
+			doc = gjDocument{SchemaVersion: gjSchemaVersion, Tool: gjTool{Name: "VyQL", Version: version}, Concepts: conceptLegend(), CodeMap: gjCodeMap{Root: root}}
+		}
+		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	default:
 		fmt.Printf("threat model: %s (%s)\n\n", prof.Title, prof.Name)
@@ -266,7 +296,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json|graph-json -profile -stats]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")

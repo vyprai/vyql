@@ -27,8 +27,9 @@ type funcInfo struct {
 	module     string
 	cls        string
 	name       string
-	validator  bool // a `# vyql: validator` function: its result clears trust-boundary taint
-	abstract   bool // an interface/abstract method (empty body) — dispatch to concrete impls
+	funcID     string // id of this function's code.Function node; stamped as `func` on its nodes
+	validator  bool   // a `# vyql: validator` function: its result clears trust-boundary taint
+	abstract   bool   // an interface/abstract method (empty body) — dispatch to concrete impls
 }
 
 type importEntry struct {
@@ -55,6 +56,9 @@ type lowerer struct {
 	curModule string
 	curClass  string // "" = none
 	curRoute  bool   // lowering the body of a web request handler (FuncDef.IsRoute)
+	curFunc   string // id of the code.Function node enclosing the nodes being lowered ("" = top level)
+	funcCtr   int    // side counter for code.Function node ids — kept OFF the shared ctr/order so
+	//        adding function records never perturbs existing dataflow node ids/ordering
 
 	// B1 structured-CFG metadata. `region` is the current control-region path (e.g.
 	// "/if3.t/loop5"); every node is stamped with it plus a monotonic `order`. For
@@ -636,9 +640,16 @@ func (l *lowerer) nid(prefix string) string {
 	return prefix + "#" + strconv.Itoa(l.ctr)
 }
 
+func boolProp(b bool) string {
+	if b {
+		return "true"
+	}
+	return ""
+}
+
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
 	id := l.nid(kind)
-	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.order)}
+	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.order), "func": l.curFunc}
 	l.order++
 	for k, v := range props {
 		p[k] = v
@@ -711,17 +722,36 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				prefix = cls + "."
 			}
 			qual := modkey + "::" + prefix + st.Name
+			// first-class function record: a code.Function node every node in this
+			// function points at via its `func` prop (the node→function map VyPr's
+			// CodeFunction / call-edge / path-function tables key off). Run-local id,
+			// unique within one export document — that's all the contract requires.
+			// Minted off a SIDE counter (not l.nid/l.node) so it consumes neither the
+			// shared id counter nor an order slot: adding function records leaves every
+			// dataflow node's id and order byte-identical to before (no taint perturbation).
+			l.funcCtr++
+			fid := "Function#" + strconv.Itoa(l.funcCtr)
+			l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Props: map[string]string{
+				"loc":          st.Loc,
+				"name":         prefix + st.Name,
+				"end_loc":      st.EndLoc,
+				"module":       modkey,
+				"class":        cls,
+				"is_route":     boolProp(st.IsRoute),
+				"is_validator": boolProp(st.IsValidator),
+			}})
 			params := map[string]string{}
 			var order []string
 			for _, p := range st.Params {
-				params[p] = l.node("Param", st.Loc, map[string]string{"name": p, "func": st.Name})
+				params[p] = l.node("Param", st.Loc, map[string]string{"name": p, "func": fid})
 				order = append(order, p)
 			}
 			info := &funcInfo{
 				paramNames: order,
 				params:     params,
-				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
+				ret:        l.node("Return", st.Loc, map[string]string{"func": fid}),
 				module:     modkey, cls: cls, name: st.Name,
+				funcID:    fid,
 				validator: st.IsValidator,
 				// an empty body marks an interface/abstract method: a call typed to it must
 				// dispatch to the concrete implementations (whose bodies carry the taint).
@@ -797,7 +827,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.region = "/fn" + l.nextBranch()
 		saveRoute := l.curRoute
 		l.curRoute = st.IsRoute
+		saveFunc := l.curFunc
+		if info != nil {
+			l.curFunc = info.funcID
+		}
 		l.block(st.Body, inner)
+		l.curFunc = saveFunc
 		l.curRoute = saveRoute
 		l.region = saveRegion
 	case nir.Assign:

@@ -99,6 +99,13 @@ func (c *jvConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
+func (c *jvConv) endloc(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
+}
+
 func (c *jvConv) text(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
@@ -182,7 +189,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L, EndLoc: c.endloc(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
 		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution

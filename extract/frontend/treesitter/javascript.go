@@ -132,6 +132,13 @@ func (c *jsConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
+func (c *jsConv) endloc(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
+}
+
 func (c *jsConv) text(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
@@ -233,7 +240,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if c.exported[name] {
 			body = append(publicAPISeeds(params, L), body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L, EndLoc: c.endloc(n)}}
 	case "class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "lexical_declaration", "variable_declaration":
@@ -403,7 +410,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					params = c.paramsFromFunctionText(inner)
 				}
 				body := append(publicAPISeeds(params, L), c.funcBody(rhs)...)
-				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L, EndLoc: c.endloc(rhs)}}
 			}
 		}
 		if left != nil && c.isModuleExports(left) && rhs != nil && rhs.Kind() == "object" {
@@ -416,7 +423,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 						params = c.paramsFromFunctionText(pr)
 					}
 					body := append(publicAPISeeds(params, L), c.funcBody(v)...)
-					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, Body: body, Loc: L})
+					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, Body: body, Loc: L, EndLoc: c.endloc(v)})
 				}
 			}
 			if len(out) > 0 {
