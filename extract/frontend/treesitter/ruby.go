@@ -308,8 +308,9 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		// a keyword argument (foo(k: v)) appearing directly in an argument_list
 		return nir.Pair{Key: c.keyName(field(n, "key")), Value: c.expr(field(n, "value")), Loc: L}
 	case "scope_resolution":
-		// A::B → treat as a Name on the dotted path
-		return nir.Name{ID: c.dotted(n), Loc: L}
+		// A::B used as a value is a constant token; carry it for `val` matching
+		// while call-path construction still uses dotted(AST) directly.
+		return nir.Const{Loc: L, Value: c.dotted(n)}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {

@@ -163,6 +163,26 @@ test "go: InsecureSkipVerify false is clean"
   }
   ```
 
+test "ruby: VERIFY_NONE disables cert validation"
+  lang ruby
+  expect VYQL-CFG-004
+  code
+  ```
+  def f(http)
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+  end
+  ```
+
+test "ruby: VERIFY_PEER is clean for cert validation"
+  lang ruby
+  reject VYQL-CFG-004
+  code
+  ```
+  def f(http)
+    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+  end
+  ```
+
 # --- CSRF disabled (VYQL-CFG-001) ---
 test "javascript: lusca csrf false disables CSRF"
   lang javascript
