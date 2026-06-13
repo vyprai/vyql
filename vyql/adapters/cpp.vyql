@@ -57,6 +57,13 @@ adapter cpp {
   sink path "realloc" arg 1 -> code.SizeComputation
   sink path "operator new" -> code.SizeComputation
   mark "alloca" -> code.StackAllocationSmell
+  mark "mktemp" -> code.InsecureTempFile
+  mark "tmpnam" -> code.InsecureTempFile
+  mark "tempnam" -> code.InsecureTempFile
+  mark "chmod" val "0777" -> code.InsecurePermission
+  mark "chmod" val "0666" -> code.InsecurePermission
+  mark "open" val "0777" -> code.InsecurePermission
+  mark "open" val "0666" -> code.InsecurePermission
   mark "__subscript" -> code.IndexAccess
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref

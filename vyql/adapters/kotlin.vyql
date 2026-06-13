@@ -120,6 +120,7 @@ adapter kotlin {
 
   // csrf disabled (CWE-352) — presence marker
   mark "csrf.disable" -> code.CsrfDisabled
+  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval

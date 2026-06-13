@@ -1,0 +1,276 @@
+# P2 parity: config/crypto presence checks with positive and negative fixtures.
+
+# --- Certificate validation disabled (VYQL-CFG-004) ---
+test "java: hostname verifier returning true disables cert validation"
+  lang java
+  expect VYQL-CFG-004
+  code
+  ```
+  class C { void f(Client client) { client.setHostnameVerifier((host, session) -> true); } }
+  ```
+
+test "java: hostname verifier returning false is clean"
+  lang java
+  reject VYQL-CFG-004
+  code
+  ```
+  class C { void f(Client client) { client.setHostnameVerifier((host, session) -> false); } }
+  ```
+
+test "kotlin: NoopHostnameVerifier disables cert validation"
+  lang kotlin
+  expect VYQL-CFG-004
+  code
+  ```
+  fun f(client: Client) {
+    client.setHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+  }
+  ```
+
+test "kotlin: default hostname verifier is clean"
+  lang kotlin
+  reject VYQL-CFG-004
+  code
+  ```
+  fun f(client: Client) {
+    client.setHostnameVerifier(DefaultHostnameVerifier.INSTANCE)
+  }
+  ```
+
+test "csharp: dangerous certificate validator disables cert validation"
+  lang csharp
+  expect VYQL-CFG-004
+  code
+  ```
+  class C { void F() { var v = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator; } }
+  ```
+
+test "csharp: default handler has no cert validation disablement"
+  lang csharp
+  reject VYQL-CFG-004
+  code
+  ```
+  class C { void F() { var handler = new HttpClientHandler(); } }
+  ```
+
+test "swift: allowing any HTTPS certificate disables validation"
+  lang swift
+  expect VYQL-CFG-004
+  code
+  ```
+  func f(session: Session) {
+    session.allowsAnyHTTPSCertificate(true)
+  }
+  ```
+
+test "swift: rejecting arbitrary HTTPS certificates is clean"
+  lang swift
+  reject VYQL-CFG-004
+  code
+  ```
+  func f(session: Session) {
+    session.allowsAnyHTTPSCertificate(false)
+  }
+  ```
+
+# --- CSRF disabled (VYQL-CFG-001) ---
+test "javascript: lusca csrf false disables CSRF"
+  lang javascript
+  expect VYQL-CFG-001
+  code
+  ```
+  app.use(lusca.csrf(false));
+  ```
+
+test "javascript: lusca csrf true is clean"
+  lang javascript
+  reject VYQL-CFG-001
+  code
+  ```
+  app.use(lusca.csrf(true));
+  ```
+
+test "php: disabling VerifyCsrfToken middleware disables CSRF"
+  lang php
+  expect VYQL-CFG-001
+  code
+  ```
+  <?php $this->withoutMiddleware("VerifyCsrfToken");
+  ```
+
+test "php: keeping auth middleware is clean for CSRF disabled"
+  lang php
+  reject VYQL-CFG-001
+  code
+  ```
+  <?php $this->withoutMiddleware("Authenticate");
+  ```
+
+test "csharp: IgnoreAntiforgeryToken disables CSRF"
+  lang csharp
+  expect VYQL-CFG-001
+  code
+  ```
+  class C { void F() { IgnoreAntiforgeryToken(); } }
+  ```
+
+test "csharp: ValidateAntiForgeryToken is clean"
+  lang csharp
+  reject VYQL-CFG-001
+  code
+  ```
+  class C { void F() { ValidateAntiForgeryToken(); } }
+  ```
+
+# --- JWT signature not verified (VYQL-CFG-005) ---
+test "java: Algorithm.none is unverified JWT"
+  lang java
+  expect VYQL-CFG-005
+  code
+  ```
+  class C { void f(String token) { JWT.require(Algorithm.none()).build().verify(token); } }
+  ```
+
+test "java: HMAC algorithm is clean for JWT verification"
+  lang java
+  reject VYQL-CFG-005
+  code
+  ```
+  class C { void f(String token) { JWT.require(Algorithm.HMAC256("k")).build().verify(token); } }
+  ```
+
+test "go: ParseUnverified is unverified JWT"
+  lang go
+  expect VYQL-CFG-005
+  code
+  ```
+  package p
+  func f(token string, claims Claims) {
+    jwt.ParseUnverified(token, claims)
+  }
+  ```
+
+test "go: ParseWithClaims is clean for JWT verification"
+  lang go
+  reject VYQL-CFG-005
+  code
+  ```
+  package p
+  func f(token string, claims Claims) {
+    jwt.ParseWithClaims(token, claims, keyfunc)
+  }
+  ```
+
+# --- Insecure permissions (VYQL-CFG-008) ---
+test "c: chmod 0777 is insecure permission"
+  lang c
+  expect VYQL-CFG-008
+  code
+  ```
+  int main(){ chmod("/tmp/x", 0777); return 0; }
+  ```
+
+test "c: chmod 0600 is clean"
+  lang c
+  reject VYQL-CFG-008
+  code
+  ```
+  int main(){ chmod("/tmp/x", 0600); return 0; }
+  ```
+
+test "cpp: chmod 0777 is insecure permission"
+  lang cpp
+  expect VYQL-CFG-008
+  code
+  ```
+  int main(){ chmod("/tmp/x", 0777); return 0; }
+  ```
+
+test "cpp: chmod 0600 is clean"
+  lang cpp
+  reject VYQL-CFG-008
+  code
+  ```
+  int main(){ chmod("/tmp/x", 0600); return 0; }
+  ```
+
+test "java: setWritable true false is insecure permission"
+  lang java
+  expect VYQL-CFG-008
+  code
+  ```
+  class C { void f(File file) { file.setWritable(true, false); } }
+  ```
+
+test "java: owner-only setWritable is clean"
+  lang java
+  reject VYQL-CFG-008
+  code
+  ```
+  class C { void f(File file) { file.setWritable(true, true); } }
+  ```
+
+test "php: chmod 0777 is insecure permission"
+  lang php
+  expect VYQL-CFG-008
+  code
+  ```
+  <?php chmod("/tmp/x", 0777);
+  ```
+
+test "php: chmod 0600 is clean"
+  lang php
+  reject VYQL-CFG-008
+  code
+  ```
+  <?php chmod("/tmp/x", 0600);
+  ```
+
+test "ruby: File.chmod 0777 is insecure permission"
+  lang ruby
+  expect VYQL-CFG-008
+  code
+  ```
+  File.chmod(0777, "/tmp/x")
+  ```
+
+test "ruby: File.chmod 0600 is clean"
+  lang ruby
+  reject VYQL-CFG-008
+  code
+  ```
+  File.chmod(0600, "/tmp/x")
+  ```
+
+test "csharp: OtherWrite unix file mode is insecure permission"
+  lang csharp
+  expect VYQL-CFG-008
+  code
+  ```
+  class C { void F() { File.SetUnixFileMode("/tmp/x", UnixFileMode.OtherWrite); } }
+  ```
+
+test "csharp: UserRead unix file mode is clean"
+  lang csharp
+  reject VYQL-CFG-008
+  code
+  ```
+  class C { void F() { File.SetUnixFileMode("/tmp/x", UnixFileMode.UserRead); } }
+  ```
+
+# --- Insecure temp file (VYQL-PATH-003) ---
+test "cpp: mktemp is insecure temp file"
+  lang cpp
+  expect VYQL-PATH-003
+  code
+  ```
+  int main(){ char *p = mktemp("/tmp/fooXXXXXX"); return 0; }
+  ```
+
+test "cpp: mkstemp is clean"
+  lang cpp
+  reject VYQL-PATH-003
+  code
+  ```
+  int main(){ int fd = mkstemp("/tmp/fooXXXXXX"); return fd; }
+  ```

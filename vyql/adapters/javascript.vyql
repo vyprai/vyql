@@ -507,6 +507,9 @@ adapter javascript {
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
   mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified
   mark "jwt.sign" val "algorithm=none" -> code.JwtUnverified
+  // explicit CSRF middleware disablement.
+  mark "lusca.csrf" val "false" -> code.CsrfDisabled
+  mark "csrfProtection" val "false" -> code.CsrfDisabled
 
   // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
   // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.

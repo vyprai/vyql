@@ -151,6 +151,10 @@ adapter csharp {
   mark "CipherMode.ECB" -> code.WeakCipher
   mark "CreateEncryptor" val "0000000000000000" -> code.StaticIv
   mark "AesGcm" val "000000000000" -> code.StaticIv
+  mark "DangerousAcceptAnyServerCertificateValidator" -> code.CertValidationDisabled
+  mark "ServerCertificateCustomValidationCallback" val "true" -> code.CertValidationDisabled
+  mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
+  mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
   mark "MD5.Create" -> code.WeakHash
   mark "SHA1.Create" -> code.WeakHash
   mark "MD5CryptoServiceProvider" -> code.WeakHash

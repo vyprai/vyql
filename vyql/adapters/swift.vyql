@@ -84,6 +84,8 @@ adapter swift {
   // insecure cookie (CWE-614) — cookie configured insecurely (setter-method idiom)
   mark "setSecure" val "false" -> code.InsecureCookie
   mark "setHttpOnly" val "false" -> code.InsecureCookie
+  mark "allowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
+  mark "serverTrustPolicy" val "disableEvaluation" -> code.CertValidationDisabled
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
