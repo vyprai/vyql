@@ -184,6 +184,7 @@ threat SqlInjection { cwe: [CWE_89], desc: "Untrusted data in a SQL command" }
 adapter python {
   meta { fidelity: resolved }
   source "request.form" -> code.HttpInput
+  source path "request.cookies" -> code.Cookie
   source receiver "body" on "express.Request" -> code.HttpInput
   sink method "execute" -> code.SqlExecution
   sink path "os.system" -> code.CommandExecution
@@ -209,27 +210,30 @@ adapter python {
 	if th == nil || th.QualifiedName() != "injection.SqlInjection" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 7 {
+	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 8 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "code.HttpInput" {
 		t.Fatalf("source mapping wrong: %+v", ad.Mappings[0])
 	}
-	if ad.Mappings[1].Kind != "source_receiver" || ad.Mappings[1].Constraint != "express.Request" {
-		t.Fatalf("source_receiver mapping wrong: %+v", ad.Mappings[1])
+	if ad.Mappings[1].Kind != "source" || ad.Mappings[1].Pattern != "request.cookies" || ad.Mappings[1].Concept != "code.Cookie" {
+		t.Fatalf("source path mapping wrong: %+v", ad.Mappings[1])
 	}
-	if ad.Mappings[2].Kind != "sink_method" || ad.Mappings[3].Kind != "sink_path" {
-		t.Fatalf("sink mapping kinds wrong: %+v", ad.Mappings[2:])
+	if ad.Mappings[2].Kind != "source_receiver" || ad.Mappings[2].Constraint != "express.Request" {
+		t.Fatalf("source_receiver mapping wrong: %+v", ad.Mappings[2])
 	}
-	if ad.Mappings[4].Kind != "sink_receiver" || ad.Mappings[4].Concept != "code.UrlFetch" {
-		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[4])
+	if ad.Mappings[3].Kind != "sink_method" || ad.Mappings[4].Kind != "sink_path" {
+		t.Fatalf("sink mapping kinds wrong: %+v", ad.Mappings[3:])
 	}
-	if ad.Mappings[5].Kind != "mark_method" || ad.Mappings[5].Pattern != "setAllowsAnyHTTPSCertificate" ||
-		ad.Mappings[5].Concept != "code.CertValidationDisabled" || len(ad.Mappings[5].ValMatches) != 1 {
-		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[5])
+	if ad.Mappings[5].Kind != "sink_receiver" || ad.Mappings[5].Concept != "code.UrlFetch" {
+		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[5])
 	}
-	if ad.Mappings[6].Kind != "mark" || !ad.Mappings[6].Exact || ad.Mappings[6].Pattern != "Random" {
-		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[6])
+	if ad.Mappings[6].Kind != "mark_method" || ad.Mappings[6].Pattern != "setAllowsAnyHTTPSCertificate" ||
+		ad.Mappings[6].Concept != "code.CertValidationDisabled" || len(ad.Mappings[6].ValMatches) != 1 {
+		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[6])
+	}
+	if ad.Mappings[7].Kind != "mark" || !ad.Mappings[7].Exact || ad.Mappings[7].Pattern != "Random" {
+		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[7])
 	}
 }
 

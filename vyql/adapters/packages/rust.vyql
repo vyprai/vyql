@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile, NetworkBind, NetworkConnect, NetworkData, NetworkSend}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter rust {
@@ -75,6 +75,13 @@ adapter rust {
   }
   package "regex" {
     sink path "Regex.new" -> RegexCompile
+  }
+  package "mio" {
+    sink method "bind" -> code.NetworkBind
+    sink method "connect" -> code.NetworkConnect
+    source method "accept" -> code.NetworkData
+    sink method "send_to" -> code.NetworkSend
+    source method "recv_from" -> code.NetworkData
   }
   package "ammonia" {
     control "ammonia.clean" -> HtmlEscape

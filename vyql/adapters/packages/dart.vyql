@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile, StoredDataRead, StoredDataWrite}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter dart {
@@ -69,6 +69,24 @@ adapter dart {
   }
   package "path" {
     control "p.normalize" -> PathCanonicalization
+  }
+  package "shared_preferences" {
+    sink method "setString" -> StoredDataWrite
+    sink method "setBool" -> StoredDataWrite
+    sink method "setInt" -> StoredDataWrite
+    sink method "setDouble" -> StoredDataWrite
+    sink method "setStringList" -> StoredDataWrite
+    source method "getString" -> StoredDataRead
+    source method "getBool" -> StoredDataRead
+    source method "getInt" -> StoredDataRead
+    source method "getDouble" -> StoredDataRead
+    source method "getStringList" -> StoredDataRead
+  }
+  package "shared_preferences_web" {
+    sink method "setValue" -> StoredDataWrite
+    sink method "clear" -> StoredDataWrite
+    sink method "remove" -> StoredDataWrite
+    source method "getAll" -> StoredDataRead
   }
   package "shelf_auth" {
     control method "authenticate" -> AuthenticationCheck

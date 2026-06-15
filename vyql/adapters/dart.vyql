@@ -10,6 +10,22 @@ adapter dart {
   source "request.params" -> code.HttpInput
   source "request.headers" -> code.HttpInput
   source ".requestedUri" -> code.HttpInput
+  source method "getAll" -> code.StoredDataRead
+  source method "getString" -> code.StoredDataRead
+  source method "getBool" -> code.StoredDataRead
+  source method "getInt" -> code.StoredDataRead
+  source method "getDouble" -> code.StoredDataRead
+  source method "getStringList" -> code.StoredDataRead
+
+  // persistent storage / preferences
+  sink method "setValue" -> code.StoredDataWrite
+  sink method "setString" -> code.StoredDataWrite
+  sink method "setBool" -> code.StoredDataWrite
+  sink method "setInt" -> code.StoredDataWrite
+  sink method "setDouble" -> code.StoredDataWrite
+  sink method "setStringList" -> code.StoredDataWrite
+  sink method "clear" -> code.StoredDataWrite
+  sink method "remove" -> code.StoredDataWrite
 
   // SQL — sqflite raw queries
   sink method "rawQuery" -> code.SqlExecution

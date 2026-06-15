@@ -551,6 +551,8 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		} else if p.atWord("receiver") { // receiver-typed source: match attr/method on a known receiver type
 			p.next()
 			kind = "source_receiver"
+		} else if p.atWord("path") { // explicit path form; equivalent to bare `source "a.b"`
+			p.next()
 		}
 		pat := p.parsePattern()
 		sm := AdapterMapping{Kind: kind, Pattern: pat}

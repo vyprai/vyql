@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -503,6 +504,78 @@ func adapterNames() []string {
 		}
 	}
 	return out
+}
+
+// ── vyql validate-adapter ──────────────────────────────────────────────────────────
+// Parse an adapter file through the real VyQL parser and emit a compact public summary.
+
+func cmdValidateAdapter(args []string) error {
+	fs := flag.NewFlagSet("validate-adapter", flag.ExitOnError)
+	file := fs.String("file", "", "adapter .vyql file to parse; reads stdin when empty")
+	_ = fs.Parse(args)
+	var data []byte
+	var err error
+	if *file != "" {
+		data, err = os.ReadFile(*file)
+	} else {
+		data, err = io.ReadAll(os.Stdin)
+	}
+	if err != nil {
+		return err
+	}
+	decls, err := parser.Parse(string(data))
+	if err != nil {
+		return fmt.Errorf("adapter parse: %w", err)
+	}
+	type mappingSummary struct {
+		Kind     string   `json:"kind"`
+		Pattern  string   `json:"pattern"`
+		Concept  string   `json:"concept,omitempty"`
+		Packages []string `json:"packages,omitempty"`
+	}
+	type adapterSummary struct {
+		Name          string           `json:"name"`
+		MappingCount  int              `json:"mapping_count"`
+		PackageBlocks []string         `json:"package_blocks,omitempty"`
+		Mappings      []mappingSummary `json:"mappings"`
+	}
+	summary := struct {
+		OK       bool             `json:"ok"`
+		Adapters []adapterSummary `json:"adapters"`
+	}{OK: true}
+	for _, d := range decls {
+		ad, ok := d.(*parser.AdapterDecl)
+		if !ok {
+			continue
+		}
+		item := adapterSummary{Name: ad.Name, MappingCount: len(ad.Mappings)}
+		packageSeen := map[string]bool{}
+		for _, m := range ad.Mappings {
+			item.Mappings = append(item.Mappings, mappingSummary{
+				Kind:     m.Kind,
+				Pattern:  m.Pattern,
+				Concept:  m.Concept,
+				Packages: m.Packages,
+			})
+			for _, pkg := range m.Packages {
+				if !packageSeen[pkg] {
+					packageSeen[pkg] = true
+					item.PackageBlocks = append(item.PackageBlocks, pkg)
+				}
+			}
+		}
+		sort.Strings(item.PackageBlocks)
+		summary.Adapters = append(summary.Adapters, item)
+	}
+	if len(summary.Adapters) == 0 {
+		return fmt.Errorf("adapter parse: no adapter declaration found")
+	}
+	out, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(out))
+	return nil
 }
 
 // ── vyql diff ───────────────────────────────────────────────────────────────────────

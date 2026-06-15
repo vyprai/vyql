@@ -323,6 +323,10 @@ concept StdinInput : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
 }
+concept StoredDataRead : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
 concept ConfigFileInput : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
@@ -455,6 +459,28 @@ concept NosqlQuery : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_943]
 }
+concept NetworkBind : sink {
+  vulnerable_to: [iac.PublicNetworkExposure]
+  cwe: [CWE_200]
+}
+concept NetworkConnect : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_918]
+}
+concept NetworkData : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
+concept NetworkDisconnect : sink {
+  vulnerable_to: [resource.ResourceLeak]
+  cwe: [CWE_772]
+}
+concept NetworkSend : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_918]
+}
 concept RedirectTarget : sink {
   vulnerable_to: [request_forgery.OpenRedirect]
   enabled_by: [taint.UntrustedData]
@@ -483,6 +509,11 @@ concept StateChangingOp : sink {
   vulnerable_to: [request_forgery.Csrf]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_352]
+}
+concept StoredDataWrite : sink {
+  vulnerable_to: [crypto.CleartextStorage]
+  enabled_by: [taint.SecretValue]
+  cwe: [CWE_312]
 }
 concept TemplateRender : sink {
   vulnerable_to: [injection.TemplateInjection]
@@ -538,6 +569,15 @@ concept AuthorizationCheck : control {
 concept CsrfProtection : control {
   neutralizes: [request_forgery.Csrf]
   applies: endpoint
+}
+// Privacy/data-collection opt-in or opt-out controls exposed by SDKs.
+concept DataCollectionControl : control {
+  applies: scope
+}
+concept CertificateValidation : control {
+  neutralizes: [crypto.ImproperCertValidation]
+  cwe: [CWE_295]
+  applies: scope
 }
 concept EncryptionAtRest : control {
   neutralizes: [crypto.CleartextStorage]
