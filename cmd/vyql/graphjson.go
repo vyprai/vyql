@@ -65,7 +65,8 @@ type gjCallEdge struct {
 
 type gjFinding struct {
 	Rule          string      `json:"rule"`
-	Kind          string      `json:"kind"` // taint | reach | assume | presence
+	Kind          string      `json:"kind"`  // taint | reach | assume | presence
+	Scope         string      `json:"scope"` // function | module | unresolved (docs/21 §4)
 	Severity      string      `json:"severity"`
 	CWE           []string    `json:"cwe"`
 	FP            string      `json:"fp"` // stable across runs — VyPr dedup + diff key
@@ -271,6 +272,21 @@ func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 			gf.PathFunctions = []gjPathFn{} // never null — VyPr path_length = len(path_functions), NOT NULL
 		}
 		gf.PathLength = len(gf.PathFunctions)
+		// scope (docs/21 §4): the routing anchor has an enclosing function?
+		// taint anchors on the source (→ entrypoint); presence/reach on the sink.
+		// invariant: scope=="function" ⟺ anchor func_id != null. `unresolved` is
+		// not yet distinguished from `module` (deferred — inline-handler modeling).
+		gf.Scope = "module"
+		switch gf.Kind {
+		case "taint", "reach", "assume":
+			if gf.Source != nil && gf.Source.FuncID != nil {
+				gf.Scope = "function"
+			}
+		default: // presence
+			if gf.Sink != nil && gf.Sink.FuncID != nil {
+				gf.Scope = "function"
+			}
+		}
 		out = append(out, gf)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].FP < out[j].FP })

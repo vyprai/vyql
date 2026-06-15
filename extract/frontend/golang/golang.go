@@ -351,6 +351,11 @@ func (c *conv) declStmt(st *ast.DeclStmt) nir.Stmt {
 }
 
 func (c *conv) expr(e ast.Expr) nir.Expr {
+	if e == nil {
+		// nil expr: a tagless `switch { }`, an empty return, an optional clause, …
+		// Return an empty node rather than dereferencing nil in c.loc(e.Pos()).
+		return nir.Const{}
+	}
 	switch ex := e.(type) {
 	case *ast.Ident:
 		if ex.Name == "true" || ex.Name == "false" {

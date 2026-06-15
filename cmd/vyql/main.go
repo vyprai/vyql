@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -47,6 +48,9 @@ func main() {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintln(os.Stderr, "vyql: "+fmt.Sprint(r))
+			if os.Getenv("VYQL_DEBUG") != "" {
+				fmt.Fprintln(os.Stderr, string(debug.Stack()))
+			}
 			os.Exit(1)
 		}
 	}()

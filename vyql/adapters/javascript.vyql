@@ -181,6 +181,14 @@ adapter javascript {
   sink path "yaml.load" -> code.Deserialization
   sink path "js-yaml.load" -> code.Deserialization
   sink path "jsyaml.load" -> code.Deserialization
+  // XML parsing (CWE-611 XXE) — libxmljs/xml2js/sax parse untrusted XML. The
+  // {noent:true} entity-expansion option makes libxmljs.parseXmlString classic XXE.
+  sink method "parseXmlString" -> code.XmlParse
+  sink method "parseXml" -> code.XmlParse
+  sink path "libxmljs.parseXmlString" -> code.XmlParse
+  sink path "libxmljs.parseXml" -> code.XmlParse
+  sink path "xml2js.parseString" -> code.XmlParse
+  sink path "xml2js.parseStringPromise" -> code.XmlParse
   sink path "axios.get" -> code.UrlFetch
   sink path "axios.post" -> code.UrlFetch
   sink path "axios.put" -> code.UrlFetch
@@ -413,6 +421,9 @@ adapter javascript {
   mark "createHash" val "md2" -> code.WeakHash
   mark "createHash" val "sha1" -> code.WeakHash
   mark "createHash" val "ripemd" -> code.WeakHash
+  // The `md5` / `sha1` npm packages, called directly (md5(data)) — always weak.
+  mark "md5" -> code.WeakHash
+  mark "sha1" -> code.WeakHash
 
   // Package managers and monorepo tools execute project-controlled lifecycle
   // scripts during install/sync. Treat explicit installer invocations as code
@@ -456,6 +467,14 @@ adapter javascript {
   // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled (omission not flagged).
   mark "res.cookie" val "httpOnly=false" -> code.InsecureCookie
   mark "res.cookie" nval "secure=true" -> code.InsecureCookie
+  // session middleware with an explicitly insecure cookie flag
+  // (express-session / cookie-session: session({cookie:{secure:false}})).
+  // Calls resolve to the imported package path, so match that.
+  mark "express-session" val "secure=false" -> code.InsecureCookie
+  mark "express-session" val "httponly=false" -> code.InsecureCookie
+  mark "cookie-session" val "secure=false" -> code.InsecureCookie
+  mark "session" val "secure=false" -> code.InsecureCookie
+  mark "cookieSession" val "secure=false" -> code.InsecureCookie
 
   // permissive CORS (CWE-942) — ACAO header set to "*" (multi-val: name AND wildcard)
   mark "res.header" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
