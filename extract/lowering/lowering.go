@@ -636,7 +636,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		selfName:       prog.Self(),
 		resolveImports: resolveImports,
 		ctorTypes:      ctorTypes,
-		g:              usg.NewInMemStore(),
+		g:              newGraphStore(0),
 		modCtr:         map[string]int{},
 		modOrder:       map[string]int{},
 		modBranch:      map[string]int{},

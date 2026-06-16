@@ -45,7 +45,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	// Preallocate the graph maps to the previous scan's node count (cached) — the whole graph is
 	// rebuilt from deltas every scan, and starting from an empty map costs repeated rehashing.
 	if raw, ok := cache.GetRaw(sizeHintKey); ok && len(raw) >= 1 {
-		l.g = usg.NewInMemStoreSized(decodeInt(raw))
+		l.g = newGraphStore(decodeInt(raw))
 	}
 	base := l.g
 	fresh := map[string]bool{}
@@ -165,6 +165,18 @@ func encodeInt(n int) []byte {
 	return w.b
 }
 func decodeInt(raw []byte) int { return (&bufReader{b: raw}).uvar() }
+
+// newGraphStore creates the analysis graph store. VYQL_STORE=int selects the int-indexed
+// IntStore (lower memory on large graphs); otherwise the map-based InMemStore. hint>0 presizes.
+func newGraphStore(hint int) usg.Store {
+	if os.Getenv("VYQL_STORE") == "int" {
+		return usg.NewIntStore(hint)
+	}
+	if hint > 0 {
+		return usg.NewInMemStoreSized(hint)
+	}
+	return usg.NewInMemStore()
+}
 
 func lowerKey(moduleHash, moduleKey, sigFP string) string {
 	return "lower\x00" + moduleHash + "\x00" + moduleKey + "\x00" + sigFP
