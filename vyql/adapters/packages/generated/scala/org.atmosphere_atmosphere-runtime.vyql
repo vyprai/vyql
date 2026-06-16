@@ -1,0 +1,14 @@
+import code.{HttpInput}
+adapter scala {
+  package "org.atmosphere:atmosphere-runtime" {
+    source method "getPathInfo" -> code.HttpInput
+    source method "getPathTranslated" -> code.HttpInput
+    source method "getQueryString" -> code.HttpInput
+    source method "getRequestedSessionId" -> code.HttpInput
+    source method "getServletPath" -> code.HttpInput
+    source method "getRequestURI" -> code.HttpInput
+    source method "getRequestURL" -> code.HttpInput
+    source method "getHeaders" -> code.HttpInput
+    source method "getIntHeader" -> code.HttpInput
+  }
+}

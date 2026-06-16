@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/gobwas/glob" {
+    sink method "Compile" -> code.Deserialization
+    sink method "MustCompile" -> code.Deserialization
+  }
+}

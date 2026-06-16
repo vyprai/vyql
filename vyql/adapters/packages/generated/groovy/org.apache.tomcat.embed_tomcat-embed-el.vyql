@@ -1,0 +1,7 @@
+import code.{Deserialization, CodeEval}
+adapter groovy {
+  package "org.apache.tomcat.embed:tomcat-embed-el" {
+    sink path "org.apache.el.parser.ELParser.parse" -> code.Deserialization
+    sink path "jakarta.el.ELProcessor.eval" -> code.CodeEval
+  }
+}

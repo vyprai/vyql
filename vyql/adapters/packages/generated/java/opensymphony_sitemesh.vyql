@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "opensymphony:sitemesh" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{CodeEval, StoredDataRead}
+
+adapter python {
+  package "django-tinymce" {
+    sink method "render_to_js_vardef" -> code.CodeEval
+    source method "flatpages_link_list" -> code.StoredDataRead
+  }
+}

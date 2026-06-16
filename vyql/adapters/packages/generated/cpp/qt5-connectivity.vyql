@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter cpp {
+  package "qt5-connectivity" {
+    source method "writeData" -> code.NetworkData
+    source method "readData" -> code.NetworkData
+  }
+}

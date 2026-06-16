@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter rust {
+  package "k256" {
+    source method "sign_raw" -> code.SecretValue
+    source method "verify_raw" -> code.SecretValue
+  }
+}

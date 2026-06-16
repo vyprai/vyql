@@ -1,0 +1,8 @@
+import code.{SecretValue}
+adapter java {
+  package "org.springframework.cloud:spring-cloud-commons" {
+    source method "getKeyStorePassword" -> code.SecretValue
+    source method "getKeyPassword" -> code.SecretValue
+    source method "getTrustStorePassword" -> code.SecretValue
+  }
+}

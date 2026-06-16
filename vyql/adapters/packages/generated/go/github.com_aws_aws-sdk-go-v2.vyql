@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/aws/aws-sdk-go-v2" {
+    source method "Parse" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+adapter csharp {
+  package "accord.io" {
+    sink method "FromUrl" -> code.UrlFetch
+    source method "FromText" -> core.UserControlledData
+  }
+}

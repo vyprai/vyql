@@ -1,0 +1,11 @@
+import code.{XmlParse, Deserialization, StoredDataRead}
+
+adapter kotlin {
+  package "javax.xml.ws:jaxws-api" {
+    sink method "invoke" -> code.XmlParse
+    sink method "invoke" -> code.Deserialization
+    sink method "getPayload" -> code.XmlParse
+    sink method "setPayload" -> code.XmlParse
+    sink method "setPayload" -> code.Deserialization
+  }
+}

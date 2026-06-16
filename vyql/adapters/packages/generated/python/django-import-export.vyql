@@ -1,0 +1,8 @@
+adapter python {
+  package "django-import-export" {
+    sink method "read" -> code.Deserialization
+    sink method "process_import" -> code.Deserialization
+    source method "get_export_data" -> core.UserControlledData
+    sink method "write_to_tmp_storage" -> code.FilePathAccess
+  }
+}

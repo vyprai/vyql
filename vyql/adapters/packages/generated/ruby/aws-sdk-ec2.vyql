@@ -1,0 +1,6 @@
+import code.{PublicNetworkExposure}
+adapter ruby {
+  package "aws-sdk-ec2" {
+    mark method "create_security_group" -> code.PublicNetworkExposure
+  }
+}

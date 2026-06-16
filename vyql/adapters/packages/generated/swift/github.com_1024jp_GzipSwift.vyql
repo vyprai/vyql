@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/1024jp/GzipSwift" {
+    sink method "gzipped" -> code.Deserialization
+    sink method "gunzipped" -> code.Deserialization
+  }
+}

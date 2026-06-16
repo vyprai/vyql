@@ -1,0 +1,8 @@
+import code.{UrlFetch}
+
+adapter python {
+  package "pytube" {
+    sink method "get" -> code.UrlFetch
+    sink method "post" -> code.UrlFetch
+  }
+}

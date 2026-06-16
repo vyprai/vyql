@@ -1,0 +1,11 @@
+import code.{HttpInput, HtmlRender, RedirectTarget}
+
+adapter python {
+  package "python-openid" {
+    source method "fromPostArgs" -> code.HttpInput
+    source method "fromOpenIDArgs" -> code.HttpInput
+    sink method "toFormMarkup" -> code.HtmlRender
+    mark method "toURL" -> code.RedirectTarget
+    mark method "toURLEncoded" -> code.RedirectTarget
+  }
+}

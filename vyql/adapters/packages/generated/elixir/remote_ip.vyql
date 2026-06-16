@@ -1,0 +1,11 @@
+import code.{HttpInput}
+
+adapter elixir {
+  package "remote_ip" {
+    source method "connect" -> code.HttpInput
+    source method "call" -> code.HttpInput
+    source method "from" -> code.HttpInput
+    source method "take" -> code.HttpInput
+    source method "parse" -> code.HttpInput
+  }
+}

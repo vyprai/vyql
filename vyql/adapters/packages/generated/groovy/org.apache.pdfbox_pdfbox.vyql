@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess}
+adapter groovy {
+  package "org.apache.pdfbox:pdfbox" {
+    sink method "loadFDF" -> code.Deserialization
+    sink method "loadXFDF" -> code.Deserialization
+    sink method "loadPDF" -> code.Deserialization
+    sink method "parseHex" -> code.Deserialization
+    sink method "createInputStream" -> code.Deserialization
+    sink method "createRawInputStream" -> code.Deserialization
+  }
+}

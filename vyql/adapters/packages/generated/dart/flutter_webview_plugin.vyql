@@ -1,0 +1,8 @@
+import code.{CodeEval, UrlFetch}
+
+adapter dart {
+  package "flutter_webview_plugin" {
+    sink method "evalJavascript" -> code.CodeEval
+    sink method "reloadUrl" -> code.UrlFetch
+  }
+}

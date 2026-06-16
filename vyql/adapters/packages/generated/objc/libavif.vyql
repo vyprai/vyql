@@ -1,0 +1,9 @@
+adapter objc {
+  package "libavif" {
+    sink method "avifDecoderRead" -> code.Deserialization
+    sink method "avifDecoderReadMemory" -> code.Deserialization
+    sink method "avifDecoderReadFile" -> code.Deserialization
+    source method "avifIOCreateMemoryReader" -> core.UserControlledData
+    sink method "avifIOCreateFileReader" -> code.FileUse
+  }
+}

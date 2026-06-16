@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter java {
+  package "com.github.ben-manes.caffeine:caffeine" {
+    source method "CaffeineSpec.parse" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter kotlin {
+  package "org.apache.ibatis:ibatis-sqlmap" {
+    sink method "SqlRunner.run" -> SqlExecution
+  }
+}

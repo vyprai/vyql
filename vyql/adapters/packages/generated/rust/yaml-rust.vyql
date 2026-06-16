@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter rust {
+  package "yaml-rust" {
+    sink method "parse" -> code.Deserialization
+    sink method "load_from_str" -> code.Deserialization
+  }
+}

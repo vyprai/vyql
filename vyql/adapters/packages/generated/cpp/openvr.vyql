@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter cpp {
+  package "openvr" {
+    sink method "LaunchApplicationFromMimeType" -> code.CommandExecution
+    sink method "GetAppContainerFilePaths" -> code.FilePathAccess
+  }
+}

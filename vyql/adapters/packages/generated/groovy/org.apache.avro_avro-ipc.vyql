@@ -1,0 +1,5 @@
+adapter groovy {
+  package "org.apache.avro:avro-ipc" {
+    source method "HttpTransceiver.readBuffers" -> code.NetworkData
+  }
+}

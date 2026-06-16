@@ -1,0 +1,12 @@
+import core.{HtmlEscape, InputValidation}
+
+adapter perl {
+  package "Waft" {
+    source method "create_query_obj" -> core.UserControlledData
+    control method "html_escape" -> core.HtmlEscape
+    control method "jsstr_escape" -> core.InputValidation
+    sink method "compile_template_file" -> code.CodeEval
+    sink method "compile_template" -> code.CodeEval
+    sink method "Waft" -> code.CodeEval
+  }
+}

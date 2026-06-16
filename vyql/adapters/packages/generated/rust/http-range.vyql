@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "http-range" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_bytes" -> code.Deserialization
+  }
+}

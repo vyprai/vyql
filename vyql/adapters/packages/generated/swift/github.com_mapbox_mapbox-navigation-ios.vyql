@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter swift {
+  package "github.com/mapbox/mapbox-navigation-ios" {
+    sink method "urlRequest" -> code.NetworkConnect
+  }
+}

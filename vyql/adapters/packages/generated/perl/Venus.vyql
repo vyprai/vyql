@@ -1,0 +1,12 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "Venus" {
+    sink method "read_json" -> code.Deserialization
+    sink method "read_json_file" -> code.Deserialization
+    sink method "read_perl" -> code.Deserialization
+    sink method "read_perl_file" -> code.Deserialization
+    sink method "read_yaml" -> code.Deserialization
+    sink method "read_yaml_file" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+adapter kotlin {
+  package "com.sparkjava:spark-core" {
+    source method "getRequestURI" -> code.NetworkData
+    sink method "add" -> code.NetworkSend
+    sink method "connect" -> code.NetworkConnect
+    source path "com.sparkjava.spark.core.cookie" -> code.HttpInput
+  }
+}

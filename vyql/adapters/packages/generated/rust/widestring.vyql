@@ -1,0 +1,10 @@
+import core.{InputValidation}
+
+adapter rust {
+  package "widestring" {
+    control method "from_slice_truncate" -> core.InputValidation
+    control method "from_slice_truncate_mut" -> core.InputValidation
+    control method "from_char_slice_truncate" -> core.InputValidation
+    control method "from_char_slice_truncate_mut" -> core.InputValidation
+  }
+}

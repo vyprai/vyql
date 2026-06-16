@@ -1,0 +1,7 @@
+import code.{TemplateRender}
+adapter elixir {
+  package "ex_cldr_lists" {
+    sink method "to_string" -> code.TemplateRender
+    sink method "to_string!" -> code.TemplateRender
+  }
+}

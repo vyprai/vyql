@@ -1,0 +1,10 @@
+import core.{InputValidation}
+adapter rust {
+  package "ucd-util" {
+    control method "character_name_normalize" -> core.InputValidation
+    control method "symbolic_name_normalize" -> core.InputValidation
+    control method "hangul_full_canonical_decomposition" -> core.InputValidation
+    control method "canonical_property_name" -> core.InputValidation
+    control method "canonical_property_value" -> core.InputValidation
+  }
+}

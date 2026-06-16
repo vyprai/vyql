@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "facebook" {
+    sink method "DeserializeObject" -> code.Deserialization
+  }
+}

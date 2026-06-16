@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter javascript {
+  package "@types/yargs" {
+    source method "check" -> core.UserControlledData
+  }
+}

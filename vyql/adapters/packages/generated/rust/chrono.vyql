@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter rust {
+  package "chrono" {
+    sink method "parse_from_rfc2822" -> code.Deserialization
+    sink method "parse_from_rfc3339" -> code.Deserialization
+    sink method "parse_from_str" -> code.Deserialization
+  }
+}

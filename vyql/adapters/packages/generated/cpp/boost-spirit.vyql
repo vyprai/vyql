@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "boost-spirit" {
+    sink method "parse" -> code.Deserialization
+  }
+}

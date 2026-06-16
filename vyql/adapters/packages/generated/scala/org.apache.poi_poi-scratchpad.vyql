@@ -1,0 +1,9 @@
+adapter scala {
+  package "org.apache.poi:poi-scratchpad" {
+    sink method "HSLFParser.parse" -> code.Deserialization
+    sink method "HWPFParser.parse" -> code.Deserialization
+    source method "MAPIMessage.getTextBody" -> core.UserControlledData
+    source method "MAPIMessage.getHtmlBody" -> core.UserControlledData
+    source method "MAPIMessage.getRtfBody" -> core.UserControlledData
+  }
+}

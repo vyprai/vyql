@@ -1,0 +1,9 @@
+import code.{CliArgument, HttpInput, NetworkData, SecretValue, StoredDataRead, CommandExecution, FilePathAccess, Deserialization, SqlExecution}
+import core.{UserControlledData, AuthenticationCheck, AuthorizationCheck, InputValidation}
+
+adapter go {
+  package "github.com/hashicorp/vault/sdk" {
+    source method "ContextOriginalRequestPathValue" -> core.UserControlledData
+    source method "ContextOriginalBodyValue" -> core.UserControlledData
+  }
+}

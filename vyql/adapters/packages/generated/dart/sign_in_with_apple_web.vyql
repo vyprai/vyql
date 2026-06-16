@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter dart {
+  package "sign_in_with_apple_web" {
+    source method "signIn" -> code.SecretValue
+    source method "signIn" -> core.UserControlledData
+  }
+}

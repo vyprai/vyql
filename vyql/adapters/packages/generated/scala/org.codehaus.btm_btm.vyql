@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.codehaus.btm:btm" {
+    sink method "parse" -> code.Deserialization
+  }
+}

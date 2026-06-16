@@ -1,0 +1,8 @@
+import code.{HttpInput, NetworkData, NetworkSend}
+adapter groovy {
+  package "org.apache.cxf:cxf-rt-transports-http-jetty" {
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+    source method "service" -> code.HttpInput
+  }
+}

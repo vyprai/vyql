@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter java {
+  package "org.apache.httpcomponents:httpmime" {
+    sink method "org.apache.http.entity.mime.MultipartEntity.writeTo" -> code.NetworkSend
+  }
+}

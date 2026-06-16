@@ -1,0 +1,7 @@
+import core.{PathAccessCheck}
+
+adapter python {
+  package "spyder-kernels" {
+    control method "safe_extract" -> core.PathAccessCheck
+  }
+}

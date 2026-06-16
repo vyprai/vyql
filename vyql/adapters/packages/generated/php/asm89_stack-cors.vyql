@@ -1,0 +1,11 @@
+import code.{HttpInput, ResponseHeaderWrite}
+import core.{InputValidation}
+
+adapter php {
+  package "asm89/stack-cors" {
+    source method "handle" -> code.HttpInput
+    sink method "addPreflightRequestHeaders" -> code.ResponseHeaderWrite
+    sink method "addActualRequestHeaders" -> code.ResponseHeaderWrite
+    control method "isOriginAllowed" -> core.InputValidation
+  }
+}

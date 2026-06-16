@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter rust {
+  package "notify" {
+    sink method "watch" -> code.FilePathAccess
+    sink method "unwatch" -> code.FilePathAccess
+  }
+}

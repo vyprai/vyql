@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter cpp {
+  package "qtactiveqt" {
+    sink method "load" -> code.CodeEval
+  }
+}

@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+
+adapter ruby {
+  package "kaminari-actionview" {
+    sink method "render_partial" -> code.HtmlRender
+  }
+}

@@ -1,0 +1,8 @@
+import code.{HttpInput}
+
+adapter javascript {
+  package "type-is" {
+    source method "typeofrequest" -> code.HttpInput
+    source method "hasbody" -> code.HttpInput
+  }
+}

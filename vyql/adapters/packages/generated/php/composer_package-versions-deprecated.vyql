@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter php {
+  package "composer/package-versions-deprecated" {
+    source method "getVersion" -> core.UserControlledData
+    source method "rootPackageName" -> core.UserControlledData
+  }
+}

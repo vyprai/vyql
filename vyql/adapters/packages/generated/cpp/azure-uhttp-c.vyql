@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter cpp {
+  package "azure-uhttp-c" {
+    sink method "uhttp_client_execute_request" -> code.UrlFetch
+  }
+}

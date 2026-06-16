@@ -1,0 +1,11 @@
+import code.{NetworkSend, HttpInput}
+adapter python {
+  package "python-gitlab" {
+    sink method "http_request" -> code.NetworkSend
+    source method "http_get" -> code.HttpInput
+    source method "http_post" -> code.HttpInput
+    source method "http_put" -> code.HttpInput
+    source method "http_delete" -> code.HttpInput
+    source method "http_head" -> code.HttpInput
+  }
+}

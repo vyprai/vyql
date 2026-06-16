@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+adapter objc {
+  package "PonyDebugger" {
+    sink method "sendEventWithName:parameters:" -> code.NetworkSend
+    sink method "connectToURL:" -> code.NetworkConnect
+    sink method "autoConnectToBonjourServiceNamed:" -> code.NetworkConnect
+  }
+}

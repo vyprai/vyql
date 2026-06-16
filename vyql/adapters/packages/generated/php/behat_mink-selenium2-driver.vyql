@@ -1,0 +1,9 @@
+import code.{CodeEval, UrlFetch}
+
+adapter php {
+  package "behat/mink-selenium2-driver" {
+    sink method "executeJsOnXpath" -> code.CodeEval
+    sink method "executeJsOnElement" -> code.CodeEval
+    sink method "visit" -> code.UrlFetch
+  }
+}

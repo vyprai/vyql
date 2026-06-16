@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter ruby {
+  package "plist" {
+    sink method "parse_xml" -> code.Deserialization
+    sink method "save_plist" -> code.FilePathAccess
+  }
+}

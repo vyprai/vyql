@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter scala {
+  package "org.apache.activemq:activemq-camel" {
+    sink method "send" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter python {
+  package "pyfiglet" {
+    sink method "installFonts" -> FilePathAccess
+  }
+}

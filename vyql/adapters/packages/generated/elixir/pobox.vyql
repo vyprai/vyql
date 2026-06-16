@@ -1,0 +1,6 @@
+adapter elixir {
+  package "pobox" {
+    sink method "send" -> code.NetworkSend
+    sink method "send_notification" -> code.NetworkSend
+  }
+}

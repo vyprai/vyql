@@ -1,0 +1,13 @@
+import code.{NetworkConnect, NetworkSend, Deserialization}
+import core.{UserControlledData}
+
+adapter php {
+  package "twilio/sdk" {
+    sink method "Twilio\Domain::request" -> code.NetworkConnect
+    sink method "Twilio\Domain::request" -> code.NetworkSend
+    sink method "Twilio\Jwt\JWT::decode" -> code.Deserialization
+    source method "Twilio\Jwt\JWT::decode" -> core.UserControlledData
+    sink method "Twilio\Jwt\JWT::jsonDecode" -> code.Deserialization
+    sink method "Twilio\Jwt\JWT::urlsafeB64Decode" -> code.Deserialization
+  }
+}

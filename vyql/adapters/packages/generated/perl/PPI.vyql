@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "PPI" {
+    sink method "load" -> code.Deserialization
+    sink method "lex_file" -> code.Deserialization
+    sink method "lex_tokenizer" -> code.Deserialization
+  }
+}

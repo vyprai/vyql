@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+adapter dart {
+  package "strings" {
+    control method "toEscaped" -> core.HtmlEscape
+    control method "toEscape" -> core.HtmlEscape
+  }
+}

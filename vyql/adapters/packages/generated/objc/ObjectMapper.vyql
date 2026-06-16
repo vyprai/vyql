@@ -1,0 +1,14 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter objc {
+  package "ObjectMapper" {
+    sink method "parseJSONStringIntoDictionary" -> code.Deserialization
+    sink method "parseJSONString" -> code.Deserialization
+    sink method "map" -> code.Deserialization
+    sink method "mapArray" -> code.Deserialization
+    sink method "mapDictionary" -> code.Deserialization
+    sink method "mapSet" -> code.Deserialization
+    sink method "mapArrayOfArrays" -> code.Deserialization
+    sink method "mapDictionaryOfArrays" -> code.Deserialization
+  }
+}

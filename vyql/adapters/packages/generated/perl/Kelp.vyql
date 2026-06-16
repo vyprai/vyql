@@ -1,0 +1,10 @@
+import code.{HttpInput}
+import core.{UserControlledData}
+
+adapter perl {
+  package "Kelp" {
+    source method "query_parameters" -> core.UserControlledData
+    source method "body_parameters" -> core.UserControlledData
+    source method "parameters" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,10 @@
+import code.{WeakRandomValue}
+
+adapter rust {
+  package "getrandom" {
+    mark method "fill" -> code.WeakRandomValue
+    mark method "fill_uninit" -> code.WeakRandomValue
+    mark method "u32" -> code.WeakRandomValue
+    mark method "u64" -> code.WeakRandomValue
+  }
+}

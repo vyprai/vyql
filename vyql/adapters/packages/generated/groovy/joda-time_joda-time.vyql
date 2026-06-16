@@ -1,0 +1,11 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter groovy {
+  package "joda-time:joda-time" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseDays" -> code.Deserialization
+    sink method "parseHours" -> code.Deserialization
+    control method "validate" -> core.InputValidation
+  }
+}

@@ -1,0 +1,8 @@
+import code.{HttpInput, Deserialization}
+
+adapter javascript {
+  package "react-router" {
+    source method "query" -> code.HttpInput
+    sink method "parse" -> code.Deserialization
+  }
+}

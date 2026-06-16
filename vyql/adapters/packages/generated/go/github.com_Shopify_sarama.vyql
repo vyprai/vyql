@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/Shopify/sarama" {
+    sink method "decode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "com.sun.mail:javax.mail" {
+    sink method "parse" -> code.Deserialization
+  }
+}

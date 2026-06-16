@@ -1,0 +1,6 @@
+import code.{RedirectTarget}
+adapter php {
+  package "yiisoft/yii2-codeception" {
+    mark method "getUrl" -> code.RedirectTarget
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter elixir {
+  package "plug_static_index_html" {
+    sink method "call" -> code.FilePathAccess
+  }
+}

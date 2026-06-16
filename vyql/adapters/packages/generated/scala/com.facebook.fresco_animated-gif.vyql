@@ -1,0 +1,9 @@
+import code.{Deserialization, FilePathAccess}
+adapter scala {
+  package "com.facebook.fresco:animated-gif" {
+    sink method "createFromByteBuffer" -> code.Deserialization
+    sink method "createFromFileDescriptor" -> code.FilePathAccess
+    sink method "decodeFromNativeMemory" -> code.Deserialization
+    sink method "decodeFromByteBuffer" -> code.Deserialization
+  }
+}

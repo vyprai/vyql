@@ -1,0 +1,11 @@
+import code.{NetworkData, Deserialization, NetworkConnect, FilePathAccess}
+import core.{UserControlledData}
+
+adapter rust {
+  package "miow" {
+    source method "read" -> core.UserControlledData
+    source method "write" -> core.UserControlledData
+    sink method "connect" -> code.NetworkConnect
+    sink method "parse" -> code.Deserialization
+  }
+}

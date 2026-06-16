@@ -1,0 +1,11 @@
+import code.{ExpressionEval}
+adapter kotlin {
+  package "org.glassfish.web:javax.el" {
+    sink method "invoke" -> code.ExpressionEval
+    sink method "CompositeExpression" -> code.ExpressionEval
+    sink method "LiteralExpression" -> code.ExpressionEval
+    sink method "DeferredExpression" -> code.ExpressionEval
+    sink method "DynamicExpression" -> code.ExpressionEval
+    sink method "Expression" -> code.ExpressionEval
+  }
+}

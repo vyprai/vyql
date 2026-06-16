@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter java {
+  package "io.netty:netty-buffer" {
+    sink method "decodeString" -> code.Deserialization
+  }
+}

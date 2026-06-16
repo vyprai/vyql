@@ -1,0 +1,15 @@
+import code.{NetworkSend, NetworkData, Deserialization}
+import core.{InputValidation, UserControlledData}
+
+adapter python {
+  package "jeepney" {
+    sink method "send" -> code.NetworkSend
+    sink method "send_and_get_reply" -> code.NetworkSend
+    source method "read" -> code.NetworkData
+    control method "unescape" -> core.InputValidation
+    source method "parse_addresses" -> core.UserControlledData
+    control method "process_line" -> core.InputValidation
+    sink method "code_from_xml" -> code.Deserialization
+    sink method "generate_from_introspection" -> code.Deserialization
+  }
+}

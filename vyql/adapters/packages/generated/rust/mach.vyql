@@ -1,0 +1,19 @@
+import code.{PrivilegedOp}
+
+adapter rust {
+  package "mach" {
+    mark method "mach_vm_read" -> code.PrivilegedOp
+    mark method "mach_vm_read_list" -> code.PrivilegedOp
+    mark method "mach_vm_write" -> code.PrivilegedOp
+    mark method "mach_vm_copy" -> code.PrivilegedOp
+    mark method "mach_vm_read_overwrite" -> code.PrivilegedOp
+    mark method "task_resume" -> code.PrivilegedOp
+    mark method "task_suspend" -> code.PrivilegedOp
+    mark method "thread_suspend" -> code.PrivilegedOp
+    mark method "thread_resume" -> code.PrivilegedOp
+    mark method "clock_set_time" -> code.PrivilegedOp
+    mark method "clock_set_attributes" -> code.PrivilegedOp
+    mark method "mach_port_extract_right" -> code.PrivilegedOp
+    mark method "mach_msg_send" -> code.PrivilegedOp
+  }
+}

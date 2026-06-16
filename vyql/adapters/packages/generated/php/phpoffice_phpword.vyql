@@ -1,0 +1,9 @@
+import code.{FileUse, Deserialization}
+
+adapter php {
+  package "phpoffice/phpword" {
+    sink method "save" -> code.FileUse
+    sink method "load" -> code.Deserialization
+    sink method "createReader" -> code.Deserialization
+  }
+}

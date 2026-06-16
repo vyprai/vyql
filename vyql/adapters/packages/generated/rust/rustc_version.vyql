@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter rust {
+  package "rustc_version" {
+    sink method "for_command" -> code.CommandExecution
+  }
+}

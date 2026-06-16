@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "file_size" {
+    sink method "FileSize.Parser.parse" -> code.Deserialization
+    sink method "FileSize.Parser.parse!" -> code.Deserialization
+  }
+}

@@ -1,0 +1,5 @@
+adapter objc {
+  package "AmplifyPlugins" {
+    mark method "update" -> code.WeakHash
+  }
+}

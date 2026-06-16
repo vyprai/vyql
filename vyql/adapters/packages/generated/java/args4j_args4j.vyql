@@ -1,0 +1,7 @@
+import code.{CliArgument, Deserialization}
+adapter java {
+  package "args4j:args4j" {
+    source method "org.kohsuke.args4j.CmdLineParser.parseArgument" -> code.CliArgument
+    sink method "org.kohsuke.args4j.XmlParser.parse" -> code.Deserialization
+  }
+}

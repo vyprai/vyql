@@ -1,0 +1,7 @@
+import code.{WeakRandomValue}
+
+adapter cpp {
+  package "kuku" {
+    mark method "MakeRandomItem" -> code.WeakRandomValue
+  }
+}

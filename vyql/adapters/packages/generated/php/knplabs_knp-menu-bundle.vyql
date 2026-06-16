@@ -1,0 +1,7 @@
+import code.{TemplateRender}
+
+adapter php {
+  package "knplabs/knp-menu-bundle" {
+    sink method "render" -> code.TemplateRender
+  }
+}

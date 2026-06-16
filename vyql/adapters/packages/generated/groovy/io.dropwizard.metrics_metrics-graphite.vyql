@@ -1,0 +1,9 @@
+import code.{NetworkSend}
+import core.{InputValidation}
+
+adapter groovy {
+  package "io.dropwizard.metrics:metrics-graphite" {
+    sink method "send" -> code.NetworkSend
+    control method "sanitize" -> core.InputValidation
+  }
+}

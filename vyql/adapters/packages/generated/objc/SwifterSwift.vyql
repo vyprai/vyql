@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter objc {
+  package "SwifterSwift" {
+    sink method "write" -> code.FilePathAccess
+  }
+}

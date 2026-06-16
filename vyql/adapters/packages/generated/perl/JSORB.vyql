@@ -1,0 +1,8 @@
+import code.{NetworkData, Deserialization, HttpInput}
+adapter perl {
+  package "JSORB" {
+    source method "JSORB::Server::Simple::run" -> code.NetworkData
+    sink method "JSORB::Client::Compiler::compile" -> code.Deserialization
+    source method "Catalyst::Action::JSORB::execute" -> code.HttpInput
+  }
+}

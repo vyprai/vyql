@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "com.fasterxml.jackson.jaxrs:jackson-jaxrs-base" {
+    sink method "readFrom" -> code.Deserialization
+  }
+}

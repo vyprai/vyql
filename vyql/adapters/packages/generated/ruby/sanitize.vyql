@@ -1,0 +1,10 @@
+import core.{InputValidation}
+
+adapter ruby {
+  package "sanitize" {
+    control method "Sanitize.document" -> core.InputValidation
+    control method "Sanitize.fragment" -> core.InputValidation
+    control method "Sanitize::CSS.properties" -> core.InputValidation
+    control method "Sanitize::CSS.stylesheet" -> core.InputValidation
+  }
+}

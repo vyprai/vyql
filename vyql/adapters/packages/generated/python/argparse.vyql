@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter python {
+  package "argparse" {
+    source method "parse_args" -> core.UserControlledData
+    source method "parse_known_args" -> core.UserControlledData
+  }
+}

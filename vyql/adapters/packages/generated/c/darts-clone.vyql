@@ -1,0 +1,6 @@
+adapter c {
+  package "darts-clone" {
+    sink method "DoubleArrayImpl::open" -> code.FilePathAccess
+    sink method "DoubleArrayImpl::save" -> code.FilePathAccess
+  }
+}

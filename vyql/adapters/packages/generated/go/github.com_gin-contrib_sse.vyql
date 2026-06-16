@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/gin-contrib/sse" {
+    sink method "Decode" -> code.Deserialization
+  }
+}

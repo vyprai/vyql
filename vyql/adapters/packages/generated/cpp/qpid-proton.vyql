@@ -1,0 +1,6 @@
+adapter cpp {
+  package "qpid-proton" {
+    sink method "pn_connection_set_hostname" -> code.NetworkConnect
+    source method "pn_connection_set_user" -> core.UserControlledData
+  }
+}

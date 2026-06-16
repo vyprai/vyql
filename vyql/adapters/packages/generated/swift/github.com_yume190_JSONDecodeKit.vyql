@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/yume190/JSONDecodeKit" {
+    sink method "decode" -> code.Deserialization
+  }
+}

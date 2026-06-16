@@ -1,0 +1,22 @@
+import code.{CliArgument, SqlExecution}
+adapter python {
+  package "flask-migrate" {
+    source method "revision" -> code.CliArgument
+    source method "migrate" -> code.CliArgument
+    source method "upgrade" -> code.CliArgument
+    source method "downgrade" -> code.CliArgument
+    source method "stamp" -> code.CliArgument
+    source method "init" -> code.CliArgument
+    source method "edit" -> code.CliArgument
+    source method "merge" -> code.CliArgument
+    source method "show" -> code.CliArgument
+    source method "history" -> code.CliArgument
+    source method "heads" -> code.CliArgument
+    source method "branches" -> code.CliArgument
+    source method "current" -> code.CliArgument
+    source method "check" -> code.CliArgument
+    sink method "run_migrations_offline" -> code.SqlExecution
+    sink method "run_migrations_online" -> code.SqlExecution
+    sink method "do_run_migrations" -> code.SqlExecution
+  }
+}

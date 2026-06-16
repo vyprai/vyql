@@ -1,0 +1,13 @@
+import code.{NetworkData, FilePathAccess}
+adapter cpp {
+  package "libice" {
+    source method "IceOpenConnection" -> code.NetworkData
+    source method "IceListenForConnections" -> code.NetworkData
+    source method "IceAcceptConnection" -> code.NetworkData
+    source method "IceProcessMessages" -> code.NetworkData
+    sink method "IceAuthFileName" -> code.FilePathAccess
+    sink method "IceReadAuthFileEntry" -> code.FilePathAccess
+    sink method "IceLockAuthFile" -> code.FilePathAccess
+    sink method "IceUnlockAuthFile" -> code.FilePathAccess
+  }
+}

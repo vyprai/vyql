@@ -1,0 +1,11 @@
+import code.{CommandExecution}
+import core.{HtmlEscape}
+
+adapter perl {
+  package "Project-Libs" {
+    sink method "command" -> code.CommandExecution
+    control method "_escape" -> core.HtmlEscape
+    control method "_escape_and_interpolate" -> core.HtmlEscape
+    control method "_escape_non_code" -> core.HtmlEscape
+  }
+}

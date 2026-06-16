@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter c {
+  package "libspatialite" {
+    sink method "spatialite_init_ex" -> code.SqlExecution
+  }
+}

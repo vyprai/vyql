@@ -1,0 +1,9 @@
+import code.{HttpInput}
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "io.vertx:vertx-web" {
+    source method "parse" -> core.UserControlledData
+    source method "query" -> code.HttpInput
+  }
+}

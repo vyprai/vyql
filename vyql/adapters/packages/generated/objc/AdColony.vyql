@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter objc {
+  package "AdColony" {
+    sink method "sendCustomMessageOfType:withContent:reply:" -> code.NetworkSend
+  }
+}

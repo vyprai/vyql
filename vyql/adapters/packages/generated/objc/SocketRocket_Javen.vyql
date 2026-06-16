@@ -1,0 +1,11 @@
+import code.{NetworkData, NetworkSend, UrlFetch}
+
+adapter objc {
+  package "SocketRocket_Javen" {
+    sink method "send" -> code.NetworkSend
+    sink method "sendPing" -> code.NetworkSend
+    source method "webSocket:didReceiveMessage:" -> code.NetworkData
+    sink method "initWithURLRequest:protocols:" -> code.UrlFetch
+    sink method "initWithURL:protocols:" -> code.UrlFetch
+  }
+}

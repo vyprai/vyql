@@ -1,0 +1,11 @@
+import code.{HttpInput, ResponseHeaderWrite}
+adapter java {
+  package "com.sun.jersey:jersey-servlet" {
+    source method "service" -> code.HttpInput
+    source method "filterFormParameters" -> code.HttpInput
+    sink method "write" -> code.ResponseHeaderWrite
+    sink method "writeStatusAndHeaders" -> code.ResponseHeaderWrite
+    sink method "writeHeaders" -> code.ResponseHeaderWrite
+    sink method "writeStatus" -> code.ResponseHeaderWrite
+  }
+}

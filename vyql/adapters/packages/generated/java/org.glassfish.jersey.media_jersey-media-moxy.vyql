@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.glassfish.jersey.media:jersey-media-moxy" {
+    sink method "initializeUnmarshaller" -> code.Deserialization
+    sink method "preReadFrom" -> code.Deserialization
+  }
+}

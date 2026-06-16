@@ -1,0 +1,10 @@
+import code.{CliArgument, Deserialization, FilePathAccess}
+
+adapter ruby {
+  package "sidekiq" {
+    sink method "parse" -> code.Deserialization
+    source method "parse_options" -> code.CliArgument
+    sink method "parse_config" -> code.Deserialization
+    sink method "parse_config" -> code.FilePathAccess
+  }
+}

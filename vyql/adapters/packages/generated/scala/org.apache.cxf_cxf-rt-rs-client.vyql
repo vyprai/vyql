@@ -1,0 +1,15 @@
+import code.{NetworkConnect, NetworkSend}
+import core.{UserControlledData}
+
+adapter scala {
+  package "org.apache.cxf:cxf-rt-rs-client" {
+    source method "query" -> core.UserControlledData
+    source method "header" -> core.UserControlledData
+    sink method "WebClient.create" -> code.NetworkConnect
+    sink method "post" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "get" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+    sink method "invoke" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,6 @@
+import code.{ExpressionEval}
+adapter javascript {
+  package "@webassemblyjs/wast-printer" {
+    sink method "print" -> code.ExpressionEval
+  }
+}

@@ -1,0 +1,9 @@
+adapter objc {
+  package "UMCCommon" {
+    source method "setSecret" -> code.SecretValue
+    source method "initWithAppkey:channel:" -> code.SecretValue
+    source method "umidString" -> code.SecretValue
+    source method "deviceIDForIntegration" -> code.SecretValue
+    source method "handleUrl" -> core.UserControlledData
+  }
+}

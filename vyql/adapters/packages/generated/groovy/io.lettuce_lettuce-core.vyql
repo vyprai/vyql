@@ -1,0 +1,8 @@
+import code.{CodeEval, SecretValue}
+adapter groovy {
+  package "io.lettuce:lettuce-core" {
+    sink method "eval" -> code.CodeEval
+    sink method "evalsha" -> code.CodeEval
+    source method "auth" -> code.SecretValue
+  }
+}

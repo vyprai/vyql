@@ -1,0 +1,15 @@
+import code.{FilePathAccess, PrivilegedOp, StoredDataRead, NetworkConnect}
+adapter go {
+  package "github.com/opencontainers/selinux" {
+    mark method "SetProcessKind" -> code.PrivilegedOp
+    sink method "SetFileLabel" -> code.FilePathAccess
+    sink method "LsetFileLabel" -> code.FilePathAccess
+    source method "FileLabel" -> code.StoredDataRead
+    source method "LfileLabel" -> code.StoredDataRead
+    source method "ExecLabel" -> code.StoredDataRead
+    mark method "SetExecLabel" -> code.PrivilegedOp
+    sink method "SetSocketLabel" -> code.NetworkConnect
+    source method "SocketLabel" -> code.StoredDataRead
+    sink method "Chcon" -> code.FilePathAccess
+  }
+}

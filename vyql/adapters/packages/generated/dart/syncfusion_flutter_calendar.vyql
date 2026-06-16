@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "syncfusion_flutter_calendar" {
+    sink method "parseRRule" -> code.Deserialization
+  }
+}

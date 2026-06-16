@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.postgresql:postgresql" {
+    sink method "getQueryTimeout" -> code.SqlExecution
+    control method "isUseServerPrepare" -> core.SqlParameterization
+  }
+}

@@ -1,0 +1,25 @@
+import core.{UserControlledData}
+
+adapter ruby {
+  package "win32console" {
+    source method "Write" -> core.UserControlledData
+    source method "WriteChar" -> core.UserControlledData
+    source method "WriteFile" -> core.UserControlledData
+    source method "WriteInput" -> core.UserControlledData
+    source method "WriteRect" -> core.UserControlledData
+    source method "WriteConsole" -> core.UserControlledData
+    source method "WriteConsoleInput" -> core.UserControlledData
+    source method "WriteConsoleOutput" -> core.UserControlledData
+    source method "WriteConsoleOutputAttribute" -> core.UserControlledData
+    source method "WriteConsoleOutputCharacter" -> core.UserControlledData
+
+    source method "ReadChar" -> core.UserControlledData
+    source method "ReadAttr" -> core.UserControlledData
+    source method "ReadRect" -> core.UserControlledData
+    source method "ReadConsole" -> core.UserControlledData
+    source method "ReadConsoleInput" -> core.UserControlledData
+    source method "ReadConsoleOutput" -> core.UserControlledData
+    source method "ReadConsoleOutputAttribute" -> core.UserControlledData
+    source method "ReadConsoleOutputCharacter" -> core.UserControlledData
+  }
+}

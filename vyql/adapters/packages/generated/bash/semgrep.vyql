@@ -1,0 +1,6 @@
+adapter bash {
+  package "semgrep" {
+    sink path "semgrep-core" -> code.CommandExecution
+    sink path "semgrep-core" -> code.FilePathAccess
+  }
+}

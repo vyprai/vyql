@@ -1,0 +1,12 @@
+import code.{CliArgument, RedirectTarget, HttpInput}
+import core.{AuthorizationCheck}
+
+adapter dart {
+  package "flutter_modular" {
+    source method "getArguments" -> code.CliArgument
+    source method "setArguments" -> code.CliArgument
+    mark method "setInitialRoute" -> code.RedirectTarget
+    mark method "getRoute" -> code.RedirectTarget
+    control method "canActivate" -> core.AuthorizationCheck
+  }
+}

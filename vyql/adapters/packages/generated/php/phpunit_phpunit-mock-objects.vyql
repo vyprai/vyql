@@ -1,0 +1,5 @@
+adapter php {
+  package "phpunit/phpunit-mock-objects" {
+    sink method "evalClass" -> code.CodeEval
+  }
+}

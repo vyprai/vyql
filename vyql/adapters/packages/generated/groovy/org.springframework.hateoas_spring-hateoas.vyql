@@ -1,0 +1,8 @@
+import code.{Deserialization, CommandExecution}
+adapter groovy {
+  package "org.springframework.hateoas:spring-hateoas" {
+    sink method "parseLinks" -> code.Deserialization
+    sink method "parseLink" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

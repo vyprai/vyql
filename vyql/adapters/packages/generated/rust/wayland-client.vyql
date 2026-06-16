@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend, Deserialization}
+
+adapter rust {
+  package "wayland-client" {
+    sink method "connect_to_env" -> code.NetworkConnect
+    sink method "from_socket" -> code.NetworkConnect
+    sink method "send_request" -> code.NetworkSend
+    sink method "parse_event" -> code.Deserialization
+  }
+}

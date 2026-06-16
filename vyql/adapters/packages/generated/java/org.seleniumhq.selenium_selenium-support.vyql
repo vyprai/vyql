@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter java {
+  package "org.seleniumhq.selenium:selenium-support" {
+    control method "Quotes.escape" -> core.InputValidation
+  }
+}

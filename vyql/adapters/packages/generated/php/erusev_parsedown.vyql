@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter php {
+  package "erusev/parsedown" {
+    sink method "line" -> code.Deserialization
+    sink method "inlines" -> code.Deserialization
+  }
+}

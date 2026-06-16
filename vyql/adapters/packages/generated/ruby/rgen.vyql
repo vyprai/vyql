@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "rgen" {
+    sink method "parse" -> code.Deserialization
+  }
+}

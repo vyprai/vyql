@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter cpp {
+  package "libgpg-error" {
+    source method "arg_parse" -> code.CliArgument
+  }
+}

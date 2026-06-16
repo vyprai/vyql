@@ -1,0 +1,6 @@
+import code.{UrlFetch, CommandExecution}
+adapter c {
+  package "kf5declarative" {
+    sink method "openUrl" -> code.UrlFetch
+  }
+}

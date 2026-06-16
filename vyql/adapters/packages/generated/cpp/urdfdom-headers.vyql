@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "urdfdom-headers" {
+    sink method "init" -> code.Deserialization
+  }
+}

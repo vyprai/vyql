@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter perl {
+  package "ToolSet" {
+    sink method "export" -> code.CodeEval
+    sink method "import" -> code.CodeEval
+  }
+}

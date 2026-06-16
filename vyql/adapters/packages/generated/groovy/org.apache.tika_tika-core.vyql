@@ -1,0 +1,7 @@
+adapter groovy {
+  package "org.apache.tika:tika-core" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseToString" -> code.Deserialization
+    sink method "detect" -> code.Deserialization
+  }
+}

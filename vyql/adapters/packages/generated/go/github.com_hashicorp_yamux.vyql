@@ -1,0 +1,10 @@
+import code.{NetworkData, NetworkSend}
+
+adapter go {
+  package "github.com/hashicorp/yamux" {
+    source method "Server" -> code.NetworkData
+    sink method "Server" -> code.NetworkSend
+    source method "Client" -> code.NetworkData
+    sink method "Client" -> code.NetworkSend
+  }
+}

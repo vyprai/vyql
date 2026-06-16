@@ -1,0 +1,13 @@
+import code.{SqlExecution}
+
+adapter groovy {
+  package "com.amazonaws:aws-java-sdk-dynamodb" {
+    sink method "query" -> code.SqlExecution
+    sink method "batchExecuteStatement" -> code.SqlExecution
+    sink method "executeStatement" -> code.SqlExecution
+    sink method "updateItem" -> code.SqlExecution
+    sink method "putItem" -> code.SqlExecution
+    sink method "deleteItem" -> code.SqlExecution
+    sink method "scan" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter python {
+  package "setproctitle" {
+    source method "setproctitle" -> core.UserControlledData
+    source method "setthreadtitle" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "libphonenumber-csharp" {
+    sink method "PhoneNumberUtil.Parse" -> code.Deserialization
+    sink method "PhoneNumberUtil.ParseAndKeepRawInput" -> code.Deserialization
+    sink method "PhoneNumberMatcher.ParseAndVerify" -> code.Deserialization
+    sink method "MetadataFilter.ParseFieldMapFromString" -> code.Deserialization
+  }
+}

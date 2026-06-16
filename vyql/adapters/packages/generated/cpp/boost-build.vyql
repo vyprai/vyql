@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter cpp {
+  package "boost-build" {
+    sink method "trigger_event_pre_exec_cmd" -> code.CommandExecution
+  }
+}

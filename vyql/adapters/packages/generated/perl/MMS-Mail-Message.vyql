@@ -1,0 +1,5 @@
+adapter perl {
+  package "MMS-Mail-Message" {
+    sink method "cleanse_map" -> code.ExpressionEval
+  }
+}

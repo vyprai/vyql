@@ -1,0 +1,7 @@
+import code.{LogOutput}
+
+adapter ruby {
+  package "mono_logger" {
+    sink method "write" -> code.LogOutput
+  }
+}

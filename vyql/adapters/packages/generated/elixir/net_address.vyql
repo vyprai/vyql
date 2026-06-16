@@ -1,0 +1,6 @@
+adapter elixir {
+  package "net_address" {
+    sink method "from_string!" -> code.Deserialization
+    sink method "from_string" -> code.Deserialization
+  }
+}

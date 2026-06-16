@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter groovy {
+  package "net.sourceforge.jexcelapi:jxl" {
+    sink method "getWorkbook" -> code.FilePathAccess
+    sink method "DVParser" -> code.Deserialization
+  }
+}

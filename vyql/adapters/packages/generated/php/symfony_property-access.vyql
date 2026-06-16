@@ -1,0 +1,9 @@
+import code.{Deserialization, FilePathAccess, CommandExecution}
+import core.{UserControlledData}
+
+adapter php {
+  package "symfony/property-access" {
+    source method "getValue" -> core.UserControlledData
+    sink method "setValue" -> code.Deserialization
+  }
+}

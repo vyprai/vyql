@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter elixir {
+  package "persistent_ets" {
+    sink method "new" -> code.FilePathAccess
+  }
+}

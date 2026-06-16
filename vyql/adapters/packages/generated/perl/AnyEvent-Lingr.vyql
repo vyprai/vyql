@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter perl {
+  package "AnyEvent-Lingr" {
+    sink method "request" -> code.NetworkConnect
+  }
+}

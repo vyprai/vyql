@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+import code.{RedirectTarget}
+
+adapter objc {
+  package "Airship" {
+    source method "processDeepLink" -> core.UserControlledData
+    mark method "handleAirshipDeeplink" -> code.RedirectTarget
+  }
+}

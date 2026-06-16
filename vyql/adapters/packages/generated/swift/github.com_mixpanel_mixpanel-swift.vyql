@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter swift {
+  package "github.com/mixpanel/mixpanel-swift" {
+    sink method "trackCharge" -> code.NetworkSend
+  }
+}

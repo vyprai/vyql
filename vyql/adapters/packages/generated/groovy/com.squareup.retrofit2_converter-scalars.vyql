@@ -1,0 +1,14 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.squareup.retrofit2:converter-scalars" {
+    sink method "ScalarResponseBodyConverters$StringResponseBodyConverter.convert" -> code.Deserialization
+    sink method "ScalarResponseBodyConverters$BooleanResponseBodyConverter.convert" -> code.Deserialization
+    sink method "ScalarResponseBodyConverters$ByteResponseBodyConverter.convert" -> code.Deserialization
+    sink method "ScalarResponseBodyConverters$CharacterResponseBodyConverter.convert" -> code.Deserialization
+    sink method "ScalarResponseBodyConverters$DoubleResponseBodyConverter.convert" -> code.Deserialization
+    sink method "ScalarResponseBodyConverters$FloatResponseBodyConverter.convert" -> code.Deserialization
+    sink method "ScalarResponseBodyConverters$IntegerResponseBodyConverter.convert" -> code.Deserialization
+    sink method "ScalarResponseBodyConverters$LongResponseBodyConverter.convert" -> code.Deserialization
+    sink method "ScalarResponseBodyConverters$ShortResponseBodyConverter.convert" -> code.Deserialization
+  }
+}

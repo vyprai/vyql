@@ -1,0 +1,7 @@
+import code.{XmlParse}
+adapter go {
+  package "github.com/jung-kurt/gofpdf" {
+    sink method "SVGBasicParse" -> code.XmlParse
+    sink method "SVGBasicFileParse" -> code.XmlParse
+  }
+}

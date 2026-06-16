@@ -1,0 +1,10 @@
+import code.{NetworkSend, SecretValue}
+
+adapter swift {
+  package "github.com/SwiftcordApp/DiscordKit" {
+    source method "connect" -> code.SecretValue
+    source method "setToken" -> code.SecretValue
+    source method "init" -> code.SecretValue
+    sink method "send" -> code.NetworkSend
+  }
+}

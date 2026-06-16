@@ -1,0 +1,6 @@
+import code.{NetworkData}
+adapter objc {
+  package "Nuke" {
+    source method "loadData" -> code.NetworkData
+  }
+}

@@ -1,0 +1,8 @@
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "mustache" {
+    control method "escape" -> core.HtmlEscape
+    control method "escapeHTML" -> core.HtmlEscape
+  }
+}

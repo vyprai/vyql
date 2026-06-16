@@ -1,0 +1,13 @@
+import code.{SessionId, StoredDataRead, CommandExecution}
+import core.{InputValidation, AuthenticationCheck}
+
+adapter php {
+  package "zendframework/zend-session" {
+    mark method "sessionExists" -> code.SessionId
+    mark method "start" -> code.SessionId
+    mark method "getId" -> code.SessionId
+    mark method "regenerateId" -> code.SessionId
+    mark method "getName" -> code.SessionId
+    control method "session_set_save_handler" -> core.InputValidation
+  }
+}

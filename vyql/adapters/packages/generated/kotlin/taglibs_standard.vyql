@@ -1,0 +1,6 @@
+import core.{SqlParameterization}
+adapter kotlin {
+  package "taglibs:standard" {
+    control method "addSQLParameter" -> core.SqlParameterization
+  }
+}

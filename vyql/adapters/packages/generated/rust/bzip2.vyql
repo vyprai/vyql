@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "bzip2" {
+    sink method "decompress" -> code.Deserialization
+    sink method "decompress_vec" -> code.Deserialization
+  }
+}

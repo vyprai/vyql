@@ -1,0 +1,9 @@
+import code.{HtmlRender, RedirectTarget}
+
+adapter scala {
+  package "javax.portlet:portlet-api" {
+    mark method "sendRedirect" -> code.RedirectTarget
+    mark method "createRedirectURL" -> code.RedirectTarget
+    sink method "getWriter" -> code.HtmlRender
+  }
+}

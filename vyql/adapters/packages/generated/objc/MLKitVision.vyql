@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter objc {
+  package "MLKitVision" {
+    source method "initWithBuffer" -> core.UserControlledData
+    source method "initWithImage" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,8 @@
+import code.{NetworkSend, NetworkData}
+
+adapter python {
+  package "google-cloud-pubsub" {
+    sink method "publish" -> code.NetworkSend
+    source method "subscribe" -> code.NetworkData
+  }
+}

@@ -1,0 +1,8 @@
+import code.{NetworkSend, SecretValue}
+
+adapter objc {
+  package "MapboxMobileEvents" {
+    sink method "postMetadata:filePaths:completionHandler:" -> code.NetworkSend
+    source method "initializeWithAccessToken:userAgentBase:hostSDKVersion:" -> code.SecretValue
+  }
+}

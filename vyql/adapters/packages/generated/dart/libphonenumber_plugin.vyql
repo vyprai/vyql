@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter dart {
+  package "libphonenumber_plugin" {
+    source method "normalizePhoneNumber" -> core.UserControlledData
+    source method "parsePhoneNumber" -> core.UserControlledData
+  }
+}

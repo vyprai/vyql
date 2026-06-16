@@ -1,0 +1,12 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "representable" {
+    sink method "from_xml" -> code.Deserialization
+    sink method "parse_xml" -> code.Deserialization
+    sink method "from_hash" -> code.Deserialization
+    sink method "from_yaml" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+    sink method "parse_pipeline" -> code.Deserialization
+  }
+}

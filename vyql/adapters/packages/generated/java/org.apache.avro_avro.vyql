@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter java {
+  package "org.apache.avro:avro" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseInternal" -> code.Deserialization
+  }
+}

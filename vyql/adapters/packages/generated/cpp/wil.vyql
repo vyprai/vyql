@@ -1,0 +1,17 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "wil" {
+    sink method "query" -> code.Deserialization
+    sink method "query_dispatch" -> code.Deserialization
+    sink method "query_to" -> code.Deserialization
+    sink method "try_query_to" -> code.Deserialization
+    sink method "copy_to" -> code.Deserialization
+    sink method "try_copy_to" -> code.Deserialization
+    sink method "com_query" -> code.Deserialization
+    sink method "com_query_failfast" -> code.Deserialization
+    sink method "com_query_to" -> code.Deserialization
+    sink method "com_query_to_failfast" -> code.Deserialization
+    sink method "com_query_to_nothrow" -> code.Deserialization
+  }
+}

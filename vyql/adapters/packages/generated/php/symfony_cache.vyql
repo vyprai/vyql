@@ -1,0 +1,6 @@
+adapter php {
+  package "symfony/cache" {
+    sink method "get" -> code.NosqlQuery
+    sink method "set" -> code.StoredDataWrite
+  }
+}

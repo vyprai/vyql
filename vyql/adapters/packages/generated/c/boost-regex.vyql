@@ -1,0 +1,5 @@
+adapter c {
+  package "boost-regex" {
+    mark method "parse" -> code.RegexCompile
+  }
+}

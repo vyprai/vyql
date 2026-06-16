@@ -1,0 +1,9 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter dart {
+  package "flutter_facebook_auth_web" {
+    source method "FlutterFacebookAuthPlugin.accessToken" -> code.SecretValue
+    control method "FlutterFacebookAuthPlugin.login" -> core.AuthenticationCheck
+  }
+}

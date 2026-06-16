@@ -1,0 +1,5 @@
+adapter objc {
+  package "Flurry-iOS-SDK" {
+    source method "query" -> core.UserControlledData
+  }
+}

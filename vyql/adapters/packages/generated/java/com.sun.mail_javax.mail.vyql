@@ -1,0 +1,14 @@
+import core.{InputValidation}
+
+adapter java {
+  package "com.sun.mail:javax.mail" {
+    sink method "send" -> code.NetworkSend
+    sink method "parse" -> code.Deserialization
+    sink method "connect" -> code.NetworkConnect
+    source method "getHeader" -> core.UserControlledData
+    source method "getAllHeaders" -> core.UserControlledData
+    source method "getMatchingHeaders" -> core.UserControlledData
+    source method "getNonMatchingHeaders" -> core.UserControlledData
+    control method "validate" -> core.InputValidation
+  }
+}

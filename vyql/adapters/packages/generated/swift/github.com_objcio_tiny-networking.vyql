@@ -1,0 +1,8 @@
+import code.{NetworkSend, UrlFetch, NetworkData}
+
+adapter swift {
+  package "github.com/objcio/tiny-networking" {
+    sink method "load" -> code.NetworkSend
+    source method "Endpoint.responseBody" -> code.NetworkData
+  }
+}

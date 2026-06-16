@@ -1,0 +1,14 @@
+import code.{NetworkData}
+
+adapter kotlin {
+  package "org.apache.activemq:activemq-broker" {
+    source method "send" -> code.NetworkData
+    source method "preProcessDispatch" -> code.NetworkData
+    source method "postProcessDispatch" -> code.NetworkData
+    source method "messageConsumed" -> code.NetworkData
+    source method "messageDelivered" -> code.NetworkData
+    source method "messageDispatched" -> code.NetworkData
+    source method "messageDiscarded" -> code.NetworkData
+    source method "sendToDeadLetterQueue" -> code.NetworkData
+  }
+}

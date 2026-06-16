@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter javascript {
+  package "tr46" {
+    source method "toASCII" -> core.UserControlledData
+    source method "toUnicode" -> core.UserControlledData
+  }
+}

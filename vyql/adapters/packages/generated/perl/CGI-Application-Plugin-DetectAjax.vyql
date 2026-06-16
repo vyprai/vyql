@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter perl {
+  package "CGI-Application-Plugin-DetectAjax" {
+    source method "is_ajax" -> code.HttpInput
+  }
+}

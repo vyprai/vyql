@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter dart {
+  package "convert" {
+    sink method "HexDecoder.convert" -> code.Deserialization
+    sink method "PercentDecoder.convert" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter dart {
+  package "shelf_proxy" {
+    sink method "proxyHandler" -> code.UrlFetch
+  }
+}

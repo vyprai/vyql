@@ -1,0 +1,14 @@
+import code.{CodeEval, HtmlRender, UrlFetch}
+
+adapter csharp {
+  package "microsoft.toolkit.wpf.ui.controls.webview" {
+    sink method "AddPreLoadedScript" -> code.CodeEval
+    sink method "AddInitializeScript" -> code.CodeEval
+    sink method "InvokeScript" -> code.CodeEval
+    sink method "InvokeScriptAsync" -> code.CodeEval
+    sink method "Navigate" -> code.UrlFetch
+    sink method "NavigateToLocal" -> code.UrlFetch
+    sink method "NavigateToLocalStreamUri" -> code.UrlFetch
+    sink method "NavigateToString" -> code.HtmlRender
+  }
+}

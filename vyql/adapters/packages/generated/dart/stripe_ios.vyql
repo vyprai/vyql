@@ -1,0 +1,9 @@
+import code.{SecretValue}
+adapter dart {
+  package "stripe_ios" {
+    source method "createTokenForCVCUpdate" -> code.SecretValue
+    source method "createToken" -> code.SecretValue
+    source method "collectBankAccountToken" -> code.SecretValue
+    source method "collectFinancialConnectionsAccounts" -> code.SecretValue
+  }
+}

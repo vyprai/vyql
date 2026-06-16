@@ -1,0 +1,9 @@
+import core.{HtmlEscape, InputValidation}
+
+adapter elixir {
+  package "fun_with_flags_ui" {
+    control method "html_escape" -> core.HtmlEscape
+    control method "sanitize" -> core.InputValidation
+    control method "validate_flag_name" -> core.InputValidation
+  }
+}

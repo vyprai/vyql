@@ -1,0 +1,6 @@
+adapter perl {
+  package "WikiText" {
+    sink method "parse" -> code.Deserialization
+    control method "uri_escape" -> core.InputValidation
+  }
+}

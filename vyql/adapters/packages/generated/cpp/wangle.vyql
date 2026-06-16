@@ -1,0 +1,12 @@
+import code.{NetworkData, NetworkConnect, SecretValue}
+
+adapter cpp {
+  package "wangle" {
+    source method "read" -> code.NetworkData
+    source method "write" -> code.NetworkData
+    sink method "bind" -> code.NetworkConnect
+    sink method "connect" -> code.NetworkConnect
+    source method "decryptOpenSSLEncFilePassString" -> code.SecretValue
+    source method "decryptOpenSSLEncFilePassFile" -> code.SecretValue
+  }
+}

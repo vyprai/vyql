@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "HTML-Selector-XPath" {
+    sink method "selector_to_xpath" -> code.Deserialization
+  }
+}

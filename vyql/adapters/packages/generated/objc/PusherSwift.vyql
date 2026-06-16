@@ -1,0 +1,13 @@
+import code.{SecretValue, NetworkConnect, NetworkSend, UrlFetch}
+adapter objc {
+  package "PusherSwift" {
+    source method "init" -> code.SecretValue
+    source method "inline" -> code.SecretValue
+    source method "generateSHA256HMAC" -> code.SecretValue
+    source method "decrypt" -> code.SecretValue
+    sink method "connect" -> code.NetworkConnect
+    sink method "subscribe" -> code.NetworkSend
+    sink method "subscribeToPresenceChannel" -> code.NetworkSend
+    sink method "endpoint" -> code.UrlFetch
+  }
+}

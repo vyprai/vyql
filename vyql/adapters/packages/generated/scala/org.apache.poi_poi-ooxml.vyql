@@ -1,0 +1,5 @@
+adapter scala {
+  package "org.apache.poi:poi-ooxml" {
+    sink method "parse" -> code.Deserialization
+  }
+}

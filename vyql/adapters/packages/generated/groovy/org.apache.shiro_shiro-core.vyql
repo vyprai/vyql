@@ -1,0 +1,16 @@
+import code.{SecretValue, CommandExecution}
+import core.{AuthenticationCheck}
+
+adapter groovy {
+  package "org.apache.shiro:shiro-core" {
+    source method "getCredentials" -> code.SecretValue
+    source method "getCredentialsSalt" -> code.SecretValue
+    source method "getSession" -> code.SecretValue
+    source method "sessionId" -> code.SecretValue
+    source method "getToken" -> code.SecretValue
+
+    control method "isAuthenticated" -> core.AuthenticationCheck
+    control method "authenticated" -> core.AuthenticationCheck
+
+  }
+}

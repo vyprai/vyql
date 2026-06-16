@@ -1,0 +1,12 @@
+adapter cpp {
+  package "attr" {
+    sink method "attr_set" -> code.FilePathAccess
+    sink method "attr_multi" -> code.FilePathAccess
+    sink method "attr_get" -> code.FilePathAccess
+    sink method "attr_list" -> code.FilePathAccess
+    sink method "do_setxattr" -> code.FilePathAccess
+    sink method "do_removexattr" -> code.FilePathAccess
+    sink method "do_getxattr" -> code.FilePathAccess
+    sink method "do_listxattr" -> code.FilePathAccess
+  }
+}

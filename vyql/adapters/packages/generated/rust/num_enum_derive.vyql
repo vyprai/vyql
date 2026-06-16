@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "num_enum_derive" {
+    sink method "parse" -> code.Deserialization
+  }
+}

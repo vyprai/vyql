@@ -1,0 +1,6 @@
+adapter perl {
+  package "App-CronUtils" {
+    sink method "parse_crontab" -> code.FilePathAccess
+    sink method "parse_crontab" -> code.Deserialization
+  }
+}

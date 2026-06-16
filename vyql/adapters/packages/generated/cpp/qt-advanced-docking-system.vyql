@@ -1,0 +1,8 @@
+import code.{Deserialization, StoredDataWrite}
+
+adapter cpp {
+  package "qt-advanced-docking-system" {
+    sink method "restoreState" -> code.Deserialization
+    sink method "saveState" -> code.StoredDataWrite
+  }
+}

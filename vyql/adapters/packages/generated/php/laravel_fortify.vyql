@@ -1,0 +1,12 @@
+import core.{AuthenticationCheck}
+
+adapter php {
+  package "laravel/fortify" {
+    control method "authenticateThrough" -> core.AuthenticationCheck
+    control method "authenticateUsing" -> core.AuthenticationCheck
+    control method "confirmPasswordsUsing" -> core.AuthenticationCheck
+    control method "updateUserProfileInformationUsing" -> core.AuthenticationCheck
+    control method "updateUserPasswordsUsing" -> core.AuthenticationCheck
+    control method "resetUserPasswordsUsing" -> core.AuthenticationCheck
+  }
+}

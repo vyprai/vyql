@@ -1,0 +1,6 @@
+import code.{TemplateRender}
+adapter python {
+  package "pystache" {
+    sink method "parse" -> code.TemplateRender
+  }
+}

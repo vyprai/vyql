@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "com.sun.jersey:jersey-core" {
+    source method "hash" -> code.SecretValue
+    mark path "com.sun.jersey.jersey.core.hash" -> code.WeakHash
+  }
+}

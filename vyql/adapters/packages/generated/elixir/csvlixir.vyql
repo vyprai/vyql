@@ -1,0 +1,10 @@
+import code.{FilePathAccess, Deserialization}
+import core.{InputValidation}
+
+adapter elixir {
+  package "csvlixir" {
+    sink method "read" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.InputValidation
+  }
+}

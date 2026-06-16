@@ -1,0 +1,10 @@
+import code.{CommandExecution, HttpInput, ResponseHeaderWrite}
+
+adapter go {
+  package "k8s.io/component-base" {
+    sink method "Run" -> code.CommandExecution
+    sink method "RunNoErrOutput" -> code.CommandExecution
+    source method "handle" -> code.HttpInput
+    sink method "write" -> code.ResponseHeaderWrite
+  }
+}

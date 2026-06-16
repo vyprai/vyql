@@ -1,0 +1,12 @@
+import code.{HttpInput, NetworkSend, ResponseHeaderWrite}
+
+adapter scala {
+  package "org.glassfish.jersey.containers:jersey-container-servlet-core" {
+    source method "service" -> code.HttpInput
+    sink method "service" -> code.NetworkSend
+    sink method "service" -> code.ResponseHeaderWrite
+    source method "getHttpServletRequest" -> code.HttpInput
+    sink method "getHttpServletResponse" -> code.NetworkSend
+    sink method "getHttpServletResponse" -> code.ResponseHeaderWrite
+  }
+}

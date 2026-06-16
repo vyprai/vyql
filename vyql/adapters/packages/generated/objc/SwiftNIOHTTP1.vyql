@@ -1,0 +1,7 @@
+import code.{HttpInput, ResponseHeaderWrite}
+
+adapter objc {
+  package "SwiftNIOHTTP1" {
+    sink method "write" -> code.ResponseHeaderWrite
+  }
+}

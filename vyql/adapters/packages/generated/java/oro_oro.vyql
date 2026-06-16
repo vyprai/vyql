@@ -1,0 +1,13 @@
+import code.{ExpressionEval, RegexCompile}
+
+adapter java {
+  package "oro:oro" {
+    mark method "compile" -> code.RegexCompile
+    sink method "split" -> code.ExpressionEval
+    sink method "substitute" -> code.ExpressionEval
+    sink method "match" -> code.ExpressionEval
+    sink method "matches" -> code.ExpressionEval
+    sink method "matchesPrefix" -> code.ExpressionEval
+    sink method "contains" -> code.ExpressionEval
+  }
+}

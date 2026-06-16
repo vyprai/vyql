@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "inja" {
+    sink method "LiteralNode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+adapter objc {
+  package "CDTDatastore" {
+    source method "init" -> code.SecretValue
+    mark path "cdtdatastore.hash" -> code.WeakHash
+  }
+}

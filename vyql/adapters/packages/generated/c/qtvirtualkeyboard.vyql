@@ -1,0 +1,6 @@
+adapter c {
+  package "qtvirtualkeyboard" {
+    source method "QVirtualKeyboardPlugin::create" -> code.CliArgument
+    source method "QVirtualKeyboardPlugin::create" -> core.UserControlledData
+  }
+}

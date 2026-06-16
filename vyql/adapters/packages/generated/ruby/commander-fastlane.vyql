@@ -1,0 +1,7 @@
+adapter ruby {
+  package "commander-fastlane" {
+    source path "commander.argv" -> code.CliArgument
+    sink method "run" -> code.CommandExecution
+    source method "replace_tokens" -> code.SecretValue
+  }
+}

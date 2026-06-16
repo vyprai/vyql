@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter objc {
+  package "CMDQueryStringSerialization" {
+    sink method "dictionaryWithQueryString" -> code.Deserialization
+    source method "cmd_queryDictionary" -> core.UserControlledData
+    control method "CMDQueryStringSerialization_stringByAddingEscapes" -> core.InputValidation
+  }
+}

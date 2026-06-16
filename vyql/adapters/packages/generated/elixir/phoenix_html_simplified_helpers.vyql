@@ -1,0 +1,6 @@
+import code.{RedirectTarget}
+adapter elixir {
+  package "phoenix_html_simplified_helpers" {
+    mark method "url_for" -> code.RedirectTarget
+  }
+}

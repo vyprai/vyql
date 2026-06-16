@@ -1,0 +1,11 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/docker/libtrust" {
+    sink method "UnmarshalPublicKeyPEM" -> code.Deserialization
+    sink method "UnmarshalPublicKeyPEMBundle" -> code.Deserialization
+    sink method "UnmarshalPrivateKeyPEM" -> code.Deserialization
+    sink method "UnmarshalPublicKeyJWK" -> code.Deserialization
+    sink method "UnmarshalPublicKeyJWKSet" -> code.Deserialization
+    sink method "UnmarshalPrivateKeyJWK" -> code.Deserialization
+  }
+}

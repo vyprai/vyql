@@ -1,0 +1,6 @@
+import core.{PathCanonicalization}
+adapter ruby {
+  package "cloudinary" {
+    control method "sanitize" -> core.PathCanonicalization
+  }
+}

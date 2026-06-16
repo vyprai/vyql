@@ -1,0 +1,5 @@
+adapter javascript {
+  package "glob-to-regexp" {
+    mark method "assertMatch" -> code.RegexCompile
+  }
+}

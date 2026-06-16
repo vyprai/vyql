@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "graphql" {
+    sink method "GraphQLSocketMessage.parse" -> code.Deserialization
+  }
+}

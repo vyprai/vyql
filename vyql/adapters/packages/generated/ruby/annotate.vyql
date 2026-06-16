@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter ruby {
+  package "annotate" {
+    source method "Annotate::Parser.parse" -> code.CliArgument
+  }
+}

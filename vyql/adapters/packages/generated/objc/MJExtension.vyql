@@ -1,0 +1,12 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "MJExtension" {
+    sink method "mj_objectWithKeyValues" -> code.Deserialization
+    sink method "mj_objectWithFilename" -> code.Deserialization
+    sink method "mj_objectWithFile" -> code.Deserialization
+    sink method "mj_objectArrayWithKeyValuesArray" -> code.Deserialization
+    sink method "mj_objectArrayWithFilename" -> code.Deserialization
+    sink method "mj_objectArrayWithFile" -> code.Deserialization
+  }
+}

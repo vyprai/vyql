@@ -1,0 +1,8 @@
+adapter c {
+  package "libpcap" {
+    source method "recv" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "connect" -> code.NetworkConnect
+    mark method "random" -> code.WeakRandomValue
+  }
+}

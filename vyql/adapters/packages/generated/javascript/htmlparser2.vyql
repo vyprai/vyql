@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter javascript {
+  package "htmlparser2" {
+    sink method "parseDocument" -> code.Deserialization
+    sink method "write" -> code.Deserialization
+  }
+}

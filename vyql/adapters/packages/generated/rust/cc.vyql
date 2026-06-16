@@ -1,0 +1,6 @@
+adapter rust {
+  package "cc" {
+    sink method "compile" -> code.DynamicCodeLoad
+    sink method "write_warning" -> code.FilePathAccess
+  }
+}

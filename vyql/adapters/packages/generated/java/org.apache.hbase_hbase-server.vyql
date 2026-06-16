@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.apache.hbase:hbase-server" {
+    sink method "SplitLogTask.parseFrom" -> code.Deserialization
+  }
+}

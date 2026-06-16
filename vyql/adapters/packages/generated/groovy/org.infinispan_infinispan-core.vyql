@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "org.infinispan:infinispan-core" {
+    sink method "readObject" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{WeakHash}
+adapter rust {
+  package "twox-hash" {
+    mark method "oneshot" -> code.WeakHash
+    mark method "oneshot_with_seed" -> code.WeakHash
+    mark method "oneshot_with_secret" -> code.WeakHash
+    mark method "oneshot_with_seed_and_secret" -> code.WeakHash
+  }
+}

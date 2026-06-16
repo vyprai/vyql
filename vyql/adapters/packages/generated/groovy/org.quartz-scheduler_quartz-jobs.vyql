@@ -1,0 +1,8 @@
+import code.{CommandExecution, SecretValue}
+
+adapter groovy {
+  package "org.quartz-scheduler:quartz-jobs" {
+    source method "getPassword" -> code.SecretValue
+    source method "setPassword" -> code.SecretValue
+  }
+}

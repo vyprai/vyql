@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "active_model_serializers" {
+    sink method "parse" -> code.Deserialization
+    sink method "jsonapi_parse" -> code.Deserialization
+    sink method "jsonapi_parse!" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{Deserialization, XmlParse}
+adapter kotlin {
+  package "commons-digester:commons-digester" {
+    sink method "parse" -> code.XmlParse
+    sink method "parse" -> code.Deserialization
+    sink method "load" -> code.XmlParse
+    sink method "load" -> code.Deserialization
+  }
+}

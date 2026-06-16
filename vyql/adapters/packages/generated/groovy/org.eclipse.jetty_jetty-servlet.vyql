@@ -1,0 +1,10 @@
+import code.{HttpInput, HtmlRender}
+
+adapter groovy {
+  package "org.eclipse.jetty:jetty-servlet" {
+    source method "service" -> code.HttpInput
+    sink method "service" -> code.HtmlRender
+    source method "doFilter" -> code.HttpInput
+    sink method "doFilter" -> code.HtmlRender
+  }
+}

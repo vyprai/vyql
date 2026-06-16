@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter swift {
+  package "github.com/trilemma-dev/EmbeddedPropertyList" {
+    sink method "readExternal" -> code.FilePathAccess
+  }
+}

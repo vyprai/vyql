@@ -1,0 +1,15 @@
+import code.{NetworkSend}
+import core.{UserControlledData}
+
+adapter java {
+  package "org.springframework:spring-context-support" {
+    sink method "send" -> code.NetworkSend
+    source method "setFrom" -> core.UserControlledData
+    source method "setReplyTo" -> core.UserControlledData
+    source method "setTo" -> core.UserControlledData
+    source method "setCc" -> core.UserControlledData
+    source method "setBcc" -> core.UserControlledData
+    source method "setSubject" -> core.UserControlledData
+    source method "setText" -> core.UserControlledData
+  }
+}

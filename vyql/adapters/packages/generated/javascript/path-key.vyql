@@ -1,0 +1,6 @@
+import code.{EnvVariable}
+adapter javascript {
+  package "path-key" {
+    source method "pathKey" -> code.EnvVariable
+  }
+}

@@ -1,0 +1,9 @@
+import code.{NetworkConnect, UrlFetch}
+adapter perl {
+  package "Furl" {
+    sink method "request" -> code.UrlFetch
+    sink method "connect" -> code.NetworkConnect
+    sink method "connect_ssl" -> code.NetworkConnect
+    sink method "connect_ssl_over_proxy" -> code.NetworkConnect
+  }
+}

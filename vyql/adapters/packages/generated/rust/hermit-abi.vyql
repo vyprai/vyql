@@ -1,0 +1,25 @@
+import code.{CommandExecution, FilePathAccess, NetworkData, NetworkSend, NetworkConnect, NetworkBind, PrivilegedOp}
+import core.{UserControlledData}
+
+adapter rust {
+  package "hermit-abi" {
+    sink method "spawn" -> code.CommandExecution
+    sink method "spawn2" -> code.CommandExecution
+    sink method "open" -> code.FilePathAccess
+    sink method "opendir" -> code.FilePathAccess
+    source method "read" -> core.UserControlledData
+    source method "readv" -> core.UserControlledData
+    source method "recv" -> code.NetworkData
+    source method "recvfrom" -> code.NetworkData
+    mark method "read_entropy" -> code.WeakRandomValue
+    sink method "write" -> code.FileUse
+    sink method "writev" -> code.FileUse
+    sink method "send" -> code.NetworkSend
+    sink method "sendto" -> code.NetworkSend
+    sink method "connect" -> code.NetworkConnect
+    sink method "bind" -> code.NetworkBind
+    sink method "listen" -> code.NetworkBind
+    mark method "ioctl" -> code.PrivilegedOp
+    mark method "fcntl" -> code.PrivilegedOp
+  }
+}

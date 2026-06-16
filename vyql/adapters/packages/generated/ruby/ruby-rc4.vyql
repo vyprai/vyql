@@ -1,0 +1,8 @@
+import code.{WeakCipher, SecretValue}
+adapter ruby {
+  package "ruby-rc4" {
+    mark method "encrypt!" -> code.WeakCipher
+    mark method "encrypt" -> code.WeakCipher
+    source method "initialize" -> code.SecretValue
+  }
+}

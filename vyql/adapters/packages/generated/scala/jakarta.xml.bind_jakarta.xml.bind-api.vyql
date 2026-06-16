@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter scala {
+  package "jakarta.xml.bind:jakarta.xml.bind-api" {
+    sink method "unmarshal" -> code.Deserialization
+    sink method "marshal" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+  }
+}

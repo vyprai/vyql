@@ -1,0 +1,6 @@
+adapter perl {
+  package "Text-WikiCreole" {
+    sink method "parse" -> code.Deserialization
+    sink method "creole_parse" -> code.Deserialization
+  }
+}

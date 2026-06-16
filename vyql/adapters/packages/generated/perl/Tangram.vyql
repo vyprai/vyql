@@ -1,0 +1,11 @@
+import code.{NetworkConnect, SqlExecution, DatabaseRead}
+
+adapter perl {
+  package "Tangram" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "prepare" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+    sink method "query_objects" -> code.DatabaseRead
+    sink method "read_object" -> code.DatabaseRead
+  }
+}

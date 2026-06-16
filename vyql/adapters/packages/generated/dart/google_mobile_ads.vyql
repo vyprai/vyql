@@ -1,0 +1,8 @@
+import code.{ExpressionEval}
+
+adapter dart {
+  package "google_mobile_ads" {
+    sink method "openDebugMenu" -> code.ExpressionEval
+    sink method "openAdInspector" -> code.ExpressionEval
+  }
+}

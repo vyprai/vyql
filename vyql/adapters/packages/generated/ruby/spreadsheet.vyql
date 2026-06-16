@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter ruby {
+  package "spreadsheet" {
+    sink method "parse" -> code.Deserialization
+    sink method "open" -> code.FilePathAccess
+  }
+}

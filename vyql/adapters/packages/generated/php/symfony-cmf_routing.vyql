@@ -1,0 +1,9 @@
+import code.{HttpInput, RedirectTarget}
+
+adapter php {
+  package "symfony-cmf/routing" {
+    source method "match" -> code.HttpInput
+    source method "matchRequest" -> code.HttpInput
+    mark method "generate" -> code.RedirectTarget
+  }
+}

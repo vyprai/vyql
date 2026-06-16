@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter elixir {
+  package "tarams" {
+    source method "index" -> code.HttpInput
+  }
+}

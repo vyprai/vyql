@@ -1,0 +1,8 @@
+import code.{HttpInput}
+
+adapter java {
+  package "org.jboss.arquillian.protocol:arquillian-protocol-servlet" {
+    source method "doPost" -> code.HttpInput
+    source method "doGet" -> code.HttpInput
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/orlandos-nl/IkigaJSON" {
+    sink method "parse" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+    sink method "scanValue" -> code.Deserialization
+  }
+}

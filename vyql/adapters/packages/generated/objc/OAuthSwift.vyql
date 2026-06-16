@@ -1,0 +1,9 @@
+import code.{RedirectTarget, URLSchemeInput, UrlFetch}
+
+adapter objc {
+  package "OAuthSwift" {
+    source method "handle" -> code.URLSchemeInput
+    mark method "authorize" -> code.RedirectTarget
+    sink method "startAuthorizedRequest" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,15 @@
+import code.{Deserialization, SecretValue, NetworkSend, WeakHash, WeakCipher}
+
+adapter ruby {
+  package "ntlm-http" {
+    sink method "parse" -> code.Deserialization
+    source method "lm_hash" -> code.SecretValue
+    mark method "lm_hash" -> code.WeakHash
+    source method "ntlm_hash" -> code.SecretValue
+    mark method "ntlm_hash" -> code.WeakHash
+    source method "ntlmv2_hash" -> code.SecretValue
+    mark method "ntlmv2_hash" -> code.WeakHash
+    mark method "apply_des" -> code.WeakCipher
+    sink method "old_request" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter ruby {
+  package "friendly_id" {
+    control method "normalize_friendly_id" -> core.InputValidation
+  }
+}

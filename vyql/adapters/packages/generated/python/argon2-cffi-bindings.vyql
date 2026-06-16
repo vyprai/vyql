@@ -1,0 +1,5 @@
+adapter python {
+  package "argon2-cffi-bindings" {
+    mark path "argon2.cffi.bindings.hash" -> code.WeakHash
+  }
+}

@@ -1,0 +1,6 @@
+adapter php {
+  package "illuminate/database" {
+    sink method "query" -> code.SqlExecution
+    control method "prepared" -> core.SqlParameterization
+  }
+}

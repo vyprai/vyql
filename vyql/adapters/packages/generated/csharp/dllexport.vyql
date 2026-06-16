@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "dllexport" {
+    sink method "Parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{CodeEval}
+import core.{UserControlledData}
+
+adapter php {
+  package "composer/semver" {
+    sink method "match" -> code.CodeEval
+    source method "parseConstraints" -> core.UserControlledData
+  }
+}

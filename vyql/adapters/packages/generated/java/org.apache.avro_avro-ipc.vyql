@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter java {
+  package "org.apache.avro:avro-ipc" {
+    sink method "readResponse" -> code.Deserialization
+    sink method "writeRequest" -> code.Deserialization
+  }
+}

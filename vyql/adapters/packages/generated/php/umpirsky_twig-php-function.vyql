@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter php {
+  package "umpirsky/twig-php-function" {
+    sink method "allowFunction" -> code.CodeEval
+    sink method "allowFunctions" -> code.CodeEval
+  }
+}

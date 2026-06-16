@@ -1,0 +1,8 @@
+import code.{Deserialization, FileUse, FilePathAccess}
+adapter php {
+  package "leafo/scssphp" {
+    sink method "Leafo\ScssPhp\Parser::parse" -> code.Deserialization
+    sink method "Leafo\ScssPhp\Cache::file_put_contents" -> code.FileUse
+    sink method "Leafo\ScssPhp\Cache::unlink" -> code.FilePathAccess
+  }
+}

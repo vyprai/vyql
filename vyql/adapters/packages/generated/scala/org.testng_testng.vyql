@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter scala {
+  package "org.testng:testng" {
+    control method "setEscapeHtml" -> core.HtmlEscape
+  }
+}

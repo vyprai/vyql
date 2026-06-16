@@ -1,0 +1,8 @@
+import code.{CodeEval}
+adapter rust {
+  package "futures-executor" {
+    sink method "spawn_obj" -> code.CodeEval
+    sink method "spawn_local_obj" -> code.CodeEval
+    sink method "spawn_obj_ok" -> code.CodeEval
+  }
+}

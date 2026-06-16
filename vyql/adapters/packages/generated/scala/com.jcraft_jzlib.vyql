@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter scala {
+  package "com.jcraft:jzlib" {
+    source method "read" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,12 @@
+import code.{SqlExecution}
+
+adapter dart {
+  package "sqflite_common" {
+    sink method "query" -> code.SqlExecution
+    sink method "rawInsert" -> code.SqlExecution
+    sink method "rawQuery" -> code.SqlExecution
+    sink method "rawUpdate" -> code.SqlExecution
+    sink method "rawDelete" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+  }
+}

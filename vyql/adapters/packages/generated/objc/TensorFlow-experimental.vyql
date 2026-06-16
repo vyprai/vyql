@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "TensorFlow-experimental" {
+    sink method "PackFrom" -> code.Deserialization
+    sink method "ParseAnyTypeUrl" -> code.Deserialization
+  }
+}

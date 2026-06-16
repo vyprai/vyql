@@ -1,0 +1,7 @@
+import code.{PrivilegedOp}
+
+adapter rust {
+  package "core-graphics" {
+    mark method "CGRequestScreenCaptureAccess" -> code.PrivilegedOp
+  }
+}

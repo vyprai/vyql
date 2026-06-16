@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter perl {
+  package "Ithumb-XS" {
+    sink method "create_thumbnail" -> code.FilePathAccess
+  }
+}

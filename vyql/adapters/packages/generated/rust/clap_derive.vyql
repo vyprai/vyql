@@ -1,0 +1,10 @@
+import code.{CliArgument}
+
+adapter rust {
+  package "clap_derive" {
+    source method "args" -> code.CliArgument
+    source method "parser" -> code.CliArgument
+    source method "subcommand" -> code.CliArgument
+    source method "value_enum" -> code.CliArgument
+  }
+}

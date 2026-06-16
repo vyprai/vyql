@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter objc {
+  package "Plaid" {
+    source method "createWithLinkTokenConfiguration:error:" -> code.SecretValue
+    source method "createWithLinkTokenConfiguration:onLoad:error:" -> code.SecretValue
+  }
+}

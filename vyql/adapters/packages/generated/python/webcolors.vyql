@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter python {
+  package "webcolors" {
+    sink method "html5_parse_simple_color" -> code.Deserialization
+    sink method "html5_parse_legacy_color" -> code.Deserialization
+    sink method "name_to_hex" -> code.Deserialization
+  }
+}

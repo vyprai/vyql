@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter swift {
+  package "github.com/Kitura/Swift-SMTP" {
+    sink method "send" -> code.NetworkSend
+  }
+}

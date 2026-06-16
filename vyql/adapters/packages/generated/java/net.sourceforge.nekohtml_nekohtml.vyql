@@ -1,0 +1,6 @@
+import code.{Deserialization, XmlParse}
+adapter java {
+  package "net.sourceforge.nekohtml:nekohtml" {
+    sink method "parse" -> code.Deserialization
+  }
+}

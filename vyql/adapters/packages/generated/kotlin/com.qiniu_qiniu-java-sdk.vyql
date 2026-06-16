@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "com.qiniu:qiniu-java-sdk" {
+    sink method "send" -> code.NetworkSend
+  }
+}

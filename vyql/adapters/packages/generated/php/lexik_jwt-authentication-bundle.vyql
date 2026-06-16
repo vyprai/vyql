@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter php {
+  package "lexik/jwt-authentication-bundle" {
+    sink method "parse" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+  }
+}

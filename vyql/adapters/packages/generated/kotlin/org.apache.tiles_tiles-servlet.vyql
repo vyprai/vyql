@@ -1,0 +1,12 @@
+adapter kotlin {
+  package "org.apache.tiles:tiles-servlet" {
+    source method "doGet" -> code.HttpInput
+    source method "doPost" -> code.HttpInput
+    source method "getDefinitionName" -> core.UserControlledData
+    sink method "getResourcePaths" -> code.FilePathAccess
+    sink method "getResource" -> code.FilePathAccess
+    sink method "getResourceAsStream" -> code.FilePathAccess
+    sink method "getRealPath" -> code.FilePathAccess
+    source method "doFilter" -> code.HttpInput
+  }
+}

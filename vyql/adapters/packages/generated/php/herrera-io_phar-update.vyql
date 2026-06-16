@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter php {
+  package "herrera-io/phar-update" {
+    source method "getRunningFile" -> code.CliArgument
+  }
+}

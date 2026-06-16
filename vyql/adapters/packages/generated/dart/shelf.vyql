@@ -1,0 +1,9 @@
+import code.{HttpInput}
+import core.{UserControlledData}
+
+adapter dart {
+  package "shelf" {
+    source method "Request.url" -> core.UserControlledData
+    source method "Request.readAsString" -> core.UserControlledData
+  }
+}

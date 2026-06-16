@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter scala {
+  package "com.github.javafaker:javafaker" {
+    mark method "md5" -> code.WeakHash
+    mark method "sha1" -> code.WeakHash
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.springframework:spring-test" {
+    sink method "deserializeState" -> code.Deserialization
+  }
+}

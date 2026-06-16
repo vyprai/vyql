@@ -1,0 +1,13 @@
+import code.{HttpInput}
+
+adapter kotlin {
+  package "org.eclipse.jetty:jetty-servlet" {
+    source method "doGet" -> code.HttpInput
+    source method "doPost" -> code.HttpInput
+    source method "doHead" -> code.HttpInput
+    source method "doTrace" -> code.HttpInput
+    source method "doOptions" -> code.HttpInput
+    source method "service" -> code.HttpInput
+    source method "handle" -> code.HttpInput
+  }
+}

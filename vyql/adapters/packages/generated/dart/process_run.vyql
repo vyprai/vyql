@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+
+adapter dart {
+  package "process_run" {
+    sink method "run" -> code.CommandExecution
+    sink method "processCmdRun" -> code.CommandExecution
+  }
+}

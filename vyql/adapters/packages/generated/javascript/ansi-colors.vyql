@@ -1,0 +1,8 @@
+import core.{InputValidation}
+adapter javascript {
+  package "ansi-colors" {
+    control method "stripColor" -> core.InputValidation
+    control method "strip" -> core.InputValidation
+    control method "unstyle" -> core.InputValidation
+  }
+}

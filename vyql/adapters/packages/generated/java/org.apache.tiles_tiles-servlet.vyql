@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter java {
+  package "org.apache.tiles:tiles-servlet" {
+    source method "getDefinitionName" -> code.HttpInput
+  }
+}

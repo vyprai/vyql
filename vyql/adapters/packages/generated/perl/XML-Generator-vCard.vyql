@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter perl {
+  package "XML-Generator-vCard" {
+    source method "parse_files" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,7 @@
+adapter scala {
+  package "com.microsoft.sqlserver:mssql-jdbc" {
+    sink method "SocketFinder" -> code.SqlExecution
+    control method "bind" -> core.SqlParameterization
+    sink method "parse" -> code.Deserialization
+  }
+}

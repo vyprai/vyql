@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter scala {
+  package "org.springframework.cloud:spring-cloud-sleuth-zipkin" {
+    sink method "sendSpans" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+  }
+}

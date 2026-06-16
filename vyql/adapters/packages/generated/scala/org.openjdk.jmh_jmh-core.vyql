@@ -1,0 +1,7 @@
+adapter scala {
+  package "org.openjdk.jmh:jmh-core" {
+    sink method "doFork" -> code.CommandExecution
+    sink method "getForkedMainCommand" -> code.CommandExecution
+    sink method "getPrintPropertiesCommand" -> code.CommandExecution
+  }
+}

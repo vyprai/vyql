@@ -1,0 +1,6 @@
+import code.{Deserialization, FilePathAccess}
+adapter python {
+  package "python3-openid" {
+    sink method "parse" -> code.Deserialization
+  }
+}

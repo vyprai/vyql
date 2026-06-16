@@ -1,0 +1,13 @@
+adapter go {
+  package "github.com/gobwas/ws" {
+    sink method "httpParseRequestLine" -> code.Deserialization
+    sink method "httpParseResponseLine" -> code.Deserialization
+    sink method "httpParseHeaderLine" -> code.Deserialization
+    sink method "ParseCloseFrameData" -> code.Deserialization
+    sink method "ParseCloseFrameDataUnsafe" -> code.Deserialization
+    sink method "httpWriteUpgradeRequest" -> code.ResponseHeaderWrite
+    sink method "httpWriteResponseUpgrade" -> code.ResponseHeaderWrite
+    sink method "httpWriteResponseError" -> code.ResponseHeaderWrite
+    control method "CheckHeader" -> core.InputValidation
+  }
+}

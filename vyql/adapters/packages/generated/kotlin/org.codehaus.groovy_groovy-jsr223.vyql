@@ -1,0 +1,10 @@
+import code.{CodeEval}
+
+adapter kotlin {
+  package "org.codehaus.groovy:groovy-jsr223" {
+    sink method "eval" -> code.CodeEval
+    sink method "compile" -> code.CodeEval
+    sink method "invokeFunction" -> code.CodeEval
+    sink method "invokeMethod" -> code.CodeEval
+  }
+}

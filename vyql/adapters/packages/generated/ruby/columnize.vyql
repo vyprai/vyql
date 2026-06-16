@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter ruby {
+  package "columnize" {
+    source method "parse_columnize_options" -> core.UserControlledData
+    source method "columnize" -> core.UserControlledData
+  }
+}

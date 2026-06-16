@@ -1,0 +1,9 @@
+import code.{Deserialization, FilePathAccess}
+adapter c {
+  package "ebml" {
+    sink method "read" -> code.Deserialization
+    sink method "ReadData" -> code.Deserialization
+    sink method "Read" -> code.Deserialization
+    sink method "open" -> code.FilePathAccess
+  }
+}

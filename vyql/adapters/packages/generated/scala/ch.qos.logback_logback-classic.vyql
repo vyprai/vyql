@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter scala {
+  package "ch.qos.logback:logback-classic" {
+    source method "SocketNode" -> code.NetworkData
+  }
+}

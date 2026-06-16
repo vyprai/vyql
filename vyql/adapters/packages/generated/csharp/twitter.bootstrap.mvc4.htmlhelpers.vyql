@@ -1,0 +1,9 @@
+import code.{HtmlRender}
+import core.{UserControlledData}
+
+adapter csharp {
+  package "twitter.bootstrap.mvc4.htmlhelpers" {
+    sink method "ActionLinkWithGlyphIcon" -> code.HtmlRender
+    sink method "Pager" -> code.HtmlRender
+  }
+}

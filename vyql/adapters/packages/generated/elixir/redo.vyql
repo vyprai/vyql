@@ -1,0 +1,5 @@
+adapter elixir {
+  package "redo" {
+    sink method "parse" -> code.Deserialization
+  }
+}

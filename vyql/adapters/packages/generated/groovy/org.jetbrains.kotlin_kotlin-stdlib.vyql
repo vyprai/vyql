@@ -1,0 +1,5 @@
+adapter groovy {
+  package "org.jetbrains.kotlin:kotlin-stdlib" {
+    control method "escape" -> core.InputValidation
+  }
+}

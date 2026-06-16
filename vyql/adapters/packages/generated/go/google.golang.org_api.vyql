@@ -1,0 +1,19 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter go {
+  package "google.golang.org/api" {
+    source method "WithTokenSource" -> code.SecretValue
+    source method "WithCredentialsFile" -> code.SecretValue
+    source method "WithAuthCredentialsFile" -> code.SecretValue
+    source method "WithServiceAccountFile" -> code.SecretValue
+    source method "WithCredentialsJSON" -> code.SecretValue
+    source method "WithAuthCredentialsJSON" -> code.SecretValue
+    source method "ImpersonateCredentials" -> code.SecretValue
+    source method "WithCredentials" -> code.SecretValue
+    source method "WithAuthCredentials" -> code.SecretValue
+    source method "Creds" -> code.SecretValue
+    source method "AuthCreds" -> code.SecretValue
+    control method "GetOAuth2Configuration" -> core.AuthenticationCheck
+  }
+}

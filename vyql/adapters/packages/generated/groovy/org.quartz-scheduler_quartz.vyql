@@ -1,0 +1,8 @@
+import code.{CliArgument, Deserialization}
+adapter groovy {
+  package "org.quartz-scheduler:quartz" {
+    source method "CronExpression.<init>" -> code.CliArgument
+    source method "CronExpression.validateExpression" -> code.CliArgument
+    source method "CronExpression.buildExpression" -> code.CliArgument
+  }
+}

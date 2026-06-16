@@ -1,0 +1,10 @@
+import code.{CommandExecution, FilePathAccess, Deserialization}
+adapter rust {
+  package "alsa-sys" {
+    sink method "snd_user_file" -> code.FilePathAccess
+    sink method "snd_input_stdio_open" -> code.FilePathAccess
+    sink method "snd_config_load" -> code.Deserialization
+    sink method "snd_config_load_string" -> code.Deserialization
+    sink method "snd_config_load_override" -> code.Deserialization
+  }
+}

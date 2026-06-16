@@ -1,0 +1,10 @@
+import code.{NetworkSend, SecretValue}
+import core.{AuthenticationCheck}
+
+adapter ruby {
+  package "net-smtp" {
+    sink method "send_message" -> code.NetworkSend
+    sink method "data" -> code.NetworkSend
+    control method "authenticate" -> core.AuthenticationCheck
+  }
+}

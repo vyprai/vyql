@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/tklauser/go-sysconf" {
+    sink method "pathconf" -> code.FilePathAccess
+  }
+}

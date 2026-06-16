@@ -1,0 +1,12 @@
+import code.{LogOutput}
+adapter go {
+  package "github.com/daviddengcn/go-colortext" {
+    sink method "ChangeColor" -> code.LogOutput
+    sink method "Foreground" -> code.LogOutput
+    sink method "Background" -> code.LogOutput
+    sink method "Print" -> code.LogOutput
+    sink method "Println" -> code.LogOutput
+    sink method "Printf" -> code.LogOutput
+    sink method "Printfln" -> code.LogOutput
+  }
+}

@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter python {
+  package "fqdn" {
+    control method "is_valid" -> core.InputValidation
+    control method "is_valid_absolute" -> core.InputValidation
+    control method "is_valid_relative" -> core.InputValidation
+  }
+}

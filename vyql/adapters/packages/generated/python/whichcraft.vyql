@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter python {
+  package "whichcraft" {
+    sink method "which" -> code.FilePathAccess
+  }
+}

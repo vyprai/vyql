@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "kaffe" {
+    sink method "decode_pem" -> code.Deserialization
+    sink method "extract_der" -> code.Deserialization
+  }
+}

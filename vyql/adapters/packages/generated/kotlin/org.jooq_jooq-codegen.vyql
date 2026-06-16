@@ -1,0 +1,8 @@
+import code.{XmlParse, CodeEval}
+
+adapter kotlin {
+  package "org.jooq:jooq-codegen" {
+    sink method "GenerationTool.load" -> code.XmlParse
+    sink method "GenerationTool.compile" -> code.CodeEval
+  }
+}

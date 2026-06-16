@@ -1,0 +1,6 @@
+adapter dart {
+  package "in_app_purchase_android" {
+    mark method "acknowledgePurchase" -> code.PrivilegedOp
+    mark method "consumeAsync" -> code.PrivilegedOp
+  }
+}

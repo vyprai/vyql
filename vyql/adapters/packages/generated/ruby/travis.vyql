@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter ruby {
+  package "travis" {
+    source method "parse" -> core.UserControlledData
+  }
+}

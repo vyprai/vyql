@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/mdiep/Tentacle" {
+    sink method "create" -> code.FilePathAccess
+    mark method "hash" -> code.WeakHash
+  }
+}

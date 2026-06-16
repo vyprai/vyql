@@ -1,0 +1,13 @@
+import code.{HttpInput, HtmlRender, RedirectTarget}
+
+adapter java {
+  package "org.apache.tomcat:tomcat-jsp-api" {
+    source method "getRequestURI" -> core.UserControlledData
+    source method "getQueryString" -> core.UserControlledData
+    source method "getRequest" -> code.HttpInput
+    sink method "print" -> code.HtmlRender
+    sink method "println" -> code.HtmlRender
+    mark method "forward" -> code.RedirectTarget
+    mark method "include" -> code.RedirectTarget
+  }
+}

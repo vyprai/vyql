@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter php {
+  package "zendframework/zend-barcode" {
+    source method "draw" -> core.UserControlledData
+    source method "setText" -> core.UserControlledData
+    control method "validateText" -> core.InputValidation
+  }
+}

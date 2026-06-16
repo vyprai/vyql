@@ -1,0 +1,7 @@
+import code.{NetworkConnect}
+
+adapter c {
+  package "libsm" {
+    sink method "SmcOpenConnection" -> code.NetworkConnect
+  }
+}

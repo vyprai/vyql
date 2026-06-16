@@ -1,0 +1,7 @@
+import core.{HtmlEscape, InputValidation}
+adapter php {
+  package "zendframework/zend-view" {
+    control method "Zend\\View\\Helper\\EscapeHtml::escape" -> core.HtmlEscape
+    control method "Zend\\View\\Helper\\EscapeJs::escape" -> core.InputValidation
+  }
+}

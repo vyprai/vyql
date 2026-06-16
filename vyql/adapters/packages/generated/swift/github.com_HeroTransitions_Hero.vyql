@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/HeroTransitions/Hero" {
+    sink method "tokenize" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

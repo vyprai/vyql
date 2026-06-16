@@ -1,0 +1,6 @@
+adapter c {
+  package "libtommath" {
+    source method "mp_read_radix" -> core.UserControlledData
+    source method "mp_fread" -> core.UserControlledData
+  }
+}

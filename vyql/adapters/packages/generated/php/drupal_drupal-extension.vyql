@@ -1,0 +1,16 @@
+import code.{NetworkSend, RedirectTarget}
+
+adapter php {
+  package "drupal/drupal-extension" {
+    sink method "iSendMail" -> code.NetworkSend
+    sink method "iSendEmail" -> code.NetworkSend
+    mark method "iFollowLinkInMail" -> code.RedirectTarget
+    mark method "iFollowLinkInMailTo" -> code.RedirectTarget
+    mark method "iFollowLinkInMailWithSubject" -> code.RedirectTarget
+    mark method "iFollowLinkInMailToWithSubject" -> code.RedirectTarget
+    mark method "iFollowLinkInEmail" -> code.RedirectTarget
+    mark method "iFollowLinkInEmailTo" -> code.RedirectTarget
+    mark method "iFollowLinkInEmailWithSubject" -> code.RedirectTarget
+    mark method "iFollowLinkInEmailToWithSubject" -> code.RedirectTarget
+  }
+}

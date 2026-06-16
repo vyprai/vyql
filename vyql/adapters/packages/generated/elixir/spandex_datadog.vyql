@@ -1,0 +1,10 @@
+import code.{NetworkData, NetworkSend}
+adapter elixir {
+  package "spandex_datadog" {
+    source method "distributed_context" -> code.NetworkData
+    source method "parse_header" -> code.NetworkData
+    sink method "send_trace" -> code.NetworkSend
+    sink method "send_spans" -> code.NetworkSend
+    sink method "push" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter php {
+  package "jcalderonzumba/gastonjs" {
+    sink method "evaluate" -> code.CodeEval
+    sink method "execute" -> code.CodeEval
+  }
+}

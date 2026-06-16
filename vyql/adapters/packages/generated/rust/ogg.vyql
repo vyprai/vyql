@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter rust {
+  package "ogg" {
+    sink method "PageParser.parse_segments" -> code.Deserialization
+    sink method "PageParser.parse_packet_data" -> code.Deserialization
+  }
+}

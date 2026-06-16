@@ -1,0 +1,22 @@
+import code.{SecretValue}
+
+adapter go {
+  package "github.com/Azure/go-autorest/autorest/azure/auth" {
+    source method "GetClientCredentials" -> code.SecretValue
+    source method "GetUsernamePassword" -> code.SecretValue
+    source method "ServicePrincipalTokenFromClientCredentials" -> code.SecretValue
+    source method "ClientCredentialsAuthorizer" -> code.SecretValue
+    source method "ServicePrincipalTokenFromClientCredentialsWithResource" -> code.SecretValue
+    source method "ClientCredentialsAuthorizerWithResource" -> code.SecretValue
+    source method "ServicePrincipalTokenFromClientCertificate" -> code.SecretValue
+    source method "ClientCertificateAuthorizer" -> code.SecretValue
+    source method "ServicePrincipalTokenFromClientCertificateWithResource" -> code.SecretValue
+    source method "ClientCertificateAuthorizerWithResource" -> code.SecretValue
+    source method "NewClientCredentialsConfig" -> code.SecretValue
+    source method "NewClientCertificateConfig" -> code.SecretValue
+    source method "NewUsernamePasswordConfig" -> code.SecretValue
+    source method "Authorizer" -> code.SecretValue
+    source method "ServicePrincipalToken" -> code.SecretValue
+    source method "MultiTenantServicePrincipalToken" -> code.SecretValue
+  }
+}

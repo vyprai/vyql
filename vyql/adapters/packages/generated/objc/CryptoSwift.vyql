@@ -1,0 +1,7 @@
+import code.{WeakHash}
+adapter objc {
+  package "CryptoSwift" {
+    mark method "md5" -> code.WeakHash
+    mark method "sha1" -> code.WeakHash
+  }
+}

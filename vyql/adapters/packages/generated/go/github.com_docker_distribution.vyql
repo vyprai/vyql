@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/docker/distribution" {
+    sink method "WithRequest" -> code.UrlFetch
+  }
+}

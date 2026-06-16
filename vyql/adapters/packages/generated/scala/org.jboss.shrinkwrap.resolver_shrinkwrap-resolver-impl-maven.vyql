@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter scala {
+  package "org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven" {
+    sink method "loadPomFromFile" -> code.FilePathAccess
+    sink method "configureSettingsFromFile" -> code.FilePathAccess
+  }
+}

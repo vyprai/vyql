@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter elixir {
+  package "ecto_sql" {
+    sink method "execute" -> code.SqlExecution
+    sink method "query" -> code.SqlExecution
+  }
+}

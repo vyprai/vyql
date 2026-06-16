@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "org.springframework.hateoas:spring-hateoas" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseLinks" -> code.Deserialization
+    sink method "parseLink" -> code.Deserialization
+  }
+}

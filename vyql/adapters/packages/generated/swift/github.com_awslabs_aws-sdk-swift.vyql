@@ -1,0 +1,12 @@
+import code.{CommandExecution, NetworkSend, Deserialization}
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/awslabs/aws-sdk-swift" {
+    sink method "run" -> code.CommandExecution
+    sink method "_run" -> code.CommandExecution
+    sink method "_runReturningStdOut" -> code.CommandExecution
+    sink method "send" -> code.NetworkSend
+    source method "parse" -> core.UserControlledData
+  }
+}

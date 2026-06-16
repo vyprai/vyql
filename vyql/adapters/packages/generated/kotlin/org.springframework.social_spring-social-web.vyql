@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter kotlin {
+  package "org.springframework.social:spring-social-web" {
+    control method "GenericConnectionStatusView.escape" -> core.HtmlEscape
+  }
+}

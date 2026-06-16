@@ -1,0 +1,12 @@
+import core.{InputValidation, AuthorizationCheck}
+adapter scala {
+  package "com.firebaseui:firebase-ui-auth" {
+    control method "validateInputs" -> core.InputValidation
+    control method "validateCountryInput" -> core.InputValidation
+    control method "validateDefaultCountryInput" -> core.InputValidation
+    control method "validateDefaultCountryIso" -> core.InputValidation
+    control method "validateDefaultPhoneIsos" -> core.InputValidation
+    control method "validateWebClientId" -> core.InputValidation
+    control method "clearCredentialState" -> core.AuthorizationCheck
+  }
+}

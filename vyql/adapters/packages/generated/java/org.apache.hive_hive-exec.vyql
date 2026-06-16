@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter java {
+  package "org.apache.hive:hive-exec" {
+    sink method "run" -> code.CommandExecution
+  }
+}

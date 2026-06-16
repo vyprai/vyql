@@ -1,0 +1,9 @@
+import code.{FilePathAccess}
+import core.{UserControlledData}
+
+adapter scala {
+  package "com.jcabi:jcabi-manifests" {
+    source method "Manifests.read" -> core.UserControlledData
+    sink method "FilesMfs.FilesMfs" -> code.FilePathAccess
+  }
+}

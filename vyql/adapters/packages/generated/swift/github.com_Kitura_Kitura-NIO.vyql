@@ -1,0 +1,12 @@
+import code.{HttpInput, NetworkSend}
+import core.{HtmlEscape, UserControlledData}
+
+adapter swift {
+  package "github.com/Kitura/Kitura-NIO" {
+    source method "read" -> code.HttpInput
+    source method "readString" -> code.HttpInput
+    source method "query" -> core.UserControlledData
+    sink method "write" -> code.NetworkSend
+    control method "escape" -> core.HtmlEscape
+  }
+}

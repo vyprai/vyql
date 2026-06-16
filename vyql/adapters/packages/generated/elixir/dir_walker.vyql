@@ -1,0 +1,7 @@
+adapter elixir {
+  package "dir_walker" {
+    sink method "start_link" -> code.FilePathAccess
+    sink method "next" -> code.FilePathAccess
+    sink method "stream" -> code.FilePathAccess
+  }
+}

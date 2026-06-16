@@ -1,0 +1,16 @@
+import code.{CommandExecution, FilePathAccess, FileUse}
+
+adapter swift {
+  package "github.com/kareman/SwiftShell" {
+    sink method "run" -> code.CommandExecution
+    sink method "runAsync" -> code.CommandExecution
+    sink method "runAsyncAndPrint" -> code.CommandExecution
+    sink method "runAndPrint" -> code.CommandExecution
+    sink method "open" -> code.FilePathAccess
+    sink method "read" -> code.FileUse
+    sink method "readSome" -> code.FileUse
+    sink method "readData" -> code.FileUse
+    sink method "readSomeData" -> code.FileUse
+    sink method "write" -> code.FileUse
+  }
+}

@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter dart {
+  package "sentry_flutter" {
+    sink method "send" -> code.NetworkSend
+  }
+}

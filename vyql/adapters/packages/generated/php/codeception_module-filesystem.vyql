@@ -1,0 +1,22 @@
+import code.{FilePathAccess}
+import core.{PathCanonicalization}
+
+adapter php {
+  package "codeception/module-filesystem" {
+    sink method "amInPath" -> code.FilePathAccess
+    control method "absolutizePath" -> core.PathCanonicalization
+    sink method "openFile" -> code.FilePathAccess
+    sink method "deleteFile" -> code.FilePathAccess
+    sink method "deleteThisFile" -> code.FilePathAccess
+    sink method "copyDir" -> code.FilePathAccess
+    sink method "seeInThisFile" -> code.FilePathAccess
+    sink method "seeThisFileMatches" -> code.FilePathAccess
+    sink method "seeFileContentsEqual" -> code.FilePathAccess
+    sink method "dontSeeInThisFile" -> code.FilePathAccess
+    sink method "seeFileFound" -> code.FilePathAccess
+    sink method "dontSeeFileFound" -> code.FilePathAccess
+    sink method "writeToFile" -> code.FilePathAccess
+    sink method "cleanDir" -> code.FilePathAccess
+    sink method "deleteDir" -> code.FilePathAccess
+  }
+}

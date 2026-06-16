@@ -1,0 +1,9 @@
+import code.{UrlFetch, FilePathAccess, Deserialization}
+adapter python {
+  package "voluptuous" {
+    sink method "Url" -> code.UrlFetch
+    sink method "IsFile" -> code.FilePathAccess
+    sink method "PathExists" -> code.FilePathAccess
+    sink method "validate" -> code.Deserialization
+  }
+}

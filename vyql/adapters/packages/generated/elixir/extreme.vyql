@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "extreme" {
+    sink method "Extreme.Response.parse" -> code.Deserialization
+  }
+}

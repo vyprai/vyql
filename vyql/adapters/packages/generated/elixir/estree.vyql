@@ -1,0 +1,5 @@
+adapter elixir {
+  package "estree" {
+    sink method "ESTree.Tools.Generator.generate" -> code.CodeEval
+  }
+}

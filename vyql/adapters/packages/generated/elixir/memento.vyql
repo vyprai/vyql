@@ -1,0 +1,9 @@
+import code.{NosqlQuery, DatabaseRead}
+adapter elixir {
+  package "memento" {
+    sink method "Memento.Query.read" -> code.DatabaseRead
+    sink method "Memento.Query.write" -> code.NosqlQuery
+    sink method "Memento.Query.match" -> code.DatabaseRead
+    sink method "Memento.Query.select_raw" -> code.DatabaseRead
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "et-orbi" {
+    sink method "parse" -> code.Deserialization
+  }
+}

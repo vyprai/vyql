@@ -1,0 +1,8 @@
+import code.{FileUse, UrlFetch}
+
+adapter dart {
+  package "share_plus_windows" {
+    sink method "ShareWindows.share" -> code.UrlFetch
+    sink method "ShareWindows.shareFiles" -> code.FileUse
+  }
+}

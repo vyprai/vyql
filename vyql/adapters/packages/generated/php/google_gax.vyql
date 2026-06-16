@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter php {
+  package "google/gax" {
+    control method "Google\ApiCore\PathTemplate::match" -> core.InputValidation
+  }
+}

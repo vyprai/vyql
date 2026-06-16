@@ -1,0 +1,13 @@
+import code.{SqlExecution}
+adapter elixir {
+  package "triplex" {
+    sink method "create" -> code.SqlExecution
+    sink method "create_schema" -> code.SqlExecution
+    sink method "drop" -> code.SqlExecution
+    sink method "rename" -> code.SqlExecution
+    sink method "migrate" -> code.SqlExecution
+    sink path "mix.tasks.triplex.gen.migration.run" -> code.SqlExecution
+    sink path "mix.tasks.triplex.migrate.run" -> code.SqlExecution
+    sink path "mix.tasks.triplex.rollback.run" -> code.SqlExecution
+  }
+}

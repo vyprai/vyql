@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter scala {
+  package "io.prometheus:simpleclient" {
+    control method "sanitizeMetricName" -> core.InputValidation
+  }
+}

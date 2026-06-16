@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter perl {
+  package "asa" {
+    sink method "import" -> code.CodeEval
+  }
+}

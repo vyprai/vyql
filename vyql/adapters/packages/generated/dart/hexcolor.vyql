@@ -1,0 +1,6 @@
+adapter dart {
+  package "hexcolor" {
+    sink method "HexColor" -> code.Deserialization
+    sink method "tryParse" -> code.Deserialization
+  }
+}

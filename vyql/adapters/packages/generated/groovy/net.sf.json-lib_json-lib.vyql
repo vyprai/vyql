@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter groovy {
+  package "net.sf.json-lib:json-lib" {
+    sink method "parse" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+  }
+}

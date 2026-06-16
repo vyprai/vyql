@@ -1,0 +1,9 @@
+import code.{FilePathAccess}
+import core.{UserControlledData}
+
+adapter dart {
+  package "flutter_share" {
+    source method "share" -> core.UserControlledData
+    sink method "shareFile" -> code.FilePathAccess
+  }
+}

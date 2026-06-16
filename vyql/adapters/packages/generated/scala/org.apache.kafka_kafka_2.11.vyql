@@ -1,0 +1,9 @@
+import code.{CliArgument}
+import core.{InputValidation}
+
+adapter scala {
+  package "org.apache.kafka:kafka_2.11" {
+    source method "ZkSecurityMigrator.run" -> code.CliArgument
+    control method "Config.validateChars" -> core.InputValidation
+  }
+}

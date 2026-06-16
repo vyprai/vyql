@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter dart {
+  package "flutter_web_auth_2" {
+    source method "authenticate" -> core.UserControlledData
+  }
+}

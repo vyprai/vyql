@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "directxmesh" {
+    sink method "CreateFromVBO" -> code.Deserialization
+  }
+}

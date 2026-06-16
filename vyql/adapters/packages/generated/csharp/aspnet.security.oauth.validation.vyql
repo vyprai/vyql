@@ -1,0 +1,9 @@
+import core.{AuthenticationCheck}
+import code.{Deserialization}
+
+adapter csharp {
+  package "aspnet.security.oauth.validation" {
+    control method "ValidateToken" -> core.AuthenticationCheck
+    sink method "DecryptToken" -> code.Deserialization
+  }
+}

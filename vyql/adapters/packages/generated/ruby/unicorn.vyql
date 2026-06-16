@@ -1,0 +1,7 @@
+adapter ruby {
+  package "unicorn" {
+    source path "for" -> code.HttpInput
+    sink path "e103_response_write" -> code.ResponseHeaderWrite
+    sink method "load" -> code.Deserialization
+  }
+}

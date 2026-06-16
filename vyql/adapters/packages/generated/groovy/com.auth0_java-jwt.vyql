@@ -1,0 +1,9 @@
+import core.{AuthenticationCheck}
+
+adapter groovy {
+  package "com.auth0:java-jwt" {
+    source method "decode" -> core.UserControlledData
+    sink method "decodeJwt" -> code.Deserialization
+    control method "verify" -> core.AuthenticationCheck
+  }
+}

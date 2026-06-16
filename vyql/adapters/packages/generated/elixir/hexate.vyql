@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "hexate" {
+    sink method "decode" -> code.Deserialization
+    sink method "decode_to_list" -> code.Deserialization
+  }
+}

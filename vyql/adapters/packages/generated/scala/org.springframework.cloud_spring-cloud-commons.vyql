@@ -1,0 +1,10 @@
+adapter scala {
+  package "org.springframework.cloud:spring-cloud-commons" {
+    source method "getKeyStorePassword" -> code.SecretValue
+    source method "keyStorePassword" -> code.SecretValue
+    source method "getKeyPassword" -> code.SecretValue
+    source method "keyPassword" -> code.SecretValue
+    source method "getTrustStorePassword" -> code.SecretValue
+    source method "trustStorePassword" -> code.SecretValue
+  }
+}

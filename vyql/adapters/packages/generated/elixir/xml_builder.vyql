@@ -1,0 +1,8 @@
+import core.{HtmlEscape}
+
+adapter elixir {
+  package "xml_builder" {
+    control method "escape" -> core.HtmlEscape
+    control method "escape_string" -> core.HtmlEscape
+  }
+}

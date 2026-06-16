@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkData, NetworkSend}
+adapter swift {
+  package "github.com/halcyonmobile/RestBird" {
+    sink method "execute" -> code.NetworkConnect
+    sink method "execute" -> code.NetworkSend
+    source method "parameters" -> code.NetworkData
+    source method "headers" -> code.NetworkData
+  }
+}

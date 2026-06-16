@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkData}
+
+adapter groovy {
+  package "com.facebook.fresco:imagepipeline-okhttp3" {
+    sink method "fetch" -> code.NetworkConnect
+    source method "onResponse" -> code.NetworkData
+  }
+}

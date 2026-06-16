@@ -1,0 +1,8 @@
+import code.{FilePathAccess, StdinInput, Deserialization}
+adapter python {
+  package "ruff" {
+    sink method "check" -> code.FilePathAccess
+    source method "check" -> code.StdinInput
+    sink method "parse_ref" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "faad2" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,14 @@
+import core.{InputValidation}
+
+adapter go {
+  package "k8s.io/apiextensions-apiserver" {
+    control method "ValidateStructural" -> core.InputValidation
+    control method "ValidateStructuralWithOptions" -> core.InputValidation
+    control method "newValueValidation" -> core.InputValidation
+    control method "newNestedValueValidation" -> core.InputValidation
+    control method "validateStructuralCompleteness" -> core.InputValidation
+    control method "validateValueValidationCompleteness" -> core.InputValidation
+    control method "validateNestedValueValidationCompleteness" -> core.InputValidation
+    control method "validateUnsupportedFields" -> core.InputValidation
+  }
+}

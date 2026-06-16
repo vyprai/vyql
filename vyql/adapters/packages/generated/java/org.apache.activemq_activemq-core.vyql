@@ -1,0 +1,6 @@
+import code.{NetworkData}
+adapter java {
+  package "org.apache.activemq:activemq-core" {
+    source method "createConsumer" -> code.NetworkData
+  }
+}

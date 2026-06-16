@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter objc {
+  package "HandyJSON" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "deserializeFrom" -> code.Deserialization
+    sink method "update" -> code.Deserialization
+    sink method "deserializeModelArrayFrom" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/golang-jwt/jwt/v4" {
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseWithClaims" -> code.Deserialization
+    sink method "DecodeSegment" -> code.Deserialization
+  }
+}

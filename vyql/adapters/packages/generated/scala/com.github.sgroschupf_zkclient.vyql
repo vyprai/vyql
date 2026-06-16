@@ -1,0 +1,6 @@
+adapter scala {
+  package "com.github.sgroschupf:zkclient" {
+    sink method "createPersistent" -> code.StoredDataWrite
+    sink method "writeData" -> code.StoredDataWrite
+  }
+}

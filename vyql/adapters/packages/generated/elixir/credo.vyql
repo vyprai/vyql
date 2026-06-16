@@ -1,0 +1,7 @@
+import code.{CliArgument, CodeEval}
+adapter elixir {
+  package "credo" {
+    source method "run" -> code.CliArgument
+    sink method "parse" -> code.CodeEval
+  }
+}

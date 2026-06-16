@@ -1,0 +1,7 @@
+import code.{NetworkSend, UrlFetch}
+adapter java {
+  package "com.badlogicgames.gdx:gdx-backend-lwjgl" {
+    sink method "sendHttpRequest" -> code.NetworkSend
+    sink method "openURI" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,11 @@
+import code.{CliArgument, CommandExecution}
+
+adapter elixir {
+  package "ex_cli" {
+    source method "ExCLI.parse" -> code.CliArgument
+    source method "ExCLI.run" -> code.CliArgument
+    sink method "ExCLI.run" -> code.CommandExecution
+    source method "ExCLI.run!" -> code.CliArgument
+    sink method "ExCLI.run!" -> code.CommandExecution
+  }
+}

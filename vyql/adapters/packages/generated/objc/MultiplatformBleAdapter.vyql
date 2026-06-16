@@ -1,0 +1,10 @@
+import code.{NetworkData, NetworkSend}
+import core.{UserControlledData}
+
+adapter objc {
+  package "MultiplatformBleAdapter" {
+    source method "startDeviceScan" -> core.UserControlledData
+    source method "readCharacteristicForDevice" -> code.NetworkData
+    sink method "writeCharacteristicForDevice" -> code.NetworkSend
+  }
+}

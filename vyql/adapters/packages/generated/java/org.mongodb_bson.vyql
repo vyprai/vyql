@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.mongodb:bson" {
+    sink method "BsonArray.parse" -> code.Deserialization
+    sink method "BsonDocument.parse" -> code.Deserialization
+  }
+}

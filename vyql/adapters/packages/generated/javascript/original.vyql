@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter javascript {
+  package "original" {
+    sink method "origin" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,6 @@
+adapter elixir {
+  package "stripity_stripe" {
+    source method "Stripe.Apps.Secret.find" -> code.SecretValue
+    source method "Stripe.Apps.Secret.delete_where" -> code.SecretValue
+  }
+}

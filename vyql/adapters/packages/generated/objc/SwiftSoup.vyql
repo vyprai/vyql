@@ -1,0 +1,13 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter objc {
+  package "SwiftSoup" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseFragment" -> code.Deserialization
+    sink method "parseXmlFragment" -> code.Deserialization
+    sink method "parseBodyFragment" -> code.Deserialization
+    sink method "parseBodyFragmentRelaxed" -> code.Deserialization
+    control method "escape" -> core.HtmlEscape
+  }
+}

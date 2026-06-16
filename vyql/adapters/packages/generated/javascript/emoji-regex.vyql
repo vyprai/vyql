@@ -1,0 +1,9 @@
+import code.{RegexCompile}
+
+adapter javascript {
+  package "emoji-regex" {
+    mark method "module.exports" -> code.RegexCompile
+    mark method "default" -> code.RegexCompile
+    mark method "emojiRegex" -> code.RegexCompile
+  }
+}

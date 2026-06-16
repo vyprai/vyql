@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/lucas34/SwiftQueue" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

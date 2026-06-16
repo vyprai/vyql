@@ -1,0 +1,8 @@
+import code.{NetworkConnect}
+
+adapter python {
+  package "aiodns" {
+    sink method "query" -> code.NetworkConnect
+    sink method "query_dns" -> code.NetworkConnect
+  }
+}

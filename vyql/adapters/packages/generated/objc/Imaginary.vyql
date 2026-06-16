@@ -1,0 +1,7 @@
+import code.{UrlFetch, Deserialization}
+adapter objc {
+  package "Imaginary" {
+    sink method "fetch" -> code.UrlFetch
+    sink method "decompress" -> code.Deserialization
+  }
+}

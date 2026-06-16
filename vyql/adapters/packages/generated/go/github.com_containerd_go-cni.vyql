@@ -1,0 +1,8 @@
+adapter go {
+  package "github.com/containerd/go-cni" {
+    sink method "WithConfFile" -> code.FilePathAccess
+    sink method "WithConfListFile" -> code.FilePathAccess
+    source method "WithConf" -> core.UserControlledData
+    source method "WithConfListBytes" -> core.UserControlledData
+  }
+}

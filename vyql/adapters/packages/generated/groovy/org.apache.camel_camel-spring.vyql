@@ -1,0 +1,8 @@
+adapter groovy {
+  package "org.apache.camel:camel-spring" {
+    sink method "parseExpression" -> code.CodeEval
+    source method "getBody" -> core.UserControlledData
+    source method "getHeader" -> core.UserControlledData
+    source method "getHeaders" -> core.UserControlledData
+  }
+}

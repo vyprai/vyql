@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "testfixtures" {
+    sink method "shell_join" -> code.CommandExecution
+    sink method "set_command" -> code.CommandExecution
+  }
+}

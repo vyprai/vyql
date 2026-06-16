@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "is-binary-path" {
+    source method "isBinaryPath" -> core.UserControlledData
+  }
+}

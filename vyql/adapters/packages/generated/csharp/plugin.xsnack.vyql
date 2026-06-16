@@ -1,0 +1,8 @@
+import code.{HtmlRender}
+
+adapter csharp {
+  package "plugin.xsnack" {
+    sink method "ShowMessageAsync" -> code.HtmlRender
+    sink method "ShowMessage" -> code.HtmlRender
+  }
+}

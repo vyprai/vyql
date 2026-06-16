@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter python {
+  package "django-nose" {
+    source method "add_arguments" -> code.CliArgument
+  }
+}

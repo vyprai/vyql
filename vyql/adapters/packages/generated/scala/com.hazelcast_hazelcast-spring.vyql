@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter scala {
+  package "com.hazelcast:hazelcast-spring" {
+    sink method "readData" -> code.Deserialization
+    sink method "parseOption" -> code.Deserialization
+  }
+}

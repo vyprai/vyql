@@ -1,0 +1,5 @@
+adapter elixir {
+  package "kaffy" {
+    sink method "build_html_input" -> code.HtmlRender
+  }
+}

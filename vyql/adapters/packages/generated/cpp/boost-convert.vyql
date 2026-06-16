@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "boost-convert" {
+    sink method "convert" -> code.Deserialization
+    sink method "str_to" -> code.Deserialization
+  }
+}

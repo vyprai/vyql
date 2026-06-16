@@ -1,0 +1,11 @@
+import code.{Deserialization, HttpInput, SecretValue}
+
+adapter go {
+  package "github.com/dgrijalva/jwt-go" {
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseWithClaims" -> code.Deserialization
+    sink method "DecodeSegment" -> code.Deserialization
+    source method "ParseFromRequest" -> code.HttpInput
+    source method "ParseFromRequestWithClaims" -> code.HttpInput
+  }
+}

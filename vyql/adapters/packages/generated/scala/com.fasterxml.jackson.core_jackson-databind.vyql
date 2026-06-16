@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "com.fasterxml.jackson.core:jackson-databind" {
+    sink method "readValue" -> code.Deserialization
+  }
+}

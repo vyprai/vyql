@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter dart {
+  package "multicast_dns" {
+    source method "encodeMDnsQuery" -> code.NetworkData
+  }
+}

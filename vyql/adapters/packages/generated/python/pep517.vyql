@@ -1,0 +1,7 @@
+adapter python {
+  package "pep517" {
+    sink method "default_subprocess_runner" -> code.CommandExecution
+    sink method "quiet_subprocess_runner" -> code.CommandExecution
+    sink method "subprocess_runner" -> code.CommandExecution
+  }
+}

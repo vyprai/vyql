@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "fable.parsimmon" {
+    sink method "Parsimmon" -> code.Deserialization
+    sink method "createLanguage" -> code.Deserialization
+    sink method "parseBufferFor" -> code.Deserialization
+    sink method "parseBuffer" -> code.Deserialization
+  }
+}

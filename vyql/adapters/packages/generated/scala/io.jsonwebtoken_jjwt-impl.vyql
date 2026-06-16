@@ -1,0 +1,8 @@
+import code.{Deserialization, SecretValue}
+
+adapter scala {
+  package "io.jsonwebtoken:jjwt-impl" {
+    sink method "parse" -> code.Deserialization
+    sink method "tokenize" -> code.Deserialization
+  }
+}

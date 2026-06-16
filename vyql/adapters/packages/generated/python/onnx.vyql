@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter python {
+  package "onnx" {
+    sink method "load" -> code.FilePathAccess
+  }
+}

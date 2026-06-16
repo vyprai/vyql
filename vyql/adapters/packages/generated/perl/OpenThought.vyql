@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter perl {
+  package "OpenThought" {
+    control method "_escape_javascript" -> core.HtmlEscape
+  }
+}

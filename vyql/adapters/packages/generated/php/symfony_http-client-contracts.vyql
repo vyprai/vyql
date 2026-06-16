@@ -1,0 +1,11 @@
+import code.{NetworkConnect, UrlFetch}
+import core.{UserControlledData}
+
+adapter php {
+  package "symfony/http-client-contracts" {
+    sink method "HttpClientInterface::request" -> code.UrlFetch
+    sink method "HttpClientInterface::request" -> code.NetworkConnect
+    source method "HttpClientInterface::request.options" -> core.UserControlledData
+    source method "HttpClientInterface::withOptions.options" -> core.UserControlledData
+  }
+}

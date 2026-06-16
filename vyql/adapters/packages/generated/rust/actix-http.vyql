@@ -1,0 +1,10 @@
+import code.{HttpInput, ResponseHeaderWrite}
+
+adapter rust {
+  package "actix-http" {
+    source method "Request::take_payload" -> code.HttpInput
+    source method "Request::uri" -> code.HttpInput
+    source method "Request::headers_mut" -> code.HttpInput
+    sink method "Response::headers_mut" -> code.ResponseHeaderWrite
+  }
+}

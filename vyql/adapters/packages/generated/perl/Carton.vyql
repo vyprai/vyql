@@ -1,0 +1,11 @@
+import code.{CommandExecution, Deserialization}
+
+adapter perl {
+  package "Carton" {
+    sink method "cmd_run" -> code.CommandExecution
+    sink method "cmd_exec" -> code.CommandExecution
+    sink method "load" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    sink method "load_json" -> code.Deserialization
+  }
+}

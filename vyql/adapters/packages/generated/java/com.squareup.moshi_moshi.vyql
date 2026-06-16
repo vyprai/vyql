@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "com.squareup.moshi:moshi" {
+    sink method "fromJson" -> code.Deserialization
+  }
+}

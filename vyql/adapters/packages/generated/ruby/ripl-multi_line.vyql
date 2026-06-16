@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter ruby {
+  package "ripl-multi_line" {
+    sink method "eval_input" -> code.CodeEval
+    sink method "loop_eval" -> code.CodeEval
+  }
+}

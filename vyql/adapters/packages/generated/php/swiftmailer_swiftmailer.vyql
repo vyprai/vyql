@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter php {
+  package "swiftmailer/swiftmailer" {
+    sink method "send" -> code.NetworkSend
+  }
+}

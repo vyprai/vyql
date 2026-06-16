@@ -1,0 +1,5 @@
+adapter c {
+  package "libplist" {
+    sink method "jsmn_parse" -> code.XmlParse
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "fdeflate" {
+    sink method "decompress_to_vec" -> code.Deserialization
+    sink method "decompress_to_vec_bounded" -> code.Deserialization
+  }
+}

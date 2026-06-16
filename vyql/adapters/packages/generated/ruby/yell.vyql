@@ -1,0 +1,9 @@
+import code.{LogOutput, TemplateRender}
+
+adapter ruby {
+  package "yell" {
+    sink method "write" -> code.LogOutput
+    sink method "write!" -> code.LogOutput
+    sink method "format" -> code.TemplateRender
+  }
+}

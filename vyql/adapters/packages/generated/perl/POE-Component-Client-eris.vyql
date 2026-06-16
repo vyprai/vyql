@@ -1,0 +1,6 @@
+import code.{NetworkConnect, Deserialization}
+adapter perl {
+  package "POE-Component-Client-eris" {
+    sink method "spawn" -> code.NetworkConnect
+  }
+}

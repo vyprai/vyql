@@ -1,0 +1,6 @@
+import code.{WeakHash}
+adapter javascript {
+  package "loader-utils" {
+    mark method "getHashDigest" -> code.WeakHash
+  }
+}

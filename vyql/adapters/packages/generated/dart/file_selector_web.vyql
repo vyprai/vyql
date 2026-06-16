@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+
+adapter dart {
+  package "file_selector_web" {
+    source method "FileSelectorWeb.openFile" -> core.UserControlledData
+    source method "FileSelectorWeb.getDirectoryPath" -> core.UserControlledData
+    source method "DomHelper.openFile" -> core.UserControlledData
+    source method "DomHelper.openDirectory" -> core.UserControlledData
+  }
+}

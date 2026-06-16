@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter dart {
+  package "polymer" {
+    source method "parseOptions" -> code.CliArgument
+  }
+}

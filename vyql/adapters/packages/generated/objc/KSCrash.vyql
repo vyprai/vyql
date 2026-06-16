@@ -1,0 +1,13 @@
+import code.{FilePathAccess, FileUse}
+adapter objc {
+  package "KSCrash" {
+    sink method "kscrashreport_writeStandardReport" -> code.FileUse
+    sink method "kscrs_readReportByPathAndID" -> code.FilePathAccess
+    sink method "kscrs_finalizeReport" -> code.FilePathAccess
+    sink method "kscrs_getReportSidecarFilePathForReport" -> code.FilePathAccess
+    sink method "kscrs_getRunSidecarFilePath" -> code.FilePathAccess
+    sink method "kscrs_getRunSidecarFilePathForRunID" -> code.FilePathAccess
+    sink method "kscrs_getNextCrashReport" -> code.FilePathAccess
+    sink method "kscrs_extractRunIdFromReportFile" -> code.FilePathAccess
+  }
+}

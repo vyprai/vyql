@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter elixir {
+  package "bolt_sips" {
+    sink method "query" -> code.SqlExecution
+    sink method "query!" -> code.SqlExecution
+  }
+}

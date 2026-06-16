@@ -1,0 +1,8 @@
+import code.{Deserialization, TemplateRender}
+
+adapter elixir {
+  package "slime" {
+    sink method "Slime.Parser.parse" -> code.Deserialization
+    sink method "Slime.Renderer.render" -> code.TemplateRender
+  }
+}

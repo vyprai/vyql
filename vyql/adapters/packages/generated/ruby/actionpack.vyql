@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "actionpack" {
+    sink method "parse" -> code.Deserialization
+  }
+}

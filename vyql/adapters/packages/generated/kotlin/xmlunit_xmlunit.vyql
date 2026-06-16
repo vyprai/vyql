@@ -1,0 +1,11 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter kotlin {
+  package "xmlunit:xmlunit" {
+    sink method "parse" -> code.Deserialization
+    sink method "buildControlDocument" -> code.Deserialization
+    sink method "buildTestDocument" -> code.Deserialization
+    control method "validate" -> core.InputValidation
+  }
+}

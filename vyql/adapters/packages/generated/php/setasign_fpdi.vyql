@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter php {
+  package "setasign/fpdi" {
+    sink method "parse" -> code.Deserialization
+    sink method "readValue" -> code.Deserialization
+  }
+}

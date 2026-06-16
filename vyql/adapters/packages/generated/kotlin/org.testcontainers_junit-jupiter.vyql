@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter kotlin {
+  package "org.testcontainers:junit-jupiter" {
+    control method "FilesystemFriendlyNameGenerator.filesystemFriendlyNameOf" -> core.InputValidation
+  }
+}

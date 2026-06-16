@@ -1,0 +1,12 @@
+import code.{Deserialization}
+adapter rust {
+  package "darling_macro" {
+    sink method "derive_from_meta" -> code.Deserialization
+    sink method "derive_from_meta_item" -> code.Deserialization
+    sink method "derive_from_attributes" -> code.Deserialization
+    sink method "derive_from_input" -> code.Deserialization
+    sink method "derive_field" -> code.Deserialization
+    sink method "derive_type_param" -> code.Deserialization
+    sink method "derive_variant" -> code.Deserialization
+  }
+}

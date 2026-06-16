@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter objc {
+  package "OneSignal" {
+    sink method "displayWebView:" -> code.HtmlRender
+  }
+}

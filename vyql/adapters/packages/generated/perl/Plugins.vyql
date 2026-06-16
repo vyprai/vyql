@@ -1,0 +1,9 @@
+import code.{FilePathAccess, Deserialization}
+
+adapter perl {
+  package "Plugins" {
+    sink method "readconfig" -> code.FilePathAccess
+    sink method "file_plugin" -> code.FilePathAccess
+    sink method "parseconfig" -> code.Deserialization
+  }
+}

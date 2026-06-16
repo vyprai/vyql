@@ -1,0 +1,6 @@
+adapter javascript {
+  package "resolve-cwd" {
+    sink method "moduleId" -> code.FilePathAccess
+    sink method "silent" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+adapter python {
+  package "watchfiles" {
+    sink method "run_process" -> code.CommandExecution
+    sink method "arun_process" -> code.CommandExecution
+  }
+}

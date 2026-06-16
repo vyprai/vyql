@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "time-macros" {
+    sink method "format_description" -> code.Deserialization
+    sink method "serde_format_description" -> code.Deserialization
+  }
+}

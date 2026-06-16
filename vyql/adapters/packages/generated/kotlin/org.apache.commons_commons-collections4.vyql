@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.apache.commons:commons-collections4" {
+    sink method "create" -> code.FilePathAccess
+    mark path "org.apache.commons.commons.collections4.hash" -> code.WeakHash
+  }
+}

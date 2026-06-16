@@ -1,0 +1,12 @@
+import code.{SqlExecution}
+
+adapter swift {
+  package "github.com/SwiftORM/MySQL-StORM" {
+    sink method "sql" -> code.SqlExecution
+    sink method "sqlRows" -> code.SqlExecution
+    sink method "insert" -> code.SqlExecution
+    sink method "update" -> code.SqlExecution
+    sink method "delete" -> code.SqlExecution
+    sink method "upsert" -> code.SqlExecution
+  }
+}

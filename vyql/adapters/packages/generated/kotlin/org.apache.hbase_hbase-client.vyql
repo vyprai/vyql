@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.apache.hbase:hbase-client" {
+    sink method "parseFrom" -> code.Deserialization
+  }
+}

@@ -1,0 +1,10 @@
+import code.{CodeEval, FilePathAccess}
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/krzysztofzablocki/Inject" {
+    source path "InjectConfiguration.bundlePath" -> core.UserControlledData
+    sink path "InjectConfiguration.bundlePath" -> code.FilePathAccess
+    sink path "InjectConfiguration.load" -> code.CodeEval
+  }
+}

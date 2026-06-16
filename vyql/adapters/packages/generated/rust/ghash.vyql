@@ -1,0 +1,6 @@
+adapter rust {
+  package "ghash" {
+    source method "new" -> code.SecretValue
+    mark method "finalize" -> code.WeakHash
+  }
+}

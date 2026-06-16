@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter perl {
+  package "User" {
+    source method "Home" -> core.UserControlledData
+    source method "Login" -> core.UserControlledData
+  }
+}

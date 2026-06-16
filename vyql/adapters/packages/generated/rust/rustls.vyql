@@ -1,0 +1,11 @@
+import code.{NetworkData, NetworkSend, Deserialization, SecretValue}
+
+adapter rust {
+  package "rustls" {
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+    sink method "from" -> code.Deserialization
+    source method "header_protection_key" -> code.SecretValue
+    source method "keys" -> code.SecretValue
+  }
+}

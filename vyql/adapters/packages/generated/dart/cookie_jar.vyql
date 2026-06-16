@@ -1,0 +1,10 @@
+import code.{StoredDataRead, StoredDataWrite, SecretValue}
+
+adapter dart {
+  package "cookie_jar" {
+    source method "read" -> code.StoredDataRead
+    sink method "write" -> code.StoredDataWrite
+    source method "loadForRequest" -> code.SecretValue
+    source method "saveFromResponse" -> code.SecretValue
+  }
+}

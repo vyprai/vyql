@@ -1,0 +1,8 @@
+import code.{CommandExecution, SecretValue}
+adapter ruby {
+  package "security" {
+    source method "password_from_output" -> code.SecretValue
+    source method "decode_hex_blob" -> code.SecretValue
+    source method "keychains_from_output" -> code.SecretValue
+  }
+}

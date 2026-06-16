@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "Hash-Typed" {
+    sink method "PARSE" -> code.Deserialization
+  }
+}

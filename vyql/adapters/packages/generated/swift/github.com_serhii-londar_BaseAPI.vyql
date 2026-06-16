@@ -1,0 +1,21 @@
+import code.{NetworkSend}
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/serhii-londar/BaseAPI" {
+    sink method "send" -> code.NetworkSend
+    sink method "get" -> code.NetworkSend
+    sink method "head" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "patch" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+    sink method "ba_get" -> code.NetworkSend
+    sink method "ba_head" -> code.NetworkSend
+    sink method "ba_post" -> code.NetworkSend
+    sink method "ba_patch" -> code.NetworkSend
+    sink method "ba_put" -> code.NetworkSend
+    sink method "ba_delete" -> code.NetworkSend
+
+  }
+}

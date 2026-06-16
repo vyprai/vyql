@@ -1,0 +1,7 @@
+adapter kotlin {
+  package "io.grpc:grpc-netty" {
+    source method "write" -> code.NetworkData
+    source method "wrap" -> code.NetworkData
+    source method "unwrap" -> code.NetworkData
+  }
+}

@@ -1,0 +1,10 @@
+import code.{Deserialization, FileUse, FilePathAccess}
+adapter ruby {
+  package "pdf-reader" {
+    sink method "PDF::Reader.open" -> code.FileUse
+    sink method "PDF::Reader::Buffer#read" -> code.Deserialization
+    sink method "PDF::Reader::LZW.decode" -> code.Deserialization
+    sink method "PDF::Reader::Cmap#process_data" -> code.Deserialization
+    sink method "PDF::Reader::Page#callback" -> code.Deserialization
+  }
+}

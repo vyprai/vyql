@@ -1,0 +1,6 @@
+import code.{RedirectTarget}
+adapter elixir {
+  package "redirect" {
+    mark method "call" -> code.RedirectTarget
+  }
+}

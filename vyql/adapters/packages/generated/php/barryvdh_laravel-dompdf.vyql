@@ -1,0 +1,12 @@
+import code.{FilePathAccess, FileUse, HtmlRender, ResponseHeaderWrite}
+
+adapter php {
+  package "barryvdh/laravel-dompdf" {
+    sink method "loadHTML" -> code.HtmlRender
+    sink method "loadFile" -> code.FilePathAccess
+    sink method "loadView" -> code.HtmlRender
+    sink method "save" -> code.FileUse
+    sink method "download" -> code.ResponseHeaderWrite
+    sink method "stream" -> code.ResponseHeaderWrite
+  }
+}

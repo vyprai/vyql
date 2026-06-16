@@ -1,0 +1,6 @@
+adapter php {
+  package "jms/cg" {
+    sink method "eval" -> code.CodeEval
+    sink method "file_put_contents" -> code.FilePathAccess
+  }
+}

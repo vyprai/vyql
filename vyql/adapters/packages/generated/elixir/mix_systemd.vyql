@@ -1,0 +1,10 @@
+import code.{CommandExecution, FilePathAccess}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "mix_systemd" {
+    source method "parse_args" -> core.UserControlledData
+    sink method "start_command" -> code.CommandExecution
+    sink method "write_template" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter python {
+  package "python-http-client" {
+    sink method "http_request" -> code.NetworkConnect
+    sink method "http_request" -> code.NetworkSend
+  }
+}

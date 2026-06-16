@@ -1,0 +1,9 @@
+import code.{Deserialization, HtmlRender}
+
+adapter python {
+  package "mkdocs" {
+    sink method "yaml_load" -> code.Deserialization
+    sink method "load_dict" -> code.Deserialization
+    sink method "on_page_content" -> code.HtmlRender
+  }
+}

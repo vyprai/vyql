@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+adapter ruby {
+  package "mixlib-shellout" {
+    sink method "shell_out" -> code.CommandExecution
+    sink method "shell_out!" -> code.CommandExecution
+  }
+}

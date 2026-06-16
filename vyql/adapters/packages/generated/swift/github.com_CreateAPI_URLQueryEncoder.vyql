@@ -1,0 +1,7 @@
+adapter swift {
+  package "github.com/CreateAPI/URLQueryEncoder" {
+    source method "encode" -> core.UserControlledData
+    source method "query" -> core.UserControlledData
+    source method "percentEncodedQuery" -> core.UserControlledData
+  }
+}

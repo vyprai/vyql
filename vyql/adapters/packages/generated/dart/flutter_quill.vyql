@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter dart {
+  package "flutter_quill" {
+    sink method "Delta.fromHtml" -> code.Deserialization
+  }
+}

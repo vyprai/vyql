@@ -1,0 +1,6 @@
+import core.{SqlParameterization}
+adapter java {
+  package "org.hibernate.javax.persistence:hibernate-jpa-2.0-api" {
+    control method "setParameter" -> core.SqlParameterization
+  }
+}

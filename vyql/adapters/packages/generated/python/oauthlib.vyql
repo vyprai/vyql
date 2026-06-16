@@ -1,0 +1,9 @@
+import code.{SecretValue, WeakRandomValue}
+
+adapter python {
+  package "oauthlib" {
+    mark method "generate_token" -> code.WeakRandomValue
+    source method "generate_signed_token" -> code.SecretValue
+    control method "verify_signed_token" -> core.AuthenticationCheck
+  }
+}

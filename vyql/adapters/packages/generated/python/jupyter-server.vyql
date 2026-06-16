@@ -1,0 +1,12 @@
+import core.{InputValidation, PathCanonicalization}
+
+adapter python {
+  package "jupyter-server" {
+    control method "url_unescape" -> core.InputValidation
+    control method "url_path_join" -> core.PathCanonicalization
+    control method "path2url" -> core.PathCanonicalization
+    control method "url2path" -> core.PathCanonicalization
+    control method "to_os_path" -> core.PathCanonicalization
+    control method "to_api_path" -> core.PathCanonicalization
+  }
+}

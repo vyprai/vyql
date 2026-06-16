@@ -1,0 +1,5 @@
+adapter php {
+  package "contao/core-bundle" {
+    sink method "get" -> code.UrlFetch
+  }
+}

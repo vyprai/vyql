@@ -1,0 +1,11 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter elixir {
+  package "filtrex" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_params" -> code.Deserialization
+    sink method "query" -> code.Deserialization
+    control method "sanitize" -> core.InputValidation
+  }
+}

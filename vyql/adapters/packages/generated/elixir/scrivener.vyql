@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter elixir {
+  package "scrivener" {
+    source method "paginate" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/aws/aws-sdk-go-v2/internal/ini" {
+    sink method "OpenFile" -> code.Deserialization
+    sink method "Parse" -> code.Deserialization
+  }
+}

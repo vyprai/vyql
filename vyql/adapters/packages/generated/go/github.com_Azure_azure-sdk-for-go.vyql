@@ -1,0 +1,9 @@
+import code.{SecretValue}
+adapter go {
+  package "github.com/Azure/azure-sdk-for-go" {
+    source method "NewClientFromConnectionString" -> code.SecretValue
+    source method "NewClient" -> code.SecretValue
+    source method "NewAccountSASClient" -> code.SecretValue
+    source method "NewAccountSASClientFromEndpointToken" -> code.SecretValue
+  }
+}

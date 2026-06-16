@@ -1,0 +1,8 @@
+adapter python {
+  package "configparser" {
+    source method "read" -> core.UserControlledData
+    source method "read_file" -> core.UserControlledData
+    source method "read_string" -> core.UserControlledData
+    source method "read_dict" -> core.UserControlledData
+  }
+}

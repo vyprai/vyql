@@ -1,0 +1,13 @@
+import code.{HtmlRender, NetworkConnect, NetworkData, WeakHash, WeakRandomValue, Cookie}
+import core.{InputValidation}
+
+adapter javascript {
+  package "sockjs" {
+    control method "escape_selected" -> core.InputValidation
+    mark method "md5_hex" -> code.WeakHash
+    mark method "sha1_base64" -> code.WeakHash
+    source method "parseCookie" -> code.Cookie
+    mark method "random32" -> code.WeakRandomValue
+    sink method "htmlfile" -> code.HtmlRender
+  }
+}

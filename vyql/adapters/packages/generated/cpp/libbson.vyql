@@ -1,0 +1,5 @@
+adapter cpp {
+  package "libbson" {
+    sink method "read" -> code.Deserialization
+  }
+}

@@ -1,0 +1,19 @@
+import code.{CommandExecution, FilePathAccess, HttpInput, NetworkConnect}
+adapter ruby {
+  package "mini_portile2" {
+    sink method "download_file_http" -> code.NetworkConnect
+    sink method "download_file_ftp" -> code.NetworkConnect
+    sink method "download_file" -> code.NetworkConnect
+    sink method "edit_path" -> code.FilePathAccess
+    sink method "apply_patch" -> code.FilePathAccess
+    sink method "verify_file" -> code.FilePathAccess
+    sink method "log_file" -> code.FilePathAccess
+    sink method "which" -> code.FilePathAccess
+    sink method "tar_command" -> code.FilePathAccess
+    sink method "extract_file" -> code.FilePathAccess
+    sink method "native_path" -> code.FilePathAccess
+    sink method "posix_path" -> code.FilePathAccess
+    sink method "download_file_file" -> code.FilePathAccess
+    sink method "with_tempfile" -> code.FilePathAccess
+  }
+}

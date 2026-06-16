@@ -1,0 +1,11 @@
+import code.{NetworkConnect, NetworkSend, Deserialization}
+import core.{AuthenticationCheck}
+
+adapter elixir {
+  package "kafka_protocol" {
+    sink method "start" -> code.NetworkConnect
+    sink method "send_request" -> code.NetworkSend
+    control method "sasl_authenticate" -> core.AuthenticationCheck
+    sink method "decode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "io.grpc:grpc-protobuf" {
+    sink method "marshallerWithRecursionLimit" -> code.Deserialization
+  }
+}

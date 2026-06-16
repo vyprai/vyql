@@ -1,0 +1,8 @@
+import code.{Deserialization, StoredDataRead}
+
+adapter cpp {
+  package "nanoflann" {
+    sink method "load_value" -> code.Deserialization
+    sink method "loadIndex" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.google.http-client:google-http-client" {
+    sink method "parse" -> code.Deserialization
+  }
+}

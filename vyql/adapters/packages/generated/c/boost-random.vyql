@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter c {
+  package "boost-random" {
+    source method "random_device" -> code.SecretValue
+  }
+}

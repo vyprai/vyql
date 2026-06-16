@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter perl {
+  package "RxPerl" {
+    source method "websocket" -> code.NetworkData
+  }
+}

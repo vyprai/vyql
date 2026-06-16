@@ -1,0 +1,5 @@
+adapter perl {
+  package "Imager" {
+    sink method "load_plugin" -> code.CodeEval
+  }
+}

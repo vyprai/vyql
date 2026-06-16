@@ -1,0 +1,5 @@
+adapter ruby {
+  package "bluecloth" {
+    sink method "Csreparse" -> code.XmlParse
+  }
+}

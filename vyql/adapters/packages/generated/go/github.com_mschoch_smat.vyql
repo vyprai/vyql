@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/mschoch/smat" {
+    source method "Fuzz" -> core.UserControlledData
+    source method "runReader" -> core.UserControlledData
+  }
+}

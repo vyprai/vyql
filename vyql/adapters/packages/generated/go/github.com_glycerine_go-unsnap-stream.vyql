@@ -1,0 +1,7 @@
+adapter go {
+  package "github.com/glycerine/go-unsnap-stream" {
+    sink method "Open" -> code.FilePathAccess
+    sink method "Create" -> code.FilePathAccess
+    sink method "ReadSnappyStreamCompressedFile" -> code.FilePathAccess
+  }
+}

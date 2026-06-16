@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter cpp {
+  package "moos-core" {
+    source method "OnCommandMsg" -> core.UserControlledData
+  }
+}

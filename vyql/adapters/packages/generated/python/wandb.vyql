@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter python {
+  package "wandb" {
+    sink method "use_model" -> code.FilePathAccess
+  }
+}

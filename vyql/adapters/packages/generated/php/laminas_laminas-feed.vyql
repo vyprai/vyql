@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "laminas/laminas-feed" {
+    sink method "libxml_disable_entity_loader" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{HttpInput, NetworkConnect}
+
+adapter swift {
+  package "github.com/AvdLee/appstoreconnect-swift-sdk" {
+    source method "init" -> code.HttpInput
+    sink method "asURLRequest" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,6 @@
+adapter ruby {
+  package "byebug" {
+    source method "match" -> code.CliArgument
+    sink method "spawn" -> code.CommandExecution
+  }
+}

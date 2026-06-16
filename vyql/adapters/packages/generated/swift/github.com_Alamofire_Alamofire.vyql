@@ -1,0 +1,13 @@
+import code.{NetworkSend, UrlFetch}
+import core.{AuthenticationCheck, InputValidation}
+
+adapter swift {
+  package "github.com/Alamofire/Alamofire" {
+    sink method "send" -> code.NetworkSend
+    control method "authenticate" -> core.AuthenticationCheck
+    sink method "request" -> code.UrlFetch
+    sink method "download" -> code.UrlFetch
+    sink method "upload" -> code.UrlFetch
+    control method "escape" -> core.InputValidation
+  }
+}

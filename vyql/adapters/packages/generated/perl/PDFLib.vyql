@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter perl {
+  package "PDFLib" {
+    sink method "filename" -> code.FilePathAccess
+    sink method "load_image" -> code.FilePathAccess
+  }
+}

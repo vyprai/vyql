@@ -1,0 +1,14 @@
+import code.{SqlExecution}
+import core.{InputValidation}
+adapter ruby {
+  package "dm-aggregates" {
+    sink method "aggregate" -> code.SqlExecution
+    sink method "count" -> code.SqlExecution
+    sink method "min" -> code.SqlExecution
+    sink method "max" -> code.SqlExecution
+    sink method "avg" -> code.SqlExecution
+    sink method "sum" -> code.SqlExecution
+    control method "assert_property_type" -> core.InputValidation
+    control method "assert_valid_fields_with_operator" -> core.InputValidation
+  }
+}

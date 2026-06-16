@@ -1,0 +1,7 @@
+import code.{NetworkBind}
+
+adapter cpp {
+  package "grpc" {
+    sink method "grpc_server_add_http2_port" -> code.NetworkBind
+  }
+}

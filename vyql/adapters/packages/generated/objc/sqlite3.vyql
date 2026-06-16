@@ -1,0 +1,5 @@
+adapter objc {
+  package "sqlite3" {
+    sink method "Jim_FindHashEntry" -> code.SqlExecution
+  }
+}

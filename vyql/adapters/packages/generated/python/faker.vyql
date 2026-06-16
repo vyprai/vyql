@@ -1,0 +1,6 @@
+import code.{ExpressionEval}
+adapter python {
+  package "faker" {
+    sink method "parse" -> code.ExpressionEval
+  }
+}

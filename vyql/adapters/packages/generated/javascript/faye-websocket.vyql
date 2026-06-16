@@ -1,0 +1,6 @@
+adapter javascript {
+  package "faye-websocket" {
+    sink method "write" -> code.NetworkSend
+    sink method "send" -> code.NetworkSend
+  }
+}

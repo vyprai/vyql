@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+import code.{NetworkConnect}
+
+adapter go {
+  package "github.com/hashicorp/consul/api" {
+    sink method "NewHttpClient" -> code.NetworkConnect
+    source method "ParseServiceAddr" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess, SecretValue}
+adapter groovy {
+  package "org.apache.curator:curator-framework" {
+    source method "AuthInfo" -> code.SecretValue
+    sink method "forPath" -> code.FilePathAccess
+  }
+}

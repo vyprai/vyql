@@ -1,0 +1,7 @@
+import code.{FileUse}
+
+adapter elixir {
+  package "benchee_json" {
+    sink method "write" -> code.FileUse
+  }
+}

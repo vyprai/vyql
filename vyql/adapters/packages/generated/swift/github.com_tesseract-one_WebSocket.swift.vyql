@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter swift {
+  package "github.com/tesseract-one/WebSocket.swift" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+    source method "onData" -> code.NetworkData
+  }
+}

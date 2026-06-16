@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "xunit.runner.utility" {
+    sink method "ConfigReader.Load" -> code.Deserialization
+  }
+}

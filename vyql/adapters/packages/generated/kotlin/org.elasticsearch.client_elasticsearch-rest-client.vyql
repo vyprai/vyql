@@ -1,0 +1,9 @@
+import code.{NetworkData, NetworkSend}
+
+adapter kotlin {
+  package "org.elasticsearch.client:elasticsearch-rest-client" {
+    source method "setEntity" -> code.NetworkData
+    source method "setJsonEntity" -> code.NetworkData
+    sink method "performRequest" -> code.NetworkSend
+  }
+}

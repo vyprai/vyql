@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter python {
+  package "numexpr" {
+    source method "necompiler.validate" -> core.UserControlledData
+  }
+}

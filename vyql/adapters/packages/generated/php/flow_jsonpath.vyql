@@ -1,0 +1,8 @@
+adapter php {
+  package "flow/jsonpath" {
+    sink method "Flow\JSONPath\JSONPath::find" -> code.Deserialization
+    sink method "Flow\JSONPath\JSONPath::parseTokens" -> code.Deserialization
+    sink method "Flow\JSONPath\JSONPathLexer::parseExpressionTokens" -> code.Deserialization
+    sink method "Flow\JSONPath\JSONPathLexer::parseExpression" -> code.Deserialization
+  }
+}

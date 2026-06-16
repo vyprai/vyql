@@ -1,0 +1,5 @@
+adapter java {
+  package "com.google.guava:guava" {
+    mark path "com.google.guava.guava.hash" -> code.WeakHash
+  }
+}

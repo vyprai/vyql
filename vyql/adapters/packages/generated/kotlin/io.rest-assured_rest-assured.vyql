@@ -1,0 +1,24 @@
+import code.{UrlFetch, Deserialization}
+
+adapter kotlin {
+  package "io.rest-assured:rest-assured" {
+    sink method "get" -> code.UrlFetch
+    sink method "post" -> code.UrlFetch
+    sink method "put" -> code.UrlFetch
+    sink method "delete" -> code.UrlFetch
+    sink method "head" -> code.UrlFetch
+    sink method "patch" -> code.UrlFetch
+    sink method "options" -> code.UrlFetch
+    sink method "request" -> code.UrlFetch
+
+    control method "basic" -> core.AuthenticationCheck
+    control method "ntlm" -> core.AuthenticationCheck
+    control method "form" -> core.AuthenticationCheck
+    control method "oauth" -> core.AuthenticationCheck
+    control method "oauth2" -> core.AuthenticationCheck
+    control method "certificate" -> core.AuthenticationCheck
+    control method "digest" -> core.AuthenticationCheck
+
+    sink method "registerParser" -> code.Deserialization
+  }
+}

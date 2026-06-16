@@ -1,0 +1,6 @@
+import code.{LogOutput}
+adapter php {
+  package "zendframework/zend-log" {
+    sink method "log" -> code.LogOutput
+  }
+}

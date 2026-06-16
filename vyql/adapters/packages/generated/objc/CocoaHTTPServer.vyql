@@ -1,0 +1,5 @@
+adapter objc {
+  package "CocoaHTTPServer" {
+    sink method "SendMessage" -> code.UrlFetch
+  }
+}

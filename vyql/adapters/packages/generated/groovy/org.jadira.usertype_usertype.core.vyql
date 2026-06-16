@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "org.jadira.usertype:usertype.core" {
+    sink method "doNullSafeGet" -> code.Deserialization
+    sink method "doNullSafeSet" -> code.Deserialization
+  }
+}

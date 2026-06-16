@@ -1,0 +1,10 @@
+import code.{SqlExecution, SecretValue}
+
+adapter java {
+  package "org.testcontainers:postgresql" {
+    sink method "getJdbcUrl" -> code.SqlExecution
+    source method "getPassword" -> code.SecretValue
+    source method "getUsername" -> core.UserControlledData
+    source method "getDatabaseName" -> core.UserControlledData
+  }
+}

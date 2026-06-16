@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter swift {
+  package "github.com/patrick-zippenfenig/SwiftTimeZoneLookup" {
+    sink method "init" -> code.FilePathAccess
+  }
+}

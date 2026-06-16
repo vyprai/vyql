@@ -1,0 +1,14 @@
+import code.{CliArgument, CommandExecution, NetworkBind, NetworkData, ResponseHeaderWrite, UrlFetch, Deserialization, HtmlRender}
+import core.{UserControlledData}
+
+adapter scala {
+  package "com.squareup.okhttp:mockwebserver" {
+    sink method "MockWebServer.start" -> code.NetworkBind
+    sink method "MockResponse.setBody" -> code.HtmlRender
+    sink method "MockResponse.setHeader" -> code.ResponseHeaderWrite
+    sink method "MockResponse.addHeader" -> code.ResponseHeaderWrite
+    source method "RecordedRequest.getPath" -> core.UserControlledData
+    source method "RecordedRequest.getMethod" -> core.UserControlledData
+    source method "RecordedRequest.getHeader" -> core.UserControlledData
+  }
+}

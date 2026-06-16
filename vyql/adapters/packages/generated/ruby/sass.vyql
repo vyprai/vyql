@@ -1,0 +1,8 @@
+import code.{CommandExecution, Deserialization, FilePathAccess}
+
+adapter ruby {
+  package "sass" {
+    sink method "parse_selectors" -> code.Deserialization
+    sink method "parse_input" -> code.Deserialization
+  }
+}

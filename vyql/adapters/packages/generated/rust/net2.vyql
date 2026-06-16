@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter rust {
+  package "net2" {
+    source method "recv" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "connect" -> code.NetworkConnect
+  }
+}

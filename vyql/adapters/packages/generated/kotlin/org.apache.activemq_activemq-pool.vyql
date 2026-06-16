@@ -1,0 +1,11 @@
+import code.{CodeEval, UrlFetch}
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "org.apache.activemq:activemq-pool" {
+    sink method "onCommand" -> code.CodeEval
+    sink method "setBrokerUrl" -> code.UrlFetch
+    source method "setProperties" -> core.UserControlledData
+    source method "setConnectionFactory" -> core.UserControlledData
+  }
+}

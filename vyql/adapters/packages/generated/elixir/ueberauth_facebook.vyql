@@ -1,0 +1,13 @@
+adapter elixir {
+  package "ueberauth_facebook" {
+    source method "handle_callback!" -> core.UserControlledData
+    sink method "handle_callback!" -> code.NetworkConnect
+    sink method "handle_callback!" -> code.NetworkSend
+    sink method "get_token!" -> code.NetworkConnect
+    sink method "get_token!" -> code.NetworkSend
+    sink method "fetch_user" -> code.NetworkConnect
+    sink method "fetch_user" -> code.NetworkSend
+    sink method "user_query" -> code.NetworkConnect
+    sink method "user_query" -> code.NetworkSend
+  }
+}

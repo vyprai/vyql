@@ -1,0 +1,8 @@
+import code.{ResponseHeaderWrite}
+
+adapter php {
+  package "fruitcake/laravel-cors" {
+    sink method "handle" -> code.ResponseHeaderWrite
+    sink method "addHeaders" -> code.ResponseHeaderWrite
+  }
+}

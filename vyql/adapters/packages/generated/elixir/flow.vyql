@@ -1,0 +1,5 @@
+adapter elixir {
+  package "flow" {
+    mark path "flow.hash" -> code.WeakHash
+  }
+}

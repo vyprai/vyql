@@ -1,0 +1,23 @@
+import core.{InputValidation, HtmlEscape}
+
+adapter php {
+  package "nette/forms" {
+    control method "sanitize" -> core.HtmlEscape
+    control method "validate" -> core.InputValidation
+    control method "validateEqual" -> core.InputValidation
+    control method "validateNotEqual" -> core.InputValidation
+    control method "validateStatic" -> core.InputValidation
+    control method "validateFilled" -> core.InputValidation
+    control method "validateBlank" -> core.InputValidation
+    control method "validateValid" -> core.InputValidation
+    control method "validateRange" -> core.InputValidation
+    control method "validateMin" -> core.InputValidation
+    control method "validateMax" -> core.InputValidation
+    control method "validateLength" -> core.InputValidation
+    control method "validateMinLength" -> core.InputValidation
+    control method "validateMaxLength" -> core.InputValidation
+    control method "validateSubmitted" -> core.InputValidation
+    control method "validateEmail" -> core.InputValidation
+    control method "validateUrl" -> core.InputValidation
+  }
+}

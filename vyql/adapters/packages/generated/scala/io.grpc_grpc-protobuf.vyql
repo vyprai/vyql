@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter scala {
+  package "io.grpc:grpc-protobuf" {
+    sink method "marshaller" -> code.Deserialization
+    sink method "marshallerWithRecursionLimit" -> code.Deserialization
+  }
+}

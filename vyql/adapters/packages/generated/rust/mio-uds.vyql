@@ -1,0 +1,6 @@
+adapter rust {
+  package "mio-uds" {
+    source method "recv" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+  }
+}

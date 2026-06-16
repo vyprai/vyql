@@ -1,0 +1,10 @@
+import code.{Deserialization, ExpressionEval}
+
+adapter php {
+  package "zendframework/zend-dom" {
+    sink method "setDocumentXml" -> code.Deserialization
+    sink method "execute" -> code.ExpressionEval
+    sink method "queryXpath" -> code.ExpressionEval
+    sink method "queryWithErrorException" -> code.ExpressionEval
+  }
+}

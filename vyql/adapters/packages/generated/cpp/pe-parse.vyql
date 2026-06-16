@@ -1,0 +1,6 @@
+adapter cpp {
+  package "pe-parse" {
+    sink method "parse_resource_id" -> code.Deserialization
+    sink method "parse_resource_table" -> code.Deserialization
+  }
+}

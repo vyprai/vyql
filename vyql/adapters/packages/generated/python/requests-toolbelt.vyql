@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter python {
+  package "requests-toolbelt" {
+    sink method "requests_toolbelt.sessions.BaseUrlSession.request" -> code.NetworkConnect
+    sink method "requests_toolbelt.sessions.BaseUrlSession.request" -> code.NetworkSend
+  }
+}

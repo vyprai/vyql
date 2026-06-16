@@ -1,0 +1,12 @@
+import code.{HtmlRender}
+
+adapter php {
+  package "uxweb/sweet-alert" {
+    sink method "message" -> code.HtmlRender
+    sink method "info" -> code.HtmlRender
+    sink method "success" -> code.HtmlRender
+    sink method "error" -> code.HtmlRender
+    sink method "warning" -> code.HtmlRender
+    sink method "html" -> code.HtmlRender
+  }
+}

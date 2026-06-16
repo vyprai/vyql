@@ -1,0 +1,7 @@
+adapter perl {
+  package "OOB" {
+    source method "OOB_get" -> code.StoredDataRead
+    sink method "OOB_set" -> code.StoredDataWrite
+    sink method "OOB_reset" -> code.StoredDataWrite
+  }
+}

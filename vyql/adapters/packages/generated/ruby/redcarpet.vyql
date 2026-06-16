@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter ruby {
+  package "redcarpet" {
+    control method "html_escape" -> core.HtmlEscape
+  }
+}

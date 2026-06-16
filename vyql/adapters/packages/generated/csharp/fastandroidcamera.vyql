@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter csharp {
+  package "fastandroidcamera" {
+    source method "AddCallbackBuffer" -> core.UserControlledData
+    source method "OnPreviewFrame" -> core.UserControlledData
+  }
+}

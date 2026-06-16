@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+import core.{ShellEscape}
+
+adapter ruby {
+  package "systemu" {
+    sink method "systemu" -> code.CommandExecution
+    control method "quote" -> core.ShellEscape
+  }
+}

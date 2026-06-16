@@ -1,0 +1,13 @@
+import core.{UserControlledData}
+import code.{NetworkData, HtmlRender, ResponseHeaderWrite}
+
+adapter groovy {
+  package "com.squareup.okhttp:mockwebserver" {
+    source method "getPath" -> core.UserControlledData
+    source method "getBody" -> code.NetworkData
+    source method "getHeaders" -> code.NetworkData
+
+    sink method "setBody" -> code.HtmlRender
+    sink method "setHeader" -> code.ResponseHeaderWrite
+  }
+}

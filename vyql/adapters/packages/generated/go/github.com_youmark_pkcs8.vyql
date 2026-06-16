@@ -1,0 +1,12 @@
+import code.{SecretValue}
+
+adapter go {
+  package "github.com/youmark/pkcs8" {
+    source method "ParsePrivateKey" -> code.SecretValue
+    source method "ParsePKCS8PrivateKey" -> code.SecretValue
+    source method "ParsePKCS8PrivateKeyRSA" -> code.SecretValue
+    source method "ParsePKCS8PrivateKeyECDSA" -> code.SecretValue
+    source method "MarshalPrivateKey" -> code.SecretValue
+    source method "ConvertPrivateKeyToPKCS8" -> code.SecretValue
+  }
+}

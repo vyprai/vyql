@@ -1,0 +1,13 @@
+import code.{FilePathAccess, NetworkConnect}
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "io.appium:java-client" {
+    sink method "pullFile" -> code.FilePathAccess
+    sink method "pullFolder" -> code.FilePathAccess
+    sink method "pushFile" -> code.FilePathAccess
+    source method "androidDataMatcher" -> core.UserControlledData
+    source method "androidViewMatcher" -> core.UserControlledData
+    sink method "connect" -> code.NetworkConnect
+  }
+}

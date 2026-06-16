@@ -1,0 +1,10 @@
+import code.{NetworkData}
+adapter go {
+  package "github.com/NYTimes/gziphandler" {
+    source method "GzipHandler" -> code.NetworkData
+    source method "GzipHandlerWithOpts" -> code.NetworkData
+    source method "NewGzipLevelHandler" -> code.NetworkData
+    source method "NewGzipLevelAndMinSize" -> code.NetworkData
+    source method "MustNewGzipLevelHandler" -> code.NetworkData
+  }
+}

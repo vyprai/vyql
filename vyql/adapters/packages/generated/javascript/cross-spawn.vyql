@@ -1,0 +1,11 @@
+import code.{CommandExecution}
+import core.{ShellEscape}
+
+adapter javascript {
+  package "cross-spawn" {
+    sink method "spawn" -> code.CommandExecution
+    sink method "spawnSync" -> code.CommandExecution
+    control method "escapeCommand" -> core.ShellEscape
+    control method "escapeArgument" -> core.ShellEscape
+  }
+}

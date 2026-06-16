@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter ruby {
+  package "os" {
+    sink method "OS.open_file_command" -> code.FilePathAccess
+    sink method "OS.app_config_path" -> code.FilePathAccess
+  }
+}

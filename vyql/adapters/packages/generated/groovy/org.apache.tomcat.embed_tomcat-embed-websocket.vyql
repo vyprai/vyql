@@ -1,0 +1,8 @@
+adapter groovy {
+  package "org.apache.tomcat.embed:tomcat-embed-websocket" {
+    source method "getRequestURI" -> core.UserControlledData
+    source method "getRequestParameterMap" -> core.UserControlledData
+    source method "getQueryString" -> core.UserControlledData
+    sink method "willDecode" -> code.Deserialization
+  }
+}

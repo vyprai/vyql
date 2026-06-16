@@ -1,0 +1,7 @@
+adapter elixir {
+  package "redix" {
+    sink method "Redix.Protocol.parse" -> code.Deserialization
+    sink method "Redix.Protocol.parse_multi" -> code.Deserialization
+    source method "Redix.URI.to_start_options" -> core.UserControlledData
+  }
+}

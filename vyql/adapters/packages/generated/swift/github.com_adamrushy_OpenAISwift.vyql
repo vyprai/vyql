@@ -1,0 +1,28 @@
+import code.{NetworkConnect, NetworkSend, SecretValue}
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/adamrushy/OpenAISwift" {
+    sink method "sendCompletion" -> code.NetworkConnect
+    sink method "sendCompletion" -> code.NetworkSend
+
+    sink method "sendEdits" -> code.NetworkConnect
+    sink method "sendEdits" -> code.NetworkSend
+
+    sink method "sendModerations" -> code.NetworkConnect
+    sink method "sendModerations" -> code.NetworkSend
+
+    sink method "sendChat" -> code.NetworkConnect
+    sink method "sendChat" -> code.NetworkSend
+
+    sink method "sendEmbeddings" -> code.NetworkConnect
+    sink method "sendEmbeddings" -> code.NetworkSend
+
+    sink method "sendStreamingChat" -> code.NetworkConnect
+    sink method "sendStreamingChat" -> code.NetworkSend
+
+    sink method "sendImages" -> code.NetworkConnect
+    sink method "sendImages" -> code.NetworkSend
+
+  }
+}

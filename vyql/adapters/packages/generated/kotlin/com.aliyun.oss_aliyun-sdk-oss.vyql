@@ -1,0 +1,7 @@
+import code.{StoredDataRead, StoredDataWrite}
+adapter kotlin {
+  package "com.aliyun.oss:aliyun-sdk-oss" {
+    sink method "putObject" -> code.StoredDataWrite
+    source method "getObject" -> code.StoredDataRead
+  }
+}

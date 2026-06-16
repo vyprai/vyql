@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "cereal" {
+    sink method "serialize" -> code.Deserialization
+  }
+}

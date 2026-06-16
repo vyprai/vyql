@@ -1,0 +1,9 @@
+import code.{Deserialization, NetworkConnect, RedirectTarget}
+adapter objc {
+  package "Siren" {
+    sink method "parseForUpdate" -> code.Deserialization
+    sink method "processVersionCheckResults" -> code.Deserialization
+    mark method "launchAppStore" -> code.RedirectTarget
+    sink method "launchAppStore" -> code.NetworkConnect
+  }
+}

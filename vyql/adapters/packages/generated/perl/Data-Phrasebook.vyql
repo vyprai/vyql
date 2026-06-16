@@ -1,0 +1,10 @@
+import code.{SqlExecution}
+
+adapter perl {
+  package "Data-Phrasebook" {
+    sink method "query" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+    sink method "prepare" -> code.SqlExecution
+    sink method "rebind" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,8 @@
+adapter ruby {
+  package "rubyntlm" {
+
+    sink method "parse" -> code.Deserialization
+
+    mark method "lm_hash" -> code.WeakHash
+  }
+}

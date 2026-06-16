@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter cpp {
+  package "exiv2" {
+    source method "read" -> core.UserControlledData
+  }
+}

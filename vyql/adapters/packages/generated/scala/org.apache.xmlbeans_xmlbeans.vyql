@@ -1,0 +1,8 @@
+import code.{XmlParse, ExpressionEval}
+adapter scala {
+  package "org.apache.xmlbeans:xmlbeans" {
+    sink method "XmlObject.Factory.parse" -> code.XmlParse
+    sink method "XmlBeans.compilePath" -> code.ExpressionEval
+    sink method "XmlBeans.compileQuery" -> code.ExpressionEval
+  }
+}

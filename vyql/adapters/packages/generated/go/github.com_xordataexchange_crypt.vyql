@@ -1,0 +1,9 @@
+import code.{Deserialization, SecretValue}
+
+adapter go {
+  package "github.com/xordataexchange/crypt" {
+    sink method "Decode" -> code.Deserialization
+    source method "NewEtcdConfigManager" -> code.SecretValue
+    source method "NewConsulConfigManager" -> code.SecretValue
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter swift {
+  package "github.com/objecthub/swift-commandlinekit" {
+    source method "parse" -> code.CliArgument
+  }
+}

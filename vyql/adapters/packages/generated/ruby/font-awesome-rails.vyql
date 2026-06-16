@@ -1,0 +1,8 @@
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "font-awesome-rails" {
+    control method "fa_icon" -> core.HtmlEscape
+    control method "fa_stacked_icon" -> core.HtmlEscape
+  }
+}

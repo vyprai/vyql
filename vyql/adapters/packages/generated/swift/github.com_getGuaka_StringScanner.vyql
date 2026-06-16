@@ -1,0 +1,9 @@
+import code.{RegexCompile}
+adapter swift {
+  package "github.com/getGuaka/StringScanner" {
+    mark method "peek(untilPattern:)" -> code.RegexCompile
+    mark method "scan(untilPattern:)" -> code.RegexCompile
+    mark method "matches(_:options:)" -> code.RegexCompile
+    mark method "groups(_:options:)" -> code.RegexCompile
+  }
+}

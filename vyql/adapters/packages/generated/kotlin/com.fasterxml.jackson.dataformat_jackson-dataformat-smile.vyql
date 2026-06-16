@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter kotlin {
+  package "com.fasterxml.jackson.dataformat:jackson-dataformat-smile" {
+    sink method "SmileParser" -> code.Deserialization
+    sink method "createParser" -> code.Deserialization
+    sink method "nextToken" -> code.Deserialization
+    sink method "readBinaryValue" -> code.Deserialization
+    sink method "hasFormat" -> code.Deserialization
+  }
+}

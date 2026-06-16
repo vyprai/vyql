@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter dart {
+  package "firebase_performance_web" {
+    sink method "newHttpMetric" -> code.UrlFetch
+  }
+}

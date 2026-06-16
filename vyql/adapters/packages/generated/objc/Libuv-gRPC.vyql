@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter objc {
+  package "Libuv-gRPC" {
+    sink method "uv_spawn" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter c {
+  package "capstone" {
+    sink method "decodeULEB128" -> code.Deserialization
+  }
+}

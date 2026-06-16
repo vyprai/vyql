@@ -1,0 +1,10 @@
+import code.{CodeEval, Deserialization, HtmlRender}
+
+adapter kotlin {
+  package "org.primefaces:primefaces" {
+    sink method "executeScript" -> code.CodeEval
+    sink method "executeInitScript" -> code.CodeEval
+    sink method "write" -> code.HtmlRender
+    sink method "parsePattern" -> code.Deserialization
+  }
+}

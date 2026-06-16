@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "Brickyard" {
+    sink method "parse_ini" -> code.Deserialization
+  }
+}

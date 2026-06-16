@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter python {
+  package "python-mimeparse" {
+    sink method "parse_mime_type" -> code.Deserialization
+    sink method "parse_media_range" -> code.Deserialization
+  }
+}

@@ -1,0 +1,12 @@
+import code.{FilePathAccess}
+adapter elixir {
+  package "temp" {
+    sink method "path" -> code.FilePathAccess
+    sink method "path!" -> code.FilePathAccess
+    sink method "open" -> code.FilePathAccess
+    sink method "open!" -> code.FilePathAccess
+    sink method "track_file" -> code.FilePathAccess
+    sink method "mkdir" -> code.FilePathAccess
+    sink method "mkdir!" -> code.FilePathAccess
+  }
+}

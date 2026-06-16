@@ -1,0 +1,12 @@
+import code.{NetworkConnect, NetworkData, NetworkSend}
+adapter swift {
+  package "github.com/manolofdez/AsyncBluetooth" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "openL2CAPChannel" -> code.NetworkConnect
+    sink method "writeValue" -> code.NetworkSend
+    source method "readValue" -> code.NetworkData
+    source method "scanForPeripherals" -> code.NetworkData
+    source method "retrieveConnectedPeripherals" -> code.NetworkData
+    source method "retrievePeripherals" -> code.NetworkData
+  }
+}

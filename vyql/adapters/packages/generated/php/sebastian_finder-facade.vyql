@@ -1,0 +1,8 @@
+import code.{FilePathAccess, XmlParse}
+
+adapter php {
+  package "sebastian/finder-facade" {
+    sink method "parse" -> code.XmlParse
+    sink method "loadConfiguration" -> code.FilePathAccess
+  }
+}

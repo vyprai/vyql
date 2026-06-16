@@ -1,0 +1,5 @@
+adapter groovy {
+  package "org.apache.httpcomponents:httpclient-cache" {
+    sink method "copyFile" -> code.FilePathAccess
+  }
+}

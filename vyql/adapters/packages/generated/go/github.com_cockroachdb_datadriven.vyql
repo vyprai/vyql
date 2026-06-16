@@ -1,0 +1,12 @@
+import code.{Deserialization, FilePathAccess}
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/cockroachdb/datadriven" {
+    sink method "RunTest" -> FilePathAccess
+    source method "RunTest" -> core.UserControlledData
+    source method "RunTestFromString" -> core.UserControlledData
+    sink method "Walk" -> FilePathAccess
+    sink method "ParseLine" -> code.Deserialization
+  }
+}

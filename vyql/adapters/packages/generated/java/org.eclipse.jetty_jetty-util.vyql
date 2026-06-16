@@ -1,0 +1,11 @@
+adapter java {
+  package "org.eclipse.jetty:jetty-util" {
+    sink method "copy" -> code.FilePathAccess
+    sink method "copyDir" -> code.FilePathAccess
+    sink method "copyFile" -> code.FilePathAccess
+    control method "resolvePath" -> core.PathCanonicalization
+    sink method "delete" -> code.FilePathAccess
+    sink method "ensureDirExists" -> code.FilePathAccess
+    sink method "isEmptyDir" -> code.FilePathAccess
+  }
+}

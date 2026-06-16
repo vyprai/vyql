@@ -1,0 +1,12 @@
+import code.{Deserialization, SecretValue}
+import core.{AuthenticationCheck}
+
+adapter python {
+  package "praw" {
+    sink method "parse" -> code.Deserialization
+    source method "authorize" -> code.SecretValue
+    control method "authorize" -> core.AuthenticationCheck
+    source method "implicit" -> code.SecretValue
+    control method "implicit" -> core.AuthenticationCheck
+  }
+}

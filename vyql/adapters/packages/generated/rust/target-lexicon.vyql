@@ -1,0 +1,11 @@
+import code.{Deserialization}
+adapter rust {
+  package "target-lexicon" {
+    sink method "Triple::from_str" -> code.Deserialization
+    sink method "Architecture::from_str" -> code.Deserialization
+    sink method "Vendor::from_str" -> code.Deserialization
+    sink method "OperatingSystem::from_str" -> code.Deserialization
+    sink method "Environment::from_str" -> code.Deserialization
+    sink method "BinaryFormat::from_str" -> code.Deserialization
+  }
+}

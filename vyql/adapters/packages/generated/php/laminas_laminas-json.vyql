@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "laminas/laminas-json" {
+    sink method "decode" -> code.Deserialization
+  }
+}

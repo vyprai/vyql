@@ -1,0 +1,5 @@
+adapter perl {
+  package "Lucene" {
+    sink method "tokenStream" -> code.Deserialization
+  }
+}

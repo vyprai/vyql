@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/sindresorhus/Defaults" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "serialize" -> code.Deserialization
+  }
+}

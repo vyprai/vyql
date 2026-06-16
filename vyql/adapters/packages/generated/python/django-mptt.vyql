@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+adapter python {
+  package "django-mptt" {
+    sink method "move_to" -> code.SqlExecution
+    sink method "save" -> code.SqlExecution
+    sink method "delete" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,6 @@
+adapter elixir {
+  package "p1_pgsql" {
+    sink method "process_squery" -> code.SqlExecution
+    control method "process_prepare" -> core.SqlParameterization
+  }
+}

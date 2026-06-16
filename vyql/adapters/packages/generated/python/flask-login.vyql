@@ -1,0 +1,6 @@
+import core.{AuthenticationCheck}
+adapter python {
+  package "flask-login" {
+    control method "login_user" -> core.AuthenticationCheck
+  }
+}

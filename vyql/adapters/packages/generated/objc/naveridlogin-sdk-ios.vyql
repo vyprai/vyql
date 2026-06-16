@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter objc {
+  package "naveridlogin-sdk-ios" {
+    source method "receiveAccessToken:" -> core.UserControlledData
+  }
+}

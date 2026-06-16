@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "pulldown-cmark" {
+    sink method "Parser.new" -> code.Deserialization
+    sink method "Parser.new_ext" -> code.Deserialization
+    sink method "Parser.new_with_broken_link_callback" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization, HtmlRender}
+
+adapter scala {
+  package "org.apache.velocity:velocity-engine-core" {
+    sink method "parse" -> code.Deserialization
+    sink method "merge" -> code.HtmlRender
+  }
+}

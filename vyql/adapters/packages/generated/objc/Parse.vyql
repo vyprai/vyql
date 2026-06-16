@@ -1,0 +1,5 @@
+adapter objc {
+  package "Parse" {
+    sink method "objectDecoder" -> code.Deserialization
+  }
+}

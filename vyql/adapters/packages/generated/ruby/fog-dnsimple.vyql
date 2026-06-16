@@ -1,0 +1,7 @@
+import code.{NetworkConnect, SecretValue}
+adapter ruby {
+  package "fog-dnsimple" {
+    sink method "request" -> code.NetworkConnect
+    source method "request" -> code.SecretValue
+  }
+}

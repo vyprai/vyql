@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter php {
+  package "guzzlehttp/ringphp" {
+    sink method "curl_setopt_array" -> code.NetworkConnect
+    sink method "curl_setopt_array" -> code.NetworkSend
+    source method "createResponse" -> code.NetworkData
+  }
+}

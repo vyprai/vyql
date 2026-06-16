@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter dart {
+  package "firebase_ml_vision" {
+    sink method "processImage" -> code.Deserialization
+    sink method "detectInImage" -> code.Deserialization
+  }
+}

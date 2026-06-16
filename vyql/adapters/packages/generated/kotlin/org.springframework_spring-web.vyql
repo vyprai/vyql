@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.springframework:spring-web" {
+    sink method "parse" -> code.Deserialization
+  }
+}

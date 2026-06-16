@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter java {
+  package "com.badlogicgames.gdx:gdx-box2d" {
+    sink method "b2DynamicTree_Query" -> code.CodeEval
+  }
+}

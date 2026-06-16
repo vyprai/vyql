@@ -1,0 +1,5 @@
+adapter java {
+  package "com.sun.xml.bind:jaxb-impl" {
+    sink method "parse" -> code.Deserialization
+  }
+}

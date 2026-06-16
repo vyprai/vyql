@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter groovy {
+  package "net.dv8tion:JDA" {
+    source method "getToken" -> code.SecretValue
+  }
+}

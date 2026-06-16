@@ -1,0 +1,11 @@
+import code.{UrlFetch, Deserialization}
+
+adapter objc {
+  package "JTSImageViewController" {
+    sink method "animatedImageWithAnimatedGIFURL:" -> code.UrlFetch
+    sink method "animatedImageWithAnimatedGIFURL:" -> code.Deserialization
+    sink method "animatedImageWithAnimatedGIFData:" -> code.Deserialization
+    sink method "downloadImageForURL:" -> code.UrlFetch
+    sink method "downloadImageForURL:" -> code.Deserialization
+  }
+}

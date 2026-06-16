@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "net.sf.jasperreports:jasperreports" {
+    sink method "loadObject" -> code.Deserialization
+    sink method "loadList" -> code.Deserialization
+  }
+}

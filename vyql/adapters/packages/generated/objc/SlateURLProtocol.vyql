@@ -1,0 +1,12 @@
+import code.{FilePathAccess, WeakHash, RedirectTarget}
+
+adapter objc {
+  package "SlateURLProtocol" {
+    mark method "md5" -> code.WeakHash
+    sink method "writeCacheWithPath:data:responseHeaders:requestURL:redirectRequestURL:" -> code.FilePathAccess
+    source method "writeCacheWithPath:data:responseHeaders:requestURL:redirectRequestURL:" -> core.UserControlledData
+    sink method "readCacheWithURL:" -> code.FilePathAccess
+    sink method "readCacheWithPath:" -> code.FilePathAccess
+    mark method "connection:willSendRequest:redirectResponse:" -> code.RedirectTarget
+  }
+}

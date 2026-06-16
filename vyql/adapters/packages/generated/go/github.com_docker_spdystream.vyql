@@ -1,0 +1,8 @@
+import code.{NetworkData}
+
+adapter go {
+  package "github.com/docker/spdystream" {
+    source method "NewConnection" -> code.NetworkData
+    source method "NewConnectionWithOptions" -> code.NetworkData
+  }
+}

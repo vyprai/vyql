@@ -1,0 +1,7 @@
+adapter php {
+  package "realrashid/sweet-alert" {
+    sink method "html" -> code.HtmlRender
+    sink method "view" -> code.HtmlRender
+    sink method "footer" -> code.HtmlRender
+  }
+}

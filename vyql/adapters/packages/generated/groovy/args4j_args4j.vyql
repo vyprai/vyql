@@ -1,0 +1,7 @@
+import code.{CliArgument, Deserialization}
+adapter groovy {
+  package "args4j:args4j" {
+    source method "parseArgument" -> code.CliArgument
+    sink method "parse" -> code.Deserialization
+  }
+}

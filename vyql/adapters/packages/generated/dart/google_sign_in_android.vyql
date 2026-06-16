@@ -1,0 +1,14 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, AuthorizationCheck, InputValidation}
+
+adapter dart {
+  package "google_sign_in_android" {
+    source method "PlatformAuthorizationRequest" -> code.SecretValue
+    source method "PlatformRevokeAccessRequest" -> code.SecretValue
+    source method "getCredential" -> code.SecretValue
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "revokeAccess" -> core.AuthorizationCheck
+    control method "clearCredentialState" -> core.InputValidation
+    control method "clearAuthorizationToken" -> core.InputValidation
+  }
+}

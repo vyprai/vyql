@@ -1,0 +1,9 @@
+import code.{ExpressionEval}
+
+adapter ruby {
+  package "docile" {
+    sink method "dsl_eval" -> code.ExpressionEval
+    sink method "dsl_eval_with_block_return" -> code.ExpressionEval
+    sink method "dsl_eval_immutable" -> code.ExpressionEval
+  }
+}

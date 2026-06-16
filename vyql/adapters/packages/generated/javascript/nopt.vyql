@@ -1,0 +1,7 @@
+import code.{CliArgument}
+adapter javascript {
+  package "nopt" {
+    source method "nopt" -> code.CliArgument
+    source method "parse" -> code.CliArgument
+  }
+}

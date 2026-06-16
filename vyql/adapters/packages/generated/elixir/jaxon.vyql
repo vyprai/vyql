@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "jaxon" {
+    sink method "decode!" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter rust {
+  package "curl-sys" {
+    control method "curl_easy_escape" -> core.InputValidation
+    control method "curl_easy_unescape" -> core.InputValidation
+  }
+}

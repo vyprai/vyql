@@ -1,0 +1,12 @@
+import code.{NetworkSend, NetworkData, SecretValue}
+
+adapter elixir {
+  package "facebook" {
+    sink method "publish" -> code.NetworkSend
+    source method "set_app_secret" -> code.SecretValue
+    source method "get_object" -> code.NetworkData
+    source method "get_object_edge" -> code.NetworkData
+    source method "access_token" -> code.SecretValue
+    source method "long_lived_access_token" -> code.SecretValue
+  }
+}

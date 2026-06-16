@@ -1,0 +1,14 @@
+import code.{NetworkData}
+adapter objc {
+  package "WXDevtool" {
+    source method "requestWillBeSentWithRequestId" -> code.NetworkData
+    source method "responseReceivedWithRequestId" -> code.NetworkData
+    source method "dataReceivedWithRequestId" -> code.NetworkData
+    source method "loadingFinishedWithRequestId" -> code.NetworkData
+    source method "loadingFailedWithRequestId" -> code.NetworkData
+    source method "webSocketWillSendHandshakeRequestWithRequestId" -> code.NetworkData
+    source method "webSocketHandshakeResponseReceivedWithRequestId" -> code.NetworkData
+    source method "webSocketFrameReceivedWithRequestId" -> code.NetworkData
+    source method "webSocketFrameSentWithRequestId" -> code.NetworkData
+  }
+}

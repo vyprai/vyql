@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter go {
+  package "dmitri.shuralyov.com/service/change" {
+    sink method "parseMessage" -> code.Deserialization
+  }
+}

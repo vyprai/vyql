@@ -1,0 +1,7 @@
+import code.{StoredDataWrite}
+
+adapter ruby {
+  package "aws-sdk-ecr" {
+    sink method "put_image" -> code.StoredDataWrite
+  }
+}

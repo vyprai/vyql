@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/OpenPeeDeeP/depguard" {
+    source method "parseConfigFile" -> core.UserControlledData
+  }
+}

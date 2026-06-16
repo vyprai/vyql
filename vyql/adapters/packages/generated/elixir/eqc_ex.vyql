@@ -1,0 +1,8 @@
+import code.{CommandExecution, NetworkSend}
+adapter elixir {
+  package "eqc_ex" {
+    sink method "run_commands" -> code.CommandExecution
+    sink method "check_commands" -> code.CommandExecution
+    sink method "send" -> code.NetworkSend
+  }
+}

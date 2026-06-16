@@ -1,0 +1,7 @@
+adapter javascript {
+  package "color-string" {
+    sink method "rgb" -> code.Deserialization
+    sink method "hsl" -> code.Deserialization
+    sink method "hwb" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{HttpInput}
+
+adapter go {
+  package "github.com/munnerz/goautoneg" {
+    source method "ParseAccept" -> code.HttpInput
+    source method "Negotiate" -> code.HttpInput
+  }
+}

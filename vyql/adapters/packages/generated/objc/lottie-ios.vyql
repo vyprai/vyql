@@ -1,0 +1,6 @@
+adapter objc {
+  package "lottie-ios" {
+    sink method "decode" -> code.Deserialization
+    mark path "lottie.ios.hash" -> code.WeakHash
+  }
+}

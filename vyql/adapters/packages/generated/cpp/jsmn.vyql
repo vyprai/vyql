@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "jsmn" {
+    sink method "jsmn_parse" -> code.Deserialization
+  }
+}

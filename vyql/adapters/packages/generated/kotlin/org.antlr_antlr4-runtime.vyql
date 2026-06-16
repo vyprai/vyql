@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.antlr:antlr4-runtime" {
+    sink method "match" -> code.Deserialization
+    sink method "matchWildcard" -> code.Deserialization
+  }
+}

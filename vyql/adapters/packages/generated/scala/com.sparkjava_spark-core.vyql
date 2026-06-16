@@ -1,0 +1,19 @@
+import code.{HttpInput, HtmlRender, RedirectTarget}
+adapter scala {
+  package "com.sparkjava:spark-core" {
+    source method "get" -> code.HttpInput
+    source method "post" -> code.HttpInput
+    source method "put" -> code.HttpInput
+    source method "patch" -> code.HttpInput
+    source method "delete" -> code.HttpInput
+    source method "head" -> code.HttpInput
+    source method "trace" -> code.HttpInput
+    source method "connect" -> code.HttpInput
+    source method "options" -> code.HttpInput
+    source method "before" -> code.HttpInput
+    source method "after" -> code.HttpInput
+    source method "afterAfter" -> code.HttpInput
+    sink method "halt" -> HtmlRender
+    mark method "redirect" -> code.RedirectTarget
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter dart {
+  package "cli_util" {
+    sink method "applicationConfigHome" -> code.FilePathAccess
+  }
+}

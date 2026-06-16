@@ -1,0 +1,6 @@
+import code.{FileUse}
+adapter swift {
+  package "github.com/dmytro-anokhin/url-image" {
+    sink method "write" -> code.FileUse
+  }
+}

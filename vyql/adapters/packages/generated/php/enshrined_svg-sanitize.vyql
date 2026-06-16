@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter php {
+  package "enshrined/svg-sanitize" {
+    control method "sanitize" -> core.HtmlEscape
+  }
+}

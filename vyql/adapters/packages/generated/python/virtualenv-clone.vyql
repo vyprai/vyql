@@ -1,0 +1,7 @@
+import code.{CommandExecution, FilePathAccess}
+adapter python {
+  package "virtualenv-clone" {
+    sink method "clone_virtualenv" -> code.FilePathAccess
+    sink method "main" -> code.FilePathAccess
+  }
+}

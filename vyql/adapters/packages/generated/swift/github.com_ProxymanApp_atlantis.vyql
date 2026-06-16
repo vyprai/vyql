@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter swift {
+  package "github.com/ProxymanApp/atlantis" {
+    source method "add" -> code.NetworkData
+  }
+}

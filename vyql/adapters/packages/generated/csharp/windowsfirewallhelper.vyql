@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "windowsfirewallhelper" {
+    sink method "Parse" -> code.Deserialization
+    sink method "TryParse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter groovy {
+  package "org.springframework.cloud:spring-cloud-config-server" {
+    source method "encrypt" -> code.SecretValue
+    source method "decrypt" -> code.SecretValue
+  }
+}

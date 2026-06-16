@@ -1,0 +1,8 @@
+adapter scala {
+  package "com.android.volley:volley" {
+    source method "getUrl" -> code.HttpInput
+    source method "getHeaders" -> code.HttpInput
+    source method "getParams" -> code.HttpInput
+    source method "getPostBody" -> code.HttpInput
+  }
+}

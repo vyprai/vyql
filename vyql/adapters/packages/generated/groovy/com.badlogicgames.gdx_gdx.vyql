@@ -1,0 +1,10 @@
+import code.{NetworkBind, NetworkConnect, RedirectTarget, UrlFetch}
+adapter groovy {
+  package "com.badlogicgames.gdx:gdx" {
+    sink method "setUrl" -> code.UrlFetch
+    sink method "sendHttpRequest" -> code.UrlFetch
+    sink method "newServerSocket" -> code.NetworkBind
+    sink method "newClientSocket" -> code.NetworkConnect
+    mark method "openURI" -> code.RedirectTarget
+  }
+}

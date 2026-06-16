@@ -1,0 +1,11 @@
+import code.{FilePathAccess, RedirectTarget}
+import core.{UserControlledData}
+
+adapter java {
+  package "io.springfox:springfox-boot-starter" {
+    sink method "addResourceHandlers" -> code.FilePathAccess
+    sink method "addViewControllers" -> code.FilePathAccess
+    source method "filter" -> core.UserControlledData
+    mark method "setBaseUrl" -> code.RedirectTarget
+  }
+}

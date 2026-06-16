@@ -1,0 +1,5 @@
+adapter elixir {
+  package "exfmt" {
+    source method "run" -> code.CliArgument
+  }
+}

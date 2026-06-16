@@ -1,0 +1,15 @@
+import code.{SecretValue, CodeEval, Deserialization}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "ex_aws_sts" {
+    source method "assume_role" -> code.SecretValue
+    source method "assume_role_with_web_identity" -> code.SecretValue
+    source method "decode_authorization_message" -> core.UserControlledData
+    source method "get_federation_token" -> code.SecretValue
+    source method "get_session_token" -> code.SecretValue
+    source method "get_access_key_info" -> code.SecretValue
+    source method "get_caller_identity" -> code.SecretValue
+    sink method "parse" -> code.Deserialization
+  }
+}

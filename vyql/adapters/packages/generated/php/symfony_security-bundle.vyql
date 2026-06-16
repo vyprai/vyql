@@ -1,0 +1,11 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, CsrfProtection}
+
+adapter php {
+  package "symfony/security-bundle" {
+    control method "login" -> core.AuthenticationCheck
+    control method "logout" -> core.AuthenticationCheck
+    control method "logout" -> core.CsrfProtection
+    source method "getToken" -> code.SecretValue
+  }
+}

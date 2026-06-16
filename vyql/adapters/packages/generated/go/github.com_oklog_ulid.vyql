@@ -1,0 +1,8 @@
+adapter go {
+  package "github.com/oklog/ulid" {
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseStrict" -> code.Deserialization
+    sink method "MustParse" -> code.Deserialization
+    sink method "MustParseStrict" -> code.Deserialization
+  }
+}

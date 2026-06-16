@@ -1,0 +1,9 @@
+import code.{Deserialization, StoredDataWrite}
+
+adapter php {
+  package "illuminate/session" {
+    source method "read" -> core.UserControlledData
+    sink method "write" -> code.StoredDataWrite
+    sink method "prepareForUnserialize" -> code.Deserialization
+  }
+}

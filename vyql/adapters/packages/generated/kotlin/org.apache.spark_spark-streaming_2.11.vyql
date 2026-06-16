@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "org.apache.spark:spark-streaming_2.11" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "readObject" -> code.Deserialization
+  }
+}

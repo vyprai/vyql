@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "io.netty:netty-codec-http" {
+    sink method "decode" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

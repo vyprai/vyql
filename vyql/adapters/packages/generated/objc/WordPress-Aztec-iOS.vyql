@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "WordPress-Aztec-iOS" {
+    sink method "parse" -> code.Deserialization
+  }
+}

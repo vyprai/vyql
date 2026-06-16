@@ -1,0 +1,8 @@
+adapter groovy {
+  package "com.aliyun.oss:aliyun-sdk-oss" {
+    sink method "putObject" -> code.StoredDataWrite
+    sink method "copyObject" -> code.StoredDataWrite
+    source method "getObject" -> code.StoredDataRead
+    source method "selectObject" -> code.StoredDataRead
+  }
+}

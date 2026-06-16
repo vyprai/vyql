@@ -1,0 +1,10 @@
+import code.{FilePathAccess, FileUse}
+
+adapter cpp {
+  package "highfive" {
+    sink method "dump" -> code.FileUse
+    sink method "load" -> code.FilePathAccess
+    sink method "File" -> code.FilePathAccess
+    sink method "getPath" -> code.FilePathAccess
+  }
+}

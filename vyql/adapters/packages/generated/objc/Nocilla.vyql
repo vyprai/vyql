@@ -1,0 +1,6 @@
+import code.{NetworkData}
+adapter objc {
+  package "Nocilla" {
+    source method "stubRequest" -> code.NetworkData
+  }
+}

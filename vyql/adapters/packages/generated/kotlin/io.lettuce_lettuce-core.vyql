@@ -1,0 +1,7 @@
+import code.{CommandExecution, SecretValue}
+adapter kotlin {
+  package "io.lettuce:lettuce-core" {
+    sink method "aclDryRun" -> code.CommandExecution
+    source method "auth" -> code.SecretValue
+  }
+}

@@ -1,0 +1,5 @@
+adapter python {
+  package "sh" {
+    sink method "process" -> code.CommandExecution
+  }
+}

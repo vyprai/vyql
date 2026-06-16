@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "phpseclib/phpseclib" {
+    sink method "loadString" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+adapter scala {
+  package "org.mariadb.jdbc:mariadb-java-client" {
+    sink method "nativeSQL" -> code.SqlExecution
+    sink method "NativeSql.parse" -> code.SqlExecution
+  }
+}

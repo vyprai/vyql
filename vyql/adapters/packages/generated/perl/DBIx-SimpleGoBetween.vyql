@@ -1,0 +1,10 @@
+adapter perl {
+  package "DBIx-SimpleGoBetween" {
+    sink method "get_list_of_hashes" -> code.SqlExecution
+    sink method "sql_do" -> code.SqlExecution
+    sink method "prep" -> code.SqlExecution
+    sink method "get_list" -> code.SqlExecution
+    sink method "get_scalar" -> code.SqlExecution
+    sink method "get_list_of_lists" -> code.SqlExecution
+  }
+}

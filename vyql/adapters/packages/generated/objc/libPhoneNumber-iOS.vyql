@@ -1,0 +1,8 @@
+adapter objc {
+  package "libPhoneNumber-iOS" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseResult" -> code.Deserialization
+    sink method "parseAndKeepRawInput" -> code.Deserialization
+    sink method "parseWithCarrierRegion" -> code.Deserialization
+  }
+}

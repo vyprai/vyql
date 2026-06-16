@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "opensymphony:sitemesh" {
+    sink method "parse" -> code.Deserialization
+  }
+}

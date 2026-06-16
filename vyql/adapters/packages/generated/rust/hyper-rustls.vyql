@@ -1,0 +1,17 @@
+import code.{NetworkConnect}
+import core.{AuthenticationCheck, InputValidation}
+
+adapter rust {
+  package "hyper-rustls" {
+    sink method "connect" -> code.NetworkConnect
+    control method "with_tls_config" -> core.AuthenticationCheck
+    control method "with_platform_verifier" -> core.AuthenticationCheck
+    control method "with_native_roots" -> core.AuthenticationCheck
+    control method "with_webpki_roots" -> core.AuthenticationCheck
+    control method "https_only" -> core.InputValidation
+    control method "https_or_http" -> core.InputValidation
+    control method "enable_http1" -> core.InputValidation
+    control method "enable_http2" -> core.InputValidation
+    control method "enable_all_versions" -> core.InputValidation
+  }
+}

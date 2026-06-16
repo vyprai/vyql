@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter c {
+  package "jbig2dec" {
+    sink method "jbig2_parse_segment_header" -> code.Deserialization
+  }
+}

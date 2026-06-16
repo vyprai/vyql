@@ -1,0 +1,6 @@
+adapter objc {
+  package "DTCoreText" {
+    sink method "parseStyleBlock" -> code.XmlParse
+    mark path "dtcoretext.hash" -> code.WeakHash
+  }
+}

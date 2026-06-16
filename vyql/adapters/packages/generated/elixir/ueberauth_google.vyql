@@ -1,0 +1,13 @@
+import code.{NetworkSend, SecretValue}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "ueberauth_google" {
+    source method "handle_callback!" -> core.UserControlledData
+    source method "get_access_token" -> code.SecretValue
+    source method "get_token" -> code.SecretValue
+    sink method "get" -> code.NetworkSend
+    source method "credentials" -> code.SecretValue
+    source method "info" -> core.UserControlledData
+  }
+}

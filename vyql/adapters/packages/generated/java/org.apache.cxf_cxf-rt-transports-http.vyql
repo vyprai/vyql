@@ -1,0 +1,7 @@
+import code.{HttpInput}
+adapter java {
+  package "org.apache.cxf:cxf-rt-transports-http" {
+    source method "readFromHeaders" -> code.HttpInput
+    source method "readFromConnection" -> code.HttpInput
+  }
+}

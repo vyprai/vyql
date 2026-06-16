@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "rust-ini" {
+    sink method "load_from_str" -> code.Deserialization
+    sink method "load_from_str_noescape" -> code.Deserialization
+    sink method "load_from_str_opt" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

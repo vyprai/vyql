@@ -1,0 +1,6 @@
+adapter java {
+  package "org.reflections:reflections" {
+    sink method "getFile" -> code.FilePathAccess
+    sink method "findFiles" -> code.FilePathAccess
+  }
+}

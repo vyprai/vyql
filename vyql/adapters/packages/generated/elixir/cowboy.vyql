@@ -1,0 +1,15 @@
+import code.{HttpInput, NetworkSend, ResponseHeaderWrite}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "cowboy" {
+    source method "cowboy_http:parse" -> code.HttpInput
+    source method "cowboy_req:read_part" -> code.HttpInput
+    source method "cowboy_req:read_part_more" -> code.HttpInput
+    source method "cowboy_req:read_part_body" -> code.HttpInput
+    source method "cowboy_router:match" -> core.UserControlledData
+    sink method "cowboy_req:set_resp_headers_list" -> code.ResponseHeaderWrite
+    sink method "cowboy_req:do_reply" -> code.NetworkSend
+    sink method "cowboy_http:sendfile" -> code.NetworkSend
+  }
+}

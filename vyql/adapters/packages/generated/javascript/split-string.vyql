@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "split-string" {
+    source method "module.exports" -> core.UserControlledData
+  }
+}

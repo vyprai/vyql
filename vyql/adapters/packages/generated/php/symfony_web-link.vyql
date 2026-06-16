@@ -1,0 +1,5 @@
+adapter php {
+  package "symfony/web-link" {
+    sink method "parse" -> code.Deserialization
+  }
+}

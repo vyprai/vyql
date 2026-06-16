@@ -1,0 +1,7 @@
+import code.{XmlParse}
+
+adapter scala {
+  package "org.eclipse.jetty:jetty-xml" {
+    sink method "parse" -> code.XmlParse
+  }
+}

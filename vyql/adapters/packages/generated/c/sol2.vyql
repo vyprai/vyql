@@ -1,0 +1,7 @@
+import code.{CodeEval, FileUse}
+adapter c {
+  package "sol2" {
+    sink method "script_file" -> code.CodeEval
+    sink method "basic_insert_dump_writer" -> code.CodeEval
+  }
+}

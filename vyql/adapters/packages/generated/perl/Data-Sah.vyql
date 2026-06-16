@@ -1,0 +1,6 @@
+import code.{ExpressionEval}
+adapter perl {
+  package "Data-Sah" {
+    sink method "compile" -> code.ExpressionEval
+  }
+}

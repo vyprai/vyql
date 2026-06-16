@@ -1,0 +1,7 @@
+import code.{WeakHash}
+adapter c {
+  package "boost-container-hash" {
+    mark method "hash_value" -> code.WeakHash
+    mark method "hash_combine" -> code.WeakHash
+  }
+}

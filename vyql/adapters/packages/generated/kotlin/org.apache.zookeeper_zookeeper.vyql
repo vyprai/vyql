@@ -1,0 +1,16 @@
+import code.{CommandExecution, StoredDataWrite, FilePathAccess}
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "org.apache.zookeeper:zookeeper" {
+    sink method "create" -> code.StoredDataWrite
+    sink method "setData" -> code.StoredDataWrite
+    sink method "delete" -> code.FilePathAccess
+    sink method "getChildren" -> code.FilePathAccess
+    sink method "getData" -> code.FilePathAccess
+    sink method "getGroupsCommand" -> code.CommandExecution
+    sink method "getGroupsForUserCommand" -> code.CommandExecution
+    sink method "getUlimitMemoryCommand" -> code.CommandExecution
+    sink method "getGET_PERMISSION_COMMAND" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess, FileUse}
+adapter elixir {
+  package "dbg" {
+    sink method "Dbg.inspect_file" -> code.FilePathAccess
+    sink method "Dbg.Handler.write" -> code.FileUse
+  }
+}

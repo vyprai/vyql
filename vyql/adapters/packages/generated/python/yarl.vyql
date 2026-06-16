@@ -1,0 +1,8 @@
+import code.{UrlFetch}
+adapter python {
+  package "yarl" {
+    sink method "encode_url" -> code.UrlFetch
+    sink method "pre_encoded_url" -> code.UrlFetch
+    sink method "build_pre_encoded_url" -> code.UrlFetch
+  }
+}

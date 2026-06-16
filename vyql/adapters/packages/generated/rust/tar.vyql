@@ -1,0 +1,12 @@
+import code.{FilePathAccess, ArchiveEntryWrite}
+
+adapter rust {
+  package "tar" {
+    sink method "read" -> code.FilePathAccess
+    sink method "write" -> code.FilePathAccess
+    sink method "open" -> code.FilePathAccess
+    sink method "unpack_in" -> code.ArchiveEntryWrite
+    sink method "unpack_dir" -> code.ArchiveEntryWrite
+    sink method "unpack" -> code.ArchiveEntryWrite
+  }
+}

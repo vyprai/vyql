@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "symfony/notifier" {
+    sink method "parse_str" -> code.Deserialization
+  }
+}

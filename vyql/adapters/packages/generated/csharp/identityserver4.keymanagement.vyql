@@ -1,0 +1,9 @@
+import code.{FilePathAccess, StoredDataRead, StoredDataWrite}
+adapter csharp {
+  package "identityserver4.keymanagement" {
+    sink method "PersistKeysToFileSystem" -> code.FilePathAccess
+    sink method "StoreKeyAsync" -> code.StoredDataWrite
+    source method "LoadKeysAsync" -> code.StoredDataRead
+    sink method "DeleteKeyAsync" -> code.FilePathAccess
+  }
+}

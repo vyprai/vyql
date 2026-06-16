@@ -1,0 +1,33 @@
+import code.{NosqlQuery, Deserialization, NetworkData, NetworkSend}
+
+adapter elixir {
+  package "mongodb" {
+    sink method "aggregate" -> code.NosqlQuery
+    sink method "find_one_and_update" -> code.NosqlQuery
+    sink method "find_one_and_replace" -> code.NosqlQuery
+    sink method "find_one_and_delete" -> code.NosqlQuery
+    sink method "find" -> code.NosqlQuery
+    sink method "find_one" -> code.NosqlQuery
+    sink method "raw_find" -> code.NosqlQuery
+    sink method "command" -> code.NosqlQuery
+    sink method "direct_command" -> code.NosqlQuery
+    sink method "command!" -> code.NosqlQuery
+    sink method "insert_one" -> code.NosqlQuery
+    sink method "insert_one!" -> code.NosqlQuery
+    sink method "insert_many" -> code.NosqlQuery
+    sink method "insert_many!" -> code.NosqlQuery
+    sink method "delete_one" -> code.NosqlQuery
+    sink method "delete_one!" -> code.NosqlQuery
+    sink method "delete_many" -> code.NosqlQuery
+    sink method "delete_many!" -> code.NosqlQuery
+    sink method "replace_one" -> code.NosqlQuery
+    sink method "replace_one!" -> code.NosqlQuery
+    sink method "update_one" -> code.NosqlQuery
+    sink method "update_one!" -> code.NosqlQuery
+    sink method "update_many" -> code.NosqlQuery
+    sink method "update_many!" -> code.NosqlQuery
+    sink method "decode" -> code.Deserialization
+    sink method "send" -> code.NetworkSend
+    source method "recv" -> code.NetworkData
+  }
+}

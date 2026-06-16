@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter php {
+  package "stack/builder" {
+    source method "handle" -> code.HttpInput
+  }
+}

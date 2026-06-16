@@ -1,0 +1,5 @@
+adapter rust {
+  package "fsevent" {
+    sink method "let" -> code.FilePathAccess
+  }
+}

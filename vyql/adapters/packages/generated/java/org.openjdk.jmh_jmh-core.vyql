@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter java {
+  package "org.openjdk.jmh:jmh-core" {
+    sink method "doFork" -> code.CommandExecution
+  }
+}

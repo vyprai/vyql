@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/fsouza/fake-gcs-server" {
+    sink method "parseJSONBody" -> code.Deserialization
+    sink method "parseContentRange" -> code.Deserialization
+  }
+}

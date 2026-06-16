@@ -1,0 +1,7 @@
+import code.{Deserialization, CommandExecution}
+adapter elixir {
+  package "absinthe" {
+    sink method "Absinthe.Lexer.tokenize" -> code.Deserialization
+    sink method "Absinthe.Blueprint.Input.parse" -> code.Deserialization
+  }
+}

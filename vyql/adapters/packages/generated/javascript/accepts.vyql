@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter javascript {
+  package "accepts" {
+    source method "Accepts" -> code.HttpInput
+  }
+}

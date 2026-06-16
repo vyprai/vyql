@@ -1,0 +1,7 @@
+import code.{UrlFetch, Deserialization}
+adapter objc {
+  package "flutter_sound_core" {
+    sink method "startPlayerFromURL" -> code.UrlFetch
+    sink method "startPlayerFromBuffer" -> code.Deserialization
+  }
+}

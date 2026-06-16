@@ -1,0 +1,11 @@
+import code.{WeakRandomValue}
+adapter rust {
+  package "rand_core" {
+    mark method "next_u32" -> code.WeakRandomValue
+    mark method "next_u64" -> code.WeakRandomValue
+    mark method "fill_bytes" -> code.WeakRandomValue
+    mark method "try_next_u32" -> code.WeakRandomValue
+    mark method "try_next_u64" -> code.WeakRandomValue
+    mark method "try_fill_bytes" -> code.WeakRandomValue
+  }
+}

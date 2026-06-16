@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter rust {
+  package "structopt-derive" {
+    source method "parse" -> core.UserControlledData
+    source method "structopt" -> core.UserControlledData
+  }
+}

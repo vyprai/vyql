@@ -1,0 +1,8 @@
+import code.{HtmlRender, ResponseHeaderWrite}
+
+adapter ruby {
+  package "actionmailer" {
+    sink method "mail" -> code.HtmlRender
+    sink method "headers" -> code.ResponseHeaderWrite
+  }
+}

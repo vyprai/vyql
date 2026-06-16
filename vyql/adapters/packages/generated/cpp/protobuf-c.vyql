@@ -1,0 +1,5 @@
+adapter cpp {
+  package "protobuf-c" {
+    sink method "get" -> code.Deserialization
+  }
+}

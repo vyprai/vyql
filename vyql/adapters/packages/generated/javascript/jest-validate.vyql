@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter javascript {
+  package "jest-validate" {
+    control method "validate" -> core.InputValidation
+    control method "validateCLIOptions" -> core.InputValidation
+  }
+}

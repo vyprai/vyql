@@ -1,0 +1,12 @@
+import code.{FilePathAccess, FileUse}
+
+adapter dart {
+  package "build_runner_core" {
+    sink method "existsSync" -> code.FilePathAccess
+    sink method "readAsStringSync" -> code.FilePathAccess
+    sink method "readAsBytesSync" -> code.FilePathAccess
+    sink method "deleteSync" -> code.FileUse
+    sink method "deleteDirectorySync" -> code.FileUse
+    sink method "writeAsBytesSync" -> code.FileUse
+  }
+}

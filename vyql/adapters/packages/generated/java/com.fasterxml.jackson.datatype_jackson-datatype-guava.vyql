@@ -1,0 +1,5 @@
+adapter java {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-guava" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

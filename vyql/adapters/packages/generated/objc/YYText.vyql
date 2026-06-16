@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "YYText" {
+    sink method "parseText" -> code.Deserialization
+    sink method "yy_unarchiveFromData" -> code.Deserialization
+  }
+}

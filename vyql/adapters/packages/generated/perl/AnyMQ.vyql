@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter perl {
+  package "AnyMQ" {
+    source method "publish" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.apache.tiles:tiles-core" {
+    sink method "read" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter rust {
+  package "remove_dir_all" {
+    sink method "remove_dir_contents" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter php {
+  package "zendframework/zend-test" {
+    source method "dispatch" -> code.HttpInput
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter rust {
+  package "hexf-parse" {
+    sink method "parse_hexf32" -> code.Deserialization
+    sink method "parse_hexf64" -> code.Deserialization
+  }
+}

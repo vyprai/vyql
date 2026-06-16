@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter go {
+  package "github.com/golangci/misspell" {
+    sink method "ReadTextFile" -> code.FilePathAccess
+  }
+}

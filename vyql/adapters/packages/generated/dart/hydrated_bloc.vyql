@@ -1,0 +1,10 @@
+import code.{Deserialization, StoredDataRead, StoredDataWrite}
+
+adapter dart {
+  package "hydrated_bloc" {
+    sink method "fromJson" -> code.Deserialization
+    source method "read" -> code.StoredDataRead
+    sink method "write" -> code.StoredDataWrite
+    sink method "delete" -> code.StoredDataWrite
+  }
+}

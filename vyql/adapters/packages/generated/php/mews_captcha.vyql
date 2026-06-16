@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter php {
+  package "mews/captcha" {
+    control method "check" -> core.InputValidation
+    control method "check_api" -> core.InputValidation
+  }
+}

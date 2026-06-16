@@ -1,0 +1,8 @@
+import code.{EnvVariable, StdinInput}
+
+adapter java {
+  package "com.github.stefanbirkner:system-rules" {
+    source method "EnvironmentVariables.set" -> code.EnvVariable
+    source method "TextFromStandardInputStream.read" -> code.StdinInput
+  }
+}

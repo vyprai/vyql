@@ -1,0 +1,8 @@
+import code.{CodeEval, UrlFetch}
+adapter cpp {
+  package "kf5declarative" {
+    sink method "setSource" -> code.CodeEval
+    sink method "loadPackage" -> code.CodeEval
+    sink method "createObjectFromSource" -> code.CodeEval
+  }
+}

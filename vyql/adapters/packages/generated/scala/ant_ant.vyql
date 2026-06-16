@@ -1,0 +1,6 @@
+adapter scala {
+  package "ant:ant" {
+    sink method "parse" -> code.Deserialization
+    sink method "parsePropertyString" -> code.ExpressionEval
+  }
+}

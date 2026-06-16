@@ -1,0 +1,6 @@
+adapter java {
+  package "com.jayway.jsonpath:json-path-assert" {
+    sink method "parse" -> code.Deserialization
+    sink method "with" -> code.Deserialization
+  }
+}

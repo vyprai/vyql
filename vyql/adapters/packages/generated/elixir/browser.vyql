@@ -1,0 +1,9 @@
+import code.{FilePathAccess}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "browser" {
+    source method "to_ua" -> core.UserControlledData
+    sink method "read_file" -> code.FilePathAccess
+  }
+}

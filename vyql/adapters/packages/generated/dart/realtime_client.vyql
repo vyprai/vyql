@@ -1,0 +1,6 @@
+import core.{AuthenticationCheck}
+adapter dart {
+  package "realtime_client" {
+    control method "setAuth" -> core.AuthenticationCheck
+  }
+}

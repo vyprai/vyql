@@ -1,0 +1,6 @@
+adapter c {
+  package "zziplib" {
+    sink method "spawn" -> code.CommandExecution
+    sink method "read" -> code.Deserialization
+  }
+}

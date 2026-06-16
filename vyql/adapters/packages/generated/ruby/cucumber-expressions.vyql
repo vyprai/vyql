@@ -1,0 +1,9 @@
+import code.{ExpressionEval}
+import core.{InputValidation}
+
+adapter ruby {
+  package "cucumber-expressions" {
+    sink method "match" -> code.ExpressionEval
+    control method "escape" -> core.InputValidation
+  }
+}

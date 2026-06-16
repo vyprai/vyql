@@ -1,0 +1,6 @@
+import code.{LogOutput}
+adapter perl {
+  package "Plack-Middleware-LogWarn" {
+    sink method "call" -> code.LogOutput
+  }
+}

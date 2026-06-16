@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter groovy {
+  package "org.eclipse.jetty.websocket:websocket-server" {
+    source method "handle" -> code.HttpInput
+  }
+}

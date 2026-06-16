@@ -1,0 +1,7 @@
+import code.{DatabaseRead}
+
+adapter cpp {
+  package "mongo-cxx-driver" {
+    sink method "run_command" -> code.DatabaseRead
+  }
+}

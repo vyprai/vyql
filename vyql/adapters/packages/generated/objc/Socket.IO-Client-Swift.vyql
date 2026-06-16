@@ -1,0 +1,10 @@
+import code.{NetworkSend, NetworkData}
+adapter objc {
+  package "Socket.IO-Client-Swift" {
+    sink method "emit" -> code.NetworkSend
+    sink method "write" -> code.NetworkSend
+    source method "read" -> code.NetworkData
+    source method "parseEngineData" -> code.NetworkData
+    source method "parseEngineMessage" -> code.NetworkData
+  }
+}

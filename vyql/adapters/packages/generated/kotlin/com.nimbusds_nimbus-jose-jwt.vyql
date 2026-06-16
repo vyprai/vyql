@@ -1,0 +1,9 @@
+import code.{Deserialization, SecretValue, WeakHash, WeakCipher}
+import core.{InputValidation}
+
+adapter kotlin {
+  package "com.nimbusds:nimbus-jose-jwt" {
+    sink method "Header.parse" -> code.Deserialization
+    sink method "JWTParser.parse" -> code.Deserialization
+  }
+}

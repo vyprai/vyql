@@ -1,0 +1,8 @@
+import code.{UrlFetch, Deserialization}
+
+adapter cpp {
+  package "date" {
+    sink method "remote_download" -> code.UrlFetch
+    sink method "parse_info" -> code.Deserialization
+  }
+}

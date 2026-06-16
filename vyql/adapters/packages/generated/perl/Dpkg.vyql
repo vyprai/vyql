@@ -1,0 +1,12 @@
+import code.{CommandExecution, FilePathAccess, Deserialization}
+import core.{PathCanonicalization, UserControlledData}
+
+adapter perl {
+  package "Dpkg" {
+    sink method "exec" -> code.CommandExecution
+    sink method "spawn" -> code.CommandExecution
+    source method "parse" -> core.UserControlledData
+    sink method "open" -> code.FilePathAccess
+    control method "canonpath" -> core.PathCanonicalization
+  }
+}

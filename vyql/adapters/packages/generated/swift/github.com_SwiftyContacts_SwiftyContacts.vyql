@@ -1,0 +1,12 @@
+import code.{Deserialization, StoredDataWrite}
+adapter swift {
+  package "github.com/SwiftyContacts/SwiftyContacts" {
+    sink method "decode" -> code.Deserialization
+    sink method "addContact" -> code.StoredDataWrite
+    sink method "updateContact" -> code.StoredDataWrite
+    sink method "deleteContact" -> code.StoredDataWrite
+    sink method "addGroup" -> code.StoredDataWrite
+    sink method "updateGroup" -> code.StoredDataWrite
+    sink method "deleteGroup" -> code.StoredDataWrite
+  }
+}

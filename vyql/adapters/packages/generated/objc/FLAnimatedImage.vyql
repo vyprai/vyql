@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter objc {
+  package "FLAnimatedImage" {
+    sink method "initWithAnimatedGIFData:optimalFrameCacheSize:predrawingEnabled:" -> code.Deserialization
+  }
+}

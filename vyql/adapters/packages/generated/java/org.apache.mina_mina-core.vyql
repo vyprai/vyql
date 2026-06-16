@@ -1,0 +1,11 @@
+import code.{NetworkConnect, NetworkBind, NetworkSend, NetworkData}
+
+adapter java {
+  package "org.apache.mina:mina-core" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "bind" -> code.NetworkBind
+    sink method "write" -> code.NetworkSend
+    source method "messageReceived" -> code.NetworkData
+    sink method "messageWriting" -> code.NetworkSend
+  }
+}

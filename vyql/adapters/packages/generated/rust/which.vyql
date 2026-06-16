@@ -1,0 +1,11 @@
+import core.{UserControlledData}
+import code.{FilePathAccess}
+
+adapter rust {
+  package "which" {
+    source method "custom_cwd" -> core.UserControlledData
+    source method "custom_path_list" -> core.UserControlledData
+    sink method "first_result" -> code.FilePathAccess
+    sink method "all_results" -> code.FilePathAccess
+  }
+}

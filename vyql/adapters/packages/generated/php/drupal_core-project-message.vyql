@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter php {
+  package "drupal/core-project-message" {
+    sink method "Drupal\Composer\Plugin\ProjectMessage\Message::getMessageFromFile" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,9 @@
+import code.{CertValidationDisabled, NetworkConnect, NetworkSend}
+
+adapter python {
+  package "lazr.restfulclient" {
+    sink method "get" -> code.NetworkConnect
+    sink method "post" -> code.NetworkSend
+    mark method "ssl_certificate_validation_disabled" -> code.CertValidationDisabled
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter python {
+  package "unittest2" {
+    source method "parseArgs" -> code.CliArgument
+  }
+}

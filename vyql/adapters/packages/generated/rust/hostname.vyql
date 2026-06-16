@@ -1,0 +1,7 @@
+import code.{StoredDataRead, FilePathAccess}
+adapter rust {
+  package "hostname" {
+    source method "get" -> code.StoredDataRead
+    sink method "set" -> code.FilePathAccess
+  }
+}

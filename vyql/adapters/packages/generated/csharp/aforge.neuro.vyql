@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter csharp {
+  package "aforge.neuro" {
+    sink method "Load" -> code.Deserialization
+    sink method "Save" -> code.FilePathAccess
+  }
+}

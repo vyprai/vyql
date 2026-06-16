@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "com.vaadin.external.google:android-json" {
+    sink method "JSONObject.JSONObject(String)" -> code.Deserialization
+    sink method "JSONArray.JSONArray(String)" -> code.Deserialization
+    sink method "JSONTokener.JSONTokener(String)" -> code.Deserialization
+  }
+}

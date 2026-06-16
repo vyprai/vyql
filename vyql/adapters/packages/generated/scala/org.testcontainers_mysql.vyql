@@ -1,0 +1,8 @@
+import code.{SecretValue, NetworkData}
+
+adapter scala {
+  package "org.testcontainers:mysql" {
+    source method "getJdbcUrl" -> code.NetworkData
+    source method "getPassword" -> code.SecretValue
+  }
+}

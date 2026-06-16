@@ -1,0 +1,11 @@
+import code.{Deserialization}
+adapter objc {
+  package "SBJson" {
+    sink method "parse" -> code.Deserialization
+    sink method "parserWithBlock" -> code.Deserialization
+    sink method "multiRootParserWithBlock" -> code.Deserialization
+    sink method "unwrapRootArrayParserWithBlock" -> code.Deserialization
+    sink method "writeObject" -> code.Deserialization
+    sink method "writeArray" -> code.Deserialization
+  }
+}

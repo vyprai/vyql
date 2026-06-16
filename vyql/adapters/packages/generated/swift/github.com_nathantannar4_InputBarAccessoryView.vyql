@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+adapter swift {
+  package "github.com/nathantannar4/InputBarAccessoryView" {
+    source method "paste" -> core.UserControlledData
+    source method "inputTextViewDidChange" -> core.UserControlledData
+    source method "didSelectSendButton" -> core.UserControlledData
+  }
+}

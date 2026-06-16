@@ -1,0 +1,5 @@
+adapter ruby {
+  package "fog-google" {
+    control method "Fog::Google.escape" -> core.InputValidation
+  }
+}

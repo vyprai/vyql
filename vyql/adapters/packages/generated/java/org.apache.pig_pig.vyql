@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter java {
+  package "org.apache.pig:pig" {
+    sink method "exec" -> code.CodeEval
+  }
+}

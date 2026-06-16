@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "nibabel" {
+    sink method "parse" -> code.Deserialization
+  }
+}

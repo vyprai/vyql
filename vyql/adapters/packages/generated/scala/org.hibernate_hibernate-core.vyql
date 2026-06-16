@@ -1,0 +1,6 @@
+adapter scala {
+  package "org.hibernate:hibernate-core" {
+    sink method "createQuery" -> code.SqlExecution
+    control method "bind" -> core.SqlParameterization
+  }
+}

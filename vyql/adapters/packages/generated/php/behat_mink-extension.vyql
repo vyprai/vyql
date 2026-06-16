@@ -1,0 +1,5 @@
+adapter php {
+  package "behat/mink-extension" {
+    sink method "system" -> code.CommandExecution
+  }
+}

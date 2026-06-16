@@ -1,0 +1,7 @@
+import code.{NosqlQuery}
+adapter scala {
+  package "org.mongodb:mongodb-driver-sync" {
+    sink method "runCommand" -> code.NosqlQuery
+    sink method "aggregate" -> code.NosqlQuery
+  }
+}

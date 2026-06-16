@@ -1,0 +1,6 @@
+adapter c {
+  package "urdfdom" {
+    sink method "parseURDFFile" -> code.FilePathAccess
+    sink method "parseURDF" -> code.XmlParse
+  }
+}

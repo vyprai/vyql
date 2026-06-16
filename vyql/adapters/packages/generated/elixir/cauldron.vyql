@@ -1,0 +1,9 @@
+import code.{HttpInput, NetworkSend}
+
+adapter elixir {
+  package "cauldron" {
+    source method "Cauldron.HTTP.run" -> code.HttpInput
+    source method "Cauldron.Request.read" -> code.HttpInput
+    sink method "Cauldron.Response.send" -> code.NetworkSend
+  }
+}

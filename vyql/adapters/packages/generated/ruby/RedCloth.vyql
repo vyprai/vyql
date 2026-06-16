@@ -1,0 +1,11 @@
+import code.{HtmlRender}
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "RedCloth" {
+    sink method "red_parse_title" -> code.HtmlRender
+    control method "escape" -> core.HtmlEscape
+    control method "rb_str_cat_escaped" -> core.HtmlEscape
+    control method "rb_str_cat_escaped_for_preformatted" -> core.HtmlEscape
+  }
+}

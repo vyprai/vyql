@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter elixir {
+  package "phoenix_live_reload" {
+    sink method "PhoenixLiveReload.Channel.handle_info" -> code.FilePathAccess
+    sink method "PhoenixLiveReload.Channel.handle_in" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,10 @@
+import core.{InputValidation}
+
+adapter swift {
+  package "github.com/KittyMac/Hitch" {
+    control method "unicodeUnescape" -> core.InputValidation
+    control method "percentUnescape" -> core.InputValidation
+    control method "ampersandUnescape" -> core.InputValidation
+    control method "quotedPrintableUnescape" -> core.InputValidation
+  }
+}

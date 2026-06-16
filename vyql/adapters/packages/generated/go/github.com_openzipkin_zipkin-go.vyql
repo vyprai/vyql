@@ -1,0 +1,9 @@
+import code.{WeakRandomValue}
+
+adapter go {
+  package "github.com/openzipkin/zipkin-go" {
+    mark method "NewRandom64" -> code.WeakRandomValue
+    mark method "NewRandom128" -> code.WeakRandomValue
+    mark method "NewRandomTimestamped" -> code.WeakRandomValue
+  }
+}

@@ -1,0 +1,9 @@
+import code.{FilePathAccess, StoredDataRead, StoredDataWrite, SecretValue, UrlFetch}
+adapter groovy {
+  package "org.apache.maven:maven-settings-builder" {
+    source method "read" -> code.StoredDataRead
+    sink method "write" -> code.StoredDataWrite
+    source method "decrypt" -> code.SecretValue
+    sink method "UrlSettingsSource" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,7 @@
+adapter rust {
+  package "tiny-bip39" {
+    source method "Mnemonic::from_phrase" -> core.UserControlledData
+    control method "Mnemonic::validate" -> core.InputValidation
+    source method "Seed::new" -> code.SecretValue
+  }
+}

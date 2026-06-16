@@ -1,0 +1,14 @@
+import code.{HttpInput, NetworkData, HtmlRender}
+
+adapter kotlin {
+  package "ch.qos.logback:logback-access" {
+    source method "getRequest" -> code.HttpInput
+    source method "getQueryString" -> code.HttpInput
+    source method "getRequestURI" -> code.HttpInput
+    source method "getRequestHeader" -> code.HttpInput
+    source method "getRequestParameter" -> code.HttpInput
+    source method "read" -> code.NetworkData
+    sink method "doLayout" -> code.HtmlRender
+    sink method "appendEventToBuffer" -> code.HtmlRender
+  }
+}

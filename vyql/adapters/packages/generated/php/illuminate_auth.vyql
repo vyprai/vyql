@@ -1,0 +1,6 @@
+adapter php {
+  package "illuminate/auth" {
+    source method "token" -> code.SecretValue
+    mark path "illuminate.auth.hash" -> code.WeakHash
+  }
+}

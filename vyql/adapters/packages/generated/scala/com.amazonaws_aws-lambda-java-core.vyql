@@ -1,0 +1,10 @@
+import code.{HttpInput, LogOutput, SecretValue}
+adapter scala {
+  package "com.amazonaws:aws-lambda-java-core" {
+    source method "handleRequest" -> code.HttpInput
+    sink method "log" -> code.LogOutput
+    source method "getInvokedFunctionArn" -> code.SecretValue
+    source method "getIdentity" -> code.SecretValue
+    source method "getClientContext" -> code.SecretValue
+  }
+}

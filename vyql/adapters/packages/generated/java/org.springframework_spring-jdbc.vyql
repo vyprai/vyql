@@ -1,0 +1,6 @@
+adapter java {
+  package "org.springframework:spring-jdbc" {
+    sink method "query" -> code.SqlExecution
+    control method "newArgPreparedStatementSetter" -> core.SqlParameterization
+  }
+}

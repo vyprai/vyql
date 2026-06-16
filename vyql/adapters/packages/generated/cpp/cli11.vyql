@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter cpp {
+  package "cli11" {
+    source method "parse" -> code.CliArgument
+  }
+}

@@ -1,0 +1,10 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter go {
+  package "github.com/vishvananda/netns" {
+    sink method "GetFromPath" -> code.FilePathAccess
+    sink method "GetFromPid" -> code.FilePathAccess
+    sink method "GetFromThread" -> code.FilePathAccess
+    sink method "GetFromDocker" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import core.{InputValidation}
+adapter elixir {
+  package "nimble_options" {
+    control method "validate" -> core.InputValidation
+    control method "validate!" -> core.InputValidation
+  }
+}

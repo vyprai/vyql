@@ -1,0 +1,11 @@
+import code.{FilePathAccess, FileUse}
+
+adapter php {
+  package "knplabs/gaufrette" {
+    sink method "read" -> code.FilePathAccess
+    sink method "write" -> code.FilePathAccess
+    sink method "rename" -> code.FileUse
+    sink method "delete" -> code.FileUse
+    sink method "listKeys" -> code.FilePathAccess
+  }
+}

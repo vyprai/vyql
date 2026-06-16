@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter python {
+  package "cloudscraper" {
+    sink method "eval" -> code.CodeEval
+  }
+}

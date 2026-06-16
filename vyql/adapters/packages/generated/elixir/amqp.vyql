@@ -1,0 +1,9 @@
+import code.{NetworkData, NetworkSend}
+
+adapter elixir {
+  package "amqp" {
+    sink method "publish" -> code.NetworkSend
+    source method "consume" -> code.NetworkData
+    source method "subscribe" -> code.NetworkData
+  }
+}

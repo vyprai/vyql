@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter java {
+  package "net.coobird:thumbnailator" {
+    sink method "fromFilenames" -> code.FilePathAccess
+  }
+}

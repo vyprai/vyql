@@ -1,0 +1,6 @@
+adapter dart {
+  package "dio_cookie_manager" {
+    source method "CookieManager" -> code.HttpInput
+    source method "getCookies" -> core.UserControlledData
+  }
+}

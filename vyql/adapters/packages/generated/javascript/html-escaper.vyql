@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter javascript {
+  package "html-escaper" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

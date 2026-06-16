@@ -1,0 +1,8 @@
+import code.{CliArgument}
+
+adapter go {
+  package "github.com/urfave/cli" {
+    source method "Run" -> code.CliArgument
+    source method "RunAndExitOnError" -> code.CliArgument
+  }
+}

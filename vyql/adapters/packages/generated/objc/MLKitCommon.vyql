@@ -1,0 +1,8 @@
+import code.{FilePathAccess, UrlFetch}
+adapter objc {
+  package "MLKitCommon" {
+    sink method "initWithPath" -> code.FilePathAccess
+    sink method "initWithManifestPath" -> code.FilePathAccess
+    sink method "downloadModel" -> code.UrlFetch
+  }
+}

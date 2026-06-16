@@ -1,0 +1,9 @@
+adapter rust {
+  package "windows" {
+    source method "Password" -> code.SecretValue
+    source method "Query" -> core.UserControlledData
+    source method "QueryParsed" -> core.UserControlledData
+    control method "EscapeComponent" -> core.InputValidation
+    control method "UnescapeComponent" -> core.InputValidation
+  }
+}

@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter java {
+  package "org.apache.struts:struts2-spring-plugin" {
+    sink method "setApplicationContextPath" -> code.FilePathAccess
+  }
+}

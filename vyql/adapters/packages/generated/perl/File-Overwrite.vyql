@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter perl {
+  package "File-Overwrite" {
+    sink method "overwrite" -> code.FilePathAccess
+    sink method "overwrite_and_unlink" -> code.FilePathAccess
+  }
+}

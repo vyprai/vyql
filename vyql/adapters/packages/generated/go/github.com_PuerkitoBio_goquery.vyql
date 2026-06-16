@@ -1,0 +1,10 @@
+import code.{Deserialization, HtmlRender, UrlFetch}
+
+adapter go {
+  package "github.com/PuerkitoBio/goquery" {
+    sink method "NewDocument" -> code.UrlFetch
+    sink method "NewDocumentFromReader" -> code.Deserialization
+    sink method "NewDocumentFromResponse" -> code.Deserialization
+    sink method "Render" -> code.HtmlRender
+  }
+}

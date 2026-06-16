@@ -1,0 +1,11 @@
+import code.{NetworkData, NetworkConnect, FilePathAccess}
+import core.{PathCanonicalization}
+
+adapter groovy {
+  package "org.apache.curator:curator-client" {
+    sink method "CuratorZookeeperClient.start()" -> code.NetworkConnect
+    control method "ZKPaths.fixForNamespace(String,String)" -> core.PathCanonicalization
+    control method "ZKPaths.makePath(String,String)" -> core.PathCanonicalization
+    sink method "ZKPaths.mkdirs(ZooKeeper,String)" -> code.FilePathAccess
+  }
+}

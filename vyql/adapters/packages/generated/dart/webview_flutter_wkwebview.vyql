@@ -1,0 +1,8 @@
+import code.{Cookie}
+
+adapter dart {
+  package "webview_flutter_wkwebview" {
+    source method "getAllCookies" -> code.Cookie
+    source method "setCookie" -> code.Cookie
+  }
+}

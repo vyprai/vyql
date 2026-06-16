@@ -1,0 +1,10 @@
+import code.{Deserialization, SecretValue}
+
+adapter go {
+  package "github.com/form3tech-oss/jwt-go" {
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseWithClaims" -> code.Deserialization
+    sink method "DecodeSegment" -> code.Deserialization
+    source method "ParseRSAPrivateKeyFromPEMWithPassword" -> code.SecretValue
+  }
+}

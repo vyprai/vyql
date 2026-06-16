@@ -1,0 +1,11 @@
+import code.{Deserialization, NetworkSend, NetworkConnect}
+import core.{AuthenticationCheck}
+
+adapter swift {
+  package "github.com/daltoniam/Starscream" {
+    sink method "parse" -> code.Deserialization
+    sink method "write" -> code.NetworkSend
+    sink method "connect" -> code.NetworkConnect
+    control method "evaluateTrust" -> core.AuthenticationCheck
+  }
+}

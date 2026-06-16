@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "rails-html-sanitizer" {
+    control method "sanitize" -> core.HtmlEscape
+  }
+}

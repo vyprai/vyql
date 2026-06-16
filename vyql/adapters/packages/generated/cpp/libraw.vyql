@@ -1,0 +1,15 @@
+import code.{Deserialization, FilePathAccess, FileUse, NetworkData}
+
+adapter cpp {
+  package "libraw" {
+    sink method "libraw_open_file" -> code.FileUse
+    sink method "libraw_open_file_ex" -> code.FileUse
+    sink method "libraw_open_wfile" -> code.FileUse
+    sink method "libraw_open_wfile_ex" -> code.FileUse
+    sink method "libraw_open_buffer" -> code.Deserialization
+    sink method "libraw_unpack" -> code.Deserialization
+    sink method "libraw_unpack_thumb" -> code.Deserialization
+    sink method "libraw_unpack_thumb_ex" -> code.Deserialization
+    sink method "libraw_open_bayer" -> code.Deserialization
+  }
+}

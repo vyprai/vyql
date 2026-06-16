@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "tokio-codec" {
+    sink method "decode" -> code.Deserialization
+    sink method "decode_eof" -> code.Deserialization
+    sink method "decode_head" -> code.Deserialization
+    sink method "decode_data" -> code.Deserialization
+  }
+}

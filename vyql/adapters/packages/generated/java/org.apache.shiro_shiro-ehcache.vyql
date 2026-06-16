@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter java {
+  package "org.apache.shiro:shiro-ehcache" {
+    sink method "setCacheManagerConfigFile" -> code.Deserialization
+  }
+}

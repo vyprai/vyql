@@ -1,0 +1,6 @@
+adapter perl {
+  package "SQLite-DB" {
+    sink method "exec" -> code.CommandExecution
+    sink method "exec" -> code.SqlExecution
+  }
+}

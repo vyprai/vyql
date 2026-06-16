@@ -1,0 +1,11 @@
+import code.{HttpInput, RedirectTarget, FilePathAccess}
+
+adapter kotlin {
+  package "org.springdoc:springdoc-openapi-ui" {
+    mark method "redirectToUi" -> code.RedirectTarget
+    mark method "buildUrl" -> code.RedirectTarget
+    mark method "buildUrlWithContextPath" -> code.RedirectTarget
+    sink method "resolveResource" -> code.FilePathAccess
+    source method "openapiJson" -> code.HttpInput
+  }
+}

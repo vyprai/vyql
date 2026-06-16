@@ -1,0 +1,8 @@
+import code.{NetworkData}
+
+adapter javascript {
+  package "whatwg-url" {
+    source method "parseURL" -> code.NetworkData
+    source method "parse" -> code.NetworkData
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter php {
+  package "laravel/sail" {
+    sink method "runCommands" -> code.CommandExecution
+  }
+}

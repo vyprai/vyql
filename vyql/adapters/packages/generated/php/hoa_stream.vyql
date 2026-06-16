@@ -1,0 +1,24 @@
+import code.{FileUse, FilePathAccess}
+adapter php {
+  package "hoa/stream" {
+    sink method "read" -> code.FileUse
+    sink method "readString" -> code.FileUse
+    sink method "readCharacter" -> code.FileUse
+    sink method "readBoolean" -> code.FileUse
+    sink method "readInteger" -> code.FileUse
+    sink method "readFloat" -> code.FileUse
+    sink method "readArray" -> code.FileUse
+    sink method "readLine" -> code.FileUse
+    sink method "readAll" -> code.FileUse
+    sink method "write" -> code.FileUse
+    sink method "writeString" -> code.FileUse
+    sink method "writeCharacter" -> code.FileUse
+    sink method "writeBoolean" -> code.FileUse
+    sink method "writeInteger" -> code.FileUse
+    sink method "writeFloat" -> code.FileUse
+    sink method "writeArray" -> code.FileUse
+    sink method "writeLine" -> code.FileUse
+    sink method "writeAll" -> code.FileUse
+    sink method "open" -> code.FilePathAccess
+  }
+}

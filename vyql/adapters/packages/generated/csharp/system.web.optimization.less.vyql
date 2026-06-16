@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess}
+import core.{PathCanonicalization}
+
+adapter csharp {
+  package "system.web.optimization.less" {
+    sink method "Process" -> code.Deserialization
+    sink method "GetFileContents" -> code.FilePathAccess
+    control method "GetFullPath" -> core.PathCanonicalization
+  }
+}

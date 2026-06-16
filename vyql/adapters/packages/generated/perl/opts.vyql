@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter perl {
+  package "opts" {
+    source method "opts" -> core.UserControlledData
+  }
+}

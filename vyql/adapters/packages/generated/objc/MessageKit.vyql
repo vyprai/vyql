@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "MessageKit" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter groovy {
+  package "org.springframework.integration:spring-integration-http" {
+    source method "read" -> code.HttpInput
+  }
+}

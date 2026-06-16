@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter kotlin {
+  package "org.springframework.security:spring-security-crypto" {
+    mark method "Md4PasswordEncoder.encode" -> code.WeakHash
+    mark method "Md4PasswordEncoder.matches" -> code.WeakHash
+  }
+}

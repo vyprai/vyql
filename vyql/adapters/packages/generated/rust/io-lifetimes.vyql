@@ -1,0 +1,9 @@
+import code.{FilePathAccess, FileUse}
+
+adapter rust {
+  package "io-lifetimes" {
+    sink method "open" -> code.FilePathAccess
+    sink method "read" -> code.FileUse
+    sink method "write" -> code.FileUse
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "base58" {
+    sink method "from_base58" -> code.Deserialization
+  }
+}

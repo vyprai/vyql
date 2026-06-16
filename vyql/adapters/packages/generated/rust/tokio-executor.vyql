@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+adapter rust {
+  package "tokio-executor" {
+    sink method "spawn" -> code.ExpressionEval
+    sink method "run" -> code.ExpressionEval
+  }
+}

@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter java {
+  package "org.dbunit:dbunit" {
+    sink method "setSql" -> code.SqlExecution
+  }
+}

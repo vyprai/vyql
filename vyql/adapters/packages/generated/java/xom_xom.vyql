@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess, UrlFetch}
+
+adapter java {
+  package "xom:xom" {
+    sink method "build" -> code.Deserialization
+  }
+}

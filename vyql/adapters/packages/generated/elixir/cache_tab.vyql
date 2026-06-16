@@ -1,0 +1,6 @@
+adapter elixir {
+  package "cache_tab" {
+    sink method "get_counter" -> code.NosqlQuery
+    sink method "memset" -> code.StoredDataWrite
+  }
+}

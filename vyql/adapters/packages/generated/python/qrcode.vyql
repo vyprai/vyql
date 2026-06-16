@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter python {
+  package "qrcode" {
+    source method "add_data" -> core.UserControlledData
+  }
+}

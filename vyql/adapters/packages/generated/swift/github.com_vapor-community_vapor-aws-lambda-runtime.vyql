@@ -1,0 +1,8 @@
+import code.{HttpInput}
+
+adapter swift {
+  package "github.com/vapor-community/vapor-aws-lambda-runtime" {
+    source method "handle" -> code.HttpInput
+    source method "init(req:in:for:)" -> code.HttpInput
+  }
+}

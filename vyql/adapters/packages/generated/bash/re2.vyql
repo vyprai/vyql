@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter bash {
+  package "re2" {
+    mark path "Re2.RE2" -> code.RegexCompile
+  }
+}

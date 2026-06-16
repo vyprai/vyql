@@ -1,0 +1,8 @@
+adapter ruby {
+  package "net-ssh" {
+    sink method "exec" -> code.CommandExecution
+    source method "read" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "connection" -> code.NetworkConnect
+  }
+}

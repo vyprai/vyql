@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter elixir {
+  package "zarex" {
+    control method "sanitize" -> core.InputValidation
+  }
+}

@@ -1,0 +1,13 @@
+import code.{WeakHash, WeakCipher}
+
+adapter cpp {
+  package "libxcrypt" {
+    mark method "MD5_Init" -> code.WeakHash
+    mark method "MD5_Update" -> code.WeakHash
+    mark method "MD5_Final" -> code.WeakHash
+    mark method "sha1_init_ctx" -> code.WeakHash
+    mark method "sha1_process_bytes" -> code.WeakHash
+    mark method "sha1_finish_ctx" -> code.WeakHash
+    mark method "des_crypt_block" -> code.WeakCipher
+  }
+}

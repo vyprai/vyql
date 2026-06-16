@@ -1,0 +1,7 @@
+adapter c {
+  package "rapidjson" {
+    sink method "compiler" -> code.DynamicCodeLoad
+    sink method "Decode" -> code.Deserialization
+    mark method "Hash" -> code.WeakHash
+  }
+}

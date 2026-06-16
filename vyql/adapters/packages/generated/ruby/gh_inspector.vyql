@@ -1,0 +1,10 @@
+import code.{NetworkConnect, UrlFetch}
+
+adapter ruby {
+  package "gh_inspector" {
+    source method "Inspector.search_query" -> core.UserControlledData
+    source method "Inspector.search_exception" -> core.UserControlledData
+    sink method "Sidekick.search" -> code.UrlFetch
+    sink method "Sidekick.get_api_results" -> code.NetworkConnect
+  }
+}

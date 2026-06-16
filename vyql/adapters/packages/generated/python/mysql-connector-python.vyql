@@ -1,0 +1,6 @@
+adapter python {
+  package "mysql-connector-python" {
+    sink method "execute" -> code.SqlExecution
+    sink method "executemany" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{NosqlQuery}
+
+adapter kotlin {
+  package "com.amazonaws:aws-java-sdk-dynamodb" {
+    sink method "query" -> code.NosqlQuery
+  }
+}

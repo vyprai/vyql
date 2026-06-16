@@ -1,0 +1,7 @@
+adapter javascript {
+  package "optionator" {
+    source method "parse" -> core.UserControlledData
+    source method "parseString" -> core.UserControlledData
+    source method "parseArgv" -> code.CliArgument
+  }
+}

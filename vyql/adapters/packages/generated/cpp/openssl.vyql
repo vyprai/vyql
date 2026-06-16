@@ -1,0 +1,7 @@
+import code.{WeakCipher}
+
+adapter cpp {
+  package "openssl" {
+    mark method "sslv3_method" -> code.WeakCipher
+  }
+}

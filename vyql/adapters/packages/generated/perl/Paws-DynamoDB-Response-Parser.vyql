@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "Paws-DynamoDB-Response-Parser" {
+    sink method "to_perl" -> code.Deserialization
+  }
+}

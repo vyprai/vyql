@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter python {
+  package "pytest-html" {
+    sink method "html" -> code.HtmlRender
+  }
+}

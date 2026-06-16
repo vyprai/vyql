@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter elixir {
+  package "boilex" {
+    sink method "Mix.Tasks.Boilex.Ci.run" -> code.CommandExecution
+  }
+}

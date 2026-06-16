@@ -1,0 +1,12 @@
+import code.{HttpInput, NetworkConnect, RedirectTarget}
+import core.{UserControlledData}
+
+adapter python {
+  package "spotipy" {
+    mark method "get_authorize_url" -> code.RedirectTarget
+    source method "parse_response_code" -> core.UserControlledData
+    source method "parse_auth_response_url" -> core.UserControlledData
+    source method "get_auth_response" -> code.HttpInput
+    sink method "start_local_http_server" -> code.NetworkConnect
+  }
+}

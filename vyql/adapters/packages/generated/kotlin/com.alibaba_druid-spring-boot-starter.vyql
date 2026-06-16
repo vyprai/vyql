@@ -1,0 +1,17 @@
+import code.{SecretValue, HttpInput}
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "com.alibaba:druid-spring-boot-starter" {
+    source method "getLoginPassword" -> code.SecretValue
+    source method "setLoginPassword" -> code.SecretValue
+    source method "getLoginUsername" -> code.SecretValue
+    source method "setLoginUsername" -> code.SecretValue
+    source method "getUrlPattern" -> core.UserControlledData
+    source method "setUrlPattern" -> core.UserControlledData
+    source method "getAllow" -> core.UserControlledData
+    source method "setAllow" -> core.UserControlledData
+    source method "getDeny" -> core.UserControlledData
+    source method "setDeny" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "cryptography" {
+    sink method "x509.name.Name.parse" -> code.Deserialization
+  }
+}

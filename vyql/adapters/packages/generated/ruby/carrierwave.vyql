@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter ruby {
+  package "carrierwave" {
+    sink method "download!" -> code.UrlFetch
+  }
+}

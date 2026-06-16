@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+adapter php {
+  package "symfony/mime" {
+    sink method "html" -> code.HtmlRender
+    sink method "text" -> code.HtmlRender
+  }
+}

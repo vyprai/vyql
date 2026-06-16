@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter java {
+  package "org.springframework.amqp:spring-amqp" {
+    source method "getBody" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,8 @@
+adapter elixir {
+  package "phoenix_template" {
+    sink method "compile" -> code.TemplateRender
+    sink method "render_to_iodata" -> code.TemplateRender
+    sink method "render_to_string" -> code.TemplateRender
+    sink method "render" -> code.TemplateRender
+  }
+}

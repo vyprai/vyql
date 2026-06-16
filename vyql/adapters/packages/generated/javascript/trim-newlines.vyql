@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter javascript {
+  package "trim-newlines" {
+    control method "trimNewlines" -> core.InputValidation
+    control method "trimNewlinesStart" -> core.InputValidation
+    control method "trimNewlinesEnd" -> core.InputValidation
+  }
+}

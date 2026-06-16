@@ -1,0 +1,8 @@
+import code.{NetworkConnect, UrlFetch}
+
+adapter dart {
+  package "firebase_performance" {
+    sink method "startHttpMetric" -> code.NetworkConnect
+    sink method "startHttpMetric" -> code.UrlFetch
+  }
+}

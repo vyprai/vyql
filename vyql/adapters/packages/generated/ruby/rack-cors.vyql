@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter ruby {
+  package "rack-cors" {
+    source method "call" -> code.HttpInput
+  }
+}

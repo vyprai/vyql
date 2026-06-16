@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/leodido/go-urn" {
+    sink method "Parse" -> code.Deserialization
+  }
+}

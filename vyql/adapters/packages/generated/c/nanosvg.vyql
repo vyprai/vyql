@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter c {
+  package "nanosvg" {
+    sink method "nsvgParseFromFile" -> code.Deserialization
+    sink method "nsvgParse" -> code.Deserialization
+  }
+}

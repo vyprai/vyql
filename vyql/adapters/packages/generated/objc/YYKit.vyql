@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "YYKit" {
+    sink method "parseText:selectedRange:" -> code.Deserialization
+  }
+}

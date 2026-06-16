@@ -1,0 +1,12 @@
+import code.{HttpInput, ResponseHeaderWrite}
+import core.{AuthenticationCheck}
+
+adapter ruby {
+  package "ruby-openid" {
+    control method "verify" -> core.AuthenticationCheck
+    control method "create_association" -> core.AuthenticationCheck
+    source method "handle_request" -> code.HttpInput
+    source method "decode_request" -> code.HttpInput
+    sink method "encode_response" -> code.ResponseHeaderWrite
+  }
+}

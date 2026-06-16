@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter javascript {
+  package "regexpu-core" {
+    mark method "rewritePattern" -> code.RegexCompile
+  }
+}

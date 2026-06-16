@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "org.apache.xbean:xbean-spring" {
+    sink method "parse" -> code.Deserialization
+  }
+}

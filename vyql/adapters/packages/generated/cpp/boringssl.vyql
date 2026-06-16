@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "boringssl" {
+    sink method "ParseOCSPCertID" -> code.Deserialization
+    sink method "ParseOCSPSingleResponse" -> code.Deserialization
+    sink method "ParseOCSPResponseData" -> code.Deserialization
+    sink method "ParseOCSPResponse" -> code.Deserialization
+  }
+}

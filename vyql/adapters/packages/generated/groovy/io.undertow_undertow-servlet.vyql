@@ -1,0 +1,7 @@
+import core.{AuthorizationCheck}
+adapter groovy {
+  package "io.undertow:undertow-servlet" {
+    control method "isUserInRole" -> core.AuthorizationCheck
+    control method "canAccessResource" -> core.AuthorizationCheck
+  }
+}

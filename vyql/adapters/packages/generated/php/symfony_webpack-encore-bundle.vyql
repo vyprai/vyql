@@ -1,0 +1,8 @@
+import code.{HtmlRender}
+
+adapter php {
+  package "symfony/webpack-encore-bundle" {
+    sink method "renderWebpackScriptTags" -> code.HtmlRender
+    sink method "renderWebpackLinkTags" -> code.HtmlRender
+  }
+}

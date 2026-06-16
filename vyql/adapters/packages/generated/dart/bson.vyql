@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter dart {
+  package "bson" {
+    sink method "EJsonCodec.parse" -> code.Deserialization
+    sink method "Codec.deserialize" -> code.Deserialization
+    sink method "BsonCodec.deserialize" -> code.Deserialization
+    sink method "BSON.deserialize" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import core.{InputValidation, UserControlledData}
+adapter php {
+  package "stof/doctrine-extensions-bundle" {
+    source method "getTmpName" -> core.UserControlledData
+    source method "getName" -> core.UserControlledData
+    source method "getSize" -> core.UserControlledData
+    source method "getType" -> core.UserControlledData
+    source method "getError" -> core.UserControlledData
+    control method "isUploadedFile" -> core.InputValidation
+  }
+}

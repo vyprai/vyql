@@ -1,0 +1,24 @@
+import code.{RedirectTarget, StoredDataRead}
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter kotlin {
+  package "org.springframework.social:spring-social-security" {
+    control method "configure" -> core.AuthenticationCheck
+    control method "configure" -> core.AuthorizationCheck
+
+    source method "SocialUser" -> core.UserControlledData
+    source method "SocialAuthenticationToken" -> core.UserControlledData
+
+    mark method "postLoginUrl" -> code.RedirectTarget
+    mark method "alwaysUsePostLoginUrl" -> code.RedirectTarget
+    mark method "postFailureUrl" -> code.RedirectTarget
+    mark method "signupUrl" -> code.RedirectTarget
+    mark method "connectionAddedRedirectUrl" -> code.RedirectTarget
+    mark method "defaultFailureUrl" -> code.RedirectTarget
+    mark method "setSignupUrl" -> code.RedirectTarget
+    mark method "setDefaultFailureUrl" -> code.RedirectTarget
+    mark method "setConnectionAddedRedirectUrl" -> code.RedirectTarget
+    mark method "setPostLoginUrl" -> code.RedirectTarget
+    mark method "setPostFailureUrl" -> code.RedirectTarget
+  }
+}

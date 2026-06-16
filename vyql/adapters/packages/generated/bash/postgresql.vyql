@@ -1,0 +1,5 @@
+adapter bash {
+  package "postgresql" {
+    sink path "Makefile" arg all -> code.SqlExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "javassist:javassist" {
+    sink method "loadClass" -> code.Deserialization
+    sink method "loadClassByDelegation" -> code.Deserialization
+  }
+}

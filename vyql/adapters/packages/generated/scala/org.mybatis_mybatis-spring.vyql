@@ -1,0 +1,12 @@
+import code.{SqlExecution}
+adapter scala {
+  package "org.mybatis:mybatis-spring" {
+    sink method "selectOne" -> code.SqlExecution
+    sink method "selectList" -> code.SqlExecution
+    sink method "selectMap" -> code.SqlExecution
+    sink method "insert" -> code.SqlExecution
+    sink method "update" -> code.SqlExecution
+    sink method "delete" -> code.SqlExecution
+    sink method "flushStatements" -> code.SqlExecution
+  }
+}

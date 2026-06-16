@@ -1,0 +1,6 @@
+import code.{XpathQuery}
+adapter scala {
+  package "xom:xom" {
+    sink method "query" -> code.XpathQuery
+  }
+}

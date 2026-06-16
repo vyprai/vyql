@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+
+adapter elixir {
+  package "ueberauth" {
+    source method "request" -> core.UserControlledData
+    source method "uid" -> core.UserControlledData
+    source method "credentials" -> core.UserControlledData
+    source method "handle_request!" -> core.UserControlledData
+  }
+}

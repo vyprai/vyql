@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter csharp {
+  package "dynamicinterop" {
+    sink method "ExecCommand" -> code.CommandExecution
+  }
+}

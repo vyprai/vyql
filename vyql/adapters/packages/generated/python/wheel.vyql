@@ -1,0 +1,12 @@
+import code.{FilePathAccess, ArchiveEntryWrite}
+
+adapter python {
+  package "wheel" {
+    sink method "open" -> code.FilePathAccess
+    sink method "write" -> code.ArchiveEntryWrite
+    sink method "write_files" -> code.ArchiveEntryWrite
+    sink method "writestr" -> code.ArchiveEntryWrite
+    sink method "unpack" -> code.ArchiveEntryWrite
+    sink method "unpack_f" -> code.ArchiveEntryWrite
+  }
+}

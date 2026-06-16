@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter javascript {
+  package "make-dir" {
+    sink method "makeDirectory" -> code.FilePathAccess
+    sink method "makeDirectorySync" -> code.FilePathAccess
+  }
+}

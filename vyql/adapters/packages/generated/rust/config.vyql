@@ -1,0 +1,13 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "config" {
+    sink method "parse" -> code.Deserialization
+    sink method "deserialize_enum" -> code.Deserialization
+    sink method "deserialize_unit_struct" -> code.Deserialization
+    sink method "deserialize_newtype_struct" -> code.Deserialization
+    sink method "deserialize_tuple" -> code.Deserialization
+    sink method "deserialize_tuple_struct" -> code.Deserialization
+    sink method "deserialize_struct" -> code.Deserialization
+  }
+}

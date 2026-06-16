@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "device_info_platform_interface" {
+    sink method "AndroidDeviceInfo.fromMap" -> code.Deserialization
+    sink method "IosDeviceInfo.fromMap" -> code.Deserialization
+  }
+}

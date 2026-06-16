@@ -1,0 +1,13 @@
+import code.{StoredDataWrite, StoredDataRead, Deserialization}
+
+adapter elixir {
+  package "commanded_eventstore_adapter" {
+    sink method "append_to_stream" -> code.StoredDataWrite
+    sink method "record_snapshot" -> code.StoredDataWrite
+    source method "stream_forward" -> code.StoredDataRead
+    source method "subscribe_to" -> code.StoredDataRead
+    source method "read_snapshot" -> code.StoredDataRead
+    sink method "to_event_data" -> code.Deserialization
+    sink method "to_snapshot_data" -> code.Deserialization
+  }
+}

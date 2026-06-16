@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "coercible" {
+    sink method "parse_value" -> code.Deserialization
+  }
+}

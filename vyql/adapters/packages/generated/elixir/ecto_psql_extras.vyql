@@ -1,0 +1,8 @@
+adapter elixir {
+  package "ecto_psql_extras" {
+    sink method "query" -> code.SqlExecution
+    control method "prepare_opts" -> core.SqlParameterization
+    sink method "query" -> code.NosqlQuery
+    sink method "db_settings" -> code.StoredDataWrite
+  }
+}

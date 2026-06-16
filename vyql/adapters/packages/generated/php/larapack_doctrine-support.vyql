@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter php {
+  package "larapack/doctrine-support" {
+    sink method "getSQLDeclaration" -> code.SqlExecution
+  }
+}

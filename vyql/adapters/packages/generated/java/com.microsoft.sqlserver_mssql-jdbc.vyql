@@ -1,0 +1,9 @@
+import code.{Deserialization, NetworkConnect, NetworkSend}
+adapter java {
+  package "com.microsoft.sqlserver:mssql-jdbc" {
+    sink method "parse" -> code.Deserialization
+    sink method "open" -> code.NetworkConnect
+    sink method "connect" -> code.NetworkConnect
+    sink method "write" -> code.NetworkSend
+  }
+}

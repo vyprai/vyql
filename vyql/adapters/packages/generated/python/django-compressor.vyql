@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+import core.{ShellEscape}
+
+adapter python {
+  package "django-compressor" {
+    control method "shell_quote" -> core.ShellEscape
+  }
+}

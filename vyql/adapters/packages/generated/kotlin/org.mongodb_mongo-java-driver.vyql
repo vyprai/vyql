@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter kotlin {
+  package "org.mongodb:mongo-java-driver" {
+    sink method "doEval" -> code.CodeEval
+    sink method "eval" -> code.CodeEval
+  }
+}

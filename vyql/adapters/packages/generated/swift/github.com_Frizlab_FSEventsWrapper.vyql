@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/Frizlab/FSEventsWrapper" {
+    sink method "FSEventAsyncStream.init(path:flags:)" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter scala {
+  package "com.codeborne:selenide" {
+    sink method "open" -> code.UrlFetch
+  }
+}

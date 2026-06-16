@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter swift {
+  package "github.com/maticzav/swift-graphql" {
+    sink method "query" -> code.NetworkSend
+    sink method "executeMutation" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "postgresql:postgresql" {
+    sink method "createSimpleQuery" -> code.SqlExecution
+    control method "setUseServerPrepare" -> core.SqlParameterization
+  }
+}

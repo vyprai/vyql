@@ -1,0 +1,14 @@
+import core.{InputValidation}
+adapter perl {
+  package "Apache2-WebApp-Plugin-Validate" {
+    control method "currency" -> core.InputValidation
+    control method "date" -> core.InputValidation
+    control method "date_is_future" -> core.InputValidation
+    control method "date_is_past" -> core.InputValidation
+    control method "domain" -> core.InputValidation
+    control method "email" -> core.InputValidation
+    control method "integer" -> core.InputValidation
+    control method "html" -> core.InputValidation
+    control method "url" -> core.InputValidation
+  }
+}

@@ -1,0 +1,10 @@
+import code.{NetworkSend}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "neuron" {
+    source method "query" -> core.UserControlledData
+    sink method "call" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+  }
+}

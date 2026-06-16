@@ -1,0 +1,6 @@
+import code.{CommandExecution, UrlFetch}
+adapter php {
+  package "php-webdriver/webdriver" {
+    sink method "get" -> code.UrlFetch
+  }
+}

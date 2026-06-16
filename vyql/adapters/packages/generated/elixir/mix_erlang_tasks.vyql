@@ -1,0 +1,5 @@
+adapter elixir {
+  package "mix_erlang_tasks" {
+    sink method "Mix.Tasks.Ct.run" -> code.CommandExecution
+  }
+}

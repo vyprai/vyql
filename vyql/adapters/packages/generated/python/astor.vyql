@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter python {
+  package "astor" {
+    sink method "visit_Exec" -> code.CodeEval
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "AI-NaiveBayes" {
+    sink method "Storage" -> code.Deserialization
+  }
+}

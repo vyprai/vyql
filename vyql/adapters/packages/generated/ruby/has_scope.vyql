@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter ruby {
+  package "has_scope" {
+    control method "parse_value" -> core.InputValidation
+  }
+}

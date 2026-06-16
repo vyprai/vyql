@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter java {
+  package "org.hdrhistogram:HdrHistogram" {
+    sink method "read" -> code.Deserialization
+    sink method "decodeFromByteBuffer" -> code.Deserialization
+    sink method "decodeFromCompressedByteBuffer" -> code.Deserialization
+    sink method "parseBase64Binary" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import code.{FilePathAccess}
+import core.{UserControlledData}
+
+adapter javascript {
+  package "gzip-size" {
+    sink method "gzipSizeFromFile" -> code.FilePathAccess
+    sink method "gzipSizeFromFileSync" -> code.FilePathAccess
+    source method "gzipSize" -> core.UserControlledData
+    source method "gzipSizeSync" -> core.UserControlledData
+  }
+}

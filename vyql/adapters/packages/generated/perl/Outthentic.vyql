@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+adapter perl {
+  package "Outthentic" {
+    sink method "execute_cmd" -> code.CommandExecution
+    sink method "execute_cmd2" -> code.CommandExecution
+  }
+}

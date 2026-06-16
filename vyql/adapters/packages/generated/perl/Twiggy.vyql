@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter perl {
+  package "Twiggy" {
+    sink method "_run_app" -> code.UrlFetch
+  }
+}

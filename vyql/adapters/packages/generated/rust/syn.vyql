@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "syn" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse2" -> code.Deserialization
+    sink method "parse_str" -> code.Deserialization
+    sink method "parse_file" -> code.Deserialization
+  }
+}

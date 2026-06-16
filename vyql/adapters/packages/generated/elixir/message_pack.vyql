@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter elixir {
+  package "message_pack" {
+    sink method "MessagePack.Unpacker.unpack" -> code.Deserialization
+    sink method "MessagePack.Unpacker.unpack!" -> code.Deserialization
+  }
+}

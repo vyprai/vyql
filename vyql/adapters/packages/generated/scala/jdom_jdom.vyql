@@ -1,0 +1,9 @@
+import code.{XmlParse, FilePathAccess, UrlFetch}
+
+adapter scala {
+  package "jdom:jdom" {
+    sink method "build" -> code.XmlParse
+    sink method "build" -> code.FilePathAccess
+    sink method "build" -> code.UrlFetch
+  }
+}

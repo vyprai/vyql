@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "com.fasterxml.jackson.core:jackson-core" {
+    sink method "decode" -> code.Deserialization
+  }
+}

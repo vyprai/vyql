@@ -1,0 +1,9 @@
+import code.{Deserialization, FilePathAccess, CommandExecution, StoredDataRead, HttpInput}
+adapter kotlin {
+  package "org.apache.tika:tika-core" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    sink method "detect" -> code.Deserialization
+    sink method "detect" -> code.Deserialization
+  }
+}

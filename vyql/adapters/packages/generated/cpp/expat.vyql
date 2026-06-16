@@ -1,0 +1,10 @@
+import code.{XmlParse}
+
+adapter cpp {
+  package "expat" {
+    sink method "XML_Parse" -> code.XmlParse
+    sink method "XML_ParseBuffer" -> code.XmlParse
+    sink method "XML_ParserCreate" -> code.XmlParse
+    sink method "XML_ParserCreateNS" -> code.XmlParse
+  }
+}

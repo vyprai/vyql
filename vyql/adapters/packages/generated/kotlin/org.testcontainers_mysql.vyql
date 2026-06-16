@@ -1,0 +1,10 @@
+import code.{DatabaseRead, SecretValue}
+adapter kotlin {
+  package "org.testcontainers:mysql" {
+    sink method "getJdbcUrl" -> code.DatabaseRead
+    sink method "constructUrlForConnection" -> code.DatabaseRead
+    source method "withPassword" -> code.SecretValue
+    source method "withDatabaseName" -> code.SecretValue
+    source method "withUsername" -> code.SecretValue
+  }
+}

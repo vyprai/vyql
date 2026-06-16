@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter swift {
+  package "github.com/Quintschaf/SchafKit" {
+    source method "SKKeychain.set" -> code.SecretValue
+    source method "SKKeychain.getPassword" -> code.SecretValue
+  }
+}

@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+adapter groovy {
+  package "org.apache.tomcat:tomcat-dbcp" {
+    sink method "getConnection" -> code.SqlExecution
+    sink method "prepareStatement" -> code.SqlExecution
+    sink method "prepareCall" -> code.SqlExecution
+    sink method "setValidationQuery" -> code.SqlExecution
+  }
+}

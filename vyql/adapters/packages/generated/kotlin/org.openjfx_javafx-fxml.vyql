@@ -1,0 +1,8 @@
+import code.{Deserialization, ExpressionEval}
+
+adapter kotlin {
+  package "org.openjfx:javafx-fxml" {
+    sink method "load" -> code.Deserialization
+    sink method "parse" -> code.ExpressionEval
+  }
+}

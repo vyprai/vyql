@@ -1,0 +1,13 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, AuthorizationCheck, UserControlledData}
+
+adapter groovy {
+  package "org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure" {
+    source method "getClientSecret" -> code.SecretValue
+    source method "setClientSecret" -> code.SecretValue
+    source method "extractPrincipal" -> core.UserControlledData
+    source method "extractAuthorities" -> core.UserControlledData
+    control method "configure" -> core.AuthenticationCheck
+    control method "configure" -> core.AuthorizationCheck
+  }
+}

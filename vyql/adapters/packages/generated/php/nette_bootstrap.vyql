@@ -1,0 +1,11 @@
+import code.{FilePathAccess}
+import core.{UserControlledData}
+
+adapter php {
+  package "nette/bootstrap" {
+    sink method "addConfig" -> code.FilePathAccess
+    source method "addParameters" -> core.UserControlledData
+    source method "addStaticParameters" -> core.UserControlledData
+    source method "addDynamicParameters" -> core.UserControlledData
+  }
+}

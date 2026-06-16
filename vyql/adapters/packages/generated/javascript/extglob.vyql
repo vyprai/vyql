@@ -1,0 +1,11 @@
+import code.{RegexCompile}
+adapter javascript {
+  package "extglob" {
+    mark method "extglob" -> code.RegexCompile
+    mark method "match" -> code.RegexCompile
+    mark method "matcher" -> code.RegexCompile
+    mark method "create" -> code.RegexCompile
+    mark method "makeRe" -> code.RegexCompile
+    mark method "Extglob" -> code.RegexCompile
+  }
+}

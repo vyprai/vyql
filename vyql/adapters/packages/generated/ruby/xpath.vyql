@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+
+adapter ruby {
+  package "xpath" {
+    sink method "render" -> code.ExpressionEval
+  }
+}

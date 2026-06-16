@@ -1,0 +1,9 @@
+import code.{HttpInput}
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/vapor/routing-kit" {
+    source method "TrieRouter.route" -> code.HttpInput
+    source method "Parameters.get" -> core.UserControlledData
+  }
+}

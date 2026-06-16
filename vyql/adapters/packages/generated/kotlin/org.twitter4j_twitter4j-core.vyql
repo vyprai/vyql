@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter kotlin {
+  package "org.twitter4j:twitter4j-core" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

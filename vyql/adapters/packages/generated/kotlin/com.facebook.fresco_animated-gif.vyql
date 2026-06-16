@@ -1,0 +1,8 @@
+adapter kotlin {
+  package "com.facebook.fresco:animated-gif" {
+    sink method "createFromByteBuffer" -> code.Deserialization
+    sink method "createFromFileDescriptor" -> code.Deserialization
+    sink method "decodeFromNativeMemory" -> code.Deserialization
+    sink method "decodeFromByteBuffer" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter php {
+  package "phpmailer/phpmailer" {
+    sink method "send" -> code.NetworkSend
+  }
+}

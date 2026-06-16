@@ -1,0 +1,5 @@
+adapter objc {
+  package "libPusher" {
+    sink method "NewBase64Decode" -> code.Deserialization
+  }
+}

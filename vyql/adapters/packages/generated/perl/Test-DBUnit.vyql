@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter perl {
+  package "Test-DBUnit" {
+    sink method "execute" -> code.SqlExecution
+  }
+}

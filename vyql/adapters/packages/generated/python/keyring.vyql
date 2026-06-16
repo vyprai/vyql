@@ -1,0 +1,10 @@
+import code.{SecretValue}
+adapter python {
+  package "keyring" {
+    source method "get_password" -> code.SecretValue
+    source method "set_password" -> code.SecretValue
+    source method "get_credential" -> code.SecretValue
+    source method "add_password" -> code.SecretValue
+    source method "find_user_password" -> code.SecretValue
+  }
+}

@@ -1,0 +1,6 @@
+import code.{PrivilegedOp}
+adapter perl {
+  package "Device-Delcom-VSI" {
+    mark method "_delcom_write_command" -> code.PrivilegedOp
+  }
+}

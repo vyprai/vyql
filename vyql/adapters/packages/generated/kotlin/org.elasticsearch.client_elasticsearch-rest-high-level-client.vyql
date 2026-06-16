@@ -1,0 +1,6 @@
+import code.{NosqlQuery}
+adapter kotlin {
+  package "org.elasticsearch.client:elasticsearch-rest-high-level-client" {
+    sink method "search" -> code.NosqlQuery
+  }
+}

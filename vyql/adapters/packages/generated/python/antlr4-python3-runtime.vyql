@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "antlr4-python3-runtime" {
+    sink method "parse" -> code.Deserialization
+  }
+}

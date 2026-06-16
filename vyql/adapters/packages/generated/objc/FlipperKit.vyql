@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter objc {
+  package "FlipperKit" {
+    source method "read" -> core.UserControlledData
+  }
+}

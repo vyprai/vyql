@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter elixir {
+  package "kadabra" {
+    sink method "open" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+  }
+}

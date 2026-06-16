@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter ruby {
+  package "stripe" {
+    sink method "execute_request" -> code.NetworkSend
+  }
+}

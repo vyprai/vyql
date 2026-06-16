@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess}
+import core.{InputValidation}
+
+adapter python {
+  package "pyxdg" {
+    sink method "parse" -> code.Deserialization
+    sink method "write" -> code.FilePathAccess
+    control method "validate" -> core.InputValidation
+  }
+}

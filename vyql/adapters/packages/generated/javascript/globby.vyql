@@ -1,0 +1,9 @@
+import code.{FilePathAccess}
+
+adapter javascript {
+  package "globby" {
+    sink method "globby" -> code.FilePathAccess
+    sink method "globbySync" -> code.FilePathAccess
+    sink method "globbyStream" -> code.FilePathAccess
+  }
+}

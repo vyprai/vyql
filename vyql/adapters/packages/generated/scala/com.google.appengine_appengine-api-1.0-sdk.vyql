@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "com.google.appengine:appengine-api-1.0-sdk" {
+    sink method "parse" -> code.Deserialization
+  }
+}

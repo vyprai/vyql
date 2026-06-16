@@ -1,0 +1,7 @@
+import code.{FilePathAccess, FileUse}
+adapter python {
+  package "pytest-arraydiff" {
+    sink method "read" -> code.FilePathAccess
+    sink method "write" -> code.FileUse
+  }
+}

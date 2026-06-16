@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter objc {
+  package "iRate" {
+    sink method "ratingsURL" -> code.UrlFetch
+  }
+}

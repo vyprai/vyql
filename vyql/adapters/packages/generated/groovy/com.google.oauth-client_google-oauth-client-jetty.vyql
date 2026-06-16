@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter groovy {
+  package "com.google.oauth-client:google-oauth-client-jetty" {
+    source method "LocalServerReceiver.handle" -> code.HttpInput
+  }
+}

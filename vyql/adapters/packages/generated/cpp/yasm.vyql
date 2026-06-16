@@ -1,0 +1,14 @@
+import code.{Deserialization, FilePathAccess}
+import core.{PathCanonicalization}
+
+adapter cpp {
+  package "yasm" {
+    sink method "yasm_unescape_cstring" -> code.Deserialization
+    sink method "yasm__splitpath_unix" -> code.FilePathAccess
+    sink method "yasm__splitpath_win" -> code.FilePathAccess
+    sink method "yasm__combpath_unix" -> code.FilePathAccess
+    sink method "yasm__combpath_win" -> code.FilePathAccess
+    sink method "yasm__createpath_common" -> code.FilePathAccess
+    sink method "yasm_add_include_path" -> code.FilePathAccess
+  }
+}

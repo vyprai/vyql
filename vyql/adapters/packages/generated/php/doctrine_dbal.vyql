@@ -1,0 +1,14 @@
+import code.{SqlExecution}
+import core.{SqlParameterization}
+
+adapter php {
+  package "doctrine/dbal" {
+    sink method "query" -> code.SqlExecution
+    sink method "exec" -> code.SqlExecution
+    sink method "executeQuery" -> code.SqlExecution
+    sink method "executeStatement" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+    control method "bindValue" -> core.SqlParameterization
+    control method "prepare" -> core.SqlParameterization
+  }
+}

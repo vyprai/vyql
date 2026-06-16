@@ -1,0 +1,13 @@
+import code.{StoredDataWrite, StoredDataRead}
+adapter objc {
+  package "Analytics" {
+    sink method "setData:forKey:" -> code.StoredDataWrite
+    source method "dataForKey:" -> code.StoredDataRead
+    sink method "setDictionary:forKey:" -> code.StoredDataWrite
+    source method "dictionaryForKey:" -> code.StoredDataRead
+    sink method "setArray:forKey:" -> code.StoredDataWrite
+    source method "arrayForKey:" -> code.StoredDataRead
+    sink method "setString:forKey:" -> code.StoredDataWrite
+    source method "stringForKey:" -> code.StoredDataRead
+  }
+}

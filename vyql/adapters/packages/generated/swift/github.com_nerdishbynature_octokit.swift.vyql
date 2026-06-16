@@ -1,0 +1,10 @@
+import core.{UserControlledData, AuthenticationCheck}
+
+adapter swift {
+  package "github.com/nerdishbynature/octokit.swift" {
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "authorize" -> core.AuthenticationCheck
+    source method "handleOpenURL" -> core.UserControlledData
+    source method "accessTokenFromResponse" -> core.UserControlledData
+  }
+}

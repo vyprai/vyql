@@ -1,0 +1,9 @@
+import code.{Deserialization, RedirectTarget}
+
+adapter objc {
+  package "OHAttributedLabel" {
+    sink method "processMarkupInAttributedString" -> code.Deserialization
+    sink method "attributedStringByProcessingMarkupInString" -> code.Deserialization
+    mark method "addCustomLink" -> code.RedirectTarget
+  }
+}

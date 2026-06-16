@@ -1,0 +1,6 @@
+adapter c {
+  package "prometheus-cpp" {
+    source method "handleGet" -> code.HttpInput
+    sink method "performHttpRequest" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,6 @@
+adapter groovy {
+  package "org.springframework.data:spring-data-commons" {
+    sink method "getSourceBeanDefinition" -> code.XmlParse
+    sink method "getObjectFactoryBeanDefinition" -> code.XmlParse
+  }
+}

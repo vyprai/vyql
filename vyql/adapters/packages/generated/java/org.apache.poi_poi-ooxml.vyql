@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter java {
+  package "org.apache.poi:poi-ooxml" {
+    sink method "parse" -> code.Deserialization
+    sink method "open" -> code.Deserialization
+    sink method "openPackage" -> code.FilePathAccess
+  }
+}

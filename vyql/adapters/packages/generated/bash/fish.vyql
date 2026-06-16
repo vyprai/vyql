@@ -1,0 +1,5 @@
+adapter bash {
+  package "fish" {
+    source path "fish.argv" -> code.CliArgument
+  }
+}

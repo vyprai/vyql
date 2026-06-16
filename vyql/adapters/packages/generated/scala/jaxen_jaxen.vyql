@@ -1,0 +1,6 @@
+adapter scala {
+  package "jaxen:jaxen" {
+    sink method "BaseXPath.<init>" -> code.ExpressionEval
+    sink method "DOMXPath.<init>" -> code.ExpressionEval
+  }
+}

@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter javascript {
+  package "micromatch" {
+    mark method "micromatch" -> code.RegexCompile
+  }
+}

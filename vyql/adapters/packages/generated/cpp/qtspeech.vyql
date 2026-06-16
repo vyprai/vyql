@@ -1,0 +1,6 @@
+adapter cpp {
+  package "qtspeech" {
+    sink method "QVoice.readFrom" -> code.Deserialization
+    sink method "QVoice.writeTo" -> code.Deserialization
+  }
+}

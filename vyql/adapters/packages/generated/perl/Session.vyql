@@ -1,0 +1,11 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter perl {
+  package "Session" {
+    source method "session_id" -> code.StoredDataRead
+    source method "get" -> code.StoredDataRead
+    sink method "set" -> code.StoredDataWrite
+    sink method "remove" -> code.StoredDataWrite
+    sink method "clear" -> code.StoredDataWrite
+  }
+}

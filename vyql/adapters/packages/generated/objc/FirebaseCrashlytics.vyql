@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter objc {
+  package "FirebaseCrashlytics" {
+    mark method "FIRCLSHashNSData" -> code.WeakHash
+    mark method "FIRCLSHashBytes" -> code.WeakHash
+  }
+}

@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.objenesis:objenesis" {
+    sink method "newInstance" -> code.Deserialization
+    sink method "getInstantiatorOf" -> code.Deserialization
+    sink method "newSerializableInstance" -> code.Deserialization
+    sink method "getSerializableObjectInstantiatorOf" -> code.Deserialization
+  }
+}

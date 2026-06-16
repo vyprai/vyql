@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/google/go-querystring" {
+    sink method "Values" -> code.Deserialization
+  }
+}

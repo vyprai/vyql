@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter c {
+  package "aws-c-s3" {
+    source method "aws_s3_client_make_meta_request" -> core.UserControlledData
+  }
+}

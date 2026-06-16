@@ -1,0 +1,11 @@
+import code.{CommandExecution}
+import core.{ShellEscape}
+
+adapter php {
+  package "consolidation/site-process" {
+    sink method "mustRun" -> code.CommandExecution
+    sink method "process" -> code.CommandExecution
+    sink method "shell" -> code.CommandExecution
+    control method "shellArg" -> core.ShellEscape
+  }
+}

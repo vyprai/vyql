@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter cpp {
+  package "lua-compat53" {
+    sink method "io_popen" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+
+adapter scala {
+  package "org.thymeleaf:thymeleaf-spring4" {
+    sink method "render" -> code.HtmlRender
+  }
+}

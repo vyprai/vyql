@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter rust {
+  package "windows-implement" {
+    source method "parse" -> core.UserControlledData
+  }
+}

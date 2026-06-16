@@ -1,0 +1,5 @@
+adapter java {
+  package "javax.servlet.jsp.jstl:jstl-api" {
+    sink method "addSQLParameter" -> code.SqlExecution
+  }
+}

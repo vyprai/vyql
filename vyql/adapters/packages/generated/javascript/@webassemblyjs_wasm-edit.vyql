@@ -1,0 +1,11 @@
+import code.{CodeEval}
+
+adapter javascript {
+  package "@webassemblyjs/wasm-edit" {
+    sink method "applyOperations" -> code.CodeEval
+    sink method "edit" -> code.CodeEval
+    sink method "editWithAST" -> code.CodeEval
+    sink method "add" -> code.CodeEval
+    sink method "addWithAST" -> code.CodeEval
+  }
+}

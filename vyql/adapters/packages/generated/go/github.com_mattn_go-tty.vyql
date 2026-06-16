@@ -1,0 +1,13 @@
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/mattn/go-tty" {
+    source method "ReadString" -> core.UserControlledData
+    source method "ReadPassword" -> core.UserControlledData
+    source method "ReadPasswordNoEcho" -> core.UserControlledData
+    source method "ReadPasswordClear" -> core.UserControlledData
+  }
+  package "github.com/mattn/go-tty/ttyutil" {
+    source method "ReadLine" -> core.UserControlledData
+  }
+}

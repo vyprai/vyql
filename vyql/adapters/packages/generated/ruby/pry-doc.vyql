@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter ruby {
+  package "pry-doc" {
+    sink method "extract" -> code.Deserialization
+    sink method "source_from_file" -> code.FilePathAccess
+  }
+}

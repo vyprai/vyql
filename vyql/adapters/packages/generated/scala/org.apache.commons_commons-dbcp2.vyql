@@ -1,0 +1,8 @@
+import code.{SqlExecution, DatabaseRead}
+adapter scala {
+  package "org.apache.commons:commons-dbcp2" {
+    sink method "setValidationQuery" -> code.SqlExecution
+    sink method "setConnectionInitSqls" -> code.SqlExecution
+    sink method "getConnection" -> code.DatabaseRead
+  }
+}

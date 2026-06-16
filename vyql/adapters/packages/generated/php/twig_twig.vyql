@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter php {
+  package "twig/twig" {
+    sink method "parse" -> code.CodeEval
+    sink method "compile" -> code.CodeEval
+  }
+}

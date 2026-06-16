@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter ruby {
+  package "uglifier" {
+    sink method "compile" -> code.Deserialization
+    sink method "compile_with_map" -> code.Deserialization
+  }
+}

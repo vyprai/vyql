@@ -1,0 +1,7 @@
+import code.{Deserialization, HttpInput}
+adapter c {
+  package "http-parser" {
+    sink method "http_parser_execute" -> code.Deserialization
+    sink method "http_parser_parse_url" -> code.Deserialization
+  }
+}

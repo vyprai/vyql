@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+adapter perl {
+  package "Scriptalicious" {
+    sink method "run" -> code.CommandExecution
+    sink method "run_err" -> code.CommandExecution
+  }
+}

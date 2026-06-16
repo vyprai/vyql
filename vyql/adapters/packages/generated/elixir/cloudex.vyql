@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter elixir {
+  package "cloudex" {
+    sink method "upload" -> code.NetworkSend
+  }
+}

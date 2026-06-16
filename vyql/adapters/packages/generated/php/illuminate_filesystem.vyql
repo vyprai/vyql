@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "illuminate/filesystem" {
+    sink method "exec" -> code.CommandExecution
+  }
+}

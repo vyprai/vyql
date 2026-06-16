@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter php {
+  package "symfony/asset" {
+    sink method "getUrl" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,7 @@
+import code.{TemplateRender}
+adapter swift {
+  package "github.com/stencilproject/Stencil" {
+    sink method "render" -> code.TemplateRender
+    sink method "renderTemplate" -> code.TemplateRender
+  }
+}

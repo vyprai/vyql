@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter swift {
+  package "github.com/ChimeHQ/LanguageClient" {
+    sink method "localProcessChannel" -> code.CommandExecution
+  }
+}

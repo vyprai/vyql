@@ -1,0 +1,10 @@
+import code.{FilePathAccess, FileUse}
+
+adapter php {
+  package "spryker/code-sniffer" {
+    sink method "Spryker\Tools\Tokenizer::tokenize" -> code.FilePathAccess
+    sink method "Spryker\Tools\Tokenizer::tokenize" -> code.FileUse
+    sink method "Spryker\Tools\Tokenizer::getTokens" -> code.FilePathAccess
+    sink method "Spryker\Tools\Tokenizer::getTokens" -> code.FileUse
+  }
+}

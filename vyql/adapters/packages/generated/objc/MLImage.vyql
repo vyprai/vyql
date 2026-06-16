@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+adapter objc {
+  package "MLImage" {
+    source method "initWithPixelBuffer" -> core.UserControlledData
+    source method "initWithSampleBuffer" -> core.UserControlledData
+    source method "initWithImage" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,8 @@
+adapter swift {
+  package "github.com/apple/swift-nio" {
+    source method "read" -> code.NetworkData
+    sink method "close" -> code.NetworkSend
+    sink method "connect" -> code.NetworkConnect
+    mark method "hash" -> code.WeakHash
+  }
+}

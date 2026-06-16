@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+import code.{SecretValue}
+
+adapter go {
+  package "k8s.io/csi-translation-lib" {
+    source method "getStorageAccountName" -> code.SecretValue
+    source method "getFileShareInfo" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "com.firebaseui:firebase-ui-database" {
+    sink method "parseSnapshot" -> code.Deserialization
+  }
+}

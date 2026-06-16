@@ -1,0 +1,12 @@
+import code.{FilePathAccess}
+
+adapter go {
+  package "github.com/cyphar/filepath-securejoin" {
+    sink method "SecureJoin" -> code.FilePathAccess
+    sink method "SecureJoinVFS" -> code.FilePathAccess
+    sink method "OpenInRoot" -> code.FilePathAccess
+    sink method "MkdirAll" -> code.FilePathAccess
+    sink method "MkdirAllHandle" -> code.FilePathAccess
+    sink method "OpenatInRoot" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter kotlin {
+  package "net.sf.jopt-simple:jopt-simple" {
+    source method "parse" -> code.CliArgument
+  }
+}

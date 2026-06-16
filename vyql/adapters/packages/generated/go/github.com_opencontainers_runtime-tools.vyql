@@ -1,0 +1,8 @@
+import core.{PathCanonicalization, PathAccessCheck}
+adapter go {
+  package "github.com/opencontainers/runtime-tools" {
+    control method "Abs" -> core.PathCanonicalization
+    control method "Clean" -> core.PathCanonicalization
+    control method "IsAncestor" -> core.PathAccessCheck
+  }
+}

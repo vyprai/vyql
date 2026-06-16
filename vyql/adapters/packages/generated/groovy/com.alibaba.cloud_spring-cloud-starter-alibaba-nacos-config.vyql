@@ -1,0 +1,5 @@
+adapter groovy {
+  package "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config" {
+    source method "loadNacosPropertySource" -> core.UserControlledData
+  }
+}

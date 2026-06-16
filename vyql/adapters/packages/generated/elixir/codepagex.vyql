@@ -1,0 +1,12 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "codepagex" {
+    sink method "to_string" -> code.Deserialization
+    sink method "to_string!" -> code.Deserialization
+    sink method "from_string" -> code.Deserialization
+    sink method "from_string!" -> code.Deserialization
+    sink method "translate" -> code.Deserialization
+    sink method "translate!" -> code.Deserialization
+  }
+}

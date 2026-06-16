@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter php {
+  package "symfony/polyfill-mbstring" {
+    source method "mb_parse_str" -> core.UserControlledData
+  }
+}

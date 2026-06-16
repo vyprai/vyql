@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter cpp {
+  package "kf5sonnet" {
+    source method "setBuffer" -> core.UserControlledData
+  }
+}

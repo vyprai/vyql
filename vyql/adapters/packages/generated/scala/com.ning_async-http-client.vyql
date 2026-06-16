@@ -1,0 +1,10 @@
+import code.{HttpInput, NetworkConnect, NetworkSend}
+
+adapter scala {
+  package "com.ning:async-http-client" {
+    source method "prepareGet" -> code.HttpInput
+    source method "preparePost" -> code.HttpInput
+    sink method "execute" -> code.NetworkConnect
+    sink method "execute" -> code.NetworkSend
+  }
+}

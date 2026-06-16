@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter elixir {
+  package "appsignal_phoenix" {
+    source method "handle_in" -> core.UserControlledData
+  }
+}

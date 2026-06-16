@@ -1,0 +1,11 @@
+import code.{CliArgument}
+import core.{InputValidation}
+
+adapter javascript {
+  package "coa" {
+    source method "Cmd" -> code.CliArgument
+    source method "run" -> code.CliArgument
+    control method "escape" -> core.InputValidation
+    control method "unescape" -> core.InputValidation
+  }
+}

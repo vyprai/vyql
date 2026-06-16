@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter javascript {
+  package "json-parse-even-better-errors" {
+    sink method "parseJson" -> code.Deserialization
+    sink method "parseJsonError" -> code.Deserialization
+  }
+}

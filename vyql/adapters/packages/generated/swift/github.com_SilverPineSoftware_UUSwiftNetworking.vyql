@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/SilverPineSoftware/UUSwiftNetworking" {
+    source method "get" -> code.HttpInput
+  }
+}

@@ -1,0 +1,7 @@
+import code.{NosqlQuery}
+
+adapter scala {
+  package "org.elasticsearch.client:elasticsearch-rest-high-level-client" {
+    sink method "search" -> code.NosqlQuery
+  }
+}

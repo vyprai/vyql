@@ -1,0 +1,16 @@
+import code.{NetworkData, NetworkSend, PrivilegedOp}
+adapter ruby {
+  package "io-like" {
+    source method "read" -> code.NetworkData
+    source method "read_nonblock" -> code.NetworkData
+    source method "readline" -> code.NetworkData
+    source method "readlines" -> code.NetworkData
+    source method "readpartial" -> code.NetworkData
+    source method "sysread" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+    sink method "write_nonblock" -> code.NetworkSend
+    sink method "syswrite" -> code.NetworkSend
+    mark method "fcntl" -> code.PrivilegedOp
+    mark method "ioctl" -> code.PrivilegedOp
+  }
+}

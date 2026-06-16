@@ -1,0 +1,12 @@
+import code.{Deserialization, ArchiveEntryWrite, FileUse}
+
+adapter python {
+  package "olefile" {
+    sink method "open" -> code.Deserialization
+    sink method "isOleFile" -> code.Deserialization
+    sink method "parse_properties" -> code.Deserialization
+    sink method "openstream" -> code.Deserialization
+    sink method "write_sect" -> code.ArchiveEntryWrite
+    sink method "write_stream" -> code.ArchiveEntryWrite
+  }
+}

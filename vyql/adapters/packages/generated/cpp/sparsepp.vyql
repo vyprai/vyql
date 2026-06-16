@@ -1,0 +1,15 @@
+import code.{Deserialization, FilePathAccess, FileUse}
+adapter cpp {
+  package "sparsepp" {
+    sink method "read_data_internal" -> code.Deserialization
+    sink method "read_data_internal_for_istream" -> code.Deserialization
+    sink method "read_data" -> code.Deserialization
+    sink method "read_metadata" -> code.Deserialization
+    sink method "read_nopointer_data" -> code.Deserialization
+    sink method "write_data_internal" -> code.FilePathAccess
+    sink method "write_data_internal_for_ostream" -> code.FilePathAccess
+    sink method "write_data" -> code.FilePathAccess
+    sink method "write_metadata" -> code.FilePathAccess
+    sink method "write_nopointer_data" -> code.FilePathAccess
+  }
+}

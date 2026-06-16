@@ -1,0 +1,8 @@
+import code.{Deserialization, UrlFetch}
+
+adapter ruby {
+  package "cocoapods-plugins" {
+    sink method "download_json" -> code.UrlFetch
+    sink method "parse_json" -> code.Deserialization
+  }
+}

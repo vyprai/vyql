@@ -1,0 +1,11 @@
+import code.{FilePathAccess, FileUse}
+
+adapter php {
+  package "mikey179/vfsstream" {
+    sink method "copyFromFileSystem" -> code.FilePathAccess
+    sink method "write" -> code.FileUse
+    sink method "read" -> code.FileUse
+    sink method "newFile" -> code.FileUse
+    sink method "newDirectory" -> code.FileUse
+  }
+}

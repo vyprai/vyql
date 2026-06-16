@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "astrolabe" {
+    sink method "n" -> code.Deserialization
+  }
+}

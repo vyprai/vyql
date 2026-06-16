@@ -1,0 +1,16 @@
+import code.{SqlExecution}
+import core.{SqlParameterization}
+
+adapter elixir {
+  package "clickhouse_ecto" {
+    sink method "ClickhouseEcto.Query.all" -> code.SqlExecution
+    sink method "ClickhouseEcto.Query.insert" -> code.SqlExecution
+    sink method "ClickhouseEcto.Query.update_all" -> code.SqlExecution
+    sink method "ClickhouseEcto.Query.delete_all" -> code.SqlExecution
+    sink method "ClickhouseEcto.Storage.run_query" -> code.SqlExecution
+    sink method "ClickhouseEcto.Migration.execute_ddl" -> code.SqlExecution
+    sink method "ClickhouseEcto.Connection.prepare_execute" -> code.SqlExecution
+    sink method "ClickhouseEcto.Connection.execute" -> code.SqlExecution
+    control method "ClickhouseEcto.Helpers.escape_string" -> core.SqlParameterization
+  }
+}

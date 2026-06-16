@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.glassfish.jersey.containers:jersey-container-servlet" {
+    source method "createDelegate" -> code.HttpInput
+    sink method "createDelegate" -> code.ResponseHeaderWrite
+  }
+}

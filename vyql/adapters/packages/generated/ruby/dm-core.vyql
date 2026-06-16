@@ -1,0 +1,5 @@
+adapter ruby {
+  package "dm-core" {
+    sink method "read" -> code.FilePathAccess
+  }
+}

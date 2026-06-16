@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter cpp {
+  package "zstd" {
+    sink method "ZSTD_getFrameHeader" -> code.Deserialization
+    sink method "ZSTD_getFrameHeader_advanced" -> code.Deserialization
+  }
+}

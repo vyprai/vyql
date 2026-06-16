@@ -1,0 +1,5 @@
+adapter javascript {
+  package "to-regex" {
+    mark method "module.exports" -> code.RegexCompile
+  }
+}

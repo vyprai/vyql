@@ -1,0 +1,7 @@
+adapter c {
+  package "seacas" {
+    sink method "executePull" -> code.SqlExecution
+    sink method "compiler" -> code.DynamicCodeLoad
+    sink method "file" -> code.FilePathAccess
+  }
+}

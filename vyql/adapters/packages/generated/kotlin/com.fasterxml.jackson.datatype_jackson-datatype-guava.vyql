@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-guava" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "deserializeWithType" -> code.Deserialization
+  }
+}

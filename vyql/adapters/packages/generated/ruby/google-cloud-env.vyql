@@ -1,0 +1,10 @@
+import code.{EnvVariable, FilePathAccess, NetworkData}
+
+adapter ruby {
+  package "google-cloud-env" {
+    sink method "FileSystem.read" -> code.FilePathAccess
+    source method "ComputeMetadata.lookup" -> code.NetworkData
+    source method "ComputeMetadata.lookup_response" -> code.NetworkData
+    source method "Env.variables" -> code.EnvVariable
+  }
+}

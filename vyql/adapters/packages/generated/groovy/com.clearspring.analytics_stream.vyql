@@ -1,0 +1,20 @@
+import code.{WeakHash, Deserialization}
+adapter groovy {
+  package "com.clearspring.analytics:stream" {
+    mark method "hash" -> code.WeakHash
+    mark method "hashLong" -> code.WeakHash
+    mark method "hash64" -> code.WeakHash
+    mark method "lookup3ycs" -> code.WeakHash
+    mark method "lookup3ycs64" -> code.WeakHash
+    sink method "readExternal" -> code.Deserialization
+    sink method "writeExternal" -> code.Deserialization
+    sink method "writeSignedVarLong" -> code.Deserialization
+    sink method "writeUnsignedVarLong" -> code.Deserialization
+    sink method "readSignedVarLong" -> code.Deserialization
+    sink method "readUnsignedVarLong" -> code.Deserialization
+    sink method "writeSignedVarInt" -> code.Deserialization
+    sink method "writeUnsignedVarInt" -> code.Deserialization
+    sink method "readSignedVarInt" -> code.Deserialization
+    sink method "readUnsignedVarInt" -> code.Deserialization
+  }
+}

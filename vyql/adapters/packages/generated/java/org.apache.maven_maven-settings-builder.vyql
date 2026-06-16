@@ -1,0 +1,5 @@
+adapter java {
+  package "org.apache.maven:maven-settings-builder" {
+    sink method "org.apache.maven.settings.io.DefaultSettingsReader.read" -> code.Deserialization
+  }
+}

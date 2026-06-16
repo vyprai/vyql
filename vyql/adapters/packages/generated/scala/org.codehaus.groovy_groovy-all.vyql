@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "org.codehaus.groovy:groovy-all" {
+    sink method "parse" -> code.Deserialization
+  }
+}

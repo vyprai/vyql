@@ -1,0 +1,8 @@
+import code.{UrlFetch}
+
+adapter python {
+  package "google" {
+    sink method "search" -> code.UrlFetch
+    sink method "get_page" -> code.UrlFetch
+  }
+}

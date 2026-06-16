@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter cpp {
+  package "nowide" {
+    sink method "system" -> code.CommandExecution
+  }
+}

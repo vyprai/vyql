@@ -1,0 +1,17 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "ftgl" {
+    sink method "Attach" -> code.Deserialization
+    sink method "ftglCreateCustomFont" -> code.Deserialization
+    sink method "ftglAttachFile" -> code.Deserialization
+    sink method "Glyph" -> code.Deserialization
+    sink method "GlyphLoadFlags" -> code.Deserialization
+    sink method "readUTF8" -> code.Deserialization
+    sink method "readUTF16" -> code.Deserialization
+    sink method "ftglCreateBufferFont" -> code.Deserialization
+    sink method "ftglCreateExtrudeFont" -> code.Deserialization
+    sink method "ftglCreateBitmapFont" -> code.Deserialization
+    sink method "ftglCreatePixmapFont" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter scala {
+  package "org.codehaus.groovy:groovy-jsr223" {
+    sink method "eval" -> code.CodeEval
+  }
+}

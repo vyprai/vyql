@@ -1,0 +1,5 @@
+adapter ruby {
+  package "ed25519" {
+    control method "validate_key_bytes" -> core.InputValidation
+  }
+}

@@ -1,0 +1,11 @@
+import core.{InputValidation}
+
+adapter kotlin {
+  package "org.glassfish.jersey.ext:jersey-bean-validation" {
+    control method "validate" -> core.InputValidation
+    control method "validateValue" -> core.InputValidation
+    control method "validateResourceAndInputParams" -> core.InputValidation
+    control method "validateResult" -> core.InputValidation
+    control method "toResponse" -> core.InputValidation
+  }
+}

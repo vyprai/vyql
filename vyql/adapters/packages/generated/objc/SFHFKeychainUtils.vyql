@@ -1,0 +1,11 @@
+import code.{SecretValue}
+
+adapter objc {
+  package "SFHFKeychainUtils" {
+    source method "getPasswordForUsername" -> code.SecretValue
+    source method "getPasswordForUsernameOld" -> code.SecretValue
+    source method "getPasswordForUsernameV2" -> code.SecretValue
+    source method "storeUsername:andPassword:" -> code.SecretValue
+    source method "storeUsername:andPassword:forServiceName:updateExisting:error:" -> code.SecretValue
+  }
+}

@@ -1,0 +1,6 @@
+adapter php {
+  package "nunomaduro/termwind" {
+    sink method "parse" -> code.Deserialization
+    sink method "HtmlRenderer.parse" -> code.Deserialization
+  }
+}

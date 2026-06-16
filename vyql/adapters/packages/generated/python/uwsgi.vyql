@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter python {
+  package "uwsgi" {
+    control method "sanitize_args" -> core.InputValidation
+  }
+}

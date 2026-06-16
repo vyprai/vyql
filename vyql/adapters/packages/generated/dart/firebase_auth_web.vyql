@@ -1,0 +1,14 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter dart {
+  package "firebase_auth_web" {
+    source method "getIdToken" -> code.SecretValue
+    control method "linkWithPopup" -> core.AuthenticationCheck
+    control method "reauthenticateWithPopup" -> core.AuthenticationCheck
+    control method "signInAnonymously" -> core.AuthenticationCheck
+    control method "signInWithCustomToken" -> core.AuthenticationCheck
+    control method "signInWithEmailLink" -> core.AuthenticationCheck
+    control method "signInWithPopup" -> core.AuthenticationCheck
+  }
+}

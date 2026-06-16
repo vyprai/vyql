@@ -1,0 +1,8 @@
+import code.{NetworkConnect}
+adapter python {
+  package "pytest-remotedata" {
+    sink method "turn_off_internet" -> code.NetworkConnect
+    sink method "turn_on_internet" -> code.NetworkConnect
+    sink method "no_internet" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/ChimeHQ/Flexer" {
+    source method "next()" -> core.UserControlledData
+    source method "peek(distance:)" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+import code.{SecretValue, UrlFetch}
+adapter perl {
+  package "WWW-Jirafe" {
+    sink method "request" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter ruby {
+  package "faraday-em_synchrony" {
+    sink method "call" -> code.NetworkConnect
+    sink method "create_request" -> code.NetworkConnect
+    sink method "execute_parallel_request" -> code.NetworkSend
+    sink method "execute_single_request" -> code.NetworkSend
+  }
+}

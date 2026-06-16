@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter php {
+  package "symfony/debug" {
+    control method "Symfony\\Component\\Debug\\ExceptionHandler::escapeHtml" -> core.HtmlEscape
+  }
+}

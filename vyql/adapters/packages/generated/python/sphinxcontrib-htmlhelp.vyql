@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter python {
+  package "sphinxcontrib-htmlhelp" {
+    control method "chm_htmlescape" -> core.HtmlEscape
+  }
+}

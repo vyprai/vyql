@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter rust {
+  package "prost-build" {
+    sink method "compile_protos" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter python {
+  package "pyasn1" {
+    sink method "valueDecoder" -> code.Deserialization
+    sink method "indefLenValueDecoder" -> code.Deserialization
+  }
+}

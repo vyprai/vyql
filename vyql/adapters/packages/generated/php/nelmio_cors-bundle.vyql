@@ -1,0 +1,8 @@
+import code.{ResponseHeaderWrite}
+import core.{AuthorizationCheck}
+adapter php {
+  package "nelmio/cors-bundle" {
+    control method "onKernelRequest" -> core.AuthorizationCheck
+    sink method "onKernelResponse" -> code.ResponseHeaderWrite
+  }
+}

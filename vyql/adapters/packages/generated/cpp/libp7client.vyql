@@ -1,0 +1,8 @@
+import code.{FilePathAccess, NetworkSend}
+
+adapter cpp {
+  package "libp7client" {
+    sink method "Write" -> code.FilePathAccess
+    sink method "Send" -> code.NetworkSend
+  }
+}

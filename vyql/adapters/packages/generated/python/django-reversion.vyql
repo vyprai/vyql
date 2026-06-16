@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "django-reversion" {
+    sink method "revert" -> code.Deserialization
+  }
+}

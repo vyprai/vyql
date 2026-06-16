@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter go {
+  package "k8s.io/kube-aggregator" {
+    sink method "proxyError" -> code.NetworkSend
+  }
+}

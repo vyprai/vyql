@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+adapter php {
+  package "beberlei/assert" {
+    mark method "regex" -> code.RegexCompile
+    mark method "notRegex" -> code.RegexCompile
+  }
+}

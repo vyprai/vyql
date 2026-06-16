@@ -1,0 +1,10 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter cpp {
+  package "detours" {
+    sink method "DetourCreateProcessWithDllA" -> code.CommandExecution
+    sink method "DetourCreateProcessWithDllW" -> code.CommandExecution
+    sink method "DetourBinaryOpen" -> code.FilePathAccess
+    sink method "DetourBinaryWrite" -> code.FilePathAccess
+  }
+}

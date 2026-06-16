@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "jaxen:jaxen" {
+    sink method "BaseXPath" -> code.Deserialization
+    sink method "DOMXPath" -> code.Deserialization
+  }
+}

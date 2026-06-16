@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter rust {
+  package "x11-dl" {
+    sink method "open" -> code.FilePathAccess
+    sink method "open_multi" -> code.FilePathAccess
+  }
+}

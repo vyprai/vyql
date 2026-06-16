@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter ruby {
+  package "pdf-core" {
+    sink method "render_file" -> code.FilePathAccess
+  }
+}

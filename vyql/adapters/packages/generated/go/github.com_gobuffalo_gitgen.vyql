@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter go {
+  package "github.com/gobuffalo/gitgen" {
+    sink method "Run" -> code.CommandExecution
+  }
+}

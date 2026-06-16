@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter dart {
+  package "http2" {
+    sink method "ClientConnection" -> code.NetworkConnect
+    sink method "ServerConnection" -> code.NetworkConnect
+    sink method "sendHeaders" -> code.NetworkSend
+    sink method "sendData" -> code.NetworkSend
+  }
+}

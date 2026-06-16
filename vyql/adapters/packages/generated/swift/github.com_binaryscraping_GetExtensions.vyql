@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter swift {
+  package "github.com/binaryscraping/GetExtensions" {
+    sink method "client" -> code.NetworkConnect
+  }
+}

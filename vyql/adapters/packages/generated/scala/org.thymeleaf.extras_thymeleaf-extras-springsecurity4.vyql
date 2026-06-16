@@ -1,0 +1,10 @@
+import core.{AuthorizationCheck}
+adapter scala {
+  package "org.thymeleaf.extras:thymeleaf-extras-springsecurity4" {
+    control method "authorizeUsingAccessExpression" -> core.AuthorizationCheck
+    control method "authorizeUsingUrlCheck" -> core.AuthorizationCheck
+    control method "authorizeUsingAccessControlList" -> core.AuthorizationCheck
+    control method "parsePermissionsString" -> core.AuthorizationCheck
+    control method "url" -> core.AuthorizationCheck
+  }
+}

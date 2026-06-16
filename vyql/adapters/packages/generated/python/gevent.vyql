@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter python {
+  package "gevent" {
+    sink method "system" -> code.CommandExecution
+  }
+}

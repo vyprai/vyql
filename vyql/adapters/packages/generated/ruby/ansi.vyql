@@ -1,0 +1,8 @@
+import code.{HtmlRender}
+
+adapter ruby {
+  package "ansi" {
+    sink method "gsub!" -> code.HtmlRender
+    sink method "gsub" -> code.HtmlRender
+  }
+}

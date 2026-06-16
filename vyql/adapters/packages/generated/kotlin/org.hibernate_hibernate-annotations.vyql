@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter kotlin {
+  package "org.hibernate:hibernate-annotations" {
+    sink method "query" -> code.SqlExecution
+    sink method "sql" -> code.SqlExecution
+  }
+}

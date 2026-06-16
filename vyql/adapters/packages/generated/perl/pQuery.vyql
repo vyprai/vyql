@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "pQuery" {
+    sink method "pQuery::DOM->fromHTML" -> code.Deserialization
+  }
+}

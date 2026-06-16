@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter elixir {
+  package "telemetry_metrics_statsd" {
+    sink method "send" -> code.NetworkSend
+  }
+}

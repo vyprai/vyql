@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/containerd/stargz-snapshotter/estargz" {
+    sink method "parseTOCEStargz" -> code.Deserialization
+    sink method "decompressTOCEStargz" -> code.Deserialization
+  }
+}

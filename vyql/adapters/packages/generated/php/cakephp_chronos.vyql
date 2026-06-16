@@ -1,0 +1,15 @@
+import code.{Deserialization, FilePathAccess}
+import core.{InputValidation}
+
+adapter php {
+  package "cakephp/chronos" {
+    sink method "parse" -> code.Deserialization
+    control method "is_string" -> core.InputValidation
+    sink method "parseString" -> code.Deserialization
+    control method "equals" -> core.InputValidation
+    control method "greaterThan" -> core.InputValidation
+    control method "greaterThanOrEquals" -> core.InputValidation
+    control method "lessThan" -> core.InputValidation
+    control method "lessThanOrEquals" -> core.InputValidation
+  }
+}

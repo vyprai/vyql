@@ -1,0 +1,8 @@
+import code.{WeakRandomValue}
+
+adapter go {
+  package "github.com/d2g/dhcp4client" {
+    mark method "CryptoGenerateXID" -> code.WeakRandomValue
+    mark method "MathGenerateXID" -> code.WeakRandomValue
+  }
+}

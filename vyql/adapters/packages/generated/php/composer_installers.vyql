@@ -1,0 +1,6 @@
+adapter php {
+  package "composer/installers" {
+    sink method "getInstallPath" -> code.CodeEval
+    sink method "getInstallPath" -> code.FilePathAccess
+  }
+}

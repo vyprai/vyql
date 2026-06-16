@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter rust {
+  package "standback" {
+    control method "escape_ascii" -> core.InputValidation
+  }
+}

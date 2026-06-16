@@ -1,0 +1,5 @@
+adapter java {
+  package "com.github.pagehelper:pagehelper" {
+    sink method "parse" -> code.SqlExecution
+  }
+}

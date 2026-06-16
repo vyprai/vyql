@@ -1,0 +1,7 @@
+adapter perl {
+  package "URI" {
+    control method "uri_escape" -> core.InputValidation
+    control method "uri_unescape" -> core.InputValidation
+    control method "uri_escape_utf8" -> core.InputValidation
+  }
+}

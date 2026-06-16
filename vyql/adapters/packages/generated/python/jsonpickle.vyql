@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "jsonpickle" {
+    sink method "decode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import core.{HtmlEscape, InputValidation}
+adapter python {
+  package "rich" {
+    control method "escape" -> core.HtmlEscape
+    control method "parse" -> core.InputValidation
+  }
+}

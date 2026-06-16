@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter elixir {
+  package "phx_gen_tailwind" {
+    sink method "maybe_run_npm_install" -> code.CommandExecution
+  }
+}

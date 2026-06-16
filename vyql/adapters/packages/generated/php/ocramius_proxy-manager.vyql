@@ -1,0 +1,6 @@
+adapter php {
+  package "ocramius/proxy-manager" {
+    sink method "eval" -> code.CodeEval
+    sink method "unlink" -> code.FilePathAccess
+  }
+}

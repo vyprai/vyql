@@ -1,0 +1,8 @@
+import code.{SqlExecution, StoredDataWrite}
+
+adapter csharp {
+  package "akavache.sqlite3" {
+    sink method "ISqliteOperation.Execute" -> code.SqlExecution
+    sink method "SqliteBlobCache.Insert" -> code.StoredDataWrite
+  }
+}

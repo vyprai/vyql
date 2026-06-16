@@ -1,0 +1,6 @@
+import code.{XmlParse}
+adapter swift {
+  package "github.com/malcommac/SwiftRichString" {
+    sink method "parse" -> code.XmlParse
+  }
+}

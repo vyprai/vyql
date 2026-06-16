@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+import core.{ShellEscape}
+
+adapter php {
+  package "composer/xdebug-handler" {
+    control method "Composer\XdebugHandler\Process::escape" -> core.ShellEscape
+    control method "Composer\XdebugHandler\Process::escapeShellCommand" -> core.ShellEscape
+  }
+}

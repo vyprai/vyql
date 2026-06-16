@@ -1,0 +1,6 @@
+adapter elixir {
+  package "protobuf" {
+    sink method "decode" -> code.Deserialization
+    sink method "decode!" -> code.Deserialization
+  }
+}

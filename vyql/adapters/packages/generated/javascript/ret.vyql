@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter javascript {
+  package "ret" {
+    mark method "tokenizer" -> code.RegexCompile
+  }
+}

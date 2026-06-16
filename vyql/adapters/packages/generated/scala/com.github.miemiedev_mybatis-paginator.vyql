@@ -1,0 +1,9 @@
+import core.{InputValidation, SqlParameterization}
+
+adapter scala {
+  package "com.github.miemiedev:mybatis-paginator" {
+    control method "isSQLInjection" -> core.InputValidation
+    sink method "getLimitString" -> code.SqlExecution
+    sink method "getCountString" -> code.SqlExecution
+  }
+}

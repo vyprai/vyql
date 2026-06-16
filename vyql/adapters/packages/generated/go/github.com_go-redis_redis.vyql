@@ -1,0 +1,9 @@
+adapter go {
+  package "github.com/go-redis/redis" {
+    sink method "Get" -> code.NosqlQuery
+    sink method "SetBit" -> code.StoredDataWrite
+    source method "Auth" -> code.SecretValue
+    mark method "Random" -> code.WeakRandomValue
+    mark method "Hash" -> code.WeakHash
+  }
+}

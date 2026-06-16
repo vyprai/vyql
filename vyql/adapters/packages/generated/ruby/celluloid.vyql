@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter ruby {
+  package "celluloid" {
+    source method "async" -> core.UserControlledData
+    source method "future" -> core.UserControlledData
+  }
+}

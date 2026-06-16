@@ -1,0 +1,7 @@
+import core.{PathCanonicalization}
+
+adapter cpp {
+  package "cyclonedds" {
+    control method "idl_untaint_path" -> core.PathCanonicalization
+  }
+}

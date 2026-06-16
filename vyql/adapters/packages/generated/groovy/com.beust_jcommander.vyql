@@ -1,0 +1,7 @@
+import code.{CliArgument}
+adapter groovy {
+  package "com.beust:jcommander" {
+    source method "parse" -> code.CliArgument
+    source method "parseWithoutValidation" -> code.CliArgument
+  }
+}

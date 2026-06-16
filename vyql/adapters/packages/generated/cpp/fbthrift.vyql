@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "fbthrift" {
+    sink method "parse" -> code.Deserialization
+  }
+}

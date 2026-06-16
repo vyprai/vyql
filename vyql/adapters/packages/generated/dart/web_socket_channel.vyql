@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkData, NetworkSend}
+adapter dart {
+  package "web_socket_channel" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "add" -> code.NetworkSend
+    sink method "addStream" -> code.NetworkSend
+  }
+}

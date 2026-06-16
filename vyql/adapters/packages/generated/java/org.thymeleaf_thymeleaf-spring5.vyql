@@ -1,0 +1,10 @@
+import code.{HtmlRender}
+import core.{HtmlEscape}
+
+adapter java {
+  package "org.thymeleaf:thymeleaf-spring5" {
+    sink method "render" -> code.HtmlRender
+    sink method "renderFragment" -> code.HtmlRender
+    control method "getDisplayString" -> core.HtmlEscape
+  }
+}

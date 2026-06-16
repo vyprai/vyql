@@ -1,0 +1,8 @@
+import code.{HttpInput}
+
+adapter kotlin {
+  package "com.google.oauth-client:google-oauth-client-jetty" {
+    source method "handle" -> code.HttpInput
+    source method "queryToMap" -> code.HttpInput
+  }
+}

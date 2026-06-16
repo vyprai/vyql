@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter javascript {
+  package "raw-body" {
+    sink method "getRawBody" -> code.Deserialization
+  }
+}

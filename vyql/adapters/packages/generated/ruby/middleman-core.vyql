@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "middleman-core" {
+    sink method "parse" -> code.Deserialization
+  }
+}

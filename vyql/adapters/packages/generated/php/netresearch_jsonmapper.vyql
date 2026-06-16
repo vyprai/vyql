@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter php {
+  package "netresearch/jsonmapper" {
+    sink method "map" -> code.Deserialization
+    sink method "mapArray" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter ruby {
+  package "ejs" {
+    sink method "compile" -> code.CodeEval
+    sink method "evaluate" -> code.CodeEval
+  }
+}

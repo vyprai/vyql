@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter go {
+  package "golang.org/x/mobile" {
+    sink method "go_seq_from_java_bytearray" -> code.Deserialization
+  }
+}

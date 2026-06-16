@@ -1,0 +1,13 @@
+import code.{HttpInput, SecretValue, RedirectTarget}
+adapter go {
+  package "google.golang.org/appengine" {
+    source method "NewContext" -> code.HttpInput
+    source method "WithContext" -> code.HttpInput
+    source method "AccessToken" -> code.SecretValue
+    source method "CurrentOAuth" -> code.HttpInput
+    source method "OAuthConsumerKey" -> code.SecretValue
+    mark method "LoginURL" -> code.RedirectTarget
+    mark method "LoginURLFederated" -> code.RedirectTarget
+    mark method "LogoutURL" -> code.RedirectTarget
+  }
+}

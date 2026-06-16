@@ -1,0 +1,15 @@
+import code.{SecretValue, HttpInput, NetworkSend}
+import core.{AuthenticationCheck, UserControlledData}
+
+adapter python {
+  package "python-twitter" {
+    source method "SetCredentials" -> code.SecretValue
+    source method "GetAppOnlyAuthToken" -> code.SecretValue
+    source method "GetSearch" -> core.UserControlledData
+    source method "GetUsersSearch" -> core.UserControlledData
+    source method "UploadMediaSimple" -> core.UserControlledData
+    source method "UploadMediaChunked" -> core.UserControlledData
+
+    control method "VerifyCredentials" -> core.AuthenticationCheck
+  }
+}

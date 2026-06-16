@@ -1,0 +1,10 @@
+import code.{Deserialization, SecretValue}
+
+adapter php {
+  package "kreait/firebase-tokens" {
+    sink method "verifyIdToken" -> code.Deserialization
+    sink method "verifyIdTokenWithLeeway" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    source method "createCustomToken" -> code.SecretValue
+  }
+}

@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+adapter groovy {
+  package "commons-dbutils:commons-dbutils" {
+    sink method "query" -> code.SqlExecution
+    sink method "update" -> code.SqlExecution
+    sink method "insert" -> code.SqlExecution
+  }
+}

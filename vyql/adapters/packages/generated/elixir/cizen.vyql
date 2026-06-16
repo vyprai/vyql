@@ -1,0 +1,5 @@
+adapter elixir {
+  package "cizen" {
+    sink method "Cizen.Pattern.Compiler.compile" -> code.ExpressionEval
+  }
+}

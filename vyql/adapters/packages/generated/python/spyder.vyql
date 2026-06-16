@@ -1,0 +1,10 @@
+import code.{CommandExecution, FilePathAccess, UrlFetch}
+
+adapter python {
+  package "spyder" {
+    sink method "run_vcs_tool" -> code.CommandExecution
+    sink method "write" -> code.FilePathAccess
+    sink method "read" -> code.FilePathAccess
+    sink method "load" -> code.UrlFetch
+  }
+}

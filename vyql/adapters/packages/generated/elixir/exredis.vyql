@@ -1,0 +1,8 @@
+import code.{NosqlQuery, Deserialization}
+adapter elixir {
+  package "exredis" {
+    sink method "query" -> code.NosqlQuery
+    sink method "query_pipe" -> code.NosqlQuery
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,5 @@
+adapter bash {
+  package "jsonnet" {
+    sink path "jsonnet.parse" -> code.Deserialization
+  }
+}

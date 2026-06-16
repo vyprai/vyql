@@ -1,0 +1,10 @@
+import code.{NetworkSend, Deserialization, FilePathAccess}
+
+adapter swift {
+  package "github.com/apollographql/apollo-ios" {
+    sink method "send" -> code.NetworkSend
+    sink method "parse" -> code.Deserialization
+    sink method "write" -> code.FilePathAccess
+    sink method "read" -> code.FilePathAccess
+  }
+}

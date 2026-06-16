@@ -1,0 +1,6 @@
+adapter objc {
+  package "CHCSVParser" {
+    sink method "parse" -> code.Deserialization
+    mark path "chcsvparser.hash" -> code.WeakHash
+  }
+}

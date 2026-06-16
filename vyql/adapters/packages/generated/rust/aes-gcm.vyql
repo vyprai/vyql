@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter rust {
+  package "aes-gcm" {
+    source method "new" -> code.SecretValue
+  }
+}

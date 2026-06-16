@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend}
+adapter elixir {
+  package "coverex" {
+    sink method "post_coveralls" -> code.NetworkConnect
+    sink method "post_coveralls" -> code.NetworkSend
+    sink method "send_http" -> code.NetworkConnect
+    sink method "send_http" -> code.NetworkSend
+  }
+}

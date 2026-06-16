@@ -1,0 +1,5 @@
+adapter rust {
+  package "nohash-hasher" {
+    mark method "finish" -> code.WeakHash
+  }
+}

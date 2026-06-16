@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/tikhop/TPInAppReceipt" {
+    sink method "decode" -> code.Deserialization
+  }
+}

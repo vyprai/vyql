@@ -1,0 +1,6 @@
+adapter objc {
+  package "FirebaseFirestore" {
+    sink method "FindHeader" -> code.NosqlQuery
+    sink method "Update" -> code.StoredDataWrite
+  }
+}

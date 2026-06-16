@@ -1,0 +1,20 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter rust {
+  package "tendril" {
+    control method "validate" -> core.InputValidation
+    control method "validate_prefix" -> core.InputValidation
+    control method "validate_suffix" -> core.InputValidation
+    control method "validate_subseq" -> core.InputValidation
+    control method "revalidate_subset" -> core.InputValidation
+    sink method "process" -> code.Deserialization
+    sink method "new_from_encoding_rs_decoder" -> code.Deserialization
+    sink method "utf8" -> code.Deserialization
+    sink method "decode_to_sink" -> code.Deserialization
+    sink method "check_decode" -> code.Deserialization
+    sink method "decode_utf8_encoding_rs" -> code.Deserialization
+    sink method "decode_koi8_u_encoding_rs" -> code.Deserialization
+    sink method "decode_windows_949_encoding_rs" -> code.Deserialization
+  }
+}

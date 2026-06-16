@@ -1,0 +1,7 @@
+import code.{Deserialization, CliArgument}
+adapter dart {
+  package "dartdoc" {
+    sink method "fromYamlMap" -> code.Deserialization
+    source method "parseArguments" -> code.CliArgument
+  }
+}

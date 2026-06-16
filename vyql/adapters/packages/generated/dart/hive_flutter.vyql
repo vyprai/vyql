@@ -1,0 +1,8 @@
+import code.{Deserialization, StoredDataWrite}
+
+adapter dart {
+  package "hive_flutter" {
+    sink method "read" -> code.Deserialization
+    sink method "write" -> code.StoredDataWrite
+  }
+}

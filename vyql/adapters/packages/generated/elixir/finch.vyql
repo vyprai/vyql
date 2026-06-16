@@ -1,0 +1,12 @@
+import code.{NetworkSend, NetworkData, HttpInput}
+
+adapter elixir {
+  package "finch" {
+    sink method "request" -> code.NetworkSend
+    sink method "request!" -> code.NetworkSend
+    source method "stream" -> code.NetworkData
+    source method "stream_while" -> code.NetworkData
+    source method "request" -> code.HttpInput
+    source method "request!" -> code.HttpInput
+  }
+}

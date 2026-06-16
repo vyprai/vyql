@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter objc {
+  package "JWTDecode" {
+    sink method "decode" -> code.Deserialization
+  }
+}

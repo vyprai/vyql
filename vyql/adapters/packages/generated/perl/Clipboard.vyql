@@ -1,0 +1,6 @@
+adapter perl {
+  package "Clipboard" {
+    source method "copy" -> core.UserControlledData
+    source method "paste" -> code.StoredDataRead
+  }
+}

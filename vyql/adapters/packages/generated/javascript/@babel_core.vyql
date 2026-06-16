@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "@babel/core" {
+    sink method "parseSync" -> code.Deserialization
+    sink method "parseAsync" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter php {
+  package "drupal/core-plugin" {
+    control method "validate" -> core.InputValidation
+  }
+}

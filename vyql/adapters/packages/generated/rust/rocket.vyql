@@ -1,0 +1,6 @@
+import code.{SecretValue, HttpInput, Cookie, NetworkData, ResponseHeaderWrite, HtmlRender}
+adapter rust {
+  package "rocket" {
+    source method "SecretKey.key" -> code.SecretValue
+  }
+}

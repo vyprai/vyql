@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter go {
+  package "github.com/chzyer/readline" {
+    source method "Password" -> core.UserControlledData
+  }
+}

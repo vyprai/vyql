@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "bokeh" {
+    sink method "from_serializable" -> code.Deserialization
+  }
+}

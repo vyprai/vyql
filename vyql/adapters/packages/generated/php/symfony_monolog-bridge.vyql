@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter php {
+  package "symfony/monolog-bridge" {
+    sink method "stream_socket_sendto" -> code.NetworkSend
+  }
+}

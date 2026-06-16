@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "date_time_picker" {
+    sink method "onChangedHandler" -> code.Deserialization
+  }
+}

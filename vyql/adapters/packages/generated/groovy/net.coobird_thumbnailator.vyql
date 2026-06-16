@@ -1,0 +1,6 @@
+adapter groovy {
+  package "net.coobird:thumbnailator" {
+    sink method "toFile" -> code.FilePathAccess
+    sink method "toFiles" -> code.FilePathAccess
+  }
+}

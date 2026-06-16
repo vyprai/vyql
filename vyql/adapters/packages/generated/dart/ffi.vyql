@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter dart {
+  package "ffi" {
+    source method "toNativeUtf8" -> core.UserControlledData
+    source method "toNativeUtf16" -> core.UserControlledData
+  }
+}

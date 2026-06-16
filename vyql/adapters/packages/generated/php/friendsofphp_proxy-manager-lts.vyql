@@ -1,0 +1,5 @@
+adapter php {
+  package "friendsofphp/proxy-manager-lts" {
+    sink method "eval" -> code.CodeEval
+  }
+}

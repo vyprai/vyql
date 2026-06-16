@@ -1,0 +1,8 @@
+adapter dart {
+  package "image_picker_ios" {
+    sink method "ImagePickerIOS.getMedia" -> code.FilePathAccess
+    sink method "ImagePickerIOS.pickVideo" -> code.FilePathAccess
+    sink method "ImagePickerIOS.pickMultiVideo" -> code.FilePathAccess
+    sink method "ImagePickerIOS.pickMedia" -> code.FilePathAccess
+  }
+}

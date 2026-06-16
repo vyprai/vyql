@@ -1,0 +1,11 @@
+import code.{FilePathAccess, NetworkSend, NetworkData, SecretValue}
+
+adapter perl {
+  package "Yandex-Disk" {
+    source method "new" -> code.SecretValue
+    sink method "uploadFile" -> code.FilePathAccess
+    sink method "uploadFile" -> code.NetworkSend
+    source method "downloadFile" -> code.NetworkData
+    sink method "downloadFile" -> code.FilePathAccess
+  }
+}

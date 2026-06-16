@@ -1,0 +1,9 @@
+import code.{SecretValue}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "ueberauth_discord" {
+    source method "handle_callback!" -> core.UserControlledData
+    source method "get_token!" -> code.SecretValue
+  }
+}

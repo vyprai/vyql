@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/vapor/open-crypto" {
+    source method "AES" -> code.SecretValue
+    mark method "Digest" -> code.WeakHash
+  }
+}

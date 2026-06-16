@@ -1,0 +1,7 @@
+import code.{FilePathAccess, CommandExecution}
+
+adapter scala {
+  package "org.seleniumhq.selenium:selenium-firefox-driver" {
+    sink method "installExtension" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,5 @@
+adapter scala {
+  package "io.rest-assured:json-path" {
+    sink method "parse" -> code.Deserialization
+  }
+}

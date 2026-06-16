@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter elixir {
+  package "cidr" {
+    source method "match" -> core.UserControlledData
+    source method "parse" -> core.UserControlledData
+  }
+}

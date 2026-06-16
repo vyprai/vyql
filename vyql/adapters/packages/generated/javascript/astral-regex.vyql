@@ -1,0 +1,6 @@
+import code.{RegexCompile}
+adapter javascript {
+  package "astral-regex" {
+    mark method "astralRegex" -> code.RegexCompile
+  }
+}

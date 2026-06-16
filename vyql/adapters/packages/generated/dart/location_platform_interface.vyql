@@ -1,0 +1,14 @@
+import code.{StoredDataRead}
+import core.{AuthorizationCheck}
+
+adapter dart {
+  package "location_platform_interface" {
+    source method "getLocation" -> code.StoredDataRead
+    control method "requestPermission" -> core.AuthorizationCheck
+    control method "hasPermission" -> core.AuthorizationCheck
+    control method "serviceEnabled" -> core.AuthorizationCheck
+    control method "requestService" -> core.AuthorizationCheck
+    control method "isBackgroundModeEnabled" -> core.AuthorizationCheck
+    control method "enableBackgroundMode" -> core.AuthorizationCheck
+  }
+}

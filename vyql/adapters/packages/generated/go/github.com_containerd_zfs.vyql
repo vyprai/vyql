@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess, FileUse}
+adapter go {
+  package "github.com/containerd/zfs" {
+    sink method "createFilesystem" -> code.CommandExecution
+    sink method "cloneFilesystem" -> code.CommandExecution
+    sink method "NewSnapshotter" -> code.FilePathAccess
+  }
+}

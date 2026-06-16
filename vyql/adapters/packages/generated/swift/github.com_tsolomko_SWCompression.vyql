@@ -1,0 +1,12 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/tsolomko/SWCompression" {
+    sink method "unarchive" -> code.Deserialization
+    sink method "splitUnarchive" -> code.Deserialization
+    sink method "decompress" -> code.Deserialization
+    sink method "multiDecompress" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+    sink method "open" -> code.Deserialization
+    sink method "info" -> code.Deserialization
+  }
+}

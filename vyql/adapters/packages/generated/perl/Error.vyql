@@ -1,0 +1,12 @@
+import code.{CodeEval, LogOutput}
+
+adapter perl {
+  package "Error" {
+    sink method "stacktrace" -> code.LogOutput
+    sink method "file" -> code.LogOutput
+    sink method "line" -> code.LogOutput
+    sink method "text" -> code.LogOutput
+    sink method "stringify" -> code.LogOutput
+    sink method "throw" -> code.CodeEval
+  }
+}

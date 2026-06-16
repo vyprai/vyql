@@ -1,0 +1,7 @@
+import code.{CommandExecution, NetworkConnect}
+adapter elixir {
+  package "chrome_remote_interface" {
+    sink method "execute_command" -> code.CommandExecution
+    sink method "call" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,8 @@
+import code.{XmlParse}
+
+adapter cpp {
+  package "hwloc" {
+    sink method "hwloc_topology_set_xml" -> code.XmlParse
+    sink method "hwloc_topology_set_xmlbuffer" -> code.XmlParse
+  }
+}

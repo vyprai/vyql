@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "phenx/php-svg-lib" {
+    sink method "loadFile" -> code.Deserialization
+  }
+}

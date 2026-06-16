@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter python {
+  package "google-cloud-bigquery" {
+    sink method "query" -> code.SqlExecution
+  }
+}

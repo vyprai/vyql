@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter objc {
+  package "MJRefresh" {
+    sink method "executeRefreshingCallback" -> code.CodeEval
+  }
+}

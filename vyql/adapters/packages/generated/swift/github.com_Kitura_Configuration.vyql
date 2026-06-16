@@ -1,0 +1,11 @@
+import code.{Deserialization, CliArgument, EnvVariable}
+
+adapter swift {
+  package "github.com/Kitura/Configuration" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+    source method "commandLineArgumentKeyPrefix" -> code.CliArgument
+    source method "commandLineArgumentPathSeparator" -> code.CliArgument
+    source method "environmentVariablePathSeparator" -> code.EnvVariable
+  }
+}

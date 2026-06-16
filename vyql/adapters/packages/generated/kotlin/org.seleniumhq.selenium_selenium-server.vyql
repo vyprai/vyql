@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter kotlin {
+  package "org.seleniumhq.selenium:selenium-server" {
+    source method "parse" -> code.CliArgument
+  }
+}

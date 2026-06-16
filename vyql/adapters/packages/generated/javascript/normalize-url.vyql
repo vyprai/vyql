@@ -1,0 +1,7 @@
+import core.{PathCanonicalization}
+
+adapter javascript {
+  package "normalize-url" {
+    control method "normalizeUrl" -> core.PathCanonicalization
+  }
+}

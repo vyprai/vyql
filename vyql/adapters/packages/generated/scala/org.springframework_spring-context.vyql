@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter scala {
+  package "org.springframework:spring-context" {
+    control method "validate" -> core.InputValidation
+    control method "validateObject" -> core.InputValidation
+  }
+}

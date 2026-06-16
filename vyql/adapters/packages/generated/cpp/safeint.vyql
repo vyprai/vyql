@@ -1,0 +1,29 @@
+import core.{InputValidation}
+
+adapter cpp {
+  package "safeint" {
+    control method "check_cast_int8_int32" -> core.InputValidation
+    control method "check_cast_int8_uint32" -> core.InputValidation
+    control method "check_cast_int8_int64" -> core.InputValidation
+    control method "check_cast_int8_uint64" -> core.InputValidation
+    control method "check_cast_int16_int32" -> core.InputValidation
+    control method "check_cast_int16_uint32" -> core.InputValidation
+    control method "check_cast_int16_int64" -> core.InputValidation
+    control method "check_cast_int16_uint64" -> core.InputValidation
+    control method "check_cast_int32_uint32" -> core.InputValidation
+    control method "check_cast_int32_int64" -> core.InputValidation
+    control method "check_cast_int32_uint64" -> core.InputValidation
+    control method "check_cast_int64_uint64" -> core.InputValidation
+    control method "check_cast_uint8_int32" -> core.InputValidation
+    control method "check_cast_uint8_uint32" -> core.InputValidation
+    control method "check_cast_uint8_int64" -> core.InputValidation
+    control method "check_cast_uint8_uint64" -> core.InputValidation
+    control method "check_cast_uint16_int32" -> core.InputValidation
+    control method "check_cast_uint16_uint32" -> core.InputValidation
+    control method "check_cast_uint16_int64" -> core.InputValidation
+    control method "check_cast_uint16_uint64" -> core.InputValidation
+    control method "check_cast_uint32_int32" -> core.InputValidation
+    control method "check_cast_uint32_int64" -> core.InputValidation
+    control method "check_cast_uint32_uint64" -> core.InputValidation
+  }
+}

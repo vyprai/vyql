@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "template_binding" {
+    sink method "MustacheTokens.parse" -> code.Deserialization
+  }
+}

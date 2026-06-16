@@ -1,0 +1,9 @@
+adapter groovy {
+  package "org.apache.pig:pig" {
+    sink method "exec" -> code.CommandExecution
+    sink method "file" -> code.FilePathAccess
+    sink method "load" -> code.Deserialization
+    mark method "RANDOM" -> code.WeakRandomValue
+    mark method "sum" -> code.WeakHash
+  }
+}

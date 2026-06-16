@@ -1,0 +1,9 @@
+import code.{WeakHash}
+
+adapter go {
+  package "github.com/cespare/xxhash" {
+    mark method "New" -> code.WeakHash
+    mark method "Sum64" -> code.WeakHash
+    mark method "Sum64String" -> code.WeakHash
+  }
+}

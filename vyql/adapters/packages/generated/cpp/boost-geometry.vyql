@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "boost-geometry" {
+    sink method "read" -> code.Deserialization
+  }
+}

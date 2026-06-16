@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter dart {
+  package "libphonenumber_web" {
+    sink method "parse" -> code.Deserialization
+  }
+}

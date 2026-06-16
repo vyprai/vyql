@@ -1,0 +1,8 @@
+import code.{Deserialization, CliArgument}
+
+adapter elixir {
+  package "telegram" {
+    sink method "parse" -> code.Deserialization
+    source method "parse_bot_command" -> code.CliArgument
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter php {
+  package "sebastian/lines-of-code" {
+    sink method "countInSourceFile" -> code.Deserialization
+    sink method "countInSourceString" -> code.Deserialization
+  }
+}

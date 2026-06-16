@@ -1,0 +1,7 @@
+import code.{CommandExecution, NetworkSend}
+adapter ruby {
+  package "codeclimate-test-reporter" {
+    sink method "post_results" -> code.NetworkSend
+    sink method "batch_post_results" -> code.NetworkSend
+  }
+}

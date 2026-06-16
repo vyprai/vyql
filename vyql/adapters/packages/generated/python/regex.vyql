@@ -1,0 +1,9 @@
+import code.{RegexCompile}
+import core.{InputValidation}
+
+adapter python {
+  package "regex" {
+    mark method "compile" -> code.RegexCompile
+    control method "escape" -> core.InputValidation
+  }
+}

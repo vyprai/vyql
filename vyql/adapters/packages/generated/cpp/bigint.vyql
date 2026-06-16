@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "bigint" {
+    sink method "stringToBigUnsigned" -> code.Deserialization
+    sink method "stringToBigInteger" -> code.Deserialization
+  }
+}

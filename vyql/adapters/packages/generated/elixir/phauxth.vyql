@@ -1,0 +1,7 @@
+import core.{AuthenticationCheck}
+adapter elixir {
+  package "phauxth" {
+    control method "check_pass" -> core.AuthenticationCheck
+    control method "verify" -> core.AuthenticationCheck
+  }
+}

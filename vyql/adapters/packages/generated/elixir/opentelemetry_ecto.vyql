@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+import core.{SqlParameterization}
+
+adapter elixir {
+  package "opentelemetry_ecto" {
+    sink method "maybe_add_db_statement" -> code.SqlExecution
+    control method "maybe_add_db_statement" -> core.SqlParameterization
+  }
+}

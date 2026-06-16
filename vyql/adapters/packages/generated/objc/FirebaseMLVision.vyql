@@ -1,0 +1,7 @@
+adapter objc {
+  package "FirebaseMLVision" {
+    sink method "detectInImage" -> code.Deserialization
+    sink method "processImage" -> code.Deserialization
+    sink method "resultsInImage" -> code.Deserialization
+  }
+}

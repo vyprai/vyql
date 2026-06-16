@@ -1,0 +1,6 @@
+import code.{FileUse}
+adapter php {
+  package "gettext/languages" {
+    sink method "Exporter::toFile" -> code.FileUse
+  }
+}

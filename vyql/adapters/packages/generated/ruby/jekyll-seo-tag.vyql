@@ -1,0 +1,7 @@
+import code.{HtmlRender, CodeEval}
+adapter ruby {
+  package "jekyll-seo-tag" {
+    sink method "render" -> code.HtmlRender
+    sink method "to_json" -> code.CodeEval
+  }
+}

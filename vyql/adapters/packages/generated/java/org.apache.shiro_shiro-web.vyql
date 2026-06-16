@@ -1,0 +1,6 @@
+adapter java {
+  package "org.apache.shiro:shiro-web" {
+    source method "decodeRequestString" -> core.UserControlledData
+    mark method "issueRedirect" -> code.RedirectTarget
+  }
+}

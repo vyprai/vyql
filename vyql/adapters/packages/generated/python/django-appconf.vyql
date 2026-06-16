@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter python {
+  package "django-appconf" {
+    sink method "import_attribute" -> code.CodeEval
+  }
+}

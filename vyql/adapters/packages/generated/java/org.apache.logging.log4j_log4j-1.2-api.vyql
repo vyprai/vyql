@@ -1,0 +1,13 @@
+import code.{LogOutput}
+
+adapter java {
+  package "org.apache.logging.log4j:log4j-1.2-api" {
+    sink method "doAppend" -> code.LogOutput
+    sink method "trace" -> code.LogOutput
+    sink method "debug" -> code.LogOutput
+    sink method "info" -> code.LogOutput
+    sink method "warn" -> code.LogOutput
+    sink method "error" -> code.LogOutput
+    sink method "fatal" -> code.LogOutput
+  }
+}

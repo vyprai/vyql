@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter ruby {
+  package "sprockets-es6" {
+    sink method "call" -> code.CodeEval
+    sink method "transform" -> code.CodeEval
+  }
+}

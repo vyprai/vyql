@@ -1,0 +1,5 @@
+adapter groovy {
+  package "com.sun.xml.bind:jaxb-core" {
+    sink method "SAXParseException2" -> code.XmlParse
+  }
+}

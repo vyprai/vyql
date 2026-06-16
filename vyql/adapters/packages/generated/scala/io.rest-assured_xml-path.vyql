@@ -1,0 +1,21 @@
+import code.{XmlParse}
+adapter scala {
+  package "io.rest-assured:xml-path" {
+    sink method "get" -> code.XmlParse
+    sink method "getList" -> code.XmlParse
+    sink method "getMap" -> code.XmlParse
+    sink method "getObject" -> code.XmlParse
+    sink method "getInt" -> code.XmlParse
+    sink method "getBoolean" -> code.XmlParse
+    sink method "getNode" -> code.XmlParse
+    sink method "getNodeChildren" -> code.XmlParse
+    sink method "getChar" -> code.XmlParse
+    sink method "getByte" -> code.XmlParse
+    sink method "getShort" -> code.XmlParse
+    sink method "getFloat" -> code.XmlParse
+    sink method "getDouble" -> code.XmlParse
+    sink method "getLong" -> code.XmlParse
+    sink method "getString" -> code.XmlParse
+    sink method "getUUID" -> code.XmlParse
+  }
+}

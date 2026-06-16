@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-hibernate4" {
+    sink method "setupModule" -> code.Deserialization
+    sink method "setupModule" -> code.Deserialization
+  }
+}

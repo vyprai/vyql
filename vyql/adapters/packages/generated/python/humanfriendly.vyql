@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "humanfriendly" {
+    sink method "run_command" -> code.CommandExecution
+  }
+}

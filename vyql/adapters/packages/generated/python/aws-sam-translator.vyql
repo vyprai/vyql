@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "aws-sam-translator" {
+    sink method "yaml_parse" -> code.Deserialization
+  }
+}

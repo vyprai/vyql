@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{HtmlEscape, InputValidation}
+
+adapter php {
+  package "league/commonmark" {
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.HtmlEscape
+    control method "unescapeAndEncode" -> core.InputValidation
+  }
+}

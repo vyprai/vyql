@@ -1,0 +1,7 @@
+import code.{CodeEval, Deserialization}
+adapter scala {
+  package "javassist:javassist" {
+    sink method "toClass" -> code.CodeEval
+    sink method "loadClass" -> code.Deserialization
+  }
+}

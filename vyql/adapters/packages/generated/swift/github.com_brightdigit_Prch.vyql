@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter swift {
+  package "github.com/brightdigit/Prch" {
+    sink method "request" -> code.NetworkSend
+    sink method "beginRequest" -> code.NetworkSend
+  }
+}

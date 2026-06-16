@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "plist" {
+    sink method "new" -> code.Deserialization
+  }
+}

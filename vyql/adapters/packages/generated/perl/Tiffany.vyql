@@ -1,0 +1,8 @@
+import code.{CodeEval, TemplateRender, FilePathAccess}
+adapter perl {
+  package "Tiffany" {
+    sink method "load" -> code.CodeEval
+    sink method "render" -> code.TemplateRender
+    sink method "slurp" -> code.FilePathAccess
+  }
+}

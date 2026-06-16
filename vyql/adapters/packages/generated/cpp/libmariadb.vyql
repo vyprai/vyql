@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter cpp {
+  package "libmariadb" {
+    sink method "mysql_query" -> code.SqlExecution
+    sink method "mysql_real_query" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,11 @@
+import core.{InputValidation}
+
+adapter groovy {
+  package "org.apache.shiro:shiro-web" {
+    source method "getRequestUri" -> code.HttpInput
+    source method "decodeRequestString" -> code.HttpInput
+    mark method "issueRedirect" -> code.RedirectTarget
+    control method "decodeAndCleanUriString" -> core.InputValidation
+    control method "getCleanParam" -> core.InputValidation
+  }
+}

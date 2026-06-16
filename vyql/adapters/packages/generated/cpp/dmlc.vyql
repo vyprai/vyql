@@ -1,0 +1,5 @@
+adapter cpp {
+  package "dmlc" {
+    sink method "ParseNext" -> code.Deserialization
+  }
+}

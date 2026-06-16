@@ -1,0 +1,9 @@
+import code.{NetworkData}
+import core.{InputValidation, UserControlledData}
+
+adapter scala {
+  package "org.springframework.data:spring-data-elasticsearch" {
+    control method "escape" -> core.InputValidation
+    source method "parse" -> core.UserControlledData
+  }
+}

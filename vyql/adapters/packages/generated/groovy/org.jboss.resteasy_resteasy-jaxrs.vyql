@@ -1,0 +1,9 @@
+import code.{Deserialization, HttpInput}
+adapter groovy {
+  package "org.jboss.resteasy:resteasy-jaxrs" {
+    sink method "read" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    source method "getHttpHeaders" -> code.HttpInput
+    source method "getDecodedFormParameters" -> code.HttpInput
+  }
+}

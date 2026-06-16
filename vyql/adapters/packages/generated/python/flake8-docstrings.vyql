@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter python {
+  package "flake8-docstrings" {
+    source method "add_options" -> core.UserControlledData
+    source method "parse_options" -> core.UserControlledData
+  }
+}

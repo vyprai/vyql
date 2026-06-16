@@ -1,0 +1,8 @@
+import code.{WeakHash}
+adapter objc {
+  package "photo_manager" {
+    mark method "getMD5WithData" -> code.WeakHash
+    mark method "getmd5WithString" -> code.WeakHash
+    mark method "getFileMD5WithPath" -> code.WeakHash
+  }
+}

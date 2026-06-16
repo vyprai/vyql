@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter swift {
+  package "github.com/mhdhejazi/Dynamic" {
+    sink method "dynamicallyCall" -> code.CodeEval
+    sink method "init" -> code.CodeEval
+  }
+}

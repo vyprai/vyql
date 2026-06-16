@@ -1,0 +1,7 @@
+import code.{FilePathAccess, HttpInput}
+adapter ruby {
+  package "url_mount" {
+    sink method "initialize" -> code.FilePathAccess
+    source method "url" -> code.HttpInput
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter csharp {
+  package "grid.mvc" {
+    sink method "gridMvc.prototype.parseFilterValues" -> code.Deserialization
+  }
+}

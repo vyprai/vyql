@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "javax.activation:javax.activation-api" {
+    sink method "parse" -> code.Deserialization
+    sink method "readExternal" -> code.Deserialization
+    sink method "writeExternal" -> code.Deserialization
+  }
+}

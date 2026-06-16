@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+adapter scala {
+  package "io.searchbox:jest" {
+    sink method "execute" -> code.NetworkSend
+    sink method "executeAsync" -> code.NetworkSend
+  }
+}

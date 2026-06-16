@@ -1,0 +1,16 @@
+import code.{WeakHash}
+
+adapter rust {
+  package "rustc-hash" {
+    mark method "FxHasher.write" -> code.WeakHash
+    mark method "FxHasher.write_u8" -> code.WeakHash
+    mark method "FxHasher.write_u16" -> code.WeakHash
+    mark method "FxHasher.write_u32" -> code.WeakHash
+    mark method "FxHasher.write_u64" -> code.WeakHash
+    mark method "FxHasher.write_u128" -> code.WeakHash
+    mark method "FxHasher.write_usize" -> code.WeakHash
+    mark method "FxHasher.write_str" -> code.WeakHash
+    mark method "FxHasher.finish" -> code.WeakHash
+    mark method "FxBuildHasher.build_hasher" -> code.WeakHash
+  }
+}

@@ -1,0 +1,15 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter ruby {
+  package "bunny" {
+    sink method "start" -> code.NetworkConnect
+    sink method "basic_publish" -> code.NetworkSend
+    sink method "basic_publish_batch" -> code.NetworkSend
+    sink method "publish" -> code.NetworkSend
+    sink method "write" -> code.NetworkSend
+    source method "basic_consume" -> code.NetworkData
+    source method "pop" -> code.NetworkData
+    source method "subscribe_with" -> code.NetworkData
+    source method "read_fully" -> code.NetworkData
+  }
+}

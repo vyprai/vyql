@@ -1,0 +1,9 @@
+import code.{HtmlRender}
+import core.{HtmlEscape}
+
+adapter scala {
+  package "org.springframework.security:spring-security-taglibs" {
+    sink method "writeMessage" -> code.HtmlRender
+    control method "setHtmlEscape" -> core.HtmlEscape
+  }
+}

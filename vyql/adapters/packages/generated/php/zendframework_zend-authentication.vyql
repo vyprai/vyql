@@ -1,0 +1,6 @@
+adapter php {
+  package "zendframework/zend-authentication" {
+    source method "Session" -> code.HttpInput
+    mark path "zendframework.zend.authentication.hash" -> code.WeakHash
+  }
+}

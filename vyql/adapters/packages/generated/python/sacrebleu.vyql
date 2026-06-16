@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter python {
+  package "sacrebleu" {
+    source method "parse_args" -> code.CliArgument
+  }
+}

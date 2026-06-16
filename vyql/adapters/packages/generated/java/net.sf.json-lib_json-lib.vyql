@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter java {
+  package "net.sf.json-lib:json-lib" {
+    sink method "JSONFunction.parse" -> code.Deserialization
+    sink method "XMLSerializer.read" -> code.Deserialization
+  }
+}

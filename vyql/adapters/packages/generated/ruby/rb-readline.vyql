@@ -1,0 +1,5 @@
+adapter ruby {
+  package "rb-readline" {
+    source method "readline" -> core.UserControlledData
+  }
+}

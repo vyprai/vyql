@@ -1,0 +1,11 @@
+import code.{Deserialization, NetworkData}
+import core.{AuthenticationCheck, InputValidation}
+
+adapter go {
+  package "github.com/hashicorp/memberlist" {
+    sink method "decompressPayload" -> code.Deserialization
+    sink method "compressPayload" -> code.Deserialization
+    control method "ValidateKey" -> core.AuthenticationCheck
+    control method "ParseCIDRs" -> core.InputValidation
+  }
+}

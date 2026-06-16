@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "abnf2" {
+    sink method "Abnf.Parser.parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import code.{NetworkConnect, SqlExecution}
+adapter perl {
+  package "RedisDB" {
+    sink method "execute" -> code.SqlExecution
+    sink method "send_command" -> code.SqlExecution
+    sink method "send_command_cb" -> code.SqlExecution
+    sink method "exec" -> code.SqlExecution
+    sink method "connect_to_master" -> code.NetworkConnect
+    sink method "_connect_to_node" -> code.NetworkConnect
+  }
+}

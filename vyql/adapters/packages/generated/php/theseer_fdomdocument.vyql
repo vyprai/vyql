@@ -1,0 +1,16 @@
+import code.{Deserialization, XmlParse}
+
+adapter php {
+  package "theseer/fdomdocument" {
+    sink method "load" -> code.Deserialization
+    sink method "loadXML" -> code.Deserialization
+    sink method "loadHTMLFile" -> code.Deserialization
+    sink method "loadHTML" -> code.Deserialization
+    sink method "appendXML" -> code.Deserialization
+    sink method "query" -> code.XmlParse
+    sink method "queryOne" -> code.XmlParse
+    control method "prepare" -> core.SqlParameterization
+    control method "prepareQuery" -> core.SqlParameterization
+    control method "bind" -> core.SqlParameterization
+  }
+}

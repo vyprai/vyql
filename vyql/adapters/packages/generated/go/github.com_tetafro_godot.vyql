@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/tetafro/godot" {
+    sink method "Fix" -> code.FilePathAccess
+    sink method "Replace" -> code.FilePathAccess
+  }
+}

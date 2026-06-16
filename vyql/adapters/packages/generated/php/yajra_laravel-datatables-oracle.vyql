@@ -1,0 +1,12 @@
+import code.{SqlExecution, DatabaseRead}
+adapter php {
+  package "yajra/laravel-datatables-oracle" {
+    sink method "query" -> code.SqlExecution
+    sink method "filterRecords" -> code.SqlExecution
+    sink method "ordering" -> code.SqlExecution
+    sink method "columnSearch" -> code.SqlExecution
+    sink method "applyFilterColumn" -> code.SqlExecution
+    sink method "compileColumnSearch" -> code.SqlExecution
+    sink method "regexColumnSearch" -> code.SqlExecution
+  }
+}

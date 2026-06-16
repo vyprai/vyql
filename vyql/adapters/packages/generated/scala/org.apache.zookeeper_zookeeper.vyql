@@ -1,0 +1,17 @@
+import code.{CommandExecution, FilePathAccess, StoredDataRead, StoredDataWrite}
+
+adapter scala {
+  package "org.apache.zookeeper:zookeeper" {
+    sink method "create" -> FilePathAccess
+    sink method "create" -> code.StoredDataWrite
+    sink method "delete" -> FilePathAccess
+    sink method "setData" -> FilePathAccess
+    sink method "setData" -> code.StoredDataWrite
+    sink method "getChildren" -> FilePathAccess
+    sink method "getData" -> FilePathAccess
+    source method "getData" -> StoredDataRead
+    sink method "getGroupsCommand" -> CommandExecution
+    sink method "getGroupsForUserCommand" -> CommandExecution
+    sink method "getUlimitMemoryCommand" -> CommandExecution
+  }
+}

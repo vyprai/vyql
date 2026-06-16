@@ -1,0 +1,7 @@
+import code.{RedirectTarget}
+
+adapter dart {
+  package "velocity_x" {
+    mark method "replaceUrl" -> code.RedirectTarget
+  }
+}

@@ -1,0 +1,13 @@
+import code.{SecretValue, WeakCipher, WeakHash}
+adapter elixir {
+  package "ockam_vault_software" {
+    source method "secret_generate" -> code.SecretValue
+    source method "secret_import" -> code.SecretValue
+    source method "secret_export" -> code.SecretValue
+    source method "secret_publickey_get" -> code.SecretValue
+    source method "secret_attributes_get" -> code.SecretValue
+    source method "secret_destroy" -> code.SecretValue
+    mark method "ecdh" -> code.WeakHash
+    mark method "aead_aes_gcm_decrypt" -> code.WeakCipher
+  }
+}

@@ -1,0 +1,14 @@
+import code.{CliArgument, FilePathAccess, UrlFetch, ArchiveEntryWrite}
+
+adapter python {
+  package "gdown" {
+    sink method "download" -> code.UrlFetch
+    sink method "download" -> code.FilePathAccess
+    sink method "cached_download" -> code.UrlFetch
+    sink method "cached_download" -> code.FilePathAccess
+    sink method "download_folder" -> code.UrlFetch
+    sink method "download_folder" -> code.FilePathAccess
+    sink method "extractall" -> code.ArchiveEntryWrite
+    source method "main" -> code.CliArgument
+  }
+}

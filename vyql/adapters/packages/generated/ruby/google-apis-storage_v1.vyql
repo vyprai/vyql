@@ -1,0 +1,15 @@
+import code.{FileUpload, FileUse}
+
+adapter ruby {
+  package "google-apis-storage_v1" {
+    control method "set_bucket_iam_policy" -> core.AuthorizationCheck
+    control method "insert_bucket_access_control" -> core.AuthorizationCheck
+    control method "update_bucket_access_control" -> core.AuthorizationCheck
+    control method "patch_bucket_access_control" -> core.AuthorizationCheck
+    control method "insert_object_access_control" -> core.AuthorizationCheck
+    control method "update_object_access_control" -> core.AuthorizationCheck
+    control method "patch_object_access_control" -> core.AuthorizationCheck
+    mark method "insert_object" -> code.FileUpload
+    sink method "copy_object" -> code.FileUse
+  }
+}

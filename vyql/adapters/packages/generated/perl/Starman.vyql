@@ -1,0 +1,11 @@
+import code.{NetworkData, NetworkSend}
+adapter perl {
+  package "Starman" {
+    source method "dispatch_request" -> code.NetworkData
+    source method "process_request" -> code.NetworkData
+    source method "_read_headers" -> code.NetworkData
+    source method "_sysread" -> code.NetworkData
+    sink method "_syswrite" -> code.NetworkSend
+    sink method "_http_error" -> code.NetworkSend
+  }
+}

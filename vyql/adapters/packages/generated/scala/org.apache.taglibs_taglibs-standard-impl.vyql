@@ -1,0 +1,11 @@
+import code.{XmlParse}
+import core.{HtmlEscape}
+
+adapter scala {
+  package "org.apache.taglibs:taglibs-standard-impl" {
+    sink method "newXMLReader" -> code.XmlParse
+    sink method "newSAXSource" -> code.XmlParse
+    sink method "resolveEntity" -> code.XmlParse
+    control method "escape" -> core.HtmlEscape
+  }
+}

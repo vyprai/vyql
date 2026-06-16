@@ -1,0 +1,14 @@
+import code.{FilePathAccess, Deserialization}
+adapter kotlin {
+  package "com.aventstack:extentreports" {
+    sink method "addScreenCaptureFromPath" -> code.FilePathAccess
+    sink method "addVideoFromPath" -> code.FilePathAccess
+    sink method "createScreenCaptureFromPath" -> code.FilePathAccess
+    sink method "createVideoFromPath" -> code.FilePathAccess
+    sink method "Video" -> code.FilePathAccess
+    sink method "ScreenCapture" -> code.FilePathAccess
+    sink method "tryResolveMediaPath" -> code.FilePathAccess
+    sink method "JsonFormatter" -> code.FilePathAccess
+    sink method "loadJSONConfig" -> code.Deserialization
+  }
+}

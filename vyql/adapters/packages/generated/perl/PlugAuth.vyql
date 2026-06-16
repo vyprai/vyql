@@ -1,0 +1,5 @@
+adapter perl {
+  package "PlugAuth" {
+    source method "init" -> code.SecretValue
+  }
+}

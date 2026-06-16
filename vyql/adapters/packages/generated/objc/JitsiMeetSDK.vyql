@@ -1,0 +1,12 @@
+adapter objc {
+  package "JitsiMeetSDK" {
+    sink method "sendEndpointTextMessage" -> code.NetworkSend
+    sink method "sendChatMessage" -> code.NetworkSend
+    sink method "overwriteConfig" -> code.CodeEval
+    source method "startRecording" -> code.SecretValue
+    sink method "startRecording" -> code.NetworkSend
+    mark method "requestTransaction" -> code.PrivilegedOp
+    mark method "request" -> code.PrivilegedOp
+    source method "fromBuilder" -> core.UserControlledData
+  }
+}

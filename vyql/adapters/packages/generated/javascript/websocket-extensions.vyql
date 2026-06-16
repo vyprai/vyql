@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter javascript {
+  package "websocket-extensions" {
+    source method "parseHeader" -> code.NetworkData
+    source method "processIncomingMessage" -> code.NetworkData
+  }
+}

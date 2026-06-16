@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter objc {
+  package "FacebookLogin" {
+    source method "logIn" -> core.UserControlledData
+  }
+}

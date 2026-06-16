@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "json" {
+    sink method "parse" -> code.Deserialization
+  }
+}

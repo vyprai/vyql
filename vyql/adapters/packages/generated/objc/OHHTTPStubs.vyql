@@ -1,0 +1,8 @@
+import code.{NetworkData, FilePathAccess}
+adapter objc {
+  package "OHHTTPStubs" {
+    source method "stubRequestsPassingTest:withStubResponse:" -> code.NetworkData
+    sink method "responseWithFileAtPath:statusCode:headers:" -> code.FilePathAccess
+    sink method "responseWithFileURL:statusCode:headers:" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,13 @@
+import core.{InputValidation}
+
+adapter scala {
+  package "commons-fileupload:commons-fileupload" {
+    sink method "parse" -> code.Deserialization
+    sink method "write" -> code.FilePathAccess
+    sink method "copy" -> code.FileUse
+    source method "next" -> core.UserControlledData
+    source method "openStream" -> core.UserControlledData
+    control method "isMultipartContent" -> core.InputValidation
+    control method "checkFileName" -> core.InputValidation
+  }
+}

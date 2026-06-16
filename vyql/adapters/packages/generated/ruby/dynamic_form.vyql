@@ -1,0 +1,9 @@
+import code.{HtmlRender}
+adapter ruby {
+  package "dynamic_form" {
+    sink method "input" -> code.HtmlRender
+    sink method "form" -> code.HtmlRender
+    sink method "error_message_on" -> code.HtmlRender
+    sink method "error_messages_for" -> code.HtmlRender
+  }
+}

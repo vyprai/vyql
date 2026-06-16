@@ -1,0 +1,11 @@
+import code.{CommandExecution, FilePathAccess, Deserialization}
+
+adapter php {
+  package "symfony/dotenv" {
+    sink method "parse" -> code.Deserialization
+    sink method "resolveCommands" -> code.CommandExecution
+    sink method "loadEnv" -> code.FilePathAccess
+    sink method "load" -> code.FilePathAccess
+    sink method "bootEnv" -> code.FilePathAccess
+  }
+}

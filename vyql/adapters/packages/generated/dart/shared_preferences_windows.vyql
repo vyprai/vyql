@@ -1,0 +1,13 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter dart {
+  package "shared_preferences_windows" {
+    sink method "setValue" -> code.StoredDataWrite
+    sink method "remove" -> code.StoredDataWrite
+    sink method "clear" -> code.StoredDataWrite
+    sink method "clearWithPrefix" -> code.StoredDataWrite
+    sink method "clearWithParameters" -> code.StoredDataWrite
+    source method "getAll" -> code.StoredDataRead
+    source method "getAllWithPrefix" -> code.StoredDataRead
+  }
+}

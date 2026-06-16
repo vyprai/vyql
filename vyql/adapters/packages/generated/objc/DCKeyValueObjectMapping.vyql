@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "DCKeyValueObjectMapping" {
+    sink method "parseDictionary" -> code.Deserialization
+    sink method "parseArray" -> code.Deserialization
+    sink method "dc_parseDictionary" -> code.Deserialization
+    sink method "dc_parseArray" -> code.Deserialization
+    sink method "dc_updateWithDictionary" -> code.Deserialization
+  }
+}

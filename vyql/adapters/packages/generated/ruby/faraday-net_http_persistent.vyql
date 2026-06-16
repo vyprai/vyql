@@ -1,0 +1,7 @@
+import code.{NetworkConnect, NetworkSend}
+adapter ruby {
+  package "faraday-net_http_persistent" {
+    sink method "call" -> code.NetworkConnect
+    sink method "perform_request" -> code.NetworkSend
+  }
+}

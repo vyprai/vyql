@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter rust {
+  package "futures-lite" {
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+  }
+}

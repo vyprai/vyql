@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter groovy {
+  package "info.cukes:cucumber-junit" {
+    source method "parse" -> code.CliArgument
+  }
+}

@@ -1,0 +1,13 @@
+import code.{HttpInput, ResponseHeaderWrite}
+adapter kotlin {
+  package "org.zalando:problem-spring-web" {
+    source method "create" -> code.HttpInput
+    source method "negotiate" -> code.HttpInput
+    source method "commence" -> code.HttpInput
+    source method "onAuthenticationFailure" -> code.HttpInput
+
+    sink method "create" -> code.ResponseHeaderWrite
+    sink method "commence" -> code.ResponseHeaderWrite
+    sink method "onAuthenticationFailure" -> code.ResponseHeaderWrite
+  }
+}

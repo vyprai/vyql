@@ -1,0 +1,12 @@
+import code.{NetworkConnect}
+
+adapter swift {
+  package "github.com/orlandos-nl/NioDNS" {
+    sink method "initiateAQuery" -> code.NetworkConnect
+    sink method "initiateAAAAQuery" -> code.NetworkConnect
+    sink method "sendQuery" -> code.NetworkConnect
+    sink method "initiateNSQuery" -> code.NetworkConnect
+    sink method "initiateSOAQuery" -> code.NetworkConnect
+    sink method "srvConnect" -> code.NetworkConnect
+  }
+}

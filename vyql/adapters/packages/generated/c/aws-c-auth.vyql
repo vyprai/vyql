@@ -1,0 +1,15 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter c {
+  package "aws-c-auth" {
+    source method "aws_credentials_new_from_string" -> code.SecretValue
+    source method "aws_credentials_new_token" -> code.SecretValue
+    source method "aws_credentials_new_from_profile" -> code.SecretValue
+    source method "aws_credentials_get_access_key_id" -> code.SecretValue
+    source method "aws_credentials_get_secret_access_key" -> code.SecretValue
+    source method "aws_credentials_get_session_token" -> code.SecretValue
+    control method "aws_sign_request_aws" -> core.AuthenticationCheck
+    control method "aws_validate_v4a_authorization_value" -> core.AuthorizationCheck
+  }
+}

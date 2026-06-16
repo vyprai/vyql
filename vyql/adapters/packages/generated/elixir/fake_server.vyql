@@ -1,0 +1,11 @@
+adapter elixir {
+  package "fake_server" {
+    source method "FakeServer.Request.body" -> code.HttpInput
+    source method "FakeServer.Request.query" -> code.HttpInput
+    source method "FakeServer.Request.cookies" -> code.HttpInput
+    source method "FakeServer.Request.headers" -> code.HttpInput
+    source method "FakeServer.Request.path" -> code.HttpInput
+    source method "FakeServer.Request.query_string" -> code.HttpInput
+    sink method "FakeServer.Response.new" -> code.ResponseHeaderWrite
+  }
+}

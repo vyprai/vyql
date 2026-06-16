@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkData, NetworkSend}
+adapter swift {
+  package "github.com/Kitura/BlueSocket" {
+    sink method "connect" -> code.NetworkConnect
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+  }
+}

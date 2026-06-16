@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter kotlin {
+  package "org.seleniumhq.selenium:selenium-ie-driver" {
+    sink method "addCommandSwitches" -> code.CommandExecution
+  }
+}

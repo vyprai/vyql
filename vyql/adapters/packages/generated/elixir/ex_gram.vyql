@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+adapter elixir {
+  package "ex_gram" {
+    sink method "ExGram.Adapter.Req.request" -> code.NetworkSend
+    sink method "ExGram.Adapter.Req.custom_encode" -> code.NetworkSend
+  }
+}

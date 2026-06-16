@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter perl {
+  package "PAR" {
+    sink method "_run_member_from_par" -> code.CodeEval
+    sink method "_run_member" -> code.CodeEval
+  }
+}

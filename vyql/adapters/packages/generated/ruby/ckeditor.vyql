@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter ruby {
+  package "ckeditor" {
+    control method "Ckeditor::Utils.escape_single_quotes" -> core.InputValidation
+  }
+}

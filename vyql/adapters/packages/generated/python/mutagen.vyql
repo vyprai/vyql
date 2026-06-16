@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter python {
+  package "mutagen" {
+    sink method "load" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

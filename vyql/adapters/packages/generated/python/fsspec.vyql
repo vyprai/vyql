@@ -1,0 +1,9 @@
+import code.{FilePathAccess, UrlFetch}
+import core.{UserControlledData}
+
+adapter python {
+  package "fsspec" {
+    sink method "open" -> code.FilePathAccess
+    source method "url_to_fs" -> core.UserControlledData
+  }
+}

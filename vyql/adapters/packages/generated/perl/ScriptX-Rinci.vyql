@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter perl {
+  package "ScriptX-Rinci" {
+    source method "on_run" -> code.CliArgument
+  }
+}

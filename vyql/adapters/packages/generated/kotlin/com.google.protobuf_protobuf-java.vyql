@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "com.google.protobuf:protobuf-java" {
+    sink method "parseFrom" -> code.Deserialization
+  }
+}

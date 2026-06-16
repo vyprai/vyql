@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter cpp {
+  package "kf5dbusaddons" {
+    source method "CommandLine" -> core.UserControlledData
+  }
+}

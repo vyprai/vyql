@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter javascript {
+  package "test-exclude" {
+    control method "shouldInstrument" -> core.InputValidation
+  }
+}

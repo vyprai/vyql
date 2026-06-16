@@ -1,0 +1,7 @@
+import code.{FilePathAccess, UrlFetch}
+
+adapter elixir {
+  package "tz" {
+    sink method "parse" -> code.FilePathAccess
+  }
+}

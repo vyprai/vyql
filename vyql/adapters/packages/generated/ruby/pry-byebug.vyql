@@ -1,0 +1,8 @@
+import code.{CodeEval}
+adapter ruby {
+  package "pry-byebug" {
+    sink method "add_file" -> code.CodeEval
+    sink method "add_method" -> code.CodeEval
+    sink method "change" -> code.CodeEval
+  }
+}

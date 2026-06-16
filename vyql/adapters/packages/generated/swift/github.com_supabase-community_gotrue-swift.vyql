@@ -1,0 +1,15 @@
+import code.{SecretValue}
+import core.{UserControlledData, AuthenticationCheck}
+
+adapter swift {
+  package "github.com/supabase-community/gotrue-swift" {
+    source method "signIn" -> core.UserControlledData
+    source method "signUp" -> core.UserControlledData
+    source method "signInWithIdToken" -> code.SecretValue
+    source method "session" -> code.SecretValue
+    source method "refreshSession" -> code.SecretValue
+    source method "setSession" -> code.SecretValue
+    source method "verifyOTP" -> core.UserControlledData
+    control method "resetPasswordForEmail" -> core.AuthenticationCheck
+  }
+}

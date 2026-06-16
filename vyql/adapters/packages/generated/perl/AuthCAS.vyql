@@ -1,0 +1,6 @@
+adapter perl {
+  package "AuthCAS" {
+    sink method "_parse_xml" -> code.Deserialization
+    control method "_escape_chars" -> core.InputValidation
+  }
+}

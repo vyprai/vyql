@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter dart {
+  package "string_validator" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

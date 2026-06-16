@@ -1,0 +1,10 @@
+adapter php {
+  package "mobiledetect/mobiledetectlib" {
+    source method "getHttpHeader" -> code.HttpInput
+    source method "setHttpHeaders" -> code.HttpInput
+    source method "match" -> code.HttpInput
+    source method "matchUserAgentWithFirstFoundMatchingRule" -> code.HttpInput
+    source method "matchUserAgentWithRule" -> code.HttpInput
+    source method "prepareUserAgent" -> code.HttpInput
+  }
+}

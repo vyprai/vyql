@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "exr" {
+    sink method "parse" -> code.Deserialization
+  }
+}

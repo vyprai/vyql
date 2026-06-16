@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "parallel_tests" {
+    sink method "execute_command_in_parallel" -> code.CommandExecution
+  }
+}

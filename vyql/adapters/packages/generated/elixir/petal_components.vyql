@@ -1,0 +1,15 @@
+import code.{CommandExecution, Deserialization, FileUse}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "petal_components" {
+    sink method "run_tests!" -> code.CommandExecution
+    sink method "extract_release_type" -> code.Deserialization
+
+    source method "password_input" -> core.UserControlledData
+    source method "search_input" -> core.UserControlledData
+    source method "url_input" -> core.UserControlledData
+    source method "file_input" -> core.UserControlledData
+    source method "textarea" -> core.UserControlledData
+  }
+}

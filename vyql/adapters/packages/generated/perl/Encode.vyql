@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+
+adapter perl {
+  package "Encode" {
+    source method "decode" -> core.UserControlledData
+    source method "cat_decode" -> core.UserControlledData
+    source method "encode" -> core.UserControlledData
+  }
+}

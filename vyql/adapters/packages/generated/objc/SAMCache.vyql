@@ -1,0 +1,12 @@
+import code.{StoredDataRead, StoredDataWrite, FilePathAccess}
+adapter objc {
+  package "SAMCache" {
+    source method "objectForKey:" -> code.StoredDataRead
+    source method "objectForKeyedSubscript:" -> code.StoredDataRead
+    source method "imageForKey:" -> code.StoredDataRead
+    sink method "pathForKey:" -> code.FilePathAccess
+    sink method "imagePathForKey:" -> code.FilePathAccess
+    sink method "setObject:forKey:" -> code.StoredDataWrite
+    sink method "setImage:forKey:" -> code.StoredDataWrite
+  }
+}

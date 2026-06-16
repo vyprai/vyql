@@ -1,0 +1,9 @@
+import code.{Deserialization, StoredDataWrite}
+adapter c {
+  package "sparsepp" {
+    sink method "read_data" -> code.Deserialization
+    sink method "write_data" -> code.StoredDataWrite
+    sink method "read_metadata" -> code.Deserialization
+    sink method "write_metadata" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,8 @@
+adapter scala {
+  package "com.google.zxing:javase" {
+    source method "readImage" -> core.UserControlledData
+    source method "decode" -> core.UserControlledData
+    sink method "writeToFile" -> code.FilePathAccess
+    sink method "writeToPath" -> code.FilePathAccess
+  }
+}

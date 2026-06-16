@@ -1,0 +1,7 @@
+import code.{Deserialization, DatabaseRead}
+adapter kotlin {
+  package "org.apache.kafka:kafka-streams" {
+    sink method "TaskId.parse" -> code.Deserialization
+    sink method "KeyQuery.withKey" -> code.DatabaseRead
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CommandExecution, Deserialization}
+adapter elixir {
+  package "dotenvy" {
+    sink method "parse" -> code.Deserialization
+    sink method "execute_shell_cmd" -> code.CommandExecution
+  }
+}

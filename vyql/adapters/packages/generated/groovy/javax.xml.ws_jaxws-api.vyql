@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess, NetworkConnect, NetworkData, SqlExecution, XmlParse}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "javax.xml.ws:jaxws-api" {
+    source method "LogicalMessage.getPayload" -> core.UserControlledData
+    sink method "LogicalMessage.setPayload" -> code.Deserialization
+    sink method "Provider.readEndpointReference" -> code.Deserialization
+  }
+}

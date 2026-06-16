@@ -1,0 +1,8 @@
+import code.{ExpressionEval}
+
+adapter cpp {
+  package "corrade" {
+    sink method "format" -> code.ExpressionEval
+    sink method "formatInto" -> code.ExpressionEval
+  }
+}

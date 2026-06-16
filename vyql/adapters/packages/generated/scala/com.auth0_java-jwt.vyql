@@ -1,0 +1,8 @@
+import code.{Deserialization, SecretValue}
+
+adapter scala {
+  package "com.auth0:java-jwt" {
+    sink method "decode" -> code.Deserialization
+    source method "sign" -> code.SecretValue
+  }
+}

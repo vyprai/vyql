@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+adapter rust {
+  package "difference" {
+    source method "lcs" -> core.UserControlledData
+    source method "new" -> core.UserControlledData
+    source method "diff" -> core.UserControlledData
+    source method "print_diff" -> core.UserControlledData
+    source method "merge" -> core.UserControlledData
+  }
+}

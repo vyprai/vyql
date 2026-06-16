@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter ruby {
+  package "cocoapods-stats" {
+    sink method "CocoaPodsStats::Sender.send" -> code.NetworkSend
+    sink method "CocoaPodsStats::Sender.curl" -> code.NetworkSend
+  }
+}

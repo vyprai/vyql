@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend}
+adapter ruby {
+  package "circleci" {
+    sink method "request" -> code.NetworkConnect
+    sink method "post" -> code.NetworkSend
+    sink method "get" -> code.NetworkSend
+    sink method "transmit" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,8 @@
+import code.{CommandExecution, CodeEval}
+
+adapter scala {
+  package "org.mongodb:mongodb-driver" {
+    sink method "command" -> code.CommandExecution
+    sink method "doEval" -> code.CodeEval
+  }
+}

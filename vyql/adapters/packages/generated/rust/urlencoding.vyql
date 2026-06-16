@@ -1,0 +1,10 @@
+import core.{InputValidation, UserControlledData}
+
+adapter rust {
+  package "urlencoding" {
+    source method "decode" -> core.UserControlledData
+    source method "decode_binary" -> core.UserControlledData
+    control method "encode" -> core.InputValidation
+    control method "encode_binary" -> core.InputValidation
+  }
+}

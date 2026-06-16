@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter elixir {
+  package "mint" {
+    source method "recv" -> code.NetworkData
+    sink method "connect" -> code.NetworkConnect
+    sink method "request" -> code.NetworkSend
+    sink method "stream_request_body" -> code.NetworkSend
+  }
+}

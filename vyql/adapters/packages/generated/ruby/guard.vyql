@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "guard" {
+    sink method "Releaser.system" -> code.CommandExecution
+  }
+}

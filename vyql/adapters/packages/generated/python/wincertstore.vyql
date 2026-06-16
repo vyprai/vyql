@@ -1,0 +1,12 @@
+import code.{FilePathAccess, SecretValue}
+
+adapter python {
+  package "wincertstore" {
+    source method "itercerts" -> code.SecretValue
+    source method "itercrls" -> code.SecretValue
+    source method "get_encoded" -> code.SecretValue
+    source method "get_pem" -> code.SecretValue
+    sink method "read" -> code.FilePathAccess
+    source method "addcerts" -> code.SecretValue
+  }
+}

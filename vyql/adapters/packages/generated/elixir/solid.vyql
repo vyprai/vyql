@@ -1,0 +1,13 @@
+import code.{Deserialization, TemplateRender}
+import core.{HtmlEscape}
+
+adapter elixir {
+  package "solid" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse!" -> code.Deserialization
+    sink method "render" -> code.TemplateRender
+    sink method "render!" -> code.TemplateRender
+    control method "escape" -> core.HtmlEscape
+    control method "html_escape" -> core.HtmlEscape
+  }
+}

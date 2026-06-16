@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "chronic" {
+    sink method "parse" -> code.Deserialization
+  }
+}

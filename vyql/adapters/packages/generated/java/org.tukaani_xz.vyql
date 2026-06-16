@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter java {
+  package "org.tukaani:xz" {
+    source method "XZInputStream.read" -> code.NetworkData
+  }
+}

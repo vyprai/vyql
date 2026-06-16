@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter javascript {
+  package "browserslist" {
+    sink method "parsePackage" -> code.Deserialization
+    sink method "parseConfig" -> code.Deserialization
+    sink method "readConfig" -> code.FilePathAccess
+  }
+}

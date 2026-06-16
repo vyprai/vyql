@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+import code.{NetworkData}
+
+adapter perl {
+  package "Weasel" {
+    source method "send_keys" -> core.UserControlledData
+    source method "get_page_source" -> code.NetworkData
+  }
+}

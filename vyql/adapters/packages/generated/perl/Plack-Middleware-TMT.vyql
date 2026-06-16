@@ -1,0 +1,5 @@
+adapter perl {
+  package "Plack-Middleware-TMT" {
+    sink method "process_template" -> code.TemplateRender
+  }
+}

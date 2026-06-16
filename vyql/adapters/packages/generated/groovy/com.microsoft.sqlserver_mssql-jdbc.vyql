@@ -1,0 +1,5 @@
+adapter groovy {
+  package "com.microsoft.sqlserver:mssql-jdbc" {
+    sink method "update" -> code.SqlExecution
+  }
+}

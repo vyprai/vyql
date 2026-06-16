@@ -1,0 +1,9 @@
+import code.{NetworkSend, NetworkData}
+
+adapter scala {
+  package "org.elasticsearch.client:elasticsearch-rest-client" {
+    sink method "performRequest" -> code.NetworkSend
+    source method "setEntity" -> code.NetworkData
+    source method "setJsonEntity" -> code.NetworkData
+  }
+}

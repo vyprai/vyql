@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter kotlin {
+  package "com.squareup:javapoet" {
+    sink method "writeToPath" -> code.FilePathAccess
+    sink method "writeToFile" -> code.FilePathAccess
+  }
+}

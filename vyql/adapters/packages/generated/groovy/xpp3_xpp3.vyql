@@ -1,0 +1,6 @@
+adapter groovy {
+  package "xpp3:xpp3" {
+    sink method "setInput" -> code.Deserialization
+    sink method "nextText" -> code.Deserialization
+  }
+}

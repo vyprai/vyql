@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "io.github.bonigarcia:webdrivermanager" {
+    sink method "parse" -> code.Deserialization
+  }
+}

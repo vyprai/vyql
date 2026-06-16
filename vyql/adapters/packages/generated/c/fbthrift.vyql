@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter c {
+  package "fbthrift" {
+    sink method "apache::thrift::compiler::parse::parse" -> code.Deserialization
+  }
+}

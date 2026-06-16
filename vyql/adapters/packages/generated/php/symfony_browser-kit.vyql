@@ -1,0 +1,5 @@
+adapter php {
+  package "symfony/browser-kit" {
+    source method "Cookie" -> code.HttpInput
+  }
+}

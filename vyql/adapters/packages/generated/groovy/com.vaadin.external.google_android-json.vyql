@@ -1,0 +1,10 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.vaadin.external.google:android-json" {
+    sink method "JSONObject.<init>(String)" -> code.Deserialization
+    sink method "JSONObject.<init>(JSONTokener)" -> code.Deserialization
+    sink method "JSONArray.<init>(String)" -> code.Deserialization
+    sink method "JSONArray.<init>(JSONTokener)" -> code.Deserialization
+    sink method "JSONTokener.<init>(String)" -> code.Deserialization
+  }
+}

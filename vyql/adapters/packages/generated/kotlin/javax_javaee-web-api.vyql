@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "javax:javaee-web-api" {
+    sink method "get" -> code.UrlFetch
+    sink method "read" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter groovy {
+  package "org.springframework.session:spring-session-data-redis" {
+    sink method "save" -> code.StoredDataWrite
+    source method "findById" -> code.StoredDataRead
+  }
+}

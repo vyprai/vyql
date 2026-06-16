@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter elixir {
+  package "ua_inspector" {
+    source method "parse" -> core.UserControlledData
+  }
+}

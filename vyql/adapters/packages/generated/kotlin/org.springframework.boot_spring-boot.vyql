@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter kotlin {
+  package "org.springframework.boot:spring-boot" {
+    source method "run" -> code.CliArgument
+  }
+}

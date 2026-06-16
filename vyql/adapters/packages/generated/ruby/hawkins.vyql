@@ -1,0 +1,8 @@
+adapter ruby {
+  package "hawkins" {
+    source method "connect" -> code.NetworkData
+    sink method "server_address" -> code.NetworkSend
+    sink method "connect" -> code.NetworkConnect
+    sink method "decodeURIComponent" -> code.Deserialization
+  }
+}

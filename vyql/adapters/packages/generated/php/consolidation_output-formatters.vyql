@@ -1,0 +1,15 @@
+import code.{HtmlRender}
+import core.{HtmlEscape}
+
+adapter php {
+  package "consolidation/output-formatters" {
+    sink method "Consolidation\\OutputFormatters\\Formatters\\CsvFormatter::write" -> code.HtmlRender
+    sink method "Consolidation\\OutputFormatters\\Formatters\\JsonFormatter::write" -> code.HtmlRender
+    sink method "Consolidation\\OutputFormatters\\Formatters\\XmlFormatter::write" -> code.HtmlRender
+    sink method "Consolidation\\OutputFormatters\\Formatters\\YamlFormatter::write" -> code.HtmlRender
+    sink method "Consolidation\\OutputFormatters\\Formatters\\TableFormatter::write" -> code.HtmlRender
+    sink method "Consolidation\\OutputFormatters\\Formatters\\ListFormatter::write" -> code.HtmlRender
+    sink method "Consolidation\\OutputFormatters\\FormatterManager::write" -> code.HtmlRender
+    control method "Consolidation\\OutputFormatters\\Formatters\\CsvFormatter::csvEscape" -> core.HtmlEscape
+  }
+}

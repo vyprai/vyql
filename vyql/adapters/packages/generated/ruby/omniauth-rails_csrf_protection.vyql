@@ -1,0 +1,7 @@
+import core.{CsrfProtection}
+
+adapter ruby {
+  package "omniauth-rails_csrf_protection" {
+    control method "TokenVerifier#call" -> core.CsrfProtection
+  }
+}

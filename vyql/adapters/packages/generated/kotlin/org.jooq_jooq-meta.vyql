@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+adapter kotlin {
+  package "org.jooq:jooq-meta" {
+    sink method "setExcludeSql" -> code.SqlExecution
+    sink method "setIncludeSql" -> code.SqlExecution
+  }
+}

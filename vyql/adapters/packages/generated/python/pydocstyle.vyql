@@ -1,0 +1,8 @@
+import code.{CliArgument, FilePathAccess}
+
+adapter python {
+  package "pydocstyle" {
+    sink method "read" -> code.FilePathAccess
+    source method "run_pydocstyle" -> code.CliArgument
+  }
+}

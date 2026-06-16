@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/colinc86/MathJaxSwift" {
+    sink method "defaultParseAs" -> code.XmlParse
+  }
+}

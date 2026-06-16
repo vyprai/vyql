@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter ruby {
+  package "google-cloud-core" {
+    source method "Google::Cloud::Credentials.default" -> code.SecretValue
+    source method "Google::Cloud::Config.credentials_from_env" -> code.SecretValue
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter dart {
+  package "metrics_center" {
+    sink method "GoogleBenchmarkParser.parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/go-toolsmith/strparse" {
+    sink method "Expr" -> code.Deserialization
+    sink method "Stmt" -> code.Deserialization
+    sink method "Decl" -> code.Deserialization
+  }
+}

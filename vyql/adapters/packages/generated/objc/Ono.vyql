@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter objc {
+  package "Ono" {
+    sink method "XMLDocumentWithString:" -> code.Deserialization
+    sink method "XMLDocumentWithData:" -> code.Deserialization
+  }
+}

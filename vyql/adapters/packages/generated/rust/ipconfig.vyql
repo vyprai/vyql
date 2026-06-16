@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter rust {
+  package "ipconfig" {
+    source method "get_search_list" -> code.NetworkData
+  }
+}

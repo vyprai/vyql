@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter php {
+  package "ralouphie/getallheaders" {
+    source method "getallheaders" -> code.HttpInput
+  }
+}

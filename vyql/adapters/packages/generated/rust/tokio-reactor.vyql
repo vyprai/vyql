@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter rust {
+  package "tokio-reactor" {
+    source method "poll_read" -> code.NetworkData
+    source method "poll_write" -> code.NetworkData
+  }
+}

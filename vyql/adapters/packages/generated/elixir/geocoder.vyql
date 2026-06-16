@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "geocoder" {
+    sink method "decode!" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,25 @@
+import code.{Deserialization, FilePathAccess, FileUse}
+
+adapter c {
+  package "matio" {
+    sink method "Mat_Open" -> code.FilePathAccess
+    sink method "Mat_CreateVer" -> code.FilePathAccess
+    sink method "Mat_VarRead" -> code.Deserialization
+    sink method "Mat_VarRead4" -> code.Deserialization
+    sink method "Mat_VarRead5" -> code.Deserialization
+    sink method "Mat_VarRead73" -> code.Deserialization
+    sink method "Mat_VarReadNextInfo4" -> code.Deserialization
+    sink method "Mat_VarReadNextInfo5" -> code.Deserialization
+    sink method "Mat_VarReadNextInfo73" -> code.Deserialization
+    sink method "Mat_VarReadData4" -> code.Deserialization
+    sink method "Mat_VarReadDataLinear4" -> code.Deserialization
+    sink method "Mat_VarReadData5" -> code.Deserialization
+    sink method "Mat_VarReadDataLinear5" -> code.Deserialization
+    sink method "Mat_VarReadData73" -> code.Deserialization
+    sink method "Mat_VarReadDataLinear73" -> code.Deserialization
+    sink method "Mat_VarWrite4" -> code.FileUse
+    sink method "Mat_VarWrite5" -> code.FileUse
+    sink method "Mat_VarWrite73" -> code.FileUse
+    sink method "Mat_VarWriteAppend73" -> code.FileUse
+  }
+}

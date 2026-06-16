@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.openapitools:jackson-databind-nullable" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "extractValues" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter php {
+  package "brain/monkey" {
+    control method "Brain\Monkey\Expectation\EscapeHelper::escUrlRaw" -> core.InputValidation
+    control method "Brain\Monkey\Expectation\EscapeHelper::escUrl" -> core.InputValidation
+    control method "Brain\Monkey\Expectation\EscapeHelper::escXml" -> core.InputValidation
+  }
+}

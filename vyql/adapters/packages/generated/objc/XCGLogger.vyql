@@ -1,0 +1,26 @@
+import code.{FileUse, LogOutput}
+
+adapter objc {
+  package "XCGLogger" {
+    sink method "write" -> code.FileUse
+    sink method "logln" -> code.LogOutput
+    sink method "verbose" -> code.LogOutput
+    sink method "debug" -> code.LogOutput
+    sink method "info" -> code.LogOutput
+    sink method "notice" -> code.LogOutput
+    sink method "warning" -> code.LogOutput
+    sink method "error" -> code.LogOutput
+    sink method "severe" -> code.LogOutput
+    sink method "alert" -> code.LogOutput
+    sink method "emergency" -> code.LogOutput
+    sink method "verboseExec" -> code.LogOutput
+    sink method "debugExec" -> code.LogOutput
+    sink method "infoExec" -> code.LogOutput
+    sink method "noticeExec" -> code.LogOutput
+    sink method "warningExec" -> code.LogOutput
+    sink method "errorExec" -> code.LogOutput
+    sink method "severeExec" -> code.LogOutput
+    sink method "alertExec" -> code.LogOutput
+    sink method "emergencyExec" -> code.LogOutput
+  }
+}

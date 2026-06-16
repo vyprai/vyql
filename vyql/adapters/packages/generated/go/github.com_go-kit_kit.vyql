@@ -1,0 +1,9 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter go {
+  package "github.com/go-kit/kit" {
+    source method "NewSigner" -> code.SecretValue
+    control method "NewParser" -> core.AuthenticationCheck
+  }
+}

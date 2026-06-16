@@ -1,0 +1,11 @@
+import code.{CliArgument}
+adapter cpp {
+  package "getopt-win32" {
+    source method "getopt_a" -> code.CliArgument
+    source method "getopt_long_a" -> code.CliArgument
+    source method "getopt_long_only_a" -> code.CliArgument
+    source method "getopt_w" -> code.CliArgument
+    source method "getopt_long_w" -> code.CliArgument
+    source method "getopt_long_only_w" -> code.CliArgument
+  }
+}

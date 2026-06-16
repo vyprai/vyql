@@ -1,0 +1,6 @@
+adapter groovy {
+  package "org.aspectj:aspectjweaver" {
+    sink method "readStructureModel" -> code.FilePathAccess
+    sink method "writeStructureModel" -> code.FilePathAccess
+  }
+}

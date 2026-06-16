@@ -1,0 +1,9 @@
+import code.{CodeEval, StdinInput, Deserialization}
+adapter ruby {
+  package "irb" {
+    source method "read_input" -> code.StdinInput
+    source method "read_input_nomultiline" -> code.StdinInput
+    sink method "parse_input" -> code.Deserialization
+    sink method "run" -> code.CodeEval
+  }
+}

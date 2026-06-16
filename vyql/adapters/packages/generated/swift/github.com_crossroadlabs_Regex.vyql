@@ -1,0 +1,6 @@
+import code.{RegexCompile}
+adapter swift {
+  package "github.com/crossroadlabs/Regex" {
+    mark method "init" -> code.RegexCompile
+  }
+}

@@ -1,0 +1,9 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter cpp {
+  package "librdkafka" {
+    control method "Conf::set" -> core.AuthenticationCheck
+    source method "oauthbearer_token_refresh_cb" -> code.SecretValue
+  }
+}

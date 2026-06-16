@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.nimbusds:nimbus-jose-jwt" {
+    sink method "parse" -> code.Deserialization
+  }
+}

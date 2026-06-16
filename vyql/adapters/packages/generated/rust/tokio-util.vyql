@@ -1,0 +1,6 @@
+adapter rust {
+  package "tokio-util" {
+    sink method "decode" -> code.Deserialization
+    source method "encode" -> core.UserControlledData
+  }
+}

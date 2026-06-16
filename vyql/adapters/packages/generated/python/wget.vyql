@@ -1,0 +1,7 @@
+import code.{UrlFetch, FilePathAccess}
+adapter python {
+  package "wget" {
+    sink method "download" -> code.UrlFetch
+    sink method "download" -> code.FilePathAccess
+  }
+}

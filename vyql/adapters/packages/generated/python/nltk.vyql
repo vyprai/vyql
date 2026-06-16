@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess, FileUse}
+
+adapter python {
+  package "nltk" {
+    sink method "parse" -> code.Deserialization
+    sink method "open" -> code.FilePathAccess
+    sink method "read" -> code.FileUse
+    sink method "write" -> code.FileUse
+    sink method "load" -> code.Deserialization
+  }
+}

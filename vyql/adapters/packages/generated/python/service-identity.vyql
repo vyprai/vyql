@@ -1,0 +1,11 @@
+import core.{AuthenticationCheck, InputValidation}
+
+adapter python {
+  package "service-identity" {
+    control method "verify_hostname" -> core.AuthenticationCheck
+    control method "verify_ip_address" -> core.AuthenticationCheck
+    control method "verify_service_identity" -> core.AuthenticationCheck
+    control method "verify_certificate_hostname" -> core.AuthenticationCheck
+    control method "verify_certificate_ip_address" -> core.AuthenticationCheck
+  }
+}

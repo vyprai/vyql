@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter ruby {
+  package "autoprefixer-rails" {
+    sink method "process" -> code.CodeEval
+  }
+}

@@ -1,0 +1,6 @@
+import code.{StdinInput}
+adapter python {
+  package "prompt-toolkit" {
+    source method "read" -> code.StdinInput
+  }
+}

@@ -1,0 +1,6 @@
+import code.{WeakHash}
+adapter javascript {
+  package "selfsigned" {
+    mark method "generate" -> code.WeakHash
+  }
+}

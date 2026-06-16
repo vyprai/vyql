@@ -1,0 +1,5 @@
+adapter elixir {
+  package "memoize" {
+    sink method "mix_cmd_with_status_check" -> code.CommandExecution
+  }
+}

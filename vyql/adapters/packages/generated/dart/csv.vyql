@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "csv" {
+    sink method "decode" -> code.Deserialization
+    sink method "decodeWithHeaders" -> code.Deserialization
+    sink method "convert" -> code.Deserialization
+  }
+}

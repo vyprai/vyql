@@ -1,0 +1,5 @@
+adapter elixir {
+  package "dialyze" {
+    source method "run" -> core.UserControlledData
+  }
+}

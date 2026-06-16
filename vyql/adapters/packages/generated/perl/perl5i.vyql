@@ -1,0 +1,8 @@
+import code.{CommandExecution, FileUse}
+
+adapter perl {
+  package "perl5i" {
+    sink path "perl5i::load" -> code.FileUse
+    sink path "perl5i::utf8_open" -> code.FileUse
+  }
+}

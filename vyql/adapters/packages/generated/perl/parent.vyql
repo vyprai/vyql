@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter perl {
+  package "parent" {
+    sink method "for" -> code.CodeEval
+  }
+}

@@ -1,0 +1,15 @@
+import code.{SecretValue}
+
+adapter objc {
+  package "SAMKeychain" {
+    source method "passwordForService" -> code.SecretValue
+    source method "passwordDataForService" -> code.SecretValue
+    source method "allAccounts" -> code.SecretValue
+    source method "accountsForService" -> code.SecretValue
+    source method "fetchAll" -> code.SecretValue
+    source method "fetch" -> code.SecretValue
+    source method "setPassword" -> code.SecretValue
+    source method "setPasswordData" -> code.SecretValue
+    source method "save" -> code.SecretValue
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "jmespath" {
+    sink method "search" -> code.Deserialization
+  }
+}

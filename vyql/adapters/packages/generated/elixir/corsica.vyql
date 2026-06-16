@@ -1,0 +1,20 @@
+import code.{HttpInput, ResponseHeaderWrite}
+import core.{InputValidation}
+
+adapter elixir {
+  package "corsica" {
+    sink method "send_preflight_resp" -> code.ResponseHeaderWrite
+    sink method "put_cors_simple_resp_headers" -> code.ResponseHeaderWrite
+    sink method "put_cors_preflight_resp_headers" -> code.ResponseHeaderWrite
+    sink method "put_cors_preflight_resp_headers_no_check" -> code.ResponseHeaderWrite
+    sink method "put_common_headers" -> code.ResponseHeaderWrite
+    sink method "put_allow_credentials_header" -> code.ResponseHeaderWrite
+    sink method "put_allow_origin_header" -> code.ResponseHeaderWrite
+    sink method "update_vary_header" -> code.ResponseHeaderWrite
+    sink method "put_allow_methods_header" -> code.ResponseHeaderWrite
+    sink method "put_allow_headers_header" -> code.ResponseHeaderWrite
+    sink method "put_allow_private_network_header" -> code.ResponseHeaderWrite
+    sink method "put_max_age_header" -> code.ResponseHeaderWrite
+    sink method "put_expose_headers_header" -> code.ResponseHeaderWrite
+  }
+}

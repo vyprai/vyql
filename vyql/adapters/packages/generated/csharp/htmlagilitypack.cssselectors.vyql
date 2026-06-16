@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "htmlagilitypack.cssselectors" {
+    sink method "SelectNodes" -> code.Deserialization
+    sink method "SelectSingleNode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,13 @@
+import code.{NetworkSend, FileUse}
+import core.{UserControlledData}
+
+adapter java {
+  package "javax.mail:mail" {
+    sink method "send" -> code.NetworkSend
+    sink method "setFileName" -> code.FileUse
+    sink method "writeTo" -> code.NetworkSend
+    source method "getHeader" -> core.UserControlledData
+    source method "setHeader" -> core.UserControlledData
+    source method "addHeader" -> core.UserControlledData
+  }
+}

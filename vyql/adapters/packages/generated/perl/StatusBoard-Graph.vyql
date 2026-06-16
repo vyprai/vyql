@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter perl {
+  package "StatusBoard-Graph" {
+    sink method "write_json" -> code.FilePathAccess
+  }
+}

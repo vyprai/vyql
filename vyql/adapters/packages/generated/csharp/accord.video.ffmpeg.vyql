@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter csharp {
+  package "accord.video.ffmpeg" {
+    sink method "VideoFileReader.Open" -> code.FilePathAccess
+    sink method "VideoFileWriter.Open" -> code.FilePathAccess
+  }
+}

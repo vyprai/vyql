@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter kotlin {
+  package "javax.persistence:persistence-api" {
+    sink method "createQuery" -> code.SqlExecution
+    sink method "createNativeQuery" -> code.SqlExecution
+  }
+}

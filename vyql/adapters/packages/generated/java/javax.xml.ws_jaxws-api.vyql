@@ -1,0 +1,11 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter java {
+  package "javax.xml.ws:jaxws-api" {
+    source method "getPayload" -> core.UserControlledData
+    sink method "setPayload" -> code.Deserialization
+    sink method "invoke" -> code.Deserialization
+    sink method "readEndpointReference" -> code.Deserialization
+  }
+}

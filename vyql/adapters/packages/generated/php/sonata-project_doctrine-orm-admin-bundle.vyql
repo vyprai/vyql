@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter php {
+  package "sonata-project/doctrine-orm-admin-bundle" {
+    sink method "apply" -> code.SqlExecution
+    sink method "filter" -> code.SqlExecution
+  }
+}

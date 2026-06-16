@@ -1,0 +1,7 @@
+import code.{Deserialization, ResponseHeaderWrite}
+adapter python {
+  package "flask-marshmallow" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "jsonify" -> code.ResponseHeaderWrite
+  }
+}

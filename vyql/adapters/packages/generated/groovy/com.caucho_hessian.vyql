@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.caucho:hessian" {
+    sink method "readObject" -> code.Deserialization
+  }
+}

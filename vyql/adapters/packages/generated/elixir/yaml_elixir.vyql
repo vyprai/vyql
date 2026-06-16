@@ -1,0 +1,14 @@
+import code.{Deserialization}
+adapter elixir {
+  package "yaml_elixir" {
+    sink method "read_all_from_file!" -> code.Deserialization
+    sink method "read_all_from_file" -> code.Deserialization
+    sink method "read_from_file!" -> code.Deserialization
+    sink method "read_from_file" -> code.Deserialization
+    sink method "read_all_from_string!" -> code.Deserialization
+    sink method "read_all_from_string" -> code.Deserialization
+    sink method "read_from_string!" -> code.Deserialization
+    sink method "read_from_string" -> code.Deserialization
+    sink method "sigil_y" -> code.Deserialization
+  }
+}

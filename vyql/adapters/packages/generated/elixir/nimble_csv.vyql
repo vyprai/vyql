@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "nimble_csv" {
+    sink method "parse_stream" -> code.Deserialization
+    sink method "parse_enumerable" -> code.Deserialization
+    sink method "parse_string" -> code.Deserialization
+    sink method "define" -> code.Deserialization
+  }
+}

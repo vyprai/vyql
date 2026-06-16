@@ -1,0 +1,10 @@
+import code.{HtmlRender, UrlFetch}
+import core.{UserControlledData}
+
+adapter ruby {
+  package "gravatar_image_tag" {
+    sink method "gravatar_image_tag" -> code.HtmlRender
+
+
+  }
+}

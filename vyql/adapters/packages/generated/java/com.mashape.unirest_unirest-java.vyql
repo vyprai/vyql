@@ -1,0 +1,17 @@
+import code.{UrlFetch, HttpInput, Deserialization}
+adapter java {
+  package "com.mashape.unirest:unirest-java" {
+    sink method "get" -> code.UrlFetch
+    sink method "post" -> code.UrlFetch
+    sink method "put" -> code.UrlFetch
+    sink method "delete" -> code.UrlFetch
+    sink method "patch" -> code.UrlFetch
+    sink method "options" -> code.UrlFetch
+    sink method "head" -> code.UrlFetch
+    source method "getBody" -> code.HttpInput
+    source method "getRawBody" -> code.HttpInput
+    source method "getHeaders" -> code.HttpInput
+    sink method "JsonNode" -> code.Deserialization
+    sink method "readValue" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "com.hazelcast:hazelcast-spring" {
+    sink method "parseOptions" -> code.Deserialization
+    sink method "parseOption" -> code.Deserialization
+    sink method "parseInternal" -> code.Deserialization
+  }
+}

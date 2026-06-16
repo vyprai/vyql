@@ -1,0 +1,5 @@
+adapter scala {
+  package "net.spy:spymemcached" {
+    mark method "hash" -> code.WeakHash
+  }
+}

@@ -1,0 +1,13 @@
+import code.{Deserialization, FileUse}
+import core.{InputValidation}
+
+adapter dart {
+  package "package_config" {
+    sink method "parseBytes" -> code.Deserialization
+    sink method "parseString" -> code.Deserialization
+    sink method "parseJson" -> code.Deserialization
+    sink method "writeBytes" -> code.FileUse
+    sink method "writeString" -> code.FileUse
+    control method "validate" -> core.InputValidation
+  }
+}

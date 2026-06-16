@@ -1,0 +1,6 @@
+adapter php {
+  package "jeremeamia/superclosure" {
+    sink method "unserialize" -> code.Deserialization
+    sink method "serialize" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+adapter cpp {
+  package "magnum" {
+    sink method "exec" -> code.CommandExecution
+    source path "requestedCount" -> code.HttpInput
+  }
+}

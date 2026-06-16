@@ -1,0 +1,10 @@
+import code.{FilePathAccess, Deserialization}
+
+adapter go {
+  package "github.com/syndtr/goleveldb" {
+    sink method "Open" -> code.FilePathAccess
+    sink method "OpenFile" -> code.FilePathAccess
+    sink method "decodeBatch" -> code.Deserialization
+    sink method "decodeBatchToMem" -> code.Deserialization
+  }
+}

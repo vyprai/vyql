@@ -1,0 +1,9 @@
+import code.{UrlFetch}
+import core.{UserControlledData}
+
+adapter objc {
+  package "CTMediator" {
+    sink method "performActionWithUrl" -> code.UrlFetch
+    source method "performTarget" -> core.UserControlledData
+  }
+}

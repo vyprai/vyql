@@ -1,0 +1,11 @@
+import code.{Deserialization, CodeEval}
+
+adapter ruby {
+  package "activejob" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "deserialize_argument" -> code.Deserialization
+    sink method "deserialize_global_id" -> code.Deserialization
+    sink method "deserialize_hash" -> code.Deserialization
+    sink method "execute" -> code.CodeEval
+  }
+}

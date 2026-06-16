@@ -1,0 +1,33 @@
+import code.{NetworkConnect, NetworkSend}
+adapter elixir {
+  package "req" {
+    sink method "get" -> code.NetworkConnect
+    sink method "get!" -> code.NetworkConnect
+    sink method "post" -> code.NetworkConnect
+    sink method "post!" -> code.NetworkConnect
+    sink method "put" -> code.NetworkConnect
+    sink method "put!" -> code.NetworkConnect
+    sink method "patch" -> code.NetworkConnect
+    sink method "patch!" -> code.NetworkConnect
+    sink method "delete" -> code.NetworkConnect
+    sink method "delete!" -> code.NetworkConnect
+    sink method "request" -> code.NetworkConnect
+    sink method "request!" -> code.NetworkConnect
+    sink method "run" -> code.NetworkConnect
+    sink method "run!" -> code.NetworkConnect
+    sink method "get" -> code.NetworkSend
+    sink method "get!" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "post!" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "put!" -> code.NetworkSend
+    sink method "patch" -> code.NetworkSend
+    sink method "patch!" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+    sink method "delete!" -> code.NetworkSend
+    sink method "request" -> code.NetworkSend
+    sink method "request!" -> code.NetworkSend
+    sink method "run" -> code.NetworkSend
+    sink method "run!" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "mime-types" {
+    sink method "load_from_json" -> code.Deserialization
+  }
+}

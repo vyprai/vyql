@@ -1,0 +1,6 @@
+adapter objc {
+  package "TMCache" {
+    sink method "setObject:forKey:block:" -> code.StoredDataWrite
+    sink method "setObject:forKey:" -> code.StoredDataWrite
+  }
+}

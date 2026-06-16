@@ -1,0 +1,10 @@
+import code.{CodeEval, DatabaseRead, NetworkSend}
+
+adapter ruby {
+  package "redis-namespace" {
+    sink method "eval" -> code.CodeEval
+    sink method "keys" -> code.DatabaseRead
+    sink method "method_missing" -> code.NetworkSend
+    sink method "method_missing" -> code.DatabaseRead
+  }
+}

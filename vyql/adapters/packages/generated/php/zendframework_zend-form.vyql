@@ -1,0 +1,6 @@
+import core.{CsrfProtection}
+adapter php {
+  package "zendframework/zend-form" {
+    control method "getCsrfValidatorOptions" -> core.CsrfProtection
+  }
+}

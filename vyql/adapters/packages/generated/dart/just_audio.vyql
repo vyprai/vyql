@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter dart {
+  package "just_audio" {
+    source method "_HttpRangeRequest.parse" -> code.HttpInput
+  }
+}

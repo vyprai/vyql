@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/xanzy/ssh-agent" {
+    source method "New" -> code.SecretValue
+    source method "query" -> code.SecretValue
+  }
+}

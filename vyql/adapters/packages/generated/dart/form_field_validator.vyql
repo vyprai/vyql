@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter dart {
+  package "form_field_validator" {
+    control method "call" -> core.InputValidation
+    control method "hasMatch" -> core.InputValidation
+  }
+}

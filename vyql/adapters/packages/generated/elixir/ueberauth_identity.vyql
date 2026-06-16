@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+adapter elixir {
+  package "ueberauth_identity" {
+    source method "uid" -> core.UserControlledData
+    source method "info" -> core.UserControlledData
+    source method "credentials" -> core.UserControlledData
+    source method "extra" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,10 @@
+import code.{CodeEval, XmlParse}
+
+adapter java {
+  package "org.tuckey:urlrewritefilter" {
+    sink method "Conf.loadDom" -> code.XmlParse
+    sink method "Run.parseClass" -> code.CodeEval
+    sink method "Run.invokeRunMethod" -> code.CodeEval
+    sink method "Run.execute" -> code.CodeEval
+  }
+}

@@ -1,0 +1,5 @@
+adapter elixir {
+  package "drab" {
+    source method "cookie" -> code.HttpInput
+  }
+}

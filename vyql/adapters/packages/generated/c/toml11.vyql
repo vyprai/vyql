@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter c {
+  package "toml11" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_str" -> code.Deserialization
+  }
+}

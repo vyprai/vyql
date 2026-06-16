@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.slf4j:slf4j-ext" {
+    source method "premain" -> core.UserControlledData
+    source method "parseArguments" -> core.UserControlledData
+  }
+}

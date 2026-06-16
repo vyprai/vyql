@@ -1,0 +1,6 @@
+import code.{DatabaseRead}
+adapter swift {
+  package "github.com/aws-amplify/amplify-swift" {
+    sink method "query" -> code.DatabaseRead
+  }
+}

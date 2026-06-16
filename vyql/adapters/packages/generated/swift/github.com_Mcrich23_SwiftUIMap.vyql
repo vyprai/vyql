@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/Mcrich23/SwiftUIMap" {
+    mark method "hash" -> code.WeakHash
+  }
+}

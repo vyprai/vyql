@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter perl {
+  package "Plack-Middleware-SetLocalEnv" {
+    source method "call" -> core.UserControlledData
+  }
+}

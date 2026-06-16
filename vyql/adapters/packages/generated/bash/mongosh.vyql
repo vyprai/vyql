@@ -1,0 +1,6 @@
+adapter bash {
+  package "mongosh" {
+    source path "mongosh.argv" -> code.CliArgument
+    sink path "mongosh" arg all -> code.SqlExecution
+  }
+}

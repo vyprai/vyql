@@ -1,0 +1,14 @@
+adapter scala {
+  package "org.apache.maven.plugins:maven-surefire-plugin" {
+    sink method "getSystemPropertiesFile" -> code.FilePathAccess
+    sink method "setSystemPropertiesFile" -> code.FilePathAccess
+    sink method "getBasedir" -> code.FilePathAccess
+    sink method "setBasedir" -> code.FilePathAccess
+    sink method "getTestClassesDirectory" -> code.FilePathAccess
+    sink method "setTestClassesDirectory" -> code.FilePathAccess
+    sink method "getMainBuildPath" -> code.FilePathAccess
+    sink method "setMainBuildPath" -> code.FilePathAccess
+    sink method "getReportsDirectory" -> code.FilePathAccess
+    sink method "setReportsDirectory" -> code.FilePathAccess
+  }
+}

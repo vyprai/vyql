@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter python {
+  package "jsonpointer" {
+    sink method "resolve_pointer" -> code.Deserialization
+    sink method "set_pointer" -> code.Deserialization
+  }
+}

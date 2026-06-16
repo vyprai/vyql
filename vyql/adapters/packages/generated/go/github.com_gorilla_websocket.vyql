@@ -1,0 +1,8 @@
+import code.{HttpInput, NetworkConnect}
+
+adapter go {
+  package "github.com/gorilla/websocket" {
+    source method "Upgrade" -> code.HttpInput
+    sink method "NewClient" -> code.NetworkConnect
+  }
+}

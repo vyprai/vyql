@@ -1,0 +1,5 @@
+adapter perl {
+  package "HTTP-Validate" {
+    control method "check_params" -> core.InputValidation
+  }
+}

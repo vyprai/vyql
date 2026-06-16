@@ -1,0 +1,7 @@
+import code.{DatabaseRead}
+
+adapter java {
+  package "org.apache.commons:commons-dbcp2" {
+    sink method "getConnection" -> code.DatabaseRead
+  }
+}

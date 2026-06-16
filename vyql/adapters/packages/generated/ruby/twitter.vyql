@@ -1,0 +1,8 @@
+import code.{Deserialization, NetworkData}
+
+adapter ruby {
+  package "twitter" {
+    source method "search" -> code.NetworkData
+    sink method "parse" -> code.Deserialization
+  }
+}

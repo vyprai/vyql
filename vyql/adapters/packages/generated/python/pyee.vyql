@@ -1,0 +1,6 @@
+import code.{ExpressionEval}
+adapter python {
+  package "pyee" {
+    sink method "emit" -> code.ExpressionEval
+  }
+}

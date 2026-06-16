@@ -1,0 +1,8 @@
+import code.{HttpInput, StoredDataRead}
+
+adapter php {
+  package "aws/aws-crt-php" {
+    source method "AWS\CRT\HTTP\Message::query" -> code.HttpInput
+    source method "AWS\CRT\IO\InputStream::read" -> code.StoredDataRead
+  }
+}

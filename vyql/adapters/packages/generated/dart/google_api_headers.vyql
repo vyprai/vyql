@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter dart {
+  package "google_api_headers" {
+    source method "getHeaders" -> code.SecretValue
+    source method "onMethodCall" -> code.SecretValue
+  }
+}

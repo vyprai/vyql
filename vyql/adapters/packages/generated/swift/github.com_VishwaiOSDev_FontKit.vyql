@@ -1,0 +1,6 @@
+import code.{FileUse}
+adapter swift {
+  package "github.com/VishwaiOSDev/FontKit" {
+    sink method "register" -> code.FileUse
+  }
+}

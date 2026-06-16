@@ -1,0 +1,6 @@
+import code.{CommandExecution, Deserialization, FilePathAccess}
+adapter python {
+  package "future" {
+    sink method "parse" -> code.Deserialization
+  }
+}

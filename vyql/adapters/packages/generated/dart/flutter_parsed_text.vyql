@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "flutter_parsed_text" {
+    sink method "MatchText.pattern" -> code.Deserialization
+  }
+}

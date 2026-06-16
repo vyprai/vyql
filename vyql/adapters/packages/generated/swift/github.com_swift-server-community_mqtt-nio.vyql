@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/swift-server-community/mqtt-nio" {
+    source method "auth" -> code.SecretValue
+    sink method "der" -> code.Deserialization
+  }
+}

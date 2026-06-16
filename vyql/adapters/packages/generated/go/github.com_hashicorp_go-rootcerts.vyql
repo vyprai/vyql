@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter go {
+  package "github.com/hashicorp/go-rootcerts" {
+    sink method "LoadCAFile" -> code.FilePathAccess
+    sink method "LoadCAPath" -> code.FilePathAccess
+  }
+}

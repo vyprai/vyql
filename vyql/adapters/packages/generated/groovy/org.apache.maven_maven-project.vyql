@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess, UrlFetch}
+import core.{PathCanonicalization}
+
+adapter groovy {
+  package "org.apache.maven:maven-project" {
+    sink method "read" -> code.Deserialization
+  }
+}

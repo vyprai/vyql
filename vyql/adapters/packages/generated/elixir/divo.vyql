@@ -1,0 +1,7 @@
+import code.{CommandExecution, FilePathAccess}
+adapter elixir {
+  package "divo" {
+    sink method "Divo.File.write" -> code.FilePathAccess
+    sink method "Divo.Compose.run" -> code.CommandExecution
+  }
+}

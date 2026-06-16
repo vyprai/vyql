@@ -1,0 +1,10 @@
+import core.{InputValidation, HtmlEscape}
+adapter php {
+  package "kartik-v/yii2-krajee-base" {
+    control method "urlencode" -> core.InputValidation
+    control method "urldecode" -> core.InputValidation
+    control method "rawurlencode" -> core.InputValidation
+    control method "rawurldecode" -> core.InputValidation
+    control method "html_entity_decode" -> core.HtmlEscape
+  }
+}

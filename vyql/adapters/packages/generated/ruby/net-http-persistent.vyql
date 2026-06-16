@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkData}
+adapter ruby {
+  package "net-http-persistent" {
+    sink path "Net::HTTP::Persistent#request" -> code.NetworkConnect
+    source path "Net::HTTP::Persistent#request" -> code.NetworkData
+    sink path "Net::HTTP::Persistent#connection_for" -> code.NetworkConnect
+  }
+}

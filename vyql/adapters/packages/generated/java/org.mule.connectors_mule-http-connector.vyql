@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+import code.{HttpInput, NetworkSend}
+
+adapter java {
+  package "org.mule.connectors:mule-http-connector" {
+    source method "getQueryString" -> core.UserControlledData
+    source method "getRequestUri" -> core.UserControlledData
+    sink method "send" -> code.NetworkSend
+  }
+}

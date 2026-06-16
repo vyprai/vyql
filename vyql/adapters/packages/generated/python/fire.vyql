@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter python {
+  package "fire" {
+    source method "Fire" -> core.UserControlledData
+  }
+}

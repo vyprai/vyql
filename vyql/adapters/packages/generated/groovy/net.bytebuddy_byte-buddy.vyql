@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "net.bytebuddy:byte-buddy" {
+    sink method "parse" -> code.Deserialization
+  }
+}

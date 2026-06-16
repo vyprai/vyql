@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter java {
+  package "com.fasterxml.jackson.core:jackson-core" {
+    sink method "readTree" -> code.Deserialization
+    sink method "readValueAs" -> code.Deserialization
+    sink method "readValueAsTree" -> code.Deserialization
+  }
+}

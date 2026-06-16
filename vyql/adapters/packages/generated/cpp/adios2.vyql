@@ -1,0 +1,6 @@
+import code.{FileUse}
+adapter cpp {
+  package "adios2" {
+    sink method "Open" -> code.FileUse
+  }
+}

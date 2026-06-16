@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter dart {
+  package "vin_decoder" {
+    sink method "getExtendedVehicleInfo" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,7 @@
+adapter scala {
+  package "io.springfox:springfox-bean-validators" {
+    control method "apply" -> core.InputValidation
+    control method "extractAnnotation" -> core.InputValidation
+    control method "annotationFromBean" -> core.InputValidation
+  }
+}

@@ -1,0 +1,13 @@
+import code.{FileUse, NetworkData, StoredDataRead}
+
+adapter php {
+  package "enlightn/security-checker" {
+    sink method "storeAdvisoriesArchive" -> code.FileUse
+    sink method "writeCacheFile" -> code.FileUse
+    sink method "delete" -> code.FileUse
+    sink method "deleteDirectory" -> code.FileUse
+    source method "fetchAdvisories" -> code.NetworkData
+    source method "fetchAdvisoriesArchive" -> code.NetworkData
+    source method "getCacheFile" -> code.StoredDataRead
+  }
+}

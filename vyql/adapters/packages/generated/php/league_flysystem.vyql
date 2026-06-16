@@ -1,0 +1,7 @@
+import core.{PathCanonicalization, InputValidation}
+adapter php {
+  package "league/flysystem" {
+    control method "normalizePath" -> core.PathCanonicalization
+    control method "guardAgainstInvalidMount" -> core.InputValidation
+  }
+}

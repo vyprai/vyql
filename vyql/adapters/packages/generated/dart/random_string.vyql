@@ -1,0 +1,7 @@
+import code.{WeakRandomValue}
+
+adapter dart {
+  package "random_string" {
+    mark method "nextDouble" -> code.WeakRandomValue
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter ruby {
+  package "ripl" {
+    sink method "eval_input" -> code.CodeEval
+  }
+}

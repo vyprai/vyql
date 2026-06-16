@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "coloredlogs" {
+    sink method "convert_command_output" -> code.CommandExecution
+  }
+}

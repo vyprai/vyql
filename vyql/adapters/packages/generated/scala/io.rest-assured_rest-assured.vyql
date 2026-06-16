@@ -1,0 +1,22 @@
+import code.{NetworkConnect, UrlFetch, Deserialization, SecretValue}
+
+adapter scala {
+  package "io.rest-assured:rest-assured" {
+    sink method "get" -> code.UrlFetch
+    sink method "post" -> code.UrlFetch
+    sink method "put" -> code.UrlFetch
+    sink method "delete" -> code.UrlFetch
+    sink method "head" -> code.UrlFetch
+    sink method "patch" -> code.UrlFetch
+    sink method "options" -> code.UrlFetch
+    sink method "request" -> code.UrlFetch
+    source method "basic" -> code.SecretValue
+    source method "ntlm" -> code.SecretValue
+    source method "form" -> code.SecretValue
+    source method "certificate" -> code.SecretValue
+    source method "digest" -> code.SecretValue
+    source method "oauth" -> code.SecretValue
+    source method "oauth2" -> code.SecretValue
+    sink method "registerParser" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter c {
+  package "pegtl-2" {
+    sink method "parse" -> code.Deserialization
+  }
+}

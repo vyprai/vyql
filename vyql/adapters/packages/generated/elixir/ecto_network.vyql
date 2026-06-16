@@ -1,0 +1,8 @@
+import code.{NetworkData}
+
+adapter elixir {
+  package "ecto_network" {
+    source method "load" -> code.NetworkData
+    source method "decode" -> code.NetworkData
+  }
+}

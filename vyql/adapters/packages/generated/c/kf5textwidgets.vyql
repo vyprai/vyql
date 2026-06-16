@@ -1,0 +1,6 @@
+adapter c {
+  package "kf5textwidgets" {
+    source method "find" -> core.UserControlledData
+    source method "replace" -> core.UserControlledData
+  }
+}

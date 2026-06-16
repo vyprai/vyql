@@ -1,0 +1,7 @@
+import code.{StoredDataRead, StoredDataWrite}
+adapter scala {
+  package "org.hibernate:hibernate-ehcache" {
+    source method "getFromCache" -> code.StoredDataRead
+    sink method "putIntoCache" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,6 @@
+adapter ruby {
+  package "rack-pjax" {
+    source method "container_selector" -> core.UserControlledData
+    sink method "call" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{CodeEval, Deserialization}
+
+adapter objc {
+  package "Typhoon" {
+    sink method "inject:" -> code.CodeEval
+    sink method "inject:withSelector:" -> code.CodeEval
+    sink method "objectForKeyedSubscript:" -> code.Deserialization
+  }
+}

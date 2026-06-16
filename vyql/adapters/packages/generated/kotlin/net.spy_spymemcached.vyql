@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "net.spy:spymemcached" {
+    mark path "net.spy.spymemcached.hash" -> code.WeakHash
+  }
+}

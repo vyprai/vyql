@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/otiai10/copy" {
+    sink method "Copy" -> code.FilePathAccess
+    sink method "Copy" -> code.FileUse
+  }
+}

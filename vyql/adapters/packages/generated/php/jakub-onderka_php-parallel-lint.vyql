@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter php {
+  package "jakub-onderka/php-parallel-lint" {
+    source method "parseArguments" -> code.CliArgument
+  }
+}

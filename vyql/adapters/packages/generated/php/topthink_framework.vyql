@@ -1,0 +1,11 @@
+adapter php {
+  package "topthink/framework" {
+    sink method "query" -> code.SqlExecution
+    control method "bind" -> core.SqlParameterization
+    source method "token" -> code.SecretValue
+    source method "cookie" -> code.HttpInput
+    sink method "write" -> code.FilePathAccess
+    sink method "parse" -> code.XmlParse
+    mark path "topthink.framework.hash" -> code.WeakHash
+  }
+}

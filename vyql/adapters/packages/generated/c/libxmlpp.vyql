@@ -1,0 +1,13 @@
+import code.{Deserialization}
+adapter c {
+  package "libxmlpp" {
+    sink method "XsdSchema::parse_file" -> code.Deserialization
+    sink method "XsdSchema::parse_memory" -> code.Deserialization
+    sink method "RelaxNGSchema::parse_file" -> code.Deserialization
+    sink method "RelaxNGSchema::parse_memory" -> code.Deserialization
+    sink method "SaxParser::parse_chunk" -> code.Deserialization
+    sink method "SaxParser::parse_stream" -> code.Deserialization
+    sink method "TextReader::read" -> code.Deserialization
+    sink method "DomParser::parse_memory" -> code.Deserialization
+  }
+}

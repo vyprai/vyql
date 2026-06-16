@@ -1,0 +1,12 @@
+import code.{Deserialization, CommandExecution}
+import core.{UserControlledData}
+
+adapter c {
+  package "ctre" {
+    source method "exec" -> core.UserControlledData
+    source method "match" -> core.UserControlledData
+    source method "search" -> core.UserControlledData
+    source method "tokenize" -> core.UserControlledData
+    source method "split" -> core.UserControlledData
+  }
+}

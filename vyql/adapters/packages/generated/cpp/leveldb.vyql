@@ -1,0 +1,11 @@
+import code.{DatabaseRead, NosqlQuery, Deserialization}
+
+adapter cpp {
+  package "leveldb" {
+    sink method "Put" -> code.NosqlQuery
+    sink method "Delete" -> code.NosqlQuery
+    sink method "Write" -> code.NosqlQuery
+    sink method "Get" -> code.DatabaseRead
+    sink method "ParseInternalKey" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{FilePathAccess, FileUse}
+adapter cpp {
+  package "llfio" {
+    sink method "open" -> code.FilePathAccess
+    sink method "read" -> code.FileUse
+    sink method "write" -> code.FileUse
+  }
+}

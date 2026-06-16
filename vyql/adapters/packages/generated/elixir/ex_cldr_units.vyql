@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "ex_cldr_units" {
+    sink method "Cldr.Unit.parse" -> code.Deserialization
+    sink method "Cldr.Unit.parse_unit_name" -> code.Deserialization
+  }
+}

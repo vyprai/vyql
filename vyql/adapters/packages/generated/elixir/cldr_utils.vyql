@@ -1,0 +1,9 @@
+import code.{UrlFetch, Deserialization}
+
+adapter elixir {
+  package "cldr_utils" {
+    sink method "get" -> code.UrlFetch
+    sink method "parse" -> code.Deserialization
+    sink method "decode!" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "org.springframework.amqp:spring-rabbit" {
+    sink method "parseArguments" -> code.Deserialization
+  }
+}

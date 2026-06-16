@@ -1,0 +1,11 @@
+import code.{HttpInput, StdinInput}
+import core.{AuthenticationCheck}
+
+adapter php {
+  package "aws/aws-php-sns-message-validator" {
+    source method "fromRawPostData" -> code.StdinInput
+    source method "fromPsrRequest" -> code.HttpInput
+    source method "fromJsonString" -> code.HttpInput
+    control method "validate" -> core.AuthenticationCheck
+  }
+}

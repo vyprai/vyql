@@ -1,0 +1,15 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter objc {
+  package "Overcoat" {
+    sink method "GET:parameters:progress:success:failure:" -> code.NetworkConnect
+    sink method "GET:parameters:success:failure:" -> code.NetworkConnect
+    sink method "HEAD:parameters:success:failure:" -> code.NetworkConnect
+    sink method "POST:parameters:progress:success:failure:" -> code.NetworkConnect
+    sink method "POST:parameters:success:failure:" -> code.NetworkConnect
+    sink method "POST:parameters:constructingBodyWithBlock:success:failure:" -> code.NetworkConnect
+    sink method "PUT:parameters:success:failure:" -> code.NetworkConnect
+    sink method "PATCH:parameters:success:failure:" -> code.NetworkConnect
+    sink method "DELETE:parameters:success:failure:" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/sindresorhus/KeyboardShortcuts" {
+    source method "onKeyDown" -> core.UserControlledData
+    source method "onKeyUp" -> core.UserControlledData
+  }
+}

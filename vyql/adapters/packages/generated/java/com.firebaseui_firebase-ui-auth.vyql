@@ -1,0 +1,11 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter java {
+  package "com.firebaseui:firebase-ui-auth" {
+    control method "AuthUI.clearCredentialState" -> core.AuthenticationCheck
+    control method "AuthUI.setCredentialManagerEnabled" -> core.AuthenticationCheck
+    source method "AuthUI.IdpResponse.getIdpToken" -> code.SecretValue
+    source method "AuthUI.IdpResponse.getAccessToken" -> code.SecretValue
+  }
+}

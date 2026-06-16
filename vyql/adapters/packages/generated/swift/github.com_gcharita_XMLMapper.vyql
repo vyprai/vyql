@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/gcharita/XMLMapper" {
+    sink method "map" -> code.Deserialization
+    sink method "parseXMLStringIntoDictionary" -> code.Deserialization
+    sink method "parseXMLString" -> code.Deserialization
+  }
+}

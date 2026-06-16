@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter ruby {
+  package "activeadmin" {
+    control method "sanitize" -> core.InputValidation
+  }
+}

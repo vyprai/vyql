@@ -1,0 +1,11 @@
+import code.{HttpInput}
+
+adapter swift {
+  package "github.com/envoy/Embassy" {
+    source method "HTTPRequest.init" -> code.HttpInput
+    source method "HTTPRequest.method" -> code.HttpInput
+    source method "HTTPRequest.path" -> code.HttpInput
+    source method "HTTPRequest.version" -> code.HttpInput
+    source method "HTTPRequest.headers" -> code.HttpInput
+  }
+}

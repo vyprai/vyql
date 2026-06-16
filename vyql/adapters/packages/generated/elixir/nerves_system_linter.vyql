@@ -1,0 +1,5 @@
+adapter elixir {
+  package "nerves_system_linter" {
+    sink method "file_to_map" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "com.github.tomakehurst:wiremock" {
+    sink method "read" -> code.Deserialization
+    sink method "mapToObject" -> code.Deserialization
+  }
+}

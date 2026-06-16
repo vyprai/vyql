@@ -1,0 +1,13 @@
+import code.{NosqlQuery}
+adapter scala {
+  package "com.amazonaws:aws-java-sdk-dynamodb" {
+    sink method "batchGetItem" -> code.NosqlQuery
+    sink method "batchWriteItem" -> code.NosqlQuery
+    sink method "deleteItem" -> code.NosqlQuery
+    sink method "executeStatement" -> code.NosqlQuery
+    sink method "getItem" -> code.NosqlQuery
+    sink method "putItem" -> code.NosqlQuery
+    sink method "query" -> code.NosqlQuery
+    sink method "scan" -> code.NosqlQuery
+  }
+}

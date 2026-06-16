@@ -1,0 +1,5 @@
+adapter php {
+  package "laminas/laminas-code" {
+    sink method "write" -> code.FileUse
+  }
+}

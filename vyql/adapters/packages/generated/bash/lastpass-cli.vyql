@@ -1,0 +1,7 @@
+import code.{CliArgument, CommandExecution}
+adapter bash {
+  package "lastpass-cli" {
+    source path "lastpass-cli" -> code.CliArgument
+    sink path "lastpass-cli" -> code.CommandExecution
+  }
+}

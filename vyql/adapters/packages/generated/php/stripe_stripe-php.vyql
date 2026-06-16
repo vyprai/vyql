@@ -1,0 +1,7 @@
+import code.{NetworkSend, Deserialization}
+adapter php {
+  package "stripe/stripe-php" {
+    sink method "Stripe\ApiRequestor::request" -> code.NetworkSend
+    sink method "Stripe\Util\RequestOptions::parse" -> code.Deserialization
+  }
+}

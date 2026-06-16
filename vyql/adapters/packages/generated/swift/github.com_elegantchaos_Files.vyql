@@ -1,0 +1,11 @@
+import code.{FilePathAccess}
+
+adapter swift {
+  package "github.com/elegantchaos/Files" {
+    sink method "asText" -> code.FilePathAccess
+    sink method "asData" -> code.FilePathAccess
+    sink method "write" -> code.FilePathAccess
+    sink method "create" -> code.FilePathAccess
+    sink method "merge" -> code.FilePathAccess
+  }
+}

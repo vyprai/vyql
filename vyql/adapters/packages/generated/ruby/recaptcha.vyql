@@ -1,0 +1,18 @@
+import code.{NetworkConnect, NetworkSend, HttpInput, NetworkData}
+import core.{UserControlledData}
+
+adapter ruby {
+  package "recaptcha" {
+    sink method "verify_via_api_call" -> code.NetworkConnect
+    sink method "verify_via_api_call" -> code.NetworkSend
+    sink method "verify_via_api_call_enterprise" -> code.NetworkConnect
+    sink method "verify_via_api_call_enterprise" -> code.NetworkSend
+    sink method "verify_via_api_call_free" -> code.NetworkConnect
+    sink method "verify_via_api_call_free" -> code.NetworkSend
+    sink method "api_verification_enterprise" -> code.NetworkConnect
+    sink method "api_verification_enterprise" -> code.NetworkSend
+    sink method "api_verification_free" -> code.NetworkConnect
+    sink method "api_verification_free" -> code.NetworkSend
+    source method "recaptcha_response_token" -> core.UserControlledData
+  }
+}

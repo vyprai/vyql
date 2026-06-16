@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter perl {
+  package "aliased" {
+    sink method "_load_alias" -> code.CodeEval
+  }
+}

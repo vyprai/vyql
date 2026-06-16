@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter javascript {
+  package "postcss-minify-params" {
+    sink method "pluginCreator" -> code.Deserialization
+  }
+}

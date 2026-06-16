@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter cpp {
+  package "z4kn4fein-semver" {
+    sink method "semver::prerelease_descriptor::parse" -> code.Deserialization
+    sink method "semver::version::parse" -> code.Deserialization
+  }
+}

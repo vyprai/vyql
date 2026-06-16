@@ -1,0 +1,11 @@
+import code.{FileUse}
+import core.{PathCanonicalization}
+
+adapter elixir {
+  package "arc" {
+    sink method "write_binary" -> code.FileUse
+    sink method "save_file" -> code.FileUse
+    sink method "save_temp_file" -> code.FileUse
+    control method "generate_temporary_path" -> core.PathCanonicalization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter java {
+  package "org.jboss.resteasy:resteasy-client" {
+    source method "request" -> code.HttpInput
+  }
+}

@@ -1,0 +1,13 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "libvorbis" {
+    sink method "codebook_load" -> code.Deserialization
+    sink method "vorbis_staticbook_unpack" -> code.Deserialization
+    sink method "vorbis_book_decode" -> code.Deserialization
+    sink method "vorbis_book_decodevs_add" -> code.Deserialization
+    sink method "vorbis_book_decodev_set" -> code.Deserialization
+    sink method "vorbis_book_decodev_add" -> code.Deserialization
+    sink method "vorbis_book_decodevv_add" -> code.Deserialization
+  }
+}

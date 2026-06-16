@@ -1,0 +1,5 @@
+adapter ruby {
+  package "net-pop" {
+    source method "auth" -> code.SecretValue
+  }
+}

@@ -1,0 +1,5 @@
+adapter groovy {
+  package "org.antlr:antlr4-runtime" {
+    sink method "parse" -> code.Deserialization
+  }
+}

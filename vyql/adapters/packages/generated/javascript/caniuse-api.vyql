@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+
+adapter javascript {
+  package "caniuse-api" {
+    source method "getSupport" -> core.UserControlledData
+    source method "find" -> core.UserControlledData
+    source method "isSupported" -> core.UserControlledData
+    source method "setBrowserScope" -> core.UserControlledData
+  }
+}

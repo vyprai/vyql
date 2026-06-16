@@ -1,0 +1,11 @@
+import code.{Deserialization}
+adapter javascript {
+  package "@webassemblyjs/leb128" {
+    sink method "decodeIntBuffer" -> code.Deserialization
+    sink method "decodeInt32" -> code.Deserialization
+    sink method "decodeInt64" -> code.Deserialization
+    sink method "decodeUIntBuffer" -> code.Deserialization
+    sink method "decodeUInt32" -> code.Deserialization
+    sink method "decodeUInt64" -> code.Deserialization
+  }
+}

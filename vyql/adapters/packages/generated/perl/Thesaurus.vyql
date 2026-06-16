@@ -1,0 +1,7 @@
+import code.{FileUse}
+
+adapter perl {
+  package "Thesaurus" {
+    sink method "Thesaurus::CSV.save" -> code.FileUse
+  }
+}

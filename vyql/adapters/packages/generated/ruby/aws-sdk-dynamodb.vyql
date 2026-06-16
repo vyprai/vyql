@@ -1,0 +1,61 @@
+import code.{NosqlQuery}
+
+adapter ruby {
+  package "aws-sdk-dynamodb" {
+    sink method "batch_execute_statement" -> code.NosqlQuery
+    sink method "batch_get_item" -> code.NosqlQuery
+    sink method "batch_write_item" -> code.NosqlQuery
+    sink method "create_backup" -> code.NosqlQuery
+    sink method "create_global_table" -> code.NosqlQuery
+    sink method "create_table" -> code.NosqlQuery
+    sink method "delete_backup" -> code.NosqlQuery
+    sink method "delete_item" -> code.NosqlQuery
+    sink method "delete_resource_policy" -> code.NosqlQuery
+    sink method "delete_table" -> code.NosqlQuery
+    sink method "describe_backup" -> code.NosqlQuery
+    sink method "describe_continuous_backups" -> code.NosqlQuery
+    sink method "describe_contributor_insights" -> code.NosqlQuery
+    sink method "describe_endpoints" -> code.NosqlQuery
+    sink method "describe_export" -> code.NosqlQuery
+    sink method "describe_global_table" -> code.NosqlQuery
+    sink method "describe_global_table_settings" -> code.NosqlQuery
+    sink method "describe_import" -> code.NosqlQuery
+    sink method "describe_kinesis_streaming_destination" -> code.NosqlQuery
+    sink method "describe_limits" -> code.NosqlQuery
+    sink method "describe_table" -> code.NosqlQuery
+    sink method "describe_table_replica_auto_scaling" -> code.NosqlQuery
+    sink method "describe_time_to_live" -> code.NosqlQuery
+    sink method "disable_kinesis_streaming_destination" -> code.NosqlQuery
+    sink method "enable_kinesis_streaming_destination" -> code.NosqlQuery
+    sink method "execute_statement" -> code.NosqlQuery
+    sink method "execute_transaction" -> code.NosqlQuery
+    sink method "export_table_to_point_in_time" -> code.NosqlQuery
+    sink method "get_item" -> code.NosqlQuery
+    sink method "get_resource_policy" -> code.NosqlQuery
+    sink method "list_backups" -> code.NosqlQuery
+    sink method "list_contributor_insights" -> code.NosqlQuery
+    sink method "list_exports" -> code.NosqlQuery
+    sink method "list_global_tables" -> code.NosqlQuery
+    sink method "list_imports" -> code.NosqlQuery
+    sink method "list_tables" -> code.NosqlQuery
+    sink method "list_tags_of_resource" -> code.NosqlQuery
+    sink method "put_item" -> code.NosqlQuery
+    sink method "put_resource_policy" -> code.NosqlQuery
+    sink method "query" -> code.NosqlQuery
+    sink method "restore_table_from_backup" -> code.NosqlQuery
+    sink method "restore_table_to_point_in_time" -> code.NosqlQuery
+    sink method "scan" -> code.NosqlQuery
+    sink method "tag_resource" -> code.NosqlQuery
+    sink method "transact_get_items" -> code.NosqlQuery
+    sink method "transact_write_items" -> code.NosqlQuery
+    sink method "untag_resource" -> code.NosqlQuery
+    sink method "update_continuous_backups" -> code.NosqlQuery
+    sink method "update_contributor_insights" -> code.NosqlQuery
+    sink method "update_global_table" -> code.NosqlQuery
+    sink method "update_global_table_settings" -> code.NosqlQuery
+    sink method "update_item" -> code.NosqlQuery
+    sink method "update_table" -> code.NosqlQuery
+    sink method "update_table_replica_auto_scaling" -> code.NosqlQuery
+    sink method "update_time_to_live" -> code.NosqlQuery
+  }
+}

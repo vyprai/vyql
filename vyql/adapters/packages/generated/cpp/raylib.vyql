@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter cpp {
+  package "raylib" {
+    sink method "LoadShader" -> code.CodeEval
+    sink method "LoadShaderFromMemory" -> code.CodeEval
+  }
+}

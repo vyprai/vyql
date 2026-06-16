@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "xml-apis:xml-apis" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import code.{NetworkConnect, NetworkSend}
+adapter ruby {
+  package "httpclient" {
+    sink method "request" -> code.NetworkConnect
+    sink method "request" -> code.NetworkSend
+    sink method "request_async" -> code.NetworkConnect
+    sink method "request_async" -> code.NetworkSend
+    sink method "request_async2" -> code.NetworkConnect
+    sink method "request_async2" -> code.NetworkSend
+  }
+}

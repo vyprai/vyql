@@ -1,0 +1,7 @@
+adapter java {
+  package "org.apache.hadoop:hadoop-common" {
+    sink method "open" -> code.FilePathAccess
+    sink method "read" -> code.FileUse
+    sink method "write" -> code.FileUse
+  }
+}

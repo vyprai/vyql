@@ -1,0 +1,7 @@
+import code.{HttpInput}
+adapter groovy {
+  package "org.apache.tomcat:tomcat-jsp-api" {
+    source method "getRequestURI" -> code.HttpInput
+    source method "getQueryString" -> code.HttpInput
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "com.sun.jersey.contribs:jersey-multipart" {
+    sink method "readMultiPart" -> code.Deserialization
+  }
+}

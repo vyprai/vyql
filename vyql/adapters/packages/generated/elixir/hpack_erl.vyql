@@ -1,0 +1,5 @@
+adapter elixir {
+  package "hpack_erl" {
+    sink method "decode" -> code.Deserialization
+  }
+}

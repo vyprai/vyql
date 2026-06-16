@@ -1,0 +1,6 @@
+import code.{CommandExecution, Deserialization}
+adapter elixir {
+  package "fwup" {
+    sink method "parse" -> code.Deserialization
+  }
+}

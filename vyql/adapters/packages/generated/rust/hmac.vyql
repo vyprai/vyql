@@ -1,0 +1,6 @@
+adapter rust {
+  package "hmac" {
+    source method "new" -> code.SecretValue
+    mark method "finalize_fixed_core" -> code.WeakHash
+  }
+}

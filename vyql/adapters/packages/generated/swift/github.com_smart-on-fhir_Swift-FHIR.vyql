@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter swift {
+  package "github.com/smart-on-fhir/Swift-FHIR" {
+    control method "validate" -> core.InputValidation
+  }
+}

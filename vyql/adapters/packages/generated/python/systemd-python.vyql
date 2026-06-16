@@ -1,0 +1,7 @@
+import code.{LogOutput}
+
+adapter python {
+  package "systemd-python" {
+    sink method "systemd.journal.send" -> code.LogOutput
+  }
+}

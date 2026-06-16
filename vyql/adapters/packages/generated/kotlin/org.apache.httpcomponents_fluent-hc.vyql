@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter kotlin {
+  package "org.apache.httpcomponents:fluent-hc" {
+    sink method "execute" -> code.NetworkConnect
+    sink method "execute" -> code.NetworkSend
+    source method "Content" -> code.NetworkData
+  }
+}

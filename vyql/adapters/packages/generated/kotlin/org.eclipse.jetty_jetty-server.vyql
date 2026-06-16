@@ -1,0 +1,12 @@
+import code.{HttpInput, Deserialization, NetworkData, NetworkSend, ResponseHeaderWrite}
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "org.eclipse.jetty:jetty-server" {
+    source method "handle" -> code.HttpInput
+    sink method "handle" -> code.ResponseHeaderWrite
+    sink method "parse" -> code.Deserialization
+    source method "read" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+  }
+}

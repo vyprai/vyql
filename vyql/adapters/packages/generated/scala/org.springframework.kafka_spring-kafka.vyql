@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+adapter scala {
+  package "org.springframework.kafka:spring-kafka" {
+    sink method "sendDefault" -> code.NetworkSend
+    sink method "send" -> code.NetworkSend
+    sink method "sendOffsetsToTransaction" -> code.NetworkSend
+  }
+}

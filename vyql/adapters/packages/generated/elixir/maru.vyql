@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "maru" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,10 @@
+import code.{Deserialization, CodeEval}
+
+adapter rust {
+  package "zbus_macros" {
+    sink method "parse" -> code.Deserialization
+    sink method "expand_derive" -> code.CodeEval
+    sink method "proxy" -> code.CodeEval
+    sink method "derive_dbus_error" -> code.CodeEval
+  }
+}

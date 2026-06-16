@@ -1,0 +1,5 @@
+adapter rust {
+  package "clap" {
+    source path "Parser.parse" -> code.CliArgument
+  }
+}

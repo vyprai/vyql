@@ -1,0 +1,10 @@
+import code.{CommandExecution, FilePathAccess, FileUse, StdinInput, LogOutput}
+adapter dart {
+  package "dartz" {
+    source method "readln" -> code.StdinInput
+    sink method "println" -> code.LogOutput
+    sink method "openFile" -> code.FilePathAccess
+    sink method "readBytes" -> code.FileUse
+    sink method "writeBytes" -> code.FileUse
+  }
+}

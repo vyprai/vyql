@@ -1,0 +1,16 @@
+import code.{CliArgument, CommandExecution, Deserialization, FilePathAccess, FileUse, HttpInput, NetworkConnect, NetworkSend}
+
+adapter cpp {
+  package "cocoyaxi" {
+    source method "parse" -> code.CliArgument
+    source method "parse_http_req" -> code.HttpInput
+    sink method "open" -> code.FilePathAccess
+    sink method "read" -> code.FileUse
+    sink method "write" -> code.FileUse
+    sink method "system" -> code.CommandExecution
+    sink method "connect" -> code.NetworkConnect
+    sink method "recv" -> code.NetworkSend
+    sink method "send" -> code.NetworkSend
+    sink method "yyparse" -> code.Deserialization
+  }
+}

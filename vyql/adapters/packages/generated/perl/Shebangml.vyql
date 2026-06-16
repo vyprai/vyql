@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "Shebangml" {
+    sink method "parse" -> code.Deserialization
+    sink method "process" -> code.Deserialization
+  }
+}

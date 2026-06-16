@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "railties" {
+    sink method "exec_bundle_command" -> code.CommandExecution
+  }
+}

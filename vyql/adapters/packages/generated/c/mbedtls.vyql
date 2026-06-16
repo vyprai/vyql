@@ -1,0 +1,9 @@
+import code.{WeakRandomValue}
+adapter c {
+  package "mbedtls" {
+    mark method "mbedtls_mpi_mod_random" -> code.WeakRandomValue
+    mark method "mbedtls_mpi_core_fill_random" -> code.WeakRandomValue
+    mark method "mbedtls_mpi_core_random" -> code.WeakRandomValue
+    mark method "mbedtls_mpi_mod_raw_random" -> code.WeakRandomValue
+  }
+}

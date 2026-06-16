@@ -1,0 +1,10 @@
+import code.{NetworkSend}
+
+adapter dart {
+  package "nm" {
+    sink method "NetworkManagerSettings.addConnection" -> code.NetworkSend
+    sink method "NetworkManagerSettings.addConnectionUnsaved" -> code.NetworkSend
+    sink method "NetworkManagerSettingsConnection.update" -> code.NetworkSend
+    sink method "NetworkManagerSettingsConnection.updateUnsaved" -> code.NetworkSend
+  }
+}

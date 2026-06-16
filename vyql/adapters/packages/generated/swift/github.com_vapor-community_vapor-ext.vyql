@@ -1,0 +1,11 @@
+import code.{SqlExecution}
+
+adapter swift {
+  package "github.com/vapor-community/vapor-ext" {
+    sink method "query" -> code.SqlExecution
+    sink method "findAll" -> code.SqlExecution
+    sink method "find" -> code.SqlExecution
+    sink method "findOne" -> code.SqlExecution
+    sink method "count" -> code.SqlExecution
+  }
+}

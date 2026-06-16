@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "org.apache.httpcomponents:httpcore" {
+    sink method "parse" -> code.Deserialization
+  }
+}

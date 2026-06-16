@@ -1,0 +1,9 @@
+import code.{NetworkSend}
+
+adapter elixir {
+  package "slack" {
+    sink method "send_message" -> code.NetworkSend
+    sink method "send_ping" -> code.NetworkSend
+    sink method "send_raw" -> code.NetworkSend
+  }
+}

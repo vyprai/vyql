@@ -1,0 +1,6 @@
+import code.{WeakRandomValue}
+adapter c {
+  package "qtwebsockets" {
+    mark method "QMaskGenerator::generateMask" -> code.WeakRandomValue
+  }
+}

@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.apache.tomcat.embed:tomcat-embed-logging-juli" {
+    sink method "findProperty" -> code.NosqlQuery
+    sink method "setLevel" -> code.StoredDataWrite
+  }
+}

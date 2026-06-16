@@ -1,0 +1,7 @@
+import code.{TemplateRender}
+
+adapter swift {
+  package "github.com/vapor/leaf" {
+    sink method "render" -> code.TemplateRender
+  }
+}

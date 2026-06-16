@@ -1,0 +1,5 @@
+adapter javascript {
+  package "require-directory" {
+    sink method "requireDirectory" -> code.CodeEval
+  }
+}

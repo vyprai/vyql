@@ -1,0 +1,11 @@
+import code.{FilePathAccess, FileUse, HtmlRender}
+import core.{UserControlledData}
+
+adapter perl {
+  package "Kwiki-AuthorOnlyPageEditing" {
+    source method "Kwiki::AuthorOnlyPageEditing::CGI::token" -> core.UserControlledData
+    sink method "Kwiki::AuthorOnlyPageEditing::associate" -> code.FileUse
+    sink method "Kwiki::AuthorOnlyPageEditing::token_path" -> code.FilePathAccess
+    sink method "Kwiki::AuthorOnlyPageEditing::modify_form" -> code.HtmlRender
+  }
+}

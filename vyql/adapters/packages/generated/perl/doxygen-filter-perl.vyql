@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter perl {
+  package "doxygen-filter-perl" {
+    sink method "ReadFile" -> code.FilePathAccess
+  }
+}

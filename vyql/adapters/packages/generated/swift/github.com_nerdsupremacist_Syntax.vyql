@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/nerdsupremacist/Syntax" {
+    sink method "parse" -> code.Deserialization
+    sink method "syntaxTree" -> code.Deserialization
+    sink method "annotated" -> code.Deserialization
+  }
+}

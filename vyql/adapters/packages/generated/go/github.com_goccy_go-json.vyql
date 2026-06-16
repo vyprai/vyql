@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/goccy/go-json" {
+    sink method "load" -> code.Deserialization
+  }
+}

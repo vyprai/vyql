@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter rust {
+  package "axum" {
+    source method "from_request" -> code.HttpInput
+  }
+}

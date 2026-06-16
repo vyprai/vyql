@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter elixir {
+  package "ex_unit_clustered_case" {
+    sink method "open" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,8 @@
+import code.{RedirectTarget, SecretValue}
+import core.{AuthenticationCheck}
+
+adapter objc {
+  package "GoogleSignIn" {
+    mark method "handleURL:" -> code.RedirectTarget
+  }
+}

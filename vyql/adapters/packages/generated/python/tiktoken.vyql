@@ -1,0 +1,14 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter python {
+  package "tiktoken" {
+    source method "encode" -> core.UserControlledData
+    source method "encode_ordinary" -> core.UserControlledData
+    source method "encode_batch" -> core.UserControlledData
+    source method "encode_ordinary_batch" -> core.UserControlledData
+    source method "encode_with_special_tokens" -> core.UserControlledData
+    sink method "decode" -> code.Deserialization
+    sink method "decode_bytes" -> code.Deserialization
+  }
+}

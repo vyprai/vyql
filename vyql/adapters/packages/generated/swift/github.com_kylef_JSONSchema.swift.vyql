@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/kylef/JSONSchema.swift" {
+    sink method "validate" -> code.Deserialization
+  }
+}

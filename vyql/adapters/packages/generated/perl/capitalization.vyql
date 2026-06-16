@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter perl {
+  package "capitalization" {
+    sink method "mod2file" -> code.FilePathAccess
+  }
+}

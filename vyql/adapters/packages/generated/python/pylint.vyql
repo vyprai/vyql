@@ -1,0 +1,7 @@
+adapter python {
+  package "pylint" {
+    sink method "run_pylint" -> code.CommandExecution
+    sink method "run_pyreverse" -> code.CommandExecution
+    sink method "run_symilar" -> code.CommandExecution
+  }
+}

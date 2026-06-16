@@ -1,0 +1,11 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter elixir {
+  package "plug" {
+    sink method "Plug.Parsers.JSON.parse" -> code.Deserialization
+    sink method "Plug.Parsers.Urlencoded.parse" -> code.Deserialization
+    sink method "Plug.Parsers.Multipart.parse" -> code.Deserialization
+    control method "Plug.HTML.html_escape" -> core.HtmlEscape
+  }
+}

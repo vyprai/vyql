@@ -1,0 +1,12 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter python {
+  package "comtypes" {
+    sink method "tlbparser.parse" -> code.Deserialization
+    sink method "persist.Load" -> code.FilePathAccess
+    sink method "persist.Save" -> code.FilePathAccess
+    sink method "typeinfo.LoadRegTypeLib" -> code.FilePathAccess
+    sink method "typeinfo.LoadTypeLibEx" -> code.FilePathAccess
+    sink method "typeinfo.LoadTypeLib" -> code.FilePathAccess
+  }
+}

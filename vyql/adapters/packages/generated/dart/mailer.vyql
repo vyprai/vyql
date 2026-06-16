@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend, SecretValue}
+
+adapter dart {
+  package "mailer" {
+    source method "SmtpServer.new" -> SecretValue
+    sink method "Connection.sendStream" -> code.NetworkSend
+    sink method "Connection.send" -> code.NetworkSend
+    sink method "Connection.new" -> NetworkConnect
+  }
+}

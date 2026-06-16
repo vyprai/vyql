@@ -1,0 +1,7 @@
+import code.{UrlFetch, RedirectTarget}
+adapter php {
+  package "inertiajs/inertia-laravel" {
+    mark method "location" -> code.RedirectTarget
+    sink path "Inertia\Commands\StopSsr.handle" -> code.UrlFetch
+  }
+}

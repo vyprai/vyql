@@ -1,0 +1,8 @@
+import code.{CodeEval, HttpInput, UrlFetch}
+
+adapter php {
+  package "symfony/panther" {
+    sink method "executeScript" -> code.CodeEval
+    sink method "request" -> code.UrlFetch
+  }
+}

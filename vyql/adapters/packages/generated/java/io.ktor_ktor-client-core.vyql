@@ -1,0 +1,7 @@
+import code.{NetworkSend, NetworkData}
+adapter java {
+  package "io.ktor:ktor-client-core" {
+    sink method "execute" -> code.NetworkSend
+    source method "body" -> code.NetworkData
+  }
+}

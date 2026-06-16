@@ -1,0 +1,8 @@
+import code.{Deserialization, XmlParse}
+adapter scala {
+  package "javax.xml.ws:jaxws-api" {
+    sink method "getPayload" -> code.XmlParse
+    sink method "setPayload" -> code.XmlParse
+    sink method "invoke" -> code.Deserialization
+  }
+}

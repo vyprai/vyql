@@ -1,0 +1,11 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter php {
+  package "symfony/security-guard" {
+    source method "getCredentials" -> code.SecretValue
+    control method "checkCredentials" -> core.AuthenticationCheck
+    source method "createAuthenticatedToken" -> code.SecretValue
+    source method "onAuthenticationSuccess" -> code.SecretValue
+  }
+}

@@ -1,0 +1,6 @@
+import code.{NetworkData}
+adapter elixir {
+  package "broadway_sqs" {
+    source method "receive_messages" -> code.NetworkData
+  }
+}

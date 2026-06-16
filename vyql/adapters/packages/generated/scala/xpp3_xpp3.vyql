@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter scala {
+  package "xpp3:xpp3" {
+    sink method "parse" -> code.Deserialization
+    sink method "setInput" -> code.Deserialization
+    source method "nextText" -> core.UserControlledData
+  }
+}

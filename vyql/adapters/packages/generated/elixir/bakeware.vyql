@@ -1,0 +1,8 @@
+import code.{ArchiveEntryWrite, FilePathAccess}
+
+adapter elixir {
+  package "bakeware" {
+    sink method "cpio_extract_all" -> code.ArchiveEntryWrite
+    sink method "rm_fr" -> code.FilePathAccess
+  }
+}

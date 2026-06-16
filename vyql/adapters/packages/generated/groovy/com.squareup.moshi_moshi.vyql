@@ -1,0 +1,7 @@
+import code.{Deserialization, HtmlRender}
+adapter groovy {
+  package "com.squareup.moshi:moshi" {
+    sink method "fromJson" -> code.Deserialization
+    sink method "toJson" -> code.HtmlRender
+  }
+}

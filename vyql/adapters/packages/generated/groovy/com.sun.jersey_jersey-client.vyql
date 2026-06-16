@@ -1,0 +1,13 @@
+import code.{NetworkConnect, NetworkSend}
+adapter groovy {
+  package "com.sun.jersey:jersey-client" {
+    sink method "head" -> code.NetworkConnect
+    sink method "put" -> code.NetworkConnect
+    sink method "post" -> code.NetworkConnect
+    sink method "delete" -> code.NetworkConnect
+    sink method "head" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+  }
+}

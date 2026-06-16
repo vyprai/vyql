@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "doctrine/doctrine-cache-bundle" {
+    sink method "unserializeAcl" -> code.Deserialization
+  }
+}

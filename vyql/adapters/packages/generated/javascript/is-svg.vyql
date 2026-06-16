@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter javascript {
+  package "is-svg" {
+    sink method "isSvg" -> code.Deserialization
+  }
+}

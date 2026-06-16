@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter dart {
+  package "eventify" {
+    source method "emit" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,11 @@
+import code.{UrlFetch, FilePathAccess, RedirectTarget}
+adapter kotlin {
+  package "com.lowagie:itext" {
+    sink method "Jpeg.<init>(java.net.URL)" -> code.UrlFetch
+    sink method "Image.<init>(java.net.URL)" -> code.UrlFetch
+    sink method "Image.getInstance(java.net.URL)" -> code.UrlFetch
+    mark method "Chunk.setRemoteGoto" -> code.RedirectTarget
+    mark method "Chunk.setAnchor" -> code.RedirectTarget
+    sink method "DocWriter.write" -> code.FilePathAccess
+  }
+}

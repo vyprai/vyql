@@ -1,0 +1,18 @@
+import code.{PrivilegedOp}
+adapter dart {
+  package "app_settings" {
+    mark method "openAppSettings" -> code.PrivilegedOp
+    mark method "openAppSettingsPanel" -> code.PrivilegedOp
+    mark method "handleOpenSettings" -> code.PrivilegedOp
+    mark method "openSettings" -> code.PrivilegedOp
+    mark method "openSubscriptionSettings" -> code.PrivilegedOp
+    mark method "handleOpenSettingsPanel" -> code.PrivilegedOp
+    mark method "openAppLocaleSettings" -> code.PrivilegedOp
+    mark method "openAlarmSettings" -> code.PrivilegedOp
+    mark method "openBatteryOptimizationSettings" -> code.PrivilegedOp
+    mark method "openHotspotSettings" -> code.PrivilegedOp
+    mark method "openNotificationSettings" -> code.PrivilegedOp
+    mark method "openSettingsWithIntent" -> code.PrivilegedOp
+    mark method "openVpnSettings" -> code.PrivilegedOp
+  }
+}

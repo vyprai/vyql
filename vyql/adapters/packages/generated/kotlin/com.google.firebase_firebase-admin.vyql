@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "com.google.firebase:firebase-admin" {
+    sink method "com.google.firebase.auth.FirebaseTokenVerifierImpl.parse" -> code.Deserialization
+  }
+}

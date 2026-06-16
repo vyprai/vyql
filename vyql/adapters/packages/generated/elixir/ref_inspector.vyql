@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "ref_inspector" {
+    sink method "parse" -> code.Deserialization
+  }
+}

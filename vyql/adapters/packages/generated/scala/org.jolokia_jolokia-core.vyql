@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter scala {
+  package "org.jolokia:jolokia-core" {
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.InputValidation
+  }
+}

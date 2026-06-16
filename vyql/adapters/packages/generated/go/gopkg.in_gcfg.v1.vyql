@@ -1,0 +1,8 @@
+import code.{Deserialization, FileUse}
+
+adapter go {
+  package "gopkg.in/gcfg.v1" {
+    sink method "ReadStringInto" -> code.Deserialization
+    sink method "ReadFileInto" -> code.Deserialization
+  }
+}

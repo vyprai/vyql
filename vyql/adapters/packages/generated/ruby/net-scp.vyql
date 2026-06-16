@@ -1,0 +1,11 @@
+import code.{FilePathAccess, NetworkSend, NetworkData}
+adapter ruby {
+  package "net-scp" {
+    sink method "upload!" -> code.FilePathAccess
+    sink method "upload!" -> code.NetworkSend
+    sink method "upload" -> code.FilePathAccess
+    sink method "upload" -> code.NetworkSend
+    source method "download!" -> code.NetworkData
+    sink method "download!" -> code.FilePathAccess
+  }
+}

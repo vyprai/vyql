@@ -1,0 +1,11 @@
+import code.{CommandExecution, FilePathAccess, HttpInput, NetworkConnect, NetworkData, RedirectTarget, UrlFetch}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "org.seleniumhq.selenium:htmlunit-driver" {
+    mark method "get" -> code.RedirectTarget
+    source method "sendKeys" -> core.UserControlledData
+    sink method "setHTTPProxy" -> code.NetworkConnect
+    sink method "setAutoProxy" -> code.NetworkConnect
+  }
+}

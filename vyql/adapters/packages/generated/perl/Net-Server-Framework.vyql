@@ -1,0 +1,11 @@
+import code.{DatabaseRead, SqlExecution}
+import core.{InputValidation}
+
+adapter perl {
+  package "Net-Server-Framework" {
+    sink method "Net::Server::Framework::DB::dbconnect" -> code.DatabaseRead
+    sink method "Net::Server::Framework::DB::prepare" -> code.SqlExecution
+    sink method "Net::Server::Framework::DB::execute" -> code.SqlExecution
+    control method "Net::Server::Framework::Validate::verify_command" -> core.InputValidation
+  }
+}

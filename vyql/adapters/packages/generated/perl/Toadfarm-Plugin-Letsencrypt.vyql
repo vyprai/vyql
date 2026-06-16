@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter perl {
+  package "Toadfarm-Plugin-Letsencrypt" {
+    sink method "register" -> code.FilePathAccess
+  }
+}

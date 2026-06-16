@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter cpp {
+  package "nanosvg" {
+    sink method "nsvgParseFromFile" -> code.Deserialization
+    sink method "nsvgParse" -> code.Deserialization
+    sink method "nsvgParseFromFile" -> code.FilePathAccess
+  }
+}

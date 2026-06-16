@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+adapter objc {
+  package "QuickDialog" {
+    sink method "initWithTitle:url:" -> code.UrlFetch
+    sink method "initWithUrl:" -> code.UrlFetch
+  }
+}

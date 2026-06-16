@@ -1,0 +1,7 @@
+import code.{FilePathAccess, CommandExecution}
+
+adapter cpp {
+  package "boost-dll" {
+    sink method "library_info" -> code.FilePathAccess
+  }
+}

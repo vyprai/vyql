@@ -1,0 +1,15 @@
+import code.{CliArgument, NetworkConnect, NetworkData, SecretValue, StoredDataRead, UrlFetch}
+import core.{UserControlledData}
+
+adapter objc {
+  package "Amplitude-iOS" {
+    source method "logEvent" -> core.UserControlledData
+    source method "identify" -> core.UserControlledData
+    source method "setUserId" -> core.UserControlledData
+    source method "setBearerToken" -> code.SecretValue
+
+    sink method "setServerUrl" -> code.UrlFetch
+    sink method "dataTaskWithRequest" -> code.NetworkConnect
+    sink method "sendAsynchronousRequest" -> code.NetworkConnect
+  }
+}

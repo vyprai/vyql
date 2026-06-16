@@ -1,0 +1,10 @@
+import code.{NetworkSend}
+import core.{InputValidation}
+
+adapter python {
+  package "fcm-django" {
+    sink method "send_message" -> code.NetworkSend
+    sink method "send_messages" -> code.NetworkSend
+    control method "validate" -> core.InputValidation
+  }
+}

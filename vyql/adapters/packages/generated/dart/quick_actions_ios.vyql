@@ -1,0 +1,6 @@
+adapter dart {
+  package "quick_actions_ios" {
+    sink method "ShortcutItemMessage.decode" -> code.Deserialization
+    source method "IOSQuickActionsFlutterApi.launchAction" -> core.UserControlledData
+  }
+}

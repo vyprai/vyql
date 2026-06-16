@@ -1,0 +1,8 @@
+import code.{NetworkSend, SecretValue}
+
+adapter perl {
+  package "WebService-Naver-TTS" {
+    source method "new" -> code.SecretValue
+    sink method "tts" -> code.NetworkSend
+  }
+}

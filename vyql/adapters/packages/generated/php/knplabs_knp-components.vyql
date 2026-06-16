@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter php {
+  package "knplabs/knp-components" {
+    sink method "Knp\\Component\\Pager\\Event\\Subscriber\\Paginate\\PropelQuerySubscriber::items" -> code.SqlExecution
+    sink method "Knp\\Component\\Pager\\Event\\Subscriber\\Paginate\\Doctrine\\ORM\\QuerySubscriber::items" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "ethereumex" {
+    sink method "jason_decode" -> code.Deserialization
+    sink method "decode_body" -> code.Deserialization
+  }
+}

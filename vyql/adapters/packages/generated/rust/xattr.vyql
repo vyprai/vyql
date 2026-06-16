@@ -1,0 +1,13 @@
+import code.{FilePathAccess}
+adapter rust {
+  package "xattr" {
+    sink method "get_path" -> code.FilePathAccess
+    sink method "set_path" -> code.FilePathAccess
+    sink method "remove_path" -> code.FilePathAccess
+    sink method "list_path" -> code.FilePathAccess
+    sink method "get_fd" -> code.FilePathAccess
+    sink method "set_fd" -> code.FilePathAccess
+    sink method "remove_fd" -> code.FilePathAccess
+    sink method "list_fd" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,12 @@
+import code.{HttpInput, FileUpload, Cookie, ResponseHeaderWrite}
+
+adapter perl {
+  package "Dancer2" {
+    source method "request" -> code.HttpInput
+    source method "params" -> core.UserControlledData
+    source method "body" -> code.HttpInput
+    mark method "uploads" -> code.FileUpload
+    source method "cookie" -> code.Cookie
+    sink method "response" -> ResponseHeaderWrite
+  }
+}

@@ -1,0 +1,20 @@
+import code.{SecretValue, HttpInput, NetworkConnect, NetworkSend, UrlFetch}
+import core.{AuthenticationCheck, InputValidation}
+
+adapter groovy {
+  package "org.springframework.social:spring-social-core" {
+    source method "OAuthToken.getSecret" -> code.SecretValue
+    source method "AccessGrant.getAccessToken" -> code.SecretValue
+    source method "AccessGrant.getRefreshToken" -> code.SecretValue
+    source method "Connection.getProfileUrl" -> core.UserControlledData
+    source method "Connection.getImageUrl" -> core.UserControlledData
+    source method "UserProfile" -> core.UserControlledData
+    source method "FormMapHttpMessageConverter.read" -> code.HttpInput
+
+    control method "ApiBinding.isAuthorized" -> core.AuthenticationCheck
+    control method "OAuth2Version.getAuthorizationHeaderValue" -> core.AuthenticationCheck
+
+    sink method "URIBuilder.queryParam" -> code.UrlFetch
+    sink method "URIBuilder.queryParams" -> code.UrlFetch
+  }
+}

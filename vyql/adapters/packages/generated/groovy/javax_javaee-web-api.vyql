@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "javax:javaee-web-api" {
+    sink method "read" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/golang/freetype" {
+    sink method "ParseFont" -> code.Deserialization
+    sink method "Parse" -> code.Deserialization
+  }
+}

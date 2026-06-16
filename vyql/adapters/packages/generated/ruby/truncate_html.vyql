@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "truncate_html" {
+    control method "truncate_html" -> core.HtmlEscape
+  }
+}

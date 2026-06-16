@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter java {
+  package "com.amazonaws:aws-lambda-java-core" {
+    source method "handleRequest" -> core.UserControlledData
+  }
+}

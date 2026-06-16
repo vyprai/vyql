@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "jasmine" {
+    sink method "process" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "typed-ast" {
+    sink method "parse" -> code.Deserialization
+  }
+}

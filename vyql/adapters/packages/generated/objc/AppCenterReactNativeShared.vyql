@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter objc {
+  package "AppCenterReactNativeShared" {
+    source method "setAppSecret:" -> code.SecretValue
+    source method "getAppSecret" -> code.SecretValue
+  }
+}

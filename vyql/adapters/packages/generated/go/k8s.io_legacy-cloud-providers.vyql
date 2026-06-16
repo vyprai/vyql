@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter go {
+  package "k8s.io/legacy-cloud-providers" {
+    sink method "readConfig" -> code.Deserialization
+  }
+}

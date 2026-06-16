@@ -1,0 +1,15 @@
+import code.{WeakRandomValue}
+
+adapter rust {
+  package "oorandom" {
+    mark method "rand_u32" -> code.WeakRandomValue
+    mark method "rand_i32" -> code.WeakRandomValue
+    mark method "rand_float" -> code.WeakRandomValue
+    mark method "rand_range" -> code.WeakRandomValue
+    mark method "rand_u64" -> code.WeakRandomValue
+    mark method "rand_i64" -> code.WeakRandomValue
+    mark method "new" -> code.WeakRandomValue
+    mark method "new_inc" -> code.WeakRandomValue
+    mark method "from_state" -> code.WeakRandomValue
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/mongodb/mongodb-vapor" {
+    sink method "decode" -> code.Deserialization
+  }
+}

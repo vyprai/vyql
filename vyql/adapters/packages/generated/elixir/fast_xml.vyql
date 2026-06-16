@@ -1,0 +1,8 @@
+import code.{Deserialization}
+import core.{InputValidation}
+adapter elixir {
+  package "fast_xml" {
+    sink method "parse" -> code.Deserialization
+    control method "sanitize_for_atd" -> core.InputValidation
+  }
+}

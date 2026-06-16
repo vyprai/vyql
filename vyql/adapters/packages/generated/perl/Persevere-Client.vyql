@@ -1,0 +1,15 @@
+import code.{NetworkConnect, NetworkSend, NosqlQuery}
+
+adapter perl {
+  package "Persevere-Client" {
+    sink method "req" -> code.NetworkConnect
+    sink method "req" -> code.NetworkSend
+    sink method "query" -> code.NosqlQuery
+    sink method "queryRange" -> code.NosqlQuery
+    sink method "create" -> code.NosqlQuery
+    sink method "createObjects" -> code.NosqlQuery
+    sink method "updateObjects" -> code.NosqlQuery
+    sink method "delete" -> code.NosqlQuery
+    sink method "deleteById" -> code.NosqlQuery
+  }
+}

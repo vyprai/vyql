@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter go {
+  package "github.com/go-ole/go-ole" {
+    sink method "GetObject" -> code.CodeEval
+  }
+}

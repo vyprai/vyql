@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter elixir {
+  package "logfmt" {
+    control method "Logfmt.Encoder.escape" -> core.HtmlEscape
+  }
+}

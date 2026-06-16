@@ -1,0 +1,5 @@
+adapter ruby {
+  package "webpacker" {
+    sink method "Webpacker::Compiler" -> code.DynamicCodeLoad
+  }
+}

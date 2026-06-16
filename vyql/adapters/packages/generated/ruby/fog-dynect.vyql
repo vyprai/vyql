@@ -1,0 +1,17 @@
+import code.{NetworkData, NetworkSend}
+adapter ruby {
+  package "fog-dynect" {
+    source method "request" -> code.NetworkData
+    sink method "request" -> code.NetworkSend
+    sink method "post_record" -> code.NetworkSend
+    sink method "put_record" -> code.NetworkSend
+    sink method "delete_record" -> code.NetworkSend
+    sink method "post_zone" -> code.NetworkSend
+    sink method "put_zone" -> code.NetworkSend
+    sink method "delete_zone" -> code.NetworkSend
+    source method "get_record" -> code.NetworkData
+    source method "get_all_records" -> code.NetworkData
+    source method "get_node_list" -> code.NetworkData
+    source method "get_zone" -> code.NetworkData
+  }
+}

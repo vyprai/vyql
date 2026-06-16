@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter groovy {
+  package "org.apache.logging.log4j:log4j-web" {
+    source method "lookup" -> core.UserControlledData
+  }
+}

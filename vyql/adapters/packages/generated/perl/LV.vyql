@@ -1,0 +1,5 @@
+adapter perl {
+  package "LV" {
+    sink method "_set_implementation" -> code.CodeEval
+  }
+}

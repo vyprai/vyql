@@ -1,0 +1,8 @@
+import code.{CodeEval, Deserialization}
+adapter scala {
+  package "com.fasterxml.jackson.module:jackson-module-afterburner" {
+    sink method "updateBuilder" -> code.Deserialization
+    sink method "CreatorOptimizer" -> code.Deserialization
+    sink method "MyClassLoader" -> code.CodeEval
+  }
+}

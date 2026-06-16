@@ -1,0 +1,7 @@
+import code.{FilePathAccess, StoredDataRead}
+adapter java {
+  package "pl.pragmatists:JUnitParams" {
+    sink method "createProperReader" -> code.FilePathAccess
+    source method "read" -> code.StoredDataRead
+  }
+}

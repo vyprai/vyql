@@ -1,0 +1,8 @@
+import code.{HttpInput}
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/julienschmidt/httprouter" {
+    source method "ParamsFromContext" -> core.UserControlledData
+  }
+}

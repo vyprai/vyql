@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter javascript {
+  package "aproba" {
+    source method "validate" -> core.UserControlledData
+  }
+}

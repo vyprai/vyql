@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter dart {
+  package "intl_phone_number_input" {
+    control method "isValidNumber" -> core.InputValidation
+    control method "getRegionInfoFromPhoneNumber" -> core.InputValidation
+  }
+}

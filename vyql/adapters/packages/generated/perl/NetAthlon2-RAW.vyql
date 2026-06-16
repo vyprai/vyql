@@ -1,0 +1,5 @@
+adapter perl {
+  package "NetAthlon2-RAW" {
+    sink method "parse" -> code.Deserialization
+  }
+}

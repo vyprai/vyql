@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter swift {
+  package "github.com/codewinsdotcom/PostgresClientKit" {
+    sink method "prepareStatement" -> code.SqlExecution
+  }
+}

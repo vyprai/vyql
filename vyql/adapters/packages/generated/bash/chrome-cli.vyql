@@ -1,0 +1,5 @@
+adapter bash {
+  package "chrome-cli" {
+    source path "arc-cli.argv" -> code.CliArgument
+  }
+}

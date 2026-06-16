@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter csharp {
+  package "system.net.http.rtc" {
+    sink method "RtcRequestFactory.Create" -> code.NetworkSend
+  }
+}

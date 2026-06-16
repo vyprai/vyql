@@ -1,0 +1,7 @@
+adapter scala {
+  package "org.apache.kafka:kafka-streams" {
+    sink method "query" -> code.NosqlQuery
+    sink method "setStateListener" -> code.StoredDataWrite
+    sink method "deserialize" -> code.Deserialization
+  }
+}

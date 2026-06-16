@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter java {
+  package "org.seleniumhq.selenium:selenium-remote-driver" {
+    sink method "executeScript" -> code.CodeEval
+  }
+}

@@ -1,0 +1,8 @@
+import code.{FilePathAccess, WeakHash}
+adapter cpp {
+  package "rhash" {
+    mark method "rhash_init" -> code.WeakHash
+    mark method "rhash_init_multi" -> code.WeakHash
+    sink method "rhash_file" -> code.FilePathAccess
+  }
+}

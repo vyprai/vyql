@@ -1,0 +1,7 @@
+adapter groovy {
+  package "com.jcabi:jcabi-manifests" {
+    source method "Manifests.read" -> core.UserControlledData
+    sink method "FilesMfs" -> code.FilePathAccess
+    sink method "FilesMfs.fetch" -> code.FileUse
+  }
+}

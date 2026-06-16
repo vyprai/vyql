@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+adapter scala {
+  package "org.webjars:webjars-locator-core" {
+    sink method "getFullPath" -> FilePathAccess
+    sink method "getFullPathExact" -> FilePathAccess
+    sink method "listAssets" -> FilePathAccess
+  }
+}

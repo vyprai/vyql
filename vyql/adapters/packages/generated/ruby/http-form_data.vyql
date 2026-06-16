@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter ruby {
+  package "http-form_data" {
+    control method "escape" -> core.InputValidation
+  }
+}

@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter dart {
+  package "firebase_app_check" {
+    source method "getToken" -> code.SecretValue
+    source method "getLimitedUseAppCheckToken" -> code.SecretValue
+  }
+}

@@ -1,0 +1,14 @@
+import code.{SqlExecution}
+
+adapter go {
+  package "github.com/erikstmartin/go-testdb" {
+    sink method "SetQueryFunc" -> code.SqlExecution
+    sink method "SetQueryWithArgsFunc" -> code.SqlExecution
+    sink method "StubQuery" -> code.SqlExecution
+    sink method "StubQueryError" -> code.SqlExecution
+    sink method "SetExecFunc" -> code.SqlExecution
+    sink method "SetExecWithArgsFunc" -> code.SqlExecution
+    sink method "StubExec" -> code.SqlExecution
+    sink method "StubExecError" -> code.SqlExecution
+  }
+}

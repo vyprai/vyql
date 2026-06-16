@@ -1,0 +1,10 @@
+import code.{HttpInput, NetworkSend, NetworkData}
+
+adapter java {
+  package "org.apache.cxf:cxf-rt-transports-http-jetty" {
+    source method "service" -> code.HttpInput
+    sink method "service" -> code.NetworkSend
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+  }
+}

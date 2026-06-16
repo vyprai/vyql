@@ -1,0 +1,9 @@
+import code.{Deserialization, SecretValue}
+
+adapter python {
+  package "google-auth" {
+    source method "google.auth.jwt.encode" -> code.SecretValue
+    sink method "google.auth.jwt.decode" -> code.Deserialization
+    source method "google.auth.jwt.from_service_account_file" -> code.SecretValue
+  }
+}

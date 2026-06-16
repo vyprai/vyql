@@ -1,0 +1,14 @@
+import code.{SecretValue, Deserialization}
+
+adapter dart {
+  package "googleapis_auth" {
+    sink method "AccessToken.fromJson" -> code.Deserialization
+    source method "AccessToken.toJson" -> code.SecretValue
+    sink method "AccessCredentials.fromJson" -> code.Deserialization
+    source method "AccessCredentials.toJson" -> code.SecretValue
+    sink method "ClientId.fromJson" -> code.Deserialization
+    source method "ClientId.toJson" -> code.SecretValue
+    sink method "ServiceAccountCredentials.fromJson" -> code.Deserialization
+    source method "ServiceAccountCredentials.sign" -> code.SecretValue
+  }
+}

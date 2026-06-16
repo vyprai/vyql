@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter kotlin {
+  package "org.seleniumhq.selenium:selenium-htmlunit-driver" {
+    sink method "executeScript" -> code.CodeEval
+    sink method "executeAsyncScript" -> code.CodeEval
+  }
+}

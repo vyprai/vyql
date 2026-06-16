@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/antlr/antlr4/runtime/Go/antlr" {
+    source method "NewInputStream" -> core.UserControlledData
+  }
+}

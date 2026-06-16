@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter java {
+  package "com.jolbox:bonecp" {
+    control method "sanitize" -> core.InputValidation
+  }
+}

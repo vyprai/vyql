@@ -1,0 +1,7 @@
+import code.{NetworkConnect}
+adapter javascript {
+  package "http-proxy-agent" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "addRequest" -> code.NetworkConnect
+  }
+}

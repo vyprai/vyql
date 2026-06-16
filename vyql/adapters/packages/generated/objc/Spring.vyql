@@ -1,0 +1,10 @@
+import code.{UrlFetch}
+
+adapter objc {
+  package "Spring" {
+    sink method "imageFromURL" -> code.UrlFetch
+    sink method "imageForUrl" -> code.UrlFetch
+    sink method "setImageURL" -> code.UrlFetch
+    sink method "setURL" -> code.UrlFetch
+  }
+}

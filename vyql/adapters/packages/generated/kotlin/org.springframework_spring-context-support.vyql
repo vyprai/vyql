@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter kotlin {
+  package "org.springframework:spring-context-support" {
+    sink method "send" -> code.NetworkSend
+  }
+}

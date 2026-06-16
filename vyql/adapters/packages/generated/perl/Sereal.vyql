@@ -1,0 +1,6 @@
+adapter perl {
+  package "Sereal" {
+    sink method "get_sereal_decoder" -> code.Deserialization
+    mark path "sereal.hash" -> code.WeakHash
+  }
+}

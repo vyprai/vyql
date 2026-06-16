@@ -1,0 +1,8 @@
+adapter objc {
+  package "Moya" {
+    source method "stream" -> code.NetworkData
+    sink method "add" -> code.NetworkSend
+    sink method "let" -> code.FilePathAccess
+    mark path "moya.hash" -> code.WeakHash
+  }
+}

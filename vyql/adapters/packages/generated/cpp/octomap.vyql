@@ -1,0 +1,12 @@
+import code.{FilePathAccess, Deserialization}
+
+adapter cpp {
+  package "octomap" {
+    sink method "writeMap" -> code.FilePathAccess
+    sink method "readMap" -> code.FilePathAccess
+    sink method "exportDot" -> code.FilePathAccess
+    sink method "writeBinary" -> code.FilePathAccess
+    sink method "readBinary" -> code.Deserialization
+    sink method "readPlainASCII" -> code.FilePathAccess
+  }
+}

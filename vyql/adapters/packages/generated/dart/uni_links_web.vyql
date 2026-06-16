@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter dart {
+  package "uni_links_web" {
+    source method "UniLinksPlugin.getInitialLink" -> code.HttpInput
+  }
+}

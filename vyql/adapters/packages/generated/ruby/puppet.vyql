@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "puppet" {
+    sink method "safe_posix_fork" -> code.CommandExecution
+  }
+}

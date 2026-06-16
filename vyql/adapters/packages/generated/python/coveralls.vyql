@@ -1,0 +1,8 @@
+import code.{NetworkSend, CommandExecution, Deserialization}
+adapter python {
+  package "coveralls" {
+    sink method "submit_report" -> code.NetworkSend
+    sink method "run_command" -> code.CommandExecution
+    sink method "parse_file" -> code.Deserialization
+  }
+}

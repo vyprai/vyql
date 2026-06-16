@@ -1,0 +1,6 @@
+adapter dart {
+  package "shelf_packages_handler" {
+    sink method "call" -> code.FilePathAccess
+    sink method "handleRequest" -> code.FilePathAccess
+  }
+}

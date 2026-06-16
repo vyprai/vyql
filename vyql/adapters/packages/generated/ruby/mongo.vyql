@@ -1,0 +1,10 @@
+adapter ruby {
+  package "mongo" {
+    sink method "get" -> code.NosqlQuery
+    source method "read" -> code.NetworkData
+    sink method "send_initial_query" -> code.NetworkSend
+    sink method "validate_max_connecting!" -> code.NetworkConnect
+    sink method "decode" -> code.Deserialization
+    mark path "mongo.random" -> code.WeakRandomValue
+  }
+}

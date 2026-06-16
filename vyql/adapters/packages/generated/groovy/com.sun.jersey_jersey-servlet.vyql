@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter groovy {
+  package "com.sun.jersey:jersey-servlet" {
+    source method "service" -> code.HttpInput
+  }
+}

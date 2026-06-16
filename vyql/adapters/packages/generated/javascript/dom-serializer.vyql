@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter javascript {
+  package "dom-serializer" {
+    sink method "render" -> code.HtmlRender
+  }
+}

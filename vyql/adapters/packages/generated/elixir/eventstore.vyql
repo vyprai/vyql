@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter elixir {
+  package "eventstore" {
+    sink method "parse" -> code.UrlFetch
+  }
+}

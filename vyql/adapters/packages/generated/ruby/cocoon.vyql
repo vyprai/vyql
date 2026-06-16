@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter ruby {
+  package "cocoon" {
+    sink method "render_association" -> code.FilePathAccess
+    sink method "get_partial_path" -> code.FilePathAccess
+  }
+}

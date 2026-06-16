@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "activesupport" {
+    sink method "ActiveSupport::Duration.parse" -> code.Deserialization
+  }
+}

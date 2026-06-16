@@ -1,0 +1,6 @@
+import code.{CommandExecution, FilePathAccess}
+adapter ruby {
+  package "capybara-screenshot" {
+    sink method "screenshot_and_save_page" -> code.FilePathAccess
+  }
+}

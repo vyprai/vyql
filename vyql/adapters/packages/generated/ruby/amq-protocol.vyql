@@ -1,0 +1,7 @@
+import code.{NetworkConnect}
+
+adapter ruby {
+  package "amq-protocol" {
+    sink method "AMQ::URI.parse" -> code.NetworkConnect
+  }
+}

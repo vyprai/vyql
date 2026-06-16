@@ -1,0 +1,7 @@
+import code.{LogWrite}
+
+adapter swift {
+  package "github.com/chrisaljoudi/swift-log-oslog" {
+    sink method "log" -> code.LogWrite
+  }
+}

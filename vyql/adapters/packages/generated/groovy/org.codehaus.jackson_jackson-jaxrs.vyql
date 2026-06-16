@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "org.codehaus.jackson:jackson-jaxrs" {
+    sink method "readFrom" -> code.Deserialization
+  }
+}

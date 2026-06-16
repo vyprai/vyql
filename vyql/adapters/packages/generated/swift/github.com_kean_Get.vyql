@@ -1,0 +1,12 @@
+import code.{HttpInput, NetworkSend}
+adapter swift {
+  package "github.com/kean/Get" {
+    sink method "send" -> code.NetworkSend
+    sink method "download" -> code.NetworkSend
+    sink method "upload" -> code.NetworkSend
+    source method "query" -> code.HttpInput
+    source method "url" -> code.HttpInput
+    source method "body" -> code.HttpInput
+    source method "headers" -> code.HttpInput
+  }
+}

@@ -1,0 +1,8 @@
+import core.{HtmlEscape}
+
+adapter php {
+  package "ezyang/htmlpurifier" {
+    control method "purify" -> core.HtmlEscape
+    control method "purifyArray" -> core.HtmlEscape
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "absinthe_plug" {
+    sink method "Absinthe.Plug.Parser.parse" -> code.Deserialization
+  }
+}

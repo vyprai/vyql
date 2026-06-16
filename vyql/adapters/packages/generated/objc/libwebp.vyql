@@ -1,0 +1,13 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "libwebp" {
+    sink method "ReadPNG" -> code.Deserialization
+    sink method "ReadPNM" -> code.Deserialization
+    sink method "ReadJPEG" -> code.Deserialization
+    sink method "ReadTIFF" -> code.Deserialization
+    sink method "ReadWebP" -> code.Deserialization
+    sink method "DecodeWebP" -> code.Deserialization
+    sink method "DecodeWebPIncremental" -> code.Deserialization
+  }
+}

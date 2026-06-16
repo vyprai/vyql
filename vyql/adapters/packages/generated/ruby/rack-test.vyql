@@ -1,0 +1,13 @@
+import core.{UserControlledData}
+adapter ruby {
+  package "rack-test" {
+    source method "request" -> core.UserControlledData
+    source method "custom_request" -> core.UserControlledData
+    source method "set_cookie" -> core.UserControlledData
+    source method "header" -> core.UserControlledData
+    source method "env" -> core.UserControlledData
+    source method "basic_authorize" -> core.UserControlledData
+    source method "parse_uri" -> core.UserControlledData
+    source method "append_query_params" -> core.UserControlledData
+  }
+}

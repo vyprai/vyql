@@ -1,0 +1,9 @@
+import code.{HtmlRender}
+import core.{HtmlEscape}
+
+adapter elixir {
+  package "mustache" {
+    sink method "render" -> code.HtmlRender
+    control method "escape" -> core.HtmlEscape
+  }
+}

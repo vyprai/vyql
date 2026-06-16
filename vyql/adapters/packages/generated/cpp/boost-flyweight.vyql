@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "boost-flyweight" {
+    sink method "load" -> code.Deserialization
+  }
+}

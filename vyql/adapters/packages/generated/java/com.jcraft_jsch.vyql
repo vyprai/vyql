@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter java {
+  package "com.jcraft:jsch" {
+    sink method "setCommand" -> code.CommandExecution
+  }
+}

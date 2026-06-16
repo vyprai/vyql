@@ -1,0 +1,10 @@
+import code.{FileUse, Deserialization}
+adapter c {
+  package "libflac" {
+    sink method "read" -> code.FileUse
+    sink method "write" -> code.FileUse
+    sink method "flac__decode_file" -> code.FileUse
+    sink method "flac__encode_file" -> code.FileUse
+    sink method "utf8_decode" -> code.Deserialization
+  }
+}

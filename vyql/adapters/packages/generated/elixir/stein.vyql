@@ -1,0 +1,11 @@
+import code.{WeakHash}
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter elixir {
+  package "stein" {
+    control method "validate_login" -> core.AuthenticationCheck
+    control method "check_password" -> core.AuthenticationCheck
+    control method "start_password_reset" -> core.AuthorizationCheck
+    mark method "hash_password" -> code.WeakHash
+  }
+}

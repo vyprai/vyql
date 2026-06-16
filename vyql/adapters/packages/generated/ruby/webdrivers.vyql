@@ -1,0 +1,16 @@
+import code.{UrlFetch, Deserialization, FilePathAccess, CommandExecution}
+
+adapter ruby {
+  package "webdrivers" {
+    sink method "download" -> code.UrlFetch
+    sink method "download_file" -> code.UrlFetch
+    sink method "get" -> code.UrlFetch
+    sink method "get_url" -> code.UrlFetch
+    sink method "get_response" -> code.UrlFetch
+    sink method "decompress_file" -> code.Deserialization
+    sink method "unzip_file" -> code.Deserialization
+    sink method "untargz_file" -> code.Deserialization
+    sink method "untarbz2_file" -> code.Deserialization
+    sink method "delete" -> code.FilePathAccess
+  }
+}

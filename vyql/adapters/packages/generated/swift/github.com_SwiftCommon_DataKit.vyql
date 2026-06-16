@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/SwiftCommon/DataKit" {
+    sink method "decode" -> code.Deserialization
+  }
+}

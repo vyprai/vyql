@@ -1,0 +1,9 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter python {
+  package "json5" {
+    sink method "load" -> code.FilePathAccess
+    sink method "loads" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

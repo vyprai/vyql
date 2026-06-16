@@ -1,0 +1,5 @@
+adapter bash {
+  package "prettier" {
+    source path "prettier.argv" -> code.CliArgument
+  }
+}

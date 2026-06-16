@@ -1,0 +1,9 @@
+import core.{AuthorizationCheck}
+import code.{DatabaseRead}
+
+adapter php {
+  package "sensio/framework-extra-bundle" {
+    control method "Sensio\Bundle\FrameworkExtraBundle\EventListener\SecurityListener::onKernelController" -> core.AuthorizationCheck
+    sink method "Sensio\Bundle\FrameworkExtraBundle\Request\ParamConverter\DoctrineParamConverter::apply" -> code.DatabaseRead
+  }
+}

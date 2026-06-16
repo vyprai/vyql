@@ -1,0 +1,14 @@
+import core.{UserControlledData}
+
+adapter perl {
+  package "SpamMonkey" {
+    source method "match" -> core.UserControlledData
+    source method "test" -> core.UserControlledData
+    source method "test_text" -> core.UserControlledData
+    source method "test_email" -> core.UserControlledData
+    source method "test_headers" -> core.UserControlledData
+    source method "test_bodylike" -> core.UserControlledData
+    source method "get_uris" -> core.UserControlledData
+    source method "uris" -> core.UserControlledData
+  }
+}

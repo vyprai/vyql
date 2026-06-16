@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/godbus/dbus" {
+    sink method "ParseSignature" -> code.Deserialization
+    sink method "ParseSignatureMust" -> code.Deserialization
+  }
+}

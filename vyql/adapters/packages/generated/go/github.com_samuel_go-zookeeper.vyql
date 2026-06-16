@@ -1,0 +1,13 @@
+import code.{StoredDataRead, StoredDataWrite}
+import core.{AuthorizationCheck}
+
+adapter go {
+  package "github.com/samuel/go-zookeeper" {
+    sink method "Create" -> code.StoredDataWrite
+    sink method "Set" -> code.StoredDataWrite
+    sink method "Delete" -> code.StoredDataWrite
+    source method "Get" -> code.StoredDataRead
+    source method "Children" -> code.StoredDataRead
+    control method "SetACL" -> core.AuthorizationCheck
+  }
+}

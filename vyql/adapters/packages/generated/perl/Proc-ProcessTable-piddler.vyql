@@ -1,0 +1,6 @@
+import code.{StoredDataRead}
+adapter perl {
+  package "Proc-ProcessTable-piddler" {
+    source method "run" -> code.StoredDataRead
+  }
+}

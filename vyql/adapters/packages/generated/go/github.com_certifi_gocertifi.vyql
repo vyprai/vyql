@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/certifi/gocertifi" {
+    source method "CACerts" -> code.SecretValue
+  }
+}

@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter python {
+  package "pyasn1-modules" {
+    sink method "readPemBlocksFromFile" -> code.Deserialization
+    sink method "readPemFromFile" -> code.Deserialization
+    sink method "readBase64fromText" -> code.Deserialization
+    sink method "readBase64FromFile" -> code.Deserialization
+  }
+}

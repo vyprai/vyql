@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter rust {
+  package "android_system_properties" {
+    source method "get" -> core.UserControlledData
+    source method "get_from_cstr" -> core.UserControlledData
+  }
+}

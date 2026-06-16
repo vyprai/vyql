@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "com.esotericsoftware:kryo" {
+    sink method "readObject" -> code.Deserialization
+    sink method "readObjectOrNull" -> code.Deserialization
+    sink method "readClassAndObject" -> code.Deserialization
+    sink method "readReferenceOrNull" -> code.Deserialization
+  }
+}

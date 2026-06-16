@@ -1,0 +1,5 @@
+adapter cpp {
+  package "tre" {
+    mark path "tre.compile" -> code.RegexCompile
+  }
+}

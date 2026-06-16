@@ -1,0 +1,6 @@
+adapter perl {
+  package "Starlet" {
+    source path "_write_mymeta_data" -> code.HttpInput
+    sink path "_handle_response" -> code.ResponseHeaderWrite
+  }
+}

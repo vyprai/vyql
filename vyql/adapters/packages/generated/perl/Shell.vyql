@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter perl {
+  package "Shell" {
+    sink method "_make_cmd" -> code.CommandExecution
+  }
+}

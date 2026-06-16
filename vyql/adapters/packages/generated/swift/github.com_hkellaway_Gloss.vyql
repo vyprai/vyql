@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/hkellaway/Gloss" {
+    sink method "json" -> code.Deserialization
+    sink method "jsonArray" -> code.Deserialization
+  }
+}

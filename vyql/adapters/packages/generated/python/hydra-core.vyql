@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter python {
+  package "hydra-core" {
+    sink method "parse_rule" -> code.Deserialization
+    sink method "parse_override" -> code.Deserialization
+    sink method "parse_overrides" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+adapter kotlin {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "deserializeWithType" -> code.Deserialization
+    sink method "extractSecondsAndNanos" -> code.Deserialization
+  }
+}

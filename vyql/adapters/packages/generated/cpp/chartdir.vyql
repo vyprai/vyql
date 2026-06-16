@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter cpp {
+  package "chartdir" {
+    source method "setLicenseFile" -> code.SecretValue
+    source method "setLicenseCode" -> code.SecretValue
+  }
+}

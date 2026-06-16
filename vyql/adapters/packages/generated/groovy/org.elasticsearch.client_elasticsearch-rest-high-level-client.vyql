@@ -1,0 +1,21 @@
+import code.{NosqlQuery}
+
+adapter groovy {
+  package "org.elasticsearch.client:elasticsearch-rest-high-level-client" {
+    sink method "search" -> code.NosqlQuery
+    sink method "open" -> code.NosqlQuery
+    sink method "split" -> code.NosqlQuery
+    sink method "putFollow" -> code.NosqlQuery
+    sink method "putAutoFollowPattern" -> code.NosqlQuery
+    sink method "deleteAutoFollowPattern" -> code.NosqlQuery
+    sink method "forgetFollower" -> code.NosqlQuery
+    sink method "pauseFollow" -> code.NosqlQuery
+    sink method "resumeFollow" -> code.NosqlQuery
+    sink method "unfollow" -> code.NosqlQuery
+    sink method "resumeAutoFollowPattern" -> code.NosqlQuery
+    sink method "pauseAutoFollowPattern" -> code.NosqlQuery
+    sink method "getCcrStats" -> code.NosqlQuery
+    sink method "getFollowStats" -> code.NosqlQuery
+    sink method "getAutoFollowPattern" -> code.NosqlQuery
+  }
+}

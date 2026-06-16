@@ -1,0 +1,8 @@
+import code.{Deserialization, NetworkSend}
+adapter ruby {
+  package "websocket-driver" {
+    sink method "parse" -> code.Deserialization
+    sink method "frame" -> code.NetworkSend
+    sink method "send_frame" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter cpp {
+  package "vcglib" {
+    sink method "saveNativeFormat" -> code.FilePathAccess
+    sink method "openNativeFormat" -> code.FilePathAccess
+  }
+}

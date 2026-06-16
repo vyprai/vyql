@@ -1,0 +1,8 @@
+adapter go {
+  package "github.com/syndtr/gocapability" {
+    sink method "NewFile" -> code.FilePathAccess
+    sink method "NewFile2" -> code.FilePathAccess
+    sink method "getVfsCap" -> code.FilePathAccess
+    sink method "setVfsCap" -> code.FilePathAccess
+  }
+}

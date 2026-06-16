@@ -1,0 +1,9 @@
+import code.{CommandExecution, FilePathAccess}
+import core.{HtmlEscape}
+
+adapter perl {
+  package "Poet" {
+    sink method "read_file" -> code.FilePathAccess
+    control method "html_escape" -> core.HtmlEscape
+  }
+}

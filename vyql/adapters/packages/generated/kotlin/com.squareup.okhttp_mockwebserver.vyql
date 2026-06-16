@@ -1,0 +1,10 @@
+import code.{HttpInput}
+adapter kotlin {
+  package "com.squareup.okhttp:mockwebserver" {
+    source method "RecordedRequest.getRequestLine" -> code.HttpInput
+    source method "RecordedRequest.getPath" -> code.HttpInput
+    source method "RecordedRequest.getMethod" -> code.HttpInput
+    source method "RecordedRequest.getHeaders" -> code.HttpInput
+    source method "RecordedRequest.getBody" -> code.HttpInput
+  }
+}

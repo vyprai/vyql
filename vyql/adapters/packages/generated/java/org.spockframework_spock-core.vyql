@@ -1,0 +1,7 @@
+adapter java {
+  package "org.spockframework:spock-core" {
+    control method "sanitize" -> core.InputValidation
+    sink method "run" -> code.CodeEval
+    sink method "compile" -> code.CodeEval
+  }
+}

@@ -1,0 +1,10 @@
+import code.{UrlFetch}
+import core.{UserControlledData}
+
+adapter objc {
+  package "KakaoSDKLink" {
+    source method "isKakaoLinkUrl" -> core.UserControlledData
+    sink method "scrapLink" -> code.UrlFetch
+    sink method "imageScrap" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,8 @@
+import code.{SecretValue}
+adapter dart {
+  package "flutter_stripe" {
+    source method "createApplePayToken" -> code.SecretValue
+    source method "createToken" -> code.SecretValue
+    source method "createTokenForCVCUpdate" -> code.SecretValue
+  }
+}

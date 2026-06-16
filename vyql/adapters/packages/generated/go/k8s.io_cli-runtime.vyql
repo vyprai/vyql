@@ -1,0 +1,10 @@
+import code.{UrlFetch}
+import core.{InputValidation}
+
+adapter go {
+  package "k8s.io/cli-runtime" {
+    control method "ValidateSchema" -> core.InputValidation
+    sink method "readHttpWithRetries" -> code.UrlFetch
+    sink method "httpgetImpl" -> code.UrlFetch
+  }
+}

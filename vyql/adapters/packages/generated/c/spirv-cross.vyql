@@ -1,0 +1,8 @@
+import code.{FilePathAccess, FileUse, CliArgument, StdinInput}
+adapter c {
+  package "spirv-cross" {
+    sink method "read_spirv_file" -> code.FilePathAccess
+    source method "read_spirv_file_stdin" -> code.StdinInput
+    sink method "write_string_to_file" -> code.FileUse
+  }
+}

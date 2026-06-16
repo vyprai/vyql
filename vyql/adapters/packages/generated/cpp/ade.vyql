@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter cpp {
+  package "ade" {
+    sink method "createExecutable" -> code.CodeEval
+  }
+}

@@ -1,0 +1,8 @@
+import code.{RedirectTarget}
+
+adapter dart {
+  package "url_launcher_web" {
+    mark method "openNewWindow" -> code.RedirectTarget
+    mark method "launchUrl" -> code.RedirectTarget
+  }
+}

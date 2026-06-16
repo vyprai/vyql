@@ -1,0 +1,6 @@
+import code.{FileUse}
+adapter php {
+  package "zendframework/zend-i18n" {
+    sink method "load" -> code.FileUse
+  }
+}

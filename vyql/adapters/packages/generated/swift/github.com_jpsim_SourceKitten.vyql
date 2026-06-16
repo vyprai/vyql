@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/jpsim/SourceKitten" {
+    sink method "send" -> code.NetworkSend
+    sink method "parse" -> code.Deserialization
+  }
+}

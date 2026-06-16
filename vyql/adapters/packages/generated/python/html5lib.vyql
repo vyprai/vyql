@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter python {
+  package "html5lib" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseFragment" -> code.Deserialization
+  }
+}

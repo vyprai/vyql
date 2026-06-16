@@ -1,0 +1,12 @@
+import code.{CliArgument, FilePathAccess, StdinInput, FileUse}
+
+adapter c {
+  package "sassc" {
+    source method "getopt" -> code.CliArgument
+    source method "getopt_long" -> code.CliArgument
+    source method "getopt_long_only" -> code.CliArgument
+    source method "compile_stdin" -> code.StdinInput
+    sink method "compile_file" -> code.FilePathAccess
+    sink method "output" -> code.FileUse
+  }
+}

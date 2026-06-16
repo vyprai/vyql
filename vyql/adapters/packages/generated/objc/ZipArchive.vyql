@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter objc {
+  package "ZipArchive" {
+    sink method "UnzipFileTo" -> code.FilePathAccess
+    sink method "UnzipFileToMemory" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{NetworkConnect}
+adapter go {
+  package "sigs.k8s.io/apiserver-network-proxy/konnectivity-client" {
+    sink method "CreateSingleUseGrpcTunnel" -> code.NetworkConnect
+    sink method "CreateSingleUseGrpcTunnelWithContext" -> code.NetworkConnect
+  }
+}

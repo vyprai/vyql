@@ -1,0 +1,9 @@
+import code.{CliArgument, CommandExecution}
+import core.{ShellEscape}
+
+adapter javascript {
+  package "shellwords" {
+    source method "split" -> code.CliArgument
+    control method "escape" -> core.ShellEscape
+  }
+}

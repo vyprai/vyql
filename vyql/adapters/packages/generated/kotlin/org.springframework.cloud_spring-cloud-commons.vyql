@@ -1,0 +1,9 @@
+import code.{HttpInput, Cookie}
+adapter kotlin {
+  package "org.springframework.cloud:spring-cloud-commons" {
+    source method "getHttpMethod" -> code.HttpInput
+    source method "getUrl" -> code.HttpInput
+    source method "getHeaders" -> code.HttpInput
+    source method "getCookies" -> code.Cookie
+  }
+}

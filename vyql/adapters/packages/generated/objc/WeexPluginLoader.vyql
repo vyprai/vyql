@@ -1,0 +1,5 @@
+adapter objc {
+  package "WeexPluginLoader" {
+    sink method "registerPlugins" -> code.CodeEval
+  }
+}

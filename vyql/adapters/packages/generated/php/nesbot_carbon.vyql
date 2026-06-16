@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "nesbot/carbon" {
+    sink method "parse" -> code.Deserialization
+  }
+}

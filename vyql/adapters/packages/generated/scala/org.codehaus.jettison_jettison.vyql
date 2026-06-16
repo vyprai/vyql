@@ -1,0 +1,6 @@
+adapter scala {
+  package "org.codehaus.jettison:jettison" {
+    sink method "get" -> code.NosqlQuery
+    sink method "add" -> code.StoredDataWrite
+  }
+}

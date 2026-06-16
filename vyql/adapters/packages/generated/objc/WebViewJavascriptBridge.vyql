@@ -1,0 +1,9 @@
+import code.{ExpressionEval, CodeEval}
+
+adapter objc {
+  package "WebViewJavascriptBridge" {
+    sink method "send:" -> code.ExpressionEval
+    sink method "callHandler:data:responseCallback:" -> code.ExpressionEval
+    sink method "injectJavascriptFile" -> code.CodeEval
+  }
+}

@@ -1,0 +1,8 @@
+import code.{SecretValue, NetworkSend}
+
+adapter objc {
+  package "Braintree" {
+    source method "tokenize" -> code.SecretValue
+    sink method "httpRequest" -> code.NetworkSend
+  }
+}

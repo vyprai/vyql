@@ -1,0 +1,7 @@
+import code.{NetworkConnect, NetworkSend}
+adapter groovy {
+  package "org.eclipse.jetty.websocket:websocket-client" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+  }
+}

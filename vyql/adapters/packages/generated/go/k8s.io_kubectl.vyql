@@ -1,0 +1,5 @@
+adapter go {
+  package "k8s.io/kubectl" {
+    sink method "command" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{WeakRandomValue}
+adapter rust {
+  package "fixed-hash" {
+    mark method "randomize" -> code.WeakRandomValue
+    mark method "random" -> code.WeakRandomValue
+  }
+}

@@ -1,0 +1,6 @@
+adapter bash {
+  package "freetds" {
+    source path "freetds.argv" -> code.CliArgument
+    sink path "freetds" arg all -> code.SqlExecution
+  }
+}

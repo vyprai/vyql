@@ -1,0 +1,8 @@
+import code.{DatabaseRead, SqlExecution}
+
+adapter kotlin {
+  package "org.jadira.usertype:usertype.core" {
+    sink method "doNullSafeGet" -> code.DatabaseRead
+    sink method "doNullSafeSet" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,12 @@
+import code.{RedirectTarget}
+import core.{UserControlledData}
+
+adapter dart {
+  package "firebase_dynamic_links" {
+    source method "getDynamicLink" -> core.UserControlledData
+    mark method "buildLink" -> code.RedirectTarget
+    mark method "buildShortLink" -> code.RedirectTarget
+    source method "onNewIntent" -> core.UserControlledData
+    source method "onMethodCall" -> core.UserControlledData
+  }
+}

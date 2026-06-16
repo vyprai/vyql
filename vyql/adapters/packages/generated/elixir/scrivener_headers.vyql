@@ -1,0 +1,8 @@
+import code.{ResponseHeaderWrite}
+import core.{UserControlledData}
+adapter elixir {
+  package "scrivener_headers" {
+    sink method "paginate" -> code.ResponseHeaderWrite
+    source method "generate_uri" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+import code.{NetworkData}
+adapter go {
+  package "github.com/jcmturner/dnsutils/v2" {
+    source method "OrderedSRV" -> code.NetworkData
+  }
+}

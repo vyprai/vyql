@@ -1,0 +1,6 @@
+import core.{AuthorizationCheck}
+adapter rust {
+  package "tower-http" {
+    control method "ValidateRequestHeaderLayer.bearer" -> core.AuthorizationCheck
+  }
+}

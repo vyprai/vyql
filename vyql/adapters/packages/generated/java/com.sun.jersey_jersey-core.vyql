@@ -1,0 +1,14 @@
+import code.{Deserialization, RegexCompile}
+import core.{InputValidation}
+
+adapter java {
+  package "com.sun.jersey:jersey-core" {
+    control method "UriComponent.validate" -> core.InputValidation
+    control method "UriComponent.decode" -> core.InputValidation
+    control method "UriTemplate.match" -> core.InputValidation
+    control method "UriPattern.match" -> core.InputValidation
+    mark method "UriPattern.compile" -> code.RegexCompile
+    sink method "UriTemplateParser.parse" -> code.Deserialization
+    sink method "ServiceFinder.parse" -> code.Deserialization
+  }
+}

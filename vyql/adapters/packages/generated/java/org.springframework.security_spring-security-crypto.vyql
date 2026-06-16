@@ -1,0 +1,15 @@
+import code.{WeakHash, WeakCipher, SecretValue}
+import core.{AuthenticationCheck}
+
+adapter java {
+  package "org.springframework.security:spring-security-crypto" {
+    mark method "PasswordEncoder.encode" -> code.WeakHash
+    control method "PasswordEncoder.matches" -> core.AuthenticationCheck
+
+    mark method "BytesEncryptor.encrypt" -> code.WeakCipher
+    source method "BytesEncryptor.decrypt" -> code.SecretValue
+
+    mark method "TextEncryptor.encrypt" -> code.WeakCipher
+    source method "TextEncryptor.decrypt" -> code.SecretValue
+  }
+}

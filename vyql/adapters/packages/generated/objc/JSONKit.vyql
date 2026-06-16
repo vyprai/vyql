@@ -1,0 +1,10 @@
+adapter objc {
+  package "JSONKit" {
+    sink method "parseUTF8String" -> code.Deserialization
+    sink method "parseJSONData" -> code.Deserialization
+    sink method "objectFromJSONStringWithParseOptions" -> code.Deserialization
+    sink method "mutableObjectFromJSONStringWithParseOptions" -> code.Deserialization
+    sink method "objectFromJSONDataWithParseOptions" -> code.Deserialization
+    sink method "mutableObjectFromJSONDataWithParseOptions" -> code.Deserialization
+  }
+}

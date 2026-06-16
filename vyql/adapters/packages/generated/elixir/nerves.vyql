@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter elixir {
+  package "nerves" {
+    sink method "fork_exec" -> code.CommandExecution
+  }
+}

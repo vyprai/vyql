@@ -1,0 +1,9 @@
+import code.{NetworkConnect}
+
+adapter go {
+  package "github.com/globalsign/mgo" {
+    sink method "Dial" -> code.NetworkConnect
+    sink method "DialWithTimeout" -> code.NetworkConnect
+    source method "ParseURL" -> core.UserControlledData
+  }
+}

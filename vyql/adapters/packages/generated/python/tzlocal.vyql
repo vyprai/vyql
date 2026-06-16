@@ -1,0 +1,9 @@
+import code.{CommandExecution, StoredDataRead}
+import core.{UserControlledData}
+
+adapter python {
+  package "tzlocal" {
+    source method "get_localzone_name" -> core.UserControlledData
+    source method "valuestodict" -> code.StoredDataRead
+  }
+}

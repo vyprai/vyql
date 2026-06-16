@@ -1,0 +1,16 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter python {
+  package "srsly" {
+    sink method "json_loads" -> code.Deserialization
+    sink method "read_json" -> code.FilePathAccess
+    sink method "read_gzip_json" -> code.FilePathAccess
+    sink method "read_gzip_jsonl" -> code.FilePathAccess
+    sink method "read_jsonl" -> code.FilePathAccess
+    sink method "yaml_loads" -> code.Deserialization
+    sink method "read_yaml" -> code.FilePathAccess
+    sink method "pickle_loads" -> code.Deserialization
+    sink method "msgpack_loads" -> code.Deserialization
+    sink method "read_msgpack" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,6 @@
+import code.{XmlParse}
+adapter groovy {
+  package "org.eclipse.jetty:jetty-xml" {
+    sink method "parse" -> code.XmlParse
+  }
+}

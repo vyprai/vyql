@@ -1,0 +1,5 @@
+adapter scala {
+  package "com.ibm.icu:icu4j" {
+    mark method "hash" -> code.WeakHash
+  }
+}

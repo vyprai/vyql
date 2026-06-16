@@ -1,0 +1,12 @@
+import code.{HttpInput}
+import core.{InputValidation}
+
+adapter elixir {
+  package "elli" {
+    source method "get_request" -> code.HttpInput
+    source method "get_headers" -> code.HttpInput
+    source method "do_get_body" -> code.HttpInput
+    control method "uri_decode" -> core.InputValidation
+    control method "parse_range_set" -> core.InputValidation
+  }
+}

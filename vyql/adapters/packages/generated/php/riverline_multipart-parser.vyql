@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter php {
+  package "riverline/multipart-parser" {
+    source method "Riverline\MultiPartParser\Converters\HttpFoundation::convert" -> code.NetworkData
+    source method "Riverline\MultiPartParser\Converters\PSR7::convert" -> code.NetworkData
+  }
+}

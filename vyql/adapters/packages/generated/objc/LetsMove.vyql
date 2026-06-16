@@ -1,0 +1,12 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter objc {
+  package "LetsMove" {
+    sink method "Trash" -> code.FilePathAccess
+    sink method "DeleteOrTrash" -> code.FilePathAccess
+    sink method "AuthorizedInstall" -> code.CommandExecution
+    sink method "CopyBundle" -> code.FilePathAccess
+    sink method "Relaunch" -> code.CommandExecution
+    sink method "ShellQuotedString" -> code.CommandExecution
+  }
+}

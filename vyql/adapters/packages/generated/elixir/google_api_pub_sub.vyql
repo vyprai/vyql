@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+adapter elixir {
+  package "google_api_pub_sub" {
+    sink method "pubsub_projects_topics_publish" -> code.NetworkSend
+    source method "pubsub_projects_subscriptions_pull" -> code.NetworkData
+    sink method "pubsub_projects_subscriptions_acknowledge" -> code.NetworkSend
+  }
+}

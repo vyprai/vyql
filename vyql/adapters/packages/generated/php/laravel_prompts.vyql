@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "laravel/prompts" {
+    sink method "exec" -> code.CommandExecution
+  }
+}

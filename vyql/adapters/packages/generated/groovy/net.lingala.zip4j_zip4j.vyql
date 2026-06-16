@@ -1,0 +1,17 @@
+import code.{FilePathAccess, ArchiveEntryWrite, Deserialization, WeakCipher}
+adapter groovy {
+  package "net.lingala.zip4j:zip4j" {
+    sink method "addFile" -> code.ArchiveEntryWrite
+    sink method "addFiles" -> code.ArchiveEntryWrite
+    sink method "addFolder" -> code.ArchiveEntryWrite
+    sink method "addStream" -> code.ArchiveEntryWrite
+    sink method "extractAll" -> code.FilePathAccess
+    sink method "extractFile" -> code.FilePathAccess
+    sink method "removeFile" -> code.FilePathAccess
+    sink method "removeFiles" -> code.FilePathAccess
+    sink method "renameFile" -> code.FilePathAccess
+    sink method "renameFiles" -> code.FilePathAccess
+    sink method "mergeSplitFiles" -> code.FilePathAccess
+    mark method "isEncrypted" -> code.WeakCipher
+  }
+}

@@ -1,0 +1,12 @@
+import code.{HttpInput}
+import core.{AuthenticationCheck}
+
+adapter php {
+  package "dingo/api" {
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "getUser" -> core.AuthenticationCheck
+    control method "user" -> core.AuthenticationCheck
+    control method "check" -> core.AuthenticationCheck
+    source method "parse" -> code.HttpInput
+  }
+}

@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter go {
+  package "golang.org/x/crypto" {
+    sink method "ParseRequest" -> code.Deserialization
+    sink method "ParseResponse" -> code.Deserialization
+    sink method "ParseResponseForCert" -> code.Deserialization
+  }
+}

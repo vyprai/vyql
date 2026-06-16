@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter java {
+  package "io.dropwizard.metrics:metrics-core" {
+    control method "CsvReporter.sanitize" -> core.InputValidation
+  }
+}

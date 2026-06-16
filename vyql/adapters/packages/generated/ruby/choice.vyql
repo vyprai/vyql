@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter ruby {
+  package "choice" {
+    source method "parse" -> code.CliArgument
+  }
+}

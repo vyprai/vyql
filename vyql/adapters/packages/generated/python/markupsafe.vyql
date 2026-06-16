@@ -1,0 +1,8 @@
+import core.{HtmlEscape}
+
+adapter python {
+  package "markupsafe" {
+    control method "escape" -> core.HtmlEscape
+    control method "escape_silent" -> core.HtmlEscape
+  }
+}

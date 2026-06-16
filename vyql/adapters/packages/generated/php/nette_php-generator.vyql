@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter php {
+  package "nette/php-generator" {
+    sink method "Nette\PhpGenerator\Factory::fromCode" -> code.CodeEval
+  }
+}

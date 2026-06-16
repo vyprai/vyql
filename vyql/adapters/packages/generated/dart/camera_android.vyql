@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter dart {
+  package "camera_android" {
+    sink method "takePicture" -> code.FilePathAccess
+  }
+}

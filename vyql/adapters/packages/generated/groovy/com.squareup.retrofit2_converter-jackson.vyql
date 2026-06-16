@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.squareup.retrofit2:converter-jackson" {
+    sink method "JacksonResponseBodyConverter.convert" -> code.Deserialization
+  }
+}

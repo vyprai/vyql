@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "rapidjson" {
+    sink method "Parse" -> code.Deserialization
+  }
+}

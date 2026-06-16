@@ -1,0 +1,10 @@
+import code.{CommandExecution, FilePathAccess, RedirectTarget}
+
+adapter groovy {
+  package "org.seleniumhq.selenium:selenium-ie-driver" {
+    sink method "useCreateProcessApiToLaunchIe" -> code.CommandExecution
+    sink method "addCommandSwitches" -> code.CommandExecution
+    mark method "withInitialBrowserUrl" -> code.RedirectTarget
+    sink method "withEdgeExecutablePath" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter java {
+  package "com.itextpdf:itextpdf" {
+    sink method "insertFile" -> code.FilePathAccess
+    sink method "insertNames" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{ArchiveEntryWrite, FilePathAccess}
+adapter java {
+  package "org.codehaus.plexus:plexus-archiver" {
+    sink method "createArchive" -> code.ArchiveEntryWrite
+    sink method "extract" -> code.FilePathAccess
+  }
+}

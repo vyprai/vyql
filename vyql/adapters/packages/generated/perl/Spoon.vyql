@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter perl {
+  package "Spoon" {
+    source method "cgi" -> code.HttpInput
+  }
+}

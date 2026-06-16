@@ -1,0 +1,29 @@
+import code.{NetworkConnect, NetworkSend, Deserialization}
+
+adapter ruby {
+  package "sawyer" {
+    sink method "call" -> code.NetworkConnect
+    sink method "call" -> code.NetworkSend
+    sink method "head" -> code.NetworkConnect
+    sink method "head" -> code.NetworkSend
+    sink method "get" -> code.NetworkConnect
+    sink method "get" -> code.NetworkSend
+    sink method "post" -> code.NetworkConnect
+    sink method "post" -> code.NetworkSend
+    sink method "put" -> code.NetworkConnect
+    sink method "put" -> code.NetworkSend
+    sink method "patch" -> code.NetworkConnect
+    sink method "patch" -> code.NetworkSend
+    sink method "delete" -> code.NetworkConnect
+    sink method "delete" -> code.NetworkSend
+    sink method "options" -> code.NetworkConnect
+    sink method "options" -> code.NetworkSend
+    sink method "decode_body" -> code.Deserialization
+    sink method "parse_links" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+    sink method "decode_object" -> code.Deserialization
+    sink method "decode_hash" -> code.Deserialization
+    sink method "decode_hash_value" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

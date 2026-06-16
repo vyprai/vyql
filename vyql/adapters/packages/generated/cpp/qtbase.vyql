@@ -1,0 +1,7 @@
+import code.{CliArgument}
+adapter cpp {
+  package "qtbase" {
+    source method "Option::init" -> code.CliArgument
+    source method "Option::parseCommandLine" -> code.CliArgument
+  }
+}

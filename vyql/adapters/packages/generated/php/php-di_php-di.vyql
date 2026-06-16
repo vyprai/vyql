@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter php {
+  package "php-di/php-di" {
+    sink method "compile" -> code.CodeEval
+  }
+}

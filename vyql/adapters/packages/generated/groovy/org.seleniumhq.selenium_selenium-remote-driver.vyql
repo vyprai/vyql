@@ -1,0 +1,6 @@
+import code.{CodeEval, NetworkSend}
+adapter groovy {
+  package "org.seleniumhq.selenium:selenium-remote-driver" {
+    sink method "execute" -> code.NetworkSend
+  }
+}

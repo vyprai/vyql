@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter rust {
+  package "ndk-glue" {
+    sink method "init" -> code.CodeEval
+  }
+}

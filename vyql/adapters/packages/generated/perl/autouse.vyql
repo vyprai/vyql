@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter perl {
+  package "autouse" {
+    sink method "import" -> code.CodeEval
+  }
+}

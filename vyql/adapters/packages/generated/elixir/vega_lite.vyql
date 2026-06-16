@@ -1,0 +1,9 @@
+import code.{Deserialization, UrlFetch}
+
+adapter elixir {
+  package "vega_lite" {
+    sink method "from_json" -> code.Deserialization
+    sink method "from_spec" -> code.Deserialization
+    sink method "data_from_url" -> code.UrlFetch
+  }
+}

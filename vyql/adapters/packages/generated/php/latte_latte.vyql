@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter php {
+  package "latte/latte" {
+    control method "Latte\Compiler\Escaper::escape" -> core.HtmlEscape
+  }
+}

@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess}
+adapter rust {
+  package "memmap" {
+    sink method "map" -> code.FilePathAccess
+    sink method "map_mut" -> code.FilePathAccess
+    sink method "map_copy" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter ruby {
+  package "rack-accept" {
+    source method "parse" -> code.HttpInput
+  }
+}

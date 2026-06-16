@@ -1,0 +1,10 @@
+import code.{RegexCompile}
+import core.{InputValidation}
+
+adapter go {
+  package "github.com/dlclark/regexp2" {
+    mark method "Compile" -> code.RegexCompile
+    mark method "MustCompile" -> code.RegexCompile
+    control method "Escape" -> core.InputValidation
+  }
+}

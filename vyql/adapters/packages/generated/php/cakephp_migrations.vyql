@@ -1,0 +1,11 @@
+import code.{SqlExecution}
+
+adapter php {
+  package "cakephp/migrations" {
+    sink method "query" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+    sink method "fetchRow" -> code.SqlExecution
+    sink method "fetchAll" -> code.SqlExecution
+    sink method "truncate" -> code.SqlExecution
+  }
+}

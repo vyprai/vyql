@@ -1,0 +1,5 @@
+adapter ruby {
+  package "ruby-debug" {
+    source path "rdebug.argv" -> code.CliArgument
+  }
+}

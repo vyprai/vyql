@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter go {
+  package "github.com/go-openapi/validate" {
+    mark method "Pattern" -> code.RegexCompile
+  }
+}

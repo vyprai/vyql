@@ -1,0 +1,8 @@
+adapter kotlin {
+  package "org.apache.lucene:lucene-highlighter" {
+    sink method "getBestFragment" -> code.HtmlRender
+    sink method "getBestFragments" -> code.HtmlRender
+    sink method "highlightTerm" -> code.HtmlRender
+    source method "QueryScorer" -> core.UserControlledData
+  }
+}

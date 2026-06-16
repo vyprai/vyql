@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "rdoc" {
+    sink method "parse" -> code.Deserialization
+    sink method "tokenize" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization, CodeEval, UrlFetch}
+adapter swift {
+  package "github.com/ChimeHQ/SwiftTreeSitter" {
+    sink method "parse" -> code.Deserialization
+    sink method "query" -> code.CodeEval
+    sink method "init" -> code.UrlFetch
+  }
+}

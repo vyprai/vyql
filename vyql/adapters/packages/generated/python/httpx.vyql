@@ -1,0 +1,10 @@
+import code.{UrlFetch}
+
+adapter python {
+  package "httpx" {
+    sink method "request" -> code.UrlFetch
+    sink method "send" -> code.UrlFetch
+    sink method "get" -> code.UrlFetch
+    sink method "post" -> code.UrlFetch
+  }
+}

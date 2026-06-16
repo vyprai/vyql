@@ -1,0 +1,16 @@
+import code.{LogOutput}
+
+adapter php {
+  package "illuminate/log" {
+    sink method "emergency" -> code.LogOutput
+    sink method "alert" -> code.LogOutput
+    sink method "critical" -> code.LogOutput
+    sink method "error" -> code.LogOutput
+    sink method "warning" -> code.LogOutput
+    sink method "notice" -> code.LogOutput
+    sink method "info" -> code.LogOutput
+    sink method "debug" -> code.LogOutput
+    sink method "log" -> code.LogOutput
+    sink method "write" -> code.LogOutput
+  }
+}

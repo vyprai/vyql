@@ -1,0 +1,15 @@
+import code.{Deserialization, NetworkConnect, RedirectTarget}
+import core.{UserControlledData}
+
+adapter objc {
+  package "razorpay-pod" {
+    source method "open" -> core.UserControlledData
+    source method "openMagicXWithStorefrontUrl" -> core.UserControlledData
+    source method "authorize" -> core.UserControlledData
+    source method "openCheckoutWithDict" -> core.UserControlledData
+    sink method "decodeURIFrom" -> code.Deserialization
+    mark method "handleRedirection" -> code.RedirectTarget
+    sink method "viewControllerForPayload" -> code.Deserialization
+    sink method "startTransaction" -> code.NetworkConnect
+  }
+}

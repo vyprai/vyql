@@ -1,0 +1,7 @@
+adapter scala {
+  package "org.jboss.resteasy:resteasy-client" {
+    sink method "get" -> code.NosqlQuery
+    sink method "delete" -> code.StoredDataWrite
+    source method "cookie" -> code.HttpInput
+  }
+}

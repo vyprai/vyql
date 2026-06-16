@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+import code.{FileUse}
+adapter objc {
+  package "CapacitorCamera" {
+    source method "presentSystemAppropriateImagePicker" -> core.UserControlledData
+    sink method "saveTemporaryImage" -> code.FileUse
+  }
+}

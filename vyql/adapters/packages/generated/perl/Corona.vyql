@@ -1,0 +1,8 @@
+import code.{HttpInput, NetworkData, NetworkSend}
+adapter perl {
+  package "Corona" {
+    source method "Plack::Handler::Corona::run" -> code.NetworkData
+    source method "Corona::Server::process_request" -> code.HttpInput
+    sink method "Corona::Server::_write_response" -> code.NetworkSend
+  }
+}

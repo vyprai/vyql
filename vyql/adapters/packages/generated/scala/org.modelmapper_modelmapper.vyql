@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter scala {
+  package "org.modelmapper:modelmapper" {
+    source method "map" -> core.UserControlledData
+  }
+}

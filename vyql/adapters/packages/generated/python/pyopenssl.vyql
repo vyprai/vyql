@@ -1,0 +1,10 @@
+import code.{FilePathAccess}
+import core.{InputValidation}
+
+adapter python {
+  package "pyopenssl" {
+    sink method "use_privatekey_file" -> code.FilePathAccess
+    sink method "use_certificate_file" -> code.FilePathAccess
+    control method "load_verify_locations" -> core.InputValidation
+  }
+}

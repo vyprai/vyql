@@ -1,0 +1,5 @@
+adapter ruby {
+  package "sentry-raven" {
+    sink method "sys_command" -> code.CommandExecution
+  }
+}

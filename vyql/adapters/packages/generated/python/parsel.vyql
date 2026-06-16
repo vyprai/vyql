@@ -1,0 +1,9 @@
+import code.{ExpressionEval, XmlParse}
+adapter python {
+  package "parsel" {
+    sink method "jmespath" -> code.ExpressionEval
+    sink method "xpath" -> code.ExpressionEval
+    sink method "css" -> code.ExpressionEval
+    sink method "css2xpath" -> code.ExpressionEval
+  }
+}

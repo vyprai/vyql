@@ -1,0 +1,6 @@
+adapter php {
+  package "colinmollenhour/credis" {
+    sink method "rawCommand" -> code.NosqlQuery
+    control method "auth" -> core.AuthenticationCheck
+  }
+}

@@ -1,0 +1,6 @@
+import code.{SecretValue}
+adapter groovy {
+  package "com.google.cloud:google-cloud-storage" {
+    source method "signUrl" -> code.SecretValue
+  }
+}

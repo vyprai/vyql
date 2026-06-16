@@ -1,0 +1,5 @@
+adapter javascript {
+  package "is-path-in-cwd" {
+    control method "isPathInCwd" -> core.PathCanonicalization
+  }
+}

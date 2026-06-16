@@ -1,0 +1,5 @@
+adapter groovy {
+  package "net.sf.ezmorph:ezmorph" {
+    sink method "morph" -> code.Deserialization
+  }
+}

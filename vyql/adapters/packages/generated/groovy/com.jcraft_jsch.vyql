@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter groovy {
+  package "com.jcraft:jsch" {
+    sink method "setCommand" -> code.CommandExecution
+  }
+}

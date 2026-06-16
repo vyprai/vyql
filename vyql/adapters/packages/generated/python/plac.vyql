@@ -1,0 +1,9 @@
+import code.{CliArgument, CodeEval, Deserialization}
+adapter python {
+  package "plac" {
+    source method "call" -> code.CliArgument
+    sink method "import_main" -> code.CodeEval
+    sink method "execute" -> code.CodeEval
+    sink method "decode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "org.apache.xbean:xbean-spring" {
+    sink method "parse" -> code.Deserialization
+    source method "bind" -> core.UserControlledData
+    source method "rebind" -> core.UserControlledData
+    source method "unbind" -> core.UserControlledData
+  }
+}

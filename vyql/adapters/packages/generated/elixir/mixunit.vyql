@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter elixir {
+  package "mixunit" {
+    source method "Mix.Tasks.Eunit.run" -> code.CliArgument
+  }
+}

@@ -1,0 +1,5 @@
+adapter python {
+  package "lmdb" {
+    sink method "mdb_mid2l_insert" -> code.SqlExecution
+  }
+}

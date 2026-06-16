@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess, HtmlRender}
+adapter csharp {
+  package "fsreveal" {
+    sink method "GetPresentationFromScriptString" -> code.Deserialization
+    sink method "GetPresentationFromMarkdown" -> code.Deserialization
+    sink method "GenerateOutputFromScriptFile" -> code.FilePathAccess
+    sink method "GenerateOutputFromMarkdownFile" -> code.FilePathAccess
+    sink method "GenerateHTML" -> code.HtmlRender
+  }
+}

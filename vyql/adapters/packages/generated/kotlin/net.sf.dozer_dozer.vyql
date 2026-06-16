@@ -1,0 +1,8 @@
+import code.{XmlParse, UrlFetch, FilePathAccess}
+adapter kotlin {
+  package "net.sf.dozer:dozer" {
+    sink method "addMapping" -> code.XmlParse
+    sink method "setMappingFiles" -> code.UrlFetch
+    sink method "setMappingFiles" -> code.FilePathAccess
+  }
+}

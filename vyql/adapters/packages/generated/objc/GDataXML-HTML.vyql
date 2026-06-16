@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter objc {
+  package "GDataXML-HTML" {
+    sink method "initWithXMLString:error:" -> code.Deserialization
+    sink method "initWithHTMLString:error:" -> code.Deserialization
+    sink method "initWithXMLString:encoding:error:" -> code.Deserialization
+    sink method "initWithHTMLString:encoding:error:" -> code.Deserialization
+  }
+}

@@ -1,0 +1,17 @@
+import code.{HttpInput, ExpressionEval, FilePathAccess, ResponseHeaderWrite, HtmlRender}
+import core.{UserControlledData}
+
+adapter scala {
+  package "org.eclipse.jetty:jetty-servlet" {
+    source method "getPathInfo" -> core.UserControlledData
+    sink method "service" -> code.UrlFetch
+    sink method "service" -> code.ResponseHeaderWrite
+    sink method "service" -> code.HtmlRender
+    sink method "doGet" -> code.UrlFetch
+    sink method "doGet" -> code.ResponseHeaderWrite
+    sink method "doGet" -> code.HtmlRender
+    sink method "setInitParameter" -> code.ExpressionEval
+    sink method "setPathSpecs" -> code.FilePathAccess
+    sink method "addMappingForUrlPatterns" -> code.FilePathAccess
+  }
+}

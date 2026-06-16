@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter elixir {
+  package "pbkdf2_elixir" {
+    mark method "Pbkdf2.hash_pwd_salt" -> code.WeakHash
+    mark method "Pbkdf2.verify_pass" -> code.WeakHash
+  }
+}

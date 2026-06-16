@@ -1,0 +1,7 @@
+import core.{AuthenticationCheck}
+
+adapter perl {
+  package "Slauth" {
+    control method "Slauth::Storage::Session_DB::check_cookie" -> core.AuthenticationCheck
+  }
+}

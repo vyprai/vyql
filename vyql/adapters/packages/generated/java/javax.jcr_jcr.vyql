@@ -1,0 +1,11 @@
+adapter java {
+  package "javax.jcr:jcr" {
+    sink method "addNode" -> code.FilePathAccess
+    sink method "getNode" -> code.FilePathAccess
+    sink method "getProperty" -> code.FilePathAccess
+    sink method "hasNode" -> code.FilePathAccess
+    sink method "hasProperty" -> code.FilePathAccess
+    sink method "setProperty" -> code.StoredDataWrite
+    control method "impersonate" -> core.AuthenticationCheck
+  }
+}

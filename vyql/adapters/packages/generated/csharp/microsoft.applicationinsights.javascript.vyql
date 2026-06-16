@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter csharp {
+  package "microsoft.applicationinsights.javascript" {
+    sink method "RemoteDependencyData" -> code.NetworkSend
+    sink method "Sender" -> code.NetworkSend
+  }
+}

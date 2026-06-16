@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter scala {
+  package "net.sourceforge.htmlunit:htmlunit" {
+    sink method "eval" -> code.CodeEval
+  }
+}

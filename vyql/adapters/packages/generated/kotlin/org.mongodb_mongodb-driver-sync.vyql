@@ -1,0 +1,12 @@
+adapter kotlin {
+  package "org.mongodb:mongodb-driver-sync" {
+    sink method "runCommand" -> code.NosqlQuery
+    sink method "aggregate" -> code.NosqlQuery
+    sink method "find" -> code.NosqlQuery
+    sink method "insertMany" -> code.NosqlQuery
+    sink method "updateOne" -> code.NosqlQuery
+    sink method "updateMany" -> code.NosqlQuery
+    sink method "deleteOne" -> code.NosqlQuery
+    sink method "deleteMany" -> code.NosqlQuery
+  }
+}

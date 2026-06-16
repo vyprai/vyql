@@ -1,0 +1,6 @@
+import code.{CommandExecution, FilePathAccess}
+adapter elixir {
+  package "exrm" {
+    sink method "chmod" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+adapter objc {
+  package "AWSCloudWatch" {
+    sink method "testInvokePathWithQueryString" -> code.NosqlQuery
+    sink method "setUp" -> code.StoredDataWrite
+    source path "awscloudwatch.key" -> code.SecretValue
+  }
+}

@@ -1,0 +1,10 @@
+import code.{CodeEval}
+
+adapter ruby {
+  package "execjs" {
+    sink method "exec" -> code.CodeEval
+    sink method "eval" -> code.CodeEval
+    sink method "compile" -> code.CodeEval
+    sink method "call" -> code.CodeEval
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter dart {
+  package "video_player" {
+    sink method "fromSubRipString" -> code.Deserialization
+    sink method "fromWebVTTString" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/apparentlymart/go-textseg" {
+    sink method "AllTokens" -> code.Deserialization
+    sink method "ScanUTF8Sequences" -> code.Deserialization
+  }
+}

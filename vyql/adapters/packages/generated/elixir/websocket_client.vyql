@@ -1,0 +1,6 @@
+adapter elixir {
+  package "websocket_client" {
+    source method "connect" -> code.NetworkData
+    sink method "connect" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess, TemplateRender}
+adapter perl {
+  package "Mojolicious-Plugin-SassRenderer" {
+    sink method "register" -> code.FilePathAccess
+    sink method "register" -> code.TemplateRender
+  }
+}

@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter elixir {
+  package "ex_aws" {
+    sink method "parse" -> code.Deserialization
+    control method "sanitize" -> core.InputValidation
+  }
+}

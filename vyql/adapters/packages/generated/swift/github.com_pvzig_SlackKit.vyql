@@ -1,0 +1,19 @@
+import code.{NetworkSend, SecretValue, FileUse, NetworkConnect, NetworkData}
+import core.{AuthenticationCheck}
+
+adapter swift {
+  package "github.com/pvzig/SlackKit" {
+    source method "oauthAccess" -> code.SecretValue
+    control method "oauthAccess" -> core.AuthenticationCheck
+    control method "oauthRevoke" -> core.AuthenticationCheck
+    sink method "sendMessage" -> code.NetworkSend
+    sink method "sendThreadedMessage" -> code.NetworkSend
+    sink method "sendEphemeral" -> code.NetworkSend
+    sink method "sendMeMessage" -> code.NetworkSend
+    sink method "uploadFile" -> code.FileUse
+    sink method "uploadFile" -> code.NetworkSend
+    sink method "search" -> code.NetworkConnect
+    sink method "searchFiles" -> code.NetworkConnect
+    sink method "searchMessages" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,8 @@
+import code.{FilePathAccess, FileUpload}
+adapter php {
+  package "unisharp/laravel-filemanager" {
+    sink method "delete" -> code.FilePathAccess
+    sink method "move" -> code.FilePathAccess
+    mark method "upload" -> code.FileUpload
+  }
+}

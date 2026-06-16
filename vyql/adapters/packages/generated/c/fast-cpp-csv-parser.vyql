@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter c {
+  package "fast-cpp-csv-parser" {
+    sink method "LineReader" -> code.Deserialization
+    sink method "open_file" -> code.FilePathAccess
+  }
+}

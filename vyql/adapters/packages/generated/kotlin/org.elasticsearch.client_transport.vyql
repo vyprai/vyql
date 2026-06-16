@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter kotlin {
+  package "org.elasticsearch.client:transport" {
+    sink method "PreBuiltTransportClient" -> code.NetworkConnect
+  }
+}

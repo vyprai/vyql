@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "HTML-Data-Parser" {
+    sink method "parse" -> code.Deserialization
+  }
+}

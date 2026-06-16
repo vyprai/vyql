@@ -1,0 +1,13 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, InputValidation}
+
+adapter elixir {
+  package "coherence" {
+    control method "checkpw" -> core.AuthenticationCheck
+    control method "encrypt_password" -> core.AuthenticationCheck
+    control method "validate_password" -> core.InputValidation
+    control method "validate_current_password" -> core.InputValidation
+    control method "validate_coherence_password_reset" -> core.InputValidation
+    source method "user_token" -> code.SecretValue
+  }
+}

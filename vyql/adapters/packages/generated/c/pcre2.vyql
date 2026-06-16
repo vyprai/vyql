@@ -1,0 +1,7 @@
+import code.{RegexCompile, ExpressionEval}
+adapter c {
+  package "pcre2" {
+    mark method "pcre2_regcomp" -> code.RegexCompile
+    sink method "pcre2_regexec" -> code.ExpressionEval
+  }
+}

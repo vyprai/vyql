@@ -1,0 +1,12 @@
+import code.{ResponseHeaderWrite}
+import core.{UserControlledData}
+
+adapter perl {
+  package "WebDAO" {
+    source method "param" -> core.UserControlledData
+    source method "_parse_body" -> core.UserControlledData
+    source method "get_body" -> core.UserControlledData
+    source method "get_cookie" -> core.UserControlledData
+    sink method "print_headers" -> code.ResponseHeaderWrite
+  }
+}

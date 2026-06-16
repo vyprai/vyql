@@ -1,0 +1,14 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "unicode_set" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse!" -> code.Deserialization
+    sink method "parse_and_reduce" -> code.Deserialization
+    sink method "parse_and_reduce!" -> code.Deserialization
+    sink method "compile_pattern" -> code.Deserialization
+    sink method "compile_pattern!" -> code.Deserialization
+    sink method "compile" -> code.Deserialization
+    sink method "compile!" -> code.Deserialization
+  }
+}

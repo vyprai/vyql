@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter python {
+  package "flask-restful" {
+    source method "parse" -> core.UserControlledData
+    source method "parse_args" -> core.UserControlledData
+  }
+}

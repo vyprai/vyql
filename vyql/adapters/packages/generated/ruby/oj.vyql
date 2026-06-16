@@ -1,0 +1,5 @@
+adapter ruby {
+  package "oj" {
+    sink method "VALUE" -> code.Deserialization
+  }
+}

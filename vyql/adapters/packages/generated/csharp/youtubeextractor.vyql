@@ -1,0 +1,10 @@
+import code.{FilePathAccess, UrlFetch}
+import core.{UserControlledData}
+
+adapter csharp {
+  package "youtubeextractor" {
+    sink method "AudioDownloader.#ctor" -> code.FilePathAccess
+    sink method "VideoDownloader.#ctor" -> code.FilePathAccess
+    sink method "DownloadUrlResolver.GetDownloadUrls" -> code.UrlFetch
+  }
+}

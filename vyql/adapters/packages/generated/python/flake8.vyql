@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter python {
+  package "flake8" {
+    source method "parse_args" -> code.CliArgument
+  }
+}

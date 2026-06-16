@@ -1,0 +1,9 @@
+import code.{Deserialization, ExpressionEval}
+
+adapter swift {
+  package "github.com/adam-fowler/jmespath.swift" {
+    sink method "compile" -> code.ExpressionEval
+    sink method "search" -> code.Deserialization
+    sink method "fromJson" -> code.Deserialization
+  }
+}

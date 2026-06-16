@@ -1,0 +1,11 @@
+import code.{SecretValue}
+import core.{CsrfProtection}
+
+adapter kotlin {
+  package "org.springframework.security:spring-security-web" {
+    control method "CsrfFilter.doFilterInternal" -> core.CsrfProtection
+    control method "CsrfFilter.setRequireCsrfProtectionMatcher" -> core.CsrfProtection
+    control method "CsrfFilter.setRequestHandler" -> core.CsrfProtection
+    source method "CsrfToken.getToken" -> code.SecretValue
+  }
+}

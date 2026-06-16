@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter ruby {
+  package "mustermann" {
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.InputValidation
+    control method "unescape" -> core.InputValidation
+  }
+}

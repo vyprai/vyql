@@ -1,0 +1,7 @@
+adapter php {
+  package "cboden/ratchet" {
+    source method "onMessage" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "handleConnect" -> code.NetworkConnect
+  }
+}

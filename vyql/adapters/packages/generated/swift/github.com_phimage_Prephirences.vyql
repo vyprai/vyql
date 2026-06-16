@@ -1,0 +1,11 @@
+import code.{FileUse, SecretValue}
+
+adapter swift {
+  package "github.com/phimage/Prephirences" {
+    sink method "read" -> code.FileUse
+    source method "get" -> code.SecretValue
+    source method "object" -> code.SecretValue
+    source method "string" -> code.SecretValue
+    source method "data" -> code.SecretValue
+  }
+}

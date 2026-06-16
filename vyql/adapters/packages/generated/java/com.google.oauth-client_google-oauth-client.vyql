@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter java {
+  package "com.google.oauth-client:google-oauth-client" {
+    control method "escape" -> core.InputValidation
+    sink method "parse" -> code.Deserialization
+  }
+}

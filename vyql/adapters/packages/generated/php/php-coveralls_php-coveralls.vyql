@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter php {
+  package "php-coveralls/php-coveralls" {
+    sink method "SystemCommandExecutor.execute" -> code.CommandExecution
+  }
+}

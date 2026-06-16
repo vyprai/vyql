@@ -1,0 +1,10 @@
+import code.{Deserialization, HttpInput}
+
+adapter groovy {
+  package "org.springframework:spring-webflux" {
+    sink method "createDataBinder" -> code.Deserialization
+    sink method "WebExchangeDataBinder" -> code.Deserialization
+    source method "getHeaders" -> code.HttpInput
+    source method "getCookies" -> code.HttpInput
+  }
+}

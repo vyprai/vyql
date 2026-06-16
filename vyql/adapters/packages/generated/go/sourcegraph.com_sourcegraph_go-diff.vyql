@@ -1,0 +1,16 @@
+adapter go {
+  package "sourcegraph.com/sourcegraph/go-diff" {
+    sink method "ParseMultiFileDiff" -> code.Deserialization
+    sink method "ParseMultiFileDiffOptions" -> code.Deserialization
+    sink method "NewMultiFileDiffReader" -> code.Deserialization
+    sink method "NewMultiFileDiffReaderOptions" -> code.Deserialization
+    sink method "ParseFileDiff" -> code.Deserialization
+    sink method "ParseFileDiffOptions" -> code.Deserialization
+    sink method "NewFileDiffReader" -> code.Deserialization
+    sink method "NewFileDiffReaderOptions" -> code.Deserialization
+    sink method "ParseHunks" -> code.Deserialization
+    sink method "ParseHunksOptions" -> code.Deserialization
+    sink method "NewHunksReader" -> code.Deserialization
+    sink method "NewHunksReaderOptions" -> code.Deserialization
+  }
+}

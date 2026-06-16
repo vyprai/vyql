@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "double-conversion" {
+    sink method "StringToDouble" -> code.Deserialization
+    sink method "Strtod" -> code.Deserialization
+  }
+}

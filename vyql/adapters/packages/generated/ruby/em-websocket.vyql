@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter ruby {
+  package "em-websocket" {
+    source method "receive_data" -> code.NetworkData
+  }
+}

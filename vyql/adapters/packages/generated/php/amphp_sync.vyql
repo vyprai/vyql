@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter php {
+  package "amphp/sync" {
+    source method "Amp\Sync\Channel::receive" -> code.NetworkData
+    sink method "Amp\Sync\Channel::send" -> code.NetworkSend
+  }
+}

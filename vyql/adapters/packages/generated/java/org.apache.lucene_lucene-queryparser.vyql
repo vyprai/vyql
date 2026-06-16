@@ -1,0 +1,6 @@
+import code.{XmlParse}
+adapter java {
+  package "org.apache.lucene:lucene-queryparser" {
+    sink method "CoreParser.parse" -> code.XmlParse
+  }
+}

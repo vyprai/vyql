@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter c {
+  package "jansson" {
+    sink method "json_loads" -> code.Deserialization
+    sink method "json_dump_file" -> code.FilePathAccess
+  }
+}

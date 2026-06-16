@@ -1,0 +1,10 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter ruby {
+  package "rails_admin" {
+    control method "authenticate_with" -> core.AuthenticationCheck
+    control method "authorize_with" -> core.AuthorizationCheck
+    source method "current_user_method" -> code.SecretValue
+  }
+}

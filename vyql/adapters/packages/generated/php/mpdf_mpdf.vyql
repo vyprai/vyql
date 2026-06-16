@@ -1,0 +1,14 @@
+import code.{HtmlRender, RedirectTarget, HttpInput}
+adapter php {
+  package "mpdf/mpdf" {
+    sink method "print_ob_text" -> code.HtmlRender
+    sink method "print_ob_textarea" -> code.HtmlRender
+    sink method "print_ob_select" -> code.HtmlRender
+    sink method "print_ob_imageinput" -> code.HtmlRender
+    sink method "print_ob_button" -> code.HtmlRender
+    sink method "print_ob_checkbox" -> code.HtmlRender
+    sink method "print_ob_radio" -> code.HtmlRender
+    mark method "SetFormSubmit" -> code.RedirectTarget
+    source method "SetFormSubmit" -> code.HttpInput
+  }
+}

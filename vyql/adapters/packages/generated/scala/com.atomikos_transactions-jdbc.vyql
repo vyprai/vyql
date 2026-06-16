@@ -1,0 +1,11 @@
+import code.{UrlFetch, SecretValue, SqlExecution}
+
+adapter scala {
+  package "com.atomikos:transactions-jdbc" {
+    sink method "setUrl" -> code.UrlFetch
+    source method "getPassword" -> code.SecretValue
+    source method "setPassword" -> code.SecretValue
+    sink method "getTestQuery" -> code.SqlExecution
+    sink method "setTestQuery" -> code.SqlExecution
+  }
+}

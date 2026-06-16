@@ -1,0 +1,5 @@
+adapter elixir {
+  package "hammer_plug" {
+    control method "call" -> core.InputValidation
+  }
+}

@@ -1,0 +1,12 @@
+import code.{ArchiveEntryWrite, Deserialization, FilePathAccess}
+adapter kotlin {
+  package "org.zeroturnaround:zt-zip" {
+    sink method "unpackEntry" -> code.FilePathAccess
+    sink method "unpack" -> code.FilePathAccess
+    sink method "pack" -> code.ArchiveEntryWrite
+    sink method "addEntry" -> code.ArchiveEntryWrite
+    sink method "addFile" -> code.ArchiveEntryWrite
+    sink method "create" -> code.ArchiveEntryWrite
+    sink method "parse" -> code.Deserialization
+  }
+}

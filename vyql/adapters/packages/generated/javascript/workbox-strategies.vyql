@@ -1,0 +1,11 @@
+import code.{NetworkSend, StoredDataRead, StoredDataWrite}
+import core.{UserControlledData}
+
+adapter javascript {
+  package "workbox-strategies" {
+    source method "Strategy.prototype.handle" -> core.UserControlledData
+    sink method "StrategyHandler.prototype.fetch" -> code.NetworkSend
+    sink method "StrategyHandler.prototype.cachePut" -> code.StoredDataWrite
+    source method "StrategyHandler.prototype.cacheMatch" -> code.StoredDataRead
+  }
+}

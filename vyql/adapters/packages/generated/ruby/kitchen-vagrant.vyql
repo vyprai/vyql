@@ -1,0 +1,11 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "kitchen-vagrant" {
+    sink method "run" -> code.CommandExecution
+    sink method "encode_command" -> code.CommandExecution
+    sink method "wrap_command" -> code.CommandExecution
+    sink method "run_ps" -> code.CommandExecution
+    sink method "execute_command" -> code.CommandExecution
+  }
+}

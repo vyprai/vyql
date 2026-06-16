@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter perl {
+  package "Mojolicious-Plugin-PlackMiddleware" {
+    source method "psgi_env_to_mojo_req" -> core.UserControlledData
+  }
+}

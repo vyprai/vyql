@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter kotlin {
+  package "org.apache.activemq:activemq-all" {
+    source method "receiveBody" -> code.NetworkData
+    source method "receiveBodyNoWait" -> code.NetworkData
+  }
+}

@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter cpp {
+  package "lodepng" {
+    sink method "lodepng_decode_memory" -> code.Deserialization
+    sink method "lodepng_decode_file" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+    sink method "lodepng_encode_file" -> code.FilePathAccess
+    sink method "encode" -> code.FilePathAccess
+  }
+}

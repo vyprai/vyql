@@ -1,0 +1,9 @@
+import code.{NetworkBind, NetworkConnect, NetworkData, NetworkSend}
+adapter c {
+  package "tcp-pubsub" {
+    sink method "Publisher.publish" -> code.NetworkSend
+    sink method "Publisher.Publisher" -> code.NetworkBind
+    source method "Subscriber.Subscriber" -> code.NetworkData
+    sink method "Subscriber.Subscriber" -> code.NetworkConnect
+  }
+}

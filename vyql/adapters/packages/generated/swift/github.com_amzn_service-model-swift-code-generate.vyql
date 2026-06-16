@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter swift {
+  package "github.com/amzn/service-model-swift-code-generate" {
+    sink method "write" -> code.FilePathAccess
+  }
+}

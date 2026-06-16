@@ -1,0 +1,12 @@
+import code.{HttpInput}
+import core.{InputValidation}
+
+adapter php {
+  package "laravel/ui" {
+    source method "AuthenticatesUsers::login" -> code.HttpInput
+    source method "RegistersUsers::register" -> code.HttpInput
+    source method "ResetsPasswords::reset" -> code.HttpInput
+    source method "VerifiesEmails::verify" -> code.HttpInput
+    control method "AuthenticatesUsers::validateLogin" -> core.InputValidation
+  }
+}

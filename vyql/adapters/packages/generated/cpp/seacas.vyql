@@ -1,0 +1,8 @@
+adapter cpp {
+  package "seacas" {
+    sink method "find" -> code.SqlExecution
+    control method "Zoltan_Bind_Param" -> core.SqlParameterization
+    sink method "Open" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+  }
+}

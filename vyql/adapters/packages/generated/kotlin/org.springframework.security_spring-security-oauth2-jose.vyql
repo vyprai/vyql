@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter kotlin {
+  package "org.springframework.security:spring-security-oauth2-jose" {
+    control method "validateIssuer" -> core.InputValidation
+    sink method "decode" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

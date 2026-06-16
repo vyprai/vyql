@@ -1,0 +1,9 @@
+import code.{Deserialization, FilePathAccess}
+adapter c {
+  package "pe-parse" {
+    sink method "readFileToFileBuffer" -> code.FilePathAccess
+    sink method "ParsePEFromFile" -> code.Deserialization
+    sink method "ParsePEFromPointer" -> code.Deserialization
+    sink method "ParsePEFromBuffer" -> code.Deserialization
+  }
+}

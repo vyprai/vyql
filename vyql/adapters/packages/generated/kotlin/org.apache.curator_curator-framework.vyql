@@ -1,0 +1,8 @@
+import code.{PrivilegedOp, SecretValue}
+adapter kotlin {
+  package "org.apache.curator:curator-framework" {
+    mark method "getACL" -> code.PrivilegedOp
+    mark method "setACL" -> code.PrivilegedOp
+    source method "getAuth" -> code.SecretValue
+  }
+}

@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkBind, NetworkData, NetworkSend}
+
+adapter java {
+  package "io.netty:netty-transport" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "bind" -> code.NetworkBind
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+  }
+}

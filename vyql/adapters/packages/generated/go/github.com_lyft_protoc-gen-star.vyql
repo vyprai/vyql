@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess}
+adapter go {
+  package "github.com/lyft/protoc-gen-star" {
+    sink method "ProcessDescriptors" -> code.Deserialization
+    sink method "ProcessCodeGeneratorRequest" -> code.Deserialization
+    sink method "ProcessCodeGeneratorRequestBidirectional" -> code.Deserialization
+    sink method "ProcessFileDescriptorSet" -> code.Deserialization
+    sink method "ProcessFileDescriptorSetBidirectional" -> code.Deserialization
+    sink method "JoinPaths" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,11 @@
+import code.{TemplateRender}
+import core.{HtmlEscape}
+
+adapter scala {
+  package "com.samskivert:jmustache" {
+    sink method "compile" -> code.TemplateRender
+    control method "escapeHTML" -> core.HtmlEscape
+    control method "escape" -> core.HtmlEscape
+    sink method "parse" -> code.TemplateRender
+  }
+}

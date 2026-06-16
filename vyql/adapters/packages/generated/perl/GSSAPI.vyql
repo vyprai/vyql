@@ -1,0 +1,11 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter perl {
+  package "GSSAPI" {
+    control method "GSSAPI::init_sec_context" -> core.AuthenticationCheck
+    control method "GSSAPI::accept_sec_context" -> core.AuthenticationCheck
+    source method "GSSAPI::acquire_cred" -> code.SecretValue
+    source method "GSSAPI::add_cred" -> code.SecretValue
+  }
+}

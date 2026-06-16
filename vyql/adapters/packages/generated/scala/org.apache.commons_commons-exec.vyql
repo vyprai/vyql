@@ -1,0 +1,7 @@
+adapter scala {
+  package "org.apache.commons:commons-exec" {
+    source method "parse" -> core.UserControlledData
+    source method "addArgument" -> core.UserControlledData
+    source method "addArguments" -> core.UserControlledData
+  }
+}

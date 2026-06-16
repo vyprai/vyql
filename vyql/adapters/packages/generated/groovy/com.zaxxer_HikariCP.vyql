@@ -1,0 +1,12 @@
+import code.{SqlExecution, SecretValue}
+import core.{InputValidation}
+
+adapter groovy {
+  package "com.zaxxer:HikariCP" {
+    sink method "setJdbcUrl" -> code.SqlExecution
+    sink method "setConnectionInitSql" -> code.SqlExecution
+    sink method "setConnectionTestQuery" -> code.SqlExecution
+    source method "setPassword" -> code.SecretValue
+    control method "validate" -> core.InputValidation
+  }
+}

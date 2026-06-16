@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+adapter php {
+  package "way/generators" {
+    sink method "Way\Generators\Filesystem\Filesystem::file_put_contents" -> code.FilePathAccess
+    sink method "Way\Generators\Filesystem\Filesystem::file_exists" -> code.FilePathAccess
+    sink method "Way\Generators\Filesystem\Filesystem::get" -> code.FilePathAccess
+  }
+}

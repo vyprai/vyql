@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter go {
+  package "sigs.k8s.io/kustomize/kyaml" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseOpenAPI" -> code.Deserialization
+  }
+}

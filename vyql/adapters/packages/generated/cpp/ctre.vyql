@@ -1,0 +1,8 @@
+import code.{RegexCompile}
+adapter cpp {
+  package "ctre" {
+    mark method "exec" -> code.RegexCompile
+    mark method "match" -> code.RegexCompile
+    mark method "search" -> code.RegexCompile
+  }
+}

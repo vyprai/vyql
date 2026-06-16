@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter python {
+  package "jupyter-console" {
+    source method "parse_command_line" -> code.CliArgument
+  }
+}

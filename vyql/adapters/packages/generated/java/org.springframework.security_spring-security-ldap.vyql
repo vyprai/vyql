@@ -1,0 +1,9 @@
+import code.{LdapQuery}
+import core.{LdapEscape}
+
+adapter java {
+  package "org.springframework.security:spring-security-ldap" {
+    sink method "search" -> code.LdapQuery
+    control method "filterEncode" -> core.LdapEscape
+  }
+}

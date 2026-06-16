@@ -1,0 +1,5 @@
+adapter perl {
+  package "Acme-CPANModules-Parse-UnixShellCommandLine" {
+    source method "Acme::CPANModules::Parse::UnixShellCommandLine" -> code.CliArgument
+  }
+}

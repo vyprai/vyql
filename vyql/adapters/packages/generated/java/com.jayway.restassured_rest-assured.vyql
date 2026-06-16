@@ -1,0 +1,25 @@
+import code.{Deserialization, HttpInput, NetworkSend, SecretValue}
+
+adapter java {
+  package "com.jayway.restassured:rest-assured" {
+    source method "given" -> code.HttpInput
+    source method "when" -> code.HttpInput
+
+    sink method "get" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+    sink method "head" -> code.NetworkSend
+    sink method "patch" -> code.NetworkSend
+    sink method "options" -> code.NetworkSend
+
+    sink method "registerParser" -> code.Deserialization
+
+    source method "basic" -> code.SecretValue
+    source method "form" -> code.SecretValue
+    source method "certificate" -> code.SecretValue
+    source method "digest" -> code.SecretValue
+    source method "oauth" -> code.SecretValue
+    source method "oauth2" -> code.SecretValue
+  }
+}

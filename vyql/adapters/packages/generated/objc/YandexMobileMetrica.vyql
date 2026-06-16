@@ -1,0 +1,17 @@
+import core.{UserControlledData}
+import code.{UrlFetch}
+
+adapter objc {
+  package "YandexMobileMetrica" {
+    source method "handleOpenURL" -> core.UserControlledData
+    source method "reportReferralUrl" -> core.UserControlledData
+    source method "reportEvent:parameters:" -> core.UserControlledData
+    source method "reportError:exception:" -> core.UserControlledData
+    source method "setUserProfileID:" -> core.UserControlledData
+    source method "reportUserProfile:" -> core.UserControlledData
+    source method "initWithSearchQuery:" -> core.UserControlledData
+    source method "initWithPayload:" -> core.UserControlledData
+    source method "withValue:" -> core.UserControlledData
+    source method "withValueIfUndefined:" -> core.UserControlledData
+  }
+}

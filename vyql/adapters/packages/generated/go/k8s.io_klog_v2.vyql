@@ -1,0 +1,9 @@
+adapter go {
+  package "k8s.io/klog/v2" {
+    sink method "SetOutput" -> code.FileUse
+    sink method "SetOutputBySeverity" -> code.FileUse
+    sink method "create" -> code.FileUse
+    sink method "openOrCreate" -> code.FileUse
+    sink method "WriteKlogBuffer" -> code.FileUse
+  }
+}

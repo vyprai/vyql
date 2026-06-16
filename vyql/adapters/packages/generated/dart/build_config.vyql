@@ -1,0 +1,10 @@
+import code.{Deserialization}
+adapter dart {
+  package "build_config" {
+    sink path "BuildConfig.fromPackageDir" -> code.Deserialization
+    sink path "BuildConfig.fromBuildConfigDir" -> code.Deserialization
+    sink path "BuildTarget.fromJson" -> code.Deserialization
+    sink path "TargetBuilderConfig.fromJson" -> code.Deserialization
+    sink path "GlobalBuilderConfig.fromJson" -> code.Deserialization
+  }
+}

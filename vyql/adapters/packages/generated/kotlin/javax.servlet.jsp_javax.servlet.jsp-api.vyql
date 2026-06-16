@@ -1,0 +1,12 @@
+import code.{HttpInput, ExpressionEval, SessionId}
+import core.{InputValidation, UserControlledData}
+
+adapter kotlin {
+  package "javax.servlet.jsp:javax.servlet.jsp-api" {
+    control method "validate" -> core.InputValidation
+    source method "getRequestURI" -> core.UserControlledData
+    source method "getRequest" -> code.HttpInput
+    mark method "getSession" -> code.SessionId
+    sink method "getExpressionEvaluator" -> code.ExpressionEval
+  }
+}

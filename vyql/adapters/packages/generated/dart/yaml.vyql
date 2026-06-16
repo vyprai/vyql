@@ -1,0 +1,7 @@
+adapter dart {
+  package "yaml" {
+    source method "Token" -> code.SecretValue
+    sink method "File" -> code.FilePathAccess
+    sink method "load" -> code.Deserialization
+  }
+}

@@ -1,0 +1,14 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter php {
+  package "algolia/algoliasearch-client-php" {
+    sink method "customDelete" -> code.NetworkConnect
+    sink method "customDelete" -> code.NetworkSend
+    sink method "customGet" -> code.NetworkConnect
+    sink method "customGet" -> code.NetworkSend
+    sink method "customPost" -> code.NetworkConnect
+    sink method "customPost" -> code.NetworkSend
+    sink method "customPut" -> code.NetworkConnect
+    sink method "customPut" -> code.NetworkSend
+  }
+}

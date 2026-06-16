@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter scala {
+  package "org.springframework:spring-oxm" {
+    sink method "unmarshal" -> code.Deserialization
+    control method "setProcessExternalEntities" -> core.InputValidation
+  }
+}

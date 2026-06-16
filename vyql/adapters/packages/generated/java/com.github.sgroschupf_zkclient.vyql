@@ -1,0 +1,5 @@
+adapter java {
+  package "com.github.sgroschupf:zkclient" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

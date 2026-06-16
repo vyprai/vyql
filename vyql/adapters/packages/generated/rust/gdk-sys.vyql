@@ -1,0 +1,9 @@
+import code.{Deserialization, NetworkConnect}
+
+adapter rust {
+  package "gdk-sys" {
+    sink method "gdk_color_parse" -> code.Deserialization
+    sink method "gdk_rgba_parse" -> code.Deserialization
+    sink method "gdk_display_open" -> code.NetworkConnect
+  }
+}

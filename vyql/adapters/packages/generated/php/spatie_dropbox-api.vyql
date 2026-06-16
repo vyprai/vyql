@@ -1,0 +1,21 @@
+import code.{FilePathAccess, NetworkData, SecretValue, StoredDataRead}
+
+adapter php {
+  package "spatie/dropbox-api" {
+    sink method "copy" -> code.FilePathAccess
+    sink method "createFolder" -> code.FilePathAccess
+    sink method "createSharedLinkWithSettings" -> code.FilePathAccess
+    sink method "delete" -> code.FilePathAccess
+    sink method "download" -> code.FilePathAccess
+    sink method "downloadZip" -> code.FilePathAccess
+    sink method "getMetadata" -> code.FilePathAccess
+    sink method "getTemporaryLink" -> code.FilePathAccess
+    sink method "getThumbnail" -> code.FilePathAccess
+    sink method "listFolder" -> code.FilePathAccess
+    sink method "move" -> code.FilePathAccess
+    source method "search" -> code.StoredDataRead
+    sink method "upload" -> code.FilePathAccess
+    source method "upload" -> code.NetworkData
+    source method "revokeToken" -> code.SecretValue
+  }
+}

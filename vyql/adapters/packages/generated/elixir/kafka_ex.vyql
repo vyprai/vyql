@@ -1,0 +1,10 @@
+import code.{NetworkSend, NetworkData}
+import core.{AuthenticationCheck}
+
+adapter elixir {
+  package "kafka_ex" {
+    sink method "KafkaEx.Network.Socket.send" -> code.NetworkSend
+    source method "KafkaEx.Network.Socket.recv" -> code.NetworkData
+    control method "KafkaEx.Auth.Sasl.authenticate" -> core.AuthenticationCheck
+  }
+}

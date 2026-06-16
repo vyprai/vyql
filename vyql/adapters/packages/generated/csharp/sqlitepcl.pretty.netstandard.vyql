@@ -1,0 +1,13 @@
+import code.{SqlExecution}
+import core.{SqlParameterization}
+
+adapter csharp {
+  package "sqlitepcl.pretty.netstandard" {
+    sink method "Execute" -> code.SqlExecution
+    sink method "ExecuteAll" -> code.SqlExecution
+    sink method "Query" -> code.SqlExecution
+    sink method "PrepareAll" -> code.SqlExecution
+    sink method "PrepareStatement" -> code.SqlExecution
+    control method "Bind" -> core.SqlParameterization
+  }
+}

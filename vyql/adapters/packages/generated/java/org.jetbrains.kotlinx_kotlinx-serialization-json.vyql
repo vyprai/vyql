@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.jetbrains.kotlinx:kotlinx-serialization-json" {
+    sink method "decodeFromString" -> code.Deserialization
+    sink method "decodeFromJsonElement" -> code.Deserialization
+    sink method "parseToJsonElement" -> code.Deserialization
+  }
+}

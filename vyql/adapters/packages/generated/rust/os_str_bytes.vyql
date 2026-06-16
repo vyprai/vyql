@@ -1,0 +1,12 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "os_str_bytes" {
+    sink method "assert_from_raw_vec" -> code.Deserialization
+    sink method "from_raw_vec" -> code.Deserialization
+    sink method "assert_cow_from_raw_bytes" -> code.Deserialization
+    sink method "cow_from_raw_bytes" -> code.Deserialization
+    sink method "cow_from_raw_bytes_unchecked" -> code.Deserialization
+    sink method "from_raw_vec_unchecked" -> code.Deserialization
+  }
+}

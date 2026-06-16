@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter java {
+  package "com.squareup.retrofit2:converter-jackson" {
+    sink method "responseBodyConverter" -> code.Deserialization
+  }
+}

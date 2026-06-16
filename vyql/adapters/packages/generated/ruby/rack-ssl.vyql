@@ -1,0 +1,7 @@
+import code.{RedirectTarget, ResponseHeaderWrite}
+adapter ruby {
+  package "rack-ssl" {
+    mark method "redirect_to_https" -> code.RedirectTarget
+    sink method "flag_cookies_as_secure!" -> code.ResponseHeaderWrite
+  }
+}

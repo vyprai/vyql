@@ -1,0 +1,18 @@
+import code.{FilePathAccess, FileUse, FileUpload, ArchiveEntryWrite}
+import core.{PathCanonicalization}
+
+adapter python {
+  package "pyarrow" {
+    sink method "copy_files" -> code.FileUse
+    sink method "copy_file" -> code.FileUse
+    control method "normalize_path" -> core.PathCanonicalization
+    sink method "get_file_info" -> code.FilePathAccess
+    sink method "create_dir" -> code.FileUse
+    sink method "delete_dir" -> code.FileUse
+    sink method "delete_file" -> code.FileUse
+    sink method "open_input_stream" -> code.FileUse
+    sink method "open_input_file" -> code.FileUse
+    sink method "open_output_stream" -> code.FileUse
+    sink method "open_append_stream" -> code.FileUse
+  }
+}

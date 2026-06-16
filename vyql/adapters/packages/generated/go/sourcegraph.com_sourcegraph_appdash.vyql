@@ -1,0 +1,10 @@
+import code.{Deserialization, NetworkConnect}
+adapter go {
+  package "sourcegraph.com/sourcegraph/appdash" {
+    sink method "ParseID" -> code.Deserialization
+    sink method "parseJSONString" -> code.Deserialization
+    sink method "parseJSONInt" -> code.Deserialization
+    sink method "ParseSpanID" -> code.Deserialization
+    sink method "NewServer" -> code.NetworkConnect
+  }
+}

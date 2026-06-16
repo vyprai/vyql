@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter python {
+  package "mistune" {
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.HtmlEscape
+    control method "escape_url" -> core.HtmlEscape
+  }
+}

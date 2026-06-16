@@ -1,0 +1,9 @@
+import code.{FilePathAccess, FileUse, XmlParse}
+
+adapter python {
+  package "python-docx" {
+    sink method "docx.opc.package.OpcPackage.open" -> code.FilePathAccess
+    sink method "docx.document.Document.save" -> code.FileUse
+    sink method "docx.opc.oxml.parse_xml" -> code.XmlParse
+  }
+}

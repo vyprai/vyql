@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.hibernate:hibernate-core" {
+    sink method "query" -> code.SqlExecution
+    sink method "parse" -> code.Deserialization
+  }
+}

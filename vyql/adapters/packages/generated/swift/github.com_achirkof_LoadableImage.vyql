@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter swift {
+  package "github.com/achirkof/LoadableImage" {
+    sink method "publisher" -> code.UrlFetch
+  }
+}

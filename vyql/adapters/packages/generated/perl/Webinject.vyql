@@ -1,0 +1,17 @@
+import code.{UrlFetch, FilePathAccess, NetworkConnect, Deserialization}
+import core.{InputValidation}
+
+adapter perl {
+  package "Webinject" {
+    sink method "_httpget" -> code.UrlFetch
+    sink method "_httppost" -> code.UrlFetch
+    sink method "_httpdelete" -> code.UrlFetch
+    sink method "_httppost_form_urlencoded" -> code.UrlFetch
+    sink method "_httppost_xml" -> code.UrlFetch
+    sink method "_httppost_form_data" -> code.UrlFetch
+    sink method "_parseresponse" -> code.Deserialization
+    sink method "_read_config_xml" -> code.Deserialization
+    control method "_url_escape" -> core.InputValidation
+    sink method "unlink" -> code.FilePathAccess
+  }
+}

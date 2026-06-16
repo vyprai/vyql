@@ -1,0 +1,10 @@
+import code.{FilePathAccess, UrlFetch, NetworkConnect}
+
+adapter java {
+  package "org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven" {
+    sink method "loadPomFromFile" -> code.FilePathAccess
+    sink method "loadPomFromClassLoaderResource" -> code.FilePathAccess
+    sink method "resolve" -> code.NetworkConnect
+    sink method "resolve" -> code.FilePathAccess
+  }
+}

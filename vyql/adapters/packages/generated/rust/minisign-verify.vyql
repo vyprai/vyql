@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "minisign-verify" {
+    sink method "decode" -> code.Deserialization
+  }
+}

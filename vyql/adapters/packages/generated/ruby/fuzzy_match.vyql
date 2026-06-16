@@ -1,0 +1,8 @@
+import code.{RegexCompile}
+import core.{UserControlledData}
+
+adapter ruby {
+  package "fuzzy_match" {
+    source method "make" -> core.UserControlledData
+  }
+}

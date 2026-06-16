@@ -1,0 +1,6 @@
+adapter elixir {
+  package "tesla" {
+    sink method "request" -> code.UrlFetch
+    sink method "request!" -> code.UrlFetch
+  }
+}

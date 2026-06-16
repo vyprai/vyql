@@ -1,0 +1,7 @@
+import code.{WeakHash}
+adapter rust {
+  package "fnv" {
+    mark method "fnv1a" -> code.WeakHash
+    mark method "finish" -> code.WeakHash
+  }
+}

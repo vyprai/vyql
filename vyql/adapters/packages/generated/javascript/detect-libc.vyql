@@ -1,0 +1,11 @@
+import code.{CommandExecution, FilePathAccess}
+adapter javascript {
+  package "detect-libc" {
+    sink method "family" -> code.FilePathAccess
+    sink method "familySync" -> code.FilePathAccess
+    sink method "isNonGlibcLinux" -> code.FilePathAccess
+    sink method "isNonGlibcLinuxSync" -> code.FilePathAccess
+    sink method "version" -> code.FilePathAccess
+    sink method "versionSync" -> code.FilePathAccess
+  }
+}

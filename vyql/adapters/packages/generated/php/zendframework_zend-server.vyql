@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter php {
+  package "zendframework/zend-server" {
+    sink method "call_user_func_array" -> code.CodeEval
+  }
+}

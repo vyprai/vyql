@@ -1,0 +1,6 @@
+adapter java {
+  package "io.grpc:grpc-protobuf" {
+    sink method "marshaller" -> code.Deserialization
+    sink method "marshallerWithRecursionLimit" -> code.Deserialization
+  }
+}

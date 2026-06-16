@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter csharp {
+  package "xam.plugins.notifier" {
+    sink method "Show" -> code.HtmlRender
+  }
+}

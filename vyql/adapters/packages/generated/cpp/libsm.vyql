@@ -1,0 +1,6 @@
+import code.{SecretValue}
+adapter cpp {
+  package "libsm" {
+    source method "SmcOpenConnection" -> code.SecretValue
+  }
+}

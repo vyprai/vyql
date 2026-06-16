@@ -1,0 +1,8 @@
+adapter java {
+  package "io.dropwizard:dropwizard-core" {
+    source method "Cli.run" -> core.UserControlledData
+    source method "Command.configure" -> core.UserControlledData
+    source method "ConfiguredCommand.configure" -> core.UserControlledData
+    source method "SslReloadTask.execute" -> core.UserControlledData
+  }
+}

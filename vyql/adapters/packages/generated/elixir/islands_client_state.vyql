@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "islands_client_state" {
+    sink method "Islands.Client.State.parse" -> code.Deserialization
+  }
+}

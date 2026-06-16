@@ -1,0 +1,5 @@
+adapter php {
+  package "composer/spdx-licenses" {
+    control method "validate" -> core.InputValidation
+  }
+}

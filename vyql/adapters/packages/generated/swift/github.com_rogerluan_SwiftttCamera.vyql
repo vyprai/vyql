@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/rogerluan/SwiftttCamera" {
+    source method "photoOutput" -> core.UserControlledData
+  }
+}

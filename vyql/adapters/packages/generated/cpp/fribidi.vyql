@@ -1,0 +1,6 @@
+adapter cpp {
+  package "fribidi" {
+    sink method "fribidi_parse_charset" -> code.Deserialization
+    sink method "fribidi_charset_to_unicode" -> code.Deserialization
+  }
+}

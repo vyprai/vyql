@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter c {
+  package "ixwebsocket" {
+    sink method "parse" -> code.UrlFetch
+  }
+}

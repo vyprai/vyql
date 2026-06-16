@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter ruby {
+  package "tux" {
+    source method "Tux::Runner.parse_option" -> core.UserControlledData
+  }
+}

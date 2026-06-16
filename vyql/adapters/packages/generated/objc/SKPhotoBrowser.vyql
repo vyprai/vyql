@@ -1,0 +1,8 @@
+import code.{Deserialization, UrlFetch}
+
+adapter objc {
+  package "SKPhotoBrowser" {
+    sink method "animatedImageWithAnimatedGIFData:" -> code.Deserialization
+    sink method "animatedImageWithAnimatedGIFURL:" -> code.Deserialization
+  }
+}

@@ -1,0 +1,13 @@
+import code.{FilePathAccess, Deserialization}
+
+adapter cpp {
+  package "sentry-native" {
+    sink method "sentry_envelope_write_to_file" -> code.FilePathAccess
+    sink method "sentry_envelope_write_to_file_n" -> code.FilePathAccess
+    sink method "sentry_envelope_deserialize" -> code.Deserialization
+    sink method "sentry_envelope_read_from_file" -> code.FilePathAccess
+    sink method "sentry_envelope_read_from_file_n" -> code.FilePathAccess
+    sink method "sentry_envelope_read_from_filew" -> code.FilePathAccess
+    sink method "sentry_envelope_read_from_filew_n" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,8 @@
+import core.{InputValidation}
+adapter elixir {
+  package "oauth" {
+    control method "uri_encode" -> core.InputValidation
+    control method "uri_decode" -> core.InputValidation
+    control method "verify_in_constant_time" -> core.InputValidation
+  }
+}

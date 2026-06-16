@@ -1,0 +1,15 @@
+import code.{Deserialization, CodeEval, ExpressionEval}
+adapter kotlin {
+  package "com.google.protobuf:protobuf-java-util" {
+    sink method "merge" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    sink method "parseInt32" -> code.Deserialization
+    sink method "parseInt64" -> code.Deserialization
+    sink method "parseUint32" -> code.Deserialization
+    sink method "parseUint64" -> code.Deserialization
+    sink method "parseBool" -> code.Deserialization
+    sink method "parseFloat" -> code.Deserialization
+    sink method "parseDouble" -> code.Deserialization
+    sink method "parseString" -> code.Deserialization
+  }
+}

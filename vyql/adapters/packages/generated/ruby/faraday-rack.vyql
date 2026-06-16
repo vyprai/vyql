@@ -1,0 +1,7 @@
+import code.{HttpInput}
+adapter ruby {
+  package "faraday-rack" {
+    source method "call" -> code.HttpInput
+    sink method "execute_request" -> code.UrlFetch
+  }
+}

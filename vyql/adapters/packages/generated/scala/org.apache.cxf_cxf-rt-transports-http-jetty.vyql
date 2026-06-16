@@ -1,0 +1,11 @@
+import code.{HttpInput, NetworkSend}
+import core.{UserControlledData}
+
+adapter scala {
+  package "org.apache.cxf:cxf-rt-transports-http-jetty" {
+    source method "read" -> core.UserControlledData
+    source method "write" -> core.UserControlledData
+    source method "service" -> code.HttpInput
+    sink method "service" -> code.NetworkSend
+  }
+}

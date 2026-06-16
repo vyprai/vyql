@@ -1,0 +1,7 @@
+adapter rust {
+  package "filetime" {
+    sink method "set_file_times" -> code.FilePathAccess
+    sink method "set_symlink_file_times" -> code.FilePathAccess
+    sink method "open" -> code.FilePathAccess
+  }
+}

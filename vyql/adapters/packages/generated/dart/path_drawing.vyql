@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter dart {
+  package "path_drawing" {
+    sink method "parseSvgPathData" -> code.Deserialization
+  }
+}

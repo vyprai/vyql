@@ -1,0 +1,13 @@
+import code.{HttpInput}
+import core.{UserControlledData}
+
+adapter javascript {
+  package "ipaddr.js" {
+    source method "parse" -> core.UserControlledData
+    source method "parseCIDR" -> core.UserControlledData
+    source method "isValid" -> core.UserControlledData
+    source method "isValidCIDR" -> core.UserControlledData
+    source method "isValidFourPartDecimal" -> core.UserControlledData
+    source method "isValidCIDRFourPartDecimal" -> core.UserControlledData
+  }
+}

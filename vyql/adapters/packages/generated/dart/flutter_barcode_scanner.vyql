@@ -1,0 +1,5 @@
+adapter dart {
+  package "flutter_barcode_scanner" {
+    source method "scanBarcode" -> core.UserControlledData
+  }
+}

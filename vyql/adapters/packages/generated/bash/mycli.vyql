@@ -1,0 +1,6 @@
+adapter bash {
+  package "mycli" {
+    source path "mycli.argv" -> code.CliArgument
+    sink path "mycli" arg all -> code.SqlExecution
+  }
+}

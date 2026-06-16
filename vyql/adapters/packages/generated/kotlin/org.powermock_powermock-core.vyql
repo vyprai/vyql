@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.powermock:powermock-core" {
+    sink method "loadClass" -> code.CodeEval
+    sink method "defineClass" -> code.CodeEval
+  }
+}

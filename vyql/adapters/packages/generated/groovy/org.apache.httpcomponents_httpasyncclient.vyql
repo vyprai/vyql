@@ -1,0 +1,7 @@
+import code.{UrlFetch, NetworkSend}
+
+adapter groovy {
+  package "org.apache.httpcomponents:httpasyncclient" {
+    sink method "execute" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,7 @@
+import code.{XmlParse}
+
+adapter php {
+  package "symfony/config" {
+    sink method "parse" -> code.XmlParse
+  }
+}

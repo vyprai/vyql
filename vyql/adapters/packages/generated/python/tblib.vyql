@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter python {
+  package "tblib" {
+    sink method "unpickle_traceback" -> code.Deserialization
+    sink method "unpickle_exception_with_attrs" -> code.Deserialization
+    sink method "unpickle_exception" -> code.Deserialization
+    sink method "install" -> code.Deserialization
+  }
+}

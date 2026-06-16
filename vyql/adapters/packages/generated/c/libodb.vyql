@@ -1,0 +1,7 @@
+adapter c {
+  package "libodb" {
+    sink method "spawn" -> code.CommandExecution
+    sink method "delete" -> code.SqlExecution
+    control method "prepared_already_cached" -> core.SqlParameterization
+  }
+}

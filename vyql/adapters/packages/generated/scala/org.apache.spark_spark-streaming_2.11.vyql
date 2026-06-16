@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.apache.spark:spark-streaming_2.11" {
+    sink method "org.apache.spark.streaming.api.python.PythonDStream.loads" -> code.Deserialization
+    sink method "org.apache.spark.streaming.api.python.PythonTransformFunctionSerializer.deserialize" -> code.Deserialization
+    sink method "org.apache.spark.streaming.Checkpoint.deserialize" -> code.Deserialization
+    sink method "org.apache.spark.streaming.util.StateMap.readObjectInternal" -> code.Deserialization
+  }
+}

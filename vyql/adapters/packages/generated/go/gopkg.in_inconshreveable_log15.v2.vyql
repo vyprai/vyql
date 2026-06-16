@@ -1,0 +1,9 @@
+import code.{NetworkSend, FileUse, CodeEval}
+
+adapter go {
+  package "gopkg.in/inconshreveable/log15.v2" {
+    sink method "NetHandler" -> code.NetworkSend
+    sink method "FileHandler" -> code.FileUse
+    sink method "StreamHandler" -> code.CodeEval
+  }
+}

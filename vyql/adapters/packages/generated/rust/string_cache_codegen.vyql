@@ -1,0 +1,5 @@
+adapter rust {
+  package "string_cache_codegen" {
+    sink method "write_to_file" -> code.FileUse
+  }
+}

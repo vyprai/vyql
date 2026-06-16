@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "timeliness" {
+    sink method "Timeliness::Parser.parse" -> code.Deserialization
+  }
+}

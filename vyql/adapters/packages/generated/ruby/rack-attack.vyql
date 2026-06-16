@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter ruby {
+  package "rack-attack" {
+    control method "safelist" -> core.InputValidation
+    control method "blocklist" -> core.InputValidation
+    control method "throttle" -> core.InputValidation
+  }
+}

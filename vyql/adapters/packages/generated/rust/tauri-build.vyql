@@ -1,0 +1,20 @@
+import code.{CommandExecution, FilePathAccess}
+import core.{InputValidation, PathAccessCheck}
+
+adapter rust {
+  package "tauri-build" {
+    control method "permissions_path_pattern" -> core.PathAccessCheck
+    sink method "save_capabilities" -> code.FilePathAccess
+    sink method "save_acl_manifests" -> code.FilePathAccess
+    sink method "read_plugins_manifests" -> code.FilePathAccess
+    sink method "copy_file" -> code.FilePathAccess
+    sink method "copy_binaries" -> code.FilePathAccess
+    sink method "copy_resources" -> code.FilePathAccess
+    sink method "symlink_dir" -> code.FilePathAccess
+    sink method "symlink_file" -> code.FilePathAccess
+    sink method "copy_dir" -> code.FilePathAccess
+    sink method "copy_framework_from" -> code.FilePathAccess
+    sink method "copy_frameworks" -> code.FilePathAccess
+    sink method "config_path" -> code.FilePathAccess
+  }
+}

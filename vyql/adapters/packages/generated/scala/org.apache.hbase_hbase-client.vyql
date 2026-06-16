@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.apache.hbase:hbase-client" {
+    sink method "parseFrom" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{PrivilegedOp}
+
+adapter dart {
+  package "window_to_front" {
+    mark method "activate" -> code.PrivilegedOp
+  }
+}

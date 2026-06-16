@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter cpp {
+  package "cxxopts" {
+    source method "Options.parse" -> code.CliArgument
+  }
+}

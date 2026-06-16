@@ -1,0 +1,13 @@
+import code.{NetworkData}
+import core.{InputValidation}
+
+adapter elixir {
+  package "websock_adapter" {
+    source method "WebSockAdapter.upgrade" -> code.NetworkData
+    control method "WebSockAdapter.UpgradeValidation.validate_upgrade" -> core.InputValidation
+    control method "WebSockAdapter.UpgradeValidation.validate_upgrade!" -> core.InputValidation
+    source method "WebSockAdapter.CowboyAdapter.websocket_init" -> code.NetworkData
+    source method "WebSockAdapter.CowboyAdapter.websocket_handle" -> code.NetworkData
+    source method "WebSockAdapter.CowboyAdapter.websocket_info" -> code.NetworkData
+  }
+}

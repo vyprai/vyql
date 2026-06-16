@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter c {
+  package "xerces-c" {
+    sink method "SAXParser.parse" -> code.Deserialization
+  }
+}

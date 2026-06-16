@@ -1,0 +1,20 @@
+import code.{CliArgument, FilePathAccess, WeakHash}
+
+adapter cpp {
+  package "libvpx" {
+    source method "arg_parse_uint" -> code.CliArgument
+    source method "arg_parse_int" -> code.CliArgument
+    source method "arg_parse_rational" -> code.CliArgument
+    source method "arg_parse_enum" -> code.CliArgument
+    source method "arg_parse_enum_or_int" -> code.CliArgument
+
+    sink method "vpx_video_reader_open" -> code.FilePathAccess
+    sink method "vpx_video_reader_read_frame" -> code.FilePathAccess
+    sink method "vpx_video_reader_get_frame" -> code.FilePathAccess
+    sink method "ivf_read_frame" -> code.FilePathAccess
+    sink method "y4m_input_open" -> code.FilePathAccess
+    sink method "webm_read_frame" -> code.FilePathAccess
+
+    mark method "MD5Final" -> code.WeakHash
+  }
+}

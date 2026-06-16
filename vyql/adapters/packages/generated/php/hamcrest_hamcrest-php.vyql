@@ -1,0 +1,5 @@
+adapter php {
+  package "hamcrest/hamcrest-php" {
+    sink method "hasXPath" -> code.XmlParse
+  }
+}

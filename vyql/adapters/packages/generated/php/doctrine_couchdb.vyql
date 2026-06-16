@@ -1,0 +1,18 @@
+import code.{NetworkConnect, NetworkSend, UrlFetch, DatabaseRead, NosqlQuery}
+
+adapter php {
+  package "doctrine/couchdb" {
+    sink method "request" -> code.NetworkConnect
+    sink method "request" -> code.NetworkSend
+    sink method "request" -> code.UrlFetch
+    sink method "findDocument" -> code.DatabaseRead
+    sink method "findRevisions" -> code.DatabaseRead
+    sink method "findDocuments" -> code.DatabaseRead
+    sink method "allDocs" -> code.DatabaseRead
+    sink method "createViewQuery" -> code.DatabaseRead
+    sink method "replicate" -> code.NetworkConnect
+    sink method "replicate" -> code.NetworkSend
+    sink method "replicate" -> code.UrlFetch
+    sink method "find" -> code.NosqlQuery
+  }
+}

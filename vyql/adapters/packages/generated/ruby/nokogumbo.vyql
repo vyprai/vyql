@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "nokogumbo" {
+    sink method "parse" -> code.Deserialization
+  }
+}

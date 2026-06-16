@@ -1,0 +1,9 @@
+import code.{NetworkBind, NetworkConnect, NetworkData}
+
+adapter rust {
+  package "tokio-tcp" {
+    sink method "bind" -> code.NetworkBind
+    source method "accept" -> code.NetworkData
+    sink method "connect" -> code.NetworkConnect
+  }
+}

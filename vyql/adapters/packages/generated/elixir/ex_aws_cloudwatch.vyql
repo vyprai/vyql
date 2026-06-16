@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+adapter elixir {
+  package "ex_aws_cloudwatch" {
+    sink method "put_dashboard" -> code.NetworkSend
+    sink method "put_metric_alarm" -> code.NetworkSend
+    sink method "put_metric_data" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter rust {
+  package "rusty-fork" {
+    sink method "fork_impl" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,14 @@
+import code.{WeakHash}
+adapter cpp {
+  package "cityhash" {
+    mark method "CityHash64" -> code.WeakHash
+    mark method "CityHash64WithSeed" -> code.WeakHash
+    mark method "CityHash64WithSeeds" -> code.WeakHash
+    mark method "CityHash128" -> code.WeakHash
+    mark method "CityHash128WithSeed" -> code.WeakHash
+    mark method "CityHash32" -> code.WeakHash
+    mark method "CityHashCrc128" -> code.WeakHash
+    mark method "CityHashCrc128WithSeed" -> code.WeakHash
+    mark method "CityHashCrc256" -> code.WeakHash
+  }
+}

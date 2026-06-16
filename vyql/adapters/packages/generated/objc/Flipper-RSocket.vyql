@@ -1,0 +1,7 @@
+import code.{NetworkSend, Deserialization}
+adapter objc {
+  package "Flipper-RSocket" {
+    sink method "send" -> code.NetworkSend
+    sink method "parse" -> code.Deserialization
+  }
+}

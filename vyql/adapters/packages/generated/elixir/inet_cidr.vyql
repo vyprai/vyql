@@ -1,0 +1,10 @@
+import code.{Deserialization}
+adapter elixir {
+  package "inet_cidr" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_cidr" -> code.Deserialization
+    sink method "parse_cidr!" -> code.Deserialization
+    sink method "parse_address" -> code.Deserialization
+    sink method "parse_address!" -> code.Deserialization
+  }
+}

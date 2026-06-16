@@ -1,0 +1,6 @@
+adapter csharp {
+  package "microsoft.reportviewer.vs2015.winforms" {
+    sink method "LoadReportDefinition" -> code.Deserialization
+    sink method "LoadSubreportDefinition" -> code.Deserialization
+  }
+}

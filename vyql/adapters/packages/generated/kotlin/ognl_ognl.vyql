@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+adapter kotlin {
+  package "ognl:ognl" {
+    sink method "parseExpression" -> code.ExpressionEval
+    sink method "compileExpression" -> code.ExpressionEval
+  }
+}

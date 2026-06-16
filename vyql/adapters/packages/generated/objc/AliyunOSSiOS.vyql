@@ -1,0 +1,7 @@
+import code.{WeakHash}
+adapter objc {
+  package "AliyunOSSiOS" {
+    mark method "calBase64Sha1WithData" -> code.WeakHash
+    mark method "sha1WithString" -> code.WeakHash
+  }
+}

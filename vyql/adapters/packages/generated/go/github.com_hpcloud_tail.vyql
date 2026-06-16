@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/hpcloud/tail" {
+    sink method "TailFile" -> code.FilePathAccess
+    sink method "OpenFile" -> code.FilePathAccess
+  }
+}

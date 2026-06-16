@@ -1,0 +1,6 @@
+adapter elixir {
+  package "rocksdb" {
+    sink method "Get" -> code.NosqlQuery
+    sink method "Delete" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,8 @@
+import code.{UrlFetch}
+
+adapter php {
+  package "php-http/curl-client" {
+    sink method "sendRequest" -> code.UrlFetch
+    sink method "sendAsyncRequest" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,13 @@
+import core.{HtmlEscape, ShellEscape, InputValidation}
+adapter ruby {
+  package "escape" {
+    control method "shell_command" -> core.ShellEscape
+    control method "shell_single_word" -> core.ShellEscape
+    control method "uri_path" -> core.InputValidation
+    control method "uri_segment" -> core.InputValidation
+    control method "html_form_fast" -> core.HtmlEscape
+    control method "html_form" -> core.HtmlEscape
+    control method "html_text" -> core.HtmlEscape
+    control method "html_attr" -> core.HtmlEscape
+  }
+}

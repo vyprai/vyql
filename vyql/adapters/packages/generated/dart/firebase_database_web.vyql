@@ -1,0 +1,5 @@
+adapter dart {
+  package "firebase_database_web" {
+    sink method "Query" -> code.SqlExecution
+  }
+}

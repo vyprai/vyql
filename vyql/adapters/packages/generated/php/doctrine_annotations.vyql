@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "doctrine/annotations" {
+    sink method "parse" -> code.Deserialization
+  }
+}

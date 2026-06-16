@@ -1,0 +1,8 @@
+import code.{ExpressionEval}
+
+adapter scala {
+  package "javax.el:el-api" {
+    sink method "createValueExpression" -> code.ExpressionEval
+    sink method "createMethodExpression" -> code.ExpressionEval
+  }
+}

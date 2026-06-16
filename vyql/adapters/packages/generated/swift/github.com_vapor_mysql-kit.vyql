@@ -1,0 +1,8 @@
+import code.{Deserialization, NetworkConnect, SqlExecution, DatabaseRead}
+adapter swift {
+  package "github.com/vapor/mysql-kit" {
+    sink method "decode" -> code.Deserialization
+    sink method "makeConnection" -> code.NetworkConnect
+    sink method "database" -> code.DatabaseRead
+  }
+}

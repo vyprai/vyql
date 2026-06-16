@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "net.minidev:json-smart" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,10 @@
+import code.{NetworkBind, NetworkConnect, NetworkSend, NetworkData}
+
+adapter csharp {
+  package "clrzmq" {
+    sink method "Bind" -> code.NetworkBind
+    sink method "Connect" -> code.NetworkConnect
+    source method "Receive" -> code.NetworkData
+    sink method "Send" -> code.NetworkSend
+  }
+}

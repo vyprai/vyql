@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "raxx" {
+    sink method "parse_request" -> code.Deserialization
+  }
+}

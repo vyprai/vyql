@@ -1,0 +1,12 @@
+import code.{SqlExecution}
+
+adapter csharp {
+  package "npgsql" {
+    sink method "Npgsql.NpgsqlBatch.ExecuteReader" -> code.SqlExecution
+    sink method "Npgsql.NpgsqlBatch.ExecuteNonQuery" -> code.SqlExecution
+    sink method "Npgsql.NpgsqlBatch.ExecuteScalar" -> code.SqlExecution
+    sink method "Npgsql.NpgsqlCommand.ExecuteNonQuery" -> code.SqlExecution
+    sink method "Npgsql.NpgsqlCommand.ExecuteReader" -> code.SqlExecution
+    sink method "Npgsql.NpgsqlCommand.ExecuteScalar" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter python {
+  package "django-taggit" {
+    source method "parse_tags" -> core.UserControlledData
+  }
+}

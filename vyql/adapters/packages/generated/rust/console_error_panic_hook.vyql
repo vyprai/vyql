@@ -1,0 +1,7 @@
+import code.{LogOutput}
+adapter rust {
+  package "console_error_panic_hook" {
+    sink method "error" -> code.LogOutput
+    sink method "hook" -> code.LogOutput
+  }
+}

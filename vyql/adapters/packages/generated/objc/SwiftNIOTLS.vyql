@@ -1,0 +1,15 @@
+import code.{NetworkConnect, NetworkData, NetworkSend}
+adapter objc {
+  package "SwiftNIOTLS" {
+    sink method "connect" -> code.NetworkConnect
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+    sink method "writeAndFlush" -> code.NetworkSend
+    sink method "CNIOLinux_sendmmsg" -> code.NetworkSend
+    source method "CNIOLinux_recvmmsg" -> code.NetworkData
+    sink method "CNIODarwin_sendmmsg" -> code.NetworkSend
+    source method "CNIODarwin_recvmmsg" -> code.NetworkData
+    sink method "CNIOWindows_sendmmsg" -> code.NetworkSend
+    source method "CNIOWindows_recvmmsg" -> code.NetworkData
+  }
+}

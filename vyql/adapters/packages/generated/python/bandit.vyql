@@ -1,0 +1,7 @@
+import code.{CommandExecution, Deserialization}
+
+adapter python {
+  package "bandit" {
+    sink method "yaml_load" -> code.Deserialization
+  }
+}

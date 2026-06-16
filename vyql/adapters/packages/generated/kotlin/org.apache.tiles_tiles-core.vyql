@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "org.apache.tiles:tiles-core" {
+    sink method "read" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization, ArchiveEntryWrite, FilePathAccess}
+adapter cpp {
+  package "miniz" {
+    sink method "tinfl_decompress" -> code.Deserialization
+    sink method "mz_zip_extract_archive_file_to_heap" -> code.FilePathAccess
+  }
+}

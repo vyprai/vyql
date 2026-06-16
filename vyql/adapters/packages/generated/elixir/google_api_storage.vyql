@@ -1,0 +1,13 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter elixir {
+  package "google_api_storage" {
+    sink method "storage_objects_insert" -> code.StoredDataWrite
+    sink method "storage_objects_insert_iodata" -> code.StoredDataWrite
+    sink method "storage_objects_insert_resumable" -> code.StoredDataWrite
+    sink method "storage_objects_insert_simple" -> code.StoredDataWrite
+    source method "storage_objects_get" -> code.StoredDataRead
+    sink method "storage_buckets_insert" -> code.StoredDataWrite
+    source method "storage_buckets_get" -> code.StoredDataRead
+  }
+}

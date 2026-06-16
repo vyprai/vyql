@@ -1,0 +1,9 @@
+import code.{NetworkConnect, FileUse}
+adapter php {
+  package "symfony/polyfill-php83" {
+    sink method "ldap_exop_sync" -> code.NetworkConnect
+    sink method "ldap_connect_wallet" -> code.NetworkConnect
+    sink method "stream_context_set_options" -> code.NetworkConnect
+    sink method "stream_context_set_options" -> code.FileUse
+  }
+}

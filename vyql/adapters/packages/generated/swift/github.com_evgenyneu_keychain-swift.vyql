@@ -1,0 +1,10 @@
+import code.{SecretValue}
+
+adapter swift {
+  package "github.com/evgenyneu/keychain-swift" {
+    source method "set" -> code.SecretValue
+    source method "get" -> code.SecretValue
+    source method "getData" -> code.SecretValue
+    source method "getBool" -> code.SecretValue
+  }
+}

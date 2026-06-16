@@ -1,0 +1,5 @@
+adapter dart {
+  package "archive" {
+    sink method "open" -> code.FilePathAccess
+  }
+}

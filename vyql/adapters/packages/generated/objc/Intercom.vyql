@@ -1,0 +1,14 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck, UserControlledData}
+
+adapter objc {
+  package "Intercom" {
+    source method "setUserHash" -> code.SecretValue
+    source method "setUserJwt" -> code.SecretValue
+    source method "setAuthTokens" -> code.SecretValue
+    source method "loginUserWithUserAttributes" -> core.UserControlledData
+    source method "setDeviceToken" -> code.SecretValue
+    source method "searchHelpCenter" -> core.UserControlledData
+    source method "logEventWithName" -> core.UserControlledData
+  }
+}

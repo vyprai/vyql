@@ -1,0 +1,7 @@
+import code.{FileUse}
+
+adapter ruby {
+  package "ci_reporter" {
+    sink method "CI::Reporter::TestSuite.to_xml" -> code.FileUse
+  }
+}

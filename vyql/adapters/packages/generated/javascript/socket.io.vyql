@@ -1,0 +1,7 @@
+adapter javascript {
+  package "socket.io" {
+    source method "read" -> code.NetworkData
+    sink method "close" -> code.NetworkSend
+    sink method "on" -> code.NetworkConnect
+  }
+}

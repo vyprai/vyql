@@ -1,0 +1,9 @@
+import code.{FilePathAccess, ExpressionEval}
+adapter php {
+  package "arcanedev/log-viewer" {
+    sink method "Arcanedev\LogViewer\Helpers\LogParser::parse" -> code.ExpressionEval
+    sink method "Arcanedev\LogViewer\LogViewer::download" -> code.FilePathAccess
+    sink method "Arcanedev\LogViewer\Http\Controllers\LogViewerController::download" -> code.FilePathAccess
+    sink method "Arcanedev\LogViewer\Entities\Log::make" -> code.ExpressionEval
+  }
+}

@@ -1,0 +1,9 @@
+import code.{HttpInput, ResponseHeaderWrite}
+
+adapter javascript {
+  package "content-disposition" {
+    source method "parse" -> code.HttpInput
+    sink method "create" -> code.ResponseHeaderWrite
+    sink method "format" -> code.ResponseHeaderWrite
+  }
+}

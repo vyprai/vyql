@@ -1,0 +1,6 @@
+import code.{RegexCompile}
+adapter javascript {
+  package "html-comment-regex" {
+    mark method "module.exports" -> code.RegexCompile
+  }
+}

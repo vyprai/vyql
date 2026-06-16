@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "hypothesis" {
+    sink method "decode_failure" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter go {
+  package "github.com/Azure/go-autorest/autorest/adal" {
+    source method "OAuthToken" -> code.SecretValue
+    source method "SignJwt" -> code.SecretValue
+  }
+}

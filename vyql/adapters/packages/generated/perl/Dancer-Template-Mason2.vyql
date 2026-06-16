@@ -1,0 +1,6 @@
+import code.{TemplateRender}
+adapter perl {
+  package "Dancer-Template-Mason2" {
+    sink method "render" -> code.TemplateRender
+  }
+}

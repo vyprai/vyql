@@ -1,0 +1,17 @@
+import code.{CliArgument, HttpInput, NetworkData, ResponseHeaderWrite, Deserialization}
+import core.{HtmlEscape, InputValidation}
+
+adapter perl {
+  package "CGI" {
+    source method "new" -> code.HttpInput
+    source method "param" -> code.HttpInput
+    source method "param_fetch" -> code.HttpInput
+    sink method "parse" -> code.Deserialization
+    source method "new_MultipartBuffer" -> code.HttpInput
+    sink method "header" -> code.ResponseHeaderWrite
+    control method "escape" -> core.HtmlEscape
+    control method "escapeHTML" -> core.HtmlEscape
+    sink method "parse_params" -> code.Deserialization
+    sink method "parse_keywordlist" -> code.Deserialization
+  }
+}

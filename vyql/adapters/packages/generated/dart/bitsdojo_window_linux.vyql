@@ -1,0 +1,19 @@
+import code.{PrivilegedOp}
+adapter dart {
+  package "bitsdojo_window_linux" {
+    mark method "startWindowDrag" -> code.PrivilegedOp
+    mark method "startDragging" -> code.PrivilegedOp
+    mark method "start_window_drag_at_position" -> code.PrivilegedOp
+    mark method "setPosition" -> code.PrivilegedOp
+    mark method "setSize" -> code.PrivilegedOp
+    mark method "setRect" -> code.PrivilegedOp
+    mark method "setMinSize" -> code.PrivilegedOp
+    mark method "setMaxSize" -> code.PrivilegedOp
+    mark method "showWindow" -> code.PrivilegedOp
+    mark method "hideWindow" -> code.PrivilegedOp
+    mark method "minimizeWindow" -> code.PrivilegedOp
+    mark method "maximizeWindow" -> code.PrivilegedOp
+    mark method "unmaximizeWindow" -> code.PrivilegedOp
+    mark method "setWindowTitle" -> code.PrivilegedOp
+  }
+}

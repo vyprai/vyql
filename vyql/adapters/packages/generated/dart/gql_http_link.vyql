@@ -1,0 +1,7 @@
+import code.{Deserialization, NetworkSend}
+adapter dart {
+  package "gql_http_link" {
+    sink method "request" -> code.NetworkSend
+    sink method "_defaultHttpResponseDecode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter php {
+  package "namshi/jose" {
+    source method "JWS::load" -> core.UserControlledData
+  }
+}

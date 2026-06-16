@@ -1,0 +1,12 @@
+import code.{HttpInput, ResponseHeaderWrite}
+import core.{UserControlledData}
+
+adapter dart {
+  package "retrofit" {
+    source method "Path" -> core.UserControlledData
+    source method "Query" -> core.UserControlledData
+    source method "Headers" -> code.HttpInput
+    sink method "Headers" -> code.ResponseHeaderWrite
+    source method "Body" -> code.HttpInput
+  }
+}

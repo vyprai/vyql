@@ -1,0 +1,10 @@
+import code.{StoredDataRead, StoredDataWrite}
+adapter groovy {
+  package "org.apache.activemq:activemq-kahadb-store" {
+    source method "read" -> code.StoredDataRead
+    sink method "write" -> code.StoredDataWrite
+    sink method "addMessage" -> code.StoredDataWrite
+    sink method "removeMessage" -> code.StoredDataWrite
+    source method "recover" -> code.StoredDataRead
+  }
+}

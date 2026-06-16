@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter perl {
+  package "Cindy" {
+    sink method "parse_html_string" -> code.Deserialization
+    sink method "parse_xml_string" -> code.Deserialization
+    sink method "get_html_doc" -> code.FilePathAccess
+    sink method "get_xml_doc" -> code.FilePathAccess
+  }
+}

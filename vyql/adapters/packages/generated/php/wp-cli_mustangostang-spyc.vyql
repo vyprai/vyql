@@ -1,0 +1,11 @@
+import code.{Deserialization}
+adapter php {
+  package "wp-cli/mustangostang-spyc" {
+    sink method "load" -> code.Deserialization
+    sink method "loadFile" -> code.Deserialization
+    sink method "YAMLLoad" -> code.Deserialization
+    sink method "YAMLLoadString" -> code.Deserialization
+    sink method "spyc_load" -> code.Deserialization
+    sink method "spyc_load_file" -> code.Deserialization
+  }
+}

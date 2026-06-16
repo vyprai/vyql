@@ -1,0 +1,9 @@
+import code.{CodeEval}
+
+adapter dart {
+  package "flutter_sound_web" {
+    sink method "import" -> code.CodeEval
+    sink method "loadScript" -> code.CodeEval
+    sink method "loadScripts" -> code.CodeEval
+  }
+}

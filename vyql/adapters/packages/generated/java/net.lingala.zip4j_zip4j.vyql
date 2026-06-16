@@ -1,0 +1,16 @@
+import code.{FilePathAccess, ArchiveEntryWrite, FileUse}
+adapter java {
+  package "net.lingala.zip4j:zip4j" {
+    sink method "addFile" -> code.FilePathAccess
+    sink method "addFiles" -> code.FilePathAccess
+    sink method "addFolder" -> code.FilePathAccess
+    sink method "extractAll" -> code.FilePathAccess
+    sink method "extractFile" -> code.FilePathAccess
+    sink method "removeFile" -> code.FilePathAccess
+    sink method "removeFiles" -> code.FilePathAccess
+    sink method "renameFile" -> code.FilePathAccess
+    sink method "renameFiles" -> code.FilePathAccess
+    sink method "mergeSplitFiles" -> code.FilePathAccess
+    sink method "setComment" -> code.FileUse
+  }
+}

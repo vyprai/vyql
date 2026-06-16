@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "youtube_explode_dart" {
+    sink method "HlsManifest.parse" -> code.Deserialization
+  }
+}

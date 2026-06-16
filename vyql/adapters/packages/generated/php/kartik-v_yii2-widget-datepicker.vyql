@@ -1,0 +1,7 @@
+import code.{Deserialization, HtmlRender}
+adapter php {
+  package "kartik-v/yii2-widget-datepicker" {
+    sink method "DatePicker::parseMarkup" -> code.Deserialization
+    sink method "DatePicker::renderInput" -> code.HtmlRender
+  }
+}

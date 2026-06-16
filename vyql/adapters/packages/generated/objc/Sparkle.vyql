@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter objc {
+  package "Sparkle" {
+    sink method "setFeedURL" -> code.UrlFetch
+  }
+}

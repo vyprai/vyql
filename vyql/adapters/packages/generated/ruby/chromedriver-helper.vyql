@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "chromedriver-helper" {
+    sink method "run" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,21 @@
+import core.{HtmlEscape, InputValidation, XmlHardening}
+
+adapter scala {
+  package "org.apache.commons:commons-text" {
+    control method "escapeCsv" -> core.InputValidation
+    control method "escapeEcmaScript" -> core.InputValidation
+    control method "escapeHtml4" -> core.HtmlEscape
+    control method "escapeHtml3" -> core.HtmlEscape
+    control method "escapeJava" -> core.InputValidation
+    control method "escapeJson" -> core.InputValidation
+    control method "escapeXml10" -> core.XmlHardening
+    control method "escapeXml11" -> core.XmlHardening
+    control method "unescapeCsv" -> core.InputValidation
+    control method "unescapeEcmaScript" -> core.InputValidation
+    control method "unescapeHtml4" -> core.HtmlEscape
+    control method "unescapeHtml3" -> core.HtmlEscape
+    control method "unescapeJava" -> core.InputValidation
+    control method "unescapeJson" -> core.InputValidation
+    control method "unescapeXml" -> core.XmlHardening
+  }
+}

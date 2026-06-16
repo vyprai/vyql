@@ -1,0 +1,18 @@
+import code.{CommandExecution, NetworkConnect, NetworkData, NetworkSend, WeakHash}
+import core.{AuthenticationCheck}
+
+adapter csharp {
+  package "system.net.ftpclient" {
+    sink method "Connect" -> code.NetworkConnect
+    sink method "BeginConnect" -> code.NetworkConnect
+    sink method "EndConnect" -> code.NetworkConnect
+    control method "Authenticate" -> core.AuthenticationCheck
+    source method "OpenRead" -> code.NetworkData
+    source method "BeginOpenRead" -> code.NetworkData
+    source method "EndOpenRead" -> code.NetworkData
+    sink method "OpenWrite" -> code.NetworkSend
+    sink method "BeginOpenWrite" -> code.NetworkSend
+    sink method "EndOpenWrite" -> code.NetworkSend
+    mark method "GetMD5" -> code.WeakHash
+  }
+}

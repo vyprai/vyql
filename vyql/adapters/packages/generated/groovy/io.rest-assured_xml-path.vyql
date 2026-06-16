@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "io.rest-assured:xml-path" {
+    sink method "XmlPath" -> code.Deserialization
+    sink method "get" -> code.Deserialization
+    sink method "getList" -> code.Deserialization
+    sink method "getMap" -> code.Deserialization
+    sink method "getObject" -> code.Deserialization
+  }
+}

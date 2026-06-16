@@ -1,0 +1,11 @@
+import code.{SqlExecution}
+import core.{SqlParameterization}
+
+adapter groovy {
+  package "jakarta.persistence:jakarta.persistence-api" {
+    sink method "executeUpdate" -> code.SqlExecution
+    sink method "createQuery" -> code.SqlExecution
+    sink method "createNamedQuery" -> code.SqlExecution
+    control method "setParameter" -> core.SqlParameterization
+  }
+}

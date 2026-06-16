@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter rust {
+  package "ahash" {
+    mark method "write" -> code.WeakHash
+    mark method "finish" -> code.WeakHash
+  }
+}

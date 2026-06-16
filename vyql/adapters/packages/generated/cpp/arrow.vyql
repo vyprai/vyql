@@ -1,0 +1,6 @@
+adapter cpp {
+  package "arrow" {
+    sink method "Decode" -> code.Deserialization
+    mark method "Compress" -> code.WeakHash
+  }
+}

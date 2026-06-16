@@ -1,0 +1,9 @@
+import code.{SqlExecution, FilePathAccess}
+
+adapter swift {
+  package "github.com/garriguv/SQLiteMigrationManager.swift" {
+    sink method "migrateDatabase" -> code.SqlExecution
+    sink method "createMigrationsTable" -> code.SqlExecution
+    sink method "init" -> code.FilePathAccess
+  }
+}

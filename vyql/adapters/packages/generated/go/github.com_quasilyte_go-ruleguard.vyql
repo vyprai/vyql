@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/quasilyte/go-ruleguard" {
+    sink method "Read" -> code.FilePathAccess
+    sink method "Parse" -> code.Deserialization
+  }
+}

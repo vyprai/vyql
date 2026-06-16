@@ -1,0 +1,17 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.springframework:spring-webmvc-portlet" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseInt" -> code.Deserialization
+    sink method "parseInts" -> code.Deserialization
+    sink method "parseLong" -> code.Deserialization
+    sink method "parseLongs" -> code.Deserialization
+    sink method "parseFloat" -> code.Deserialization
+    sink method "parseFloats" -> code.Deserialization
+    sink method "parseDouble" -> code.Deserialization
+    sink method "parseDoubles" -> code.Deserialization
+    sink method "parseBoolean" -> code.Deserialization
+    sink method "parseBooleans" -> code.Deserialization
+  }
+}

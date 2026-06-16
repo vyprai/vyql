@@ -1,0 +1,5 @@
+adapter java {
+  package "org.apache.solr:solr-solrj" {
+    sink method "query" -> code.SqlExecution
+  }
+}

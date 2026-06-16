@@ -1,0 +1,5 @@
+adapter bash {
+  package "zoxide" {
+    sink path "zoxide" arg all -> code.FilePathAccess
+  }
+}

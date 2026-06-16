@@ -1,0 +1,6 @@
+import code.{CommandExecution, FileUse}
+adapter ruby {
+  package "fog-vmfusion" {
+    sink method "scp" -> code.FileUse
+  }
+}

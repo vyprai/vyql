@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+adapter scala {
+  package "org.hibernate:hibernate-envers" {
+    sink method "createQuery" -> code.SqlExecution
+    sink method "add" -> code.SqlExecution
+    sink method "addProjection" -> code.SqlExecution
+    sink method "addOrder" -> code.SqlExecution
+  }
+}

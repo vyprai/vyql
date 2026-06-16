@@ -1,0 +1,9 @@
+import code.{HttpInput}
+
+adapter kotlin {
+  package "org.apache.cxf:cxf-rt-transports-http" {
+    source method "read" -> code.HttpInput
+    source method "readFromConnection" -> code.HttpInput
+    source method "readFromHeaders" -> code.HttpInput
+  }
+}

@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+adapter perl {
+  package "DBIx-Class" {
+    sink method "connect" -> code.SqlExecution
+    sink method "connection" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,6 @@
+adapter csharp {
+  package "mlkpwgen" {
+    mark method "MlkPwgen.PasswordGenerator.Generate" -> code.WeakRandomValue
+    mark method "MlkPwgen.PasswordGenerator.GenerateComplex" -> code.WeakRandomValue
+  }
+}

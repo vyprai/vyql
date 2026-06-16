@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter kotlin {
+  package "org.springframework.data:spring-data-elasticsearch" {
+    sink method "parse" -> code.NetworkConnect
+  }
+}

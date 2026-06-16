@@ -1,0 +1,13 @@
+import code.{UrlFetch}
+
+adapter objc {
+  package "UIActivityIndicator-for-SDWebImage" {
+    sink method "setImageWithURL:usingActivityIndicatorStyle:" -> code.UrlFetch
+    sink method "setImageWithURL:placeholderImage:usingActivityIndicatorStyle:" -> code.UrlFetch
+    sink method "setImageWithURL:placeholderImage:options:usingActivityIndicatorStyle:" -> code.UrlFetch
+    sink method "setImageWithURL:completed:usingActivityIndicatorStyle:" -> code.UrlFetch
+    sink method "setImageWithURL:placeholderImage:completed:usingActivityIndicatorStyle:" -> code.UrlFetch
+    sink method "setImageWithURL:placeholderImage:options:completed:usingActivityIndicatorStyle:" -> code.UrlFetch
+    sink method "setImageWithURL:placeholderImage:options:progress:completed:usingActivityIndicatorStyle:" -> code.UrlFetch
+  }
+}

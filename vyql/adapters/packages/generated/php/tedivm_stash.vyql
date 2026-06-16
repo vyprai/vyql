@@ -1,0 +1,10 @@
+import code.{StoredDataWrite}
+import core.{UserControlledData, AuthorizationCheck}
+
+adapter php {
+  package "tedivm/stash" {
+    source method "read" -> core.UserControlledData
+    sink method "write" -> code.StoredDataWrite
+    control method "session_set_save_handler" -> core.AuthorizationCheck
+  }
+}

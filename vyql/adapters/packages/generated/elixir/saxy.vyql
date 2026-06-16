@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "saxy" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_string" -> code.Deserialization
+    sink method "parse_stream" -> code.Deserialization
+  }
+}

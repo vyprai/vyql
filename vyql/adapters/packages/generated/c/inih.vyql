@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess}
+adapter c {
+  package "inih" {
+    sink method "ini_parse" -> code.Deserialization
+    sink method "ini_parse_file" -> code.Deserialization
+    sink method "ini_parse_stream" -> code.Deserialization
+    sink method "ini_parse_string" -> code.Deserialization
+    sink method "ini_parse_string_length" -> code.Deserialization
+    sink method "INIReader" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter objc {
+  package "GoogleUserMessagingPlatform" {
+    source method "requestConsentInfoUpdateWithParameters" -> core.UserControlledData
+  }
+}

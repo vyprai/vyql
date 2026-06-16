@@ -1,0 +1,5 @@
+adapter rust {
+  package "serde_yaml" {
+    sink method "new" -> code.Deserialization
+  }
+}

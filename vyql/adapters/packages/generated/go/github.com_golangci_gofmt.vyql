@@ -1,0 +1,12 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter go {
+  package "github.com/golangci/gofmt" {
+    sink method "Source" -> code.Deserialization
+    sink method "parseExpression" -> code.Deserialization
+    sink method "processFile" -> code.FilePathAccess
+    sink method "readFile" -> code.FilePathAccess
+    sink method "writeFile" -> code.FilePathAccess
+    sink method "backupFile" -> code.FilePathAccess
+  }
+}

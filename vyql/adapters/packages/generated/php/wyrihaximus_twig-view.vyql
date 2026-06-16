@@ -1,0 +1,7 @@
+import code.{FilePathAccess, Deserialization}
+adapter php {
+  package "wyrihaximus/twig-view" {
+    sink method "file_get_contents" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+  }
+}

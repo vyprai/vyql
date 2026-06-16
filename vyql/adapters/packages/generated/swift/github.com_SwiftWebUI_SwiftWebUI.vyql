@@ -1,0 +1,9 @@
+import code.{HtmlRender, NetworkBind, NetworkSend}
+
+adapter swift {
+  package "github.com/SwiftWebUI/SwiftWebUI" {
+    sink method "listen" -> code.NetworkBind
+    sink method "send" -> code.NetworkSend
+    sink method "init" -> code.HtmlRender
+  }
+}

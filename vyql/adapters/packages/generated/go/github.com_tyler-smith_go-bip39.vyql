@@ -1,0 +1,11 @@
+import code.{SecretValue}
+adapter go {
+  package "github.com/tyler-smith/go-bip39" {
+    source method "NewEntropy" -> code.SecretValue
+    source method "NewMnemonic" -> code.SecretValue
+    source method "EntropyFromMnemonic" -> code.SecretValue
+    source method "MnemonicToByteArray" -> code.SecretValue
+    source method "NewSeed" -> code.SecretValue
+    source method "NewSeedWithErrorChecking" -> code.SecretValue
+  }
+}

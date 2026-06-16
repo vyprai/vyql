@@ -1,0 +1,10 @@
+import code.{FilePathAccess, UrlFetch}
+import core.{UserControlledData}
+
+adapter dart {
+  package "video_thumbnail" {
+    sink method "thumbnailFile" -> code.UrlFetch
+    sink method "thumbnailData" -> code.UrlFetch
+    sink method "thumbnailFile" -> code.FilePathAccess
+  }
+}

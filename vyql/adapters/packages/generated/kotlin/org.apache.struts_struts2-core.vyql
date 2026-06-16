@@ -1,0 +1,14 @@
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "org.apache.struts:struts2-core" {
+    source method "withParameters" -> code.HttpInput
+    source method "getParameters" -> code.HttpInput
+    mark method "withSession" -> code.SessionId
+    mark method "getSession" -> code.SessionId
+    source method "withServletRequest" -> code.HttpInput
+    source method "getServletRequest" -> code.HttpInput
+    sink method "withServletResponse" -> code.ResponseHeaderWrite
+    sink method "getServletResponse" -> code.ResponseHeaderWrite
+  }
+}

@@ -1,0 +1,6 @@
+adapter groovy {
+  package "com.google.protobuf:protobuf-java-util" {
+    sink method "merge" -> code.Deserialization
+    source method "parse" -> core.UserControlledData
+  }
+}

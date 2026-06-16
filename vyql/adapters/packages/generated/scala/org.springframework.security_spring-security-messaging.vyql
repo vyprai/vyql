@@ -1,0 +1,7 @@
+import core.{CsrfProtection}
+
+adapter scala {
+  package "org.springframework.security:spring-security-messaging" {
+    control method "preSend" -> core.CsrfProtection
+  }
+}

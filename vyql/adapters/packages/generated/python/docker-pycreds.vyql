@@ -1,0 +1,8 @@
+import code.{CommandExecution, SecretValue}
+
+adapter python {
+  package "docker-pycreds" {
+    source method "Store.get" -> code.SecretValue
+    source method "Store.store" -> code.SecretValue
+  }
+}

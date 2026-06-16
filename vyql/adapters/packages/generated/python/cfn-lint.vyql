@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "cfn-lint" {
+    sink method "loads" -> code.Deserialization
+  }
+}

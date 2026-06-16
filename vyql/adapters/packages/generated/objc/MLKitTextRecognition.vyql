@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter objc {
+  package "MLKitTextRecognition" {
+    source method "textRecognizer" -> core.UserControlledData
+  }
+}

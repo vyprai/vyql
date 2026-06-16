@@ -1,0 +1,12 @@
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter java {
+  package "org.eclipse.jetty:jetty-security" {
+    control method "login" -> core.AuthenticationCheck
+    control method "validate" -> core.AuthenticationCheck
+    control method "validateRequest" -> core.AuthenticationCheck
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "isAuthorized" -> core.AuthorizationCheck
+    control method "handle" -> core.AuthorizationCheck
+  }
+}

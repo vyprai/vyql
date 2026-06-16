@@ -1,0 +1,10 @@
+import code.{NetworkSend, CleartextChannel}
+import core.{AuthenticationCheck}
+
+adapter go {
+  package "contrib.go.opencensus.io/exporter/ocagent" {
+    sink method "WithHeaders" -> code.NetworkSend
+    mark method "WithInsecure" -> code.CleartextChannel
+    control method "WithTLSCredentials" -> core.AuthenticationCheck
+  }
+}

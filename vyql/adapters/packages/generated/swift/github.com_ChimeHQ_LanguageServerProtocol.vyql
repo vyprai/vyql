@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/ChimeHQ/LanguageServerProtocol" {
+    sink method "parsePlaceholderValue" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+adapter scala {
+  package "io.appium:java-client" {
+    sink method "pullFile" -> code.FilePathAccess
+    sink method "pushFile" -> code.FilePathAccess
+  }
+}

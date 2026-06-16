@@ -1,0 +1,7 @@
+import code.{CliArgument}
+adapter rust {
+  package "clap_lex" {
+    source method "RawArgs.from_args" -> code.CliArgument
+    source method "RawArgs.new" -> code.CliArgument
+  }
+}

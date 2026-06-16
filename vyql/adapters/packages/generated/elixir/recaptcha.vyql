@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter elixir {
+  package "recaptcha" {
+    sink method "Recaptcha.verify" -> code.NetworkSend
+  }
+}

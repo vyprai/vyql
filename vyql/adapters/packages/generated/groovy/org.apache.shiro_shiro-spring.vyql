@@ -1,0 +1,7 @@
+adapter groovy {
+  package "org.apache.shiro:shiro-spring" {
+    mark method "setLoginUrl" -> code.RedirectTarget
+    mark method "setSuccessUrl" -> code.RedirectTarget
+    mark method "setUnauthorizedUrl" -> code.RedirectTarget
+  }
+}

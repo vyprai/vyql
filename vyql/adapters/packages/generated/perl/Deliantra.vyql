@@ -1,0 +1,8 @@
+import code.{FileUse, FilePathAccess}
+
+adapter perl {
+  package "Deliantra" {
+    sink method "new_from_file" -> code.FilePathAccess
+    sink method "write_file" -> code.FileUse
+  }
+}

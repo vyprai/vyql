@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "weezl" {
+    sink method "decode_bytes" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+    sink method "decode_all" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{FilePathAccess, UrlFetch}
+
+adapter python {
+  package "sphinxcontrib-devhelp" {
+    sink method "build_devhelp" -> code.FilePathAccess
+    sink method "write_toc" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,12 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter python {
+  package "stripe" {
+    sink method "request" -> code.NetworkConnect
+    sink method "request" -> code.NetworkSend
+    source method "handle_error_response" -> code.NetworkData
+    source method "specific_v2_api_error" -> code.NetworkData
+    source method "specific_v1_api_error" -> code.NetworkData
+    source method "specific_oauth_error" -> code.NetworkData
+  }
+}

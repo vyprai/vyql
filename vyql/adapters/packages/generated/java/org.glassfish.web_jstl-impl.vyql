@@ -1,0 +1,15 @@
+import code.{Deserialization, SqlExecution, CodeEval, FilePathAccess, NetworkConnect, NetworkSend}
+import core.{HtmlEscape, InputValidation}
+
+adapter java {
+  package "org.glassfish.web:jstl-impl" {
+    sink method "setXml" -> code.Deserialization
+    sink method "setSystemId" -> code.FilePathAccess
+    sink method "compile" -> code.Deserialization
+    sink method "setSql" -> code.SqlExecution
+    sink method "parseExpressionString" -> code.CodeEval
+    sink method "parseAndRender" -> code.CodeEval
+    control method "setEscapeXml" -> core.InputValidation
+    source method "setStartRow" -> core.UserControlledData
+  }
+}

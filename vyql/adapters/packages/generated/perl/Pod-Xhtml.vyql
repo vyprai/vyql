@@ -1,0 +1,13 @@
+import core.{HtmlEscape}
+import code.{Deserialization, HtmlRender}
+
+adapter perl {
+  package "Pod-Xhtml" {
+    sink method "parse_from_file" -> code.Deserialization
+    sink method "parse_from_filehandle" -> code.Deserialization
+    control method "_htmlEscape" -> core.HtmlEscape
+    sink method "addHeadText" -> code.HtmlRender
+    sink method "addBodyOpenText" -> code.HtmlRender
+    sink method "addBodyCloseText" -> code.HtmlRender
+  }
+}

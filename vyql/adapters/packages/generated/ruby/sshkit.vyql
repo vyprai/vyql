@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "sshkit" {
+    sink method "execute_command" -> code.CommandExecution
+  }
+}

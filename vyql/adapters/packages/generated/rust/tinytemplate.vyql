@@ -1,0 +1,9 @@
+import code.{HtmlRender, TemplateRender}
+
+adapter rust {
+  package "tinytemplate" {
+    control method "escape" -> core.HtmlEscape
+    sink method "format_unescaped" -> code.HtmlRender
+    sink method "render" -> code.TemplateRender
+  }
+}

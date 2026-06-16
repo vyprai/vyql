@@ -1,0 +1,6 @@
+import code.{ResponseHeaderWrite}
+adapter kotlin {
+  package "com.github.penggle:kaptcha" {
+    sink method "doGet" -> code.ResponseHeaderWrite
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter javascript {
+  package "@webassemblyjs/wasm-opt" {
+    sink method "shrinkPaddedLEB128" -> code.Deserialization
+  }
+}

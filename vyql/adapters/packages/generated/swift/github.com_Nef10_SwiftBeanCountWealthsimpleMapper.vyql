@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/Nef10/SwiftBeanCountWealthsimpleMapper" {
+    sink method "mapTransactionsToPriceAndTransactions" -> code.Deserialization
+  }
+}

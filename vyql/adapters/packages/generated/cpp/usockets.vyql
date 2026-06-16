@@ -1,0 +1,19 @@
+import code.{NetworkData, NetworkConnect}
+
+adapter cpp {
+  package "usockets" {
+    source method "us_quic_socket_context_on_stream_data" -> code.NetworkData
+    source method "us_quic_socket_context_on_stream_headers" -> code.NetworkData
+    source method "us_udp_packet_buffer_payload" -> code.NetworkData
+
+    source method "us_quic_stream_write" -> code.NetworkData
+    source method "us_quic_socket_context_set_header" -> code.NetworkData
+    source method "us_quic_socket_context_send_headers" -> code.NetworkData
+    source method "us_socket_send_buffer" -> code.NetworkData
+    source method "us_socket_write" -> code.NetworkData
+    source method "us_socket_write2" -> code.NetworkData
+
+    sink method "us_quic_socket_context_listen" -> code.NetworkConnect
+    sink method "us_quic_socket_context_connect" -> code.NetworkConnect
+  }
+}

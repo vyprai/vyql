@@ -1,0 +1,8 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter scala {
+  package "com.google.cloud:google-cloud-storage" {
+    source method "BlobReadChannel.read" -> code.StoredDataRead
+    sink method "BaseStorageWriteChannel.write" -> code.StoredDataWrite
+  }
+}

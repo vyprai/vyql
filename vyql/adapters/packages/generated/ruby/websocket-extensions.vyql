@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter ruby {
+  package "websocket-extensions" {
+    sink method "parse_header" -> code.Deserialization
+    sink method "activate" -> code.Deserialization
+    sink method "process_incoming_message" -> code.Deserialization
+  }
+}

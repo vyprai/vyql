@@ -1,0 +1,8 @@
+import core.{HtmlEscape, UserControlledData}
+
+adapter perl {
+  package "Pod-Usage-CGI" {
+    source method "pod2usage" -> core.UserControlledData
+    control method "_html_escape" -> core.HtmlEscape
+  }
+}

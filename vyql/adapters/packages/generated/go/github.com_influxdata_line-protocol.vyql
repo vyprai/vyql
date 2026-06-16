@@ -1,0 +1,12 @@
+import core.{InputValidation}
+
+adapter go {
+  package "github.com/influxdata/line-protocol" {
+    control method "escape" -> core.InputValidation
+    control method "nameEscape" -> core.InputValidation
+    control method "stringFieldEscape" -> core.InputValidation
+    control method "unescape" -> core.InputValidation
+    control method "nameUnescape" -> core.InputValidation
+    control method "stringFieldUnescape" -> core.InputValidation
+  }
+}

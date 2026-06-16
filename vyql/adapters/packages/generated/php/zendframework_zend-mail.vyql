@@ -1,0 +1,7 @@
+import code.{DatabaseRead}
+
+adapter php {
+  package "zendframework/zend-mail" {
+    sink method "search" -> code.DatabaseRead
+  }
+}

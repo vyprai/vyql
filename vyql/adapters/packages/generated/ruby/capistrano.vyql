@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "capistrano" {
+    sink method "run_locally" -> code.CommandExecution
+    sink method "run_shell_command" -> code.CommandExecution
+    sink method "run_remote_ssh_command" -> code.CommandExecution
+  }
+}

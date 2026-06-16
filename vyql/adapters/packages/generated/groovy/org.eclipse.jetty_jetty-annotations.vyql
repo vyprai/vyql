@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "org.eclipse.jetty:jetty-annotations" {
+    sink method "parse" -> code.Deserialization
+  }
+}

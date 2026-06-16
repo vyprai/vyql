@@ -1,0 +1,12 @@
+import code.{NetworkData, NetworkSend, Deserialization}
+import core.{UserControlledData}
+
+adapter ruby {
+  package "actioncable" {
+    source method "receive" -> code.NetworkData
+    source method "dispatch_websocket_message" -> code.NetworkData
+    source method "handle_channel_command" -> core.UserControlledData
+    sink method "write" -> code.NetworkSend
+    sink method "parse" -> code.Deserialization
+  }
+}

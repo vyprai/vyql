@@ -1,0 +1,7 @@
+adapter rust {
+  package "ciborium-ll" {
+    sink method "pull" -> code.Deserialization
+    source method "bytes" -> core.UserControlledData
+    source method "text" -> core.UserControlledData
+  }
+}

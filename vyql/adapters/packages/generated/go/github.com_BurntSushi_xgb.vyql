@@ -1,0 +1,9 @@
+import code.{SecretValue}
+
+adapter go {
+  package "github.com/BurntSushi/xgb" {
+    source method "readAuthority" -> code.SecretValue
+    source method "getBytes" -> code.SecretValue
+    source method "getString" -> code.SecretValue
+  }
+}

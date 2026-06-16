@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/krisk/fuse-swift" {
+    sink method "parseIndex" -> code.Deserialization
+  }
+}

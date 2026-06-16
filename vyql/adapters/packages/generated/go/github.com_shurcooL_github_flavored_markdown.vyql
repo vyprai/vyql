@@ -1,0 +1,9 @@
+import code.{HtmlRender}
+
+adapter go {
+  package "github.com/shurcooL/github_flavored_markdown" {
+    sink method "Markdown" -> code.HtmlRender
+    sink method "Heading" -> code.HtmlRender
+    sink method "highlightCode" -> code.HtmlRender
+  }
+}

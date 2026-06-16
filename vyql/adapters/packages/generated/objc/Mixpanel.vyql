@@ -1,0 +1,8 @@
+import code.{DatabaseRead, FilePathAccess, FileUse}
+adapter objc {
+  package "Mixpanel" {
+    sink method "open" -> code.FilePathAccess
+    sink method "readRows" -> code.DatabaseRead
+    sink method "initWithToken" -> code.FileUse
+  }
+}

@@ -1,0 +1,21 @@
+import code.{Deserialization, FilePathAccess, CliArgument}
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/nats-io/nats-server/v2" {
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseWithChecks" -> code.Deserialization
+    sink method "ParseFile" -> code.Deserialization
+    sink method "ParseFileWithChecks" -> code.Deserialization
+    sink method "ParseFileWithChecksDigest" -> code.Deserialization
+    sink method "parseEnv" -> code.Deserialization
+
+    sink method "ParseFile" -> code.FilePathAccess
+    sink method "ParseFileWithChecks" -> code.FilePathAccess
+    sink method "ParseFileWithChecksDigest" -> code.FilePathAccess
+
+    source method "Parse" -> core.UserControlledData
+    source method "ParseWithChecks" -> core.UserControlledData
+    source method "parseEnv" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter dart {
+  package "dart_code_metrics" {
+    source method "ParsedArguments.fromArgs" -> code.CliArgument
+  }
+}

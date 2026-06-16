@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter csharp {
+  package "dotnetopenauth.mvc5" {
+    sink method "AsActionResultMvc5" -> code.NetworkSend
+    sink method "OutgoingWebResponseActionResult5.ExecuteResult" -> code.NetworkSend
+  }
+}

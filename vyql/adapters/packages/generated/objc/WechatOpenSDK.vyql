@@ -1,0 +1,12 @@
+import code.{HttpInput, SecretValue}
+import core.{AuthenticationCheck, UserControlledData}
+
+adapter objc {
+  package "WechatOpenSDK" {
+    source method "handleOpenURL" -> core.UserControlledData
+    source method "handleOpenUniversalLink" -> core.UserControlledData
+    source method "onNeedGrantReadPasteBoardPermissionWithURL" -> core.UserControlledData
+    source method "sendReq" -> core.UserControlledData
+    control method "sendAuthReq" -> core.AuthenticationCheck
+  }
+}

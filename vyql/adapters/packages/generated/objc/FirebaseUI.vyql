@@ -1,0 +1,9 @@
+import code.{NosqlQuery}
+adapter objc {
+  package "FirebaseUI" {
+    sink method "query" -> code.NosqlQuery
+    sink method "setQuery" -> code.NosqlQuery
+    sink method "initWithQuery" -> code.NosqlQuery
+    sink method "bindToFirestoreQuery" -> code.NosqlQuery
+  }
+}

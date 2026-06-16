@@ -1,0 +1,9 @@
+import code.{RegexCompile}
+
+adapter php {
+  package "webmozart/glob" {
+    mark method "Webmozart\\Glob\\Glob::toRegEx" -> code.RegexCompile
+    mark method "Webmozart\\Glob\\Glob::match" -> code.RegexCompile
+    mark method "Webmozart\\Glob\\Glob::filter" -> code.RegexCompile
+  }
+}

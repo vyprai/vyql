@@ -1,0 +1,5 @@
+adapter javascript {
+  package "clone-deep" {
+    sink method "cloneDeep" -> code.Deserialization
+  }
+}

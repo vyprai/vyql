@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "msgpack" {
+    sink path "msgpack/v2/parse.hpp::execute" -> code.Deserialization
+    sink path "msgpack/v2/parse.hpp::parse" -> code.Deserialization
+    sink path "msgpack/v3/parse.hpp::execute" -> code.Deserialization
+  }
+}

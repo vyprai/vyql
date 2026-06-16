@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter cpp {
+  package "sdl2-image" {
+    sink method "qoi_read" -> code.Deserialization
+    sink method "qoi_decode" -> code.Deserialization
+  }
+}

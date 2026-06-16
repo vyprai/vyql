@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+import core.{UserControlledData}
+
+adapter python {
+  package "terminado" {
+    source method "on_message" -> core.UserControlledData
+    source method "get_terminal" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,12 @@
+import code.{Deserialization}
+
+adapter java {
+  package "com.thoughtworks.xstream:xstream" {
+    sink method "fromXML" -> code.Deserialization
+    sink method "unmarshal" -> code.Deserialization
+    sink method "createObjectInputStream" -> code.Deserialization
+    sink method "readFromStream" -> code.Deserialization
+    sink method "readFieldsFromStream" -> code.Deserialization
+    sink method "defaultReadObject" -> code.Deserialization
+  }
+}

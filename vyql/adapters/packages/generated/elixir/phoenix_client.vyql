@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "phoenix_client" {
+    sink method "decode!" -> code.Deserialization
+  }
+}

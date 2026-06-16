@@ -1,0 +1,14 @@
+import code.{SqlExecution, Deserialization}
+adapter elixir {
+  package "mariaex" {
+    sink method "query" -> code.SqlExecution
+    sink method "query!" -> code.SqlExecution
+    sink method "prepare" -> code.SqlExecution
+    sink method "prepare!" -> code.SqlExecution
+    sink method "prepare_execute" -> code.SqlExecution
+    sink method "prepare_execute!" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+    sink method "execute!" -> code.SqlExecution
+    sink method "parse" -> code.Deserialization
+  }
+}

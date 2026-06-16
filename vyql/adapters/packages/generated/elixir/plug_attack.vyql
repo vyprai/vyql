@@ -1,0 +1,12 @@
+import code.{NetworkData, RedirectTarget, WeakRandomValue}
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter elixir {
+  package "plug_attack" {
+    source method "call" -> code.NetworkData
+    mark method "block_action" -> code.RedirectTarget
+    control method "allow_action" -> core.AuthenticationCheck
+    mark method "throttle" -> code.WeakRandomValue
+    control method "fail2ban" -> core.AuthorizationCheck
+  }
+}

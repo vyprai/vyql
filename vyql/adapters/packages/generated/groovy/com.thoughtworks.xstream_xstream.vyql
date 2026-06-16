@@ -1,0 +1,6 @@
+adapter groovy {
+  package "com.thoughtworks.xstream:xstream" {
+    source method "Token" -> code.SecretValue
+    sink method "unmarshal" -> code.Deserialization
+  }
+}

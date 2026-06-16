@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.apache.xbean:xbean-spring" {
+    sink method "ClassPathXmlApplicationContext" -> code.Deserialization
+    sink method "FileSystemXmlApplicationContext" -> code.Deserialization
+    sink method "ResourceXmlApplicationContext" -> code.Deserialization
+  }
+}

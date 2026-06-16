@@ -1,0 +1,8 @@
+import code.{CliArgument}
+import core.{UserControlledData}
+
+adapter javascript {
+  package "mime" {
+    source method "getType" -> core.UserControlledData
+  }
+}

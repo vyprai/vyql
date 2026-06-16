@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter objc {
+  package "FirebaseAuthUI" {
+    source method "handleOpenURL" -> core.UserControlledData
+  }
+}

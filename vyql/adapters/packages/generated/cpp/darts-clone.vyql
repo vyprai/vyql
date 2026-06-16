@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter cpp {
+  package "darts-clone" {
+    sink method "open" -> code.FilePathAccess
+    sink method "save" -> code.FilePathAccess
+  }
+}

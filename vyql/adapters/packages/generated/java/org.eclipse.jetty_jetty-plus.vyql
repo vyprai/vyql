@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter java {
+  package "org.eclipse.jetty:jetty-plus" {
+    sink method "bindToENC" -> code.Deserialization
+    sink method "EnvEntry" -> code.Deserialization
+    sink method "Resource" -> code.Deserialization
+    sink method "NamingEntry" -> code.Deserialization
+  }
+}

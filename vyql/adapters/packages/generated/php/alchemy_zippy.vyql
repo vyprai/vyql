@@ -1,0 +1,5 @@
+adapter php {
+  package "alchemy/zippy" {
+    sink method "open" -> code.FilePathAccess
+  }
+}

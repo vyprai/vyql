@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+
+adapter swift {
+  package "github.com/ChimeHQ/ProcessService" {
+    sink method "launch" -> code.CommandExecution
+    sink method "userShellInvocation" -> code.CommandExecution
+  }
+}

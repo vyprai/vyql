@@ -1,0 +1,5 @@
+adapter python {
+  package "orjson" {
+    sink method "byte_load_2" -> code.Deserialization
+  }
+}

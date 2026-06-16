@@ -1,0 +1,5 @@
+adapter scala {
+  package "org.apache.logging.log4j:log4j-web" {
+    sink method "put" -> code.UrlFetch
+  }
+}

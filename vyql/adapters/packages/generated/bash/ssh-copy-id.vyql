@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter bash {
+  package "ssh-copy-id" {
+    sink path "ssh-copy-id" -> code.CommandExecution
+  }
+}

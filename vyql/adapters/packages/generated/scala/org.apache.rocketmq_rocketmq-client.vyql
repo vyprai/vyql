@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.apache.rocketmq:rocketmq-client" {
+    sink method "getYamlDataObject" -> code.Deserialization
+  }
+}

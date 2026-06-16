@@ -1,0 +1,10 @@
+import code.{NetworkData}
+
+adapter go {
+  package "github.com/hashicorp/mdns" {
+    source method "Query" -> code.NetworkData
+    source method "QueryContext" -> code.NetworkData
+    source method "Lookup" -> code.NetworkData
+    source method "NewServer" -> code.NetworkData
+  }
+}

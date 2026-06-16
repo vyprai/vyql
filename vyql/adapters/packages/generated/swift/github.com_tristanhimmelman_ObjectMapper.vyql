@@ -1,0 +1,18 @@
+adapter swift {
+  package "github.com/tristanhimmelman/ObjectMapper" {
+    sink method "parseJSONStringIntoDictionary" -> code.Deserialization
+    sink method "parseJSONString" -> code.Deserialization
+    sink method "map" -> code.Deserialization
+    sink method "mapArray" -> code.Deserialization
+    sink method "mapDictionary" -> code.Deserialization
+    sink method "mapDictionaryOfArrays" -> code.Deserialization
+    sink method "mapArrayOfArrays" -> code.Deserialization
+    sink method "toJSON" -> code.Deserialization
+    sink method "toJSONArray" -> code.Deserialization
+    sink method "toJSONDictionary" -> code.Deserialization
+    sink method "toJSONDictionaryOfArrays" -> code.Deserialization
+    sink method "toJSONString" -> code.Deserialization
+    sink method "toJSONData" -> code.Deserialization
+    sink method "toJSONSet" -> code.Deserialization
+  }
+}

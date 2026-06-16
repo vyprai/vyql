@@ -1,0 +1,5 @@
+adapter java {
+  package "org.apache.velocity:velocity-engine-core" {
+    sink method "parse" -> code.Deserialization
+  }
+}

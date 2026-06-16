@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter java {
+  package "org.apache.commons:commons-exec" {
+    sink method "exec" -> code.CommandExecution
+  }
+}

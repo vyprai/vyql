@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+adapter csharp {
+  package "sqlite-net" {
+    sink method "Execute" -> code.SqlExecution
+    sink method "Query" -> code.SqlExecution
+    sink method "InsertAll" -> code.SqlExecution
+    sink method "UpdateAll" -> code.SqlExecution
+  }
+}

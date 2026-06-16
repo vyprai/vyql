@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+
+adapter ruby {
+  package "cucumber-tag_expressions" {
+    sink method "parse" -> code.ExpressionEval
+  }
+}

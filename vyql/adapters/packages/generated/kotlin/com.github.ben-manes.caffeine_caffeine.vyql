@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "com.github.ben-manes.caffeine:caffeine" {
+    sink method "CaffeineSpec.parse" -> code.Deserialization
+  }
+}

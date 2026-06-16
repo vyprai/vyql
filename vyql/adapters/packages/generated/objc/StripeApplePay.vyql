@@ -1,0 +1,5 @@
+adapter objc {
+  package "StripeApplePay" {
+    sink method "requestAPI" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,11 @@
+adapter java {
+  package "org.hibernate:hibernate-envers" {
+    sink method "createQuery" -> code.SqlExecution
+    sink method "traverseRelation" -> code.SqlExecution
+    sink method "add" -> code.SqlExecution
+    sink method "addProjection" -> code.SqlExecution
+    sink method "addOrder" -> code.SqlExecution
+    sink method "forEntitiesAtRevision" -> code.SqlExecution
+    sink method "forEntitiesModifiedAtRevision" -> code.SqlExecution
+  }
+}

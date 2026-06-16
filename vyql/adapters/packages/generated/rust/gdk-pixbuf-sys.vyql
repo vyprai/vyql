@@ -1,0 +1,10 @@
+import code.{FilePathAccess}
+
+adapter rust {
+  package "gdk-pixbuf-sys" {
+    sink method "gdk_pixbuf_new_from_file" -> code.FilePathAccess
+    sink method "gdk_pixbuf_new_from_file_at_scale" -> code.FilePathAccess
+    sink method "gdk_pixbuf_new_from_file_at_size" -> code.FilePathAccess
+    sink method "gdk_pixbuf_animation_new_from_file" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter perl {
+  package "mod_perl" {
+    control method "ModPerl::CScan::sanitize" -> core.InputValidation
+  }
+}

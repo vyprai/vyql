@@ -1,0 +1,7 @@
+import code.{StoredDataWrite}
+
+adapter java {
+  package "org.apache.hadoop:hadoop-yarn-common" {
+    sink method "write" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,6 @@
+import code.{ExpressionEval}
+adapter php {
+  package "kartik-v/yii2-widget-select2" {
+    sink method "JsExpression" -> code.ExpressionEval
+  }
+}

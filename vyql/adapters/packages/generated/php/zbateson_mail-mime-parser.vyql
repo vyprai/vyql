@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter php {
+  package "zbateson/mail-mime-parser" {
+    sink method "parse" -> code.Deserialization
+    sink method "addAttachmentPartFromFile" -> code.FilePathAccess
+  }
+}

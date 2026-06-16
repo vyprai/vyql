@@ -1,0 +1,7 @@
+import code.{CommandExecution, SecretValue}
+adapter perl {
+  package "Atheme" {
+    source method "login" -> code.SecretValue
+    source method "logout" -> code.SecretValue
+  }
+}

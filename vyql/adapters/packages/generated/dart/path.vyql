@@ -1,0 +1,7 @@
+import core.{PathCanonicalization}
+adapter dart {
+  package "path" {
+    control method "canonicalize" -> core.PathCanonicalization
+    control method "normalize" -> core.PathCanonicalization
+  }
+}

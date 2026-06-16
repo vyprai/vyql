@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "Data-Binary" {
+    sink method "is_text" -> code.Deserialization
+    sink method "is_binary" -> code.Deserialization
+  }
+}

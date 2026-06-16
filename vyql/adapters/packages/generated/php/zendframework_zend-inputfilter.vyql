@@ -1,0 +1,8 @@
+import core.{InputValidation, UserControlledData}
+adapter php {
+  package "zendframework/zend-inputfilter" {
+    source method "getRawValue" -> core.UserControlledData
+    control method "validate" -> core.InputValidation
+    control method "isEmptyFile" -> core.InputValidation
+  }
+}

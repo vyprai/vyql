@@ -1,0 +1,8 @@
+import code.{HttpInput, HtmlRender}
+adapter perl {
+  package "Maypole" {
+    source method "CGI::Maypole::run" -> code.HttpInput
+    sink method "CGI::Maypole::run" -> code.HtmlRender
+    source method "CGI::Maypole::get_request" -> code.HttpInput
+  }
+}

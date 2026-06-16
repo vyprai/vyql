@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "microsoftajax" {
+    sink method "Sys$Enum$parse" -> code.Deserialization
+  }
+}

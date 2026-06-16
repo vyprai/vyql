@@ -1,0 +1,21 @@
+import code.{HttpInput, SecretValue, Cookie}
+
+adapter groovy {
+  package "org.springframework.cloud:spring-cloud-commons" {
+    source method "getKeyStorePassword" -> code.SecretValue
+    source method "setKeyStorePassword" -> code.SecretValue
+    source method "keyStorePassword" -> code.SecretValue
+    source method "getKeyPassword" -> code.SecretValue
+    source method "setKeyPassword" -> code.SecretValue
+    source method "keyPassword" -> code.SecretValue
+    source method "getTrustStorePassword" -> code.SecretValue
+    source method "setTrustStorePassword" -> code.SecretValue
+    source method "trustStorePassword" -> code.SecretValue
+
+    source method "getUrl" -> code.HttpInput
+    source method "getHeaders" -> code.HttpInput
+    source method "getCookies" -> code.Cookie
+
+    source method "loadKeyStore" -> code.SecretValue
+  }
+}

@@ -1,0 +1,10 @@
+import code.{Deserialization, TemplateRender}
+import core.{HtmlEscape}
+
+adapter swift {
+  package "github.com/vapor/template-kit" {
+    sink method "parse" -> code.Deserialization
+    sink method "render" -> code.TemplateRender
+    control method "htmlEscaped" -> core.HtmlEscape
+  }
+}

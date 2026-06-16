@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter elixir {
+  package "phoenix_form_awesomplete" {
+    source method "handle_event" -> core.UserControlledData
+  }
+}

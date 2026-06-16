@@ -1,0 +1,5 @@
+adapter scala {
+  package "jakarta.persistence:jakarta.persistence-api" {
+    sink method "executeUpdate" -> code.SqlExecution
+  }
+}

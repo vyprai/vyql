@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/ApolloZhu/swift_qrcodejs" {
+    sink method "toString" -> code.HtmlRender
+  }
+}

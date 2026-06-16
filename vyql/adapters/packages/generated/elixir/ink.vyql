@@ -1,0 +1,6 @@
+adapter elixir {
+  package "ink" {
+    control method "filter_secret_strings" -> core.InputValidation
+    control method "update_secret_strings" -> core.InputValidation
+  }
+}

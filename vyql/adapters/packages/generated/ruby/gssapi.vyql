@@ -1,0 +1,12 @@
+import code.{NetworkData}
+
+adapter ruby {
+  package "gssapi" {
+    source method "init_context" -> code.NetworkData
+    source method "accept_context" -> code.NetworkData
+    source method "get_mic" -> code.NetworkData
+    source method "verify_mic" -> code.NetworkData
+    source method "wrap_message" -> code.NetworkData
+    source method "unwrap_message" -> code.NetworkData
+  }
+}

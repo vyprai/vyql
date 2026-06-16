@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.apache.commons:commons-math3" {
+    sink method "parse" -> code.Deserialization
+  }
+}

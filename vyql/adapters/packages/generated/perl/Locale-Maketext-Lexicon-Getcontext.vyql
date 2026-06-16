@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter perl {
+  package "Locale-Maketext-Lexicon-Getcontext" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_metadata" -> code.Deserialization
+  }
+}

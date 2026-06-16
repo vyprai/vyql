@@ -1,0 +1,9 @@
+import code.{StoredDataRead, Deserialization}
+adapter rust {
+  package "dotenv" {
+    source method "load" -> code.StoredDataRead
+    source method "dotenv_iter" -> code.StoredDataRead
+    sink method "parse_line" -> code.Deserialization
+    sink method "parse_value" -> code.Deserialization
+  }
+}

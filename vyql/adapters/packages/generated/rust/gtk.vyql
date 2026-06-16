@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter rust {
+  package "gtk" {
+    sink method "file" -> code.FilePathAccess
+  }
+}

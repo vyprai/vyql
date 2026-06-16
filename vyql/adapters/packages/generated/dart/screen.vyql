@@ -1,0 +1,8 @@
+import code.{PrivilegedOp}
+
+adapter dart {
+  package "screen" {
+    mark method "setBrightness" -> code.PrivilegedOp
+    mark method "keepOn" -> code.PrivilegedOp
+  }
+}

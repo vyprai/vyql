@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter objc {
+  package "SwinjectAutoregistration" {
+    sink method "parseType" -> code.Deserialization
+  }
+}

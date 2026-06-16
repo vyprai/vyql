@@ -1,0 +1,8 @@
+import code.{Deserialization, XmlParse}
+adapter elixir {
+  package "sweet_xml" {
+    sink method "parse" -> code.Deserialization
+    sink method "do_parse" -> code.Deserialization
+    sink method "handle_dtd" -> code.XmlParse
+  }
+}

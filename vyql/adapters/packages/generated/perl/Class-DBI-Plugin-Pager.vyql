@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter perl {
+  package "Class-DBI-Plugin-Pager" {
+    sink method "pager" -> code.SqlExecution
+    sink method "search_where" -> code.SqlExecution
+  }
+}

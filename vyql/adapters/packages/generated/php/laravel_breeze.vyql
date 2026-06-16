@@ -1,0 +1,7 @@
+adapter php {
+  package "laravel/breeze" {
+    sink method "runCommands" -> code.CommandExecution
+    control method "authorize" -> core.AuthorizationCheck
+    control method "authenticate" -> core.AuthenticationCheck
+  }
+}

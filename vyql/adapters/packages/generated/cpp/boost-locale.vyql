@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "boost-locale" {
+    sink method "parse" -> code.Deserialization
+  }
+}

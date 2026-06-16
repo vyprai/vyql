@@ -1,0 +1,5 @@
+adapter bash {
+  package "kube-linter" {
+    source path "gitignore.argv" -> code.CliArgument
+  }
+}
