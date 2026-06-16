@@ -247,22 +247,6 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 	}
 }
 
-func encodePass1(d *pass1Delta) []byte {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(d); err != nil {
-		return nil
-	}
-	return buf.Bytes()
-}
-
-func decodePass1(raw []byte) (*pass1Delta, error) {
-	var d pass1Delta
-	if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&d); err != nil {
-		return nil, err
-	}
-	return &d, nil
-}
-
 // batchReader / batchWriter are the optional fast paths a badger-backed DeltaCache implements:
 // reading/writing many keys in one transaction. In-memory test caches don't, so the helpers
 // fall back to per-key access.
@@ -403,21 +387,6 @@ func (r *recordingStore) AddLabel(nodeID string, l usg.Label) error {
 	return r.Store.AddLabel(nodeID, l)
 }
 
-func encodeDelta(d *moduleDelta) []byte {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(d); err != nil {
-		return nil
-	}
-	return buf.Bytes()
-}
-
-func decodeDelta(raw []byte) (*moduleDelta, error) {
-	var d moduleDelta
-	if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&d); err != nil {
-		return nil, err
-	}
-	return &d, nil
-}
 
 // --- deterministic map iteration helpers for the fingerprint ------------------------------
 
