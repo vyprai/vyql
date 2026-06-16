@@ -62,6 +62,9 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 		if !ok {
 			return true // not module-scoped — always process, never cached
 		}
+		if _, hashed := modHash[mod]; !hashed {
+			return true // hashless module (native frontend, no content hash) — always relabel
+		}
 		return relabel[mod]
 	}}
 	if _, _, err := adapters.Apply(view, ads, nil); err != nil {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/engine"
@@ -151,11 +152,28 @@ func TestIncrementalScanFindings(t *testing.T) {
 	writeFile(t, app, appSrc)
 	writeFile(t, helper, helperV1)
 
+	// A Go file in the same tree: the native Go frontend yields modules WITHOUT a content hash,
+	// so they take the "always relabel, never cache" adapter path. Its weak-hash finding must
+	// survive every incremental rescan — guarding the regression where hashless modules were
+	// omitted from the relabel set and their adapter labels silently dropped.
+	writeFile(t, filepath.Join(dir, "weak.go"), "package main\n\nimport \"crypto/md5\"\n\nfunc weak(b []byte) {\n\th := md5.New()\n\th.Write(b)\n}\n")
+
 	// baseline: a full scan should find the cross-file command injection (sanity that the
 	// fixture exercises real taint, so the equivalence check isn't vacuous).
 	base := scanFindingKeys(t, []string{dir}, nil)
 	if len(base) == 0 {
 		t.Fatalf("fixture produced no findings — equivalence check would be vacuous")
+	}
+	// the Go (hashless module) weak-hash finding must be in the baseline, else the
+	// hashless-adapter guard below would pass vacuously.
+	hasGo := false
+	for _, k := range base {
+		if strings.HasPrefix(k, "VYQL-CRY-001@") { // weak-hash from the Go (hashless) module
+			hasGo = true
+		}
+	}
+	if !hasGo {
+		t.Fatalf("expected the Go weak-hash finding in baseline (hashless-module guard would be vacuous): %v", base)
 	}
 
 	edits := []struct {
