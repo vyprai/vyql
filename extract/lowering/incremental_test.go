@@ -78,6 +78,12 @@ func snapshot(t *testing.T, s usg.Store) string {
 		for k, v := range n.Props {
 			props = append(props, k+"="+v)
 		}
+		// include the inline fields so the equivalence check covers loc/region/order too.
+		for _, k := range []string{"loc", "region", "order"} {
+			if v := n.Prop(k); v != "" {
+				props = append(props, k+"="+v)
+			}
+		}
 		sort.Strings(props)
 		lines = append(lines, fmt.Sprintf("N %s %s {%v}", n.ID, n.Type, props))
 		for _, et := range []string{"FLOWS", "CONTROL", "STEP", "NET", "DEPENDS_ON"} {

@@ -89,6 +89,25 @@ func (r *bufReader) smap() map[string]string {
 	return m
 }
 func (r *bufReader) boolean() bool { v := r.b[r.i] == 1; r.i++; return v }
+
+// writeNode/readNode (de)serialize a usg.Node including its inline loc/region/order fields.
+func (w *bufWriter) node(n usg.Node) {
+	w.str(n.ID)
+	w.str(n.Type)
+	w.str(n.Loc)
+	w.str(n.Region)
+	w.uvar(int(n.Order))
+	w.boolean(n.HasOrder)
+	w.str(n.Scope)
+	w.smap(n.Props)
+}
+
+func (r *bufReader) node() usg.Node {
+	return usg.Node{
+		ID: r.str(), Type: r.str(), Loc: r.str(), Region: r.str(),
+		Order: int32(r.uvar()), HasOrder: r.boolean(), Scope: r.str(), Props: r.smap(),
+	}
+}
 func (r *bufReader) strs() []string {
 	n := r.uvar()
 	if n == 0 {
@@ -107,10 +126,7 @@ func encodeDelta(d *moduleDelta) []byte {
 	w := &bufWriter{b: make([]byte, 0, 256)}
 	w.uvar(len(d.Nodes))
 	for _, n := range d.Nodes {
-		w.str(n.ID)
-		w.str(n.Type)
-		w.str(n.Scope)
-		w.smap(n.Props)
+		w.node(n)
 	}
 	w.uvar(len(d.Edges))
 	for _, e := range d.Edges {
@@ -145,7 +161,7 @@ func decodeDelta(raw []byte) (d *moduleDelta, err error) {
 	if n := r.uvar(); n > 0 {
 		d.Nodes = make([]usg.Node, n)
 		for i := range d.Nodes {
-			d.Nodes[i] = usg.Node{ID: r.str(), Type: r.str(), Scope: r.str(), Props: r.smap()}
+			d.Nodes[i] = r.node()
 		}
 	}
 	if n := r.uvar(); n > 0 {
@@ -176,10 +192,7 @@ func encodePass1(d *pass1Delta) []byte {
 	w := &bufWriter{b: make([]byte, 0, 256)}
 	w.uvar(len(d.Nodes))
 	for _, n := range d.Nodes {
-		w.str(n.ID)
-		w.str(n.Type)
-		w.str(n.Scope)
-		w.smap(n.Props)
+		w.node(n)
 	}
 	w.uvar(len(d.Imports))
 	for _, ie := range d.Imports {
@@ -226,7 +239,7 @@ func decodePass1(raw []byte) (d *pass1Delta, err error) {
 	if n := r.uvar(); n > 0 {
 		d.Nodes = make([]usg.Node, n)
 		for i := range d.Nodes {
-			d.Nodes[i] = usg.Node{ID: r.str(), Type: r.str(), Scope: r.str(), Props: r.smap()}
+			d.Nodes[i] = r.node()
 		}
 	}
 	if n := r.uvar(); n > 0 {

@@ -5,6 +5,8 @@
 // This is the hybrid recorded in docs/adr/0002-go-badgerdb.md.
 package usg
 
+import "strconv"
+
 // Provenance records where a fact or label came from (docs/04 §provenance).
 type Provenance struct {
 	Extractor  string `json:"extractor,omitempty"`
@@ -22,16 +24,41 @@ type Label struct {
 	Detail     map[string]string `json:"detail,omitempty"`
 }
 
-// Node is a graph vertex with a namespaced type and typed properties.
+// Node is a graph vertex with a namespaced type and typed properties. The three properties
+// every lowered code node carries — loc, region, order — are stored inline (Loc/Region/Order)
+// instead of in the Props map, so the common node needs no map allocation at all. Props holds
+// only the rarer extras (callee_path, method, vkind, …) and is nil when there are none — this
+// is the dominant memory saving on large graphs (millions of tiny maps eliminated).
 type Node struct {
-	ID    string            `json:"id"`
-	Type  string            `json:"type"`
-	Props map[string]string `json:"props,omitempty"`
-	Scope string            `json:"scope,omitempty"`
+	ID       string            `json:"id"`
+	Type     string            `json:"type"`
+	Loc      string            `json:"loc,omitempty"`
+	Region   string            `json:"region,omitempty"`
+	Order    int32             `json:"order,omitempty"`
+	HasOrder bool              `json:"hasOrder,omitempty"` // distinguishes Order==0 from "unset"
+	Props    map[string]string `json:"props,omitempty"`
+	Scope    string            `json:"scope,omitempty"`
 }
 
-// Prop returns a property value (empty string if absent).
+// Prop returns a property value (empty string if absent). loc/region/order resolve to the inline
+// fields; everything else comes from the Props map.
 func (n Node) Prop(k string) string {
+	// inline fields win when set; otherwise fall through to Props so nodes built the old way
+	// (hand-built graphs, tests, spec fixtures that put loc/region/order in the map) still work.
+	switch k {
+	case "loc":
+		if n.Loc != "" {
+			return n.Loc
+		}
+	case "region":
+		if n.Region != "" {
+			return n.Region
+		}
+	case "order":
+		if n.HasOrder {
+			return strconv.Itoa(int(n.Order))
+		}
+	}
 	if n.Props == nil {
 		return ""
 	}

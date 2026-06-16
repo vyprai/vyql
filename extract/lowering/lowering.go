@@ -680,12 +680,16 @@ func (l *lowerer) node(kind, loc string, props map[string]string) string {
 // whose ids are NAME-derived (sigID) so they survive a body edit and remain valid targets for
 // cross-module call edges from other (possibly cached) modules.
 func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) string {
-	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.modOrder[l.curNS])}
+	ord := l.modOrder[l.curNS]
 	l.modOrder[l.curNS]++
-	for k, v := range props {
-		p[k] = v
+	// loc/region/order live inline on the Node; props (the freshly-built extras map, often empty)
+	// becomes Props directly — nil/empty when there are no extras, so most nodes carry no map.
+	var extras map[string]string
+	if len(props) > 0 {
+		extras = props
 	}
-	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Props: p})
+	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
+		Order: int32(ord), HasOrder: true, Props: extras})
 	return id
 }
 

@@ -17,6 +17,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"sort"
+	"strconv"
 
 	"github.com/vyprai/vyql/usg"
 )
@@ -95,8 +96,26 @@ type SyncLabel struct {
 func NodeKey(nodeID string) string { return hashID("node", nodeID) }
 
 func nodeRow(modID string, n usg.Node) SyncNode {
-	fp := hashID(n.Type, mapHash(n.Props))
-	return SyncNode{Key: NodeKey(n.ID), Module: modID, Type: n.Type, Props: n.Props, Fingerprint: fp}
+	// loc/region/order are inline fields on Node; fold them back into the row's Props so the DB
+	// view (and the fingerprint) is identical to when they lived in the map.
+	props := map[string]string{}
+	if n.Loc != "" {
+		props["loc"] = n.Loc
+	}
+	if n.Region != "" {
+		props["region"] = n.Region
+	}
+	if n.HasOrder {
+		props["order"] = strconv.Itoa(int(n.Order))
+	}
+	for k, v := range n.Props {
+		props[k] = v
+	}
+	if len(props) == 0 {
+		props = nil
+	}
+	fp := hashID(n.Type, mapHash(props))
+	return SyncNode{Key: NodeKey(n.ID), Module: modID, Type: n.Type, Props: props, Fingerprint: fp}
 }
 
 func edgeRow(modID string, e usg.Edge) SyncEdge {
