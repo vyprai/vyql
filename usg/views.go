@@ -20,42 +20,40 @@ func (r *RecordingStore) AddLabel(nodeID string, l Label) error {
 	return r.Store.AddLabel(nodeID, l)
 }
 
-// RestrictStore is a read view that hides nodes from the type-indexed listings (NodesOfType,
-// AllNodes) unless Allow permits them — so an adapter phase iterates only a subset of nodes
-// (e.g. freshly-lowered modules) while still resolving any node by id. Import and SBOM nodes
-// are ALWAYS listed regardless of Allow, because package-evidence gathering needs all of them.
-// Writes and point reads (GetNode, edges, Labels) pass through unchanged.
-type RestrictStore struct {
+// AlwaysListed reports node types that an adapter subset view must always expose regardless of
+// which modules are being relabeled: import and SBOM nodes, because package-evidence gathering
+// scans all of them.
+func AlwaysListed(t string) bool { return t == "code.Import" || t == "sbom.PackageVersion" }
+
+// SubsetStore is a read view whose type-indexed listings (NodesOfType, AllNodes) return only a
+// PRECOMPUTED node subset, so an adapter phase iterates O(subset) per adapter instead of
+// re-filtering the whole graph on every call. Point reads (GetNode, edges, Labels) and writes
+// pass through to the embedded Store unchanged, so an adapter that resolves a referenced node by
+// id still sees the full graph. Build it with NewSubsetStore.
+type SubsetStore struct {
 	Store
-	Allow func(nodeID string) bool
+	byType map[string][]string
+	all    []Node
 }
 
-func alwaysListed(t string) bool { return t == "code.Import" || t == "sbom.PackageVersion" }
-
-func (r *RestrictStore) NodesOfType(nodeType string) ([]string, error) {
-	ids, err := r.Store.NodesOfType(nodeType)
-	if err != nil || alwaysListed(nodeType) {
-		return ids, err
-	}
-	out := ids[:0]
-	for _, id := range ids {
-		if r.Allow(id) {
-			out = append(out, id)
-		}
-	}
-	return out, nil
-}
-
-func (r *RestrictStore) AllNodes() ([]Node, error) {
-	all, err := r.Store.AllNodes()
+// NewSubsetStore builds a subset view exposing only the nodes for which keep(id, type) is true,
+// plus all AlwaysListed (import/SBOM) nodes, in a single pass over the backing store. The byType
+// index makes each adapter's NodesOfType O(result).
+func NewSubsetStore(s Store, keep func(id, nodeType string) bool) (*SubsetStore, error) {
+	all, err := s.AllNodes()
 	if err != nil {
 		return nil, err
 	}
-	out := all[:0]
+	byType := map[string][]string{}
+	subset := make([]Node, 0, len(all))
 	for _, n := range all {
-		if alwaysListed(n.Type) || r.Allow(n.ID) {
-			out = append(out, n)
+		if AlwaysListed(n.Type) || keep(n.ID, n.Type) {
+			byType[n.Type] = append(byType[n.Type], n.ID)
+			subset = append(subset, n)
 		}
 	}
-	return out, nil
+	return &SubsetStore{Store: s, byType: byType, all: subset}, nil
 }
+
+func (s *SubsetStore) NodesOfType(nodeType string) ([]string, error) { return s.byType[nodeType], nil }
+func (s *SubsetStore) AllNodes() ([]Node, error)                     { return s.all, nil }

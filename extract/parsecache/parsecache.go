@@ -213,6 +213,46 @@ func (c *Cache) GetRaw(key string) ([]byte, bool) {
 	return raw, true
 }
 
+// GetManyRaw reads many keys in a SINGLE read transaction and returns the present ones. The
+// per-module adapter-label cache looks up thousands of keys per scan; one transaction instead
+// of one-per-key turns an I/O-bound loop (the dominant cost of a large incremental scan) into a
+// single pass. Missing keys are simply absent from the result.
+func (c *Cache) GetManyRaw(keys []string) map[string][]byte {
+	if c == nil || len(keys) == 0 {
+		return nil
+	}
+	out := make(map[string][]byte, len(keys))
+	_ = c.db.View(func(txn *badger.Txn) error {
+		for _, k := range keys {
+			item, err := txn.Get([]byte(k))
+			if err != nil {
+				continue
+			}
+			if v, err := item.ValueCopy(nil); err == nil {
+				out[k] = v
+			}
+		}
+		return nil
+	})
+	return out
+}
+
+// PutManyRaw writes many key/value pairs, batching into as few transactions as Badger's size
+// limits allow. Used for the cold-scan path where every module's labels are stored at once.
+func (c *Cache) PutManyRaw(kv map[string][]byte) {
+	if c == nil || len(kv) == 0 {
+		return
+	}
+	wb := c.db.NewWriteBatch()
+	defer wb.Cancel()
+	for k, v := range kv {
+		if err := wb.Set([]byte(k), v); err != nil {
+			return
+		}
+	}
+	_ = wb.Flush()
+}
+
 // PutRaw stores raw bytes under key (best-effort).
 func (c *Cache) PutRaw(key string, val []byte) {
 	if c == nil {

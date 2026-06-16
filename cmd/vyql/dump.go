@@ -34,10 +34,12 @@ func lowerCache() lowering.DeltaCache {
 // (nil = no caching / full lowering). Threading the cache makes the incremental path testable
 // (a findings-equivalence harness injects its own cache).
 func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanStats, error) {
+	tk := newTimer()
 	prog, ads, ctorTypes, stats, err := extractAll(paths)
 	if err != nil {
 		return nil, stats, err
 	}
+	tk.mark("extract")
 	if len(stats.files) == 0 {
 		return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
 	}
@@ -58,6 +60,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	if err != nil {
 		return nil, stats, err
 	}
+	tk.mark("lower")
 	// SCA runs before adapter apply so SBOM/manifest packages join the import evidence
 	// that gates package-aware adapters (the generated catalog included).
 	applySCA(g, paths)
@@ -68,6 +71,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	for _, lang := range stats.languages {
 		ads = append(ads, frontend.GeneratedPackageAdaptersFor(lang, deps)...)
 	}
+	tk.mark("sca+pkg")
 	// Adapter labeling: incremental (reuse unchanged modules' cached labels) when caching is
 	// on, else a full pass. Both produce identical labels — adapter precedence is per-node.
 	if incremental {
@@ -77,6 +81,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {
 		return nil, stats, err
 	}
+	tk.mark("adapters")
 	return g, stats, nil
 }
 

@@ -40,11 +40,18 @@ type cachedLabels struct{ Recs []usg.LabelRec }
 func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[string]string, cache lowering.DeltaCache) error {
 	fp := adapterFingerprint(g)
 
-	// decide which modules must be (re)labeled: those whose adapter-cache key misses.
+	// decide which modules must be (re)labeled: those whose adapter-cache key misses. Read all
+	// module keys in one batched transaction — thousands of individual badger reads here was the
+	// dominant cost of a large incremental scan (I/O-bound, invisible to a CPU profile).
+	keys := make([]string, 0, len(modHash))
+	for ns, h := range modHash {
+		keys = append(keys, adapterKey(fp, ns, h))
+	}
+	raws := batchGet(cache, keys)
 	relabel := map[string]bool{}
 	cachedFor := map[string]cachedLabels{}
 	for ns, h := range modHash {
-		if raw, ok := cache.GetRaw(adapterKey(fp, ns, h)); ok {
+		if raw, ok := raws[adapterKey(fp, ns, h)]; ok {
 			var cl cachedLabels
 			if gob.NewDecoder(bytes.NewReader(raw)).Decode(&cl) == nil {
 				cachedFor[ns] = cl
@@ -55,9 +62,10 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 	}
 
 	// run adapters over a view that exposes only relabel-set modules (plus nodes with no module
-	// and — via RestrictStore — all Import/SBOM evidence), recording the labels each produces.
+	// and all Import/SBOM evidence), recording the labels each produces. The subset is computed
+	// once; each adapter then iterates O(subset) instead of re-filtering the whole graph.
 	rec := &usg.RecordingStore{Store: g}
-	view := &usg.RestrictStore{Store: rec, Allow: func(id string) bool {
+	view, err := usg.NewSubsetStore(rec, func(id, _ string) bool {
 		mod, ok := lowering.NodeModule(id)
 		if !ok {
 			return true // not module-scoped — always process, never cached
@@ -66,7 +74,10 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 			return true // hashless module (native frontend, no content hash) — always relabel
 		}
 		return relabel[mod]
-	}}
+	})
+	if err != nil {
+		return err
+	}
 	if _, _, err := adapters.Apply(view, ads, nil); err != nil {
 		return err
 	}
@@ -79,12 +90,14 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 			buckets[mod] = append(buckets[mod], lr)
 		}
 	}
+	writes := make(map[string][]byte, len(relabel))
 	for ns := range relabel {
 		var buf bytes.Buffer
 		if gob.NewEncoder(&buf).Encode(cachedLabels{Recs: buckets[ns]}) == nil {
-			cache.PutRaw(adapterKey(fp, ns, modHash[ns]), buf.Bytes())
+			writes[adapterKey(fp, ns, modHash[ns])] = append([]byte(nil), buf.Bytes()...)
 		}
 	}
+	batchPut(cache, writes)
 
 	// replay cached labels for the unchanged modules onto the real store.
 	for _, cl := range cachedFor {
@@ -97,6 +110,39 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 
 func adapterKey(fp, moduleNS, moduleHash string) string {
 	return "adapt\x00" + fp + "\x00" + moduleNS + "\x00" + moduleHash
+}
+
+// batchReader / batchWriter are the optional fast paths a real (badger-backed) DeltaCache
+// implements: reading/writing thousands of keys in one transaction. In-memory test caches
+// don't, so batchGet/batchPut fall back to per-key access.
+type batchReader interface {
+	GetManyRaw(keys []string) map[string][]byte
+}
+type batchWriter interface {
+	PutManyRaw(kv map[string][]byte)
+}
+
+func batchGet(cache lowering.DeltaCache, keys []string) map[string][]byte {
+	if br, ok := cache.(batchReader); ok {
+		return br.GetManyRaw(keys)
+	}
+	out := make(map[string][]byte, len(keys))
+	for _, k := range keys {
+		if v, ok := cache.GetRaw(k); ok {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func batchPut(cache lowering.DeltaCache, kv map[string][]byte) {
+	if bw, ok := cache.(batchWriter); ok {
+		bw.PutManyRaw(kv)
+		return
+	}
+	for k, v := range kv {
+		cache.PutRaw(k, v)
+	}
 }
 
 // adapterFingerprint hashes every global input the adapter phase depends on besides a module's
