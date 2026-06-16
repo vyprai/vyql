@@ -202,3 +202,47 @@ func TestIncrementalScanFindings(t *testing.T) {
 		})
 	}
 }
+
+// TestIncrementalEditRevertAdd is the finding-identity stability gate (the lifecycle a
+// reviewer experiences): edit a file so a finding disappears, revert it and the SAME finding
+// reappears with a byte-identical key — VyQL recomputes from content-addressed module state, it
+// does not "undo" a cached finding — and adding a file introduces a genuinely new finding.
+// Throughout, the incremental scan must equal a full scan of the same tree.
+func TestIncrementalEditRevertAdd(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.py")
+	// a weak-hash (md5) finding, presence-based — no taint needed, deterministic key.
+	weak := "import hashlib\ndef f(data):\n    return hashlib.md5(data).hexdigest()\n"
+	safe := "import hashlib\ndef f(data):\n    return hashlib.sha256(data).hexdigest()\n"
+	writeFile(t, a, weak)
+
+	cache := fakeDelta{}
+	base := scanFindingKeys(t, []string{dir}, cache) // cold populate
+	if len(base) != 1 {
+		t.Fatalf("expected exactly one baseline finding, got %v", base)
+	}
+
+	// change: finding gone (incremental == full).
+	writeFile(t, a, safe)
+	if got, full := scanFindingKeys(t, []string{dir}, cache), scanFindingKeys(t, []string{dir}, nil); !eqKeys(got, full) || len(got) != 0 {
+		t.Fatalf("after change: incr=%v full=%v (want empty, equal)", got, full)
+	}
+
+	// revert: the SAME finding with the SAME key reappears via incremental rescan.
+	writeFile(t, a, weak)
+	rev := scanFindingKeys(t, []string{dir}, cache)
+	if !eqKeys(rev, base) {
+		t.Fatalf("revert did not reproduce the identical finding key\nbase=%v\nrev =%v", base, rev)
+	}
+
+	// add: a second file introduces a new, distinct finding; total grows to two.
+	writeFile(t, filepath.Join(dir, "b.py"), "import hashlib\ndef g(x):\n    return hashlib.md5(x).hexdigest()\n")
+	add := scanFindingKeys(t, []string{dir}, cache)
+	full := scanFindingKeys(t, []string{dir}, nil)
+	if !eqKeys(add, full) {
+		t.Fatalf("after add: incr=%v != full=%v", add, full)
+	}
+	if len(add) != 2 {
+		t.Fatalf("expected two findings after add, got %v", add)
+	}
+}
