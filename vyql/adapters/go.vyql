@@ -40,7 +40,17 @@ adapter go {
   source ".QueryArray" -> code.HttpInput
   source ".GetQuery" -> code.HttpInput
   source ".ShouldBind" -> code.HttpInput
+  source ".ShouldBindJSON" -> code.HttpInput
+  source ".ShouldBindQuery" -> code.HttpInput
+  source ".ShouldBindUri" -> code.HttpInput
+  source ".ShouldBindWith" -> code.HttpInput
+  source ".ShouldBindBodyWith" -> code.HttpInput
   source ".BindJSON" -> code.HttpInput
+  source ".BindQuery" -> code.HttpInput
+  source ".BindUri" -> code.HttpInput
+  source ".BindWith" -> code.HttpInput
+  source ".Bind" -> code.HttpInput
+  source ".Body" -> code.HttpInput
   source ".URLParam" -> code.HttpInput
   source "mux.Vars" -> code.HttpInput
   source ".Cookie" -> code.HttpInput

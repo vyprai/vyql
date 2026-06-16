@@ -288,6 +288,25 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		}
 		return nir.Return{}
 	case *ast.ExprStmt:
+		// out-parameter taint: a bare call passing the address of a local
+		// (`json.Unmarshal(b, &v)`, `c.ShouldBind(&form)`, `decoder.Decode(&x)`)
+		// writes through that pointer, so model it as a (re)definition of the
+		// variable from the call. This is what lets a bind/decode SOURCE taint
+		// the struct the request is decoded into — the dominant web-handler
+		// pattern — instead of the (discarded) error return.
+		if call, ok := st.X.(*ast.CallExpr); ok {
+			var outs []string
+			for _, a := range call.Args {
+				if u, ok := a.(*ast.UnaryExpr); ok && u.Op == token.AND {
+					if id, ok := u.X.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
+						outs = append(outs, id.Name)
+					}
+				}
+			}
+			if len(outs) > 0 {
+				return nir.Assign{Targets: outs, Value: c.expr(st.X)}
+			}
+		}
 		return nir.ExprStmt{Value: c.expr(st.X)}
 	case *ast.DeclStmt:
 		return c.declStmt(st)
