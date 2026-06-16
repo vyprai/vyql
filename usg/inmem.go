@@ -10,15 +10,27 @@ type InMemStore struct {
 	labels   map[string][]Label
 }
 
-func NewInMemStore() *InMemStore {
+func NewInMemStore() *InMemStore { return NewInMemStoreSized(0) }
+
+// NewInMemStoreSized preallocates the node/edge maps for an expected node count, avoiding the
+// repeated map growth (rehashing) of building a large graph from scratch — the incremental
+// lowerer rebuilds the whole graph from cached deltas on every scan, so a good size hint cuts
+// the insert cost. nodeHint <= 0 means "unknown" (start empty).
+func NewInMemStoreSized(nodeHint int) *InMemStore {
+	if nodeHint < 0 {
+		nodeHint = 0
+	}
 	return &InMemStore{
-		nodes:    map[string]Node{},
-		out:      map[string][]Edge{},
-		in:       map[string][]Edge{},
+		nodes:    make(map[string]Node, nodeHint),
+		out:      make(map[string][]Edge, nodeHint),
+		in:       make(map[string][]Edge, nodeHint),
 		byConcpt: map[string][]string{},
-		labels:   map[string][]Label{},
+		labels:   make(map[string][]Label, nodeHint/4),
 	}
 }
+
+// NodeCount returns the number of nodes (used as a size hint for preallocating a rebuilt graph).
+func (s *InMemStore) NodeCount() int { return len(s.nodes) }
 
 func (s *InMemStore) AddNode(n Node) error {
 	s.nodes[n.ID] = n

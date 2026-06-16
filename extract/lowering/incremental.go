@@ -41,6 +41,11 @@ type DeltaCache interface {
 func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache) (usg.Store, map[string]bool, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
 	l.parseCache = cache
+	// Preallocate the graph maps to the previous scan's node count (cached) — the whole graph is
+	// rebuilt from deltas every scan, and starting from an empty map costs repeated rehashing.
+	if raw, ok := cache.GetRaw(sizeHintKey); ok && len(raw) >= 1 {
+		l.g = usg.NewInMemStoreSized(decodeInt(raw))
+	}
 	base := l.g
 	fresh := map[string]bool{}
 	hits, total := 0, 0
@@ -130,6 +135,9 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		fresh[ModuleNS(m)] = true
 	}
 	batchPutRaw(cache, writes)
+	if s, ok := base.(*usg.InMemStore); ok {
+		cache.PutRaw(sizeHintKey, encodeInt(s.NodeCount()))
+	}
 	t2 := nowNano()
 	if timingOn {
 		fmt.Fprintf(stderr, "[timing] lower.pass1 %7.1fms  lower.pass2 %7.1fms  (replay %d/%d)\n",
@@ -137,6 +145,15 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	}
 	return base, fresh, nil
 }
+
+const sizeHintKey = "lower\x00graphsize"
+
+func encodeInt(n int) []byte {
+	w := &bufWriter{}
+	w.uvar(n)
+	return w.b
+}
+func decodeInt(raw []byte) int { return (&bufReader{b: raw}).uvar() }
 
 func lowerKey(moduleHash, moduleKey, sigFP string) string {
 	return "lower\x00" + moduleHash + "\x00" + moduleKey + "\x00" + sigFP
