@@ -44,7 +44,7 @@ type lowerer struct {
 	resolveImports bool
 	ctorTypes      map[string]string // constructor callee-path -> returned type name
 	g              usg.Store
-	ctr            int
+	modCtr         map[string]int // per-module node-id counter (stable, module-local ids)
 
 	funcQual     map[string]*funcInfo         // "modkey::qual" -> info
 	funcShort    map[string][]*funcInfo       // short name -> infos
@@ -615,6 +615,7 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		resolveImports: resolveImports,
 		ctorTypes:      ctorTypes,
 		g:              usg.NewInMemStore(),
+		modCtr:         map[string]int{},
 		funcQual:       map[string]*funcInfo{},
 		funcShort:      map[string][]*funcInfo{},
 		classQual:      map[string]bool{},
@@ -632,13 +633,23 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 
 // --- graph helpers ------------------------------------------------------
 
+// nid mints a node id that is STABLE per module: a module-local counter, namespaced by the
+// module key. So a node's id depends only on its own module's content and processing order,
+// not on global cross-module ordering — the prerequisite for reusing an unchanged module's
+// lowered sub-graph (incremental dataflow). Distinct module keys can never collide.
 func (l *lowerer) nid(prefix string) string {
-	l.ctr++
-	return prefix + "#" + strconv.Itoa(l.ctr)
+	l.modCtr[l.curModule]++
+	return l.curModule + "\x1f" + prefix + "#" + strconv.Itoa(l.modCtr[l.curModule])
 }
 
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
-	id := l.nid(kind)
+	return l.nodeWithID(l.nid(kind), kind, loc, props)
+}
+
+// nodeWithID creates a node with an explicit id — used for signature nodes (Param/Return)
+// whose ids are NAME-derived (sigID) so they survive a body edit and remain valid targets for
+// cross-module call edges from other (possibly cached) modules.
+func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) string {
 	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.order)}
 	l.order++
 	for k, v := range props {
@@ -646,6 +657,13 @@ func (l *lowerer) node(kind, loc string, props map[string]string) string {
 	}
 	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Props: p})
 	return id
+}
+
+// sigID is the stable, name-derived id of a function's signature node (a Param or Return).
+// Independent of the function body and of other modules, so cross-module references to it
+// stay valid when the body changes or another module is reused from cache.
+func sigID(modkey, qual, kind, name string) string {
+	return modkey + "\x1f" + qual + "#" + kind + "#" + name
 }
 
 func (l *lowerer) flow(a, b string) {
@@ -665,6 +683,7 @@ func (l *lowerer) flow(a, b string) {
 
 func (l *lowerer) run() error {
 	for _, m := range l.prog.Modules {
+		l.curModule, l.curClass = m.Key, ""
 		l.importTables[m.Key] = importTable(m)
 		for _, imp := range m.Imports {
 			l.importNode(m, imp)
@@ -724,6 +743,39 @@ func importPackageRoot(module string) string {
 	return module
 }
 
+// makeFuncInfo creates a function's signature nodes (Param/Return) with stable, name-derived
+// ids and returns its funcInfo. Shared by pass-1 registration and the pass-2 nested-function
+// fallback so both mint identical, body-independent signature ids — the anchor cross-module
+// call edges (and reused modules) point at.
+func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
+	prefix := ""
+	if cls != "" {
+		prefix = cls + "."
+	}
+	rel := prefix + st.Name // module-relative qualified name
+	params := map[string]string{}
+	order := make([]string, 0, len(st.Params))
+	for _, p := range st.Params {
+		props := map[string]string{"name": p, "func": st.Name}
+		if typ := st.ParamTypes[p]; typ != "" {
+			props["decl_type"] = typ
+		}
+		params[p] = l.nodeWithID(sigID(modkey, rel, "param", p), "Param", st.Loc, props)
+		order = append(order, p)
+	}
+	return &funcInfo{
+		paramNames: order,
+		params:     params,
+		paramTypes: st.ParamTypes,
+		ret:        l.nodeWithID(sigID(modkey, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
+		module:     modkey, cls: cls, name: st.Name,
+		validator: st.IsValidator,
+		// an empty body marks an interface/abstract method: a call typed to it must dispatch
+		// to the concrete implementations (whose bodies carry the taint).
+		abstract: len(st.Body) == 0,
+	}
+}
+
 // --- pass 1: registration ----------------------------------------------
 
 func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
@@ -749,27 +801,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				prefix = cls + "."
 			}
 			qual := modkey + "::" + prefix + st.Name
-			params := map[string]string{}
-			var order []string
-			for _, p := range st.Params {
-				props := map[string]string{"name": p, "func": st.Name}
-				if typ := st.ParamTypes[p]; typ != "" {
-					props["decl_type"] = typ
-				}
-				params[p] = l.node("Param", st.Loc, props)
-				order = append(order, p)
-			}
-			info := &funcInfo{
-				paramNames: order,
-				params:     params,
-				paramTypes: st.ParamTypes,
-				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
-				module:     modkey, cls: cls, name: st.Name,
-				validator: st.IsValidator,
-				// an empty body marks an interface/abstract method: a call typed to it must
-				// dispatch to the concrete implementations (whose bodies carry the taint).
-				abstract: len(st.Body) == 0,
-			}
+			info := l.makeFuncInfo(modkey, cls, st)
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
 		}
@@ -799,25 +831,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		qual := l.curModule + "::" + prefix + st.Name
 		info := l.funcQual[qual]
 		if info == nil {
-			params := map[string]string{}
-			var order []string
-			for _, p := range st.Params {
-				props := map[string]string{"name": p, "func": st.Name}
-				if typ := st.ParamTypes[p]; typ != "" {
-					props["decl_type"] = typ
-				}
-				params[p] = l.node("Param", st.Loc, props)
-				order = append(order, p)
-			}
-			info = &funcInfo{
-				paramNames: order,
-				params:     params,
-				paramTypes: st.ParamTypes,
-				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
-				module:     l.curModule, cls: l.curClass, name: st.Name,
-				validator: st.IsValidator,
-				abstract:  len(st.Body) == 0,
-			}
+			info = l.makeFuncInfo(l.curModule, l.curClass, st)
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
 		}
