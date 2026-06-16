@@ -46,11 +46,14 @@ type BadgerGraph struct {
 	byConcept  map[string][]int32
 	conceptHas map[string]map[int32]bool
 
-	// bounded write-back buffer for node detail (flushed to badger in batches).
-	detBuf map[int32][]byte
+	// write-back buffer for node detail. detCap == 0 means UNBOUNDED (no RAM ceiling): detail
+	// stays in RAM and is never written to badger, so the build pays no write cost and reads are
+	// RAM-served — the in-memory-fast path. With a ceiling, detCap bounds the buffer and detail
+	// spills to badger when full, so RAM stays under budget (cold detail pages from disk).
+	detBuf     map[int32][]byte
+	detBytes   int   // approx bytes buffered (for the byte-accurate spill threshold)
+	detCapByte int64 // spill when detBytes exceeds this (0 = unbounded)
 }
-
-const detBufMax = 1 << 14 // flush detail to badger every ~16k nodes
 
 type nodeDetail struct {
 	typ, loc, region, scope string
@@ -81,7 +84,9 @@ func OpenBadgerGraph(path string, cacheBytes int64) (*BadgerGraph, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewBadgerGraphDB(db, true), nil
+	g := NewBadgerGraphDB(db, true)
+	g.detCapByte = cacheBytes // 0 = unbounded; else spill detail to badger past this many bytes
+	return g, nil
 }
 
 // NewBadgerGraphDB wraps an existing *badger.DB (e.g. the shared parse cache db) as a graph store.
@@ -130,10 +135,15 @@ func (g *BadgerGraph) AddNode(n Node) error {
 		}
 		g.byType[n.Type] = append(g.byType[n.Type], i)
 	}
-	g.detBuf[i] = encDet(nodeDetail{typ: n.Type, loc: n.Loc, region: n.Region, scope: n.Scope,
+	b := encDet(nodeDetail{typ: n.Type, loc: n.Loc, region: n.Region, scope: n.Scope,
 		order: n.Order, hasOrder: n.HasOrder, props: n.Props})
-	if len(g.detBuf) >= detBufMax {
-		g.flushDet()
+	if old, ok := g.detBuf[i]; ok {
+		g.detBytes -= len(old) + 8
+	}
+	g.detBuf[i] = b
+	g.detBytes += len(b) + 8 // +8 ≈ map entry overhead
+	if g.detCapByte > 0 && int64(g.detBytes) >= g.detCapByte {
+		g.flushDet() // ceiling set: spill to badger to bound RAM
 	}
 	return nil
 }
@@ -216,6 +226,7 @@ func (g *BadgerGraph) flushDet() {
 	}
 	_ = wb.Flush()
 	g.detBuf = map[int32][]byte{}
+	g.detBytes = 0
 }
 
 func detKey(i int32) []byte {
@@ -424,7 +435,21 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 // SEQUENTIAL badger scan of the gn\0 prefix (cheap, cache-friendly) rather than a random Get per
 // node — the adapter passes iterate all nodes, and random Gets were the dominant disk-path cost.
 func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
-	g.flushDet()
+	emit := func(idx int32, b []byte) bool {
+		d := decDet(b)
+		return fn(Node{ID: g.ids[idx], Type: d.typ, Loc: d.loc, Region: d.region,
+			Order: d.order, HasOrder: d.hasOrder, Scope: d.scope, Props: d.props})
+	}
+	// in-RAM (unflushed) detail first — the only detail at all when unbounded (no ceiling).
+	for idx, b := range g.detBuf {
+		if !emit(idx, b) {
+			return
+		}
+	}
+	if len(g.detBuf) == len(g.ids) { // everything resident → no badger scan needed
+		return
+	}
+	// spilled detail: one sequential prefix scan, skipping any index also held in RAM.
 	pfx := []byte("gn")
 	stop := false
 	_ = g.db.View(func(txn *badger.Txn) error {
@@ -437,10 +462,11 @@ func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
 				continue
 			}
 			idx := int32(binary.LittleEndian.Uint32(k[2:]))
+			if _, inRAM := g.detBuf[idx]; inRAM {
+				continue
+			}
 			if err := item.Value(func(v []byte) error {
-				d := decDet(v)
-				if !fn(Node{ID: g.ids[idx], Type: d.typ, Loc: d.loc, Region: d.region,
-					Order: d.order, HasOrder: d.hasOrder, Scope: d.scope, Props: d.props}) {
+				if !emit(idx, v) {
 					stop = true
 				}
 				return nil
