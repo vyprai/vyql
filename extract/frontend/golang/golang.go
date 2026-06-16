@@ -377,6 +377,12 @@ func (c *conv) declStmt(st *ast.DeclStmt) nir.Stmt {
 }
 
 func (c *conv) expr(e ast.Expr) nir.Expr {
+	if e == nil {
+		// nil sub-expressions are legal in Go ASTs: a tag-less `switch { … }`,
+		// a slice expr with omitted bounds (a[:]), a bare `return`, etc. Model
+		// them as an empty constant so downstream lowering never deref-panics.
+		return nir.Const{}
+	}
 	switch ex := e.(type) {
 	case *ast.Ident:
 		if ex.Name == "true" || ex.Name == "false" {

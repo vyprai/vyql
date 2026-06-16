@@ -50,6 +50,9 @@ func main() {
 	// deep in loading — recover into a clean message rather than a stack trace.
 	defer func() {
 		if r := recover(); r != nil {
+			if os.Getenv("VYQL_PANIC") != "" {
+				panic(r)
+			}
 			fmt.Fprintln(os.Stderr, "vyql: "+fmt.Sprint(r))
 			os.Exit(1)
 		}
