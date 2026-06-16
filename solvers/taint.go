@@ -91,8 +91,6 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	if len(srcs) == 0 {
 		return nil, nil
 	}
-	words := (len(srcs) + 63) / 64
-
 	// isKill: a node neutralizes taint if it carries a kill control, or a char-filter whose
 	// bounded output alphabet provably excludes the sink's dangerous chars. killOf also returns
 	// the concept for near-miss detail. Memoized — each node's labels are scanned once.
@@ -130,81 +128,43 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 		}
 	}
 
-	// forward live-reachability fixpoint (monotone bitset OR; worklist over FLOWS edges).
-	in := map[string][]uint64{}
-	getBits := func(id string) []uint64 {
-		b := in[id]
-		if b == nil {
-			b = make([]uint64, words)
-			in[id] = b
-		}
-		return b
-	}
+	// forward live-reachability fixpoint. A finding is "some live source reaches this sink", and
+	// findings dedup to one per (rule, sink) — so we track a single BOOLEAN per node (reached by
+	// a live source) rather than a bitset of WHICH sources. That drops the cost from O(E·sources)
+	// to O(V+E): a node is marked tainted once and propagates once. pred records the node that
+	// first tainted each node, giving a witness source→sink path for free (no separate BFS). A
+	// kill control / sound char-filter absorbs taint: it is marked reached (for near-miss) but
+	// never propagates, matching the bitset semantics where a sanitized prefix can't reach a live
+	// sink. The chosen witness source is "a" valid rule source (sources are pre-filtered to the
+	// rule's source concept), which is all a per-(rule,sink) finding needs.
+	tainted := make(map[string]bool, len(srcs)*8)
+	pred := make(map[string]string, len(srcs)*8)
 	var nearMiss [][2]string
 	queue := make([]string, 0, len(srcs)*4)
-	inQ := map[string]bool{}
-	push := func(id string) {
-		if !inQ[id] {
-			inQ[id] = true
-			queue = append(queue, id)
+	for _, s := range srcs {
+		if !tainted[s] {
+			tainted[s] = true
+			queue = append(queue, s)
 		}
-	}
-	for i, s := range srcs {
-		getBits(s)[i/64] |= 1 << uint(i%64)
-		push(s)
 	}
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
-		inQ[node] = false
-		bits := in[node]
-		if kill, c := killOf(node); kill {
-			if anyBit(bits) { // sources die here — record the neutralizing control (near-miss)
-				nearMiss = append(nearMiss, [2]string{node, c})
-			}
-			continue // killed: nothing propagates past a neutralizer
+		if kill, c := killOf(node); kill { // reached a neutralizer: record near-miss, don't propagate
+			nearMiss = append(nearMiss, [2]string{node, c})
+			continue
 		}
 		forEachSucc(node, func(dst string) {
-			db := getBits(dst)
-			changed := false
-			for w := 0; w < words; w++ {
-				if nv := db[w] | bits[w]; nv != db[w] {
-					db[w] = nv
-					changed = true
-				}
-			}
-			if changed {
-				push(dst)
+			if !tainted[dst] {
+				tainted[dst] = true
+				pred[dst] = node
+				queue = append(queue, dst)
 			}
 		})
 	}
 
-	// witnesses: one multi-source BFS over the live graph (kill nodes excluded) gives each
-	// reached node a predecessor, so every live sink has a representative path back to a source.
-	pred := map[string]string{}
-	seen := make(map[string]bool, len(in))
-	bfs := make([]string, 0, len(srcs))
-	for _, s := range srcs {
-		if k, _ := killOf(s); !k {
-			seen[s] = true
-			bfs = append(bfs, s)
-		}
-	}
-	for len(bfs) > 0 {
-		node := bfs[0]
-		bfs = bfs[1:]
-		forEachSucc(node, func(dst string) {
-			if seen[dst] {
-				return
-			}
-			if k, _ := killOf(dst); k {
-				return
-			}
-			seen[dst] = true
-			pred[dst] = node
-			bfs = append(bfs, dst)
-		})
-	}
+	// witness path: walk pred from a tainted node back to its source root (recorded during the
+	// fixpoint, so no second traversal). path[0] is a valid source for the (rule, sink) finding.
 	pathTo := func(sink string) []string {
 		var rev []string
 		for n := sink; ; {
@@ -221,7 +181,8 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 		return rev
 	}
 
-	// emit one flow per (source, sink) with a live path; sinks/sources sorted for determinism.
+	// emit one flow per tainted live sink (findings dedup to one per (rule, sink) anyway);
+	// sinks sorted for determinism, witness source = the recorded path's root.
 	sinkSet := map[string]bool{}
 	for c := range sinkConcepts {
 		ids, _ := store.NodesWithConcept(c)
@@ -236,35 +197,16 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	sort.Strings(sinks)
 	nm := dedupPairs(nearMiss)
 	for _, sink := range sinks {
-		bits := in[sink]
-		if bits == nil {
+		if !tainted[sink] {
 			continue
 		}
 		if k, _ := killOf(sink); k { // a sink that is itself a neutralizer sanitizes its own use
 			continue
 		}
-		var path []string
-		for i, s := range srcs {
-			if bits[i/64]&(1<<uint(i%64)) == 0 {
-				continue
-			}
-			if path == nil {
-				path = pathTo(sink)
-			}
-			out = append(out, TaintFlow{SourceID: s, SinkID: sink, Kind: kind, Path: path, NearMiss: nm})
-		}
+		path := pathTo(sink)
+		out = append(out, TaintFlow{SourceID: path[0], SinkID: sink, Kind: kind, Path: path, NearMiss: nm})
 	}
 	return out, nil
-}
-
-// anyBit reports whether any source bit is set in a reachability word slice.
-func anyBit(b []uint64) bool {
-	for _, w := range b {
-		if w != 0 {
-			return true
-		}
-	}
-	return false
 }
 
 func dedupPairs(ps [][2]string) [][2]string {

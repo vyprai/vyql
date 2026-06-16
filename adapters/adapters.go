@@ -12,7 +12,11 @@
 // judgments, the lower-precedence one is suppressed and the conflict recorded.
 package adapters
 
-import "github.com/vyprai/vyql/usg"
+import (
+	"sort"
+
+	"github.com/vyprai/vyql/usg"
+)
 
 // FidelityRank and OriginRank realise the precedence partial orders (docs/07).
 var FidelityRank = map[string]int{"syntactic": 1, "resolved": 2, "semantic": 3}
@@ -242,12 +246,9 @@ func sortedKeys(m map[key][]proposal) []key {
 	for k := range m {
 		ks = append(ks, k)
 	}
-	// insertion sort by (node, concept) for determinism without importing sort
-	for i := 1; i < len(ks); i++ {
-		for j := i; j > 0 && lessKey(ks[j], ks[j-1]); j-- {
-			ks[j], ks[j-1] = ks[j-1], ks[j]
-		}
-	}
+	// sort by (node, concept) for deterministic attach order. Must be O(k log k): an insertion
+	// sort here was O(k²) and dominated the adapter phase on large graphs (millions of keys).
+	sort.Slice(ks, func(i, j int) bool { return lessKey(ks[i], ks[j]) })
 	return ks
 }
 

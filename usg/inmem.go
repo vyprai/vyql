@@ -3,11 +3,13 @@ package usg
 // InMemStore is the in-memory working-set representation used for hot-path
 // evaluation (docs/adr/0002). Maps + adjacency lists + a concept index.
 type InMemStore struct {
-	nodes    map[string]Node
-	out      map[string][]Edge
-	in       map[string][]Edge
-	byConcpt map[string][]string
-	labels   map[string][]Label
+	nodes      map[string]Node
+	byType     map[string][]string // node type -> ids (so NodesOfType is O(result), not O(all))
+	out        map[string][]Edge
+	in         map[string][]Edge
+	byConcpt   map[string][]string
+	conceptHas map[string]map[string]bool // concept -> set of node ids (O(1) dedup for byConcpt)
+	labels     map[string][]Label
 }
 
 func NewInMemStore() *InMemStore { return NewInMemStoreSized(0) }
@@ -21,11 +23,13 @@ func NewInMemStoreSized(nodeHint int) *InMemStore {
 		nodeHint = 0
 	}
 	return &InMemStore{
-		nodes:    make(map[string]Node, nodeHint),
-		out:      make(map[string][]Edge, nodeHint),
-		in:       make(map[string][]Edge, nodeHint),
-		byConcpt: map[string][]string{},
-		labels:   make(map[string][]Label, nodeHint/4),
+		nodes:      make(map[string]Node, nodeHint),
+		byType:     map[string][]string{},
+		out:        make(map[string][]Edge, nodeHint),
+		in:         make(map[string][]Edge, nodeHint),
+		byConcpt:   map[string][]string{},
+		conceptHas: map[string]map[string]bool{},
+		labels:     make(map[string][]Label, nodeHint/4),
 	}
 }
 
@@ -33,6 +37,9 @@ func NewInMemStoreSized(nodeHint int) *InMemStore {
 func (s *InMemStore) NodeCount() int { return len(s.nodes) }
 
 func (s *InMemStore) AddNode(n Node) error {
+	if _, exists := s.nodes[n.ID]; !exists {
+		s.byType[n.Type] = append(s.byType[n.Type], n.ID)
+	}
 	s.nodes[n.ID] = n
 	return nil
 }
@@ -45,13 +52,18 @@ func (s *InMemStore) AddEdge(e Edge) error {
 
 func (s *InMemStore) AddLabel(nodeID string, l Label) error {
 	s.labels[nodeID] = append(s.labels[nodeID], l)
-	// keep the concept index a SET of node ids: two adapters may label the same
-	// node with the same concept (different provenance), but it is one node.
-	for _, id := range s.byConcpt[l.Concept] {
-		if id == nodeID {
-			return nil
-		}
+	// keep the concept index a SET of node ids: two adapters may label the same node with the
+	// same concept (different provenance), but it is one node. A membership set makes the dedup
+	// O(1) — a linear scan here was O(n²) on large graphs where a concept labels many nodes.
+	seen := s.conceptHas[l.Concept]
+	if seen == nil {
+		seen = map[string]bool{}
+		s.conceptHas[l.Concept] = seen
 	}
+	if seen[nodeID] {
+		return nil
+	}
+	seen[nodeID] = true
 	s.byConcpt[l.Concept] = append(s.byConcpt[l.Concept], nodeID)
 	return nil
 }
@@ -76,12 +88,9 @@ func (s *InMemStore) NodesWithConcept(concept string) ([]string, error) {
 }
 
 func (s *InMemStore) NodesOfType(nodeType string) ([]string, error) {
-	var out []string
-	for id, n := range s.nodes {
-		if n.Type == nodeType {
-			out = append(out, id)
-		}
-	}
+	ids := s.byType[nodeType]
+	out := make([]string, len(ids))
+	copy(out, ids)
 	return out, nil
 }
 

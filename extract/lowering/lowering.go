@@ -49,7 +49,7 @@ type lowerer struct {
 	funcQual     map[string]*funcInfo         // "modkey::qual" -> info
 	funcShort    map[string][]*funcInfo       // short name -> infos
 	classQual    map[string]bool              // "modkey::Class"
-	classDefs    map[string][]string          // bare class name -> modules that define it
+	classDefs    map[string]map[string]bool   // bare class name -> SET of modules that define it
 	classFields  map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables map[string]map[string]importEntry
 
@@ -643,7 +643,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		funcQual:       map[string]*funcInfo{},
 		funcShort:      map[string][]*funcInfo{},
 		classQual:      map[string]bool{},
-		classDefs:      map[string][]string{},
+		classDefs:      map[string]map[string]bool{},
 		classFields:    map[string]map[string]string{},
 		importTables:   map[string]map[string]importEntry{},
 		containers:     map[string]*containerInfo{},
@@ -816,7 +816,10 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 		switch st := s.(type) {
 		case nir.ClassDef:
 			l.classQual[modkey+"::"+st.Name] = true
-			l.classDefs[st.Name] = appendUniq(l.classDefs[st.Name], modkey)
+			if l.classDefs[st.Name] == nil {
+				l.classDefs[st.Name] = map[string]bool{}
+			}
+			l.classDefs[st.Name][modkey] = true
 			if l.p1 != nil {
 				l.p1.ClassQual = append(l.p1.ClassQual, modkey+"::"+st.Name)
 				l.p1.ClassDefs = append(l.p1.ClassDefs, st.Name)
@@ -1712,19 +1715,11 @@ func (l *lowerer) classModule(name string, imports map[string]importEntry) (stri
 	// same-package classes). Only when EXACTLY ONE module defines that name, to
 	// avoid wrongly linking same-named classes in unrelated files.
 	if mods := l.classDefs[name]; len(mods) == 1 {
-		return mods[0], true
-	}
-	return "", false
-}
-
-// appendUniq appends s to xs if not already present.
-func appendUniq(xs []string, s string) []string {
-	for _, x := range xs {
-		if x == s {
-			return xs
+		for m := range mods {
+			return m, true
 		}
 	}
-	return append(xs, s)
+	return "", false
 }
 
 func (l *lowerer) resolveCtor(callee nir.Expr) ([2]string, bool) {

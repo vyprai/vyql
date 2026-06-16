@@ -259,7 +259,10 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 		l.classQual[k] = true
 	}
 	for _, name := range d.ClassDefs {
-		l.classDefs[name] = appendUniq(l.classDefs[name], modkey)
+		if l.classDefs[name] == nil {
+			l.classDefs[name] = map[string]bool{}
+		}
+		l.classDefs[name][modkey] = true
 	}
 	for _, cf := range d.ClassFields {
 		if l.classFields[cf.Key] == nil {
@@ -354,8 +357,8 @@ func (l *lowerer) sigFingerprint() string {
 			fmt.Fprintf(h, "I %s %s %s %s %s\n", mk, local, e.kind, e.module, e.symbol)
 		}
 	}
-	for _, c := range sortedStrSliceKeys(l.classDefs) {
-		fmt.Fprintf(h, "D %s %v\n", c, l.classDefs[c])
+	for _, c := range sortedSetKeys(l.classDefs) {
+		fmt.Fprintf(h, "D %s %v\n", c, sortedBoolKeys(l.classDefs[c]))
 	}
 	for _, c := range sortedBoolKeys(l.classQual) {
 		fmt.Fprintf(h, "Q %s\n", c)
@@ -453,7 +456,7 @@ func sortedImportEntries(m map[string]importEntry) []string {
 	return out
 }
 
-func sortedStrSliceKeys(m map[string][]string) []string {
+func sortedSetKeys(m map[string]map[string]bool) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
 		out = append(out, k)
