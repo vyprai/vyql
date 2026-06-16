@@ -62,18 +62,27 @@ func parseModules(
 				if i >= n {
 					return
 				}
+				// stat fast-path: an unchanged file (same size+mtime) resolves to its cached
+				// module without being read or hashed — the dominant cost on a warm re-scan.
+				if cache != nil {
+					if m, hit := cache.GetByStat(root, files[i]); hit {
+						mods[i], ok[i] = m, true
+						continue
+					}
+				}
 				src, err := readFile(files[i])
 				if err != nil {
 					continue
 				}
-				// content-addressed cache: a re-scan of an unchanged file skips the (expensive)
-				// tree-sitter parse entirely. The key folds in root+abs so the cached module's
-				// path-derived Key/File are correct for this scan.
+				// content-addressed cache: a re-scan of an unchanged file (whose mtime moved, so
+				// the stat path missed) still skips the expensive tree-sitter parse. The key
+				// folds in root+abs so the cached module's path-derived Key/File are correct.
 				var key string
 				if cache != nil {
 					key = cache.Key(root, files[i], src)
 					if m, hit := cache.Get(key); hit {
 						mods[i], ok[i] = m, true
+						cache.PutStat(root, files[i], key) // refresh stat→content for next time
 						continue
 					}
 				}
@@ -88,6 +97,7 @@ func parseModules(
 					mods[i], ok[i] = m, true
 					if cache != nil {
 						cache.Put(key, m)
+						cache.PutStat(root, files[i], key)
 					}
 				}
 			}

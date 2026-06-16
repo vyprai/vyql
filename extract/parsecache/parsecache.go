@@ -128,6 +128,61 @@ func (c *Cache) Put(key string, m nir.Module) {
 	})
 }
 
+// statKey keys a file by identity-WITHOUT-content: salt ∥ root ∥ abs ∥ size ∥ mtime. It maps
+// to the file's content key, so an unchanged file (same size+mtime) resolves to its parsed
+// module without being read or hashed — the dominant cost on a warm re-scan of a large tree.
+// The salt folds in the binary identity, so a rebuilt scanner invalidates stat entries too.
+func (c *Cache) statKey(root, abs string, size, mtimeNs int64) string {
+	h := sha256.New()
+	h.Write(c.salt)
+	h.Write([]byte("stat\x00"))
+	h.Write([]byte(root))
+	h.Write([]byte{0})
+	h.Write([]byte(abs))
+	h.Write([]byte{0})
+	h.Write([]byte(strconv.FormatInt(size, 10)))
+	h.Write([]byte{0})
+	h.Write([]byte(strconv.FormatInt(mtimeNs, 10)))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// GetByStat resolves a file's cached module via its (size, mtime) identity, skipping the file
+// read and content hash. The two-level lookup (stat→content key→module) keeps the cache
+// content-addressed: the stat entry only records which content key was current at last parse,
+// so a rebuilt binary or a different stored module still misses. Returns false when caching is
+// off, the file can't be stat'd, no stat entry exists (first scan), or the file changed
+// (size/mtime differ → new stat key). Like most build caches, this trusts size+mtime: a
+// content change that preserves both (rare; editors bump mtime) would be missed — callers that
+// need byte-exact invalidation can `vyql cache clear`.
+func (c *Cache) GetByStat(root, abs string) (nir.Module, bool) {
+	if c == nil {
+		return nir.Module{}, false
+	}
+	fi, err := os.Stat(abs)
+	if err != nil {
+		return nir.Module{}, false
+	}
+	ck, ok := c.GetRaw(c.statKey(root, abs, fi.Size(), fi.ModTime().UnixNano()))
+	if !ok {
+		return nir.Module{}, false
+	}
+	return c.Get(string(ck))
+}
+
+// PutStat records the stat→content-key mapping after a (re)parse so the next scan can skip the
+// read. Called whenever a content key is known to be valid for the file's current stat (fresh
+// parse, or a content hit where only the mtime moved).
+func (c *Cache) PutStat(root, abs, contentKey string) {
+	if c == nil || contentKey == "" {
+		return
+	}
+	fi, err := os.Stat(abs)
+	if err != nil {
+		return
+	}
+	c.PutRaw(c.statKey(root, abs, fi.Size(), fi.ModTime().UnixNano()), []byte(contentKey))
+}
+
 // Salt returns the executable-derived cache-busting salt (nil if disabled). Callers building
 // higher-level keys (e.g. a whole-scan result key) fold it in so a rebuilt binary invalidates.
 func (c *Cache) Salt() []byte {
