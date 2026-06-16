@@ -589,6 +589,7 @@ type jsonFinding struct {
 	FP                string                      `json:"fp"`
 	Source            string                      `json:"source"`
 	Sink              string                      `json:"sink"`
+	Path              []string                    `json:"path,omitempty"`
 	Noted             bool                        `json:"assumption_noted"`
 	ExploitConditions []findings.ExploitCondition `json:"exploit_conditions,omitempty"`
 }
@@ -613,6 +614,7 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 				jf.Noted = true
 			}
 		}
+		jf.Path = f.PathLocs
 		jf.ExploitConditions = f.ExploitConditions
 		out = append(out, jf)
 	}

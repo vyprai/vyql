@@ -455,6 +455,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				{Name: "sink", NodeID: fl.SinkID, Concept: snkC, Loc: e.loc(fl.SinkID), LabelProvenance: e.prov(fl.SinkID, snkC)},
 			},
 			Witness:           fl.Path,
+			PathLocs:          e.pathLocs(fl.Path),
 			WitnessKind:       "taint",
 			NegationEvidence:  ne,
 			Confidence:        e.conf(fl.SourceID, fl.SinkID),
@@ -482,6 +483,29 @@ func (e *Engine) ruleID(cr *CompiledRule) string {
 		return id
 	}
 	return cr.Rule.QualifiedName()
+}
+
+// pathLocs resolves each witness node to its loc, keeping order and dropping
+// consecutive duplicates. Used to expose the files the taint path traverses
+// (a CVE patch frequently lands on a sanitizer/helper on the flow, not the
+// source or sink site), so downstream localization can match the patch file.
+func (e *Engine) pathLocs(path []string) []string {
+	if len(path) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(path))
+	prev := ""
+	for _, id := range path {
+		l := e.loc(id)
+		if l == "" || l == id {
+			continue
+		}
+		if l != prev {
+			out = append(out, l)
+			prev = l
+		}
+	}
+	return out
 }
 
 func (e *Engine) loc(nodeID string) string {
