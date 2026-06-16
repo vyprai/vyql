@@ -166,10 +166,15 @@ func encodeInt(n int) []byte {
 }
 func decodeInt(raw []byte) int { return (&bufReader{b: raw}).uvar() }
 
-// newGraphStore creates the analysis graph store. VYQL_STORE=int selects the int-indexed
-// IntStore (lower memory on large graphs); otherwise the map-based InMemStore. hint>0 presizes.
+// UseIntStore forces the int-indexed (lower-memory) store; set by the CLI when a RAM ceiling is
+// configured. VYQL_STORE=int also selects it.
+var UseIntStore bool
+
+// newGraphStore creates the analysis graph store. The int-indexed IntStore (lower memory on
+// large graphs) is used when UseIntStore / VYQL_STORE=int; otherwise the map-based InMemStore.
+// hint>0 presizes.
 func newGraphStore(hint int) usg.Store {
-	if os.Getenv("VYQL_STORE") == "int" {
+	if UseIntStore || os.Getenv("VYQL_STORE") == "int" {
 		return usg.NewIntStore(hint)
 	}
 	if hint > 0 {

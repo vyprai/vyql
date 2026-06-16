@@ -19,13 +19,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"runtime/pprof"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
+	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/graphsync"
@@ -94,13 +97,62 @@ func cmdScan(args []string) error {
 	format := fs.String("format", "text", "output format: text | sarif | json")
 	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
+	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
 		usage()
 		os.Exit(2)
 	}
+	applyMaxRAM(*maxRAM)
 	return run(paths, *rulesPath, *format, *profileName, *stats)
+}
+
+// applyMaxRAM honors --max-ram (or $VYQL_MAX_RAM): set the soft heap limit to it and select the
+// low-footprint int-indexed store so a scan stays under the ceiling. Overrides the auto-80%
+// default. An invalid value is reported and ignored.
+func applyMaxRAM(v string) {
+	if v == "" {
+		v = os.Getenv("VYQL_MAX_RAM")
+	}
+	if v == "" {
+		return
+	}
+	n, err := parseBytes(v)
+	if err != nil || n <= 0 {
+		fmt.Fprintf(os.Stderr, "vyql: invalid --max-ram %q (use e.g. 8GB, 16GiB)\n", v)
+		return
+	}
+	debug.SetMemoryLimit(n)
+	lowering.UseIntStore = true // lower footprint helps stay under the ceiling
+}
+
+// parseBytes parses a human size like "8GB", "512MiB", "2G", "1048576". Decimal (KB/MB/GB) and
+// binary (KiB/MiB/GiB) units are accepted; a bare number is bytes.
+func parseBytes(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	mult := int64(1)
+	upper := strings.ToUpper(s)
+	for _, u := range []struct {
+		suf string
+		m   int64
+	}{
+		{"KIB", 1 << 10}, {"MIB", 1 << 20}, {"GIB", 1 << 30}, {"TIB", 1 << 40},
+		{"KB", 1e3}, {"MB", 1e6}, {"GB", 1e9}, {"TB", 1e12},
+		{"K", 1 << 10}, {"M", 1 << 20}, {"G", 1 << 30}, {"T", 1 << 40},
+		{"B", 1},
+	} {
+		if strings.HasSuffix(upper, u.suf) {
+			mult = u.m
+			s = strings.TrimSpace(s[:len(s)-len(u.suf)])
+			break
+		}
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+	return int64(f * float64(mult)), nil
 }
 
 // applyProfile selects the threat-model profile (explicit name or auto-detected),
