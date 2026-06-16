@@ -174,6 +174,11 @@ var UseIntStore bool
 // large graphs) is used when UseIntStore / VYQL_STORE=int; otherwise the map-based InMemStore.
 // hint>0 presizes.
 func newGraphStore(hint int) usg.Store {
+	if os.Getenv("VYQL_STORE") == "badger" {
+		if g, err := usg.OpenBadgerGraph(":memory:", 0); err == nil {
+			return g
+		}
+	}
 	if UseIntStore || os.Getenv("VYQL_STORE") == "int" {
 		return usg.NewIntStore(hint)
 	}
