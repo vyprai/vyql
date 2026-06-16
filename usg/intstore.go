@@ -34,6 +34,20 @@ type iedge struct {
 	props map[string]string
 }
 
+// IntGraph is the int-indexed fast path for hot-loop analysis (taint/reach): nodes are addressed
+// by dense int32, so a solver needs no string ids or payload in its inner loop. This is what lets
+// an out-of-core store keep only int adjacency + label sets resident while ids/payload live on
+// disk. Implemented by IntStore (and, later, its disk-backed variant).
+type IntGraph interface {
+	NodeCount() int
+	ConceptNodes(concept string) []int32
+	RangeOut(src int32, edgeType string, fn func(dst int32) bool)
+	LabelsAt(idx int32) []Label
+	NodeID(idx int32) string
+}
+
+var _ IntGraph = (*IntStore)(nil)
+
 // NewIntStore creates an int-indexed store, optionally presized for an expected node count.
 func NewIntStore(nodeHint int) *IntStore {
 	if nodeHint < 0 {
@@ -248,3 +262,36 @@ func (s *IntStore) RangeNodes(fn func(Node) bool) {
 }
 
 func (s *IntStore) NodeCount() int { return len(s.ids) }
+
+// --- IntGraph: int-indexed fast path for hot-loop analysis ----------------------------------
+
+// ConceptNodes returns the indices of nodes carrying a concept (the source/sink/kill sets the
+// taint solver iterates) without materializing any strings.
+func (s *IntStore) ConceptNodes(concept string) []int32 { return s.byConcept[concept] }
+
+// RangeOut visits the indices of out-neighbours along edgeType ("" = all). No string ids touched
+// — the basis for spilling ids/payload to disk while taint stays fully in RAM on int adjacency.
+func (s *IntStore) RangeOut(src int32, edgeType string, fn func(dst int32) bool) {
+	if int(src) >= len(s.out) {
+		return
+	}
+	for _, e := range s.out[src] {
+		if edgeType == "" || e.typ == edgeType {
+			if !fn(e.dst) {
+				return
+			}
+		}
+	}
+}
+
+// LabelsAt returns the labels on a node index (for kill-control checks in the fixpoint).
+func (s *IntStore) LabelsAt(idx int32) []Label {
+	if int(idx) >= len(s.labels) {
+		return nil
+	}
+	return s.labels[idx]
+}
+
+// NodeID maps an index back to its string id — used only when emitting findings (a handful),
+// never in the hot loop, so it can become a disk lookup in the out-of-core store.
+func (s *IntStore) NodeID(idx int32) string { return s.ids[idx] }

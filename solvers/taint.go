@@ -44,6 +44,12 @@ func firstKey(m map[string]bool) string {
 // kill-control node lies on it (the control killed the fact). Records near-miss
 // controls seen on killed sibling paths.
 func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, dangerous string) ([]TaintFlow, error) {
+	// int-indexed fast path: run the whole fixpoint on int32 node indices (no string ids/payload
+	// in the hot loop) when the store supports it — the basis for keeping only int adjacency +
+	// labels resident while ids/payload spill to disk. Produces identical findings.
+	if ig, ok := store.(usg.IntGraph); ok {
+		return findTaintFlowsInt(ig, sourceConcepts, sinkConcepts, taintKinds, killControls, dangerous), nil
+	}
 	// collect source nodes (nodes carrying any source concept)
 	sourceNodes := map[string]bool{}
 	for c := range sourceConcepts {
@@ -207,6 +213,127 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 		out = append(out, TaintFlow{SourceID: path[0], SinkID: sink, Kind: kind, Path: path, NearMiss: nm})
 	}
 	return out, nil
+}
+
+// findTaintFlowsInt is the int-indexed twin of FindTaintFlows: same boolean live-reachability
+// fixpoint and witness semantics, but every per-node structure is an array indexed by node
+// int32 (no string maps in the hot loop), and adjacency/labels/concept-sets come from the
+// IntGraph. String ids are produced only when emitting findings (NodeID), so the inner loop
+// touches no ids or payload — exactly what an out-of-core (ids/payload-on-disk) store needs.
+func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, dangerous string) []TaintFlow {
+	n := g.NodeCount()
+	kind := firstKey(taintKinds)
+
+	// source indices (sorted, deduped) for a deterministic witness choice.
+	srcSet := map[int32]bool{}
+	for c := range sourceConcepts {
+		for _, i := range g.ConceptNodes(c) {
+			srcSet[i] = true
+		}
+	}
+	if len(srcSet) == 0 {
+		return nil
+	}
+	srcs := make([]int32, 0, len(srcSet))
+	for i := range srcSet {
+		srcs = append(srcs, i)
+	}
+	sort.Slice(srcs, func(a, b int) bool { return srcs[a] < srcs[b] })
+
+	// memoized kill check on a node index.
+	killMemo := make([]int8, n) // 0 unknown, 1 kill, 2 not-kill
+	killConcept := map[int32]string{}
+	killOf := func(i int32) (bool, string) {
+		switch killMemo[i] {
+		case 1:
+			return true, killConcept[i]
+		case 2:
+			return false, ""
+		}
+		for _, l := range g.LabelsAt(i) {
+			if killControls[l.Concept] {
+				killMemo[i] = 1
+				killConcept[i] = l.Concept
+				return true, l.Concept
+			}
+			if l.Concept == "core.CharFilter" && dangerous != "" &&
+				l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], dangerous) {
+				killMemo[i] = 1
+				killConcept[i] = "core.CharFilter"
+				return true, "core.CharFilter"
+			}
+		}
+		killMemo[i] = 2
+		return false, ""
+	}
+
+	tainted := make([]bool, n)
+	pred := make([]int32, n)
+	for i := range pred {
+		pred[i] = -1
+	}
+	var nearMiss [][2]string
+	queue := make([]int32, 0, len(srcs)*4)
+	for _, s := range srcs {
+		if !tainted[s] {
+			tainted[s] = true
+			queue = append(queue, s)
+		}
+	}
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+		if kill, c := killOf(node); kill {
+			nearMiss = append(nearMiss, [2]string{g.NodeID(node), c})
+			continue
+		}
+		g.RangeOut(node, "FLOWS", func(dst int32) bool {
+			if !tainted[dst] {
+				tainted[dst] = true
+				pred[dst] = node
+				queue = append(queue, dst)
+			}
+			return true
+		})
+	}
+
+	pathTo := func(sink int32) []string {
+		var rev []int32
+		for i := sink; i >= 0; i = pred[i] {
+			rev = append(rev, i)
+		}
+		out := make([]string, len(rev))
+		for k := range rev { // reverse to source→sink order, mapping to string ids
+			out[k] = g.NodeID(rev[len(rev)-1-k])
+		}
+		return out
+	}
+
+	// sinks (sorted) → one flow per tainted live sink.
+	sinkSet := map[int32]bool{}
+	for c := range sinkConcepts {
+		for _, i := range g.ConceptNodes(c) {
+			sinkSet[i] = true
+		}
+	}
+	sinks := make([]int32, 0, len(sinkSet))
+	for i := range sinkSet {
+		sinks = append(sinks, i)
+	}
+	sort.Slice(sinks, func(a, b int) bool { return sinks[a] < sinks[b] })
+	nm := dedupPairs(nearMiss)
+	var out []TaintFlow
+	for _, sink := range sinks {
+		if !tainted[sink] {
+			continue
+		}
+		if k, _ := killOf(sink); k {
+			continue
+		}
+		path := pathTo(sink)
+		out = append(out, TaintFlow{SourceID: path[0], SinkID: g.NodeID(sink), Kind: kind, Path: path, NearMiss: nm})
+	}
+	return out
 }
 
 func dedupPairs(ps [][2]string) [][2]string {
