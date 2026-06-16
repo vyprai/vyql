@@ -175,23 +175,31 @@ var (
 	DiskCacheBytes int64
 )
 
-// newGraphStore creates the analysis graph store. Disk-backed BadgerGraph when a RAM ceiling is
-// configured (DiskStorePath); int-indexed IntStore when UseIntStore/VYQL_STORE=int; in-memory
-// BadgerGraph for VYQL_STORE=badger (testing); else the map-based InMemStore. hint>0 presizes.
+// newGraphStore creates the analysis graph store. BadgerDB is the DEFAULT source of truth:
+// on-disk when a RAM ceiling is configured (DiskStorePath, cache=DiskCacheBytes), else in-memory
+// badger. VYQL_STORE=int|inmem are escape hatches to the map-based stores (faster on small repos,
+// no badger overhead). hint>0 presizes the in-RAM stores.
 func newGraphStore(hint int) usg.Store {
-	if DiskStorePath != "" {
-		if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes); err == nil {
-			return g
+	switch os.Getenv("VYQL_STORE") {
+	case "int":
+		return usg.NewIntStore(hint)
+	case "inmem":
+		if hint > 0 {
+			return usg.NewInMemStoreSized(hint)
 		}
+		return usg.NewInMemStore()
 	}
-	if os.Getenv("VYQL_STORE") == "badger" {
-		if g, err := usg.OpenBadgerGraph(":memory:", 0); err == nil {
-			return g
-		}
-	}
-	if UseIntStore || os.Getenv("VYQL_STORE") == "int" {
+	if UseIntStore {
 		return usg.NewIntStore(hint)
 	}
+	path, cache := ":memory:", int64(0)
+	if DiskStorePath != "" {
+		path, cache = DiskStorePath, DiskCacheBytes
+	}
+	if g, err := usg.OpenBadgerGraph(path, cache); err == nil {
+		return g
+	}
+	// badger unavailable → fall back to the in-RAM store.
 	if hint > 0 {
 		return usg.NewInMemStoreSized(hint)
 	}
