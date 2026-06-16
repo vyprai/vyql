@@ -75,7 +75,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	// Adapter labeling: incremental (reuse unchanged modules' cached labels) when caching is
 	// on, else a full pass. Both produce identical labels — adapter precedence is per-node.
 	if incremental {
-		if err := applyAdaptersIncremental(g, ads, moduleHashes(prog), cache); err != nil {
+		if err := applyAdaptersIncremental(g, ads, moduleHashes(prog), deps, cache); err != nil {
 			return nil, stats, err
 		}
 	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {

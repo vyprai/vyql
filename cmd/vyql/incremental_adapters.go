@@ -37,8 +37,8 @@ type cachedLabels struct{ Recs []usg.LabelRec }
 // adapter input misses every module and re-labels the whole graph. modHash maps each module's
 // namespace (lowering.ModuleNS) to its content hash; a module absent from it (e.g. a native
 // frontend with no Hash) is always relabeled and never cached.
-func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[string]string, cache lowering.DeltaCache) error {
-	fp := adapterFingerprint(g)
+func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) error {
+	fp := adapterFingerprint(deps)
 
 	// decide which modules must be (re)labeled: those whose adapter-cache key misses. Read all
 	// module keys in one batched transaction — thousands of individual badger reads here was the
@@ -150,7 +150,7 @@ func batchPut(cache lowering.DeltaCache, kv map[string][]byte) {
 // the package-evidence set (which package-gated adapters fire), and a stat-hash of the loaded
 // adapter data (static per-language adapters + the generated per-package files for present
 // deps). If this is unchanged, a module's adapter labels are reproducible from its content.
-func adapterFingerprint(g usg.Store) string {
+func adapterFingerprint(deps map[string]bool) string {
 	h := sha256.New()
 	if salt := parsecache.Shared().Salt(); salt != nil {
 		h.Write(salt)
@@ -158,7 +158,6 @@ func adapterFingerprint(g usg.Store) string {
 	io.WriteString(h, "\x00sources\x00")
 	io.WriteString(h, frontend.ActiveSourcesKey())
 
-	deps := frontend.DependencyEvidence(g)
 	io.WriteString(h, "\x00deps\x00")
 	keys := make([]string, 0, len(deps))
 	for k := range deps {

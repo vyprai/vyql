@@ -155,6 +155,7 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	}
 	eng := engine.New(onto, g)
 	var all []*findings.Finding
+	tk := newTimer()
 	for _, cr := range compiled {
 		got, err := eng.Evaluate(cr)
 		if err != nil {
@@ -162,6 +163,7 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 		}
 		all = append(all, got...)
 	}
+	tk.mark("evaluate")
 	return all, stats, nil
 }
 
