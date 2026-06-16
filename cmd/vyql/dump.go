@@ -9,6 +9,7 @@ import (
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
+	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -26,7 +27,16 @@ func buildGraph(paths []string) (usg.Store, scanStats, error) {
 	if len(prog.Modules) == 0 {
 		return nil, stats, nil
 	}
-	g, err := lowering.LowerTyped(prog, true, ctorTypes)
+	// Incremental lowering when caching is on ($VYQL_CACHE): reuse the lowered sub-graph of
+	// unchanged modules, re-lowering only edited ones. Equivalent to LowerTyped (the merged
+	// graph is identical), so adapters/taint/rules below are untouched. Benefits every command
+	// that builds a graph (scan, trace, query, graph, …).
+	var g usg.Store
+	if cache := parsecache.Shared(); cache != nil {
+		g, err = lowering.LowerIncremental(prog, true, ctorTypes, cache)
+	} else {
+		g, err = lowering.LowerTyped(prog, true, ctorTypes)
+	}
 	if err != nil {
 		return nil, stats, err
 	}
