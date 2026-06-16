@@ -18,27 +18,17 @@ type luaConv struct {
 
 // ExtractLua parses Lua files into one NIR Program (one module per file).
 func ExtractLua(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tslua.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "self"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &luaConv{src: src, file: rel, key: moduleKey(root, f, ".lua")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.block(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tslua.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &luaConv{src: src, file: rel, key: moduleKey(root, abs, ".lua")}
+			return nir.Module{Key: c.key, File: rel, Body: c.block(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func (c *luaConv) loc(n *tree_sitter.Node) string {

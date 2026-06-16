@@ -1626,6 +1626,14 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 				return []*funcInfo{m}
 			}
 		}
+		// Cross-file fallback: the receiver type is unresolved (common with dynamically-typed
+		// `$this->getIp()` / `obj.helper()` where the helper lives in another file), but the
+		// method name is UNIQUE across the whole program. Route through it so a tainted return
+		// value connects to the call result — the canonical interprocedural-across-files miss.
+		// The uniqueness guard avoids mis-resolving same-named methods on different types.
+		if infos := l.funcShort[c.Attr]; len(infos) == 1 {
+			return infos
+		}
 	}
 	return nil
 }

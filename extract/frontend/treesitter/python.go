@@ -28,29 +28,18 @@ type pyConv struct {
 // ExtractPython parses Python files into one NIR Program (one module per file,
 // keyed by its source-root-relative dotted path so imports resolve).
 func ExtractPython(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tspython.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "self"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue // skip unreadable
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, f, ".py")}
-		root0 := tree.RootNode()
-		mod := nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}
-		prog.Modules = append(prog.Modules, mod)
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tspython.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
+			root0 := tree.RootNode()
+			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+		})
+	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func (c *pyConv) loc(n *tree_sitter.Node) string {
@@ -75,8 +64,11 @@ func namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
-	out := make([]*tree_sitter.Node, 0, n.NamedChildCount())
-	for i := uint(0); i < n.NamedChildCount(); i++ {
+	// cache the count: each *Count() is a cgo call, and re-evaluating it in the loop
+	// condition (once per child) was the bulk of the cgo traffic in this hot helper.
+	k := n.NamedChildCount()
+	out := make([]*tree_sitter.Node, 0, k)
+	for i := uint(0); i < k; i++ {
 		out = append(out, n.NamedChild(i))
 	}
 	return out
@@ -86,8 +78,9 @@ func children(n *tree_sitter.Node) []*tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
-	out := make([]*tree_sitter.Node, 0, n.ChildCount())
-	for i := uint(0); i < n.ChildCount(); i++ {
+	k := n.ChildCount()
+	out := make([]*tree_sitter.Node, 0, k)
+	for i := uint(0); i < k; i++ {
 		out = append(out, n.Child(i))
 	}
 	return out

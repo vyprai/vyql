@@ -87,6 +87,25 @@ func (s *InMemStore) Labels(nodeID string) ([]Label, error) {
 	return out, nil
 }
 
+// LabelsOf returns the node's labels WITHOUT copying — a read-only fast path for hot
+// solver loops (the taint DFS touches every reachable node). Callers must not mutate the
+// returned slice. Avoids the per-node allocation of Labels on million-node graphs.
+func (s *InMemStore) LabelsOf(nodeID string) []Label { return s.labels[nodeID] }
+
+// RangeOutEdges invokes fn for each out-edge of src matching edgeType ("" = all) without
+// allocating a filtered slice (the hot-path complement to OutEdges). Stop early by
+// returning false from fn.
+func (s *InMemStore) RangeOutEdges(src, edgeType string, fn func(dst string) bool) {
+	for _, e := range s.out[src] {
+		if edgeType != "" && e.Type != edgeType {
+			continue
+		}
+		if !fn(e.Dst) {
+			return
+		}
+	}
+}
+
 func (s *InMemStore) Close() error { return nil }
 
 func filterEdges(edges []Edge, edgeType string) []Edge {

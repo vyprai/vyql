@@ -23,28 +23,17 @@ type rbConv struct {
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
 func ExtractRuby(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsruby.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "self"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &rbConv{src: src, root: root, file: rel}
-		mod := nir.Module{Key: "", File: rel, Body: c.blockChildren(tree.RootNode())}
-		prog.Modules = append(prog.Modules, mod)
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsruby.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &rbConv{src: src, root: root, file: rel}
+			return nir.Module{Key: "", File: rel, Body: c.blockChildren(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func (c *rbConv) loc(n *tree_sitter.Node) string {

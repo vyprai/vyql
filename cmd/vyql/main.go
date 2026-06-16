@@ -19,12 +19,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"sort"
 	"strings"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
+	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
@@ -72,6 +74,8 @@ func main() {
 		err = cmdValidateAdapter(args)
 	case "diff":
 		err = cmdDiff(args)
+	case "cache":
+		err = cmdCache(args)
 	default:
 		usage()
 		os.Exit(2)
@@ -162,14 +166,39 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 }
 
 func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
+	if cp := os.Getenv("VYQL_CPUPROFILE"); cp != "" {
+		f, _ := os.Create(cp)
+		_ = pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 	prof := applyProfile(paths, profileName)
 	src, err := loadRules(rulesPath)
 	if err != nil {
 		return err
 	}
-	all, stats, err := scanPaths(paths, src)
-	if err != nil {
-		return err
+	// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
+	// changed — no source file edit and no vyql/ data change — replay the cached findings and
+	// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
+	// reparse only the files that actually changed.
+	cache := parsecache.Shared()
+	var rkey string
+	var all []*findings.Finding
+	var stats scanStats
+	hit := false
+	if cache != nil {
+		rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
+		if cs, ok := loadCachedScan(cache, rkey); ok {
+			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
+		}
+	}
+	if !hit {
+		all, stats, err = scanPaths(paths, src)
+		if err != nil {
+			return err
+		}
+		if cache != nil {
+			storeCachedScan(cache, rkey, all, stats)
+		}
 	}
 
 	// output

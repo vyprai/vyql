@@ -6,6 +6,7 @@
 package solvers
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/vyprai/vyql/usg"
@@ -21,53 +22,8 @@ type TaintFlow struct {
 	NearMiss [][2]string
 }
 
-// nodeConcepts returns the set of concept labels on a node.
-func nodeConcepts(store usg.Store, nodeID string) map[string]bool {
-	labels, _ := store.Labels(nodeID)
-	out := make(map[string]bool, len(labels))
-	for _, l := range labels {
-		out[l.Concept] = true
-	}
-	return out
-}
-
-func killingControl(concepts, killControls map[string]bool) string {
-	for c := range concepts {
-		if killControls[c] {
-			return c
-		}
-	}
-	return ""
-}
-
-// charFilterSound reports whether a node carries a core.CharFilter label (a character-
-// filtering replace) and, if so, whether it PROVABLY neutralizes the given dangerous
-// characters — its output alphabet is bounded and excludes all of them.
-func charFilterSound(store usg.Store, nodeID, dangerous string) (present, sound bool) {
-	if dangerous == "" {
-		// no dangerous-char set declared for this sink → a filter can never be proven
-		// sound (but is still "present" so a weak-filter note can be emitted).
-		labels, _ := store.Labels(nodeID)
-		for _, l := range labels {
-			if l.Concept == "core.CharFilter" {
-				return true, false
-			}
-		}
-		return false, false
-	}
-	labels, _ := store.Labels(nodeID)
-	for _, l := range labels {
-		if l.Concept != "core.CharFilter" {
-			continue
-		}
-		present = true
-		if l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], dangerous) {
-			sound = true
-		}
-	}
-	return
-}
-
+// excludesAll reports whether a char-filter's bounded output alphabet excludes every
+// dangerous character for a sink (i.e. the filter provably neutralizes the taint).
 func excludesAll(alphabet, dangerous string) bool {
 	for _, d := range dangerous {
 		if strings.ContainsRune(alphabet, d) {
@@ -75,15 +31,6 @@ func excludesAll(alphabet, dangerous string) bool {
 		}
 	}
 	return true
-}
-
-func intersects(a, b map[string]bool) bool {
-	for c := range a {
-		if b[c] {
-			return true
-		}
-	}
-	return false
 }
 
 func firstKey(m map[string]bool) string {
@@ -112,83 +59,208 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	kind := firstKey(taintKinds)
 	var out []TaintFlow
 
-	for src := range sourceNodes {
-		var livePaths [][]string
-		var killed [][2]string
-		// Memoize (node, sanitized-state) within this source's traversal. Without it the DFS
-		// ENUMERATES every distinct path; a diamond-shaped graph — which a shared helper
-		// (one callee reached from N call sites and feeding N results) produces — has an
-		// exponential number of paths, so a few hundred call sites take minutes. Each (node,
-		// sanitized) pair is explored once: the sinks reachable below a node depend only on the
-		// node and whether the prefix was already sanitized, not on which prefix reached it, and
-		// only one witness per sink is reported anyway. A node first seen sanitized can still be
-		// re-explored unsanitized (the more permissive state) — the bool is part of the key.
-		visited := map[string]bool{}
+	// Hot-path fast accessors (in-memory store): read labels and iterate out-edges without
+	// the per-call slice copies that OutEdges/Labels make. The taint DFS touches every
+	// reachable node, so those copies dominated transient allocation (and thus GC/scavenger
+	// — runtime.madvise — time) on large graphs. Falls back to the interface for other stores.
+	fast, isFast := store.(interface {
+		LabelsOf(nodeID string) []usg.Label
+		RangeOutEdges(src, edgeType string, fn func(dst string) bool)
+	})
+	labelsOf := func(id string) []usg.Label {
+		if isFast {
+			return fast.LabelsOf(id)
+		}
+		ls, _ := store.Labels(id)
+		return ls
+	}
 
-		var dfs func(nodeID string, path []string, sanitized bool, killers [][2]string)
-		dfs = func(nodeID string, path []string, sanitized bool, killers [][2]string) {
-			vkey := nodeID + "\x00f"
-			if sanitized {
-				vkey = nodeID + "\x00t"
+	// Global cross-source taint. Rather than an independent DFS per source (which re-traverses
+	// shared subgraphs once per source), compute live source→sink reachability in ONE forward
+	// dataflow pass: every node carries a bitset of the sources that reach it along a LIVE
+	// (un-sanitized) path. A kill control / sound char-filter absorbs taint — its live-out is
+	// empty, so sources never propagate past it — which matches the DFS semantics where a
+	// sanitized prefix can never reach a live sink (sanitization is monotone). Cost is
+	// O((V+E)·words) ONCE instead of O(sources·(V+E)). Witnesses are presentation-only and are
+	// reconstructed by a single multi-source BFS over the live graph.
+	srcs := make([]string, 0, len(sourceNodes))
+	for s := range sourceNodes {
+		srcs = append(srcs, s)
+	}
+	sort.Strings(srcs)
+	if len(srcs) == 0 {
+		return nil, nil
+	}
+	words := (len(srcs) + 63) / 64
+
+	// isKill: a node neutralizes taint if it carries a kill control, or a char-filter whose
+	// bounded output alphabet provably excludes the sink's dangerous chars. killOf also returns
+	// the concept for near-miss detail. Memoized — each node's labels are scanned once.
+	killMemo := map[string]int8{} // 0 unknown, 1 kill, 2 not-kill
+	killConcept := map[string]string{}
+	killOf := func(id string) (bool, string) {
+		switch killMemo[id] {
+		case 1:
+			return true, killConcept[id]
+		case 2:
+			return false, ""
+		}
+		for _, l := range labelsOf(id) {
+			if killControls[l.Concept] {
+				killMemo[id], killConcept[id] = 1, l.Concept
+				return true, l.Concept
 			}
-			if visited[vkey] {
+			if l.Concept == "core.CharFilter" && dangerous != "" &&
+				l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], dangerous) {
+				killMemo[id], killConcept[id] = 1, "core.CharFilter"
+				return true, "core.CharFilter"
+			}
+		}
+		killMemo[id] = 2
+		return false, ""
+	}
+	forEachSucc := func(id string, fn func(string)) {
+		if isFast {
+			fast.RangeOutEdges(id, "FLOWS", func(dst string) bool { fn(dst); return true })
+		} else {
+			edges, _ := store.OutEdges(id, "FLOWS")
+			for _, e := range edges {
+				fn(e.Dst)
+			}
+		}
+	}
+
+	// forward live-reachability fixpoint (monotone bitset OR; worklist over FLOWS edges).
+	in := map[string][]uint64{}
+	getBits := func(id string) []uint64 {
+		b := in[id]
+		if b == nil {
+			b = make([]uint64, words)
+			in[id] = b
+		}
+		return b
+	}
+	var nearMiss [][2]string
+	queue := make([]string, 0, len(srcs)*4)
+	inQ := map[string]bool{}
+	push := func(id string) {
+		if !inQ[id] {
+			inQ[id] = true
+			queue = append(queue, id)
+		}
+	}
+	for i, s := range srcs {
+		getBits(s)[i/64] |= 1 << uint(i%64)
+		push(s)
+	}
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+		inQ[node] = false
+		bits := in[node]
+		if kill, c := killOf(node); kill {
+			if anyBit(bits) { // sources die here — record the neutralizing control (near-miss)
+				nearMiss = append(nearMiss, [2]string{node, c})
+			}
+			continue // killed: nothing propagates past a neutralizer
+		}
+		forEachSucc(node, func(dst string) {
+			db := getBits(dst)
+			changed := false
+			for w := 0; w < words; w++ {
+				if nv := db[w] | bits[w]; nv != db[w] {
+					db[w] = nv
+					changed = true
+				}
+			}
+			if changed {
+				push(dst)
+			}
+		})
+	}
+
+	// witnesses: one multi-source BFS over the live graph (kill nodes excluded) gives each
+	// reached node a predecessor, so every live sink has a representative path back to a source.
+	pred := map[string]string{}
+	seen := make(map[string]bool, len(in))
+	bfs := make([]string, 0, len(srcs))
+	for _, s := range srcs {
+		if k, _ := killOf(s); !k {
+			seen[s] = true
+			bfs = append(bfs, s)
+		}
+	}
+	for len(bfs) > 0 {
+		node := bfs[0]
+		bfs = bfs[1:]
+		forEachSucc(node, func(dst string) {
+			if seen[dst] {
 				return
 			}
-			visited[vkey] = true
-			concepts := nodeConcepts(store, nodeID)
-			nowSan := sanitized
-			local := killers
-			if k := killingControl(concepts, killControls); k != "" {
-				nowSan = true
-				local = append(append([][2]string{}, killers...), [2]string{nodeID, k})
+			if k, _ := killOf(dst); k {
+				return
 			}
-			// A character-filtering replace whose bounded output alphabet excludes every
-			// dangerous char for this sink soundly neutralizes the taint (allowlist).
-			if _, sound := charFilterSound(store, nodeID, dangerous); sound {
-				nowSan = true
-				local = append(append([][2]string{}, killers...), [2]string{nodeID, "core.CharFilter"})
+			seen[dst] = true
+			pred[dst] = node
+			bfs = append(bfs, dst)
+		})
+	}
+	pathTo := func(sink string) []string {
+		var rev []string
+		for n := sink; ; {
+			rev = append(rev, n)
+			p, ok := pred[n]
+			if !ok {
+				break
 			}
-			// sink? (DFS starts only at sources, so a sink reached here is
-			// genuinely tainted — including the source node itself)
-			if intersects(concepts, sinkConcepts) {
-				if nowSan {
-					killed = append(killed, local...)
-				} else {
-					cp := append([]string{}, path...)
-					livePaths = append(livePaths, cp)
-				}
-			}
-			edges, _ := store.OutEdges(nodeID, "FLOWS")
-			for _, e := range edges {
-				if !contains(path, e.Dst) {
-					next := append(append([]string{}, path...), e.Dst)
-					dfs(e.Dst, next, nowSan, local)
-				}
-			}
+			n = p
 		}
-		dfs(src, []string{src}, false, nil)
+		for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
+			rev[i], rev[j] = rev[j], rev[i]
+		}
+		return rev
+	}
 
-		// one finding per (source, sink) with at least one live path
-		bySink := map[string][]string{}
-		for _, p := range livePaths {
-			sink := p[len(p)-1]
-			if _, ok := bySink[sink]; !ok {
-				bySink[sink] = p
-			}
+	// emit one flow per (source, sink) with a live path; sinks/sources sorted for determinism.
+	sinkSet := map[string]bool{}
+	for c := range sinkConcepts {
+		ids, _ := store.NodesWithConcept(c)
+		for _, id := range ids {
+			sinkSet[id] = true
 		}
-		for sink, witness := range bySink {
-			out = append(out, TaintFlow{
-				SourceID: src, SinkID: sink, Kind: kind,
-				Path: witness, NearMiss: dedupPairs(killed),
-			})
+	}
+	sinks := make([]string, 0, len(sinkSet))
+	for s := range sinkSet {
+		sinks = append(sinks, s)
+	}
+	sort.Strings(sinks)
+	nm := dedupPairs(nearMiss)
+	for _, sink := range sinks {
+		bits := in[sink]
+		if bits == nil {
+			continue
+		}
+		if k, _ := killOf(sink); k { // a sink that is itself a neutralizer sanitizes its own use
+			continue
+		}
+		var path []string
+		for i, s := range srcs {
+			if bits[i/64]&(1<<uint(i%64)) == 0 {
+				continue
+			}
+			if path == nil {
+				path = pathTo(sink)
+			}
+			out = append(out, TaintFlow{SourceID: s, SinkID: sink, Kind: kind, Path: path, NearMiss: nm})
 		}
 	}
 	return out, nil
 }
 
-func contains(xs []string, v string) bool {
-	for _, x := range xs {
-		if x == v {
+// anyBit reports whether any source bit is set in a reachability word slice.
+func anyBit(b []uint64) bool {
+	for _, w := range b {
+		if w != 0 {
 			return true
 		}
 	}

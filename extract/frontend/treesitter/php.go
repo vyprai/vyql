@@ -18,28 +18,17 @@ type phConv struct {
 
 // ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
 func ExtractPHP(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsphp.LanguagePHP()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &phConv{src: src, root: root, file: rel}
-		mod := nir.Module{Key: "", File: rel, Body: c.block(tree.RootNode())}
-		prog.Modules = append(prog.Modules, mod)
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsphp.LanguagePHP()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &phConv{src: src, root: root, file: rel}
+			return nir.Module{Key: "", File: rel, Body: c.block(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *phConv) loc(n *tree_sitter.Node) string {

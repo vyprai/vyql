@@ -25,7 +25,12 @@ type Mapping struct {
 	Concept    string
 	Fidelity   string // optional per-mapping fidelity; overrides the adapter's
 	Confidence string // optional per-mapping confidence; overrides the adapter's
-	Detail     map[string]string
+	// Specificity, when > 0, overrides the adapter's specificity for this one mapping.
+	// It realises the default-adapter tiering: a package-specific match (3) supersedes a
+	// native-runtime path match (2) which supersedes a general name-based method match (1)
+	// on the same (node, concept).
+	Specificity int
+	Detail      map[string]string
 }
 
 func (m Mapping) negative() string {
@@ -59,6 +64,22 @@ func less(a, b [3]int) bool {
 		}
 	}
 	return false
+}
+
+// proposalKey is the per-mapping precedence: the mapping's own specificity/fidelity
+// override the adapter's when set. This lets a single adapter emit mappings at different
+// tiers (general method match vs native path match vs package-specific) and have the most
+// specific win the (node, concept) — the default-adapter tiering the design calls for.
+func proposalKey(p proposal) [3]int {
+	spec := p.ad.Specificity
+	if p.m.Specificity > 0 {
+		spec = p.m.Specificity
+	}
+	fid := p.ad.Fidelity
+	if p.m.Fidelity != "" {
+		fid = p.m.Fidelity
+	}
+	return [3]int{spec, FidelityRank[fid], OriginRank[p.ad.Origin]}
 }
 
 // ConflictRecord notes that one adapter's claim was suppressed or out-ranked.
@@ -136,12 +157,15 @@ func Apply(store usg.Store, ads []Adapter, tenantOverrides []Mapping) ([]Conflic
 			}
 		}
 
+		// the most-specific positive proposal wins (per-mapping tiering): a package
+		// match supersedes a native path match supersedes a general method match.
+		win := maxProposal(plist)
+
 		// resolve positive vs negative claims on the same (node, concept)
 		negAds := neg[k]
 		if len(negAds) > 0 {
-			bestPos := maxAdapter(plist)
 			bestNeg := maxNeg(negAds)
-			if less(bestPos.precedenceKey(), bestNeg.precedenceKey()) {
+			if less(proposalKey(win), bestNeg.precedenceKey()) {
 				for _, p := range plist {
 					suppressed = append(suppressed, p.m)
 					conflicts = append(conflicts, ConflictRecord{p.m.NodeID, p.m.Concept,
@@ -150,18 +174,16 @@ func Apply(store usg.Store, ads []Adapter, tenantOverrides []Mapping) ([]Conflic
 				continue
 			}
 			conflicts = append(conflicts, ConflictRecord{k.node, k.concept,
-				bestPos.Name, bestNeg.Name, "positive claim higher precedence"})
+				win.ad.Name, bestNeg.Name, "positive claim higher precedence"})
 		}
 
-		// attach the winning positive; note out-ranked losers
-		winner := maxAdapter(plist)
+		// attach the winner; note out-ranked losers (lower-tier matches superseded)
 		for _, p := range plist {
-			if p.ad.Name != winner.Name {
+			if p.ad.Name != win.ad.Name {
 				conflicts = append(conflicts, ConflictRecord{p.m.NodeID, p.m.Concept,
-					winner.Name, p.ad.Name, "lower precedence (specificity/fidelity/origin)"})
+					win.ad.Name, p.ad.Name, "lower precedence (specificity/fidelity/origin)"})
 			}
 		}
-		win := winnerProposal(plist, winner)
 		if err := attach(store, win.m, win.ad.Name, win.ad.Fidelity, win.ad.Confidence); err != nil {
 			return nil, nil, err
 		}
@@ -191,11 +213,15 @@ func attach(store usg.Store, m Mapping, adapter, fidelity, confidence string) er
 	})
 }
 
-func maxAdapter(ps []proposal) Adapter {
-	best := ps[0].ad
+// maxProposal returns the highest-precedence proposal (per-mapping tiering), keeping
+// the first on ties for determinism. Subsumes the old adapter-then-fidelity selection:
+// specificity (package > native > general) dominates, then fidelity, then origin.
+func maxProposal(ps []proposal) proposal {
+	best := ps[0]
+	bestK := proposalKey(best)
 	for _, p := range ps[1:] {
-		if less(best.precedenceKey(), p.ad.precedenceKey()) {
-			best = p.ad
+		if k := proposalKey(p); less(bestK, k) {
+			best, bestK = p, k
 		}
 	}
 	return best
@@ -209,27 +235,6 @@ func maxNeg(ads []Adapter) Adapter {
 		}
 	}
 	return best
-}
-
-// winnerProposal returns the winning adapter's proposal for a (node, concept);
-// among that adapter's proposals it prefers the highest per-mapping fidelity, so
-// a type-verified (resolved) mapping isn't shadowed by an earlier syntactic one.
-func winnerProposal(ps []proposal, winner Adapter) proposal {
-	best := -1
-	bestRank := -1
-	for i, p := range ps {
-		if p.ad.Name != winner.Name {
-			continue
-		}
-		r := FidelityRank[p.m.Fidelity]
-		if best < 0 || r > bestRank {
-			best, bestRank = i, r
-		}
-	}
-	if best >= 0 {
-		return ps[best]
-	}
-	return ps[0]
 }
 
 func sortedKeys(m map[key][]proposal) []key {

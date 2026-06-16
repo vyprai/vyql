@@ -23,30 +23,19 @@ type jsConv struct {
 
 // ExtractJavaScript parses JS/TS files into one NIR Program.
 func ExtractJavaScript(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsjs.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, f)}
-		root0 := tree.RootNode()
-		c.exported = c.exportedNames(root0)
-		mod := nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}
-		prog.Modules = append(prog.Modules, mod)
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsjs.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
+			root0 := tree.RootNode()
+			c.exported = c.exportedNames(root0)
+			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/usg"
 )
@@ -29,10 +30,19 @@ func buildGraph(paths []string) (usg.Store, scanStats, error) {
 	if err != nil {
 		return nil, stats, err
 	}
+	// SCA runs before adapter apply so SBOM/manifest packages join the import evidence
+	// that gates package-aware adapters (the generated catalog included).
+	applySCA(g, paths)
+	// Dynamic, dependency-gated package adapters: load the generated per-package catalog
+	// only for packages this project actually depends on, then apply alongside the static
+	// framework adapters.
+	deps := frontend.DependencyEvidence(g)
+	for _, lang := range stats.languages {
+		ads = append(ads, frontend.GeneratedPackageAdaptersFor(lang, deps)...)
+	}
 	if _, _, err := adapters.Apply(g, ads, nil); err != nil {
 		return nil, stats, err
 	}
-	applySCA(g, paths)
 	return g, stats, nil
 }
 

@@ -1,0 +1,92 @@
+package main
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/gob"
+	"encoding/hex"
+	"fmt"
+	"hash"
+	"io"
+	"io/fs"
+	"path/filepath"
+
+	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/extract/parsecache"
+	"github.com/vyprai/vyql/findings"
+)
+
+// cachedScan is the gob-serialized whole-scan result stored under a scan fingerprint, so an
+// unchanged repo (no source change AND no vyql/ data change) replays instantly instead of
+// re-running the pipeline. scanStats' fields are unexported, so its data is carried explicitly.
+type cachedScan struct {
+	Findings  []*findings.Finding
+	Files     map[string]int
+	Languages []string
+}
+
+// scanFingerprint hashes everything a scan's output depends on: the binary (cache salt — a
+// rebuild invalidates), the rule source, the active profile, every file under the vyql/ data
+// dir (adapters/packs/ontology), and every file under the scan paths. Uses size+mtime (a
+// stat, not a read), the conventional incremental-build change signal.
+func scanFingerprint(salt []byte, paths []string, rulesSrc, profile string) string {
+	h := sha256.New()
+	h.Write(salt)
+	io.WriteString(h, "\x00rules\x00")
+	io.WriteString(h, rulesSrc)
+	io.WriteString(h, "\x00profile\x00")
+	io.WriteString(h, profile)
+	io.WriteString(h, "\x00data\x00")
+	statWalk(h, datadir.Root())
+	for _, p := range paths {
+		io.WriteString(h, "\x00src\x00")
+		statWalk(h, p)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// statWalk folds each regular file's path, size, and mtime under root into h, in WalkDir's
+// deterministic lexical order. VCS/dependency dirs are skipped (they don't affect findings).
+func statWalk(h hash.Hash, root string) {
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", "node_modules", "vendor", ".hg", ".svn":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		info, e := d.Info()
+		if e != nil {
+			return nil
+		}
+		io.WriteString(h, p)
+		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
+		return nil
+	})
+}
+
+// loadCachedScan returns a previously cached scan result for key, if present.
+func loadCachedScan(c *parsecache.Cache, key string) (cachedScan, bool) {
+	raw, ok := c.GetRaw("scan\x00" + key)
+	if !ok {
+		return cachedScan{}, false
+	}
+	var cs cachedScan
+	if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&cs); err != nil {
+		return cachedScan{}, false
+	}
+	return cs, true
+}
+
+// storeCachedScan persists a scan result under key.
+func storeCachedScan(c *parsecache.Cache, key string, all []*findings.Finding, stats scanStats) {
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(cachedScan{Findings: all, Files: stats.files, Languages: stats.languages}); err != nil {
+		return
+	}
+	c.PutRaw("scan\x00"+key, buf.Bytes())
+}

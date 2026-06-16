@@ -22,28 +22,18 @@ var csHTTPAttrs = map[string]bool{
 
 // ExtractCSharp parses C# files into one NIR Program (one module per file).
 func ExtractCSharp(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tscs.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &csConv{src: src, file: rel, key: moduleKey(root, f, ".cs")}
-		root := tree.RootNode()
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Imports: c.imports(root), Body: c.decls(root)})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tscs.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &csConv{src: src, file: rel, key: moduleKey(root, abs, ".cs")}
+			r := tree.RootNode()
+			return nir.Module{Key: c.key, File: rel, Imports: c.imports(r), Body: c.decls(r)}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *csConv) loc(n *tree_sitter.Node) string {
