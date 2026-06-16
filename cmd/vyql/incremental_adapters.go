@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
 	"encoding/hex"
 	"hash"
 	"io"
@@ -18,8 +16,106 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// cachedLabels is the gob-serialized adapter-label output for one module's nodes.
-type cachedLabels struct{ Recs []usg.LabelRec }
+// encodeLabels/decodeLabels are a compact length-prefixed codec for one module's adapter-label
+// output — far faster than gob (no reflection, fewer allocations), the dominant cost of replaying
+// thousands of modules' cached labels per warm scan. The bytes are a cache value (never hashed),
+// so encoding order is free; round-trip fidelity is gated by the findings-equivalence harness.
+func encodeLabels(recs []usg.LabelRec) []byte {
+	w := &lblWriter{b: make([]byte, 0, 128)}
+	w.uvar(len(recs))
+	for _, lr := range recs {
+		w.str(lr.NodeID)
+		w.str(lr.Label.Concept)
+		p := lr.Label.Provenance
+		w.str(p.Extractor)
+		w.str(p.Adapter)
+		w.str(p.SourceRef)
+		w.str(p.Confidence)
+		w.str(p.Fidelity)
+		w.smap(lr.Label.Detail)
+	}
+	return w.b
+}
+
+func decodeLabels(raw []byte) (recs []usg.LabelRec, ok bool) {
+	defer func() {
+		if recover() != nil {
+			recs, ok = nil, false
+		}
+	}()
+	r := &lblReader{b: raw}
+	n := r.uvar()
+	if n == 0 {
+		return nil, true
+	}
+	recs = make([]usg.LabelRec, n)
+	for i := range recs {
+		nodeID := r.str()
+		lbl := usg.Label{Concept: r.str()}
+		lbl.Provenance = usg.Provenance{
+			Extractor: r.str(), Adapter: r.str(), SourceRef: r.str(),
+			Confidence: r.str(), Fidelity: r.str(),
+		}
+		lbl.Detail = r.smap()
+		recs[i] = usg.LabelRec{NodeID: nodeID, Label: lbl}
+	}
+	return recs, true
+}
+
+type lblWriter struct{ b []byte }
+
+func (w *lblWriter) uvar(n int) {
+	for n >= 0x80 {
+		w.b = append(w.b, byte(n)|0x80)
+		n >>= 7
+	}
+	w.b = append(w.b, byte(n))
+}
+func (w *lblWriter) str(s string) { w.uvar(len(s)); w.b = append(w.b, s...) }
+func (w *lblWriter) smap(m map[string]string) {
+	w.uvar(len(m))
+	for k, v := range m {
+		w.str(k)
+		w.str(v)
+	}
+}
+
+type lblReader struct {
+	b []byte
+	i int
+}
+
+func (r *lblReader) uvar() int {
+	var x int
+	var s uint
+	for {
+		c := r.b[r.i]
+		r.i++
+		x |= int(c&0x7f) << s
+		if c < 0x80 {
+			return x
+		}
+		s += 7
+	}
+}
+func (r *lblReader) str() string {
+	n := r.uvar()
+	s := string(r.b[r.i : r.i+n])
+	r.i += n
+	return s
+}
+func (r *lblReader) smap() map[string]string {
+	n := r.uvar()
+	if n == 0 {
+		return nil
+	}
+	m := make(map[string]string, n)
+	for j := 0; j < n; j++ {
+		k := r.str()
+		m[k] = r.str()
+	}
+	return m
+}
 
 // applyAdaptersIncremental runs the adapter labeling phase reusing the cached concept labels of
 // modules whose content AND the global adapter inputs are unchanged, re-running adapters only on
@@ -49,12 +145,11 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 	}
 	raws := batchGet(cache, keys)
 	relabel := map[string]bool{}
-	cachedFor := map[string]cachedLabels{}
+	cachedFor := map[string][]usg.LabelRec{}
 	for ns, h := range modHash {
 		if raw, ok := raws[adapterKey(fp, ns, h)]; ok {
-			var cl cachedLabels
-			if gob.NewDecoder(bytes.NewReader(raw)).Decode(&cl) == nil {
-				cachedFor[ns] = cl
+			if recs, ok := decodeLabels(raw); ok {
+				cachedFor[ns] = recs
 				continue
 			}
 		}
@@ -92,16 +187,13 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 	}
 	writes := make(map[string][]byte, len(relabel))
 	for ns := range relabel {
-		var buf bytes.Buffer
-		if gob.NewEncoder(&buf).Encode(cachedLabels{Recs: buckets[ns]}) == nil {
-			writes[adapterKey(fp, ns, modHash[ns])] = append([]byte(nil), buf.Bytes()...)
-		}
+		writes[adapterKey(fp, ns, modHash[ns])] = encodeLabels(buckets[ns])
 	}
 	batchPut(cache, writes)
 
 	// replay cached labels for the unchanged modules onto the real store.
-	for _, cl := range cachedFor {
-		for _, lr := range cl.Recs {
+	for _, recs := range cachedFor {
+		for _, lr := range recs {
 			_ = g.AddLabel(lr.NodeID, lr.Label)
 		}
 	}
