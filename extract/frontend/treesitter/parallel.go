@@ -49,6 +49,13 @@ func parseModules(
 		workers = 1
 	}
 	cache := parsecache.Shared() // nil unless $VYQL_CACHE is set; all methods are nil-safe
+	// Prefetch all unchanged modules' cached blobs in two batched transactions, so workers
+	// gob-decode from memory instead of doing per-file badger round-trips (the I/O that
+	// dominated a warm re-scan). Misses (changed/new files) fall through to read+parse below.
+	var prefetched map[string][]byte
+	if cache != nil {
+		prefetched = cache.PrefetchByStat(root, files)
+	}
 	var next int64 = -1
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
@@ -62,10 +69,10 @@ func parseModules(
 				if i >= n {
 					return
 				}
-				// stat fast-path: an unchanged file (same size+mtime) resolves to its cached
-				// module without being read or hashed — the dominant cost on a warm re-scan.
-				if cache != nil {
-					if m, hit := cache.GetByStat(root, files[i]); hit {
+				// stat fast-path: an unchanged file resolves to its cached module without being
+				// read, hashed, or individually fetched — decode the prefetched blob in-worker.
+				if blob, hit := prefetched[files[i]]; hit {
+					if m, good := parsecache.DecodeModule(blob); good {
 						mods[i], ok[i] = m, true
 						continue
 					}

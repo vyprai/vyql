@@ -6,12 +6,21 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/usg"
 )
+
+var (
+	timingOn = os.Getenv("VYQL_TIMING") != ""
+	stderr   = os.Stderr
+)
+
+func nowNano() int64 { return time.Now().UnixNano() }
 
 // DeltaCache is the minimal byte cache the incremental lowerer needs (satisfied by
 // parsecache.Cache). A nil DeltaCache is invalid here — callers gate on cache != nil.
@@ -35,6 +44,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	fresh := map[string]bool{}
 	hits, total := 0, 0
 
+	t0 := nowNano()
 	// pass 1 (always): import tables, import nodes, and signature nodes — into the base store.
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
@@ -45,9 +55,20 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		l.register(m.Key, m.Body, "")
 	}
 	sigFP := l.sigFingerprint()
+	t1 := nowNano()
 
 	// pass 2 (per module): replay a cached body delta, or lower the body fresh while recording.
-	for _, m := range l.prog.Modules {
+	// Read all body deltas in ONE batched transaction (thousands of individual badger reads here
+	// was the dominant cost of a warm incremental scan — I/O-bound, invisible to a CPU profile).
+	keys := make([]string, len(l.prog.Modules))
+	for i, m := range l.prog.Modules {
+		if m.Hash != "" {
+			keys[i] = lowerKey(m.Hash, ModuleNS(m), sigFP)
+		}
+	}
+	raws := batchGetRaw(cache, keys)
+	writes := map[string][]byte{}
+	for i, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		if m.Hash == "" { // not content-addressed (e.g. native Go frontend) → always fresh
 			l.g = base
@@ -56,8 +77,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 			continue
 		}
 		total++
-		key := lowerKey(m.Hash, ModuleNS(m), sigFP)
-		if raw, ok := cache.GetRaw(key); ok {
+		if raw, ok := raws[keys[i]]; ok {
 			if d, err := decodeDelta(raw); err == nil {
 				d.replay(base)
 				hits++
@@ -68,14 +88,66 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		l.g = rec
 		l.block(m.Body, newScope())
 		l.g = base
-		cache.PutRaw(key, encodeDelta(rec.d))
+		writes[keys[i]] = encodeDelta(rec.d)
 		fresh[ModuleNS(m)] = true
+	}
+	batchPutRaw(cache, writes)
+	t2 := nowNano()
+	if timingOn {
+		fmt.Fprintf(stderr, "[timing] lower.pass1 %7.1fms  lower.pass2 %7.1fms  (replay %d/%d)\n",
+			float64(t1-t0)/1e6, float64(t2-t1)/1e6, hits, total)
 	}
 	return base, fresh, nil
 }
 
 func lowerKey(moduleHash, moduleKey, sigFP string) string {
 	return "lower\x00" + moduleHash + "\x00" + moduleKey + "\x00" + sigFP
+}
+
+// batchReader / batchWriter are the optional fast paths a badger-backed DeltaCache implements:
+// reading/writing many keys in one transaction. In-memory test caches don't, so the helpers
+// fall back to per-key access.
+type batchReader interface {
+	GetManyRaw(keys []string) map[string][]byte
+}
+type batchWriter interface {
+	PutManyRaw(kv map[string][]byte)
+}
+
+func batchGetRaw(cache DeltaCache, keys []string) map[string][]byte {
+	if br, ok := cache.(batchReader); ok {
+		// drop empty keys (modules with no hash) before the batched read.
+		nz := make([]string, 0, len(keys))
+		for _, k := range keys {
+			if k != "" {
+				nz = append(nz, k)
+			}
+		}
+		return br.GetManyRaw(nz)
+	}
+	out := map[string][]byte{}
+	for _, k := range keys {
+		if k == "" {
+			continue
+		}
+		if v, ok := cache.GetRaw(k); ok {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func batchPutRaw(cache DeltaCache, kv map[string][]byte) {
+	if len(kv) == 0 {
+		return
+	}
+	if bw, ok := cache.(batchWriter); ok {
+		bw.PutManyRaw(kv)
+		return
+	}
+	for k, v := range kv {
+		cache.PutRaw(k, v)
+	}
 }
 
 // NodeModule returns the module key a node id belongs to (ids are "<modkey>\x1f..."), or ""

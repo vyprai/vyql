@@ -169,6 +169,53 @@ func (c *Cache) GetByStat(root, abs string) (nir.Module, bool) {
 	return c.Get(string(ck))
 }
 
+// PrefetchByStat resolves, for as many of files as are unchanged, the cached module blob — in
+// just TWO batched read transactions (stat keys → content keys, then content keys → blobs)
+// instead of two badger round-trips per file. Returns file path → gob-encoded module bytes;
+// callers decode in parallel (the decode is CPU-bound, the lookups were I/O-bound). Files that
+// changed or were never cached are simply absent. root selects the same key space as Key/Get.
+func (c *Cache) PrefetchByStat(root string, files []string) map[string][]byte {
+	if c == nil || len(files) == 0 {
+		return nil
+	}
+	// stat each file (cheap, no read) → stat key; remember which file each key maps to.
+	statKeys := make([]string, 0, len(files))
+	statKeyFile := make(map[string]string, len(files))
+	for _, f := range files {
+		fi, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
+		sk := c.statKey(root, f, fi.Size(), fi.ModTime().UnixNano())
+		statKeys = append(statKeys, sk)
+		statKeyFile[sk] = f
+	}
+	// batch 1: stat key → content key.
+	contentKeys := c.GetManyRaw(statKeys)
+	ckFile := make(map[string]string, len(contentKeys))
+	ckList := make([]string, 0, len(contentKeys))
+	for sk, ck := range contentKeys {
+		ckFile[string(ck)] = statKeyFile[sk]
+		ckList = append(ckList, string(ck))
+	}
+	// batch 2: content key → module blob.
+	blobs := c.GetManyRaw(ckList)
+	out := make(map[string][]byte, len(blobs))
+	for ck, blob := range blobs {
+		out[ckFile[ck]] = blob
+	}
+	return out
+}
+
+// DecodeModule gob-decodes a module blob from PrefetchByStat (or any Get* raw value).
+func DecodeModule(blob []byte) (nir.Module, bool) {
+	var m nir.Module
+	if err := gob.NewDecoder(bytes.NewReader(blob)).Decode(&m); err != nil {
+		return nir.Module{}, false
+	}
+	return m, true
+}
+
 // PutStat records the stat→content-key mapping after a (re)parse so the next scan can skip the
 // read. Called whenever a content key is known to be valid for the file's current stat (fresh
 // parse, or a content hit where only the mtime moved).
