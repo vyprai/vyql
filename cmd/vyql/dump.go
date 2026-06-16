@@ -17,6 +17,22 @@ import (
 // USG the rule engine evaluates against). Shared by scanPaths and the -dump debug path.
 // Returns a nil store when recognized files produced nothing to analyze.
 func buildGraph(paths []string) (usg.Store, scanStats, error) {
+	return buildGraphWith(paths, lowerCache())
+}
+
+// lowerCache returns the process cache as a lowering.DeltaCache, or nil when caching is off.
+// (A nil *parsecache.Cache must become a nil interface, not a non-nil interface holding nil.)
+func lowerCache() lowering.DeltaCache {
+	if c := parsecache.Shared(); c != nil {
+		return c
+	}
+	return nil
+}
+
+// buildGraphWith runs extract → lower → adapters → SCA against an explicit lowering cache
+// (nil = no caching / full lowering). Threading the cache makes the incremental path testable
+// (a findings-equivalence harness injects its own cache).
+func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanStats, error) {
 	prog, ads, ctorTypes, stats, err := extractAll(paths)
 	if err != nil {
 		return nil, stats, err
@@ -27,12 +43,12 @@ func buildGraph(paths []string) (usg.Store, scanStats, error) {
 	if len(prog.Modules) == 0 {
 		return nil, stats, nil
 	}
-	// Incremental lowering when caching is on ($VYQL_CACHE): reuse the lowered sub-graph of
-	// unchanged modules, re-lowering only edited ones. Equivalent to LowerTyped (the merged
-	// graph is identical), so adapters/taint/rules below are untouched. Benefits every command
-	// that builds a graph (scan, trace, query, graph, …).
+	// Incremental lowering when a cache is provided: reuse the lowered sub-graph of unchanged
+	// modules, re-lowering only edited ones. Equivalent to LowerTyped (the merged graph is
+	// identical), so adapters/taint/rules below are untouched. Benefits every command that
+	// builds a graph (scan, trace, query, graph, …).
 	var g usg.Store
-	if cache := parsecache.Shared(); cache != nil {
+	if cache != nil {
 		g, err = lowering.LowerIncremental(prog, true, ctorTypes, cache)
 	} else {
 		g, err = lowering.LowerTyped(prog, true, ctorTypes)
