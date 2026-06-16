@@ -40,20 +40,57 @@ type DeltaCache interface {
 // adapter labeling (re-label only fresh modules; replay cached labels for the rest).
 func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache) (usg.Store, map[string]bool, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
+	l.parseCache = cache
 	base := l.g
 	fresh := map[string]bool{}
 	hits, total := 0, 0
 
 	t0 := nowNano()
-	// pass 1 (always): import tables, import nodes, and signature nodes — into the base store.
-	for _, m := range l.prog.Modules {
-		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
-		l.importTables[m.Key] = importTable(m)
-		for _, imp := range m.Imports {
-			l.importNode(m, imp)
+	// pass 1 (always): import tables, import nodes, signature nodes, and the cross-module symbol
+	// table — into the base store. Cached per module (keyed by content + namespace, independent
+	// of other modules) so an unchanged module's signatures are replayed WITHOUT re-reading its
+	// NIR — the foundation for skipping the body decode of unchanged modules entirely.
+	p1keys := make([]string, len(l.prog.Modules))
+	for i, m := range l.prog.Modules {
+		if m.Hash != "" {
+			p1keys[i] = pass1Key(m.Hash, m.Key, ModuleNS(m))
 		}
-		l.register(m.Key, m.Body, "")
 	}
+	p1raws := batchGetRaw(cache, p1keys)
+	p1writes := map[string][]byte{}
+	for i, m := range l.prog.Modules {
+		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
+		if m.Hash != "" {
+			if raw, ok := p1raws[p1keys[i]]; ok {
+				if d, err := decodePass1(raw); err == nil {
+					d.replay(l, base, m.Key, l.curNS)
+					continue // signatures restored from cache — no NIR body needed
+				}
+			}
+		}
+		// fresh registration: record this module's contribution for the cache.
+		body := l.bodyOf(m)
+		l.p1 = &pass1Delta{}
+		l.importTables[m.Key] = importTable(body)
+		for _, imp := range body.Imports {
+			l.p1.Imports = append(l.p1.Imports, ieGob{imp.Local, imp.IsModule, imp.Module, imp.Symbol})
+		}
+		rec := &recordingStore{Store: base, d: &moduleDelta{}}
+		l.g = rec
+		for _, imp := range body.Imports {
+			l.importNode(body, imp)
+		}
+		l.register(m.Key, body.Body, "")
+		l.g = base
+		l.p1.Nodes = rec.d.Nodes
+		l.p1.Counter = l.modCtr[l.curNS]
+		l.p1.Order = l.modOrder[l.curNS]
+		if m.Hash != "" {
+			p1writes[p1keys[i]] = encodePass1(l.p1)
+		}
+		l.p1 = nil
+	}
+	batchPutRaw(cache, p1writes)
 	sigFP := l.sigFingerprint()
 	t1 := nowNano()
 
@@ -72,7 +109,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		if m.Hash == "" { // not content-addressed (e.g. native Go frontend) → always fresh
 			l.g = base
-			l.block(m.Body, newScope())
+			l.block(l.bodyOf(m).Body, newScope())
 			fresh[ModuleNS(m)] = true
 			continue
 		}
@@ -84,9 +121,10 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 				continue
 			}
 		}
+		// cache miss → lower the body fresh (decoding the stub on demand if needed).
 		rec := &recordingStore{Store: base, d: &moduleDelta{}}
 		l.g = rec
-		l.block(m.Body, newScope())
+		l.block(l.bodyOf(m).Body, newScope())
 		l.g = base
 		writes[keys[i]] = encodeDelta(rec.d)
 		fresh[ModuleNS(m)] = true
@@ -102,6 +140,127 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 
 func lowerKey(moduleHash, moduleKey, sigFP string) string {
 	return "lower\x00" + moduleHash + "\x00" + moduleKey + "\x00" + sigFP
+}
+
+// pass1Key identifies a module's signature/symbol-table contribution. It depends ONLY on the
+// module's own content (hash), resolution key, and node-id namespace — register is purely
+// per-module — so it is valid regardless of what other modules look like (unlike lowerKey,
+// which folds in the global sigFP because pass-2 body lowering resolves against all signatures).
+func pass1Key(moduleHash, moduleKey, ns string) string {
+	return "p1\x00" + moduleHash + "\x00" + moduleKey + "\x00" + ns
+}
+
+// bodyOf returns a module's full NIR. For a normal (decoded) module it is the module itself;
+// for a stub (Body nil but a parse-cache content key set) it decodes the cached blob on demand —
+// so an unchanged module whose signatures and body sub-graph are both cached is never decoded.
+func (l *lowerer) bodyOf(m nir.Module) nir.Module {
+	if m.Body != nil || m.CacheKey == "" || l.parseCache == nil {
+		return m
+	}
+	if raw, ok := l.parseCache.GetRaw(m.CacheKey); ok {
+		if full, ok := decodeModule(raw); ok {
+			return full
+		}
+	}
+	return m
+}
+
+func decodeModule(raw []byte) (nir.Module, bool) {
+	var m nir.Module
+	if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&m); err != nil {
+		return nir.Module{}, false
+	}
+	return m, true
+}
+
+// --- pass 1 (signature/symbol) cache --------------------------------------------------------
+
+type ieGob struct {
+	Local    string
+	IsModule bool
+	Module   string
+	Symbol   string
+}
+type fiGob struct {
+	Qual, Short         string
+	ParamNames          []string
+	Params, ParamTypes  map[string]string
+	Ret, Module, Cls    string
+	Name                string
+	Validator, Abstract bool
+}
+type cfGob struct{ Key, Field, Type string }
+
+// pass1Delta is one module's pass-1 output: the import/signature store nodes, its import table,
+// the functions/classes it contributes to the global symbol table, and the post-pass-1 value of
+// its per-namespace node counter (so a later fresh pass-2 of the same module continues minting
+// body node ids without colliding with these signature/import ids).
+type pass1Delta struct {
+	Nodes       []usg.Node
+	Imports     []ieGob
+	Funcs       []fiGob
+	ClassQual   []string
+	ClassDefs   []string
+	ClassFields []cfGob
+	Counter     int // modCtr[ns] after pass 1 (node-id counter)
+	Order       int // modOrder[ns] after pass 1 (CFG order counter)
+}
+
+func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
+	for _, n := range d.Nodes {
+		_ = base.AddNode(n)
+	}
+	tbl := map[string]importEntry{}
+	for _, ie := range d.Imports {
+		if ie.IsModule {
+			tbl[ie.Local] = importEntry{kind: "mod", module: ie.Module}
+		} else {
+			tbl[ie.Local] = importEntry{kind: "sym", module: ie.Module, symbol: ie.Symbol}
+		}
+	}
+	l.importTables[modkey] = tbl
+	for _, f := range d.Funcs {
+		fi := &funcInfo{
+			paramNames: f.ParamNames, params: f.Params, paramTypes: f.ParamTypes, ret: f.Ret,
+			module: f.Module, cls: f.Cls, name: f.Name, validator: f.Validator, abstract: f.Abstract,
+		}
+		l.funcQual[f.Qual] = fi
+		l.funcShort[f.Short] = append(l.funcShort[f.Short], fi)
+	}
+	for _, k := range d.ClassQual {
+		l.classQual[k] = true
+	}
+	for _, name := range d.ClassDefs {
+		l.classDefs[name] = appendUniq(l.classDefs[name], modkey)
+	}
+	for _, cf := range d.ClassFields {
+		if l.classFields[cf.Key] == nil {
+			l.classFields[cf.Key] = map[string]string{}
+		}
+		l.classFields[cf.Key][cf.Field] = cf.Type
+	}
+	if d.Counter > l.modCtr[ns] {
+		l.modCtr[ns] = d.Counter
+	}
+	if d.Order > l.modOrder[ns] {
+		l.modOrder[ns] = d.Order
+	}
+}
+
+func encodePass1(d *pass1Delta) []byte {
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(d); err != nil {
+		return nil
+	}
+	return buf.Bytes()
+}
+
+func decodePass1(raw []byte) (*pass1Delta, error) {
+	var d pass1Delta
+	if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&d); err != nil {
+		return nil, err
+	}
+	return &d, nil
 }
 
 // batchReader / batchWriter are the optional fast paths a badger-backed DeltaCache implements:

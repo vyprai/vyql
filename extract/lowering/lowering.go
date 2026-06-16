@@ -79,6 +79,14 @@ type lowerer struct {
 	// node ids, so a higher-order call (arr.map(cb), p.then(cb)) can route the receiver's
 	// taint into the callback's parameters.
 	lambdaParams map[string][]string
+
+	// p1, when non-nil, captures the symbol-table contributions of the module currently being
+	// registered (pass 1), so they can be cached and replayed without re-reading the module's
+	// NIR. nil on the full (non-incremental) path — zero cost there.
+	p1 *pass1Delta
+	// parseCache, when set (incremental path), lets bodyOf decode a stub module's full NIR on
+	// demand from the parse cache. nil on the full path.
+	parseCache DeltaCache
 }
 
 type containerInfo struct {
@@ -809,6 +817,10 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 		case nir.ClassDef:
 			l.classQual[modkey+"::"+st.Name] = true
 			l.classDefs[st.Name] = appendUniq(l.classDefs[st.Name], modkey)
+			if l.p1 != nil {
+				l.p1.ClassQual = append(l.p1.ClassQual, modkey+"::"+st.Name)
+				l.p1.ClassDefs = append(l.p1.ClassDefs, st.Name)
+			}
 			// record field -> declared class type (for cross-file method resolution
 			// on field receivers, e.g. Spring `@Autowired UserService svc; svc.m()`).
 			for _, bs := range st.Body {
@@ -817,6 +829,9 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 						l.classFields[modkey+"::"+st.Name] = map[string]string{}
 					}
 					l.classFields[modkey+"::"+st.Name][a.Targets[0]] = a.Type
+					if l.p1 != nil {
+						l.p1.ClassFields = append(l.p1.ClassFields, cfGob{modkey + "::" + st.Name, a.Targets[0], a.Type})
+					}
 				}
 			}
 			l.register(modkey, st.Body, st.Name)
@@ -829,6 +844,13 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 			info := l.makeFuncInfo(modkey, cls, st)
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
+			if l.p1 != nil {
+				l.p1.Funcs = append(l.p1.Funcs, fiGob{
+					Qual: qual, Short: st.Name, ParamNames: info.paramNames, Params: info.params,
+					ParamTypes: info.paramTypes, Ret: info.ret, Module: info.module, Cls: info.cls,
+					Name: info.name, Validator: info.validator, Abstract: info.abstract,
+				})
+			}
 		}
 	}
 }

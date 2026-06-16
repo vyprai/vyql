@@ -49,12 +49,14 @@ func parseModules(
 		workers = 1
 	}
 	cache := parsecache.Shared() // nil unless $VYQL_CACHE is set; all methods are nil-safe
-	// Prefetch all unchanged modules' cached blobs in two batched transactions, so workers
-	// gob-decode from memory instead of doing per-file badger round-trips (the I/O that
-	// dominated a warm re-scan). Misses (changed/new files) fall through to read+parse below.
-	var prefetched map[string][]byte
+	// Prefetch stubs for unchanged files (one batched transaction): an unchanged module resolves
+	// to a STUB (identity only, no body) without being read or decoded — the lowerer decodes the
+	// body on demand only if it actually needs it. This skips the dominant cost of a warm re-scan
+	// (gob-decoding every module whose body the incremental lowerer never even uses). Misses
+	// (changed/new files) fall through to read+parse below.
+	var stubs map[string]nir.Module
 	if cache != nil {
-		prefetched = cache.PrefetchByStat(root, files)
+		stubs = cache.PrefetchStubs(root, files)
 	}
 	var next int64 = -1
 	var wg sync.WaitGroup
@@ -69,13 +71,11 @@ func parseModules(
 				if i >= n {
 					return
 				}
-				// stat fast-path: an unchanged file resolves to its cached module without being
-				// read, hashed, or individually fetched — decode the prefetched blob in-worker.
-				if blob, hit := prefetched[files[i]]; hit {
-					if m, good := parsecache.DecodeModule(blob); good {
-						mods[i], ok[i] = m, true
-						continue
-					}
+				// stat fast-path: an unchanged file resolves to a STUB (identity only) without
+				// being read or decoded — the lowerer pulls the body on demand if needed.
+				if stub, hit := stubs[files[i]]; hit {
+					mods[i], ok[i] = stub, true
+					continue
 				}
 				src, err := readFile(files[i])
 				if err != nil {
@@ -89,7 +89,7 @@ func parseModules(
 					key = cache.Key(root, files[i], src)
 					if m, hit := cache.Get(key); hit {
 						mods[i], ok[i] = m, true
-						cache.PutStat(root, files[i], key) // refresh stat→content for next time
+						cache.PutStat(root, files[i], key, m) // refresh stat→header for next time
 						continue
 					}
 				}
@@ -104,7 +104,7 @@ func parseModules(
 					mods[i], ok[i] = m, true
 					if cache != nil {
 						cache.Put(key, m)
-						cache.PutStat(root, files[i], key)
+						cache.PutStat(root, files[i], key, m)
 					}
 				}
 			}

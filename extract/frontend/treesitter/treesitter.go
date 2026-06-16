@@ -37,3 +37,42 @@ func ListFiles(root string, exts map[string]bool) ([]string, error) {
 	})
 	return out, err
 }
+
+// ListAllFiles walks root ONCE and returns every regular file (dependency/build/VCS dirs
+// skipped), each tagged with its lowercased extension and basename. Callers with many language
+// filters bucket from this single result instead of walking the tree once per language — on a
+// large tree the redundant walks dominated extraction.
+type Entry struct {
+	Path string
+	Ext  string // lowercased extension, e.g. ".py"
+	Base string // lowercased basename, e.g. "dockerfile"
+}
+
+func ListAllFiles(root string) []Entry {
+	var out []Entry
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if skipDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") && d.Name() != "." {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		out = append(out, Entry{Path: path, Ext: strings.ToLower(filepath.Ext(path)), Base: strings.ToLower(filepath.Base(path))})
+		return nil
+	})
+	return out
+}
+
+// FilterEntries returns the paths from entries whose extension or basename is in exts.
+func FilterEntries(entries []Entry, exts map[string]bool) []string {
+	var out []string
+	for _, e := range entries {
+		if exts[e.Ext] || exts[e.Base] {
+			out = append(out, e.Path)
+		}
+	}
+	return out
+}

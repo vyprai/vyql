@@ -146,39 +146,40 @@ func (c *Cache) statKey(root, abs string, size, mtimeNs int64) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// GetByStat resolves a file's cached module via its (size, mtime) identity, skipping the file
-// read and content hash. The two-level lookup (stat→content key→module) keeps the cache
-// content-addressed: the stat entry only records which content key was current at last parse,
-// so a rebuilt binary or a different stored module still misses. Returns false when caching is
-// off, the file can't be stat'd, no stat entry exists (first scan), or the file changed
-// (size/mtime differ → new stat key). Like most build caches, this trusts size+mtime: a
-// content change that preserves both (rare; editors bump mtime) would be missed — callers that
-// need byte-exact invalidation can `vyql cache clear`.
-func (c *Cache) GetByStat(root, abs string) (nir.Module, bool) {
-	if c == nil {
-		return nir.Module{}, false
-	}
-	fi, err := os.Stat(abs)
-	if err != nil {
-		return nir.Module{}, false
-	}
-	ck, ok := c.GetRaw(c.statKey(root, abs, fi.Size(), fi.ModTime().UnixNano()))
-	if !ok {
-		return nir.Module{}, false
-	}
-	return c.Get(string(ck))
+// statHeader is the stat entry value: enough to build a STUB module (the lowerer's identity
+// fields) without decoding the body, plus the content key to fetch the full NIR on demand.
+type statHeader struct {
+	ContentKey string
+	Key        string
+	File       string
+	Hash       string
 }
 
-// PrefetchByStat resolves, for as many of files as are unchanged, the cached module blob — in
-// just TWO batched read transactions (stat keys → content keys, then content keys → blobs)
-// instead of two badger round-trips per file. Returns file path → gob-encoded module bytes;
-// callers decode in parallel (the decode is CPU-bound, the lookups were I/O-bound). Files that
-// changed or were never cached are simply absent. root selects the same key space as Key/Get.
-func (c *Cache) PrefetchByStat(root string, files []string) map[string][]byte {
+func encodeHeader(h statHeader) []byte {
+	var buf bytes.Buffer
+	_ = gob.NewEncoder(&buf).Encode(h)
+	return buf.Bytes()
+}
+
+func decodeHeader(raw []byte) (statHeader, bool) {
+	var h statHeader
+	if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&h); err != nil {
+		return statHeader{}, false
+	}
+	return h, true
+}
+
+// PrefetchStubs resolves, for each unchanged file (same size+mtime), a STUB module — its Key,
+// File, Hash, and CacheKey (the content key) WITHOUT reading or decoding the file's NIR. The
+// lowerer decodes the full body on demand only if it actually needs it (a signature change
+// elsewhere invalidating the cached body sub-graph). One batched read transaction. Files that
+// changed or were never cached are absent. Like most build caches this trusts size+mtime; a
+// content change preserving both (rare; editors bump mtime) is missed — `vyql cache clear`
+// forces a rebuild.
+func (c *Cache) PrefetchStubs(root string, files []string) map[string]nir.Module {
 	if c == nil || len(files) == 0 {
 		return nil
 	}
-	// stat each file (cheap, no read) → stat key; remember which file each key maps to.
 	statKeys := make([]string, 0, len(files))
 	statKeyFile := make(map[string]string, len(files))
 	for _, f := range files {
@@ -190,36 +191,20 @@ func (c *Cache) PrefetchByStat(root string, files []string) map[string][]byte {
 		statKeys = append(statKeys, sk)
 		statKeyFile[sk] = f
 	}
-	// batch 1: stat key → content key.
-	contentKeys := c.GetManyRaw(statKeys)
-	ckFile := make(map[string]string, len(contentKeys))
-	ckList := make([]string, 0, len(contentKeys))
-	for sk, ck := range contentKeys {
-		ckFile[string(ck)] = statKeyFile[sk]
-		ckList = append(ckList, string(ck))
-	}
-	// batch 2: content key → module blob.
-	blobs := c.GetManyRaw(ckList)
-	out := make(map[string][]byte, len(blobs))
-	for ck, blob := range blobs {
-		out[ckFile[ck]] = blob
+	headers := c.GetManyRaw(statKeys)
+	out := make(map[string]nir.Module, len(headers))
+	for sk, raw := range headers {
+		if h, ok := decodeHeader(raw); ok {
+			out[statKeyFile[sk]] = nir.Module{Key: h.Key, File: h.File, Hash: h.Hash, CacheKey: h.ContentKey}
+		}
 	}
 	return out
 }
 
-// DecodeModule gob-decodes a module blob from PrefetchByStat (or any Get* raw value).
-func DecodeModule(blob []byte) (nir.Module, bool) {
-	var m nir.Module
-	if err := gob.NewDecoder(bytes.NewReader(blob)).Decode(&m); err != nil {
-		return nir.Module{}, false
-	}
-	return m, true
-}
-
-// PutStat records the stat→content-key mapping after a (re)parse so the next scan can skip the
-// read. Called whenever a content key is known to be valid for the file's current stat (fresh
-// parse, or a content hit where only the mtime moved).
-func (c *Cache) PutStat(root, abs, contentKey string) {
+// PutStat records the stat→header mapping after a (re)parse so the next scan can build a stub
+// without reading the file. Called whenever a content key is known valid for the file's current
+// stat (fresh parse, or a content hit where only the mtime moved).
+func (c *Cache) PutStat(root, abs, contentKey string, m nir.Module) {
 	if c == nil || contentKey == "" {
 		return
 	}
@@ -227,7 +212,8 @@ func (c *Cache) PutStat(root, abs, contentKey string) {
 	if err != nil {
 		return
 	}
-	c.PutRaw(c.statKey(root, abs, fi.Size(), fi.ModTime().UnixNano()), []byte(contentKey))
+	c.PutRaw(c.statKey(root, abs, fi.Size(), fi.ModTime().UnixNano()),
+		encodeHeader(statHeader{ContentKey: contentKey, Key: m.Key, File: m.File, Hash: m.Hash}))
 }
 
 // Salt returns the executable-derived cache-busting salt (nil if disabled). Callers building

@@ -272,6 +272,11 @@ type Module struct {
 	// frontend). It identifies the module's parse result for the incremental lowering cache;
 	// empty means "not content-addressed" (e.g. the native Go frontend) → always re-lowered.
 	Hash string
+	// CacheKey is TRANSIENT (excluded from gob via being set only post-decode): when a module is
+	// returned as a stub (Body/Imports nil, to skip decoding an unchanged file), it carries the
+	// parse cache's content key so the lowerer can decode the full NIR on demand if a signature
+	// change elsewhere invalidates this module's cached body sub-graph.
+	CacheKey string
 }
 
 // Program is a set of modules plus the receiver name used for self/this
