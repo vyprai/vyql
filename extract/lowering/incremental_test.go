@@ -46,6 +46,26 @@ func prog(mods ...nir.Module) nir.Program {
 	return nir.Program{Modules: mods, SelfName: "self"}
 }
 
+// php-style modules: resolution Key is "" (flat namespace) and only File distinguishes them —
+// the case that exposed the node-id collision. Cross-file via a unique bare-name call.
+func modPhpA(hash, retCall string) nir.Module {
+	return nir.Module{Key: "", File: "a.php", Hash: hash, Body: []nir.Stmt{
+		nir.FuncDef{Name: "getInput", Loc: "a.php:1", Body: []nir.Stmt{
+			nir.Return{Value: nir.Call{Callee: nir.Name{ID: retCall, Loc: "a.php:2"}, Path: retCall, Method: retCall, Loc: "a.php:2"}},
+		}},
+	}}
+}
+
+func modPhpB(hash string, extra []nir.Stmt) nir.Module {
+	body := []nir.Stmt{
+		nir.Assign{Targets: []string{"y"}, Value: nir.Call{Callee: nir.Name{ID: "getInput", Loc: "b.php:2"}, Path: "getInput", Method: "getInput", Loc: "b.php:2"}},
+		nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "sink", Loc: "b.php:3"}, Path: "sink", Method: "sink", Args: []nir.Expr{nir.Name{ID: "y", Loc: "b.php:3"}}, Loc: "b.php:3"}},
+	}
+	body = append(body, extra...)
+	return nir.Module{Key: "", File: "b.php", Hash: hash,
+		Body: []nir.Stmt{nir.FuncDef{Name: "handler", Params: []string{"req"}, Loc: "b.php:1", Body: body}}}
+}
+
 // snapshot renders a store as a sorted, comparable string (nodes with type+props, edges,
 // labels). Two graphs are equivalent iff their snapshots match — a stronger invariant than
 // finding-equality (identical graphs ⇒ identical adapter/taint/rule output).
@@ -90,7 +110,7 @@ func lowerFull(t *testing.T, p nir.Program) usg.Store {
 
 func lowerInc(t *testing.T, p nir.Program, c DeltaCache) usg.Store {
 	t.Helper()
-	g, err := LowerIncremental(p, true, nil, c)
+	g, _, err := LowerIncremental(p, true, nil, c)
 	if err != nil {
 		t.Fatalf("LowerIncremental: %v", err)
 	}
@@ -116,6 +136,15 @@ func TestIncrementalEquivalence(t *testing.T) {
 			prog(modA("a1", "read"), modB("b1", nil), nir.Module{Key: "c", File: "c.x", Hash: "c1", Body: []nir.Stmt{nir.FuncDef{Name: "f", Loc: "c.x:1", Body: []nir.Stmt{nir.Return{}}}}})},
 		{"delete module a body change", prog(modA("a1", "read"), modB("b1", nil), nir.Module{Key: "c", File: "c.x", Hash: "c1", Body: []nir.Stmt{nir.FuncDef{Name: "f", Loc: "c.x:1", Body: []nir.Stmt{nir.Return{}}}}}),
 			prog(modA("a1", "read"), modB("b1", nil))},
+		// php-style modules (resolution Key=="", only File namespaces): exercises the per-file
+		// node-id namespacing (curNS) — without it, a.php and b.php share the "" counter space and
+		// incremental reuse mints colliding ids.
+		{"php no change", prog(modPhpA("a1", "read"), modPhpB("b1", nil)),
+			prog(modPhpA("a1", "read"), modPhpB("b1", nil))},
+		{"php body edit (b changes, a reused)", prog(modPhpA("a1", "read"), modPhpB("b1", nil)),
+			prog(modPhpA("a1", "read"), modPhpB("b2", []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "log", Loc: "b.php:4"}, Path: "log", Method: "log", Loc: "b.php:4"}}}))},
+		{"php a body edit (b reused)", prog(modPhpA("a1", "read"), modPhpB("b1", nil)),
+			prog(modPhpA("a2", "fetch"), modPhpB("b1", nil))},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

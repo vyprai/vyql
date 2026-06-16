@@ -7,11 +7,26 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/engine"
+	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/profile"
 )
+
+// setProfile applies a named threat-model profile's trust boundary (active source set), the
+// way a real scan does. Changing it changes which source labels adapters emit — so it is a
+// global input the incremental adapter-label cache must fingerprint.
+func setProfile(t *testing.T, name string) {
+	t.Helper()
+	profs, _ := profile.Load()
+	p, ok := profile.ByName(profs, name)
+	if !ok {
+		t.Fatalf("profile %q not found", name)
+	}
+	frontend.SetActiveSources(p.ActiveSources())
+}
 
 // fakeDelta is an in-memory lowering.DeltaCache for the findings-equivalence harness.
 type fakeDelta map[string][]byte
@@ -87,6 +102,34 @@ func eqKeys(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// TestIncrementalFingerprintProfile proves the incremental cache fingerprints the active
+// PROFILE (trust boundary), not just source content. The web profile activates HttpInput (so
+// the fixture's request→os.system flow is a finding); cli does not (no finding). Populating the
+// cache under one profile and rescanning under the other must match a full scan under the new
+// profile — i.e. cached labels from profile A must NOT leak into a profile-B scan. (Vacuous
+// today since adapters run whole-graph; the gate that keeps incremental adapter-label caching
+// honest.)
+func TestIncrementalFingerprintProfile(t *testing.T) {
+	defer frontend.SetActiveSources(nil)
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "app.py"), "import os\nfrom helper import build_cmd\ndef handler(request):\n    x = request.args.get('name')\n    os.system(build_cmd(x))\n")
+	writeFile(t, filepath.Join(dir, "helper.py"), "def build_cmd(v):\n    return 'echo ' + v\n")
+
+	for _, flip := range [][2]string{{"cli", "web"}, {"web", "cli"}} {
+		t.Run(flip[0]+"->"+flip[1], func(t *testing.T) {
+			cache := fakeDelta{}
+			setProfile(t, flip[0])
+			_ = scanFindingKeys(t, []string{dir}, cache) // populate under profile A
+			setProfile(t, flip[1])
+			incr := scanFindingKeys(t, []string{dir}, cache) // reuse cache under profile B
+			full := scanFindingKeys(t, []string{dir}, nil)   // full under profile B
+			if !eqKeys(incr, full) {
+				t.Errorf("profile-fingerprint leak %s->%s\nincr=%v\nfull=%v", flip[0], flip[1], incr, full)
+			}
+		})
+	}
 }
 
 // TestIncrementalScanFindings is the integration soundness gate: for each change shape, an

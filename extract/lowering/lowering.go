@@ -53,7 +53,8 @@ type lowerer struct {
 	classFields  map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables map[string]map[string]importEntry
 
-	curModule string
+	curModule string // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
+	curNS     string // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
 	curClass  string // "" = none
 	curRoute  bool   // lowering the body of a web request handler (FuncDef.IsRoute)
 
@@ -95,8 +96,8 @@ func (l *lowerer) inRegion(seg string, f func()) {
 }
 
 func (l *lowerer) nextBranch() string {
-	l.modBranch[l.curModule]++
-	return strconv.Itoa(l.modBranch[l.curModule])
+	l.modBranch[l.curNS]++
+	return strconv.Itoa(l.modBranch[l.curNS])
 }
 
 // mutatorMethods add a value into their receiver (collection/builder), so the receiver
@@ -649,8 +650,18 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 // not on global cross-module ordering — the prerequisite for reusing an unchanged module's
 // lowered sub-graph (incremental dataflow). Distinct module keys can never collide.
 func (l *lowerer) nid(prefix string) string {
-	l.modCtr[l.curModule]++
-	return l.curModule + "\x1f" + prefix + "#" + strconv.Itoa(l.modCtr[l.curModule])
+	l.modCtr[l.curNS]++
+	return l.curNS + "\x1f" + prefix + "#" + strconv.Itoa(l.modCtr[l.curNS])
+}
+
+// ModuleNS is a module's per-FILE node-id namespace: the file path (unique per file) so node
+// ids stay file-local and stable even for languages whose resolution Key is "" (PHP, Ruby,
+// …). Cross-module references use the resolution Key; node ids use this.
+func ModuleNS(m nir.Module) string {
+	if m.File != "" {
+		return m.File
+	}
+	return m.Key
 }
 
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
@@ -661,8 +672,8 @@ func (l *lowerer) node(kind, loc string, props map[string]string) string {
 // whose ids are NAME-derived (sigID) so they survive a body edit and remain valid targets for
 // cross-module call edges from other (possibly cached) modules.
 func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) string {
-	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.modOrder[l.curModule])}
-	l.modOrder[l.curModule]++
+	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.modOrder[l.curNS])}
+	l.modOrder[l.curNS]++
 	for k, v := range props {
 		p[k] = v
 	}
@@ -694,7 +705,7 @@ func (l *lowerer) flow(a, b string) {
 
 func (l *lowerer) run() error {
 	for _, m := range l.prog.Modules {
-		l.curModule, l.curClass = m.Key, ""
+		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		l.importTables[m.Key] = importTable(m)
 		for _, imp := range m.Imports {
 			l.importNode(m, imp)
@@ -702,7 +713,7 @@ func (l *lowerer) run() error {
 		l.register(m.Key, m.Body, "")
 	}
 	for _, m := range l.prog.Modules {
-		l.curModule, l.curClass = m.Key, ""
+		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		l.block(m.Body, newScope())
 	}
 	return nil
@@ -764,6 +775,9 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		prefix = cls + "."
 	}
 	rel := prefix + st.Name // module-relative qualified name
+	// signature node ids use the per-FILE namespace (curNS), so they are file-local and stable
+	// even when the resolution key (modkey) is shared ("") across files.
+	ns := l.curNS
 	params := map[string]string{}
 	order := make([]string, 0, len(st.Params))
 	for _, p := range st.Params {
@@ -771,14 +785,14 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		if typ := st.ParamTypes[p]; typ != "" {
 			props["decl_type"] = typ
 		}
-		params[p] = l.nodeWithID(sigID(modkey, rel, "param", p), "Param", st.Loc, props)
+		params[p] = l.nodeWithID(sigID(ns, rel, "param", p), "Param", st.Loc, props)
 		order = append(order, p)
 	}
 	return &funcInfo{
 		paramNames: order,
 		params:     params,
 		paramTypes: st.ParamTypes,
-		ret:        l.nodeWithID(sigID(modkey, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
+		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
 		module:     modkey, cls: cls, name: st.Name,
 		validator: st.IsValidator,
 		// an empty body marks an interface/abstract method: a call typed to it must dispatch
@@ -872,7 +886,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// each function gets a distinct region ROOT, so structural dominance never spans
 		// functions (cross-function flows fall back to presence semantics — conservative).
 		saveRegion := l.region
-		l.region = l.curModule + "/fn" + l.nextBranch()
+		l.region = l.curNS + "/fn" + l.nextBranch()
 		saveRoute := l.curRoute
 		l.curRoute = st.IsRoute
 		l.block(st.Body, inner)

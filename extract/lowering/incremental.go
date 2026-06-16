@@ -25,14 +25,18 @@ type DeltaCache interface {
 // and signature/import nodes are always rebuilt (cheap); only the expensive per-module body
 // lowering is cached. The merged graph is byte-identical to LowerTyped's, so adapters, taint,
 // and rules run on it unchanged. Falls back to fresh body lowering for modules without a Hash.
-func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache) (usg.Store, error) {
+// LowerIncremental returns the lowered store plus the set of module keys that were freshly
+// lowered (cache miss or not content-addressed) — the caller uses it to drive incremental
+// adapter labeling (re-label only fresh modules; replay cached labels for the rest).
+func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache) (usg.Store, map[string]bool, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
 	base := l.g
+	fresh := map[string]bool{}
 	hits, total := 0, 0
 
 	// pass 1 (always): import tables, import nodes, and signature nodes — into the base store.
 	for _, m := range l.prog.Modules {
-		l.curModule, l.curClass = m.Key, ""
+		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		l.importTables[m.Key] = importTable(m)
 		for _, imp := range m.Imports {
 			l.importNode(m, imp)
@@ -43,14 +47,15 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 
 	// pass 2 (per module): replay a cached body delta, or lower the body fresh while recording.
 	for _, m := range l.prog.Modules {
-		l.curModule, l.curClass = m.Key, ""
+		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		if m.Hash == "" { // not content-addressed (e.g. native Go frontend) → always fresh
 			l.g = base
 			l.block(m.Body, newScope())
+			fresh[ModuleNS(m)] = true
 			continue
 		}
 		total++
-		key := lowerKey(m.Hash, m.Key, sigFP)
+		key := lowerKey(m.Hash, ModuleNS(m), sigFP)
 		if raw, ok := cache.GetRaw(key); ok {
 			if d, err := decodeDelta(raw); err == nil {
 				d.replay(base)
@@ -63,12 +68,32 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		l.block(m.Body, newScope())
 		l.g = base
 		cache.PutRaw(key, encodeDelta(rec.d))
+		fresh[ModuleNS(m)] = true
 	}
-	return base, nil
+	return base, fresh, nil
 }
 
 func lowerKey(moduleHash, moduleKey, sigFP string) string {
 	return "lower\x00" + moduleHash + "\x00" + moduleKey + "\x00" + sigFP
+}
+
+// NodeModule returns the module key a node id belongs to (ids are "<modkey>\x1f..."), or ""
+// for nodes not minted by the module-namespacing lowerer (e.g. SBOM nodes). Lets the caller
+// attribute graph nodes to modules for incremental adapter labeling.
+func NodeModule(id string) (string, bool) {
+	if i := indexByte(id, '\x1f'); i >= 0 {
+		return id[:i], true
+	}
+	return "", false
+}
+
+func indexByte(s string, b byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == b {
+			return i
+		}
+	}
+	return -1
 }
 
 // sigFingerprint hashes everything cross-module body lowering depends on besides a module's own

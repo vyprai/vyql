@@ -49,7 +49,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	// builds a graph (scan, trace, query, graph, …).
 	var g usg.Store
 	if cache != nil {
-		g, err = lowering.LowerIncremental(prog, true, ctorTypes, cache)
+		g, _, err = lowering.LowerIncremental(prog, true, ctorTypes, cache)
 	} else {
 		g, err = lowering.LowerTyped(prog, true, ctorTypes)
 	}
