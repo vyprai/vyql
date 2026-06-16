@@ -28,6 +28,7 @@ import (
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/graphsync"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/profile"
@@ -184,11 +185,17 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	// reparse only the files that actually changed.
 	cache := parsecache.Shared()
 	tk := newTimer()
+	// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force the
+	// full pipeline (skip the whole-scan findings cache) so the collector is populated.
+	syncPath := syncOutputPath()
+	if syncPath != "" {
+		syncCollector = graphsync.New()
+	}
 	var rkey string
 	var all []*findings.Finding
 	var stats scanStats
 	hit := false
-	if cache != nil {
+	if cache != nil && syncCollector == nil {
 		rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
 			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
@@ -200,9 +207,17 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		if err != nil {
 			return err
 		}
-		if cache != nil {
+		if cache != nil && syncCollector == nil {
 			storeCachedScan(cache, rkey, all, stats)
 		}
+	}
+	if syncPath != "" {
+		n, e, l, d, serr := writeSyncDelta(syncPath)
+		if serr != nil {
+			return fmt.Errorf("graph sync: %w", serr)
+		}
+		fmt.Fprintf(os.Stderr, "[sync] wrote %s: %d node, %d edge, %d label upserts; %d module tombstones\n",
+			syncPath, n, e, l, d)
 	}
 
 	// output

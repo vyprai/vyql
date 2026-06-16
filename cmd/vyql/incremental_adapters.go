@@ -133,7 +133,7 @@ func (r *lblReader) smap() map[string]string {
 // adapter input misses every module and re-labels the whole graph. modHash maps each module's
 // namespace (lowering.ModuleNS) to its content hash; a module absent from it (e.g. a native
 // frontend with no Hash) is always relabeled and never cached.
-func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) error {
+func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) (map[string]bool, error) {
 	fp := adapterFingerprint(deps)
 
 	// decide which modules must be (re)labeled: those whose adapter-cache key misses. Read all
@@ -171,10 +171,10 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 		return relabel[mod]
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if _, _, err := adapters.Apply(view, ads, nil); err != nil {
-		return err
+		return nil, err
 	}
 
 	// bucket recorded labels by module, then persist one entry per relabeled module — even an
@@ -197,7 +197,7 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 			_ = g.AddLabel(lr.NodeID, lr.Label)
 		}
 	}
-	return nil
+	return relabel, nil
 }
 
 func adapterKey(fp, moduleNS, moduleHash string) string {

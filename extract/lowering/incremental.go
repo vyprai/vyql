@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/vyprai/vyql/extract/nir"
+	"github.com/vyprai/vyql/graphsync"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -38,7 +39,7 @@ type DeltaCache interface {
 // LowerIncremental returns the lowered store plus the set of module keys that were freshly
 // lowered (cache miss or not content-addressed) — the caller uses it to drive incremental
 // adapter labeling (re-label only fresh modules; replay cached labels for the rest).
-func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache) (usg.Store, map[string]bool, error) {
+func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache, sync *graphsync.Collector) (usg.Store, map[string]bool, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
 	l.parseCache = cache
 	// Preallocate the graph maps to the previous scan's node count (cached) — the whole graph is
@@ -112,10 +113,18 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 	writes := map[string][]byte{}
 	for i, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
+		ns := ModuleNS(m)
+		sync.Present(ns)
 		if m.Hash == "" { // not content-addressed (e.g. native Go frontend) → always fresh
-			l.g = base
+			// record into a throwaway delta so the sync collector gets this module's edges
+			// (creator-attributed); the nodes/edges still land in base via the recordingStore.
+			rec := &recordingStore{Store: base, d: &moduleDelta{}}
+			l.g = rec
 			l.block(l.bodyOf(m).Body, newScope())
-			fresh[ModuleNS(m)] = true
+			l.g = base
+			fresh[ns] = true
+			sync.MarkFresh(ns)
+			sync.AddEdges(ns, rec.d.Edges)
 			continue
 		}
 		total++
@@ -132,7 +141,9 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		l.block(l.bodyOf(m).Body, newScope())
 		l.g = base
 		writes[keys[i]] = encodeDelta(rec.d)
-		fresh[ModuleNS(m)] = true
+		fresh[ns] = true
+		sync.MarkFresh(ns)
+		sync.AddEdges(ns, rec.d.Edges)
 	}
 	batchPutRaw(cache, writes)
 	if s, ok := base.(*usg.InMemStore); ok {
@@ -403,7 +414,6 @@ func (r *recordingStore) AddLabel(nodeID string, l usg.Label) error {
 	r.d.Labels = append(r.d.Labels, deltaLabel{nodeID, l})
 	return r.Store.AddLabel(nodeID, l)
 }
-
 
 // --- deterministic map iteration helpers for the fingerprint ------------------------------
 

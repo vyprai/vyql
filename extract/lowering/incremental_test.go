@@ -110,7 +110,7 @@ func lowerFull(t *testing.T, p nir.Program) usg.Store {
 
 func lowerInc(t *testing.T, p nir.Program, c DeltaCache) usg.Store {
 	t.Helper()
-	g, _, err := LowerIncremental(p, true, nil, c)
+	g, _, err := LowerIncremental(p, true, nil, c, nil)
 	if err != nil {
 		t.Fatalf("LowerIncremental: %v", err)
 	}

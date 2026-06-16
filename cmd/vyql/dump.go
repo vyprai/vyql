@@ -51,9 +51,10 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	// identical), so adapters/taint/rules below are untouched. Benefits every command that
 	// builds a graph (scan, trace, query, graph, …).
 	var g usg.Store
+	var fresh map[string]bool
 	incremental := cache != nil
 	if incremental {
-		g, _, err = lowering.LowerIncremental(prog, true, ctorTypes, cache)
+		g, fresh, err = lowering.LowerIncremental(prog, true, ctorTypes, cache, syncCollector)
 	} else {
 		g, err = lowering.LowerTyped(prog, true, ctorTypes)
 	}
@@ -75,8 +76,28 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	// Adapter labeling: incremental (reuse unchanged modules' cached labels) when caching is
 	// on, else a full pass. Both produce identical labels — adapter precedence is per-node.
 	if incremental {
-		if err := applyAdaptersIncremental(g, ads, moduleHashes(prog), deps, cache); err != nil {
+		relabel, err := applyAdaptersIncremental(g, ads, moduleHashes(prog), deps, cache)
+		if err != nil {
 			return nil, stats, err
+		}
+		// Graph DB change-feed: collect the label rows of every label-dirty module. Label-dirty
+		// = the adapter relabel set ∪ the lowering fresh set (a fresh module's labels may also
+		// have changed; re-emitting unchanged ones is an idempotent upsert). Nodes come from the
+		// same pass (fresh set); edges were collected creator-attributed during lowering.
+		if syncCollector != nil {
+			labelDirty := map[string]bool{}
+			for ns := range fresh {
+				labelDirty[ns] = true
+			}
+			for ns := range relabel {
+				labelDirty[ns] = true
+			}
+			for ns := range labelDirty {
+				syncCollector.MarkRelabel(ns)
+			}
+			if err := syncCollector.CollectGraph(g, labelDirty); err != nil {
+				return nil, stats, err
+			}
 		}
 	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {
 		return nil, stats, err
