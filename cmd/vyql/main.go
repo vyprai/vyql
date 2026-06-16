@@ -133,10 +133,11 @@ func applyMaxRAM(v string) func() {
 		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
 		return noop
 	}
-	// Split the budget: ~1/3 to badger's (off-Go-heap) cache, ~2/3 to the Go heap via GOMEMLIMIT,
-	// so total RSS ≈ the requested ceiling (GOMEMLIMIT alone wouldn't count badger's cache).
-	lowering.DiskCacheBytes = n / 3
-	debug.SetMemoryLimit(n - n/3)
+	// Program-controlled budget: the graph lives on disk and RAM is bounded by badger's (off-heap)
+	// cache, sized here — NOT by a tight GOMEMLIMIT, which would make the GC thrash whenever the
+	// resident core approaches the limit. Most of the budget is the cache (the dominant, tunable
+	// consumer); the resident structural core sits on top.
+	lowering.DiskCacheBytes = n * 3 / 4
 	lowering.DiskStorePath = dir
 	return func() { os.RemoveAll(dir) }
 }

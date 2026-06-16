@@ -68,7 +68,12 @@ func OpenBadgerGraph(path string, cacheBytes int64) (*BadgerGraph, error) {
 	} else {
 		opts = badger.DefaultOptions(path)
 	}
-	opts = opts.WithLogger(nil)
+	opts = opts.WithLogger(nil).
+		WithSyncWrites(false).       // a scan-scoped graph: durability not needed, speed is
+		WithCompression(0).          // skip per-block (de)compression CPU
+		WithNumVersionsToKeep(1).    // no MVCC history
+		WithMemTableSize(128 << 20). // fewer, larger flushes during the streaming build
+		WithDetectConflicts(false)
 	if cacheBytes > 0 {
 		opts = opts.WithBlockCacheSize(cacheBytes * 7 / 10).WithIndexCacheSize(cacheBytes * 3 / 10)
 	}
@@ -275,10 +280,8 @@ func (g *BadgerGraph) idsOf(idxs []int32) []string {
 }
 
 func (g *BadgerGraph) AllNodes() ([]Node, error) {
-	out := make([]Node, len(g.ids))
-	for i := range g.ids {
-		out[i] = g.nodeAt(int32(i))
-	}
+	out := make([]Node, 0, len(g.ids))
+	g.RangeNodes(func(n Node) bool { out = append(out, n); return true })
 	return out, nil
 }
 
@@ -417,10 +420,37 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 	}
 }
 
+// RangeNodes streams every node. It flushes the detail buffer, then reads detail via a single
+// SEQUENTIAL badger scan of the gn\0 prefix (cheap, cache-friendly) rather than a random Get per
+// node — the adapter passes iterate all nodes, and random Gets were the dominant disk-path cost.
 func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
-	for i := range g.ids {
-		if !fn(g.nodeAt(int32(i))) {
-			return
+	g.flushDet()
+	pfx := []byte("gn")
+	stop := false
+	_ = g.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek(pfx); it.ValidForPrefix(pfx); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			if len(k) != 6 {
+				continue
+			}
+			idx := int32(binary.LittleEndian.Uint32(k[2:]))
+			if err := item.Value(func(v []byte) error {
+				d := decDet(v)
+				if !fn(Node{ID: g.ids[idx], Type: d.typ, Loc: d.loc, Region: d.region,
+					Order: d.order, HasOrder: d.hasOrder, Scope: d.scope, Props: d.props}) {
+					stop = true
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+			if stop {
+				return nil
+			}
 		}
-	}
+		return nil
+	})
 }
