@@ -7,12 +7,15 @@
 package secretscan
 
 import (
+	"bytes"
+	"encoding/gob"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/vyprai/vyql/extract/nir"
+	"github.com/vyprai/vyql/extract/parsecache"
 )
 
 // providerPatterns are high-precision, near-zero-FP secret tokens (CWE-798).
@@ -44,31 +47,88 @@ var placeholders = map[string]bool{
 }
 
 // Extract scans the given files for hardcoded secrets.
+// secretHits is the cached per-file result: the 1-based line numbers carrying a secret. nil/
+// empty means a clean file — still cached, so an unchanged file is never re-read.
+type secretHits struct{ Lines []int }
+
 func Extract(files []string, root string) (nir.Program, error) {
 	var prog nir.Program
 	prog.SelfName = "self"
+	// Stat fast-path: the result depends only on file content, so an unchanged file's hits are
+	// replayed from cache instead of re-reading and re-scanning it — secret scanning otherwise
+	// reads every source file on every scan.
+	cache := parsecache.Shared()
+	var auxKeys map[string]string
+	var cached map[string][]byte
+	if cache != nil {
+		auxKeys = cache.AuxStatKeys(root, files, "secret")
+		keyList := make([]string, 0, len(auxKeys))
+		for _, k := range auxKeys {
+			keyList = append(keyList, k)
+		}
+		cached = cache.GetManyRaw(keyList)
+	}
+	writes := map[string][]byte{}
 	for _, f := range files {
+		rel := relPath(root, f)
+		var lines []int
+		if k, ok := auxKeys[f]; ok {
+			if raw, hit := cached[k]; hit {
+				if h, ok := decodeHits(raw); ok {
+					lines = h.Lines
+					addSecrets(&prog, rel, lines)
+					continue
+				}
+			}
+		}
 		data, err := os.ReadFile(f)
 		if err != nil || isBinary(data) {
 			continue
 		}
-		rel := relPath(root, f)
-		var body []nir.Stmt
 		for i, line := range strings.Split(string(data), "\n") {
-			if hit := scanLine(line); hit {
-				loc := rel + ":" + itoa(i+1)
-				body = append(body, nir.ExprStmt{Value: nir.Call{
-					Callee: nir.Name{ID: "hardcoded_secret", Loc: loc},
-					Path:   "hardcoded_secret", Method: "hardcoded_secret", Loc: loc}})
+			if scanLine(line) {
+				lines = append(lines, i+1)
 			}
 		}
-		if len(body) == 0 {
-			continue
+		if k, ok := auxKeys[f]; ok {
+			writes[k] = encodeHits(secretHits{Lines: lines})
 		}
-		fn := nir.FuncDef{Name: "__secrets__", Body: body, Loc: rel + ":1"}
-		prog.Modules = append(prog.Modules, nir.Module{Key: rel, File: rel, Body: []nir.Stmt{fn}})
+		addSecrets(&prog, rel, lines)
+	}
+	if cache != nil && len(writes) > 0 {
+		cache.PutManyRaw(writes)
 	}
 	return prog, nil
+}
+
+// addSecrets appends a secret-bearing module for rel if lines is non-empty.
+func addSecrets(prog *nir.Program, rel string, lines []int) {
+	if len(lines) == 0 {
+		return
+	}
+	var body []nir.Stmt
+	for _, ln := range lines {
+		loc := rel + ":" + itoa(ln)
+		body = append(body, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: "hardcoded_secret", Loc: loc},
+			Path:   "hardcoded_secret", Method: "hardcoded_secret", Loc: loc}})
+	}
+	fn := nir.FuncDef{Name: "__secrets__", Body: body, Loc: rel + ":1"}
+	prog.Modules = append(prog.Modules, nir.Module{Key: rel, File: rel, Body: []nir.Stmt{fn}})
+}
+
+func encodeHits(h secretHits) []byte {
+	var buf bytes.Buffer
+	_ = gob.NewEncoder(&buf).Encode(h)
+	return buf.Bytes()
+}
+
+func decodeHits(raw []byte) (secretHits, bool) {
+	var h secretHits
+	if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&h); err != nil {
+		return secretHits{}, false
+	}
+	return h, true
 }
 
 func scanLine(line string) bool {

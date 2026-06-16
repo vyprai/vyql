@@ -201,6 +201,26 @@ func (c *Cache) PrefetchStubs(root string, files []string) map[string]nir.Module
 	return out
 }
 
+// AuxStatKeys returns, for each stattable file, a stat-derived cache key in namespace ns. It
+// lets an auxiliary per-file analysis whose result depends only on file content (e.g. secret
+// scanning) reuse the stat fast-path: an unchanged file's cached result is replayed instead of
+// re-reading the file. Combine with GetManyRaw/PutManyRaw for batched I/O. Returns nil if
+// caching is off.
+func (c *Cache) AuxStatKeys(root string, files []string, ns string) map[string]string {
+	if c == nil {
+		return nil
+	}
+	out := make(map[string]string, len(files))
+	for _, f := range files {
+		fi, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
+		out[f] = "aux\x00" + ns + "\x00" + c.statKey(root, f, fi.Size(), fi.ModTime().UnixNano())
+	}
+	return out
+}
+
 // PutStat records the stat→header mapping after a (re)parse so the next scan can build a stub
 // without reading the file. Called whenever a content key is known valid for the file's current
 // stat (fresh parse, or a content hit where only the mtime moved).

@@ -183,6 +183,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
 	// reparse only the files that actually changed.
 	cache := parsecache.Shared()
+	tk := newTimer()
 	var rkey string
 	var all []*findings.Finding
 	var stats scanStats
@@ -193,6 +194,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
 		}
 	}
+	tk.mark("fingerprint")
 	if !hit {
 		all, stats, err = scanPaths(paths, src)
 		if err != nil {
