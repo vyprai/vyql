@@ -174,6 +174,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		_ = pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+	peakHeapPath = os.Getenv("VYQL_MEMPROFILE") // captured at peak (graph built) in buildGraphWith
 	prof := applyProfile(paths, profileName)
 	src, err := loadRules(rulesPath)
 	if err != nil {

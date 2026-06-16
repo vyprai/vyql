@@ -592,7 +592,6 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 		Name: spec.Name + ".input", Technology: spec.Technology, Specificity: 2,
 		Fidelity: fidelity, Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
-			nodes, _ := s.AllNodes()
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			inIdx := buildSpecIndex(len(spec.Inputs), func(i int) (methods, paths []string, loose bool) {
 				return spec.Inputs[i].Methods, spec.Inputs[i].Paths, spec.Inputs[i].Match == "contains"
@@ -604,13 +603,13 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				allowed[i] = packageAllowed(spec.Inputs[i].Packages, pkgs)
 			}
 			var out []adapters.Mapping
-			for _, n := range nodes {
+			rangeNodes(s, func(n usg.Node) bool {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				if path == "" && method == "" {
-					continue
+					return true
 				}
 				if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
-					continue // only label this language's nodes (cross-language adapters skip this)
+					return true // only label this language's nodes (cross-language adapters skip this)
 				}
 				for _, ci := range inIdx.candidates(method, path) {
 					in := spec.Inputs[ci]
@@ -642,7 +641,8 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 						break
 					}
 				}
-			}
+				return true
+			})
 			return out
 		},
 	}
@@ -871,8 +871,23 @@ func nodeTech(loc string) string {
 	return ""
 }
 
-func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
+// rangeNodes streams every node to fn via the store's RangeNodes fast path (no full []Node copy)
+// when available, else falls back to AllNodes. Adapter passes iterate every node once; the slice
+// copy was a multi-GB transient on large graphs.
+func rangeNodes(s usg.Store, fn func(usg.Node) bool) {
+	if rs, ok := s.(interface{ RangeNodes(func(usg.Node) bool) }); ok {
+		rs.RangeNodes(fn)
+		return
+	}
 	nodes, _ := s.AllNodes()
+	for _, n := range nodes {
+		if !fn(n) {
+			return
+		}
+	}
+}
+
+func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 	out := map[string]bool{}
 	add := func(v string) {
 		v = sca.NormalizePackageName(v)
@@ -889,19 +904,27 @@ func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 			out[a] = true
 		}
 	}
-	for _, n := range nodes {
-		switch n.Type {
-		case "code.Import":
-			if !crossLang {
-				if t := nodeTech(n.Prop("loc")); t != "" && t != tech {
-					continue
-				}
+	// only import/SBOM nodes carry package evidence — use the type index (O(result)) instead of
+	// scanning every node, since this runs once per adapter spec.
+	impIDs, _ := s.NodesOfType("code.Import")
+	for _, id := range impIDs {
+		n, ok, _ := s.GetNode(id)
+		if !ok {
+			continue
+		}
+		if !crossLang {
+			if t := nodeTech(n.Prop("loc")); t != "" && t != tech {
+				continue
 			}
-			add(n.Prop("module"))
-			add(n.Prop("symbol"))
-			add(n.Prop("package"))
-			add(n.Prop("root"))
-		case "sbom.PackageVersion":
+		}
+		add(n.Prop("module"))
+		add(n.Prop("symbol"))
+		add(n.Prop("package"))
+		add(n.Prop("root"))
+	}
+	sbomIDs, _ := s.NodesOfType("sbom.PackageVersion")
+	for _, id := range sbomIDs {
+		if n, ok, _ := s.GetNode(id); ok {
 			add(n.Prop("name"))
 		}
 	}

@@ -44,9 +44,16 @@ func (s *InMemStore) AddNode(n Node) error {
 	return nil
 }
 
+// inIndexedTypes are the only edge types ever queried by InEdges (endpoint-guard resolution).
+// Reverse-indexing only these — instead of every edge — roughly halves edge memory on large
+// graphs, where FLOWS/STEP/NET edges dominate and are never traversed backwards.
+var inIndexedTypes = map[string]bool{"PROTECTS": true, "CHECKS": true}
+
 func (s *InMemStore) AddEdge(e Edge) error {
 	s.out[e.Src] = append(s.out[e.Src], e)
-	s.in[e.Dst] = append(s.in[e.Dst], e)
+	if inIndexedTypes[e.Type] {
+		s.in[e.Dst] = append(s.in[e.Dst], e)
+	}
 	return nil
 }
 
@@ -77,6 +84,8 @@ func (s *InMemStore) OutEdges(src, edgeType string) ([]Edge, error) {
 	return filterEdges(s.out[src], edgeType), nil
 }
 
+// InEdges returns reverse edges of the in-indexed types only (PROTECTS/CHECKS); other types are
+// not reverse-indexed (see inIndexedTypes) and return nothing.
 func (s *InMemStore) InEdges(dst, edgeType string) ([]Edge, error) {
 	return filterEdges(s.in[dst], edgeType), nil
 }
@@ -100,6 +109,17 @@ func (s *InMemStore) AllNodes() ([]Node, error) {
 		out = append(out, n)
 	}
 	return out, nil
+}
+
+// RangeNodes streams every node to fn (stop early by returning false) WITHOUT materializing a
+// full []Node copy. Adapters and SCA iterate all nodes once per pass; AllNodes' slice copy was a
+// multi-GB transient allocation (and GC churn) on large graphs. fn must not retain the Node.
+func (s *InMemStore) RangeNodes(fn func(Node) bool) {
+	for _, n := range s.nodes {
+		if !fn(n) {
+			return
+		}
+	}
 }
 
 func (s *InMemStore) Labels(nodeID string) ([]Label, error) {

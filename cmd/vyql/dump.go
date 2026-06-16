@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +16,20 @@ import (
 	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/usg"
 )
+
+// peakHeapPath, when set ($VYQL_MEMPROFILE), makes buildGraphWith write a heap profile right
+// after the graph is fully built — capturing peak-live memory (diagnostic only).
+var peakHeapPath string
+
+func dumpHeap(path string) {
+	f, err := os.Create(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	runtime.GC()
+	_ = pprof.WriteHeapProfile(f)
+}
 
 // buildGraph runs extract → lower → adapters → SCA and returns the analysis graph (the
 // USG the rule engine evaluates against). Shared by scanPaths and the -dump debug path.
@@ -103,6 +120,9 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		return nil, stats, err
 	}
 	tk.mark("adapters")
+	if mp := peakHeapPath; mp != "" { // peak-live heap snapshot (graph fully built)
+		dumpHeap(mp)
+	}
 	return g, stats, nil
 }
 
