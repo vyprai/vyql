@@ -25,18 +25,6 @@ import (
 	"github.com/vyprai/vyql/extract/nir"
 )
 
-func init() {
-	// register every concrete NIR Expr/Stmt so gob can (de)serialize the interface fields.
-	for _, v := range []any{
-		nir.Name{}, nir.Const{}, nir.Attr{}, nir.Index{}, nir.Call{}, nir.Format{}, nir.Seq{},
-		nir.Pair{}, nir.Lambda{}, nir.Thru{}, nir.BinOp{}, nir.Unary{}, nir.Ternary{},
-		nir.Assign{}, nir.AugAssign{}, nir.Return{}, nir.ExprStmt{}, nir.FuncDef{}, nir.ClassDef{},
-		nir.Block{}, nir.If{}, nir.Loop{}, nir.Switch{}, nir.Try{},
-	} {
-		gob.Register(v)
-	}
-}
-
 // Cache is a Badger-backed parse-result cache. A nil *Cache is a valid no-op (all methods
 // are safe), so callers can treat "caching disabled" uniformly.
 type Cache struct {

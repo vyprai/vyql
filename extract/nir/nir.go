@@ -14,6 +14,21 @@
 // used for resolution (may differ from display paths).
 package nir
 
+import "encoding/gob"
+
+// register every concrete Expr/Stmt so gob can (de)serialize the interface fields of Module
+// — used by the parse cache and the incremental-lowering delta cache.
+func init() {
+	for _, v := range []any{
+		Name{}, Const{}, Attr{}, Index{}, Call{}, Format{}, Seq{}, Pair{}, Lambda{}, Thru{},
+		BinOp{}, Unary{}, Ternary{},
+		Assign{}, AugAssign{}, Return{}, ExprStmt{}, FuncDef{}, ClassDef{}, Block{}, If{},
+		Loop{}, Switch{}, Try{},
+	} {
+		gob.Register(v)
+	}
+}
+
 // Expr is the NIR expression interface (a closed set, switched on in lowering).
 type Expr interface{ isExpr() }
 
@@ -253,6 +268,10 @@ type Module struct {
 	File    string
 	Imports []Import
 	Body    []Stmt
+	// Hash is a content hash of the source file this module was parsed from (set by the
+	// frontend). It identifies the module's parse result for the incremental lowering cache;
+	// empty means "not content-addressed" (e.g. the native Go frontend) → always re-lowered.
+	Hash string
 }
 
 // Program is a set of modules plus the receiver name used for self/this

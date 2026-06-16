@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -10,6 +12,13 @@ import (
 	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/extract/parsecache"
 )
+
+// contentHash is the per-file content fingerprint used as a module's identity for the
+// incremental-lowering cache (nir.Module.Hash).
+func contentHash(src []byte) string {
+	h := sha256.Sum256(src)
+	return hex.EncodeToString(h[:])
+}
 
 // parseModules parses files concurrently — one tree-sitter parser per worker (parsers are
 // not goroutine-safe) — and returns the resulting modules in INPUT ORDER (deterministic
@@ -75,6 +84,7 @@ func parseModules(
 				m, good := build(src, files[i], relPath(root, files[i]), tree)
 				tree.Close()
 				if good {
+					m.Hash = contentHash(src) // identifies this parse for the incremental-lowering cache
 					mods[i], ok[i] = m, true
 					if cache != nil {
 						cache.Put(key, m)

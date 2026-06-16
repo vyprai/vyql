@@ -57,14 +57,17 @@ type lowerer struct {
 	curClass  string // "" = none
 	curRoute  bool   // lowering the body of a web request handler (FuncDef.IsRoute)
 
-	// B1 structured-CFG metadata. `region` is the current control-region path (e.g.
-	// "/if3.t/loop5"); every node is stamped with it plus a monotonic `order`. For
-	// goto-free structured control flow this encodes the dominator tree directly:
-	// G dominates S iff region(G) is an ancestor of region(S) and order(G) < order(S)
-	// (see solvers.Dominates). Pure metadata — inert until a path-sensitive rule reads it.
-	region   string
-	order    int
-	branchCt int
+	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
+	// module key (e.g. "app/utils.go/fn3/loop5"); every node is stamped with it plus a
+	// per-module monotonic `order`. For goto-free structured control flow this encodes the
+	// dominator tree directly: G dominates S iff region(G) is an ancestor of region(S) and
+	// order(G) < order(S) (see solvers.Dominates). order and the branch counter are MODULE-
+	// LOCAL (keyed by curModule) and regions are module-namespaced, so a module's CFG metadata
+	// is deterministic from its own content alone — the same whether it is lowered in
+	// isolation (incremental) or alongside others (full). Pure metadata until a rule reads it.
+	region    string
+	modOrder  map[string]int
+	modBranch map[string]int
 
 	// container element-sensitivity: per-container-node taint of individual constant
 	// keys/indices, so `m.put("kB", tainted); m.get("kA")` reads a clean element rather
@@ -92,8 +95,8 @@ func (l *lowerer) inRegion(seg string, f func()) {
 }
 
 func (l *lowerer) nextBranch() string {
-	l.branchCt++
-	return strconv.Itoa(l.branchCt)
+	l.modBranch[l.curModule]++
+	return strconv.Itoa(l.modBranch[l.curModule])
 }
 
 // mutatorMethods add a value into their receiver (collection/builder), so the receiver
@@ -609,13 +612,25 @@ func Lower(prog nir.Program, resolveImports bool) (usg.Store, error) {
 // assigned from a known constructor lets the lowering stamp `recv_type` on its
 // method calls, which type-constrained sink adapters use for precision.
 func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]string) (usg.Store, error) {
-	l := &lowerer{
+	l := newLowerer(prog, resolveImports, ctorTypes)
+	if err := l.run(); err != nil {
+		return nil, err
+	}
+	return l.g, nil
+}
+
+// newLowerer builds a fresh lowerer with all maps initialised. Shared by LowerTyped and the
+// incremental lowerer.
+func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]string) *lowerer {
+	return &lowerer{
 		prog:           prog,
 		selfName:       prog.Self(),
 		resolveImports: resolveImports,
 		ctorTypes:      ctorTypes,
 		g:              usg.NewInMemStore(),
 		modCtr:         map[string]int{},
+		modOrder:       map[string]int{},
+		modBranch:      map[string]int{},
 		funcQual:       map[string]*funcInfo{},
 		funcShort:      map[string][]*funcInfo{},
 		classQual:      map[string]bool{},
@@ -625,10 +640,6 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		containers:     map[string]*containerInfo{},
 		lambdaParams:   map[string][]string{},
 	}
-	if err := l.run(); err != nil {
-		return nil, err
-	}
-	return l.g, nil
 }
 
 // --- graph helpers ------------------------------------------------------
@@ -650,8 +661,8 @@ func (l *lowerer) node(kind, loc string, props map[string]string) string {
 // whose ids are NAME-derived (sigID) so they survive a body edit and remain valid targets for
 // cross-module call edges from other (possibly cached) modules.
 func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) string {
-	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.order)}
-	l.order++
+	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.modOrder[l.curModule])}
+	l.modOrder[l.curModule]++
 	for k, v := range props {
 		p[k] = v
 	}
@@ -861,7 +872,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// each function gets a distinct region ROOT, so structural dominance never spans
 		// functions (cross-function flows fall back to presence semantics — conservative).
 		saveRegion := l.region
-		l.region = "/fn" + l.nextBranch()
+		l.region = l.curModule + "/fn" + l.nextBranch()
 		saveRoute := l.curRoute
 		l.curRoute = st.IsRoute
 		l.block(st.Body, inner)
