@@ -104,27 +104,41 @@ func cmdScan(args []string) error {
 		usage()
 		os.Exit(2)
 	}
-	applyMaxRAM(*maxRAM)
+	cleanup := applyMaxRAM(*maxRAM)
+	defer cleanup()
 	return run(paths, *rulesPath, *format, *profileName, *stats)
 }
 
-// applyMaxRAM honors --max-ram (or $VYQL_MAX_RAM): set the soft heap limit to it and select the
-// low-footprint int-indexed store so a scan stays under the ceiling. Overrides the auto-80%
-// default. An invalid value is reported and ignored.
-func applyMaxRAM(v string) {
+// applyMaxRAM honors --max-ram (or $VYQL_MAX_RAM): set the soft heap limit and route the graph
+// through the disk-backed BadgerGraph store (graph on disk, RAM bounded by badger's cache, sized
+// to ~half the budget) so a scan stays under the ceiling even when the graph exceeds it. Returns
+// a cleanup func that removes the temporary graph db. Overrides the auto-80% default; an invalid
+// value is reported and ignored.
+func applyMaxRAM(v string) func() {
+	noop := func() {}
 	if v == "" {
 		v = os.Getenv("VYQL_MAX_RAM")
 	}
 	if v == "" {
-		return
+		return noop
 	}
 	n, err := parseBytes(v)
 	if err != nil || n <= 0 {
 		fmt.Fprintf(os.Stderr, "vyql: invalid --max-ram %q (use e.g. 8GB, 16GiB)\n", v)
-		return
+		return noop
 	}
-	debug.SetMemoryLimit(n)
-	lowering.UseIntStore = true // lower footprint helps stay under the ceiling
+	dir, err := os.MkdirTemp("", "vyql-graph-")
+	if err != nil {
+		debug.SetMemoryLimit(n)
+		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
+		return noop
+	}
+	// Split the budget: ~1/3 to badger's (off-Go-heap) cache, ~2/3 to the Go heap via GOMEMLIMIT,
+	// so total RSS ≈ the requested ceiling (GOMEMLIMIT alone wouldn't count badger's cache).
+	lowering.DiskCacheBytes = n / 3
+	debug.SetMemoryLimit(n - n/3)
+	lowering.DiskStorePath = dir
+	return func() { os.RemoveAll(dir) }
 }
 
 // parseBytes parses a human size like "8GB", "512MiB", "2G", "1048576". Decimal (KB/MB/GB) and

@@ -1,6 +1,7 @@
 package usg
 
 import (
+	"encoding/binary"
 	"sync"
 
 	badger "github.com/dgraph-io/badger/v4"
@@ -31,20 +32,25 @@ type BadgerGraph struct {
 	db    *badger.DB
 	owned bool // we opened db and must close it
 
-	mu       sync.Mutex
-	finished bool
+	mu sync.Mutex
 
-	// build-time accumulators (freed after Finalize); reads before Finalize hit these.
+	// Resident structural core (int-indexed). Node DETAIL (loc/region/props/type) is NOT kept
+	// here — it is streamed to badger so peak RAM is bounded by the core + a small write buffer +
+	// badger's cache, not the full payload.
 	idx        map[string]int32
 	ids        []string
-	det        []nodeDetail
 	out        [][]iedge
 	in         map[int32][]iedge
 	labels     [][]Label
 	byType     map[string][]int32
 	byConcept  map[string][]int32
 	conceptHas map[string]map[int32]bool
+
+	// bounded write-back buffer for node detail (flushed to badger in batches).
+	detBuf map[int32][]byte
 }
+
+const detBufMax = 1 << 14 // flush detail to badger every ~16k nodes
 
 type nodeDetail struct {
 	typ, loc, region, scope string
@@ -79,7 +85,7 @@ func NewBadgerGraphDB(db *badger.DB, owned bool) *BadgerGraph {
 		db: db, owned: owned,
 		idx: map[string]int32{}, in: map[int32][]iedge{},
 		byType: map[string][]int32{}, byConcept: map[string][]int32{},
-		conceptHas: map[string]map[int32]bool{},
+		conceptHas: map[string]map[int32]bool{}, detBuf: map[int32][]byte{},
 	}
 }
 
@@ -90,10 +96,20 @@ func (g *BadgerGraph) intern(id string) int32 {
 	i := int32(len(g.ids))
 	g.idx[id] = i
 	g.ids = append(g.ids, id)
-	g.det = append(g.det, nodeDetail{})
 	g.out = append(g.out, nil)
 	g.labels = append(g.labels, nil)
 	return i
+}
+
+// typeOf returns a node's type without decoding its full detail (type leads the detail blob).
+func (g *BadgerGraph) typeOf(i int32) string {
+	if b, ok := g.detBuf[i]; ok {
+		return (&detReader{b: b}).str()
+	}
+	if b := g.rawDet(i); b != nil {
+		return (&detReader{b: b}).str()
+	}
+	return ""
 }
 
 func (g *BadgerGraph) AddNode(n Node) error {
@@ -103,14 +119,17 @@ func (g *BadgerGraph) AddNode(n Node) error {
 	if !existed {
 		i = g.intern(n.ID)
 	}
-	if g.det[i].typ != n.Type {
-		if existed && g.det[i].typ != "" {
-			removeIdx(g.byType, g.det[i].typ, i)
+	if t := g.typeOf(i); t != n.Type {
+		if existed && t != "" {
+			removeIdx(g.byType, t, i)
 		}
 		g.byType[n.Type] = append(g.byType[n.Type], i)
 	}
-	g.det[i] = nodeDetail{typ: n.Type, loc: n.Loc, region: n.Region, scope: n.Scope,
-		order: n.Order, hasOrder: n.HasOrder, props: n.Props}
+	g.detBuf[i] = encDet(nodeDetail{typ: n.Type, loc: n.Loc, region: n.Region, scope: n.Scope,
+		order: n.Order, hasOrder: n.HasOrder, props: n.Props})
+	if len(g.detBuf) >= detBufMax {
+		g.flushDet()
+	}
 	return nil
 }
 
@@ -157,11 +176,53 @@ func removeIdx(m map[string][]int32, k string, i int32) {
 
 func (g *BadgerGraph) idxOf(id string) (int32, bool) { i, ok := g.idx[id]; return i, ok }
 
+// rawDet returns a node's encoded detail from the write buffer or badger (cache-served).
+func (g *BadgerGraph) rawDet(i int32) []byte {
+	if b, ok := g.detBuf[i]; ok {
+		return b
+	}
+	var out []byte
+	_ = g.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(detKey(i))
+		if err != nil {
+			return err
+		}
+		out, err = item.ValueCopy(nil)
+		return err
+	})
+	return out
+}
+
 func (g *BadgerGraph) nodeAt(i int32) Node {
-	d := g.det[i]
+	d := decDet(g.rawDet(i))
 	return Node{ID: g.ids[i], Type: d.typ, Loc: d.loc, Region: d.region, Order: d.order,
 		HasOrder: d.hasOrder, Scope: d.scope, Props: d.props}
 }
+
+// flushDet writes the buffered node details to badger in one transaction and clears the buffer,
+// bounding RAM to the structural core + ~detBufMax buffered blobs + badger's cache.
+func (g *BadgerGraph) flushDet() {
+	if len(g.detBuf) == 0 {
+		return
+	}
+	wb := g.db.NewWriteBatch()
+	for i, b := range g.detBuf {
+		_ = wb.Set(detKey(i), b)
+	}
+	_ = wb.Flush()
+	g.detBuf = map[int32][]byte{}
+}
+
+func detKey(i int32) []byte {
+	b := make([]byte, 6)
+	b[0], b[1] = 'g', 'n'
+	binary.LittleEndian.PutUint32(b[2:], uint32(i))
+	return b
+}
+
+// Has reports whether a node id exists, without decoding its detail (existence-only fast path for
+// the lowerer's flow() checks, so the build never reads detail back from disk).
+func (g *BadgerGraph) Has(id string) bool { _, ok := g.idx[id]; return ok }
 
 func (g *BadgerGraph) GetNode(id string) (Node, bool, error) {
 	i, ok := g.idxOf(id)
@@ -230,10 +291,95 @@ func (g *BadgerGraph) Labels(nodeID string) ([]Label, error) {
 }
 
 func (g *BadgerGraph) Close() error {
+	g.flushDet()
 	if g.owned {
 		return g.db.Close()
 	}
 	return nil
+}
+
+// --- node-detail binary codec ---------------------------------------------------------------
+
+type detWriter struct{ b []byte }
+
+func (w *detWriter) u(n int) {
+	for n >= 0x80 {
+		w.b = append(w.b, byte(n)|0x80)
+		n >>= 7
+	}
+	w.b = append(w.b, byte(n))
+}
+func (w *detWriter) str(s string) { w.u(len(s)); w.b = append(w.b, s...) }
+func (w *detWriter) boolean(v bool) {
+	if v {
+		w.b = append(w.b, 1)
+	} else {
+		w.b = append(w.b, 0)
+	}
+}
+
+type detReader struct {
+	b []byte
+	i int
+}
+
+func (r *detReader) u() int {
+	var x int
+	var s uint
+	for {
+		c := r.b[r.i]
+		r.i++
+		x |= int(c&0x7f) << s
+		if c < 0x80 {
+			return x
+		}
+		s += 7
+	}
+}
+func (r *detReader) str() string {
+	if r.i >= len(r.b) {
+		return ""
+	}
+	n := r.u()
+	s := string(r.b[r.i : r.i+n])
+	r.i += n
+	return s
+}
+func (r *detReader) boolean() bool { v := r.b[r.i] == 1; r.i++; return v }
+
+// encDet writes type first (so typeOf can read it cheaply), then the rest of the payload.
+func encDet(d nodeDetail) []byte {
+	w := &detWriter{}
+	w.str(d.typ)
+	w.str(d.loc)
+	w.str(d.region)
+	w.str(d.scope)
+	w.u(int(uint32(d.order)))
+	w.boolean(d.hasOrder)
+	w.u(len(d.props))
+	for k, v := range d.props {
+		w.str(k)
+		w.str(v)
+	}
+	return w.b
+}
+
+func decDet(b []byte) nodeDetail {
+	if len(b) == 0 {
+		return nodeDetail{}
+	}
+	r := &detReader{b: b}
+	d := nodeDetail{typ: r.str(), loc: r.str(), region: r.str(), scope: r.str()}
+	d.order = int32(uint32(r.u()))
+	d.hasOrder = r.boolean()
+	if n := r.u(); n > 0 {
+		d.props = make(map[string]string, n)
+		for j := 0; j < n; j++ {
+			k := r.str()
+			d.props[k] = r.str()
+		}
+	}
+	return d
 }
 
 // --- IntGraph fast path ---------------------------------------------------------------------

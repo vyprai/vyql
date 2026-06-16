@@ -166,14 +166,24 @@ func encodeInt(n int) []byte {
 }
 func decodeInt(raw []byte) int { return (&bufReader{b: raw}).uvar() }
 
-// UseIntStore forces the int-indexed (lower-memory) store; set by the CLI when a RAM ceiling is
-// configured. VYQL_STORE=int also selects it.
-var UseIntStore bool
+// Store-selection knobs set by the CLI. UseIntStore forces the int-indexed in-RAM store. When
+// DiskStorePath is set (a RAM ceiling is configured), the badger-backed store is used: the graph
+// is the source of truth on disk and RAM is bounded by DiskCacheBytes (badger's cache).
+var (
+	UseIntStore    bool
+	DiskStorePath  string
+	DiskCacheBytes int64
+)
 
-// newGraphStore creates the analysis graph store. The int-indexed IntStore (lower memory on
-// large graphs) is used when UseIntStore / VYQL_STORE=int; otherwise the map-based InMemStore.
-// hint>0 presizes.
+// newGraphStore creates the analysis graph store. Disk-backed BadgerGraph when a RAM ceiling is
+// configured (DiskStorePath); int-indexed IntStore when UseIntStore/VYQL_STORE=int; in-memory
+// BadgerGraph for VYQL_STORE=badger (testing); else the map-based InMemStore. hint>0 presizes.
 func newGraphStore(hint int) usg.Store {
+	if DiskStorePath != "" {
+		if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes); err == nil {
+			return g
+		}
+	}
 	if os.Getenv("VYQL_STORE") == "badger" {
 		if g, err := usg.OpenBadgerGraph(":memory:", 0); err == nil {
 			return g

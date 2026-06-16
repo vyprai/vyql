@@ -704,13 +704,20 @@ func (l *lowerer) flow(a, b string) {
 	if a == "" || b == "" {
 		return
 	}
-	if _, ok, _ := l.g.GetNode(a); !ok {
-		return
-	}
-	if _, ok, _ := l.g.GetNode(b); !ok {
+	if !l.exists(a) || !l.exists(b) {
 		return
 	}
 	l.g.AddEdge(usg.Edge{Type: "FLOWS", Src: a, Dst: b})
+}
+
+// exists is an existence-only check; on a disk-backed store it uses Has (no detail decode) so the
+// build never reads node payload back from disk.
+func (l *lowerer) exists(id string) bool {
+	if h, ok := l.g.(interface{ Has(string) bool }); ok {
+		return h.Has(id)
+	}
+	_, ok, _ := l.g.GetNode(id)
+	return ok
 }
 
 // --- entry --------------------------------------------------------------
