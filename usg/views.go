@@ -2,10 +2,11 @@ package usg
 
 // RecordingStore forwards every operation to the embedded Store and records the labels added
 // through it, so a phase's label output (e.g. adapter labeling of a node subset) can be
-// captured for caching. Reads and node/edge writes pass straight through.
+// captured for caching. Reads and node/edge writes pass straight through. The captured labels
+// live in Recs (not "Labels", which would shadow the Store.Labels(id) method).
 type RecordingStore struct {
 	Store
-	Labels []LabelRec
+	Recs []LabelRec
 }
 
 // LabelRec is one captured (node, label) pair.
@@ -15,7 +16,7 @@ type LabelRec struct {
 }
 
 func (r *RecordingStore) AddLabel(nodeID string, l Label) error {
-	r.Labels = append(r.Labels, LabelRec{nodeID, l})
+	r.Recs = append(r.Recs, LabelRec{nodeID, l})
 	return r.Store.AddLabel(nodeID, l)
 }
 

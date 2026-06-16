@@ -33,6 +33,10 @@ func generatedRoot() string {
 	return filepath.Join(datadir.Root(), "adapters", "packages", "generated")
 }
 
+// GeneratedRoot exports generatedRoot so the incremental adapter-label cache can fingerprint
+// the specific generated per-package files a scan loads (honoring $VYQL_PACKAGE_ADAPTERS).
+func GeneratedRoot() string { return generatedRoot() }
+
 // DependencyEvidence collects the project's dependency surface from an already-built
 // graph: imported modules/symbols (code.Import) and declared packages (sbom.PackageVersion),
 // normalized and expanded to package roots. This is the gate set used to decide which

@@ -9,7 +9,9 @@ import (
 	"hash"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/parsecache"
@@ -67,6 +69,26 @@ func statWalk(h hash.Hash, root string) {
 		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
 		return nil
 	})
+}
+
+// statFile folds one file's path+size+mtime into h (skipped silently if it can't be stat'd).
+// The building block for fingerprinting a known, bounded file set without walking a tree.
+func statFile(h hash.Hash, path string) {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return
+	}
+	io.WriteString(h, path)
+	fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
+}
+
+// statGlob folds every file matching pattern into h, in sorted order (deterministic).
+func statGlob(h hash.Hash, pattern string) {
+	matches, _ := filepath.Glob(pattern)
+	sort.Strings(matches)
+	for _, m := range matches {
+		statFile(h, m)
+	}
 }
 
 // loadCachedScan returns a previously cached scan result for key, if present.

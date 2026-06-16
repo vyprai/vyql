@@ -60,6 +60,24 @@ var activeSources map[string]bool
 // active application profile's entry-point families). Pass nil to disable.
 func SetActiveSources(s map[string]bool) { activeSources = s }
 
+// ActiveSourcesKey returns a deterministic fingerprint of the active source set (the profile's
+// trust boundary), for the incremental adapter-label cache: changing the profile changes which
+// source labels adapters emit, so cached labels from one profile must not be reused under
+// another. "*" means no filter (every source active).
+func ActiveSourcesKey() string {
+	if activeSources == nil {
+		return "*"
+	}
+	keys := make([]string, 0, len(activeSources))
+	for k, on := range activeSources {
+		if on {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
+}
+
 // valContains reports whether the NUL-joined str_args prop contains sub,
 // case-insensitively. Used by `val`/`nval` matching.
 func valContains(tokens, sub string) bool {

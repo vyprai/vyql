@@ -9,6 +9,7 @@ import (
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
+	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/usg"
 )
@@ -48,7 +49,8 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	// identical), so adapters/taint/rules below are untouched. Benefits every command that
 	// builds a graph (scan, trace, query, graph, …).
 	var g usg.Store
-	if cache != nil {
+	incremental := cache != nil
+	if incremental {
 		g, _, err = lowering.LowerIncremental(prog, true, ctorTypes, cache)
 	} else {
 		g, err = lowering.LowerTyped(prog, true, ctorTypes)
@@ -66,10 +68,29 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	for _, lang := range stats.languages {
 		ads = append(ads, frontend.GeneratedPackageAdaptersFor(lang, deps)...)
 	}
-	if _, _, err := adapters.Apply(g, ads, nil); err != nil {
+	// Adapter labeling: incremental (reuse unchanged modules' cached labels) when caching is
+	// on, else a full pass. Both produce identical labels — adapter precedence is per-node.
+	if incremental {
+		if err := applyAdaptersIncremental(g, ads, moduleHashes(prog), cache); err != nil {
+			return nil, stats, err
+		}
+	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {
 		return nil, stats, err
 	}
 	return g, stats, nil
+}
+
+// moduleHashes maps each content-addressed module's namespace (lowering.ModuleNS) to its
+// content hash, the per-module identity the incremental adapter-label cache keys on. Modules
+// without a Hash (native frontends) are omitted, so they are always relabeled.
+func moduleHashes(prog nir.Program) map[string]string {
+	m := map[string]string{}
+	for _, mod := range prog.Modules {
+		if mod.Hash != "" {
+			m[lowering.ModuleNS(mod)] = mod.Hash
+		}
+	}
+	return m
 }
 
 // edgeTypes are the edge kinds dumped (data, control, guard, graph-domain).

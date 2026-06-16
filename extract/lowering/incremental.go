@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/usg"
@@ -81,19 +82,10 @@ func lowerKey(moduleHash, moduleKey, sigFP string) string {
 // for nodes not minted by the module-namespacing lowerer (e.g. SBOM nodes). Lets the caller
 // attribute graph nodes to modules for incremental adapter labeling.
 func NodeModule(id string) (string, bool) {
-	if i := indexByte(id, '\x1f'); i >= 0 {
+	if i := strings.IndexByte(id, '\x1f'); i >= 0 {
 		return id[:i], true
 	}
 	return "", false
-}
-
-func indexByte(s string, b byte) int {
-	for i := 0; i < len(s); i++ {
-		if s[i] == b {
-			return i
-		}
-	}
-	return -1
 }
 
 // sigFingerprint hashes everything cross-module body lowering depends on besides a module's own
