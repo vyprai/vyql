@@ -408,6 +408,31 @@ def get_ldap_connection(conf):
     return Server(conf.get("ldap", "uri"), use_ssl=True, tls=tls_configuration)
 `
 
+const vulnerablePythonTracebackHTML = `import traceback
+
+def respond_error(context):
+    context.respond_server_error()
+    stack = traceback.format_exc()
+    return """
+    <html><body><pre>
+%s
+    </pre></body></html>
+    """ % stack
+`
+
+const fixedPythonTracebackHTML = `import cgi
+import traceback
+
+def respond_error(context):
+    context.respond_server_error()
+    stack = traceback.format_exc()
+    return """
+    <html><body><pre>
+%s
+    </pre></body></html>
+    """ % cgi.escape(stack)
+`
+
 func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "vuln.php"), []byte(vulnerablePhpStoredHtmlWrite), 0o644); err != nil {
@@ -432,6 +457,33 @@ func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
 	}
 	if !strings.Contains(stored[0].Bindings[0].Loc, "vuln.php") {
 		t.Fatalf("stored HTML write finding should be in vuln.php, got %#v", stored[0].Bindings)
+	}
+}
+
+func TestScanPythonTracebackHtmlEscaping(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "vuln.py"), []byte(vulnerablePythonTracebackHTML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "fixed.py"), []byte(fixedPythonTracebackHTML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var xss []*findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-INJ-004" {
+			xss = append(xss, f)
+		}
+	}
+	if len(xss) != 1 {
+		t.Fatalf("expected one traceback HTML XSS finding only in vulnerable file, got %d: %#v", len(xss), fs)
+	}
+	if !strings.Contains(xss[0].Bindings[1].Loc, "vuln.py") {
+		t.Fatalf("expected XSS sink in vulnerable file, got %#v", xss[0].Bindings)
 	}
 }
 

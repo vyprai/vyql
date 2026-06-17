@@ -38,6 +38,7 @@ adapter python {
   source "request.POST" -> code.HttpInput
   source "request.body" -> code.HttpInput
   source "request.COOKIES" -> code.HttpInput
+  source "security.python.traceback_html.source" -> code.HttpInput
   source "request.META" -> code.HttpInput
   source "request.FILES" -> code.HttpInput
   source "request.path_info" -> code.HttpInput
@@ -358,6 +359,7 @@ adapter python {
   sink receiver "unlink" -> code.FilePathAccess
   sink path "render_template_string" -> code.HtmlRender
   sink path "flask.render_template_string" -> code.HtmlRender
+  sink path "security.python.traceback_html.render" -> code.HtmlRender
   // the response BODY reflected to the browser (Flask make_response / Response / HttpResponse).
   // and the synthetic http_response wrapping a route handler's return value).
   sink path "make_response" -> code.HtmlRender

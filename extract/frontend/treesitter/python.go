@@ -259,6 +259,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body = append(body, c.pyIncompleteFStringValidation(n)...)
 		body = append(body, c.pyStartTLSBufferReview(n)...)
 		body = append(body, c.pyOptionalLDAPTLSValidation(n)...)
+		body = append(body, c.pyUnescapedTracebackHTML(n)...)
 		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
 		// the args after self/info/root/parent are the query's user-supplied inputs.
 		if strings.HasPrefix(name, "resolve_") {
@@ -548,6 +549,42 @@ func (c *pyConv) pyOptionalLDAPTLSValidation(fn *tree_sitter.Node) []nir.Stmt {
 		Method: lastSeg(path),
 		Loc:    c.loc(fn),
 	}}}
+}
+
+func (c *pyConv) pyUnescapedTracebackHTML(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := c.text(body)
+	if !strings.Contains(text, "traceback.format_exc") ||
+		(!strings.Contains(text, "<html") && !strings.Contains(text, "<pre")) {
+		return nil
+	}
+	if strings.Contains(text, "cgi.escape") ||
+		strings.Contains(text, "html.escape") ||
+		strings.Contains(text, "markupsafe.escape") {
+		return nil
+	}
+	loc := c.loc(fn)
+	srcPath := "security.python.traceback_html.source"
+	renderPath := "security.python.traceback_html.render"
+	tmp := "__vyql_traceback_html"
+	return []nir.Stmt{
+		nir.Assign{Targets: []string{tmp}, Value: nir.Call{
+			Callee: nir.Name{ID: srcPath, Loc: loc},
+			Path:   srcPath,
+			Method: lastSeg(srcPath),
+			Loc:    loc,
+		}},
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: renderPath, Loc: loc},
+			Args:   []nir.Expr{nir.Name{ID: tmp, Loc: loc}},
+			Path:   renderPath,
+			Method: lastSeg(renderPath),
+			Loc:    loc,
+		}},
+	}
 }
 
 // clauseBlock returns the lowered statements of a clause's `block` child.
