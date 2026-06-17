@@ -41,11 +41,11 @@ concept DynamicCodeLoad : sink {
   vulnerable_to: [injection.UnsafeDynamicLoading]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_829]
-  exploit_category: "code_loading"
-  exploit_condition: "attacker-controlled module or library name reaches a dynamic code loader"
-  exploit_evidence: "dynamic loader {pattern} receives tainted input"
-  exploit_assumption: "the resolved module/library path or search path can be influenced by the attacker"
-  exploit_confidence: medium
+  review_category: "code_loading"
+  review_condition: "attacker-controlled module or library name reaches a dynamic code loader"
+  review_evidence: "dynamic loader {pattern} receives tainted input"
+  review_assumption: "the resolved module/library path or search path can be influenced by the attacker"
+  review_confidence: medium
 }
 concept PackageInstallExecution : sink {
   vulnerable_to: [injection.CodeInjection]
@@ -253,40 +253,40 @@ concept ResourceHandle : sink {
 concept LockAcquire : sink {
   vulnerable_to: [concurrency.Deadlock]
   cwe: [CWE_667]
-  exploit_category: "lifecycle"
-  exploit_condition: "a lock acquisition may not be released on every path"
-  exploit_evidence: "lock primitive {pattern} is acquired"
-  exploit_assumption: "an unreleased lock can be triggered to deadlock or starve concurrent work"
-  exploit_confidence: medium
+  review_category: "lifecycle"
+  review_condition: "a lock acquisition may not be released on every path"
+  review_evidence: "lock primitive {pattern} is acquired"
+  review_assumption: "an unreleased lock can be triggered to deadlock or starve concurrent work"
+  review_confidence: medium
 }
 concept UnboundedCopy : sink {
   vulnerable_to: [memory.OobWrite]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_787, CWE_120]
-  exploit_category: "memory"
-  exploit_condition: "attacker-controlled bytes reach an unbounded copy into a fixed-size destination"
-  exploit_evidence: "unsafe copy primitive {pattern} receives tainted input"
-  exploit_assumption: "the destination capacity can be smaller than the copied bytes"
-  exploit_confidence: high
+  review_category: "memory"
+  review_condition: "attacker-controlled bytes reach an unbounded copy into a fixed-size destination"
+  review_evidence: "unsafe copy primitive {pattern} receives tainted input"
+  review_assumption: "the destination capacity can be smaller than the copied bytes"
+  review_confidence: high
 }
 concept UnboundedCopySmell : sink {
   vulnerable_to: [memory.OobWrite]
   cwe: [CWE_787, CWE_120]
-  exploit_category: "memory"
-  exploit_condition: "an unbounded copy can overflow its destination"
-  exploit_evidence: "unsafe copy primitive {pattern} is present"
-  exploit_assumption: "an attacker can influence source length or destination capacity is insufficient"
-  exploit_confidence: low
+  review_category: "memory"
+  review_condition: "an unbounded copy can overflow its destination"
+  review_evidence: "unsafe copy primitive {pattern} is present"
+  review_assumption: "an attacker can influence source length or destination capacity is insufficient"
+  review_confidence: low
 }
 concept RawMemoryCopySize : sink {
   vulnerable_to: [memory.OobWrite]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_787]
-  exploit_category: "memory"
-  exploit_condition: "attacker-controlled size reaches a raw memory copy"
-  exploit_evidence: "copy-size argument to {pattern} is tainted"
-  exploit_assumption: "the size can exceed the destination object bounds"
-  exploit_confidence: medium
+  review_category: "memory"
+  review_condition: "attacker-controlled size reaches a raw memory copy"
+  review_evidence: "copy-size argument to {pattern} is tainted"
+  review_assumption: "the size can exceed the destination object bounds"
+  review_confidence: medium
 }
 concept UnsafeMutableAlias : sink {
   vulnerable_to: [memory.OobWrite, memory.UseAfterFree]
@@ -300,57 +300,57 @@ concept SizeComputation : sink {
   vulnerable_to: [memory.IntegerOverflow]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_190]
-  exploit_category: "numeric"
-  exploit_condition: "attacker-controlled size feeds allocation or bounds-sensitive operation"
-  exploit_evidence: "size argument to {pattern} is tainted"
-  exploit_assumption: "the value is not range-checked before memory use"
-  exploit_confidence: medium
+  review_category: "numeric"
+  review_condition: "attacker-controlled size feeds allocation or bounds-sensitive operation"
+  review_evidence: "size argument to {pattern} is tainted"
+  review_assumption: "the value is not range-checked before memory use"
+  review_confidence: medium
 }
 concept StackAllocationSmell : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
-  exploit_category: "memory"
-  exploit_condition: "unbounded stack allocation can exhaust stack or corrupt nearby state"
-  exploit_evidence: "stack allocation primitive {pattern} is present"
-  exploit_assumption: "the allocation size can be attacker-influenced or unexpectedly large"
-  exploit_confidence: low
+  review_category: "memory"
+  review_condition: "unbounded stack allocation can exhaust stack or corrupt nearby state"
+  review_evidence: "stack allocation primitive {pattern} is present"
+  review_assumption: "the allocation size can be attacker-influenced or unexpectedly large"
+  review_confidence: low
 }
 concept FileCheck : sink {
   vulnerable_to: [concurrency.Toctou]
   cwe: [CWE_367]
-  exploit_category: "race"
-  exploit_condition: "filesystem state is checked before a later use"
-  exploit_evidence: "check primitive {pattern} observes path state"
-  exploit_assumption: "an attacker can change the path target between check and use"
-  exploit_confidence: medium
+  review_category: "race"
+  review_condition: "filesystem state is checked before a later use"
+  review_evidence: "check primitive {pattern} observes path state"
+  review_assumption: "an attacker can change the path target between check and use"
+  review_confidence: medium
 }
 concept FileUse : sink {
   vulnerable_to: [concurrency.Toctou]
   cwe: [CWE_367]
-  exploit_category: "race"
-  exploit_condition: "checked filesystem state is later used"
-  exploit_evidence: "use primitive {pattern} acts on the path"
-  exploit_assumption: "the use is not protected by atomic open flags or symlink-safe handling"
-  exploit_confidence: medium
+  review_category: "race"
+  review_condition: "checked filesystem state is later used"
+  review_evidence: "use primitive {pattern} acts on the path"
+  review_assumption: "the use is not protected by atomic open flags or symlink-safe handling"
+  review_confidence: medium
 }
 concept LocklessSharedMutation : sink {
   vulnerable_to: [concurrency.RaceCondition]
   cwe: [CWE_362]
-  exploit_category: "race"
-  exploit_condition: "shared state appears to be mutated without an observed lock or atomic guard"
-  exploit_evidence: "concurrency-capable mutation primitive {pattern} is present"
-  exploit_assumption: "multiple attacker-triggerable executions can interleave on the same state"
-  exploit_confidence: low
+  review_category: "race"
+  review_condition: "shared state appears to be mutated without an observed lock or atomic guard"
+  review_evidence: "concurrency-capable mutation primitive {pattern} is present"
+  review_assumption: "multiple attacker-triggerable executions can interleave on the same state"
+  review_confidence: low
 }
 concept IndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_125, CWE_787]
-  exploit_category: "memory"
-  exploit_condition: "attacker-controlled index reaches an array/subscript access"
-  exploit_evidence: "subscript index flows into {pattern}"
-  exploit_assumption: "the index is not range-checked against the accessed object"
-  exploit_confidence: medium
+  review_category: "memory"
+  review_condition: "attacker-controlled index reaches an array/subscript access"
+  review_evidence: "subscript index flows into {pattern}"
+  review_assumption: "the index is not range-checked against the accessed object"
+  review_confidence: medium
 }
 concept FieldDerivedIndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
@@ -360,67 +360,67 @@ concept DivisionDenominator : sink {
   vulnerable_to: [numeric.DivideByZero]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_369]
-  exploit_category: "numeric"
-  exploit_condition: "attacker-controlled denominator reaches division or modulo"
-  exploit_evidence: "denominator operand for {pattern} is tainted"
-  exploit_assumption: "zero or unsafe divisor values are not excluded before the operation"
-  exploit_confidence: medium
+  review_category: "numeric"
+  review_condition: "attacker-controlled denominator reaches division or modulo"
+  review_evidence: "denominator operand for {pattern} is tainted"
+  review_assumption: "zero or unsafe divisor values are not excluded before the operation"
+  review_confidence: medium
 }
 concept IntegerSizeArithmetic : sink {
   vulnerable_to: [memory.IntegerOverflow]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_190]
-  exploit_category: "numeric"
-  exploit_condition: "attacker-controlled value participates in size-sensitive arithmetic"
-  exploit_evidence: "arithmetic operation {pattern} receives tainted input"
-  exploit_assumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
-  exploit_confidence: low
+  review_category: "numeric"
+  review_condition: "attacker-controlled value participates in size-sensitive arithmetic"
+  review_evidence: "arithmetic operation {pattern} receives tainted input"
+  review_assumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
+  review_confidence: low
 }
 concept PointerFree : sink {
   vulnerable_to: [memory.UseAfterFree, memory.DoubleFree]
   cwe: [CWE_416, CWE_415]
-  exploit_category: "memory"
-  exploit_condition: "a pointer is released and may be released or used again later"
-  exploit_evidence: "release primitive {pattern} is observed"
-  exploit_assumption: "the same allocation or alias is involved and remains attacker-reachable"
-  exploit_confidence: low
+  review_category: "memory"
+  review_condition: "a pointer is released and may be released or used again later"
+  review_evidence: "release primitive {pattern} is observed"
+  review_assumption: "the same allocation or alias is involved and remains attacker-reachable"
+  review_confidence: low
 }
 concept PointerUse : sink {
   vulnerable_to: [memory.UseAfterFree]
   cwe: [CWE_416]
-  exploit_category: "memory"
-  exploit_condition: "a pointer is dereferenced or otherwise used after a prior release"
-  exploit_evidence: "pointer-use primitive {pattern} is observed"
-  exploit_assumption: "the pointer aliases the released allocation and no safe reinitialization occurs"
-  exploit_confidence: low
+  review_category: "memory"
+  review_condition: "a pointer is dereferenced or otherwise used after a prior release"
+  review_evidence: "pointer-use primitive {pattern} is observed"
+  review_assumption: "the pointer aliases the released allocation and no safe reinitialization occurs"
+  review_confidence: low
 }
 concept NullableDeref : sink {
   vulnerable_to: [memory.NullDereference]
   cwe: [CWE_476]
-  exploit_category: "memory"
-  exploit_condition: "a pointer-like value is dereferenced without an observed null exclusion"
-  exploit_evidence: "dereference primitive {pattern} is present"
-  exploit_assumption: "the dereferenced value may be null on an attacker-triggerable path"
-  exploit_confidence: low
+  review_category: "memory"
+  review_condition: "a pointer-like value is dereferenced without an observed null exclusion"
+  review_evidence: "dereference primitive {pattern} is present"
+  review_assumption: "the dereferenced value may be null on an attacker-triggerable path"
+  review_confidence: low
 }
 concept AuthenticationRequiredOp : sink {
   vulnerable_to: [authentication.MissingAuthentication]
   cwe: [CWE_306]
-  exploit_category: "auth"
-  exploit_condition: "security-sensitive operation is reachable without an observed authentication guard"
-  exploit_evidence: "sensitive operation {pattern} is present"
-  exploit_assumption: "the enclosing endpoint or entry point can be reached by an unauthenticated actor"
-  exploit_confidence: low
+  review_category: "auth"
+  review_condition: "security-sensitive operation is reachable without an observed authentication guard"
+  review_evidence: "sensitive operation {pattern} is present"
+  review_assumption: "the enclosing endpoint or entry point can be reached by an unauthenticated actor"
+  review_confidence: low
 }
 concept ObjectLookupByUserInput : sink {
   vulnerable_to: [access_control.Idor]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_639]
-  exploit_category: "access_control"
-  exploit_condition: "attacker-controlled object id reaches a direct object lookup"
-  exploit_evidence: "lookup primitive {pattern} receives tainted input"
-  exploit_assumption: "the object is not constrained to the authenticated principal or tenant"
-  exploit_confidence: medium
+  review_category: "access_control"
+  review_condition: "attacker-controlled object id reaches a direct object lookup"
+  review_evidence: "lookup primitive {pattern} receives tainted input"
+  review_assumption: "the object is not constrained to the authenticated principal or tenant"
+  review_confidence: medium
 }
 // A privileged / state-changing operation (delete/grant/setRole/admin, DB writes) whose
 // access-control can't be verified statically. POSSIBILITY-tier review concept (broader than
@@ -481,20 +481,20 @@ concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_22, CWE_59]
-  exploit_category: "path"
-  exploit_condition: "attacker-controlled archive entry path reaches filesystem write/extraction"
-  exploit_evidence: "archive extraction/write primitive {pattern} receives tainted input"
-  exploit_assumption: "the entry name is not normalized, confined, or symlink-safe before writing"
-  exploit_confidence: medium
+  review_category: "path"
+  review_condition: "attacker-controlled archive entry path reaches filesystem write/extraction"
+  review_evidence: "archive extraction/write primitive {pattern} receives tainted input"
+  review_assumption: "the entry name is not normalized, confined, or symlink-safe before writing"
+  review_confidence: medium
 }
 concept StaticIv : sink {
   vulnerable_to: [crypto.StaticIv]
   cwe: [CWE_329]
-  exploit_category: "crypto"
-  exploit_condition: "cipher operation uses a static or predictable IV/nonce"
-  exploit_evidence: "cipher primitive {pattern} is called with static-looking IV material"
-  exploit_assumption: "the mode requires nonce/IV uniqueness for confidentiality or integrity"
-  exploit_confidence: low
+  review_category: "crypto"
+  review_condition: "cipher operation uses a static or predictable IV/nonce"
+  review_evidence: "cipher primitive {pattern} is called with static-looking IV material"
+  review_assumption: "the mode requires nonce/IV uniqueness for confidentiality or integrity"
+  review_confidence: low
 }
 concept TxOriginAuth : sink {
   vulnerable_to: [smartcontract.TxOriginAuth]

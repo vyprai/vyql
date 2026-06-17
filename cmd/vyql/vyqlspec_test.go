@@ -229,7 +229,7 @@ func TestVyqlSpecs(t *testing.T) {
 							for _, ne := range fnd.NegationEvidence {
 								evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
 							}
-							for _, ec := range fnd.ExploitConditions {
+							for _, ec := range fnd.ReviewConditions {
 								evidence[fnd.RuleID] = append(evidence[fnd.RuleID], strings.Join([]string{
 									ec.Category, ec.Condition, ec.Evidence, ec.Assumption, ec.Confidence,
 								}, " "))
@@ -283,7 +283,7 @@ func TestVyqlSpecs(t *testing.T) {
 						for _, ne := range fnd.NegationEvidence {
 							evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
 						}
-						for _, ec := range fnd.ExploitConditions {
+						for _, ec := range fnd.ReviewConditions {
 							evidence[fnd.RuleID] = append(evidence[fnd.RuleID], strings.Join([]string{
 								ec.Category, ec.Condition, ec.Evidence, ec.Assumption, ec.Confidence,
 							}, " "))

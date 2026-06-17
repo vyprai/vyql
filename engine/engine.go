@@ -34,12 +34,12 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 }
 
 // PossibilityFindings emits low-confidence "possibility" findings for the AI/triage pass:
-// one per dangerous-concept node (any sink in the ontology) that the confirmed rules did
-// NOT already report. The idea — "if VyQL can't prove exploitability, surface the site as a
-// possibility and let a later AI pass decide" — trades precision for recall. Each carries an
-// exploit condition describing what to verify, and confidence "possibility" (below "low"),
-// so it is OFF by default and never affects the protected benchmarks; the AI-pass pipeline
-// opts in. `confirmed` is the set of findings already produced by the normal rules.
+// one per ontology sink node that the confirmed rules did NOT already report. The idea —
+// "if VyQL can't prove the full rule, surface the site as a possibility and let a later AI
+// pass decide" — trades precision for recall. Each carries a review condition describing
+// what to verify, and confidence "possibility" (below "low"), so it is OFF by default and
+// never affects the protected benchmarks; the AI-pass pipeline opts in. `confirmed` is the
+// set of findings already produced by the normal rules.
 func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.Finding {
 	covered := map[string]bool{}
 	for _, f := range confirmed {
@@ -74,10 +74,10 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 				Confidence:  "possibility",
 				WitnessKind: "possibility",
 				Bindings:    []findings.Binding{{Name: "sink", NodeID: id, Concept: qn, Loc: e.loc(id)}},
-				ExploitConditions: []findings.ExploitCondition{{
+				ReviewConditions: []findings.ReviewCondition{{
 					Category:   threat,
 					Condition:  "a " + c.Name + " sink (" + threat + ", " + cwe + ") with no proven sanitized untrusted-input flow — verify whether attacker-controlled data can reach it",
-					Assumption: "exploitable only if untrusted input reaches this site unsanitized",
+					Assumption: "relevant only if untrusted input reaches this site unsanitized",
 					Confidence: "possibility",
 				}},
 			})
@@ -119,8 +119,8 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 			}
 			out = append(out, &findings.Finding{
 				RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "order",
-				Confidence:        e.conf(a),
-				ExploitConditions: append(e.exploitConditions(a, body.First.Concept), e.exploitConditions(b, body.Second.Concept)...),
+				Confidence:       e.conf(a),
+				ReviewConditions: append(e.reviewConditions(a, body.First.Concept), e.reviewConditions(b, body.Second.Concept)...),
 				Bindings: []findings.Binding{
 					{Name: "first", NodeID: a, Concept: body.First.Concept, Loc: e.loc(a), LabelProvenance: e.prov(a, body.First.Concept)},
 					{Name: "second", NodeID: b, Concept: body.Second.Concept, Loc: e.loc(b), LabelProvenance: e.prov(b, body.Second.Concept)},
@@ -501,7 +501,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
 		conf := e.conf(fl.SourceID, fl.SinkID)
-		exploit := e.exploitConditions(fl.SinkID, snkC)
+		review := e.reviewConditions(fl.SinkID, snkC)
 		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourcePolicy == "caller_conditional" {
 			n, _, _ := e.Store.GetNode(fl.SourceID)
 			param := ""
@@ -509,7 +509,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				param = n.Prop("name")
 			}
 			cond := strings.ReplaceAll(srcMeta.SourceCondition, "{param}", param)
-			exploit = append(exploit, findings.ExploitCondition{
+			review = append(review, findings.ReviewCondition{
 				Category:   srcMeta.SourceConditionCategory,
 				Condition:  cond,
 				Assumption: srcMeta.SourceAssumption,
@@ -527,13 +527,13 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				{Name: "source", NodeID: fl.SourceID, Concept: srcC, Loc: e.loc(fl.SourceID), LabelProvenance: e.prov(fl.SourceID, srcC)},
 				{Name: "sink", NodeID: fl.SinkID, Concept: snkC, Loc: e.loc(fl.SinkID), LabelProvenance: e.prov(fl.SinkID, snkC)},
 			},
-			Witness:           fl.Path,
-			PathLocs:          e.pathLocs(fl.Path),
-			WitnessKind:       "taint",
-			NegationEvidence:  ne,
-			Confidence:        conf,
-			Context:           e.crossDomainContext(fl.SinkID),
-			ExploitConditions: exploit,
+			Witness:          fl.Path,
+			PathLocs:         e.pathLocs(fl.Path),
+			WitnessKind:      "taint",
+			NegationEvidence: ne,
+			Confidence:       conf,
+			Context:          e.crossDomainContext(fl.SinkID),
+			ReviewConditions: review,
 		}
 		if idx, seen := bySink[fl.SinkID]; seen {
 			// same sink already reported for this rule — keep whichever source gives the
@@ -636,26 +636,26 @@ func (e *Engine) prov(nodeID, concept string) string {
 	return fallback
 }
 
-func (e *Engine) exploitConditions(nodeID, concept string) []findings.ExploitCondition {
-	var out []findings.ExploitCondition
+func (e *Engine) reviewConditions(nodeID, concept string) []findings.ReviewCondition {
+	var out []findings.ReviewCondition
 	seen := map[string]bool{}
 	for _, l := range e.labels(nodeID) {
 		if l.Concept != concept || l.Detail == nil {
 			continue
 		}
-		cond := firstNonEmpty(l.Detail["exploit_condition"], l.Detail["condition"])
+		cond := firstNonEmpty(l.Detail["review_condition"], l.Detail["condition"])
 		if cond == "" {
 			continue
 		}
-		conf := firstNonEmpty(l.Detail["exploit_confidence"], l.Provenance.Confidence)
+		conf := firstNonEmpty(l.Detail["review_confidence"], l.Provenance.Confidence)
 		if conf == "" {
 			conf = "medium"
 		}
-		ec := findings.ExploitCondition{
-			Category:   firstNonEmpty(l.Detail["exploit_category"], l.Detail["category"]),
+		ec := findings.ReviewCondition{
+			Category:   firstNonEmpty(l.Detail["review_category"], l.Detail["category"]),
 			Condition:  cond,
-			Evidence:   firstNonEmpty(l.Detail["exploit_evidence"], l.Detail["evidence"]),
-			Assumption: firstNonEmpty(l.Detail["exploit_assumption"], l.Detail["assumption"]),
+			Evidence:   firstNonEmpty(l.Detail["review_evidence"], l.Detail["evidence"]),
+			Assumption: firstNonEmpty(l.Detail["review_assumption"], l.Detail["assumption"]),
 			Confidence: conf,
 		}
 		key := ec.Category + "\x00" + ec.Condition + "\x00" + ec.Evidence + "\x00" + ec.Assumption

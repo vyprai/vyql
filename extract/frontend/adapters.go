@@ -122,7 +122,7 @@ var (
 	conceptDetails    map[string]map[string]string
 )
 
-func exploitDetail(concept, pattern string) (map[string]string, string) {
+func reviewDetail(concept, pattern string) (map[string]string, string) {
 	template := ontologyConceptDetails()[concept]
 	if len(template) == 0 {
 		return nil, ""
@@ -132,7 +132,7 @@ func exploitDetail(concept, pattern string) (map[string]string, string) {
 		detail[k] = strings.ReplaceAll(v, "{pattern}", pattern)
 	}
 	conf := ""
-	if detail["exploit_confidence"] == "low" {
+	if detail["review_confidence"] == "low" {
 		conf = "low"
 	}
 	return detailWithPattern(detail, pattern), conf
@@ -161,7 +161,7 @@ func ontologyConceptDetails() map[string]map[string]string {
 				}
 				detail := map[string]string{}
 				for k, v := range cd.Fields {
-					if !strings.HasPrefix(k, "exploit_") {
+					if !strings.HasPrefix(k, "review_") {
 						continue
 					}
 					if s, ok := v.(string); ok && s != "" {
@@ -631,10 +631,10 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					}
 					if isAttr {
 						if sk.ByMethod {
-							detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						} else {
-							detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "resolved", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
@@ -642,7 +642,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					// receiver-sink: the tainted data is the receiver; the call node
 					// carries that taint, so label the node itself rather than an arg.
 					if sk.Receiver {
-						detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+						detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						continue
 					}
@@ -671,7 +671,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && a.Prop("vkind") == "Seq" {
 								continue
 							}
-							detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 							out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
@@ -683,7 +683,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && a.Prop("vkind") == "Seq" {
 						continue
 					}
-					detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+					detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 					out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
 				}
 			}
@@ -908,7 +908,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 						if !valConds(strArgs, m.ValMatches, m.ValAbsents) {
 							continue
 						}
-						detail, conf := exploitDetail(m.Concept, m.Pattern)
+						detail, conf := reviewDetail(m.Concept, m.Pattern)
 						spec := 0
 						if len(m.Packages) > 0 {
 							spec = 3 // package-specific mark supersedes native/general

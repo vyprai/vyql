@@ -250,8 +250,8 @@ func cmdExplain(args []string) error {
 			}
 			fmt.Printf("  %s %s: %s\n", mark, ne.Clause, ne.Detail)
 		}
-		for _, ec := range f.ExploitConditions {
-			fmt.Printf("  exploit: %s", ec.Condition)
+		for _, ec := range f.ReviewConditions {
+			fmt.Printf("  review: %s", ec.Condition)
 			if ec.Category != "" {
 				fmt.Printf(" [%s]", ec.Category)
 			}
@@ -579,16 +579,16 @@ func cmdValidateAdapter(args []string) error {
 // scorecards.
 
 type jsonFinding struct {
-	RuleID            string                      `json:"rule"`
-	Severity          string                      `json:"severity"`
-	Confidence        string                      `json:"confidence,omitempty"`
-	WitnessKind       string                      `json:"witness_kind,omitempty"`
-	FP                string                      `json:"fp"`
-	Source            string                      `json:"source"`
-	Sink              string                      `json:"sink"`
-	Path              []string                    `json:"path,omitempty"`
-	Noted             bool                        `json:"assumption_noted"`
-	ExploitConditions []findings.ExploitCondition `json:"exploit_conditions,omitempty"`
+	RuleID           string                     `json:"rule"`
+	Severity         string                     `json:"severity"`
+	Confidence       string                     `json:"confidence,omitempty"`
+	WitnessKind      string                     `json:"witness_kind,omitempty"`
+	FP               string                     `json:"fp"`
+	Source           string                     `json:"source"`
+	Sink             string                     `json:"sink"`
+	Path             []string                   `json:"path,omitempty"`
+	Noted            bool                       `json:"assumption_noted"`
+	ReviewConditions []findings.ReviewCondition `json:"review_conditions,omitempty"`
 }
 
 func findingsJSON(all []*findings.Finding) []jsonFinding {
@@ -612,7 +612,7 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 			}
 		}
 		jf.Path = f.PathLocs
-		jf.ExploitConditions = f.ExploitConditions
+		jf.ReviewConditions = f.ReviewConditions
 		out = append(out, jf)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].FP < out[j].FP })
