@@ -116,6 +116,11 @@ var mutatorMethods = map[string]bool{
 	"addElement": true, "addFirst": true, "addLast": true, "push": true, "offer": true,
 	"offerFirst": true, "offerLast": true, "put": true, "putAll": true, "putIfAbsent": true,
 	"set": true, "enqueue": true,
+	// C#/.NET PascalCase collection mutators (case differs from the lowercase JS/Java/Python
+	// names above, so they were unrecognised → C# collections never inherited element taint).
+	"Add": true, "AddRange": true, "Insert": true, "InsertRange": true, "Append": true,
+	"Push": true, "Enqueue": true, "TryAdd": true, "AddFirst": true, "AddLast": true,
+	"AddParameter": true, "AddOrUpdateParameter": true, "Set": true,
 	// __setitem__ models a subscript store `container[k] = v` (frontends lower it to this
 	// synthetic call) so the container inherits the stored value's taint.
 	"__setitem__": true,
@@ -143,6 +148,9 @@ var elementCallbackMethods = map[string]bool{
 var appendMutators = map[string]bool{
 	"add": true, "append": true, "push": true, "offer": true, "offerFirst": true,
 	"offerLast": true, "addFirst": true, "addLast": true, "addElement": true, "enqueue": true,
+	// C#/.NET PascalCase single-element appenders.
+	"Add": true, "Append": true, "Push": true, "Enqueue": true, "AddFirst": true,
+	"AddLast": true, "AddParameter": true, "AddOrUpdateParameter": true,
 }
 
 // containerInvalidate handles a container method that may shift/invalidate element slots.
@@ -1728,6 +1736,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for i, a := range args {
 		if !mapped[i] {
 			l.flow(a, result)
+		}
+	}
+	// wrapper-object taint: `new T(taintedArg)` builds an object that CONTAINS its args, so the
+	// constructed object (result) carries each arg's taint — even when the ctor body is resolved
+	// (args mapped to params). Lets a tainted value wrapped in an object propagate through it
+	// (e.g. RestSharp `new HeaderParameter(name, value)`). FN-safe over-approximation.
+	if call.IsCtor {
+		for _, av := range argVals {
+			l.flow(av, result)
 		}
 	}
 	return result

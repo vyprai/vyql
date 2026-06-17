@@ -72,6 +72,9 @@ type Call struct {
 	Path   string
 	Method string
 	Loc    string
+	// IsCtor marks a constructor / `new T(args)` call: the constructed object contains its
+	// arguments, so the lowerer flows tainted args into the call result (wrapper-object taint).
+	IsCtor bool
 }
 
 // Format is a taint-propagating string build (f-string, %, +, .format).

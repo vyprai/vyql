@@ -498,7 +498,7 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 				args = append(args, c.expr(ch))
 			}
 		}
-		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: args, Path: typ, Method: typ, Loc: L}
+		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: args, Path: typ, Method: typ, Loc: L, IsCtor: true}
 	case "lambda_expression", "anonymous_method_expression":
 		// C# lambdas / anonymous delegates were unlowered (fell through to a Seq), so callbacks
 		// and ALL LINQ (Select/Where/ForEach/GroupBy…) dropped their bodies — no taint reached
