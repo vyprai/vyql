@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	adapterapply "github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
@@ -32,6 +33,9 @@ import (
 //	  reject_evidence RULE-ID char-filter # rule evidence must not contain text
 //	  expect_review some.Concept          # repeatable — review concept must appear
 //	  reject_review some.Concept          # repeatable — review concept must not appear
+//	  adapter python                     # optional graph adapter to apply before label checks
+//	  expect_label node-id code.HttpInput # graph adapter label assertion
+//	  reject_label node-id code.HttpInput # graph adapter negative label assertion
 //	  gitlink vendor/lib <sha>  # optional git submodule/gitlink fixture
 //	  code
 //	  ```
@@ -53,6 +57,11 @@ type gitlinkSpec struct {
 	sha  string
 }
 
+type labelSpec struct {
+	nodeID  string
+	concept string
+}
+
 type vyqlSpec struct {
 	name         string
 	lang         string
@@ -62,6 +71,9 @@ type vyqlSpec struct {
 	rejectEv     []evidenceSpec
 	expectReview []string
 	rejectReview []string
+	adapterTech  string
+	expectLabels []labelSpec
+	rejectLabels []labelSpec
 	profile      string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
 	files        []specFile // one or more code blocks (multi-file specs supported)
 	gitlinks     []gitlinkSpec
@@ -149,6 +161,12 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			cur.expectReview = append(cur.expectReview, rest)
 		case "reject_review":
 			cur.rejectReview = append(cur.rejectReview, rest)
+		case "adapter":
+			cur.adapterTech = rest
+		case "expect_label":
+			cur.expectLabels = append(cur.expectLabels, parseLabelSpec(t, rel, i+1, rest))
+		case "reject_label":
+			cur.rejectLabels = append(cur.rejectLabels, parseLabelSpec(t, rel, i+1, rest))
 		case "file":
 			pendingFile = rest // next fence writes to this filename
 		case "gitlink":
@@ -209,8 +227,9 @@ func TestVyqlSpecs(t *testing.T) {
 			s := s
 			total++
 			t.Run(s.src+"/"+s.name, func(t *testing.T) {
-				if len(s.expect) == 0 && len(s.reject) == 0 && len(s.expectEv) == 0 && len(s.rejectEv) == 0 && len(s.expectReview) == 0 && len(s.rejectReview) == 0 {
-					t.Fatalf("%s:%d: spec has neither expect/reject nor expect_review/reject_review", s.src, s.line)
+				if len(s.expect) == 0 && len(s.reject) == 0 && len(s.expectEv) == 0 && len(s.rejectEv) == 0 &&
+					len(s.expectReview) == 0 && len(s.rejectReview) == 0 && len(s.expectLabels) == 0 && len(s.rejectLabels) == 0 {
+					t.Fatalf("%s:%d: spec has no expect/reject, review, or label assertion", s.src, s.line)
 				}
 				fired := map[string]bool{}
 				evidence := map[string][]string{}
@@ -218,6 +237,11 @@ func TestVyqlSpecs(t *testing.T) {
 				if s.graphSrc != "" {
 					// graph spec: build the asset/identity graph and evaluate the packs.
 					store := buildGraphStore(t, s)
+					if s.adapterTech != "" {
+						if _, _, err := adapterapply.Apply(store, frontend.AdaptersFor(s.adapterTech), nil); err != nil {
+							t.Fatalf("apply %s adapters: %v", s.adapterTech, err)
+						}
+					}
 					eng := engine.New(onto, store)
 					for _, cr := range compiled {
 						got, err := eng.Evaluate(cr)
@@ -239,6 +263,8 @@ func TestVyqlSpecs(t *testing.T) {
 					for _, row := range collectReviewItems(store) {
 						reviewed[row.Concept] = true
 					}
+					assertLabelSpecs(t, store, s.expectLabels, true)
+					assertLabelSpecs(t, store, s.rejectLabels, false)
 				} else {
 					// code spec: write the snippet(s) and scan as source.
 					ext, ok := primaryExt[s.lang]
@@ -394,6 +420,38 @@ func parseEvidenceSpec(t *testing.T, src string, line int, rest string) evidence
 		t.Fatalf("%s:%d: evidence assertion must be `expect_evidence <RULE> <text>`", src, line)
 	}
 	return evidenceSpec{ruleID: strings.TrimSpace(ruleID), text: strings.TrimSpace(text)}
+}
+
+func parseLabelSpec(t *testing.T, src string, line int, rest string) labelSpec {
+	t.Helper()
+	nodeID, concept, ok := strings.Cut(rest, " ")
+	if !ok || strings.TrimSpace(nodeID) == "" || strings.TrimSpace(concept) == "" {
+		t.Fatalf("%s:%d: label assertion must be `expect_label <node-id> <concept>`", src, line)
+	}
+	return labelSpec{nodeID: strings.TrimSpace(nodeID), concept: strings.TrimSpace(concept)}
+}
+
+func assertLabelSpecs(t *testing.T, store usg.Store, specs []labelSpec, want bool) {
+	t.Helper()
+	for _, spec := range specs {
+		got, err := store.Labels(spec.nodeID)
+		if err != nil {
+			t.Fatalf("labels(%s): %v", spec.nodeID, err)
+		}
+		found := false
+		for _, label := range got {
+			if label.Concept == spec.concept {
+				found = true
+				break
+			}
+		}
+		if want && !found {
+			t.Errorf("expected node %s to have label %s; got %+v", spec.nodeID, spec.concept, got)
+		}
+		if !want && found {
+			t.Errorf("expected node %s not to have label %s; got %+v", spec.nodeID, spec.concept, got)
+		}
+	}
 }
 
 func parseGitlinkSpec(t *testing.T, src string, line int, rest string) gitlinkSpec {
