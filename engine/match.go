@@ -7,7 +7,7 @@ import (
 )
 
 // evalMatch evaluates `match <concept> as id where <expr> unless guarded_by C`.
-// Composes solver calls in `where` through the engine (toxic combinations).
+// Composes solver calls in `where` through the engine.
 func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.MatchStmt)
 	if body.TargetKind == "transition" {
@@ -72,7 +72,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 // evalTransition evaluates `match transition F -> T on M as t unless <expr>`.
 func (e *Engine) evalTransition(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.MatchStmt)
-	nodes, _ := e.Store.NodesOfType("business.Transition")
+	nodes, _ := e.Store.NodesOfType("analysis.Transition")
 	var out []*findings.Finding
 	for _, id := range nodes {
 		n, _, _ := e.Store.GetNode(id)

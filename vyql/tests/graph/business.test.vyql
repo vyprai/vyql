@@ -20,7 +20,7 @@ test "an invalid transition into Refunded (BIZ-002)"
   expect VYQL-BIZ-002
   graph
   ```
-  node t1 business.Transition { machine = Order, from = Created, to = Refunded }
+  node t1 analysis.Transition { machine = Order, from = Created, to = Refunded }
   ```
 
 # Path-sensitive authorization (B1): a permission check suppresses only the actions it
