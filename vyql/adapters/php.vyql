@@ -40,6 +40,11 @@ adapter php {
   sink method "get_var" -> code.SqlExecution
   sink method "get_row" -> code.SqlExecution
   sink method "get_col" -> code.SqlExecution
+  source "wp.list_table.row" -> code.DatabaseRead
+  source method "get_results" -> code.DatabaseRead
+  source method "get_var" -> code.DatabaseRead
+  source method "get_row" -> code.DatabaseRead
+  source method "get_col" -> code.DatabaseRead
   // Drupal
   sink path "db_query" -> code.SqlExecution
   // Laravel Eloquent / query-builder raw expressions
@@ -100,6 +105,7 @@ adapter php {
   sink path "Html.rawElement" arg 1 -> code.HtmlRender
   sink path "Html.rawElement" arg 2 -> code.HtmlRender
   sink path "Html.element" arg 1 -> code.HtmlRender
+  sink "wp.list_table.render" -> code.HtmlRender
 
   // server-side template injection (CWE-1336) — Twig compiles a STRING template
   sink method "createTemplate" -> code.TemplateRender
@@ -117,6 +123,11 @@ adapter php {
   control "isOwner" -> core.OwnershipCheck
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
+  control "esc_html" -> core.HtmlEscape
+  control "esc_attr" -> core.HtmlEscape
+  control "esc_url" -> core.HtmlEscape
+  control "wp_kses" -> core.HtmlEscape
+  control "wp_kses_post" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape
   control "escapeshellarg" -> core.ShellEscape
   control "escapeshellcmd" -> core.ShellEscape

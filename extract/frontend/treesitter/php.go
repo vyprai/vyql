@@ -13,9 +13,10 @@ import (
 // namespace (module key ""), like Ruby; `echo`/`print`/`include`/`require` are
 // modeled as calls so they can be sinks.
 type phConv struct {
-	src  []byte
-	root string
-	file string
+	src      []byte
+	root     string
+	file     string
+	funcName string
 }
 
 // ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
@@ -57,6 +58,7 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	switch n.Kind() {
 	case "function_definition", "method_declaration":
 		params := c.params(field(n, "parameters"))
+		name := c.text(field(n, "name"))
 		// top-level functions are public; methods are public unless private/protected.
 		exported := true
 		if n.Kind() == "method_declaration" {
@@ -68,7 +70,14 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 		ptypes := c.paramTypes(field(n, "parameters"))
+		prevFunc := c.funcName
+		c.funcName = name
 		body := c.block(field(n, "body"))
+		c.funcName = prevFunc
+		if n.Kind() == "method_declaration" && phpIsWPListTableColumn(name) && len(params) > 0 {
+			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
+				Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.row", Loc: L}, Path: "wp.list_table.row", Method: "row", Loc: L}}}, body...)
+		}
 		// MediaWiki parser hook: a method taking a `Parser`/`PPFrame` carries user wiki markup
 		// in its OTHER params ($input, $args of `parse3DTag($input,$args,Parser $p,PPFrame $f)`),
 		// which flow into Html::element/rawElement output (stored XSS). Seed those as input.
@@ -83,7 +92,7 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			body = append(seed, body...)
 		}
 		return []nir.Stmt{nir.FuncDef{
-			Name:       c.text(field(n, "name")),
+			Name:       name,
 			Params:     params,
 			ParamTypes: ptypes,
 			Body:       body,
@@ -112,7 +121,13 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "return_statement":
 		kids := namedChildren(n)
 		if len(kids) > 0 {
-			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
+			value := c.expr(kids[0])
+			if phpIsWPListTableColumn(c.funcName) {
+				render := nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.render", Loc: L},
+					Args: []nir.Expr{value}, Path: "wp.list_table.render", Method: "render", Loc: L}}
+				return []nir.Stmt{render, nir.Return{Value: value}}
+			}
+			return []nir.Stmt{nir.Return{Value: value}}
 		}
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1). PHP did not evaluate the condition before → Cond stays nil,
@@ -400,6 +415,10 @@ func phpHasFrameworkParam(ptypes map[string]string) bool {
 		}
 	}
 	return false
+}
+
+func phpIsWPListTableColumn(name string) bool {
+	return name == "column_default" || strings.HasPrefix(name, "column_")
 }
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —
