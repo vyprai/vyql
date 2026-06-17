@@ -35,6 +35,9 @@ type Concept struct {
 	SourceCondition         string   `json:"source_condition,omitempty"`
 	SourceAssumption        string   `json:"source_assumption,omitempty"`
 	SourceConfidence        string   `json:"source_confidence,omitempty"`
+	AssumeMinLevel          string   `json:"assume_min_level,omitempty"`
+	ContextReachSource      string   `json:"context_reach_source,omitempty"`
+	ContextReachLabel       string   `json:"context_reach_label,omitempty"`
 	// DangerousChars: for sinks, the characters that MUST be absent for taint to be
 	// neutralized — lets a character-filter (allowlist replace) be proven a sound
 	// sanitizer when its output alphabet excludes all of them.

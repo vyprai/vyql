@@ -87,3 +87,54 @@ func TestCrossDomainContext(t *testing.T) {
 		t.Fatalf("internal & non-PII: expected no context, got %v", ctx2)
 	}
 }
+
+func TestCrossDomainContextReachSourceComesFromOntology(t *testing.T) {
+	src := `
+module custom;
+concept PublicEdge : exposure {
+  context_reach_source: true
+  context_reach_label: "public-edge-reachable"
+}
+module code;
+concept Input : source { taint: [taint.UntrustedData] }
+concept Sink : sink { vulnerable_to: [injection.SqlInjection] }
+module t;
+rule Flow {
+  taint code.Input -> code.Sink
+}
+`
+	onto := ontology.Seed()
+	cs, err := ontology.LoadConceptText(src)
+	if err != nil {
+		t.Fatalf("load concepts: %v", err)
+	}
+	for _, c := range cs {
+		onto.Add(c)
+	}
+	decls, _ := parser.Parse(src)
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "edge", Type: "custom.Edge"})
+	s.AddLabel("edge", usg.Label{Concept: "custom.PublicEdge"})
+	s.AddNode(usg.Node{ID: "svc", Type: "runtime.Service"})
+	s.AddNode(usg.Node{ID: "in", Type: "code.Call", Props: map[string]string{"loc": "h:1"}})
+	s.AddLabel("in", usg.Label{Concept: "code.Input"})
+	s.AddNode(usg.Node{ID: "sink", Type: "code.Call", Props: map[string]string{"loc": "h:2", "service": "svc"}})
+	s.AddLabel("sink", usg.Label{Concept: "code.Sink"})
+	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "sink"})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "svc", Props: map[string]string{"rule": "edge-rule", "proto": "tcp", "port": "443"}})
+
+	fs, err := New(onto, s).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("expected one finding, got %d", len(fs))
+	}
+	if len(fs[0].Context) == 0 || !strings.Contains(fs[0].Context[0], "public-edge-reachable") {
+		t.Fatalf("context should use ontology reach-source label, got %v", fs[0].Context)
+	}
+}

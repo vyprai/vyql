@@ -170,11 +170,7 @@ func (e *Engine) evalAssume(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.FlowStmt)
 	sources, _ := e.Store.NodesWithConcept(body.Src.Concept)
 	targets, _ := e.Store.NodesWithConcept(body.Dst.Concept)
-	minLevel := ""
-	if body.Dst.Concept == "identity.AdminPrivilege" {
-		minLevel = "ADMIN"
-	}
-	paths, err := solvers.FindAssume(e.Store, sources, targets, minLevel)
+	paths, err := solvers.FindAssume(e.Store, sources, targets, e.assumeMinLevel(body.Dst.Concept))
 	if err != nil {
 		return nil, err
 	}
@@ -235,21 +231,23 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 	var ctx []string
 	if svc := n.Prop("service"); svc != "" {
 		if _, ok, _ := e.Store.GetNode(svc); ok {
-			internet, _ := e.Store.NodesWithConcept("cloud.Internet")
-			if paths, _ := solvers.FindReach(e.Store, internet, []string{svc}, nil); len(paths) > 0 {
-				h := paths[0].Hops
-				via := ""
-				if len(h) > 0 {
-					via = h[len(h)-1].Rule
+			for _, src := range e.contextReachSources() {
+				sourceIDs, _ := e.Store.NodesWithConcept(src.Concept)
+				if paths, _ := solvers.FindReach(e.Store, sourceIDs, []string{svc}, nil); len(paths) > 0 {
+					h := paths[0].Hops
+					via := ""
+					if len(h) > 0 {
+						via = h[len(h)-1].Rule
+					}
+					line := svc + " is " + src.Label + " (via " + via + ")"
+					// static↔runtime confirmation (docs/11 Part B): a statically
+					// predicted exposure observed in runtime telemetry is confirmed,
+					// which the risk layer escalates (docs/17 exposure→confirmed).
+					if e.observedExternalConnection(svc) {
+						line += " — confirmed by runtime traffic (last 24h)"
+					}
+					ctx = append(ctx, line)
 				}
-				line := svc + " is internet-reachable (via " + via + ")"
-				// static↔runtime confirmation (docs/11 Part B): a statically
-				// predicted exposure observed in runtime telemetry is confirmed,
-				// which the risk layer escalates (docs/17 exposure→confirmed).
-				if e.observedExternalConnection(svc) {
-					line += " — confirmed by runtime traffic (last 24h)"
-				}
-				ctx = append(ctx, line)
 			}
 		}
 	}
@@ -261,6 +259,26 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 		}
 	}
 	return ctx
+}
+
+type contextReachSource struct {
+	Concept string
+	Label   string
+}
+
+func (e *Engine) contextReachSources() []contextReachSource {
+	var out []contextReachSource
+	for _, c := range e.Onto.AllConcepts() {
+		if c.ContextReachSource != "true" {
+			continue
+		}
+		label := c.ContextReachLabel
+		if label == "" {
+			label = c.Name
+		}
+		out = append(out, contextReachSource{Concept: c.QualifiedName(), Label: label})
+	}
+	return out
 }
 
 // observedExternalConnection reports whether the pre-aggregated runtime snapshot
@@ -308,6 +326,13 @@ func intersect(a, b map[string]bool) bool {
 		}
 	}
 	return false
+}
+
+func (e *Engine) assumeMinLevel(concept string) string {
+	if c, err := e.Onto.Get(concept); err == nil {
+		return c.AssumeMinLevel
+	}
+	return ""
 }
 
 // weakCharFilter returns an assumption note if a character-filter (replace) lies on a

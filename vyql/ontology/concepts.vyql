@@ -9,7 +9,10 @@ concept Refund : action { }
 module cloud;
 
 concept Database : asset { }
-concept Internet : exposure { }
+concept Internet : exposure {
+  context_reach_source: true
+  context_reach_label: "internet-reachable"
+}
 concept ObjectStore : asset { }
 concept PublicStorage : exposure { }
 concept SecretStore : asset { }
@@ -922,12 +925,16 @@ concept XmlHardening : control {
 
 module identity;
 
-concept AdminPrivilege : privilege { }
+concept AdminPrivilege : privilege {
+  assume_min_level: ADMIN
+}
 concept Anonymous : principal { }
 concept AuthenticatedUser : principal { }
 concept CiPrincipal : principal { }
 concept ExternalPrincipal : principal { }
-concept SuperAdminPrivilege : privilege { }
+concept SuperAdminPrivilege : privilege {
+  assume_min_level: SUPERADMIN
+}
 concept WorkloadIdentity : principal { }
 
 module runtime;

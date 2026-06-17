@@ -29,6 +29,9 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 		SourceCondition:         str(d.Fields, "source_condition"),
 		SourceAssumption:        str(d.Fields, "source_assumption"),
 		SourceConfidence:        str(d.Fields, "source_confidence"),
+		AssumeMinLevel:          str(d.Fields, "assume_min_level"),
+		ContextReachSource:      str(d.Fields, "context_reach_source"),
+		ContextReachLabel:       str(d.Fields, "context_reach_label"),
 		DangerousChars:          str(d.Fields, "dangerous_chars"),
 	}
 	return c

@@ -188,12 +188,8 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 		}
 	case "assume":
 		bConcept := call.Args[1].Ref.String()
-		minLevel := ""
-		if bConcept == "identity.AdminPrivilege" {
-			minLevel = "ADMIN"
-		}
 		bIDs := e.resolveArg(call.Args[1], env)
-		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, minLevel)
+		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, e.assumeMinLevel(bConcept))
 		if len(paths) > 0 {
 			var w []string
 			for _, s := range paths[0].Steps {

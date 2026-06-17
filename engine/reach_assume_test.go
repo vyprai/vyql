@@ -90,3 +90,42 @@ rule ExternalToAdmin {
 		t.Fatalf("witness first step wrong: %v", fs[0].Witness)
 	}
 }
+
+func TestAssumeMinLevelComesFromOntology(t *testing.T) {
+	src := `
+module custom;
+concept External : principal { }
+concept Elevated : privilege {
+  assume_min_level: ADMIN
+}
+rule ExternalToElevated {
+  assume custom.External -> custom.Elevated
+}
+`
+	onto := ontology.Seed()
+	cs, err := ontology.LoadConceptText(src)
+	if err != nil {
+		t.Fatalf("load concepts: %v", err)
+	}
+	for _, c := range cs {
+		onto.Add(c)
+	}
+	decls, _ := parser.Parse(src)
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "ext", Type: "custom.Principal"})
+	s.AddLabel("ext", usg.Label{Concept: "custom.External"})
+	s.AddNode(usg.Node{ID: "role", Type: "custom.Role", Props: map[string]string{"priv_level": "ADMIN"}})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "ext", Dst: "role", Props: map[string]string{"ability": "assume"}})
+
+	fs, err := New(onto, s).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("expected data-driven min-level assume finding, got %d", len(fs))
+	}
+}
