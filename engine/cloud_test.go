@@ -5,48 +5,43 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/adapters"
-	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
-const publicStorageRule = `
-package vypr.cloud;
-rule PublicStorageSensitive {
-  meta { id: "VYQL-CLD-001", severity: critical }
-  match cloud.PublicStorage as s
-  where s holds_asset_kind [data.Pii]
+const assetMarkerRule = `
+package test;
+rule MarkedAsset {
+  meta { id: "TEST-ASSET-001", severity: critical }
+  match custom.Marker as s
+  where s holds_asset_kind [custom.Important]
 }
 `
 
-// storageGraph mirrors case_04's storage_graph(): three public PII buckets
-// across three clouds plus a private non-PII bucket that must NOT fire.
-func storageGraph() usg.Store {
+func assetMarkerGraph() usg.Store {
 	s := usg.NewInMemStore()
-	s.AddNode(usg.Node{ID: "aws.bucket", Type: "cloud.Bucket", Props: map[string]string{"loc": "aws/s3/exports", "acl": "public-read"}})
-	s.AddNode(usg.Node{ID: "az.container", Type: "cloud.Bucket", Props: map[string]string{"loc": "azure/blob/exports", "public_access": "container"}})
-	s.AddNode(usg.Node{ID: "gcp.bucket", Type: "cloud.Bucket", Props: map[string]string{"loc": "gcp/gcs/exports", "iam_member": "allUsers"}})
-	s.AddNode(usg.Node{ID: "aws.private", Type: "cloud.Bucket", Props: map[string]string{"loc": "aws/s3/internal", "acl": "private"}})
+	s.AddNode(usg.Node{ID: "alpha.resource", Type: "custom.Resource", Props: map[string]string{"loc": "alpha/export", "flag_a": "shared"}})
+	s.AddNode(usg.Node{ID: "beta.resource", Type: "custom.Resource", Props: map[string]string{"loc": "beta/export", "flag_b": "enabled"}})
+	s.AddNode(usg.Node{ID: "gamma.resource", Type: "custom.Resource", Props: map[string]string{"loc": "gamma/export", "flag_c": "open"}})
+	s.AddNode(usg.Node{ID: "private.resource", Type: "custom.Resource", Props: map[string]string{"loc": "private/internal", "flag_a": "closed"}})
 	return s
 }
 
-// bucketAdapter labels a cloud.Bucket as cloud.PublicStorage (holding PII) when
-// the given provider property has a public value — the provider-specific match.
-func bucketAdapter(name, prop string, publicValues ...string) adapters.Adapter {
-	pub := map[string]bool{}
-	for _, v := range publicValues {
-		pub[v] = true
+func markerAdapter(name, prop string, acceptedValues ...string) adapters.Adapter {
+	accepted := map[string]bool{}
+	for _, v := range acceptedValues {
+		accepted[v] = true
 	}
 	return adapters.Adapter{
-		Name: name, Technology: strings.SplitN(name, ".", 2)[0], Specificity: 2, Fidelity: "resolved", Origin: "human",
+		Name: name, Technology: strings.SplitN(name, ".", 2)[0], Specificity: 2, Fidelity: "resolved", Origin: "test",
 		Apply: func(s usg.Store) []adapters.Mapping {
-			ids, _ := s.NodesOfType("cloud.Bucket")
+			ids, _ := s.NodesOfType("custom.Resource")
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
-				if pub[n.Prop(prop)] {
-					out = append(out, adapters.Mapping{NodeID: id, Concept: "cloud.PublicStorage",
-						Detail: map[string]string{"asset_kinds": "data.Pii"}})
+				if accepted[n.Prop(prop)] {
+					out = append(out, adapters.Mapping{NodeID: id, Concept: "custom.Marker",
+						Detail: map[string]string{"asset_kinds": "custom.Important"}})
 				}
 			}
 			return out
@@ -54,14 +49,9 @@ func bucketAdapter(name, prop string, publicValues ...string) adapters.Adapter {
 	}
 }
 
-// Mirrors poc/cases/case_04_cloud.py (a) — ONE public-storage rule fires once per
-// cloud via three provider adapters (AWS ACL / Azure public_access / GCP IAM
-// member); the private bucket never fires; the finding's provenance cites the
-// adapter. The concept layer (cloud.PublicStorage) is provider-independent — only
-// the technology matching differs.
-func TestPublicStorageThreeProviders(t *testing.T) {
-	onto := ontology.Seed()
-	decls, err := parser.Parse(publicStorageRule)
+func TestMarkedAssetThreeAdapters(t *testing.T) {
+	onto := solverContractOntology()
+	decls, err := parser.Parse(assetMarkerRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -70,16 +60,16 @@ func TestPublicStorageThreeProviders(t *testing.T) {
 		t.Fatalf("compile: %v", errs)
 	}
 
-	providers := []struct {
+	sources := []struct {
 		adapter  adapters.Adapter
 		provider string
 	}{
-		{bucketAdapter("aws.s3", "acl", "public-read", "public-read-write"), "aws"},
-		{bucketAdapter("azure.blob", "public_access", "blob", "container"), "azure"},
-		{bucketAdapter("gcp.storage", "iam_member", "allUsers", "allAuthenticatedUsers"), "gcp"},
+		{markerAdapter("alpha.adapter", "flag_a", "shared"), "alpha"},
+		{markerAdapter("beta.adapter", "flag_b", "enabled"), "beta"},
+		{markerAdapter("gamma.adapter", "flag_c", "open"), "gamma"},
 	}
-	for _, p := range providers {
-		g := storageGraph()
+	for _, p := range sources {
+		g := assetMarkerGraph()
 		if _, _, err := adapters.Apply(g, []adapters.Adapter{p.adapter}, nil); err != nil {
 			t.Fatal(err)
 		}
@@ -88,7 +78,7 @@ func TestPublicStorageThreeProviders(t *testing.T) {
 			t.Fatalf("%s: eval: %v", p.provider, err)
 		}
 		if len(fs) != 1 {
-			t.Fatalf("%s: expected 1 public-PII bucket finding, got %d", p.provider, len(fs))
+			t.Fatalf("%s: expected 1 marked asset finding, got %d", p.provider, len(fs))
 		}
 		if prov := fs[0].Bindings[0].LabelProvenance; !strings.Contains(prov, p.provider) {
 			t.Fatalf("%s: finding provenance should cite the adapter, got %q", p.provider, prov)
