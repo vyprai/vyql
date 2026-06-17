@@ -106,6 +106,16 @@ func (t *ThreatDecl) QualifiedName() string {
 	return t.Package + "." + t.Name
 }
 
+// ReviewDecl attaches review/triage presentation metadata to a concept. The
+// scanner still labels concepts through adapters/rules; this declaration only
+// controls `vyql review` categorization, expected checks, and reader guidance.
+type ReviewDecl struct {
+	Concept string
+	Fields  map[string]any
+}
+
+func (*ReviewDecl) isDecl() {}
+
 // ProfileDecl is an application-archetype threat-modelling profile
 // (`profile <name> { title:…  detect:[…]  entrypoints:[…]  packs:[…] }`). It
 // selects the trust boundary (active entry-point source concepts), the relevant

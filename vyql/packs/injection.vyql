@@ -9,6 +9,11 @@ rule Sql {
   unless sanitized_by core.SqlParameterization
 }
 
+rule UnparameterizedSqlQueryParser {
+  meta { id: "VYQL-INJ-030", severity: high, cwe: [CWE_89], confidence_floor: medium }
+  match code.UnparameterizedSqlQueryParser as sink
+}
+
 rule Command {
   meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78] }
   taint core.UserControlledData -> code.CommandExecution

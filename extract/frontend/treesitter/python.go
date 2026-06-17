@@ -19,10 +19,11 @@ import (
 
 // pyConv walks a tree-sitter Python CST into NIR.
 type pyConv struct {
-	src  []byte
-	root string // scan root, for display-relative loc
-	file string // current file (display path, relative to root)
-	key  string // current module key (source-root dotted)
+	src           []byte
+	root          string // scan root, for display-relative loc
+	file          string // current file (display path, relative to root)
+	key           string // current module key (source-root dotted)
+	moduleContext string
 }
 
 // ExtractPython parses Python files into one NIR Program (one module per file,
@@ -35,8 +36,9 @@ func ExtractPython(files []string, root string) (nir.Program, error) {
 			return p
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
 			root0 := tree.RootNode()
+			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
+			c.moduleContext = c.pyModuleLiteralContext(root0)
 			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
@@ -257,6 +259,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		body = append(body, c.pyIncompleteFStringValidation(n)...)
+		body = append(body, c.pyFunctionContext(n)...)
 		body = append(body, c.pyStartTLSBufferReview(n)...)
 		body = append(body, c.pyOptionalLDAPTLSValidation(n)...)
 		body = append(body, c.pyUnescapedTracebackHTML(n)...)
@@ -505,6 +508,51 @@ func (c *pyConv) pyIncompleteFStringValidation(fn *tree_sitter.Node) []nir.Stmt 
 		Method: lastSeg(path),
 		Loc:    c.loc(fn),
 	}}}
+}
+
+func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	name := c.text(field(fn, "name"))
+	bodyText := c.text(body)
+	if name != "parse" && !strings.Contains(bodyText, "parseString") {
+		return nil
+	}
+	loc := c.loc(fn)
+	path := "analysis.function.context"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "name=" + name},
+			nir.Const{Loc: loc, Value: bodyText},
+			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
+			nir.Const{Loc: loc, Value: c.moduleContext},
+		},
+		Path:   path,
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
+	var toks []string
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "string" || n.Kind() == "concatenated_string" {
+			toks = append(toks, c.text(n))
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return strings.Join(toks, "\n")
 }
 
 func (c *pyConv) pyStartTLSBufferReview(fn *tree_sitter.Node) []nir.Stmt {

@@ -27,6 +27,8 @@ import (
 //	  lang   java
 //	  expect VYQL-CRY-002      # repeatable — every listed rule MUST fire
 //	  reject VYQL-INJ-001      # repeatable — every listed rule must NOT fire
+//	  expect_review code.CryptoOperation # repeatable — review concept must appear
+//	  reject_review code.CryptoOperation # repeatable — review concept must not appear
 //	  code
 //	  ```
 //	  class C { void f() { Cipher.getInstance("DES/CBC/PKCS5Padding"); } }
@@ -38,15 +40,17 @@ type specFile struct {
 }
 
 type vyqlSpec struct {
-	name     string
-	lang     string
-	expect   []string
-	reject   []string
-	profile  string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
-	files    []specFile // one or more code blocks (multi-file specs supported)
-	graphSrc string     // a `graph` block: an asset/identity graph (mutually exclusive with code)
-	src      string     // source spec filename (for messages)
-	line     int
+	name         string
+	lang         string
+	expect       []string
+	reject       []string
+	expectReview []string
+	rejectReview []string
+	profile      string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
+	files        []specFile // one or more code blocks (multi-file specs supported)
+	graphSrc     string     // a `graph` block: an asset/identity graph (mutually exclusive with code)
+	src          string     // source spec filename (for messages)
+	line         int
 }
 
 // primaryExt maps a spec `lang` to the file extension its frontend keys on.
@@ -121,6 +125,10 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			cur.expect = append(cur.expect, rest)
 		case "reject":
 			cur.reject = append(cur.reject, rest)
+		case "expect_review":
+			cur.expectReview = append(cur.expectReview, rest)
+		case "reject_review":
+			cur.rejectReview = append(cur.rejectReview, rest)
 		case "file":
 			pendingFile = rest // next fence writes to this filename
 		case "code":
@@ -179,10 +187,11 @@ func TestVyqlSpecs(t *testing.T) {
 			s := s
 			total++
 			t.Run(s.src+"/"+s.name, func(t *testing.T) {
-				if len(s.expect) == 0 && len(s.reject) == 0 {
-					t.Fatalf("%s:%d: spec has neither expect nor reject", s.src, s.line)
+				if len(s.expect) == 0 && len(s.reject) == 0 && len(s.expectReview) == 0 && len(s.rejectReview) == 0 {
+					t.Fatalf("%s:%d: spec has neither expect/reject nor expect_review/reject_review", s.src, s.line)
 				}
 				fired := map[string]bool{}
+				reviewed := map[string]bool{}
 				if s.graphSrc != "" {
 					// graph spec: build the asset/identity graph and evaluate the packs.
 					store := buildGraphStore(t, s)
@@ -195,6 +204,9 @@ func TestVyqlSpecs(t *testing.T) {
 						for _, fnd := range got {
 							fired[fnd.RuleID] = true
 						}
+					}
+					for _, row := range collectReviewItems(store) {
+						reviewed[row.Concept] = true
 					}
 				} else {
 					// code spec: write the snippet(s) and scan as source.
@@ -231,6 +243,15 @@ func TestVyqlSpecs(t *testing.T) {
 					for _, fnd := range found {
 						fired[fnd.RuleID] = true
 					}
+					if len(s.expectReview) > 0 || len(s.rejectReview) > 0 {
+						g, _, err := buildGraph([]string{dir})
+						if err != nil {
+							t.Fatalf("build graph for review: %v", err)
+						}
+						for _, row := range collectReviewItems(g) {
+							reviewed[row.Concept] = true
+						}
+					}
 				}
 				for _, want := range s.expect {
 					if !fired[want] {
@@ -240,6 +261,16 @@ func TestVyqlSpecs(t *testing.T) {
 				for _, no := range s.reject {
 					if fired[no] {
 						t.Errorf("rule %s fired but should not have", no)
+					}
+				}
+				for _, want := range s.expectReview {
+					if !reviewed[want] {
+						t.Errorf("expected review concept %s to appear, but it did not (reviewed: %s)", want, keys(reviewed))
+					}
+				}
+				for _, no := range s.rejectReview {
+					if reviewed[no] {
+						t.Errorf("review concept %s appeared but should not have", no)
 					}
 				}
 			})

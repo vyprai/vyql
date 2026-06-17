@@ -1,0 +1,144 @@
+test "review: auth checks and targets are surfaced"
+  lang java
+  expect_review core.AuthorizationCheck
+  expect_review core.AuthenticationCheck
+  expect_review code.SensitiveOperation
+  expect_review code.AuthenticationRequiredOp
+  code
+  ```
+  class User {
+    boolean isAuthenticated() { return true; }
+  }
+  class Admin {
+    void handle(User user, String id) {
+      hasRole("ADMIN");
+      deleteUser(id);
+    }
+    void update(User user) {
+      if (!user.isAuthenticated()) {
+        return;
+      }
+      changePassword("new");
+    }
+    void deleteUser(String id) {}
+    void changePassword(String password) {}
+    boolean hasRole(String role) { return true; }
+  }
+  ```
+
+test "review: memory attention points are surfaced"
+  lang c
+  expect_review code.IndexAccess
+  expect_review code.IntegerSizeArithmetic
+  code
+  ```
+  struct bar { unsigned long addr; unsigned long size; };
+  struct dev { struct bar bar[8]; };
+  int pci_emul_mem_handler(struct dev *pdi, unsigned long addr, int size, long arg2) {
+    int bidx = (int) arg2;
+    return addr + size <= pdi->bar[bidx].addr + pdi->bar[bidx].size;
+  }
+  ```
+
+test "review: starttls buffer handoff is surfaced"
+  lang python
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  class SMTP:
+      def connection_made(self, transport):
+          seen_starttls = self._original_transport is not None
+          if self.transport is not None and seen_starttls:
+              self._reader._transport = transport
+              self._writer._transport = transport
+              self.transport = transport
+              self.session.ssl = self._tls_protocol._extra
+          else:
+              super().connection_made(transport)
+  ```
+
+test "review: fixed starttls buffer handoff is clean"
+  lang python
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  class SMTP:
+      def connection_made(self, transport):
+          seen_starttls = self._original_transport is not None
+          if self.transport is not None and seen_starttls:
+              self._reader._transport = transport
+              self._writer._transport = transport
+              self.transport = transport
+              self._reader._buffer.clear()
+              self.session.ssl = self._tls_protocol._extra
+          else:
+              super().connection_made(transport)
+  ```
+
+test "review: incomplete scala csrf token validation is surfaced"
+  lang scala
+  expect_review code.IncompleteCsrfTokenValidation
+  code
+  ```
+  trait CsrfDirectives {
+    def randomTokenCsrfProtection(): Unit = {
+      if (submitted == cookie) {
+        pass
+      } else {
+        reject
+      }
+    }
+  }
+  ```
+
+test "review: php access policy config is surfaced"
+  lang php
+  expect_review code.AccessPolicyReview
+  code
+  ```
+  <?php
+  return [
+    'locale' => [
+      'groups' => ['admin', 'super'],
+      'site' => [
+        'groups' => ['admin', 'super'],
+      ],
+      'language' => [
+        'groups' => ['admin', 'super'],
+      ],
+      'currency' => [
+        'groups' => ['admin', 'super'],
+      ],
+    ],
+  ];
+  ```
+
+test "review: php workflow policy config is surfaced"
+  lang php
+  expect_review code.WorkflowPolicyReview
+  code
+  ```
+  <?php
+  class Download {
+    protected function vulnerable($search, $customerId, $id) {
+      $expr = array(
+        $search->compare('==', 'order.customerid', $customerId),
+        $search->compare('==', 'order.product.attribute.id', $id),
+      );
+    }
+  }
+  ```
+
+test "review: php idor policy config is surfaced"
+  lang php
+  expect_review code.IdorPolicyReview
+  code
+  ```
+  <?php
+  class Review {
+    public function vulnerable($ids) {
+      $filter = $this->manager->filter()->add(['review.id' => $ids]);
+      $this->manager->delete($this->manager->search($filter)->toArray());
+    }
+  }
+  ```

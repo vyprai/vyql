@@ -1,0 +1,203 @@
+import core.*
+import code.*
+
+review core.AuthenticationCheck {
+  category: "auth"
+  kind: "check"
+}
+review core.AuthorizationCheck {
+  category: "auth"
+  kind: "check"
+}
+review core.OwnershipCheck {
+  category: "auth"
+  kind: "check"
+}
+review core.CsrfProtection {
+  category: "request"
+  kind: "check"
+}
+review core.ResourceRelease {
+  category: "resource"
+  kind: "check"
+}
+review core.LockRelease {
+  category: "concurrency"
+  kind: "check"
+}
+review core.XmlHardening {
+  category: "xml"
+  kind: "check"
+}
+review core.CertificateValidation {
+  category: "crypto"
+  kind: "check"
+}
+review core.EncryptionAtRest {
+  category: "crypto"
+  kind: "check"
+}
+review core.EncryptionInTransit {
+  category: "crypto"
+  kind: "check"
+}
+
+review code.AuthenticationRequiredOp {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck]
+  text: "verify an authenticated user is required before this operation"
+}
+review code.ObjectLookupByUserInput {
+  category: "auth"
+  kind: "target"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "verify object access is constrained to the current principal"
+}
+review code.SensitiveOperation {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify this privileged or destructive operation enforces authorization"
+}
+review code.AccessPolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review role or group policy configuration for overly broad access"
+}
+review code.WorkflowPolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review workflow or status checks before this protected business action"
+}
+review code.IdorPolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "review object lookup or delete criteria for a current-principal ownership constraint"
+}
+review code.IncompleteIpDenylist {
+  category: "request"
+  kind: "attention"
+  text: "review network address validation for missing special-use IP ranges such as unspecified or broadcast"
+}
+review code.ProtocolStateReview {
+  category: "request"
+  kind: "attention"
+  text: "review protocol state transitions for stale plaintext or unauthenticated data accepted after the trust boundary changes"
+}
+review code.StateChangingOp {
+  category: "request"
+  kind: "target"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "verify state-changing request paths have CSRF protection and auth context"
+}
+review code.CsrfDisabled {
+  category: "request"
+  kind: "target"
+  expected: [core.CsrfProtection]
+  text: "review why CSRF protection is disabled or exempted here"
+}
+review code.IncompleteCsrfTokenValidation {
+  category: "request"
+  kind: "attention"
+  expected: [core.CsrfProtection]
+  text: "review CSRF token validation for empty-token acceptance or missing freshness checks"
+}
+review code.InsecurePermission {
+  category: "permission"
+  kind: "target"
+  text: "review broad permission assignment and surrounding privilege checks"
+}
+review code.CryptoOperation {
+  category: "crypto"
+  kind: "target"
+  expected: [core.CertificateValidation, core.EncryptionAtRest, core.EncryptionInTransit]
+  text: "verify algorithm choice, key/IV handling, and signature or certificate checks"
+}
+review code.ResourceReview {
+  category: "resource"
+  kind: "target"
+  expected: [core.ResourceRelease]
+  text: "verify resource usage is bounded, timed out, and released"
+}
+review code.ConfigExposureReview {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "verify config or diagnostic serialization redacts inline secrets before exposure"
+}
+review code.LockAcquire {
+  category: "concurrency"
+  kind: "target"
+  expected: [core.LockRelease]
+  text: "verify the lock is released on every path"
+}
+review code.XmlParserCreate {
+  category: "xml"
+  kind: "target"
+  expected: [core.XmlHardening]
+  text: "verify parser factory hardening disables dangerous XML features"
+}
+review code.UnboundedCopy {
+  category: "memory"
+  kind: "attention"
+  text: "review copy bounds and whether attacker-controlled data can reach the copied length or source"
+}
+review code.UnboundedCopySmell {
+  category: "memory"
+  kind: "attention"
+  text: "review unbounded string copy usage and surrounding length constraints"
+}
+review code.RawMemoryCopySize {
+  category: "memory"
+  kind: "attention"
+  text: "review raw memory copy size calculations and bounds checks"
+}
+review code.UnsafeMutableAlias {
+  category: "memory"
+  kind: "attention"
+  text: "review unsafe mutable reference construction from raw pointer casts and aliasing/lifetime guarantees"
+}
+review code.SizeComputation {
+  category: "memory"
+  kind: "attention"
+  text: "review allocation or size computation for overflow and untrusted dimensions"
+}
+review code.StackAllocationSmell {
+  category: "memory"
+  kind: "attention"
+  text: "review stack allocation size and whether it is bounded"
+}
+review code.IndexAccess {
+  category: "memory"
+  kind: "attention"
+  text: "review index/subscript access and the dominating bounds checks"
+}
+review code.FieldDerivedIndexAccess {
+  category: "memory"
+  kind: "attention"
+  text: "review field-derived array index access and the dominating upper-bound checks"
+}
+review code.IntegerSizeArithmetic {
+  category: "memory"
+  kind: "attention"
+  text: "review integer arithmetic used for address, size, or bounds calculations"
+}
+review code.PointerFree {
+  category: "memory"
+  kind: "attention"
+  text: "review pointer lifetime: frees, aliases, and later uses"
+}
+review code.PointerUse {
+  category: "memory"
+  kind: "attention"
+  text: "review pointer use and whether lifetime/initialization is guaranteed"
+}
+review code.NullableDeref {
+  category: "memory"
+  kind: "attention"
+  text: "review dereference and nearby null checks"
+}

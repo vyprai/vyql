@@ -109,6 +109,8 @@ func (p *parser) parseDecl() Decl {
 		return p.parseAdapterDecl()
 	case p.atWord("threat"):
 		return p.parseThreatDecl()
+	case p.atWord("review"):
+		return p.parseReviewDecl()
 	case p.atWord("state_machine"):
 		return p.parseStateMachine()
 	case p.atWord("profile"):
@@ -546,7 +548,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.next()
 		kind := "source"
 		if p.atWord("param") { // public-API parameter source (library archetype): no pattern;
-			p.next()           // labels parameter nodes. A first-class source form like method/receiver.
+			p.next() // labels parameter nodes. A first-class source form like method/receiver.
 			sm := AdapterMapping{Kind: "source_param"}
 			p.parseAdapterGuards(&sm, true)
 			p.expect(tArrow, "->")
@@ -774,6 +776,25 @@ func (p *parser) parseThreatDecl() *ThreatDecl {
 	}
 	p.expect(tRBrace, "}")
 	return t
+}
+
+// parseReviewDecl parses `review <concept> { key: value … }`. Review metadata is
+// presentation/triage data, not rule semantics; concept refs are resolved with the
+// same imports as rules and adapters.
+func (p *parser) parseReviewDecl() *ReviewDecl {
+	p.next() // 'review'
+	r := &ReviewDecl{Concept: p.parseConceptRef(), Fields: map[string]any{}}
+	p.expect(tLBrace, "{")
+	for !p.at(tRBrace) {
+		key := p.expect(tWord, "word").val
+		p.expect(tColon, ":")
+		r.Fields[key] = p.parseConceptValue()
+		if p.at(tComma) || p.at(tSemi) {
+			p.next()
+		}
+	}
+	p.expect(tRBrace, "}")
+	return r
 }
 
 // parseConceptValue parses a concept-field value: a string, a qualified name, or

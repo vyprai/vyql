@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/solvers"
 	"github.com/vyprai/vyql/usg"
 )
@@ -41,200 +45,73 @@ type reviewConceptInfo struct {
 	review   string
 }
 
-var reviewConcepts = map[string]reviewConceptInfo{
-	"core.AuthenticationCheck": {category: "auth", kind: "check"},
-	"core.AuthorizationCheck":  {category: "auth", kind: "check"},
-	"core.OwnershipCheck":      {category: "auth", kind: "check"},
-	"core.CsrfProtection":      {category: "request", kind: "check"},
-	"core.ResourceRelease":     {category: "resource", kind: "check"},
-	"core.LockRelease":         {category: "concurrency", kind: "check"},
-	"core.XmlHardening":        {category: "xml", kind: "check"},
-	"core.CertificateValidation": {
-		category: "crypto",
-		kind:     "check",
-	},
-	"core.EncryptionAtRest": {
-		category: "crypto",
-		kind:     "check",
-	},
-	"core.EncryptionInTransit": {
-		category: "crypto",
-		kind:     "check",
-	},
+func loadReviewConcepts() (map[string]reviewConceptInfo, error) {
+	out := map[string]reviewConceptInfo{}
+	root := filepath.Join(datadir.Root(), "review")
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".vyql") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		decls, err := parser.Parse(string(data))
+		if err != nil {
+			return err
+		}
+		for _, d := range decls {
+			rd, ok := d.(*parser.ReviewDecl)
+			if !ok {
+				continue
+			}
+			out[rd.Concept] = reviewConceptInfo{
+				category: reviewString(rd.Fields, "category"),
+				kind:     reviewString(rd.Fields, "kind"),
+				expected: reviewList(rd.Fields, "expected"),
+				review:   reviewString(rd.Fields, "text"),
+			}
+		}
+		return nil
+	})
+	if os.IsNotExist(err) {
+		return out, nil
+	}
+	return out, err
+}
 
-	"code.AuthenticationRequiredOp": {
-		category: "auth",
-		kind:     "target",
-		expected: []string{"core.AuthenticationCheck"},
-		review:   "verify an authenticated user is required before this operation",
-	},
-	"code.ObjectLookupByUserInput": {
-		category: "auth",
-		kind:     "target",
-		expected: []string{"core.OwnershipCheck", "core.AuthorizationCheck"},
-		review:   "verify object access is constrained to the current principal",
-	},
-	"code.SensitiveOperation": {
-		category: "auth",
-		kind:     "target",
-		expected: []string{"core.AuthorizationCheck"},
-		review:   "verify this privileged or destructive operation enforces authorization",
-	},
-	"code.AccessPolicyReview": {
-		category: "auth",
-		kind:     "attention",
-		expected: []string{"core.AuthorizationCheck"},
-		review:   "review role or group policy configuration for overly broad access",
-	},
-	"code.WorkflowPolicyReview": {
-		category: "auth",
-		kind:     "attention",
-		expected: []string{"core.AuthorizationCheck"},
-		review:   "review workflow or status checks before this protected business action",
-	},
-	"code.IdorPolicyReview": {
-		category: "auth",
-		kind:     "attention",
-		expected: []string{"core.OwnershipCheck", "core.AuthorizationCheck"},
-		review:   "review object lookup or delete criteria for a current-principal ownership constraint",
-	},
-	"code.IncompleteIpDenylist": {
-		category: "request",
-		kind:     "attention",
-		review:   "review network address validation for missing special-use IP ranges such as unspecified or broadcast",
-	},
-	"code.ProtocolStateReview": {
-		category: "request",
-		kind:     "attention",
-		review:   "review protocol state transitions for stale plaintext or unauthenticated data accepted after the trust boundary changes",
-	},
-	"code.StateChangingOp": {
-		category: "request",
-		kind:     "target",
-		expected: []string{"core.CsrfProtection", "core.AuthenticationCheck"},
-		review:   "verify state-changing request paths have CSRF protection and auth context",
-	},
-	"code.CsrfDisabled": {
-		category: "request",
-		kind:     "target",
-		expected: []string{"core.CsrfProtection"},
-		review:   "review why CSRF protection is disabled or exempted here",
-	},
-	"code.IncompleteCsrfTokenValidation": {
-		category: "request",
-		kind:     "attention",
-		expected: []string{"core.CsrfProtection"},
-		review:   "review CSRF token validation for empty-token acceptance or missing freshness checks",
-	},
-	"code.InsecurePermission": {
-		category: "permission",
-		kind:     "target",
-		review:   "review broad permission assignment and surrounding privilege checks",
-	},
-	"code.CryptoOperation": {
-		category: "crypto",
-		kind:     "target",
-		expected: []string{"core.CertificateValidation", "core.EncryptionAtRest", "core.EncryptionInTransit"},
-		review:   "verify algorithm choice, key/IV handling, and signature or certificate checks",
-	},
-	"code.ResourceReview": {
-		category: "resource",
-		kind:     "target",
-		expected: []string{"core.ResourceRelease"},
-		review:   "verify resource usage is bounded, timed out, and released",
-	},
-	"code.ConfigExposureReview": {
-		category: "secret",
-		kind:     "attention",
-		expected: []string{"core.SecretRedaction"},
-		review:   "verify config or diagnostic serialization redacts inline secrets before exposure",
-	},
-	"code.LockAcquire": {
-		category: "concurrency",
-		kind:     "target",
-		expected: []string{"core.LockRelease"},
-		review:   "verify the lock is released on every path",
-	},
-	"code.XmlParserCreate": {
-		category: "xml",
-		kind:     "target",
-		expected: []string{"core.XmlHardening"},
-		review:   "verify parser factory hardening disables dangerous XML features",
-	},
-	"code.UnboundedCopy": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review copy bounds and whether attacker-controlled data can reach the copied length or source",
-	},
-	"code.UnboundedCopySmell": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review unbounded string copy usage and surrounding length constraints",
-	},
-	"code.RawMemoryCopySize": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review raw memory copy size calculations and bounds checks",
-	},
-	"code.UnsafeMutableAlias": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review unsafe mutable reference construction from raw pointer casts and aliasing/lifetime guarantees",
-	},
-	"code.SizeComputation": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review allocation or size computation for overflow and untrusted dimensions",
-	},
-	"code.StackAllocationSmell": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review stack allocation size and whether it is bounded",
-	},
-	"code.IndexAccess": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review index/subscript access and the dominating bounds checks",
-	},
-	"code.FieldDerivedIndexAccess": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review field-derived array index access and the dominating upper-bound checks",
-	},
-	"code.IntegerSizeArithmetic": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review integer arithmetic used for address, size, or bounds calculations",
-	},
-	"code.PointerFree": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review pointer lifetime: frees, aliases, and later uses",
-	},
-	"code.PointerUse": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review pointer use and whether lifetime/initialization is guaranteed",
-	},
-	"code.NullableDeref": {
-		category: "memory",
-		kind:     "attention",
-		review:   "review dereference and nearby null checks",
-	},
+func reviewString(fields map[string]any, key string) string {
+	if v, ok := fields[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func reviewList(fields map[string]any, key string) []string {
+	switch v := fields[key].(type) {
+	case []string:
+		return v
+	case string:
+		return []string{v}
+	}
+	return nil
 }
 
 func cmdReview(args []string) error {
 	fs := flag.NewFlagSet("review", flag.ExitOnError)
 	format := fs.String("format", "text", "output format: text | json")
 	profileName := fs.String("profile", "auto", "threat-model profile")
-	category := fs.String("category", "all", "category filter: all | auth | request | crypto | resource | permission | concurrency | xml | memory | secret")
+	category := fs.String("category", "all", "review category filter")
 	loc := fs.String("loc", "", "location substring filter, e.g. core.c:422")
 	checksOnly := fs.Bool("checks", false, "show only check/control sites")
 	targetsOnly := fs.Bool("targets", false, "show only review targets")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql review [-format text|json] [-category all|auth|request|crypto|resource|permission|concurrency|xml|memory|secret] [-loc SUBSTR] [-checks|-targets] <path>...")
+		return fmt.Errorf("usage: vyql review [-format text|json] [-category NAME|all] [-loc SUBSTR] [-checks|-targets] <path>...")
 	}
 	if *checksOnly && *targetsOnly {
 		return fmt.Errorf("-checks and -targets are mutually exclusive")
@@ -248,7 +125,11 @@ func cmdReview(args []string) error {
 		fmt.Println("(no analyzable source)")
 		return nil
 	}
-	rows := collectReviewItems(g)
+	reviewConcepts, err := loadReviewConcepts()
+	if err != nil {
+		return err
+	}
+	rows := collectReviewItemsWith(g, reviewConcepts)
 	if *category != "" && *category != "all" {
 		filtered := rows[:0]
 		for _, r := range rows {
@@ -292,6 +173,14 @@ func cmdReview(args []string) error {
 }
 
 func collectReviewItems(g usg.Store) []reviewItem {
+	reviewConcepts, err := loadReviewConcepts()
+	if err != nil {
+		return nil
+	}
+	return collectReviewItemsWith(g, reviewConcepts)
+}
+
+func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConceptInfo) []reviewItem {
 	nodes, _ := g.AllNodes()
 	byID := map[string]usg.Node{}
 	for _, n := range nodes {
@@ -319,7 +208,7 @@ func collectReviewItems(g usg.Store) []reviewItem {
 				Provenance: labelProvenance(l),
 			}
 			if info.kind == "target" {
-				cp.NearbyChecks = relatedReviewChecks(g, byID, n.ID, info.expected)
+				cp.NearbyChecks = relatedReviewChecks(g, byID, n.ID, info.expected, reviewConcepts)
 			}
 			out = append(out, cp)
 		}
@@ -330,7 +219,7 @@ func collectReviewItems(g usg.Store) []reviewItem {
 	return out
 }
 
-func relatedReviewChecks(g usg.Store, nodes map[string]usg.Node, targetID string, expected []string) []reviewRelatedCheck {
+func relatedReviewChecks(g usg.Store, nodes map[string]usg.Node, targetID string, expected []string, reviewConcepts map[string]reviewConceptInfo) []reviewRelatedCheck {
 	want := map[string]bool{}
 	for _, c := range expected {
 		want[c] = true

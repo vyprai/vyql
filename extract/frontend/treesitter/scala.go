@@ -109,13 +109,10 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if alt := field(n, "alternative"); alt != nil {
 			ifn.Else = c.collectBlocks(alt)
 		}
-		if c.isIncompleteCsrfTokenGuard(cond) && !scalaCsrfConditionHasNonEmptyCheck(c.text(condNode)) {
-			return []nir.Stmt{
-				nir.ExprStmt{Value: csrfEmptyTokenCompareCall(L)},
-				ifn,
-			}
+		return []nir.Stmt{
+			nir.ExprStmt{Value: c.conditionContextCall(condNode, L)},
+			ifn,
 		}
-		return []nir.Stmt{ifn}
 	case "for_expression", "while_expression":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_expression":
@@ -128,136 +125,20 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 }
 
-func (c *scConvScala) isIncompleteCsrfTokenGuard(e nir.Expr) bool {
-	if !strings.Contains(strings.ToLower(c.currentFunc), "csrf") {
-		return false
-	}
-	return hasCsrfTokenEquality(e) && !hasCsrfNonEmptyCheck(e)
-}
-
-func scalaCsrfConditionHasNonEmptyCheck(s string) bool {
-	lower := strings.ToLower(strings.ReplaceAll(s, " ", ""))
-	return strings.Contains(lower, ".isempty") ||
-		strings.Contains(lower, ".nonempty") ||
-		strings.Contains(lower, "!=\"\"") ||
-		strings.Contains(lower, "!=null") ||
-		strings.Contains(lower, ".exists(")
-}
-
-func csrfEmptyTokenCompareCall(loc string) nir.Call {
+func (c *scConvScala) conditionContextCall(cond *tree_sitter.Node, loc string) nir.Call {
+	raw := c.text(cond)
+	compact := strings.Join(strings.Fields(raw), "")
 	return nir.Call{
-		Callee: nir.Name{ID: "security.csrf.empty_token_compare", Loc: loc},
-		Path:   "security.csrf.empty_token_compare",
-		Method: "empty_token_compare",
+		Callee: nir.Name{ID: "analysis.condition.if", Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: raw},
+			nir.Const{Loc: loc, Value: compact},
+			nir.Const{Loc: loc, Value: c.currentFunc},
+		},
+		Path:   "analysis.condition.if",
+		Method: "if",
 		Loc:    loc,
 	}
-}
-
-func hasCsrfTokenEquality(e nir.Expr) bool {
-	switch v := e.(type) {
-	case nir.BinOp:
-		if v.Op == "==" && isCsrfTokenExpr(v.Left) && isCsrfTokenExpr(v.Right) {
-			return true
-		}
-		return hasCsrfTokenEquality(v.Left) || hasCsrfTokenEquality(v.Right)
-	case nir.Unary:
-		return hasCsrfTokenEquality(v.Operand)
-	case nir.Thru:
-		return hasCsrfTokenEquality(v.Inner)
-	case nir.Seq:
-		for _, p := range v.Parts {
-			if hasCsrfTokenEquality(p) {
-				return true
-			}
-		}
-	case nir.Ternary:
-		return hasCsrfTokenEquality(v.Cond) || hasCsrfTokenEquality(v.Then) || hasCsrfTokenEquality(v.Else)
-	}
-	return false
-}
-
-func hasCsrfNonEmptyCheck(e nir.Expr) bool {
-	switch v := e.(type) {
-	case nir.Unary:
-		if (v.Op == "!" || v.Op == "not") && isEmptyCheck(v.Operand) {
-			return true
-		}
-		return hasCsrfNonEmptyCheck(v.Operand)
-	case nir.BinOp:
-		if (v.Op == "!=" || v.Op == "==") && comparesWithEmptyLiteral(v.Left, v.Right) {
-			return true
-		}
-		return hasCsrfNonEmptyCheck(v.Left) || hasCsrfNonEmptyCheck(v.Right)
-	case nir.Call:
-		if strings.EqualFold(v.Method, "nonEmpty") && isCsrfTokenExpr(v.Callee) {
-			return true
-		}
-		for _, a := range v.Args {
-			if hasCsrfNonEmptyCheck(a) {
-				return true
-			}
-		}
-	case nir.Thru:
-		return hasCsrfNonEmptyCheck(v.Inner)
-	case nir.Seq:
-		for _, p := range v.Parts {
-			if hasCsrfNonEmptyCheck(p) {
-				return true
-			}
-		}
-	case nir.Ternary:
-		return hasCsrfNonEmptyCheck(v.Cond) || hasCsrfNonEmptyCheck(v.Then) || hasCsrfNonEmptyCheck(v.Else)
-	}
-	return false
-}
-
-func isEmptyCheck(e nir.Expr) bool {
-	switch v := e.(type) {
-	case nir.Call:
-		return strings.EqualFold(v.Method, "isEmpty") && isCsrfTokenExpr(v.Callee)
-	case nir.Attr:
-		return strings.EqualFold(v.Attr, "isEmpty") && isCsrfTokenExpr(v.Base)
-	case nir.Thru:
-		return isEmptyCheck(v.Inner)
-	}
-	return false
-}
-
-func comparesWithEmptyLiteral(a, b nir.Expr) bool {
-	return (isCsrfTokenExpr(a) && isEmptyLiteral(b)) || (isCsrfTokenExpr(b) && isEmptyLiteral(a))
-}
-
-func isEmptyLiteral(e nir.Expr) bool {
-	switch v := e.(type) {
-	case nir.Const:
-		s := strings.Trim(v.Value, `"'`)
-		return s == ""
-	case nir.Thru:
-		return isEmptyLiteral(v.Inner)
-	}
-	return false
-}
-
-func isCsrfTokenExpr(e nir.Expr) bool {
-	switch v := e.(type) {
-	case nir.Name:
-		return isCsrfTokenName(v.ID)
-	case nir.Attr:
-		return isCsrfTokenName(v.Attr) || isCsrfTokenExpr(v.Base)
-	case nir.Call:
-		return isCsrfTokenName(v.Method) || isCsrfTokenName(v.Path) || isCsrfTokenExpr(v.Callee)
-	case nir.Thru:
-		return isCsrfTokenExpr(v.Inner)
-	}
-	return false
-}
-
-func isCsrfTokenName(s string) bool {
-	lower := strings.ToLower(s)
-	return strings.Contains(lower, "csrf") ||
-		strings.Contains(lower, "token") ||
-		strings.Contains(lower, "cookie") ||
-		strings.Contains(lower, "submitted")
 }
 
 // scMatch lowers a `x match { case … }` to a subject+labelled nir.Switch so a constant
@@ -489,10 +370,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		} else {
 			t.Else = nir.Const{Loc: L}
 		}
-		if c.isIncompleteCsrfTokenGuard(cond) && !scalaCsrfConditionHasNonEmptyCheck(c.text(condNode)) {
-			return nir.Seq{Parts: []nir.Expr{csrfEmptyTokenCompareCall(L), t}, Loc: L}
-		}
-		return t
+		return nir.Seq{Parts: []nir.Expr{c.conditionContextCall(condNode, L), t}, Loc: L}
 	case "match_expression", "block":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
