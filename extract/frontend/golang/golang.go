@@ -178,7 +178,7 @@ type conv struct {
 	file string
 	// hoisted holds synthetic FuncDefs lifted from func-literal expressions (inline
 	// HTTP handlers / goroutines / callbacks). They are flushed into the module body so
-	// their bodies are analyzed (and *http.Request params seeded), instead of dropped.
+	// their bodies and parameter-entry facts are analyzed instead of dropped.
 	hoisted []nir.Stmt
 	anonSeq int
 }
@@ -217,8 +217,8 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 }
 
 // funcDef builds a FuncDef from a function type+body (shared by top-level FuncDecl and
-// hoisted func literals): extracts params/types, seeds each *http.Request param as an
-// http_input source (Java/C#-symmetric handler-param tainting), and lowers the body.
+// hoisted func literals): extracts params/types, records neutral parameter-entry facts,
+// and lowers the body.
 func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, exported bool, loc string) nir.FuncDef {
 	var params []string
 	paramTypes := map[string]string{}
@@ -237,17 +237,23 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 	if bodyNode != nil {
 		body = c.stmts(bodyNode.List)
 	}
-	var seed []nir.Stmt
-	for _, p := range params {
-		if paramTypes[p] == "http.Request" {
-			seed = append(seed, nir.Assign{Targets: []string{p},
-				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: loc}, Path: "http_input", Method: "http_input", Loc: loc}})
+	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
+		ParamEntries: c.goParamEntries(name, params, paramTypes), Exported: exported}
+}
+
+func (c *conv) goParamEntries(name string, params []string, paramTypes map[string]string) []nir.ParamEntry {
+	var out []nir.ParamEntry
+	for i, p := range params {
+		if p == "" || p == "_" {
+			continue
 		}
+		tokens := []string{"function_name:" + name, "param_name:" + p, "param_index:" + strconv.Itoa(i)}
+		if typ := paramTypes[p]; typ != "" {
+			tokens = append(tokens, "param_type:"+typ)
+		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
 	}
-	if len(seed) > 0 {
-		body = append(seed, body...)
-	}
-	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc, Exported: exported}
+	return out
 }
 
 // callOutParams returns the identifiers a call writes THROUGH as out-parameters:
@@ -579,8 +585,8 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 	case *ast.FuncLit:
 		// An inline closure (HTTP handler registered via http.HandleFunc/router.GET, a
 		// goroutine, a callback). Its body would otherwise be dropped. Hoist it as a
-		// synthetic anonymous FuncDef so the body is analyzed and its params (incl. a
-		// seeded *http.Request) carry taint; the closure value itself flows nothing.
+		// synthetic anonymous FuncDef so the body and parameter-entry facts are analyzed;
+		// the closure value itself flows nothing.
 		c.anonSeq++
 		fd := c.funcDef("func#"+strconv.Itoa(c.anonSeq), ex.Type, ex.Body, false, c.loc(ex.Pos()))
 		c.hoisted = append(c.hoisted, fd)

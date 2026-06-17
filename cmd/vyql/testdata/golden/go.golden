@@ -1,5 +1,5 @@
 attr r.URL
+call analysis.parameter.entry
 call db.Query
-call http_input
 call r.URL.Query
 call r.URL.Query.Get

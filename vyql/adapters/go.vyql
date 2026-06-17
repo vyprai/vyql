@@ -21,7 +21,7 @@ adapter go {
   type "support.NewSession" -> session.Store
   type "csv.NewWriter" -> csv.Writer
 
-  source "http_input" -> code.HttpInput  // seeded on *http.Request params
+  source path "analysis.parameter.entry" val "param_type:http.Request" -> code.HttpInput
   source "os.Args" -> code.CliArgument
   source "os.Getenv" -> code.EnvVariable
   source "flag.Arg" -> code.CliArgument
