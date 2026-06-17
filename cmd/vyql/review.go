@@ -80,6 +80,11 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		expected: []string{"core.AuthorizationCheck"},
 		review:   "verify this privileged or destructive operation enforces authorization",
 	},
+	"code.IncompleteIpDenylist": {
+		category: "request",
+		kind:     "attention",
+		review:   "review network address validation for missing special-use IP ranges such as unspecified or broadcast",
+	},
 	"code.StateChangingOp": {
 		category: "request",
 		kind:     "target",

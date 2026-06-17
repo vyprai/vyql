@@ -320,6 +320,12 @@ concept SensitiveOperation : sink {
   vulnerable_to: [access_control.MissingAuthorization]
   cwe: [CWE_862]
 }
+// A network address denylist that recognizes special/private address classes but omits
+// ranges needed to keep SSRF fetches away from local or nonsensical endpoints.
+concept IncompleteIpDenylist : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  cwe: [CWE_918]
+}
 // A resource-acquiring / potentially-unbounded operation (open file/socket/connection,
 // spawn thread, allocate, read-all). POSSIBILITY-tier review concept for the resource/DoS
 // bucket: "verify this resource is bounded and released". Inert for confirmed rules.

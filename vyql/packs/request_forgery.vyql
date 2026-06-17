@@ -8,6 +8,11 @@ rule Ssrf {
   unless guarded_by core.AllowlistValidation
 }
 
+rule IncompleteIpDenylist {
+  meta { id: "VYQL-RF-004", severity: high, cwe: [CWE_918] }
+  match code.IncompleteIpDenylist as guard
+}
+
 rule OpenRedirect {
   meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601] }
   taint core.UserControlledData -> code.RedirectTarget
