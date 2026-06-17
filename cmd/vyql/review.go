@@ -141,6 +141,11 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		kind:     "attention",
 		review:   "review raw memory copy size calculations and bounds checks",
 	},
+	"code.UnsafeMutableAlias": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review unsafe mutable reference construction from raw pointer casts and aliasing/lifetime guarantees",
+	},
 	"code.SizeComputation": {
 		category: "memory",
 		kind:     "attention",

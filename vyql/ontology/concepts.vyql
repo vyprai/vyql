@@ -254,6 +254,10 @@ concept RawMemoryCopySize : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_787]
 }
+concept UnsafeMutableAlias : sink {
+  vulnerable_to: [memory.OobWrite, memory.UseAfterFree]
+  cwe: [CWE_787, CWE_416]
+}
 concept SizeComputation : sink {
   vulnerable_to: [memory.IntegerOverflow]
   enabled_by: [taint.UntrustedData]

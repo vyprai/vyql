@@ -100,6 +100,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
+		body = append(body, c.rsUnsafeMutableAliasCasts(n)...)
 		body = append(body, c.rsIncompleteIPv4DenylistChecks(n)...)
 		if handler {
 			var seed []nir.Stmt
@@ -230,6 +231,46 @@ func rustLooksLikeIPv4Denylist(seen map[string]bool) bool {
 		}
 	}
 	return core >= 3
+}
+
+func (c *rsConv) rsUnsafeMutableAliasCasts(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "reference_expression" && rustUnsafeMutableAliasText(c.text(n)) {
+			loc := c.loc(n)
+			if !seen[loc] {
+				seen[loc] = true
+				path := "security.rust.unsafe.mutable_alias"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Path:   path,
+					Method: lastSeg(path),
+					Loc:    loc,
+				}})
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+func rustUnsafeMutableAliasText(s string) bool {
+	return strings.Contains(s, "&mut") &&
+		strings.Contains(s, "*") &&
+		strings.Contains(s, "as *const") &&
+		strings.Contains(s, "as *mut")
 }
 
 func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {

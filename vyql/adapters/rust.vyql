@@ -15,6 +15,7 @@ adapter rust {
   sink path "Command.new" -> code.CommandExecution
   sink method "arg" -> code.CommandExecution
   sink method "args" -> code.CommandExecution
+  mark "security.rust.unsafe.mutable_alias" -> code.UnsafeMutableAlias
 
   // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
   sink path "reqwest.get" -> code.UrlFetch
