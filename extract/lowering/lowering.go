@@ -1617,12 +1617,14 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// thunk, .then, event handler) thus fires with the captured taint.
 		inner := sc.clone()
 		var paramNodes []string
+		paramByName := map[string]string{}
 		for _, p := range ex.Params {
 			props := map[string]string{"name": p}
 			if typ := ex.ParamTypes[p]; typ != "" {
 				props["decl_type"] = typ
 			}
 			pn := l.node("Param", ex.Loc, props)
+			paramByName[p] = pn
 			inner.node[p] = pn
 			if typ := ex.ParamTypes[p]; typ != "" {
 				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
@@ -1630,6 +1632,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 				}
 			}
 			paramNodes = append(paramNodes, pn)
+		}
+		for _, pe := range ex.ParamEntries {
+			if paramNode := paramByName[pe.Param]; paramNode != "" {
+				l.parameterEntry(paramNode, ex.Loc, pe.Tokens)
+			}
 		}
 		l.block(ex.Body, inner)
 		fn := l.node("Func", ex.Loc, nil)
