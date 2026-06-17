@@ -1,0 +1,51 @@
+// Cross-language crypto-operation labeling for the POSSIBILITY tier.
+//
+// Marks cryptographic operations (cipher/sign/verify/hash/KDF/key-gen) as
+// code.CryptoOperation. No CONFIRMED rule consumes this concept, so these labels are
+// inert in normal scans (zero effect on default output / benchmarks). The possibility
+// tier (VYQL_POSSIBILITY=1) surfaces each as a "review this crypto logic" finding for the
+// AI/triage pass — the bug class behind many crypto CVEs (bypassed verification, weak
+// key/IV handling) that static taint cannot prove. cross_language: crypto APIs recur by
+// name across ecosystems.
+adapter cryptoreview {
+  meta { fidelity: syntactic, cross_language: true }
+
+  // Node.js / JS-TS crypto
+  mark "crypto.createCipheriv" -> code.CryptoOperation
+  mark "crypto.createDecipheriv" -> code.CryptoOperation
+  mark "crypto.createCipher" -> code.CryptoOperation
+  mark "crypto.createSign" -> code.CryptoOperation
+  mark "crypto.createVerify" -> code.CryptoOperation
+  mark "crypto.publicEncrypt" -> code.CryptoOperation
+  mark "crypto.privateDecrypt" -> code.CryptoOperation
+  mark "crypto.pbkdf2" -> code.CryptoOperation
+  mark "crypto.scrypt" -> code.CryptoOperation
+  mark "crypto.generateKeyPair" -> code.CryptoOperation
+
+  // JVM (java/kotlin) + .NET — by dotted path so generic getInstance is crypto-scoped
+  mark "Cipher.getInstance" -> code.CryptoOperation
+  mark "Signature.getInstance" -> code.CryptoOperation
+  mark "Mac.getInstance" -> code.CryptoOperation
+  mark "KeyGenerator.getInstance" -> code.CryptoOperation
+  mark "KeyPairGenerator.getInstance" -> code.CryptoOperation
+  mark method "doFinal" -> code.CryptoOperation
+  mark method "EncryptValue" -> code.CryptoOperation
+  mark method "DecryptValue" -> code.CryptoOperation
+
+  // Go x/crypto + stdlib
+  mark "aes.NewCipher" -> code.CryptoOperation
+  mark "cipher.NewGCM" -> code.CryptoOperation
+  mark "rsa.SignPKCS1v15" -> code.CryptoOperation
+  mark "rsa.VerifyPKCS1v15" -> code.CryptoOperation
+  mark "ecdsa.Sign" -> code.CryptoOperation
+  mark "ecdsa.Verify" -> code.CryptoOperation
+  mark "hmac.New" -> code.CryptoOperation
+
+  // C / OpenSSL
+  mark "EVP_EncryptInit_ex" -> code.CryptoOperation
+  mark "EVP_DecryptInit_ex" -> code.CryptoOperation
+  mark "EVP_DigestSignInit" -> code.CryptoOperation
+  mark "EVP_DigestVerifyInit" -> code.CryptoOperation
+  mark "RSA_sign" -> code.CryptoOperation
+  mark "RSA_verify" -> code.CryptoOperation
+}

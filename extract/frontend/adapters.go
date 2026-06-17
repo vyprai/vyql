@@ -1232,6 +1232,10 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 // the library profile (the concept it labels is gated by the profile's trust boundary).
 func LibraryAdapters() []adapters.Adapter    { return AdaptersFor("library") }
 
+// CryptoReviewAdapters labels cryptographic operations (adapters/cryptoreview.vyql) with
+// code.CryptoOperation. Inert for confirmed rules; the possibility tier surfaces them.
+func CryptoReviewAdapters() []adapters.Adapter { return AdaptersFor("cryptoreview") }
+
 func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }
 func DartAdapters() []adapters.Adapter       { return AdaptersFor("dart") }
 func GroovyAdapters() []adapters.Adapter     { return AdaptersFor("groovy") }

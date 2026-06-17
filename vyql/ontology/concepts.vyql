@@ -107,6 +107,15 @@ concept WeakCipher : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_327]
 }
+// A cryptographic operation (sign/verify/encrypt/decrypt/hash/key-derivation) whose
+// CORRECTNESS — algorithm choice, signature verification, key/IV handling — can't be
+// proven by static analysis. Surfaced only by the possibility tier for AI/triage review
+// of crypto logic (the bug class behind many crypto CVEs: bypassed verification, weak
+// key management). Not used by the confirmed rules, so it never affects default output.
+concept CryptoOperation : sink {
+  vulnerable_to: [crypto.WeakCrypto]
+  cwe: [CWE_327]
+}
 
 concept SessionId : sink {
   vulnerable_to: [session.SessionFixation]
