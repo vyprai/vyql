@@ -263,6 +263,17 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 				return nir.AugAssign{Target: id.Name, Value: c.expr(st.Rhs[0]), Loc: c.loc(st.Pos())}
 			}
 		}
+		// subscript write `m[k] = v` / `a[i] = v`: model as a container taint-join
+		// `m = combine(m, v)` so a later `m[k]` read carries v's taint (otherwise the
+		// write target is "_" and the taint is dropped). Conservative (whole-container).
+		if len(st.Lhs) == 1 && len(st.Rhs) == 1 {
+			if ix, ok := st.Lhs[0].(*ast.IndexExpr); ok {
+				if base, ok := ix.X.(*ast.Ident); ok && base.Name != "_" {
+					return nir.Assign{Targets: []string{base.Name},
+						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: base.Name, Loc: c.loc(base.Pos())}, c.expr(st.Rhs[0])}, Loc: c.loc(st.Pos())}}
+				}
+			}
+		}
 		var targets []string
 		for _, lhs := range st.Lhs {
 			if id, ok := lhs.(*ast.Ident); ok {

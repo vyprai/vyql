@@ -987,7 +987,24 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 	case nir.ExprStmt:
-		l.eval(st.Value, sc)
+		callNode := l.eval(st.Value, sc)
+		// receiver-mutating ("builder"/accumulator) taint: a stdlib builder method
+		// (strings.Builder.WriteString, bytes.Buffer.Write…) or a C string-accumulator
+		// (g_string_append*, strcat/strncat) folds its args INTO the object you later read
+		// back. Model it as a taint-join on that variable (like `x += …`): the variable
+		// gains the call's taint. Without this, `b.WriteString(taint); b.String()` loses it.
+		// (stdlib accumulator semantics = language mechanism, not security knowledge.)
+		if call, ok := st.Value.(nir.Call); ok && callNode != "" {
+			if v := mutatedVar(call); v != "" {
+				n := l.node("Concat", call.Loc, nil)
+				if cur := sc.node[v]; cur != "" {
+					l.flow(cur, n) // preserve the builder's existing taint (`var b` may be unbound)
+				}
+				l.flow(callNode, n) // call node carries its args' taint
+				sc.node[v] = n
+				delete(sc.cnst, v)
+			}
+		}
 	case nir.Block:
 		l.block(st.Stmts, sc)
 	// Structured control flow (B1). Until the CFG lowering lands (B1.2), these flatten
@@ -1390,6 +1407,46 @@ func constSetFactory(path, method string) bool {
 // recognize structured-field sinks even when the field value is non-literal
 // (`{ hypertext: userInput }`). Frontends that don't emit nir.Pair simply
 // contribute bare values.
+// recvMutators are stdlib accumulator METHODS whose receiver gains the args' taint
+// (strings.Builder / bytes.Buffer in Go, StringBuilder/StringBuffer in Java/Kotlin/C#).
+var recvMutators = map[string]bool{
+	"WriteString": true, "WriteByte": true, "WriteRune": true, "Write": true,
+	"append": true, "push": true, // StringBuilder.append / list-ish builders
+}
+
+// argMutators are C/stdlib accumulator FUNCTIONS whose first argument (the destination)
+// gains the other args' taint (g_string_append*, strcat/strncat, …).
+var argMutators = map[string]bool{
+	"strcat": true, "strncat": true, "strlcat": true,
+	"g_string_append": true, "g_string_append_printf": true, "g_string_append_len": true,
+	"g_string_prepend": true, "g_string_insert": true,
+}
+
+// mutatedVar returns the variable a builder/accumulator call mutates (so taint can be
+// joined onto it): the receiver of a recvMutator method, or arg0 of an argMutator function.
+func mutatedVar(call nir.Call) string {
+	if recvMutators[call.Method] {
+		if at, ok := call.Callee.(nir.Attr); ok {
+			if nm, ok := at.Base.(nir.Name); ok {
+				return nm.ID
+			}
+		}
+	}
+	if argMutators[lastDot(call.Path)] && len(call.Args) > 0 {
+		if nm, ok := call.Args[0].(nir.Name); ok {
+			return nm.ID
+		}
+	}
+	return ""
+}
+
+func lastDot(p string) string {
+	if i := strings.LastIndex(p, "."); i >= 0 {
+		return p[i+1:]
+	}
+	return p
+}
+
 func collectValTokens(e nir.Expr, key string, out *[]string) {
 	switch ex := e.(type) {
 	case nir.Const:

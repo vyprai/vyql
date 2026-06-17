@@ -29,9 +29,11 @@ var cPropagators = map[string]bool{
 	"memcpy": true, "memmove": true, "stpcpy": true,
 }
 
-// cReaders read external input into their dest (arg0) buffer.
-var cReaders = map[string]bool{
-	"fgets": true, "gets": true, "fread": true, "read": true, "recv": true, "recvfrom": true,
+// cReaders read external input into a destination BUFFER argument; the value is the
+// arg index of that buffer (recv/read take the buffer at arg1, not arg0).
+var cReaders = map[string]int{
+	"fgets": 0, "gets": 0, "fread": 0, "fscanf": 0,
+	"read": 1, "recv": 1, "recvfrom": 1, "pread": 1,
 }
 
 // ExtractC parses C files into one NIR Program (one module per file).
@@ -300,10 +302,10 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	case "call_expression":
 		name := lastSeg(c.dotted(field(inner, "function")))
 		args := namedChildren(field(inner, "arguments"))
-		// buffer writers: dest (arg0) is tainted from the source args / the read
+		// buffer writers: the destination buffer is tainted from the source args / the read.
 		if len(args) > 0 {
-			if dst := c.destName(args[0]); dst != "" {
-				if cPropagators[name] {
+			if cPropagators[name] {
+				if dst := c.destName(args[0]); dst != "" { // dest is arg0 for str/mem copy
 					var parts []nir.Expr
 					for _, a := range args[1:] {
 						parts = append(parts, c.expr(a))
@@ -313,7 +315,9 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 						nir.ExprStmt{Value: c.expr(inner)},
 					}
 				}
-				if cReaders[name] {
+			}
+			if idx, ok := cReaders[name]; ok && idx < len(args) {
+				if dst := c.destName(args[idx]); dst != "" { // read into the BUFFER arg (recv/read = arg1)
 					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
 				}
 			}
