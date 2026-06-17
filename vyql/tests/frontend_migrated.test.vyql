@@ -37,3 +37,28 @@ test "javascript destructured exported values reach shell command sink"
     childProcess.spawn('cmd.exe', ['/C', editor].concat(args), {});
   };
   ```
+
+test "javascript express receiver-typed body reaches query sink"
+  lang javascript
+  expect VYQL-INJ-001
+  code
+  ```
+  const express = require("express");
+  const app = express();
+  app.post("/submit", (incoming, outgoing) => {
+    db.query("select * from users where name = '" + incoming.body.name + "'");
+  });
+  ```
+
+test "javascript untyped lookalike body does not reach query sink"
+  lang javascript
+  reject VYQL-INJ-001
+  code
+  ```
+  const express = require("express");
+  const app = express();
+  app.post("/submit", (incoming, outgoing) => {
+    const payload = { body: { name: "fixed" } };
+    db.query("select * from users where name = '" + payload.body.name + "'");
+  });
+  ```
