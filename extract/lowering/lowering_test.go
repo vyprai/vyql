@@ -1,11 +1,37 @@
 package lowering
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/extract/nir"
 )
+
+func TestLoweringDoesNotHardcodeConceptLabels(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	files, err := filepath.Glob(filepath.Join(filepath.Dir(file), "*.go"))
+	if err != nil {
+		t.Fatalf("glob lowering files: %v", err)
+	}
+	for _, path := range files {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if strings.Contains(string(src), `Concept: "`) {
+			t.Fatalf("%s hardcodes a concept label; emit structural facts and map them in VyQL data", filepath.Base(path))
+		}
+	}
+}
 
 func TestCollectValTokensDescendsIntoFormat(t *testing.T) {
 	var toks []string
