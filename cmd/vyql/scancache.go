@@ -14,6 +14,7 @@ import (
 	"sort"
 
 	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/findings"
 )
@@ -38,6 +39,11 @@ func scanFingerprint(salt []byte, paths []string, rulesSrc, profile string) stri
 	io.WriteString(h, rulesSrc)
 	io.WriteString(h, "\x00profile\x00")
 	io.WriteString(h, profile)
+	io.WriteString(h, "\x00exclude\x00")
+	for _, e := range treesitter.Excludes() {
+		io.WriteString(h, e)
+		io.WriteString(h, "\x00")
+	}
 	io.WriteString(h, "\x00data\x00")
 	statWalk(h, datadir.Root())
 	for _, p := range paths {

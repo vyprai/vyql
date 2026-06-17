@@ -36,6 +36,10 @@ func SetExcludes(patterns []string) {
 	userExcludes = out
 }
 
+// Excludes returns the active user exclude globs (for cache-key fingerprinting, so a
+// scan with different -exclude patterns never replays another's cached result).
+func Excludes() []string { return userExcludes }
+
 func excluded(base, rel string) bool {
 	for _, p := range userExcludes {
 		if strings.Contains(p, "/") {
@@ -101,10 +105,14 @@ func ListAllFiles(root string) []Entry {
 		if err != nil {
 			return nil
 		}
+		rel := strings.TrimPrefix(path, root)
 		if d.IsDir() {
-			if skipDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") && d.Name() != "." {
+			if skipDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") && d.Name() != "." || excluded(d.Name(), rel) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if excluded(filepath.Base(path), rel) {
 			return nil
 		}
 		out = append(out, Entry{Path: path, Ext: strings.ToLower(filepath.Ext(path)), Base: strings.ToLower(filepath.Base(path))})
