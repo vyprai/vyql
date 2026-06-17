@@ -351,6 +351,14 @@ concept ResourceReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
 }
+// Configuration or diagnostic serialization that may include inline secrets unless redacted.
+// Review-only: static analysis cannot know which config fields are sensitive in every
+// project, so the AI/manual pass should verify redaction before exposure through APIs,
+// logs, diagnostics, or support bundles.
+concept ConfigExposureReview : sink {
+  vulnerable_to: [secrets.SecretLeak, crypto.CleartextStorage]
+  cwe: [CWE_200, CWE_312]
+}
 concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   enabled_by: [taint.UntrustedData]

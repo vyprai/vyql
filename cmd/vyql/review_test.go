@@ -104,6 +104,17 @@ int pci_emul_mem_handler(struct dev *pdi, unsigned long addr, int size, long arg
   return addr + size <= pdi->bar[bidx].addr + pdi->bar[bidx].size;
 }`
 
+const configExposureReviewGo = `package main
+
+type Config struct{}
+
+func handle(c Config) {
+  MarshalConfig(&c, false)
+}
+
+func MarshalConfig(c *Config, redact bool) []byte { return nil }
+`
+
 func TestCollectReviewItemsAuthCategory(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "Admin.java"), []byte(authReviewJava), 0o644); err != nil {
@@ -235,6 +246,22 @@ func TestCollectReviewItemsMemoryAttention(t *testing.T) {
 	}
 	if !hasReviewKind(rows, "memory", "attention", "code.IntegerSizeArithmetic") {
 		t.Fatalf("expected memory attention item for integer/address arithmetic, got %#v", rows)
+	}
+}
+
+func TestCollectReviewItemsConfigExposureAttention(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.go"), []byte(configExposureReviewGo), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if !hasReviewKind(rows, "secret", "attention", "code.ConfigExposureReview") {
+		t.Fatalf("expected secret exposure review attention item, got %#v", rows)
 	}
 }
 

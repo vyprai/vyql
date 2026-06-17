@@ -114,6 +114,12 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		expected: []string{"core.ResourceRelease"},
 		review:   "verify resource usage is bounded, timed out, and released",
 	},
+	"code.ConfigExposureReview": {
+		category: "secret",
+		kind:     "attention",
+		expected: []string{"core.SecretRedaction"},
+		review:   "verify config or diagnostic serialization redacts inline secrets before exposure",
+	},
 	"code.LockAcquire": {
 		category: "concurrency",
 		kind:     "target",
@@ -192,14 +198,14 @@ func cmdReview(args []string) error {
 	fs := flag.NewFlagSet("review", flag.ExitOnError)
 	format := fs.String("format", "text", "output format: text | json")
 	profileName := fs.String("profile", "auto", "threat-model profile")
-	category := fs.String("category", "all", "category filter: all | auth | request | crypto | resource | permission | concurrency | xml | memory")
+	category := fs.String("category", "all", "category filter: all | auth | request | crypto | resource | permission | concurrency | xml | memory | secret")
 	loc := fs.String("loc", "", "location substring filter, e.g. core.c:422")
 	checksOnly := fs.Bool("checks", false, "show only check/control sites")
 	targetsOnly := fs.Bool("targets", false, "show only review targets")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql review [-format text|json] [-category all|auth|request|crypto|resource|permission|concurrency|xml|memory] [-loc SUBSTR] [-checks|-targets] <path>...")
+		return fmt.Errorf("usage: vyql review [-format text|json] [-category all|auth|request|crypto|resource|permission|concurrency|xml|memory|secret] [-loc SUBSTR] [-checks|-targets] <path>...")
 	}
 	if *checksOnly && *targetsOnly {
 		return fmt.Errorf("-checks and -targets are mutually exclusive")

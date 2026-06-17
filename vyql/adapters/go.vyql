@@ -218,6 +218,10 @@ adapter go {
   mark "os.Chmod" val "0666" -> code.InsecurePermission
   mark "os.MkdirAll" val "0777" -> code.InsecurePermission
   mark "os.WriteFile" val "0777" -> code.InsecurePermission
+  // Review-only: project-specific config serializers often need an explicit
+  // "redact/scrub secrets" option before returning configs through diagnostics/API.
+  mark "MarshalConfig" val "false" -> code.ConfigExposureReview
+  mark "instance.MarshalConfig" val "false" -> code.ConfigExposureReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission
