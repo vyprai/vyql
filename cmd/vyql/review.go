@@ -103,6 +103,11 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		kind:     "attention",
 		review:   "review network address validation for missing special-use IP ranges such as unspecified or broadcast",
 	},
+	"code.ProtocolStateReview": {
+		category: "request",
+		kind:     "attention",
+		review:   "review protocol state transitions for stale plaintext or unauthenticated data accepted after the trust boundary changes",
+	},
 	"code.StateChangingOp": {
 		category: "request",
 		kind:     "target",

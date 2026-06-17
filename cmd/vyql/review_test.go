@@ -115,6 +115,31 @@ func handle(c Config) {
 func MarshalConfig(c *Config, redact bool) []byte { return nil }
 `
 
+const startTLSBufferReviewPython = `class SMTP:
+    def connection_made(self, transport):
+        seen_starttls = self._original_transport is not None
+        if self.transport is not None and seen_starttls:
+            self._reader._transport = transport
+            self._writer._transport = transport
+            self.transport = transport
+            self.session.ssl = self._tls_protocol._extra
+        else:
+            super().connection_made(transport)
+`
+
+const fixedStartTLSBufferReviewPython = `class SMTP:
+    def connection_made(self, transport):
+        seen_starttls = self._original_transport is not None
+        if self.transport is not None and seen_starttls:
+            self._reader._transport = transport
+            self._writer._transport = transport
+            self.transport = transport
+            self._reader._buffer.clear()
+            self.session.ssl = self._tls_protocol._extra
+        else:
+            super().connection_made(transport)
+`
+
 const phpBulkUpdateReview = `<?php
 trait UpdateTrait {
   protected function updateItem($manager, $item, array $entry) {
@@ -345,6 +370,35 @@ func TestCollectReviewItemsConfigExposureAttention(t *testing.T) {
 	rows := collectReviewItems(g)
 	if !hasReviewKind(rows, "secret", "attention", "code.ConfigExposureReview") {
 		t.Fatalf("expected secret exposure review attention item, got %#v", rows)
+	}
+}
+
+func TestCollectReviewItemsStartTLSBufferAttention(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "smtp.py"), []byte(startTLSBufferReviewPython), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if !hasReviewKind(rows, "request", "attention", "code.ProtocolStateReview") {
+		t.Fatalf("expected STARTTLS protocol-state review attention item, got %#v", rows)
+	}
+
+	fixed := t.TempDir()
+	if err := os.WriteFile(filepath.Join(fixed, "smtp.py"), []byte(fixedStartTLSBufferReviewPython), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{fixed}, "auto")
+	g, _, err = buildGraph([]string{fixed})
+	if err != nil {
+		t.Fatalf("fixed buildGraph: %v", err)
+	}
+	if hasReviewKind(collectReviewItems(g), "request", "attention", "code.ProtocolStateReview") {
+		t.Fatal("fixed STARTTLS buffer clear should suppress protocol-state review item")
 	}
 }
 

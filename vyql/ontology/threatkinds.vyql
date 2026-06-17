@@ -63,6 +63,7 @@ threat FormatString { cwe: [CWE_134], desc: "Untrusted data used as a format str
 threat CrlfInjection { cwe: [CWE_93], desc: "Improper neutralization of CRLF sequences" }
 threat ExpressionLanguageInjection { cwe: [CWE_917], desc: "Untrusted data in an expression-language statement" }
 threat HttpResponseSplitting { cwe: [CWE_113], desc: "Untrusted data in HTTP headers" }
+threat ProtocolStateConfusion { cwe: [CWE_349], desc: "Protocol state transition accepts stale untrusted data as trusted data" }
 threat LdapInjection { cwe: [CWE_90], desc: "Untrusted data in an LDAP query" }
 threat LogInjection { cwe: [CWE_117], desc: "Untrusted data in log output" }
 threat NosqlInjection { cwe: [CWE_943], desc: "Untrusted data in a data-query/NoSQL command" }

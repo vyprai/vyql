@@ -257,6 +257,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		body = append(body, c.pyIncompleteFStringValidation(n)...)
+		body = append(body, c.pyStartTLSBufferReview(n)...)
 		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
 		// the args after self/info/root/parent are the query's user-supplied inputs.
 		if strings.HasPrefix(name, "resolve_") {
@@ -496,6 +497,29 @@ func (c *pyConv) pyIncompleteFStringValidation(fn *tree_sitter.Node) []nir.Stmt 
 		return nil
 	}
 	path := "security.template.fstring.validation.incomplete"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
+		Path:   path,
+		Method: lastSeg(path),
+		Loc:    c.loc(fn),
+	}}}
+}
+
+func (c *pyConv) pyStartTLSBufferReview(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := c.text(body)
+	if !strings.Contains(text, "_original_transport") ||
+		!strings.Contains(text, "_reader._transport") ||
+		!strings.Contains(text, "_writer._transport") {
+		return nil
+	}
+	if strings.Contains(text, "_reader._buffer.clear") {
+		return nil
+	}
+	path := "security.protocol.starttls.buffer_uncleared"
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
 		Path:   path,
