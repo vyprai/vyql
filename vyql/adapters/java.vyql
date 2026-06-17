@@ -394,6 +394,7 @@ adapter java {
   assume guard method "endsWith"   -> code.FilePathAccess
   assume guard method "contains"   -> code.FilePathAccess
   assume guard method "matches"    -> code.FilePathAccess
+  assume guard path "analysis.guard.containment_check" -> code.FilePathAccess
   assume guard method "startsWith" -> code.TrustBoundary
   // Path canonicalizers normalize but do NOT confine to a base dir on their own.
   assume sanitizer method "normalize"        -> code.FilePathAccess

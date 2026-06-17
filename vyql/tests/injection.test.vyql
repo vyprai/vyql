@@ -163,6 +163,36 @@ test "js: a constant nunjucks template is clean"
   nunjucks.compile('<h1>hello</h1>');
   ```
 
+test "python: f-string field validation misses nested field syntax"
+  lang python
+  expect VYQL-INJ-024
+  code
+  ```
+  from string import Formatter
+
+  def validate(template):
+      for literal, field, format_spec, conv in Formatter().parse(template):
+          if field and "." in field:
+              raise ValueError("bad field")
+      return template
+  ```
+
+test "python: f-string field validation covers nested format specs"
+  lang python
+  reject VYQL-INJ-024
+  code
+  ```
+  from string import Formatter
+
+  def validate(template):
+      for literal, field, format_spec, conv in Formatter().parse(template):
+          if field and "." in field:
+              raise ValueError("bad field")
+          if format_spec and ("{" in format_spec or "}" in format_spec):
+              raise ValueError("bad format")
+      return template
+  ```
+
 # --- Expression-language injection (VYQL-INJ-016) ---
 test "java: tainted SpEL parseExpression is EL injection"
   lang java
@@ -629,6 +659,71 @@ test "javascript: encoded error message sent as HTML is clean"
   module.exports = (err, request, response) => {
     response.status(500).send(encode(err.message));
   };
+  ```
+
+test "python: traceback rendered as raw HTML is XSS"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  import traceback
+
+  def respond_error(context):
+      context.respond_server_error()
+      stack = traceback.format_exc()
+      return """
+      <html><body><pre>
+  %s
+      </pre></body></html>
+      """ % stack
+  ```
+
+test "python: escaped traceback HTML is clean"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  import cgi
+  import traceback
+
+  def respond_error(context):
+      context.respond_server_error()
+      stack = traceback.format_exc()
+      return """
+      <html><body><pre>
+  %s
+      </pre></body></html>
+      """ % cgi.escape(stack)
+  ```
+
+test "python: Flask raw route return is XSS"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, Response, request
+
+  app = Flask(__name__)
+
+  @app.route("/raw")
+  def raw():
+      value = request.args.get("x", "")
+      return value
+  ```
+
+test "python: Flask text/plain Response route return is clean"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, Response, request
+
+  app = Flask(__name__)
+
+  @app.route("/plain")
+  def plain():
+      value = request.args.get("y", "")
+      return Response(value, mimetype="text/plain")
   ```
 
 test "javascript: generate-function builder receives tainted source"

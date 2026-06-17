@@ -664,26 +664,99 @@ func (l *lowerer) markPathContainment(call nir.Call, sc *scope) {
 	}
 }
 
-func (l *lowerer) routeReturnRawBody(id string) bool {
+func (l *lowerer) routeReturn(id, loc string) {
+	if id == "" {
+		return
+	}
+	var valToks []string
 	n, ok, _ := l.g.GetNode(id)
-	if !ok {
-		return false
-	}
-	if n.Type != "code.Call" {
-		return true
-	}
-	path := n.Prop("callee_path")
-	method := n.Prop("method")
-	for _, safe := range []string{
-		"abort", "jsonify", "redirect", "render_template", "render_template_string",
-		"send_file", "send_from_directory", "url_for",
-		"FileResponse", "Response", "HttpResponse", "make_response",
-	} {
-		if method == safe || strings.HasSuffix(path, "."+safe) || path == safe {
-			return false
+	if ok {
+		if loc == "" {
+			loc = n.Loc
+		}
+		if path := n.Prop("callee_path"); path != "" {
+			valToks = append(valToks, path)
+			if last := lastPathSegment(path); last != "" && last != path {
+				valToks = append(valToks, last)
+			}
+		}
+		if method := n.Prop("method"); method != "" {
+			valToks = append(valToks, method)
 		}
 	}
-	return true
+	if loc == "" {
+		loc = "?:0"
+	}
+	arg := l.node("Arg", loc, map[string]string{"vkind": "Return"})
+	l.flow(id, arg)
+	props := map[string]string{
+		"callee_path": "analysis.route.return",
+		"method":      "return",
+		"arg0":        arg,
+	}
+	if len(valToks) > 0 {
+		props["str_args"] = strings.Join(valToks, "\x00")
+	}
+	call := l.node("Call", loc, props)
+	l.flow(arg, call)
+}
+
+func (l *lowerer) syntheticCall(path, method, id, loc string, valToks ...string) string {
+	if id == "" {
+		return ""
+	}
+	n, ok, _ := l.g.GetNode(id)
+	if ok && loc == "" {
+		loc = n.Loc
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	arg := l.node("Arg", loc, map[string]string{"vkind": "Analysis"})
+	l.flow(id, arg)
+	props := map[string]string{
+		"callee_path": path,
+		"method":      method,
+		"arg0":        arg,
+	}
+	if len(valToks) > 0 {
+		props["str_args"] = strings.Join(valToks, "\x00")
+	}
+	call := l.node("Call", loc, props)
+	l.flow(arg, call)
+	return call
+}
+
+func (l *lowerer) guardObservation(path, method, observed, loc string, valToks ...string) string {
+	if observed == "" {
+		return ""
+	}
+	n, ok, _ := l.g.GetNode(observed)
+	if ok && loc == "" {
+		loc = n.Loc
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{"callee_path": path, "method": method}
+	if len(valToks) > 0 {
+		props["str_args"] = strings.Join(valToks, "\x00")
+	}
+	call := l.node("Call", loc, props)
+	l.flow(observed, call)
+	in, _ := l.g.InEdges(observed, "FLOWS")
+	for _, ed := range in {
+		l.flow(ed.Src, call)
+	}
+	return call
+}
+
+func lastPathSegment(path string) string {
+	i := strings.LastIndex(path, ".")
+	if i < 0 || i == len(path)-1 {
+		return path
+	}
+	return path[i+1:]
 }
 
 func isPathResolveParents(expr nir.Expr) bool {
@@ -1245,11 +1318,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		sc.node[st.Target] = n
 	case nir.Return:
 		rv := l.eval(st.Value, sc)
-		l.flow(rv, sc.node["__ret__"])
+		retVal := rv
 		if sc.pathContained[rv] {
-			l.g.AddLabel(sc.node["__ret__"], usg.Label{Concept: "core.PathCanonicalization",
-				Provenance: usg.Provenance{Adapter: "pathlib.relative_to", Fidelity: "semantic", Confidence: "high"}})
+			retVal = l.syntheticCall("analysis.path.contained_value", "contained_value", rv, "")
 		}
+		l.flow(retVal, sc.node["__ret__"])
 		// escape direction of cross-method field taint: returning an object whose field was
 		// tainted (`h.X = src; return h`) flows each tainted slot into the ret node, so the
 		// caller's result (ret → result edge) carries it and a later `o.X` read connects.
@@ -1261,12 +1334,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 		}
-		// Reflected/stored XSS: Flask route handlers that return a raw string send it as
-		// HTML by default. Framework response/template/redirect helpers are modeled by
-		// adapters instead, so only non-wrapper return values get this route-return sink.
-		if l.curRoute && rv != "" && l.routeReturnRawBody(rv) {
-			l.g.AddLabel(rv, usg.Label{Concept: "code.HtmlRender",
-				Provenance: usg.Provenance{Adapter: "route.return", Fidelity: "syntactic", Confidence: "medium"}})
+		if l.curRoute {
+			l.routeReturn(rv, "")
 		}
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
@@ -1298,14 +1367,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	// Cond=nil and the eval is a no-op — each frontend keeps its exact prior node set.
 	case nir.If:
 		condNode := l.eval(st.Cond, sc)
-		// Unsound blocklist guard: `if '<bad>' in tainted: <reject>` (the Python/Ruby OWASP
-		// idiom). A substring/containment filter cannot be proven complete (absolute paths,
-		// encodings, alternate separators bypass it), so it NEVER suppresses — label the
-		// condition core.Assumption(guard) and the engine notes any sink it dominates. The
-		// allowlist form `tainted in (consts)` is the SOUND ternary case, handled separately.
-		if pat, ok := unsoundContainmentGuard(st.Cond); ok && condNode != "" {
-			l.g.AddLabel(condNode, usg.Label{Concept: "core.Assumption",
-				Detail: map[string]string{"mode": "guard", "about": "*", "pattern": pat}})
+		if pat, name, ok := unsoundContainmentGuard(st.Cond); ok && condNode != "" {
+			observed := condNode
+			if name != "" && sc.node[name] != "" {
+				observed = sc.node[name]
+			}
+			l.guardObservation("analysis.guard.containment_check", "containment_check", observed, "", pat)
 		}
 		// opaque-predicate pruning: a compile-time-constant condition has a dead branch that
 		// never executes — lower ONLY the live branch (no Phi join), so `if (const) x = src();
@@ -1473,8 +1540,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		l.flow(left, n)
 		l.flow(right, n)
 		if ex.Op == "in" && isPathResolveParents(ex.Right) {
-			l.g.AddLabel(n, usg.Label{Concept: "core.PathAccessCheck",
-				Provenance: usg.Provenance{Adapter: "pathlib.parents", Fidelity: "semantic", Confidence: "high"}})
+			l.syntheticCall("analysis.path.access_check", "access_check", n, ex.Loc, "path.resolve.parents")
 		}
 		return n
 	case nir.Unary:
@@ -1658,18 +1724,19 @@ func allowlistMembershipVar(cond nir.Expr) (string, bool) {
 // bad substring and cannot be proven complete. It deliberately does NOT match the allowlist
 // shape `<var> in <literal-set>` (that is the sound membership ternary): here the constant is
 // the LEFT operand (the needle) and the variable the right (the haystack).
-func unsoundContainmentGuard(cond nir.Expr) (string, bool) {
+func unsoundContainmentGuard(cond nir.Expr) (string, string, bool) {
 	b, ok := cond.(nir.BinOp)
 	if !ok || (b.Op != "in" && b.Op != "not in") {
-		return "", false
+		return "", "", false
 	}
 	if _, lc := b.Left.(nir.Const); !lc {
-		return "", false
+		return "", "", false
 	}
-	if _, rn := b.Right.(nir.Name); !rn {
-		return "", false
+	rn, ok := b.Right.(nir.Name)
+	if !ok {
+		return "", "", false
 	}
-	return b.Op + " <const>", true
+	return b.Op + " <const>", rn.ID, true
 }
 
 // constSeqVar confirms set is a fixed literal set of constants and returns varID,true. A set
@@ -2057,11 +2124,8 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		if recvNode != "" && target.selfNode != "" {
 			l.aliasReceiverSelf(recvNode, target.selfNode)
 		}
-		// a `# vyql: validator` function returns validated data: label the call result so
-		// `unless sanitized_by core.InputValidation` clears the trust-boundary threat.
 		if target.validator {
-			l.g.AddLabel(result, usg.Label{Concept: "core.InputValidation",
-				Provenance: usg.Provenance{Adapter: "vyql.validator", Fidelity: "resolved", Confidence: "high"}})
+			result = l.syntheticCall("analysis.validator.result", "result", result, call.Loc)
 		}
 	}
 	for i, a := range args {

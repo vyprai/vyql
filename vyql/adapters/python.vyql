@@ -38,7 +38,8 @@ adapter python {
   source "request.POST" -> code.HttpInput
   source "request.body" -> code.HttpInput
   source "request.COOKIES" -> code.HttpInput
-  source "security.python.traceback_html.source" -> code.HttpInput
+  source path "analysis.function.context.source" val "traceback.format_exc" val "<pre" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HttpInput
+  source path "analysis.function.context.source" val "traceback.format_exc" val "<html" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HttpInput
   source "request.META" -> code.HttpInput
   source "request.FILES" -> code.HttpInput
   source "request.path_info" -> code.HttpInput
@@ -168,6 +169,7 @@ adapter python {
   control method "validate_credentials" -> core.InputValidation
   control method "check_password" -> core.InputValidation
   control method "verify_password" -> core.InputValidation
+  control "analysis.validator.result" -> core.InputValidation
   control "validate_url" -> core.AllowlistValidation
   // XXE hardening — a parser configured to not resolve external entities / fetch network,
   // dominating the parse it is passed to (value-matched config).
@@ -359,7 +361,9 @@ adapter python {
   sink receiver "unlink" -> code.FilePathAccess
   sink path "render_template_string" -> code.HtmlRender
   sink path "flask.render_template_string" -> code.HtmlRender
-  sink path "security.python.traceback_html.render" -> code.HtmlRender
+  sink path "analysis.function.context.sink" val "traceback.format_exc" val "<pre" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HtmlRender
+  sink path "analysis.function.context.sink" val "traceback.format_exc" val "<html" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HtmlRender
+  sink path "analysis.route.return" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
   // the response BODY reflected to the browser (Flask make_response / Response / HttpResponse).
   // and the synthetic http_response wrapping a route handler's return value).
   sink path "make_response" -> code.HtmlRender
@@ -380,11 +384,14 @@ adapter python {
   sink path "mako.template.Template" -> code.TemplateRender
   sink path "Environment.from_string" -> code.TemplateRender
   sink path "render_template_string" -> code.TemplateRender
-  mark "security.template.fstring.validation.incomplete" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "Formatter().parse" val "." nval "format_spec" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "Formatter().parse" val "[" nval "format_spec" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "Formatter().parse" val "." val "format_spec" nval "{" nval "}" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "Formatter().parse" val "[" val "format_spec" nval "{" nval "}" -> code.IncompleteTemplateValidation
   mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "ILIKE" -> code.UnparameterizedSqlQueryParser
   mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "::jsonb" -> code.UnparameterizedSqlQueryParser
   mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "=ANY(" -> code.UnparameterizedSqlQueryParser
-  mark "security.protocol.starttls.buffer_uncleared" -> code.ProtocolStateReview
+  mark exact "analysis.function.context" val "_original_transport" val "_reader._transport" val "_writer._transport" nval "_reader._buffer.clear" -> code.ProtocolStateReview
   sink path "redirect" -> code.RedirectTarget
   sink path "flask.redirect" -> code.RedirectTarget
   sink path "HttpResponseRedirect" -> code.RedirectTarget
@@ -440,6 +447,8 @@ adapter python {
   // Boundary check for realpath/common workspace guards: `resolved.startswith(base + os.sep)`
   // requires a path separator after the base, unlike plain prefix checks.
   control method "startswith" val "os.sep" -> core.PathAccessCheck
+  control "analysis.path.access_check" val "path.resolve.parents" -> core.PathAccessCheck
+  control "analysis.path.contained_value" -> core.PathCanonicalization
   // pathlib containment guard: `candidate.resolve().relative_to(root)` raises
   // ValueError when the candidate escapes root, and is the patched idiom for
   // Windows-safe prompt file containment in CVE-2026-10044.
@@ -451,6 +460,7 @@ adapter python {
   // prefix/suffix checks and path canonicalizers that do NOT confine to a base directory.
   assume guard method "startswith" -> code.FilePathAccess
   assume guard method "endswith"   -> code.FilePathAccess
+  assume guard path "analysis.guard.containment_check" -> code.FilePathAccess
   assume sanitizer path "os.path.normpath" -> code.FilePathAccess
   assume sanitizer path "os.path.realpath" -> code.FilePathAccess
   assume sanitizer path "posixpath.normpath" -> code.FilePathAccess
@@ -540,7 +550,7 @@ adapter python {
   // TLS cert validation disabled (CWE-295) — requests/httpx verify=False
   mark "requests" val "verify=False" -> code.CertValidationDisabled
   mark "httpx" val "verify=False" -> code.CertValidationDisabled
-  mark "security.ldap.tls.optional_validation" -> code.CertValidationDisabled
+  mark exact "analysis.function.context" val "use_ssl=False" val "Tls(" val "validate=ssl.CERT_REQUIRED" val "Server(" -> code.CertValidationDisabled
 
   // JWT signature not verified (CWE-347) — pyjwt alg none / verify off
   mark "jwt.decode" val "algorithms=none" -> code.JwtUnverified

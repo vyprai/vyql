@@ -211,21 +211,6 @@ def get_prompt(filename: str):
         return f.read()
 `
 
-const pyFlaskRouteReturnXSS = `from flask import Flask, Response, request
-
-app = Flask(__name__)
-
-@app.route("/raw")
-def raw():
-    value = request.args.get("x", "")
-    return value
-
-@app.route("/plain")
-def plain():
-    value = request.args.get("y", "")
-    return Response(value, mimetype="text/plain")
-`
-
 const pyPathlibParentsContainmentGuard = `from pathlib import Path
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
@@ -285,27 +270,6 @@ func TestScanPythonPathlibRelativeToGuard(t *testing.T) {
 		if f.RuleID == "VYQL-PATH-001" {
 			t.Fatalf("pathlib resolve+relative_to containment should suppress path traversal finding: %+v", f)
 		}
-	}
-}
-
-func TestScanPythonRouteReturnTextPlainResponse(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "app.py"), []byte(pyFlaskRouteReturnXSS), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	rules, _ := loadRules("")
-	fs, _, err := scanPaths([]string{dir}, rules)
-	if err != nil {
-		t.Fatalf("scan: %v", err)
-	}
-	var xss []*findings.Finding
-	for _, f := range fs {
-		if f.RuleID == "VYQL-INJ-004" {
-			xss = append(xss, f)
-		}
-	}
-	if len(xss) != 1 {
-		t.Fatalf("expected exactly one XSS finding for raw route return, not text/plain Response; got %d: %#v", len(xss), fs)
 	}
 }
 
@@ -379,59 +343,6 @@ class Standard {
     $this->context()->fs("fs-media")->write($path, $file->getStream()->getContents());
   }
 }`
-
-const vulnerablePythonOptionalLDAPTLS = `from ldap3 import Server, Tls
-import ssl
-
-def get_ldap_connection(conf):
-    tls_configuration = None
-    use_ssl = False
-    try:
-        cacert = conf.get("ldap", "cacert")
-        tls_configuration = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=cacert)
-        use_ssl = True
-    except Exception:
-        pass
-    return Server(conf.get("ldap", "uri"), use_ssl, tls_configuration)
-`
-
-const fixedPythonRequiredLDAPTLS = `from ldap3 import Server, Tls
-import ssl
-
-def get_ldap_connection(conf):
-    cacert = None
-    try:
-        cacert = conf.get("ldap", "cacert")
-    except Exception:
-        pass
-    tls_configuration = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=cacert)
-    return Server(conf.get("ldap", "uri"), use_ssl=True, tls=tls_configuration)
-`
-
-const vulnerablePythonTracebackHTML = `import traceback
-
-def respond_error(context):
-    context.respond_server_error()
-    stack = traceback.format_exc()
-    return """
-    <html><body><pre>
-%s
-    </pre></body></html>
-    """ % stack
-`
-
-const fixedPythonTracebackHTML = `import cgi
-import traceback
-
-def respond_error(context):
-    context.respond_server_error()
-    stack = traceback.format_exc()
-    return """
-    <html><body><pre>
-%s
-    </pre></body></html>
-    """ % cgi.escape(stack)
-`
 
 const vulnerableAjvLimitItemsTemplate = `{{# def.definitions }}
 {{# def.errors }}
@@ -518,60 +429,6 @@ func TestScanAjvSchemaCodegenValidationBypass(t *testing.T) {
 	}
 	if !strings.Contains(codegen[0].Bindings[0].Loc, filepath.Join("vuln", "_limitItems.jst")) {
 		t.Fatalf("expected codegen finding in vulnerable template, got %#v", codegen[0].Bindings)
-	}
-}
-
-func TestScanPythonTracebackHtmlEscaping(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "vuln.py"), []byte(vulnerablePythonTracebackHTML), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "fixed.py"), []byte(fixedPythonTracebackHTML), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	rules, _ := loadRules("")
-	fs, _, err := scanPaths([]string{dir}, rules)
-	if err != nil {
-		t.Fatalf("scan: %v", err)
-	}
-	var xss []*findings.Finding
-	for _, f := range fs {
-		if f.RuleID == "VYQL-INJ-004" {
-			xss = append(xss, f)
-		}
-	}
-	if len(xss) != 1 {
-		t.Fatalf("expected one traceback HTML XSS finding only in vulnerable file, got %d: %#v", len(xss), fs)
-	}
-	if !strings.Contains(xss[0].Bindings[1].Loc, "vuln.py") {
-		t.Fatalf("expected XSS sink in vulnerable file, got %#v", xss[0].Bindings)
-	}
-}
-
-func TestScanPythonOptionalLDAPTLSValidation(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "vuln.py"), []byte(vulnerablePythonOptionalLDAPTLS), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "fixed.py"), []byte(fixedPythonRequiredLDAPTLS), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	rules, _ := loadRules("")
-	fs, _, err := scanPaths([]string{dir}, rules)
-	if err != nil {
-		t.Fatalf("scan: %v", err)
-	}
-	var cert []*findings.Finding
-	for _, f := range fs {
-		if f.RuleID == "VYQL-CFG-004" {
-			cert = append(cert, f)
-		}
-	}
-	if len(cert) != 1 {
-		t.Fatalf("expected one cert-validation-disabled finding for optional LDAP TLS only, got %d: %#v", len(cert), fs)
-	}
-	if !strings.Contains(cert[0].Bindings[0].Loc, "vuln.py") {
-		t.Fatalf("expected cert finding in vulnerable file, got %#v", cert[0].Bindings)
 	}
 }
 

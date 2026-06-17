@@ -258,11 +258,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
-		body = append(body, c.pyIncompleteFStringValidation(n)...)
 		body = append(body, c.pyFunctionContext(n)...)
-		body = append(body, c.pyStartTLSBufferReview(n)...)
-		body = append(body, c.pyOptionalLDAPTLSValidation(n)...)
-		body = append(body, c.pyUnescapedTracebackHTML(n)...)
 		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
 		// the args after self/info/root/parent are the query's user-supplied inputs.
 		if strings.HasPrefix(name, "resolve_") {
@@ -483,33 +479,6 @@ func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 	return els
 }
 
-func (c *pyConv) pyIncompleteFStringValidation(fn *tree_sitter.Node) []nir.Stmt {
-	body := field(fn, "body")
-	if body == nil {
-		return nil
-	}
-	text := c.text(body)
-	if !strings.Contains(text, "Formatter().parse") {
-		return nil
-	}
-	if !strings.Contains(text, "'.'") && !strings.Contains(text, "\".\"") &&
-		!strings.Contains(text, "'['") && !strings.Contains(text, "\"[\"") {
-		return nil
-	}
-	if strings.Contains(text, "format_spec") &&
-		(strings.Contains(text, "'{'") || strings.Contains(text, "\"{\"") ||
-			strings.Contains(text, "'}'") || strings.Contains(text, "\"}\"")) {
-		return nil
-	}
-	path := "security.template.fstring.validation.incomplete"
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
-		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
-		Path:   path,
-		Method: lastSeg(path),
-		Loc:    c.loc(fn),
-	}}}
-}
-
 func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
@@ -517,23 +486,41 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	}
 	name := c.text(field(fn, "name"))
 	bodyText := c.text(body)
-	if name != "parse" && !strings.Contains(bodyText, "parseString") {
-		return nil
-	}
 	loc := c.loc(fn)
-	path := "analysis.function.context"
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
-		Callee: nir.Name{ID: path, Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "name=" + name},
-			nir.Const{Loc: loc, Value: bodyText},
-			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
-			nir.Const{Loc: loc, Value: c.moduleContext},
-		},
-		Path:   path,
-		Method: "context",
-		Loc:    loc,
-	}}}
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "name=" + name},
+		nir.Const{Loc: loc, Value: bodyText},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
+		nir.Const{Loc: loc, Value: c.moduleContext},
+	}
+	contextPath := "analysis.function.context"
+	sourcePath := "analysis.function.context.source"
+	sinkPath := "analysis.function.context.sink"
+	tmp := "__vyql_function_context"
+	sinkArgs := append([]nir.Expr{nir.Name{ID: tmp, Loc: loc}}, args...)
+	return []nir.Stmt{
+		nir.Assign{Targets: []string{tmp}, Value: nir.Call{
+			Callee: nir.Name{ID: sourcePath, Loc: loc},
+			Args:   args,
+			Path:   sourcePath,
+			Method: "source",
+			Loc:    loc,
+		}},
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: contextPath, Loc: loc},
+			Args:   args,
+			Path:   contextPath,
+			Method: "context",
+			Loc:    loc,
+		}},
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: sinkPath, Loc: loc},
+			Args:   sinkArgs,
+			Path:   sinkPath,
+			Method: "sink",
+			Loc:    loc,
+		}},
+	}
 }
 
 func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
@@ -553,86 +540,6 @@ func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
 	}
 	walk(root)
 	return strings.Join(toks, "\n")
-}
-
-func (c *pyConv) pyStartTLSBufferReview(fn *tree_sitter.Node) []nir.Stmt {
-	body := field(fn, "body")
-	if body == nil {
-		return nil
-	}
-	text := c.text(body)
-	if !strings.Contains(text, "_original_transport") ||
-		!strings.Contains(text, "_reader._transport") ||
-		!strings.Contains(text, "_writer._transport") {
-		return nil
-	}
-	if strings.Contains(text, "_reader._buffer.clear") {
-		return nil
-	}
-	path := "security.protocol.starttls.buffer_uncleared"
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
-		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
-		Path:   path,
-		Method: lastSeg(path),
-		Loc:    c.loc(fn),
-	}}}
-}
-
-func (c *pyConv) pyOptionalLDAPTLSValidation(fn *tree_sitter.Node) []nir.Stmt {
-	body := field(fn, "body")
-	if body == nil {
-		return nil
-	}
-	text := c.text(body)
-	if !strings.Contains(text, "use_ssl = False") ||
-		!strings.Contains(text, "Tls(") ||
-		!strings.Contains(text, "validate=ssl.CERT_REQUIRED") ||
-		!strings.Contains(text, "Server(") {
-		return nil
-	}
-	path := "security.ldap.tls.optional_validation"
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
-		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
-		Path:   path,
-		Method: lastSeg(path),
-		Loc:    c.loc(fn),
-	}}}
-}
-
-func (c *pyConv) pyUnescapedTracebackHTML(fn *tree_sitter.Node) []nir.Stmt {
-	body := field(fn, "body")
-	if body == nil {
-		return nil
-	}
-	text := c.text(body)
-	if !strings.Contains(text, "traceback.format_exc") ||
-		(!strings.Contains(text, "<html") && !strings.Contains(text, "<pre")) {
-		return nil
-	}
-	if strings.Contains(text, "cgi.escape") ||
-		strings.Contains(text, "html.escape") ||
-		strings.Contains(text, "markupsafe.escape") {
-		return nil
-	}
-	loc := c.loc(fn)
-	srcPath := "security.python.traceback_html.source"
-	renderPath := "security.python.traceback_html.render"
-	tmp := "__vyql_traceback_html"
-	return []nir.Stmt{
-		nir.Assign{Targets: []string{tmp}, Value: nir.Call{
-			Callee: nir.Name{ID: srcPath, Loc: loc},
-			Path:   srcPath,
-			Method: lastSeg(srcPath),
-			Loc:    loc,
-		}},
-		nir.ExprStmt{Value: nir.Call{
-			Callee: nir.Name{ID: renderPath, Loc: loc},
-			Args:   []nir.Expr{nir.Name{ID: tmp, Loc: loc}},
-			Path:   renderPath,
-			Method: lastSeg(renderPath),
-			Loc:    loc,
-		}},
-	}
 }
 
 // clauseBlock returns the lowered statements of a clause's `block` child.
