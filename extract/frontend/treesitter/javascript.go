@@ -19,6 +19,15 @@ type jsConv struct {
 	file     string
 	key      string
 	exported map[string]bool
+	// exportsAlias holds local identifiers aliased to the module's exports object via
+	// `module.exports = res`. The dominant Node-library idiom then augments it as
+	// `res.method = function(...)`; treating those methods as the public API lets their
+	// params be seeded as untrusted input (publicAPISeeds), just like `module.exports.x`.
+	exportsAlias map[string]bool
+	// thisReceiver is the object `this` binds to inside this file's methods — set to the
+	// sole exports alias so `this.X` resolves to `res.X` (see dotted()). Empty when there
+	// isn't exactly one alias, leaving `this` unresolved.
+	thisReceiver string
 }
 
 // ExtractJavaScript parses JS/TS files into one NIR Program.
@@ -33,6 +42,13 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 			c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
 			root0 := tree.RootNode()
 			c.exported = c.exportedNames(root0)
+			// single-prototype library (`module.exports = res; res.x = function`): bind `this`
+			// to res so `this.end`/`this.set`/… resolve to the receiver-named sinks.
+			if len(c.exportsAlias) == 1 {
+				for a := range c.exportsAlias {
+					c.thisReceiver = a
+				}
+			}
 			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -81,6 +97,12 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 				if c.isModuleExports(left) {
 					if rhs != nil && rhs.Kind() == "identifier" {
 						out[c.text(rhs)] = true
+						// `module.exports = res` aliases `res` to exports; later
+						// `res.method = fn` assignments then export `method`.
+						if c.exportsAlias == nil {
+							c.exportsAlias = map[string]bool{}
+						}
+						c.exportsAlias[c.text(rhs)] = true
 					}
 					markObjectExports(rhs)
 				} else if name := c.exportFuncName(left); name != "" {
@@ -355,6 +377,9 @@ func (c *jsConv) exportFuncName(left *tree_sitter.Node) string {
 	}
 	if obj.Kind() == "identifier" && c.text(obj) == "exports" {
 		return name
+	}
+	if obj.Kind() == "identifier" && c.exportsAlias[c.text(obj)] {
+		return name // `res.method = fn` where `module.exports = res` aliased res to exports
 	}
 	if c.isModuleExports(obj) {
 		return name
@@ -1126,6 +1151,16 @@ func (c *jsConv) dotted(n *tree_sitter.Node) string {
 		return "?"
 	}
 	switch n.Kind() {
+	case "this":
+		// In a Node prototype library — `module.exports = res; res.method = function(){ … this.end() … }`
+		// — `this` is the exports object. Binding it lets `this.end`/`this.set`/`this.location`
+		// resolve to `res.*` so the receiver-named sink adapters (sink path "res.end", …) match,
+		// instead of dead-ending at an unresolved `?.*` receiver. Only when the file has exactly
+		// one such alias (the common single-prototype case); otherwise the receiver stays unknown.
+		if c.thisReceiver != "" {
+			return c.thisReceiver
+		}
+		return "?"
 	case "identifier", "property_identifier":
 		return c.text(n)
 	case "member_expression":
