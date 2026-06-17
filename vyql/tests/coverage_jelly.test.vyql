@@ -25,3 +25,30 @@ test "jelly: escaped parameter title is clean"
     </f:entry>
   </j:jelly>
   ```
+
+test "jsp: raw JMS destination in link is XSS"
+  lang config
+  expect VYQL-INJ-004
+  file browse.jsp
+  code
+  ```
+  <html>
+  <body>
+    <a href="message.jsp?JMSDestination=${requestContext.queueBrowser.JMSDestination}">View Consumers</a>
+    <a href="deleteMessage.action?JMSDestination=${row.JMSDestination}&messageId=${row.JMSMessageID}">Delete</a>
+  </body>
+  </html>
+  ```
+
+test "jsp: c:out escaped JMS destination is clean"
+  lang config
+  reject VYQL-INJ-004
+  file browse.jsp
+  code
+  ```
+  <html>
+  <body>
+    <a href="message.jsp?JMSDestination=<c:out value="${requestContext.queueBrowser.JMSDestination}" />">View Consumers</a>
+  </body>
+  </html>
+  ```

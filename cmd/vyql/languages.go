@@ -61,10 +61,10 @@ var languages = []language{
 	{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, frontend.DartAdapters},
 	{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, frontend.GroovyAdapters},
 	// config / IaC files (AndroidManifest.xml, Info.plist, Dockerfile, K8s YAML,
-	// Terraform, Jelly templates) — a non-tree-sitter frontend; non-matching files yield no nodes so
+	// Terraform, JSP/Jelly templates) — a non-tree-sitter frontend; non-matching files yield no nodes so
 	// other repos are unaffected. "dockerfile" matches by basename (no extension).
 	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
-		".tf": true, ".jelly": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
+		".tf": true, ".jelly": true, ".jsp": true, ".tag": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
 	// hardcoded-secret scanner — runs over source + config/env files (alongside the real
 	// frontend), emitting HardcodedSecret nodes from provider tokens / secret literals.
 	{"secretscan", secretscanExts, secretscan.Extract, frontend.SecretscanAdapters},

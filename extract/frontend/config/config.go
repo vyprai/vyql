@@ -41,6 +41,8 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanTerraform(src, rel)
 		case "jelly":
 			body = scanJelly(src, rel)
+		case "jsp":
+			body = scanJSP(src, rel)
 		}
 		if len(body) == 0 {
 			continue
@@ -71,6 +73,9 @@ func kind(path string, src []byte) string {
 	if ext == ".jelly" {
 		return "jelly"
 	}
+	if ext == ".jsp" || ext == ".tag" {
+		return "jsp"
+	}
 	if ext == ".yaml" || ext == ".yml" {
 		// only Kubernetes-shaped manifests yield nodes; other YAML is inert.
 		if bytes.Contains(src, []byte("apiVersion")) && bytes.Contains(src, []byte("kind")) {
@@ -98,24 +103,35 @@ func kind(path string, src []byte) string {
 	}
 }
 
-var jellyInputRE = regexp.MustCompile(`\bit\.(name|description|value|defaultValue)\b`)
+var (
+	jellyInputRE = regexp.MustCompile(`\bit\.(name|description|value|defaultValue)\b`)
+	jspInputRE   = regexp.MustCompile(`\b(requestContext|request|param|row|queues|value|text|name|defaultValue|JMSDestination)\b`)
+)
 
 func scanJelly(src []byte, file string) []nir.Stmt {
+	return scanTemplateExpressions(src, file, "jelly", jellyInputRE, jellyControlLine, jellyExpr)
+}
+
+func scanJSP(src []byte, file string) []nir.Stmt {
+	return scanTemplateExpressions(src, file, "jsp", jspInputRE, jspControlLine, jspExpr)
+}
+
+func scanTemplateExpressions(src []byte, file, prefix string, inputRE *regexp.Regexp, skipLine func(string) bool, exprFn func(string, string) nir.Expr) []nir.Stmt {
 	var out []nir.Stmt
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
-		if line == "" || !strings.Contains(line, "${") || jellyControlLine(line) {
+		if line == "" || !strings.Contains(line, "${") || skipLine(line) {
 			continue
 		}
 		for _, expr := range jellyExpressions(line) {
-			if expr == "" || !jellyInputRE.MatchString(expr) {
+			if expr == "" || !inputRE.MatchString(expr) {
 				continue
 			}
 			loc := file + ":" + itoa(i+1)
 			out = append(out, nir.ExprStmt{Value: nir.Call{
-				Callee: nir.Name{ID: "jelly.render", Loc: loc},
-				Args:   []nir.Expr{jellyExpr(expr, loc)},
-				Path:   "jelly.render",
+				Callee: nir.Name{ID: prefix + ".render", Loc: loc},
+				Args:   []nir.Expr{exprFn(expr, loc)},
+				Path:   prefix + ".render",
 				Method: "render",
 				Loc:    loc,
 			}})
@@ -128,6 +144,15 @@ func jellyControlLine(line string) bool {
 	return strings.Contains(line, "<j:set") ||
 		strings.Contains(line, "<j:when") ||
 		strings.Contains(line, "<j:if") ||
+		strings.Contains(line, " test=")
+}
+
+func jspControlLine(line string) bool {
+	return strings.Contains(line, "<%@") ||
+		strings.Contains(line, "<c:out") ||
+		strings.Contains(line, "<c:forEach") ||
+		strings.Contains(line, "<c:if") ||
+		strings.Contains(line, " items=") ||
 		strings.Contains(line, " test=")
 }
 
@@ -159,6 +184,16 @@ func jellyExpr(expr, loc string) nir.Expr {
 		}
 	}
 	return jellySource(expr, loc)
+}
+
+func jspExpr(expr, loc string) nir.Expr {
+	return nir.Call{
+		Callee: nir.Name{ID: "jsp.input", Loc: loc},
+		Args:   []nir.Expr{nir.Const{Value: expr, Loc: loc}},
+		Path:   "jsp.input",
+		Method: "input",
+		Loc:    loc,
+	}
 }
 
 func jellyEscapeArg(expr string) (string, bool) {
