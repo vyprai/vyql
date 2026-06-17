@@ -237,6 +237,7 @@ adapter php {
   // PDF previews can execute embedded script in-browser when streamed/rendered before
   // content scanning. Match only explicit PDF responses and suppress once a scan gate runs.
   mark "security.php.pdf_preview.unscanned" -> code.UnscannedPdfPreview
+  mark "security.php.variable_variable.unrestricted" -> code.UnrestrictedVariableVariableAssignment
   control method "getScanStatus" -> core.PdfScanCheck
   control "getResponseByScanStatus" -> core.PdfScanCheck
 

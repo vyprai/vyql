@@ -439,6 +439,10 @@ concept UnscannedPdfPreview : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
 }
+concept UnrestrictedVariableVariableAssignment : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
 concept HttpHeader : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData

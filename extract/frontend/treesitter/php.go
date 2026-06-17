@@ -34,6 +34,7 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 			body = append(body, c.phpIncompleteServerPortValidation(tree.RootNode())...)
 			body = append(body, c.phpUnescapedSessionFlash(tree.RootNode())...)
 			body = append(body, c.phpUnscannedPdfPreview(tree.RootNode())...)
+			body = append(body, c.phpUnrestrictedVariableVariableAssignment(tree.RootNode())...)
 			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -583,6 +584,70 @@ func phpPdfScanGateBefore(scope, objectText string) bool {
 	return strings.Contains(prefix, "getresponsebyscanstatus") ||
 		strings.Contains(prefix, "getscanstatus") ||
 		strings.Contains(prefix, "scan_pdf")
+}
+
+func (c *phConv) phpUnrestrictedVariableVariableAssignment(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "foreach_statement" {
+			text := c.text(n)
+			if strings.Contains(text, "$_GET") &&
+				strings.Contains(text, "$$") &&
+				!phpVariableVariableKeyGuardBefore(text) {
+				loc := c.phpVariableVariableAssignLoc(n)
+				if !seen[loc] {
+					seen[loc] = true
+					path := "security.php.variable_variable.unrestricted"
+					out = append(out, nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: path, Loc: loc},
+						Path:   path,
+						Method: lastSeg(path),
+						Loc:    loc,
+					}})
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func phpVariableVariableKeyGuardBefore(foreachText string) bool {
+	idx := strings.Index(foreachText, "$$")
+	if idx < 0 {
+		return false
+	}
+	prefix := strings.ToLower(foreachText[:idx])
+	return strings.Contains(prefix, "preg_match") ||
+		strings.Contains(prefix, "in_array") ||
+		strings.Contains(prefix, "array_key_exists")
+}
+
+func (c *phConv) phpVariableVariableAssignLoc(n *tree_sitter.Node) string {
+	loc := c.loc(n)
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		if cur.Kind() == "assignment_expression" && strings.Contains(c.text(cur), "$$") {
+			loc = c.loc(cur)
+			return
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return loc
 }
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —

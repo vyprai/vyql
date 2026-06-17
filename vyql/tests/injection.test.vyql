@@ -872,6 +872,43 @@ test "php: non-PDF streamed response is not PDF preview XSS"
   }
   ```
 
+test "php: GET key variable-variable assignment is XSS-relevant"
+  lang php
+  expect VYQL-INJ-027
+  code
+  ```
+  <?php
+  foreach ($_GET as $k => $v) {
+      $$k = $v;
+  }
+  echo $title;
+  ```
+
+test "php: allowlisted GET key variable-variable assignment is clean"
+  lang php
+  reject VYQL-INJ-027
+  code
+  ```
+  <?php
+  foreach ($_GET as $k => $v) {
+      if (preg_match('/^(test|no)\w+$/', $k)) {
+          $$k = $v;
+      }
+  }
+  echo $title;
+  ```
+
+test "php: non-request variable-variable assignment is not request XSS"
+  lang php
+  reject VYQL-INJ-027
+  code
+  ```
+  <?php
+  foreach ($defaults as $k => $v) {
+      $$k = $v;
+  }
+  ```
+
 test "javascript: environment value in webpack shell plugin script is command injection"
   lang javascript
   expect VYQL-INJ-002

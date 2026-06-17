@@ -62,6 +62,11 @@ rule UnscannedPdfPreview {
   unless guarded_by core.PdfScanCheck
 }
 
+rule UnrestrictedVariableVariableAssignment {
+  meta { id: "VYQL-INJ-027", severity: high, cwe: [CWE_79], confidence_floor: low }
+  match code.UnrestrictedVariableVariableAssignment as sink
+}
+
 // Stored / second-order XSS — data read back from the database (assumed attacker-
 // influenced) rendered WITHOUT escaping (Markup/mark_safe/html_safe/raw). Auto-escaped
 // renders (render_template / Jinja default) are not sinks, so they don't fire. Medium
