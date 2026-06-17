@@ -164,6 +164,24 @@ return [
   ],
 ];`
 
+const phpWorkflowPolicyReview = `<?php
+class Download {
+  protected function vulnerable($search, $customerId, $id) {
+    $expr = array(
+      $search->compare('==', 'order.customerid', $customerId),
+      $search->compare('==', 'order.product.attribute.id', $id),
+    );
+  }
+
+  protected function fixed($search, $customerId, $id) {
+    $expr = array(
+      $search->compare('>=', 'order.statuspayment', Base::PAY_RECEIVED),
+      $search->compare('==', 'order.customerid', $customerId),
+      $search->compare('==', 'order.product.attribute.id', $id),
+    );
+  }
+}`
+
 func TestCollectReviewItemsAuthCategory(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "Admin.java"), []byte(authReviewJava), 0o644); err != nil {
@@ -349,6 +367,25 @@ func TestCollectReviewItemsPhpAccessPolicyConfig(t *testing.T) {
 	}
 	if !hasReviewKind(rows, "auth", "attention", "code.AccessPolicyReview") {
 		t.Fatalf("expected auth attention item for access policy config, got %#v", rows)
+	}
+}
+
+func TestCollectReviewItemsPhpWorkflowPolicyConfig(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Download.php"), []byte(phpWorkflowPolicyReview), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if got := countReviewConcept(rows, "code.WorkflowPolicyReview"); got != 1 {
+		t.Fatalf("expected one workflow policy review item, got %d: %#v", got, rows)
+	}
+	if !hasReviewKind(rows, "auth", "attention", "code.WorkflowPolicyReview") {
+		t.Fatalf("expected auth attention item for workflow policy config, got %#v", rows)
 	}
 }
 

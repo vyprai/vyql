@@ -86,6 +86,12 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		expected: []string{"core.AuthorizationCheck"},
 		review:   "review role or group policy configuration for overly broad access",
 	},
+	"code.WorkflowPolicyReview": {
+		category: "auth",
+		kind:     "attention",
+		expected: []string{"core.AuthorizationCheck"},
+		review:   "review workflow or status checks before this protected business action",
+	},
 	"code.IncompleteIpDenylist": {
 		category: "request",
 		kind:     "attention",

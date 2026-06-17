@@ -338,6 +338,12 @@ concept AccessPolicyReview : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_863]
 }
+// Review-only: business workflow/status policy that guards a protected action (for
+// example payment state before a digital download). Inert for confirmed scan rules.
+concept WorkflowPolicyReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_841, CWE_862, CWE_863]
+}
 // A network address denylist that recognizes special/private address classes but omits
 // ranges needed to keep SSRF fetches away from local or nonsensical endpoints.
 concept IncompleteIpDenylist : sink {
