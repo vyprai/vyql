@@ -3,16 +3,22 @@ package treesitter
 import (
 	"path/filepath"
 	"strings"
+	"unsafe"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsjs "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
+	tstypescript "github.com/tree-sitter/tree-sitter-typescript/bindings/go"
 
 	"github.com/vyprai/vyql/extract/nir"
 )
 
-// jsConv walks a tree-sitter JavaScript/TypeScript CST into NIR. The JS grammar
-// covers JSX and most of TS surface; for TS we parse with the JS grammar (type
-// annotations are skipped as unknown nodes), which is enough for taint.
+// jsConv walks a tree-sitter JavaScript/TypeScript CST into NIR. The SAME walker handles
+// both — TS is a syntactic superset of JS, so the JS node kinds are identical; TS-only
+// nodes (type annotations, generics, `as`/`!`/`satisfies`, accessibility modifiers) are
+// either skipped as unknown or unwrapped to their inner expression. Crucially, .ts/.tsx
+// files are parsed with the TYPESCRIPT grammar (not the JS grammar), so a generic in a
+// type annotation — `: Promise<string | null>` — no longer mis-parses `<` as less-than
+// and drops the function body.
 type jsConv struct {
 	src      []byte
 	root     string
@@ -21,20 +27,40 @@ type jsConv struct {
 	exported map[string]bool
 }
 
-// ExtractJavaScript parses JS/TS files into one NIR Program.
+func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
+	return func() *tree_sitter.Parser {
+		p := tree_sitter.NewParser()
+		_ = p.SetLanguage(tree_sitter.NewLanguage(lang))
+		return p
+	}
+}
+
+// ExtractJavaScript parses JS/TS files into one NIR Program. Files are routed to the
+// matching grammar by extension (.ts → typescript, .tsx → tsx, else javascript); all
+// share the jsConv walker.
 func ExtractJavaScript(files []string, root string) (nir.Program, error) {
-	mods := parseModules(files, root,
-		func() *tree_sitter.Parser {
-			p := tree_sitter.NewParser()
-			_ = p.SetLanguage(tree_sitter.NewLanguage(tsjs.Language()))
-			return p
-		},
-		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
-			root0 := tree.RootNode()
-			c.exported = c.exportedNames(root0)
-			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
-		})
+	var js, ts, tsx []string
+	for _, f := range files {
+		l := strings.ToLower(f)
+		switch {
+		case strings.HasSuffix(l, ".tsx"):
+			tsx = append(tsx, f)
+		case strings.HasSuffix(l, ".ts") || strings.HasSuffix(l, ".mts") || strings.HasSuffix(l, ".cts"):
+			ts = append(ts, f)
+		default:
+			js = append(js, f)
+		}
+	}
+	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+		c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
+		root0 := tree.RootNode()
+		c.exported = c.exportedNames(root0)
+		return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+	}
+	var mods []nir.Module
+	mods = append(mods, parseModules(js, root, jsParserFor(tsjs.Language()), build)...)
+	mods = append(mods, parseModules(ts, root, jsParserFor(tstypescript.LanguageTypescript()), build)...)
+	mods = append(mods, parseModules(tsx, root, jsParserFor(tstypescript.LanguageTSX()), build)...)
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
