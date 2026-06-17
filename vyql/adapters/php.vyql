@@ -5,6 +5,7 @@ adapter php {
 
   // superglobals (subscripted) -> HTTP input
   source "$argv" -> code.CliArgument
+  source "http_input" -> code.HttpInput   // synthetic seed (MediaWiki parser-hook user params)
   source "$_GET" -> code.HttpInput
   source "$_POST" -> code.HttpInput
   source "$_REQUEST" -> code.HttpInput
@@ -91,6 +92,14 @@ adapter php {
   sink path "echo" -> code.HtmlRender
   sink path "print" -> code.HtmlRender
   sink path "printf" -> code.HtmlRender
+  // MediaWiki Html builder: rawElement emits its content arg RAW (unescaped) and both
+  // element/rawElement pass the attributes array through WITHOUT validating attribute names,
+  // so a tainted attributes array is attribute-injection XSS (CVE-2025-59332; the upstream fix
+  // is Sanitizer::validateAttributes). element escapes the content arg, so only its attrs sink.
+  sink path "Html.rawElement" -> code.HtmlRender
+  sink path "Html.rawElement" arg 1 -> code.HtmlRender
+  sink path "Html.rawElement" arg 2 -> code.HtmlRender
+  sink path "Html.element" arg 1 -> code.HtmlRender
 
   // server-side template injection (CWE-1336) — Twig compiles a STRING template
   sink method "createTemplate" -> code.TemplateRender

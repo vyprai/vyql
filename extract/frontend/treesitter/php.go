@@ -67,11 +67,26 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				}
 			}
 		}
+		ptypes := c.paramTypes(field(n, "parameters"))
+		body := c.block(field(n, "body"))
+		// MediaWiki parser hook: a method taking a `Parser`/`PPFrame` carries user wiki markup
+		// in its OTHER params ($input, $args of `parse3DTag($input,$args,Parser $p,PPFrame $f)`),
+		// which flow into Html::element/rawElement output (stored XSS). Seed those as input.
+		if phpHasFrameworkParam(ptypes) {
+			var seed []nir.Stmt
+			for _, p := range params {
+				if t := ptypes[p]; !phpFrameworkType(t) {
+					seed = append(seed, nir.Assign{Targets: []string{p},
+						Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+				}
+			}
+			body = append(seed, body...)
+		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:       c.text(field(n, "name")),
 			Params:     params,
-			ParamTypes: c.paramTypes(field(n, "parameters")),
-			Body:       c.block(field(n, "body")),
+			ParamTypes: ptypes,
+			Body:       body,
 			Loc:        L,
 			Exported:   exported,
 		}}
@@ -104,7 +119,36 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	// byte-identical.
 	case "if_statement":
 		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.phpBranch(field(n, "body")), Else: c.phpElse(n)}}
-	case "while_statement", "for_statement", "foreach_statement", "do_statement":
+	case "foreach_statement":
+		// `foreach ($coll as $k => $v) {…}` — bind the loop key/value vars to the collection
+		// (conservative whole-collection taint) so element taint flows into the body. Without
+		// this $v/$k were unbound and all per-element taint was lost (e.g. building an HTML
+		// attribute array `$par[$k]=$v` from user input). Binding $k too matters for
+		// attribute-NAME injection. tree-sitter-php: `body` is a field; the non-body children
+		// are [iterable, value-spec], where value-spec is variable_name | by_ref | list_literal
+		// | pair($k => $v).
+		body := c.collectBlocks(n)
+		bodyNode := field(n, "body")
+		var nonBody []*tree_sitter.Node
+		for _, ch := range namedChildren(n) {
+			if bodyNode != nil && ch.StartByte() == bodyNode.StartByte() {
+				continue
+			}
+			nonBody = append(nonBody, ch)
+		}
+		if len(nonBody) >= 2 {
+			coll := nonBody[0]
+			var names []string
+			c.foreachVarNames(nonBody[1], &names)
+			var binds []nir.Stmt
+			for _, vn := range names {
+				binds = append(binds, nir.Assign{Targets: []string{vn},
+					Value: nir.Format{Parts: []nir.Expr{c.expr(coll)}, Loc: L}})
+			}
+			body = append(binds, body...)
+		}
+		return []nir.Stmt{nir.Loop{Body: body}}
+	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
@@ -133,13 +177,24 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: c.loc(inner)}}}
 		}
-		// subscript write ($_SESSION['role'] = v) — model as a write to the base's path
-		// ($_SESSION → "_SESSION") so the trust-boundary path sink fires (CWE-501).
+		// subscript write ($arr[$k] = v) — two effects: (1) a write to the base's path
+		// ($_SESSION['role'] → "_SESSION") so the trust-boundary path sink fires (CWE-501);
+		// (2) when the base is a plain variable, a taint-JOIN `$arr = combine($arr, v)` so a
+		// later read of $arr carries v's taint (an array built element-by-element from user
+		// input — e.g. `$par[$k]=$v; Html::element('canvas',$par)` — stays tainted). Without (2)
+		// the value taint was dropped at the discarded write.
 		if left != nil && left.Kind() == "subscript_expression" {
 			if kids := namedChildren(left); len(kids) > 0 {
 				base := kids[0]
-				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right},
-					Path: c.dotted(base), Method: "", Loc: c.loc(inner)}}}
+				write := nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right},
+					Path: c.dotted(base), Method: "", Loc: c.loc(inner)}}
+				if base.Kind() == "variable_name" {
+					bn := c.text(base)
+					join := nir.Assign{Targets: []string{bn},
+						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: bn, Loc: c.loc(base)}, right}, Loc: c.loc(inner)}}
+					return []nir.Stmt{write, join}
+				}
+				return []nir.Stmt{write}
 			}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
@@ -326,6 +381,41 @@ func (c *phConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 		}
 	}
 	return out
+}
+
+// phpFrameworkType reports whether a PHP param type is a MediaWiki framework object (NOT user
+// data) — used to identify a parser hook and exclude these params from input seeding.
+func phpFrameworkType(t string) bool {
+	switch t {
+	case "Parser", "PPFrame", "OutputPage", "Skin", "Title", "MimeAnalyzer":
+		return true
+	}
+	return false
+}
+
+func phpHasFrameworkParam(ptypes map[string]string) bool {
+	for _, t := range ptypes {
+		if t == "Parser" || t == "PPFrame" {
+			return true
+		}
+	}
+	return false
+}
+
+// foreachVarNames collects the bare variable names bound by a foreach value-spec —
+// `$v` (variable_name), `&$v` (by_ref), `[$a,$b]` (list_literal), or `$k => $v` (pair).
+func (c *phConv) foreachVarNames(n *tree_sitter.Node, out *[]string) {
+	if n == nil {
+		return
+	}
+	switch n.Kind() {
+	case "variable_name":
+		*out = append(*out, c.text(n))
+	case "by_ref", "list_literal", "pair":
+		for _, ch := range namedChildren(n) {
+			c.foreachVarNames(ch, out)
+		}
+	}
 }
 
 func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
