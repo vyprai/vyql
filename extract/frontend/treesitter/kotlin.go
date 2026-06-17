@@ -11,16 +11,10 @@ import (
 
 // ktConv walks a tree-sitter Kotlin CST into NIR.
 type ktConv struct {
-	src          []byte
-	file         string
-	key          string
-	inController bool // inside a Spring @RestController/@Controller
-}
-
-// ktHandlerAnns mark a function as a Spring request handler.
-var ktHandlerAnns = map[string]bool{
-	"GetMapping": true, "PostMapping": true, "PutMapping": true, "DeleteMapping": true,
-	"PatchMapping": true, "RequestMapping": true, "RestController": true, "Controller": true,
+	src              []byte
+	file             string
+	key              string
+	classParamTokens []string
 }
 
 // ExtractKotlin parses Kotlin files into one NIR Program (one module per file).
@@ -61,25 +55,20 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "class_declaration", "object_declaration", "interface_declaration":
-		prev := c.inController
-		c.inController = prev || c.hasHandlerAnn(n)
+		prev := c.classParamTokens
+		c.classParamTokens = append(append([]string{}, prev...), c.ktAnnotationTokens(n, "class_annotation:")...)
 		cd := nir.ClassDef{Name: c.declName(n), Body: c.decls(c.classBody(n)), Loc: L}
-		c.inController = prev
+		c.classParamTokens = prev
 		return []nir.Stmt{cd}
 	case "function_declaration":
+		name := c.declName(n)
 		params := c.params(n)
 		paramTypes := c.paramTypes(n)
 		body := c.block(c.funcBody(n))
-		if c.inController || c.hasHandlerAnn(n) {
-			var seed []nir.Stmt
-			for _, p := range params {
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-			}
-			body = append(seed, body...)
-		}
-		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
-			Exported: c.inController || c.hasHandlerAnn(n) || ktPublic(c, n)}}
+		tokens := append([]string{}, c.classParamTokens...)
+		tokens = append(tokens, c.ktAnnotationTokens(n, "annotation:")...)
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
+			ParamEntries: c.ktParamEntries(name, params, tokens), Exported: ktPublic(c, n)}}
 	case "property_declaration":
 		name := c.propName(n)
 		val := c.propValue(n)
@@ -413,21 +402,22 @@ func (c *ktConv) branchValue(n *tree_sitter.Node) nir.Expr {
 	return nir.Const{Loc: c.loc(n)}
 }
 
-// hasHandlerAnn reports whether a class/function carries a Spring handler
-// annotation (@RestController/@GetMapping/…). Annotation names nest under
-// modifiers > annotation > [constructor_invocation >] user_type > identifier.
-func (c *ktConv) hasHandlerAnn(n *tree_sitter.Node) bool {
-	found := false
-	var deep func(m *tree_sitter.Node)
-	deep = func(m *tree_sitter.Node) {
-		if found {
+// ktAnnotationTokens extracts syntax-level annotation names without interpreting
+// framework/domain meaning. Adapters decide what each token means.
+func (c *ktConv) ktAnnotationTokens(n *tree_sitter.Node, prefix string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(name string) {
+		if name == "" || seen[name] {
 			return
 		}
+		seen[name] = true
+		out = append(out, prefix+name)
+	}
+	var deep func(m *tree_sitter.Node)
+	deep = func(m *tree_sitter.Node) {
 		if k := m.Kind(); k == "identifier" || k == "type_identifier" {
-			if ktHandlerAnns[c.text(m)] {
-				found = true
-			}
-			return
+			add(c.text(m))
 		}
 		for _, ch := range namedChildren(m) {
 			deep(ch)
@@ -438,7 +428,23 @@ func (c *ktConv) hasHandlerAnn(n *tree_sitter.Node) bool {
 			deep(ch)
 		}
 	}
-	return found
+	return out
+}
+
+func (c *ktConv) ktParamEntries(name string, params []string, base []string) []nir.ParamEntry {
+	if len(base) == 0 {
+		return nil
+	}
+	out := make([]nir.ParamEntry, 0, len(params))
+	for i, p := range params {
+		if p == "" || p == "_" {
+			continue
+		}
+		tokens := append([]string{}, base...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return out
 }
 
 func (c *ktConv) callArgs(args *tree_sitter.Node) []nir.Expr {

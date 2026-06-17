@@ -3,8 +3,16 @@
 adapter kotlin {
   meta { match: contains, fidelity: resolved }
 
-  // Spring handler params (seeded http_input) + servlet inputs
-  source "http_input" -> code.HttpInput
+  // Spring handler params + servlet inputs
+  source path "analysis.parameter.entry" val "annotation:GetMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PostMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PutMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:DeleteMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PatchMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:RequestMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:RestController" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:Controller" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:RequestMapping" -> code.HttpInput
   source ".getParameter" -> code.HttpInput
   source ".getHeader" -> code.HttpInput
   source ".queryParameters" -> code.HttpInput
