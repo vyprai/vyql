@@ -53,6 +53,15 @@ type lowerer struct {
 	classFields  map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables map[string]map[string]importEntry
 
+	// inheritance-aware implicit-`this` member resolution (populated by frontends that set
+	// ClassDef.Members/Bases — currently C#). directMembers: "modkey::Class" -> declared member
+	// set; classBaseNames: "modkey::Class" -> base SHORT names; membersOfShort: short class name
+	// -> union of declared members (for resolving inherited members by name across files).
+	directMembers  map[string]map[string]bool
+	classBaseNames map[string][]string
+	membersOfShort map[string]map[string]bool
+	allMembersMemo map[string]map[string]bool // memoized transitive member set per "modkey::Class"
+
 	curModule string // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS     string // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
 	curClass  string // "" = none
@@ -663,6 +672,10 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		importTables:   map[string]map[string]importEntry{},
 		containers:     map[string]*containerInfo{},
 		lambdaParams:   map[string][]string{},
+		directMembers:  map[string]map[string]bool{},
+		classBaseNames: map[string][]string{},
+		membersOfShort: map[string]map[string]bool{},
+		allMembersMemo: map[string]map[string]bool{},
 	}
 }
 
@@ -841,6 +854,38 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 
 // --- pass 1: registration ----------------------------------------------
 
+// classMemberSet returns the transitive data-member names of "modkey::Class": its declared
+// members plus those inherited from base classes (resolved by short name across files, so an
+// inherited property like RequestHeaders' `Parameters` from ParametersCollection<T> is included).
+// Memoized; cycle-safe.
+func (l *lowerer) classMemberSet(modkey, class string) map[string]bool {
+	qual := modkey + "::" + class
+	if m, ok := l.allMembersMemo[qual]; ok {
+		return m
+	}
+	out := map[string]bool{}
+	l.allMembersMemo[qual] = out // mark in-progress (cycle guard)
+	for m := range l.directMembers[qual] {
+		out[m] = true
+	}
+	for _, base := range l.classBaseNames[qual] {
+		// resolve the base by short name: union the declared members of every class with that
+		// name, and recurse through that class's own bases where it is defined.
+		for m := range l.membersOfShort[base] {
+			out[m] = true
+		}
+		for bq := range l.directMembers {
+			if strings.HasSuffix(bq, "::"+base) {
+				bmod := strings.TrimSuffix(bq, "::"+base)
+				for m := range l.classMemberSet(bmod, base) {
+					out[m] = true
+				}
+			}
+		}
+	}
+	return out
+}
+
 func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 	for _, s := range stmts {
 		switch st := s.(type) {
@@ -853,6 +898,24 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 			if l.p1 != nil {
 				l.p1.ClassQual = append(l.p1.ClassQual, modkey+"::"+st.Name)
 				l.p1.ClassDefs = append(l.p1.ClassDefs, st.Name)
+			}
+			// inheritance-aware implicit-this: record declared members (by qual + by short name)
+			// and base names, so a bare member ref in a method resolves to `this.<member>`.
+			if len(st.Members) > 0 {
+				qual := modkey + "::" + st.Name
+				if l.directMembers[qual] == nil {
+					l.directMembers[qual] = map[string]bool{}
+				}
+				if l.membersOfShort[st.Name] == nil {
+					l.membersOfShort[st.Name] = map[string]bool{}
+				}
+				for _, m := range st.Members {
+					l.directMembers[qual][m] = true
+					l.membersOfShort[st.Name][m] = true
+				}
+			}
+			if len(st.Bases) > 0 {
+				l.classBaseNames[modkey+"::"+st.Name] = st.Bases
 			}
 			// record field -> declared class type (for cross-file method resolution
 			// on field receivers, e.g. Spring `@Autowired UserService svc; svc.m()`).
@@ -931,6 +994,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
 			inner.typ[l.selfName] = [2]string{l.curModule, l.curClass}
+		}
+		// languages with no explicit self param (C#) still need a STABLE `this` node per method
+		// so `this.Field` writes/reads — and inheritance-aware implicit-`this` member refs —
+		// connect within the method and escape via `return this`. Synthesize one when the class
+		// has known members (i.e. the frontend opted into member resolution).
+		// implicit-this is C#-gated (only C# populates ClassDef.Members); C#'s self keyword is
+		// "this" (the merged multi-language Program loses per-language SelfName), so key on "this".
+		if l.curClass != "" && inner.node["this"] == "" && len(l.classMemberSet(l.curModule, l.curClass)) > 0 {
+			thisNode := l.node("Param", st.Loc, map[string]string{"name": "this"})
+			inner.node["this"] = thisNode
+			inner.typ["this"] = [2]string{l.curModule, l.curClass}
 		}
 		// seed enclosing-class field receivers so `field.method()` resolves
 		for fld, typ := range l.classFields[l.curModule+"::"+l.curClass] {
@@ -1131,6 +1205,16 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Name:
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
+		}
+		// inheritance-aware implicit-`this`: a bare identifier that is a (declared or inherited)
+		// member of the enclosing class — and is NOT a local/param (checked above) — refers to
+		// this.<member>. Resolve to the STABLE this-field SLOT so reads AND mutations connect and
+		// the taint escapes via `return this`. (Static-type refs like File/Console aren't members,
+		// so they stay untouched — sink matching is preserved.)
+		if l.curClass != "" {
+			if self := sc.node["this"]; self != "" && l.classMemberSet(l.curModule, l.curClass)[ex.ID] {
+				return l.elemNode(self, ex.ID, ex.Loc)
+			}
 		}
 		return l.node("Name", ex.Loc, map[string]string{"callee_path": ex.ID, "method": ex.ID})
 	case nir.Const:

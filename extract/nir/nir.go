@@ -204,6 +204,12 @@ type ClassDef struct {
 	Name string
 	Body []Stmt
 	Loc  string
+	// Bases are the base class / interface short names (generics stripped) — used for
+	// inheritance-aware implicit-`this` member resolution.
+	Bases []string
+	// Members are the data-member names (fields + properties) declared on this class, so a
+	// bare member reference inside a method can be resolved to `this.<member>`.
+	Members []string
 }
 
 // Block is a flattened control-flow body, processed once in scope

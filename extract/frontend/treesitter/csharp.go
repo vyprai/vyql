@@ -84,7 +84,8 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "class_declaration", "struct_declaration", "interface_declaration", "record_declaration", "enum_declaration":
 		prev := c.inController
 		c.inController = prev || c.isController(n)
-		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}
+		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L,
+			Bases: c.classBases(n), Members: c.classMembers(field(n, "body"))}
 		c.inController = prev
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration", "local_function_statement", "operator_declaration":
@@ -140,6 +141,13 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		kids := namedChildren(n)
 		if len(kids) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
+		}
+		// `return this;` / `return base;` — `this`/`base` are UNNAMED keyword tokens, so they
+		// are not in namedChildren; capture them explicitly so `return this` carries the self ref.
+		for _, ch := range children(n) {
+			if k := ch.Kind(); k == "this" || k == "base" {
+				return []nir.Stmt{nir.Return{Value: nir.Name{ID: "this", Loc: L}}}
+			}
 		}
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1); Cond nil (C# did not evaluate the predicate) -> byte-identical.
@@ -365,6 +373,73 @@ func (c *csConv) block(block *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
+// classBases returns the base class / interface SHORT names of a class declaration (generics
+// stripped: `ParametersCollection<HeaderParameter>` -> `ParametersCollection`), for
+// inheritance-aware implicit-`this` member resolution.
+func (c *csConv) classBases(n *tree_sitter.Node) []string {
+	var bl *tree_sitter.Node
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "base_list" {
+			bl = ch
+			break
+		}
+	}
+	if bl == nil {
+		return nil
+	}
+	var out []string
+	for _, b := range namedChildren(bl) {
+		if nm := lastSeg(baseTypeName(c, b)); nm != "" {
+			out = append(out, nm)
+		}
+	}
+	return out
+}
+
+// baseTypeName extracts the type name from a base-list entry, stripping generic arguments.
+func baseTypeName(c *csConv, n *tree_sitter.Node) string {
+	switch n.Kind() {
+	case "generic_name":
+		if id := field(n, "name"); id != nil {
+			return c.text(id)
+		}
+		if k := namedChildren(n); len(k) > 0 {
+			return c.text(k[0])
+		}
+	}
+	return c.text(n)
+}
+
+// classMembers returns the data-member names (fields + properties) declared directly in a class
+// body, so a bare member reference in a method resolves to `this.<member>`.
+func (c *csConv) classMembers(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	var out []string
+	for _, m := range namedChildren(body) {
+		switch m.Kind() {
+		case "property_declaration", "event_declaration":
+			if nm := field(m, "name"); nm != nil {
+				out = append(out, c.text(nm))
+			}
+		case "field_declaration", "event_field_declaration":
+			for _, ch := range namedChildren(m) {
+				if ch.Kind() == "variable_declaration" {
+					for _, d := range namedChildren(ch) {
+						if d.Kind() == "variable_declarator" {
+							if nm := field(d, "name"); nm != nil {
+								out = append(out, c.text(nm))
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
 // lambdaParams extracts the parameter names of a C# lambda: an `implicit_parameter`/identifier
 // for `x => …`, or a `parameter_list` for `(x, y) => …` / `(int x) => …`.
 func (c *csConv) lambdaParams(p *tree_sitter.Node) []string {
@@ -446,6 +521,10 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "this", "base":
 		return nir.Name{ID: c.text(n), Loc: L}
+	case "this_expression", "base_expression":
+		// `this` / `base` — model both as the self reference ("this") so member writes/reads and
+		// `return this` resolve to the same stable self node (base.X is this.X for our purposes).
+		return nir.Name{ID: "this", Loc: L}
 	case "null_literal", "predefined_type":
 		return nir.Const{Loc: L}
 	case "integer_literal", "real_literal", "character_literal":
