@@ -52,6 +52,11 @@ type evidenceSpec struct {
 	text   string
 }
 
+type confidenceSpec struct {
+	ruleID string
+	level  string
+}
+
 type gitlinkSpec struct {
 	path string
 	sha  string
@@ -67,6 +72,7 @@ type vyqlSpec struct {
 	lang         string
 	expect       []string
 	reject       []string
+	expectConf   []confidenceSpec
 	expectEv     []evidenceSpec
 	rejectEv     []evidenceSpec
 	expectReview []string
@@ -153,6 +159,8 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			cur.expect = append(cur.expect, rest)
 		case "reject":
 			cur.reject = append(cur.reject, rest)
+		case "expect_confidence":
+			cur.expectConf = append(cur.expectConf, parseConfidenceSpec(t, rel, i+1, rest))
 		case "expect_evidence":
 			cur.expectEv = append(cur.expectEv, parseEvidenceSpec(t, rel, i+1, rest))
 		case "reject_evidence":
@@ -232,6 +240,7 @@ func TestVyqlSpecs(t *testing.T) {
 					t.Fatalf("%s:%d: spec has no expect/reject, review, or label assertion", s.src, s.line)
 				}
 				fired := map[string]bool{}
+				confidence := map[string]string{}
 				evidence := map[string][]string{}
 				reviewed := map[string]bool{}
 				if s.graphSrc != "" {
@@ -250,6 +259,7 @@ func TestVyqlSpecs(t *testing.T) {
 						}
 						for _, fnd := range got {
 							fired[fnd.RuleID] = true
+							confidence[fnd.RuleID] = fnd.Confidence
 							for _, ne := range fnd.NegationEvidence {
 								evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
 							}
@@ -306,6 +316,7 @@ func TestVyqlSpecs(t *testing.T) {
 					}
 					for _, fnd := range found {
 						fired[fnd.RuleID] = true
+						confidence[fnd.RuleID] = fnd.Confidence
 						for _, ne := range fnd.NegationEvidence {
 							evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
 						}
@@ -333,6 +344,11 @@ func TestVyqlSpecs(t *testing.T) {
 				for _, no := range s.reject {
 					if fired[no] {
 						t.Errorf("rule %s fired but should not have", no)
+					}
+				}
+				for _, want := range s.expectConf {
+					if got := confidence[want.ruleID]; got != want.level {
+						t.Errorf("expected rule %s confidence %q, got %q", want.ruleID, want.level, got)
 					}
 				}
 				for _, want := range s.expectEv {
@@ -420,6 +436,15 @@ func parseEvidenceSpec(t *testing.T, src string, line int, rest string) evidence
 		t.Fatalf("%s:%d: evidence assertion must be `expect_evidence <RULE> <text>`", src, line)
 	}
 	return evidenceSpec{ruleID: strings.TrimSpace(ruleID), text: strings.TrimSpace(text)}
+}
+
+func parseConfidenceSpec(t *testing.T, src string, line int, rest string) confidenceSpec {
+	t.Helper()
+	ruleID, level, ok := strings.Cut(rest, " ")
+	if !ok || strings.TrimSpace(ruleID) == "" || strings.TrimSpace(level) == "" {
+		t.Fatalf("%s:%d: confidence assertion must be `expect_confidence <RULE> <level>`", src, line)
+	}
+	return confidenceSpec{ruleID: strings.TrimSpace(ruleID), level: strings.TrimSpace(level)}
 }
 
 func parseLabelSpec(t *testing.T, src string, line int, rest string) labelSpec {
