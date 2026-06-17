@@ -1,0 +1,50 @@
+test "sca: Python dependency manifests produce dependency findings"
+  lang python
+  expect VYQL-SCA-001
+  expect VYQL-SCA-004
+  file app.py
+  code
+  ```
+  import flask
+  ```
+  file requirements.txt
+  code
+  ```
+  flask==0.12.2
+  colourama==0.1
+  requests==2.31.0
+  ```
+
+test "sca: vulnerable git submodule commit is reported"
+  lang python
+  expect VYQL-SCA-005
+  gitlink vendor/llhttp 69d6db2008508489d19267a0dcab30602b16fc5b
+  file app.py
+  code
+  ```
+  import aiohttp
+  ```
+  file .gitmodules
+  code
+  ```
+  [submodule "vendor/llhttp"]
+  path = vendor/llhttp
+  url = https://github.com/nodejs/llhttp.git
+  ```
+
+test "sca: patched git submodule commit is clean"
+  lang python
+  reject VYQL-SCA-005
+  gitlink vendor/llhttp 7e18596bae8f63692ded9d3250d5d984fe90dcfb
+  file app.py
+  code
+  ```
+  import aiohttp
+  ```
+  file .gitmodules
+  code
+  ```
+  [submodule "vendor/llhttp"]
+  path = vendor/llhttp
+  url = https://github.com/nodejs/llhttp.git
+  ```

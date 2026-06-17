@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,8 +28,11 @@ import (
 //	  lang   java
 //	  expect VYQL-CRY-002      # repeatable — every listed rule MUST fire
 //	  reject VYQL-INJ-001      # repeatable — every listed rule must NOT fire
+//	  expect_evidence VYQL-PATH-001 assumption  # rule must carry negation evidence text
+//	  reject_evidence VYQL-INJ-004 char-filter  # rule evidence must not contain text
 //	  expect_review code.CryptoOperation # repeatable — review concept must appear
 //	  reject_review code.CryptoOperation # repeatable — review concept must not appear
+//	  gitlink vendor/lib <sha>  # optional git submodule/gitlink fixture
 //	  code
 //	  ```
 //	  class C { void f() { Cipher.getInstance("DES/CBC/PKCS5Padding"); } }
@@ -39,17 +43,30 @@ type specFile struct {
 	code string
 }
 
+type evidenceSpec struct {
+	ruleID string
+	text   string
+}
+
+type gitlinkSpec struct {
+	path string
+	sha  string
+}
+
 type vyqlSpec struct {
 	name         string
 	lang         string
 	expect       []string
 	reject       []string
+	expectEv     []evidenceSpec
+	rejectEv     []evidenceSpec
 	expectReview []string
 	rejectReview []string
 	profile      string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
 	files        []specFile // one or more code blocks (multi-file specs supported)
-	graphSrc     string     // a `graph` block: an asset/identity graph (mutually exclusive with code)
-	src          string     // source spec filename (for messages)
+	gitlinks     []gitlinkSpec
+	graphSrc     string // a `graph` block: an asset/identity graph (mutually exclusive with code)
+	src          string // source spec filename (for messages)
 	line         int
 }
 
@@ -125,12 +142,18 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			cur.expect = append(cur.expect, rest)
 		case "reject":
 			cur.reject = append(cur.reject, rest)
+		case "expect_evidence":
+			cur.expectEv = append(cur.expectEv, parseEvidenceSpec(t, rel, i+1, rest))
+		case "reject_evidence":
+			cur.rejectEv = append(cur.rejectEv, parseEvidenceSpec(t, rel, i+1, rest))
 		case "expect_review":
 			cur.expectReview = append(cur.expectReview, rest)
 		case "reject_review":
 			cur.rejectReview = append(cur.rejectReview, rest)
 		case "file":
 			pendingFile = rest // next fence writes to this filename
+		case "gitlink":
+			cur.gitlinks = append(cur.gitlinks, parseGitlinkSpec(t, rel, i+1, rest))
 		case "code":
 			// optional keyword; the following ``` opens the block
 		case "graph":
@@ -187,10 +210,11 @@ func TestVyqlSpecs(t *testing.T) {
 			s := s
 			total++
 			t.Run(s.src+"/"+s.name, func(t *testing.T) {
-				if len(s.expect) == 0 && len(s.reject) == 0 && len(s.expectReview) == 0 && len(s.rejectReview) == 0 {
+				if len(s.expect) == 0 && len(s.reject) == 0 && len(s.expectEv) == 0 && len(s.rejectEv) == 0 && len(s.expectReview) == 0 && len(s.rejectReview) == 0 {
 					t.Fatalf("%s:%d: spec has neither expect/reject nor expect_review/reject_review", s.src, s.line)
 				}
 				fired := map[string]bool{}
+				evidence := map[string][]string{}
 				reviewed := map[string]bool{}
 				if s.graphSrc != "" {
 					// graph spec: build the asset/identity graph and evaluate the packs.
@@ -203,6 +227,9 @@ func TestVyqlSpecs(t *testing.T) {
 						}
 						for _, fnd := range got {
 							fired[fnd.RuleID] = true
+							for _, ne := range fnd.NegationEvidence {
+								evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
+							}
 						}
 					}
 					for _, row := range collectReviewItems(store) {
@@ -226,9 +253,16 @@ func TestVyqlSpecs(t *testing.T) {
 								name = "snippet" + strconv.Itoa(n) + ext
 							}
 						}
-						if err := os.WriteFile(filepath.Join(dir, name), []byte(fl.code), 0o644); err != nil {
+						dst := filepath.Join(dir, name)
+						if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 							t.Fatal(err)
 						}
+						if err := os.WriteFile(dst, []byte(fl.code), 0o644); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if len(s.gitlinks) > 0 {
+						initGitlinks(t, dir, s.gitlinks)
 					}
 					// optional `profile` directive: set the trust boundary (e.g. library) so
 					// profile-gated sources like ExternalEntryInput are active for this spec.
@@ -242,6 +276,9 @@ func TestVyqlSpecs(t *testing.T) {
 					}
 					for _, fnd := range found {
 						fired[fnd.RuleID] = true
+						for _, ne := range fnd.NegationEvidence {
+							evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
+						}
 					}
 					if len(s.expectReview) > 0 || len(s.rejectReview) > 0 {
 						g, _, err := buildGraph([]string{dir})
@@ -261,6 +298,16 @@ func TestVyqlSpecs(t *testing.T) {
 				for _, no := range s.reject {
 					if fired[no] {
 						t.Errorf("rule %s fired but should not have", no)
+					}
+				}
+				for _, want := range s.expectEv {
+					if !evidenceContains(evidence[want.ruleID], want.text) {
+						t.Errorf("expected rule %s evidence to contain %q, got %q", want.ruleID, want.text, strings.Join(evidence[want.ruleID], " | "))
+					}
+				}
+				for _, no := range s.rejectEv {
+					if evidenceContains(evidence[no.ruleID], no.text) {
+						t.Errorf("rule %s evidence contained forbidden text %q: %q", no.ruleID, no.text, strings.Join(evidence[no.ruleID], " | "))
 					}
 				}
 				for _, want := range s.expectReview {
@@ -329,6 +376,56 @@ func parseGraphProps(s string) map[string]string {
 		}
 	}
 	return out
+}
+
+func parseEvidenceSpec(t *testing.T, src string, line int, rest string) evidenceSpec {
+	t.Helper()
+	ruleID, text, ok := strings.Cut(rest, " ")
+	if !ok || strings.TrimSpace(ruleID) == "" || strings.TrimSpace(text) == "" {
+		t.Fatalf("%s:%d: evidence assertion must be `expect_evidence <RULE> <text>`", src, line)
+	}
+	return evidenceSpec{ruleID: strings.TrimSpace(ruleID), text: strings.TrimSpace(text)}
+}
+
+func parseGitlinkSpec(t *testing.T, src string, line int, rest string) gitlinkSpec {
+	t.Helper()
+	path, sha, ok := strings.Cut(rest, " ")
+	if !ok || strings.TrimSpace(path) == "" || strings.TrimSpace(sha) == "" {
+		t.Fatalf("%s:%d: gitlink fixture must be `gitlink <path> <sha>`", src, line)
+	}
+	return gitlinkSpec{path: strings.TrimSpace(path), sha: strings.TrimSpace(sha)}
+}
+
+func initGitlinks(t *testing.T, dir string, gitlinks []gitlinkSpec) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q")
+	run("config", "user.email", "test@example.invalid")
+	run("config", "user.name", "VyQL Test")
+	run("add", ".")
+	for _, gl := range gitlinks {
+		run("update-index", "--add", "--cacheinfo", "160000,"+gl.sha+","+gl.path)
+	}
+	run("commit", "-q", "-m", "fixture")
+}
+
+func evidenceContains(items []string, text string) bool {
+	text = strings.ToLower(text)
+	for _, item := range items {
+		if strings.Contains(strings.ToLower(item), text) {
+			return true
+		}
+	}
+	return false
 }
 
 func keys(m map[string]bool) string {

@@ -167,6 +167,7 @@ test "python exhaustive: pathlib parents guard suppresses path traversal"
 test "python exhaustive: substring blocklist does not suppress path traversal"
   lang python
   expect VYQL-PATH-001
+  expect_evidence VYQL-PATH-001 assumption
   code
   ```
   def handler():
