@@ -568,6 +568,10 @@ concept TemplateRender : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_1336]
 }
+concept IncompleteTemplateValidation : sink {
+  vulnerable_to: [injection.TemplateInjection]
+  cwe: [CWE_1336]
+}
 concept UrlFetch : sink {
   vulnerable_to: [request_forgery.Ssrf]
   enabled_by: [taint.UntrustedData]

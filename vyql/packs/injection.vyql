@@ -83,6 +83,11 @@ rule Template {
   taint core.UserControlledData -> code.TemplateRender
 }
 
+rule IncompleteTemplateValidation {
+  meta { id: "VYQL-INJ-024", severity: medium, cwe: [CWE_1336], confidence_floor: low }
+  match code.IncompleteTemplateValidation as sink
+}
+
 rule Log {
   meta { id: "VYQL-INJ-009", severity: medium, cwe: [CWE_117] }
   taint core.UserControlledData -> code.LogOutput

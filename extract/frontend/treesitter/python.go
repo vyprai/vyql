@@ -256,6 +256,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
+		body = append(body, c.pyIncompleteFStringValidation(n)...)
 		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
 		// the args after self/info/root/parent are the query's user-supplied inputs.
 		if strings.HasPrefix(name, "resolve_") {
@@ -474,6 +475,33 @@ func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 		els = []nir.Stmt{nir.If{Cond: cond, Then: body, Else: els}}
 	}
 	return els
+}
+
+func (c *pyConv) pyIncompleteFStringValidation(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := c.text(body)
+	if !strings.Contains(text, "Formatter().parse") {
+		return nil
+	}
+	if !strings.Contains(text, "'.'") && !strings.Contains(text, "\".\"") &&
+		!strings.Contains(text, "'['") && !strings.Contains(text, "\"[\"") {
+		return nil
+	}
+	if strings.Contains(text, "format_spec") &&
+		(strings.Contains(text, "'{'") || strings.Contains(text, "\"{\"") ||
+			strings.Contains(text, "'}'") || strings.Contains(text, "\"}\"")) {
+		return nil
+	}
+	path := "security.template.fstring.validation.incomplete"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
+		Path:   path,
+		Method: lastSeg(path),
+		Loc:    c.loc(fn),
+	}}}
 }
 
 // clauseBlock returns the lowered statements of a clause's `block` child.

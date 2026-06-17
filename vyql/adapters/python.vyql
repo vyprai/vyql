@@ -381,6 +381,7 @@ adapter python {
   sink path "mako.template.Template" -> code.TemplateRender
   sink path "Environment.from_string" -> code.TemplateRender
   sink path "render_template_string" -> code.TemplateRender
+  mark "security.template.fstring.validation.incomplete" -> code.IncompleteTemplateValidation
   sink path "redirect" -> code.RedirectTarget
   sink path "flask.redirect" -> code.RedirectTarget
   sink path "HttpResponseRedirect" -> code.RedirectTarget
