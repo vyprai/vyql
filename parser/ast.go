@@ -41,7 +41,7 @@ func containsDot(s string) bool {
 }
 
 // ConceptDecl is an ontology concept declaration. The kind is a type
-// annotation in the header — `concept Deserialization : sink { … }` — not a
+// annotation in the header — `concept SomeConcept : sink { ... }` — not a
 // redundant body field. Name is the short PascalCase name; Package is the
 // enclosing `module <namespace>` (or the prefix if the header name is dotted).
 // Fields holds the kind-dependent typing/standards attributes (values are
@@ -84,7 +84,7 @@ type AdapterMapping struct {
 	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
 	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
 	Packages   []string // inherited from `package "name" { ... }` — fire only when import/SBOM package evidence is present
-	Collection bool     // `collection` — also flag a Seq/collection-literal arg (e.g. ldap search options {filter})
+	Collection bool     // `collection` — also flag a Seq/collection-literal arg
 	Exact      bool     // exact path match (currently used by `mark exact`)
 	About      string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
 }

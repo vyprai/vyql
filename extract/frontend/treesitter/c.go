@@ -691,7 +691,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "concatenated_string", "raw_string_literal":
 		// carry the quote-stripped literal text so val-matched marks/sinks
-		// (Cipher "DES", setSecure "false", algorithm strings) can value-match;
+		// adapter value predicates can match constants;
 		// unquoteLit in lowering strips the surrounding delimiters.
 		return nir.Const{Loc: L, Value: cStringText(c.text(n))}
 	case "new_expression": // C++

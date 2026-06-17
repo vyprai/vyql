@@ -238,15 +238,15 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "identifier":
-		// tree-sitter-groovy parses boolean/null literals as bare identifiers; carry their
-		// value so value-matching marks (setSecure(false) → InsecureCookie) fire.
+		// tree-sitter-groovy parses boolean/null literals as bare identifiers; carry
+		// their value so value-matching marks can inspect them.
 		if t := c.text(n); t == "true" || t == "false" || t == "null" {
 			return nir.Const{Loc: L, Value: t}
 		}
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "number_literal", "integer", "decimal", "float", "boolean", "null",
 		"boolean_literal", "null_literal":
-		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding (setSecure(false))
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string", "gstring":
 		var parts []nir.Expr
 		var content string

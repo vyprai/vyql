@@ -82,8 +82,8 @@ func (p *parser) parseProgram() []Decl {
 			}
 			continue
 		}
-		// `import code.HttpInput;`, `import code.*;`, and
-		// `import code.{HttpInput, SqlExecution};` make concept references shorter
+		// `import code.SomeConcept;`, `import code.*;`, and
+		// `import code.{A, B};` make concept references shorter
 		// in rule/adapter bodies without changing declaration namespaces.
 		if p.atWord("import") {
 			p.parseImportDecl()
@@ -403,8 +403,8 @@ func (p *parser) parseAtom() Expr {
 		p.next()
 		return Has{Ref: ref, Concept: p.parseConceptRef()}
 	}
-	// `labeled <Concept>` — the node the ref resolves to carries the concept
-	// (docs/11: `c.dst labeled threat.MiningPool`). Same semantics as `has`.
+	// `labeled <Concept>` — the node the ref resolves to carries the concept.
+	// Same semantics as `has`.
 	if p.atWord("labeled") {
 		p.next()
 		return Has{Ref: ref, Concept: p.parseConceptRef()}
@@ -597,7 +597,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 				m.ArgIndex = n
 			}
 		}
-		if p.atWord("collection") { // also flag a Seq/collection-literal arg (ldap options {filter})
+		if p.atWord("collection") { // also flag a Seq/collection-literal arg
 			p.next()
 			m.Collection = true
 		}
@@ -677,9 +677,9 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.parseAdapterGuards(&fm, false)
 		return []AdapterMapping{fm}
 	case p.atWord("assume"):
-		// `assume guard method "startsWith" -> core.FilePathAccess` /
-		// `assume sanitizer path "ldapEscape" -> core.LdapQuery` declares an UNSOUND
-		// neutralizer: a guard or escaper that *might* defuse the threat but cannot be
+		// `assume guard method "check" -> code.Target` /
+		// `assume sanitizer path "normalize" -> code.Target` declares an UNSOUND
+		// neutralizer: a guard or transformer that *might* defuse the condition but cannot be
 		// proven to. The engine never suppresses on it — instead it labels the node
 		// core.Assumption and, when that node guards/sanitizes a finding, attaches an
 		// assumption note (the regex-CharFilter pattern, generalized to any neutralizer).
@@ -802,8 +802,7 @@ func (p *parser) parseReviewDecl() *ReviewDecl {
 }
 
 // parseConceptValue parses a concept-field value: a string, a qualified name, or
-// a bracketed list of either (so qualified refs like
-// `deserialization.DeserializationAbuse` survive inside `[...]`).
+// a bracketed list of either, preserving qualified refs inside `[...]`.
 func (p *parser) parseConceptValue() any {
 	if p.at(tString) {
 		return p.next().val
