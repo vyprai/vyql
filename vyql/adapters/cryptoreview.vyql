@@ -41,6 +41,24 @@ adapter cryptoreview {
   mark "ecdsa.Verify" -> code.CryptoOperation
   mark "hmac.New" -> code.CryptoOperation
 
+  // .NET (System.Security.Cryptography)
+  mark "Aes.Create" -> code.CryptoOperation
+  mark "SymmetricAlgorithm.Create" -> code.CryptoOperation
+  mark "HashAlgorithm.Create" -> code.CryptoOperation
+  mark method "CreateEncryptor" -> code.CryptoOperation
+  mark method "CreateDecryptor" -> code.CryptoOperation
+  mark method "TransformFinalBlock" -> code.CryptoOperation
+  mark method "GenerateKey" -> code.CryptoOperation
+  mark method "GenerateIV" -> code.CryptoOperation
+  mark "CryptoStream" -> code.CryptoOperation
+  mark "RSACryptoServiceProvider" -> code.CryptoOperation
+  mark "AesManaged" -> code.CryptoOperation
+  mark "TripleDESCryptoServiceProvider" -> code.CryptoOperation
+  mark "RijndaelManaged" -> code.CryptoOperation
+  mark "ProtectedData.Protect" -> code.CryptoOperation
+  mark "ProtectedData.Unprotect" -> code.CryptoOperation
+  mark "Rfc2898DeriveBytes" -> code.CryptoOperation
+
   // C / OpenSSL
   mark "EVP_EncryptInit_ex" -> code.CryptoOperation
   mark "EVP_DecryptInit_ex" -> code.CryptoOperation

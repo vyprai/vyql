@@ -47,6 +47,13 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 			covered[b.NodeID] = true
 		}
 	}
+	// Low-signal / high-volume concepts excluded from the possibility pass: they ride on
+	// very broad labels (e.g. TrustBoundary on every collection .Add; LogOutput on every
+	// log call) that are fine for taint-GATED confirmed rules but would flood the AI pass
+	// as untainted possibilities. (Confirmed taint findings for these still fire normally.)
+	possibilityDeny := map[string]bool{
+		"code.TrustBoundary": true, "code.LogOutput": true, "code.LogWrite": true,
+	}
 	var out []*findings.Finding
 	seen := map[string]bool{}
 	for _, c := range e.Onto.AllConcepts() {
@@ -54,6 +61,9 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 			continue
 		}
 		qn := c.QualifiedName()
+		if possibilityDeny[qn] {
+			continue
+		}
 		nodes, _ := e.Store.NodesWithConcept(qn)
 		for _, id := range nodes {
 			if covered[id] || seen[id] {
