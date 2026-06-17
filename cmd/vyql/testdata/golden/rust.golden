@@ -1,3 +1,4 @@
+call analysis.function.context
 call std.env.var
 call std.env.var.unwrap
 call std.process.Command.new

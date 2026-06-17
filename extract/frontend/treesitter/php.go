@@ -31,10 +31,7 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &phConv{src: src, root: root, file: rel}
 			body := c.block(tree.RootNode())
-			body = append(body, c.phpIncompleteServerPortValidation(tree.RootNode())...)
-			body = append(body, c.phpUnescapedSessionFlash(tree.RootNode())...)
-			body = append(body, c.phpUnscannedPdfPreview(tree.RootNode())...)
-			body = append(body, c.phpUnrestrictedVariableVariableAssignment(tree.RootNode())...)
+			body = append(body, c.phpModuleContext(tree.RootNode())...)
 			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -79,6 +76,7 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		prevFunc := c.funcName
 		c.funcName = name
 		body := c.block(field(n, "body"))
+		body = append(body, c.phpFunctionContext(n)...)
 		c.funcName = prevFunc
 		if n.Kind() == "method_declaration" && phpIsWPListTableColumn(name) && len(params) > 0 {
 			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
@@ -230,6 +228,46 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			Args: args, Path: "include", Method: "include", Loc: c.loc(inner)}}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+func (c *phConv) phpModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	return c.phpContextCall("analysis.module.context", c.loc(root), "module", "lang=php", c.text(root))
+}
+
+func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	name := c.text(field(fn, "name"))
+	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", "lang=php\x00name="+name, c.text(body))
+}
+
+func (c *phConv) phpContextCall(path, loc, method, prefix, text string) []nir.Stmt {
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: prefix},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: phpCompactText(text)},
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: method,
+		Loc:    loc,
+	}}}
+}
+
+func phpCompactText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // phpBranch flattens one if-branch body: a `{}` compound_statement, or a brace-less
@@ -425,229 +463,6 @@ func phpHasFrameworkParam(ptypes map[string]string) bool {
 
 func phpIsWPListTableColumn(name string) bool {
 	return name == "column_default" || strings.HasPrefix(name, "column_")
-}
-
-func (c *phConv) phpIncompleteServerPortValidation(root *tree_sitter.Node) []nir.Stmt {
-	full := c.text(root)
-	compact := strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, full)
-	if !strings.Contains(compact, "connect(") ||
-		!strings.Contains(compact, "is_numeric($port)") ||
-		!(strings.Contains(compact, "explode(\":\",SERVER") || strings.Contains(compact, "explode(':',SERVER")) ||
-		!(strings.Contains(compact, "$port<1024") || strings.Contains(compact, "1024>$port")) {
-		return nil
-	}
-	var out []nir.Stmt
-	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
-		if n == nil {
-			return
-		}
-		callText := strings.Map(func(r rune) rune {
-			if unicode.IsSpace(r) {
-				return -1
-			}
-			return r
-		}, c.text(n))
-		if n.Kind() == "function_call_expression" &&
-			c.dotted(field(n, "function")) == "is_numeric" &&
-			strings.Contains(callText, "is_numeric($port)") {
-			loc := c.loc(n)
-			if !seen[loc] {
-				seen[loc] = true
-				path := "security.php.server_port_validation.incomplete"
-				out = append(out, nir.ExprStmt{Value: nir.Call{
-					Callee: nir.Name{ID: path, Loc: loc},
-					Path:   path,
-					Method: lastSeg(path),
-					Loc:    loc,
-				}})
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch)
-		}
-	}
-	walk(root)
-	return out
-}
-
-func (c *phConv) phpUnescapedSessionFlash(root *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind() == "assignment_expression" {
-			left := c.text(field(n, "left"))
-			right := c.text(field(n, "right"))
-			if phpSessionFlashInfoWrite(left) &&
-				strings.Contains(right, "$") &&
-				!phpLooksHtmlEscaped(right) {
-				loc := c.loc(n)
-				if !seen[loc] {
-					seen[loc] = true
-					path := "security.php.session_flash.unescaped"
-					out = append(out, nir.ExprStmt{Value: nir.Call{
-						Callee: nir.Name{ID: path, Loc: loc},
-						Path:   path,
-						Method: lastSeg(path),
-						Loc:    loc,
-					}})
-				}
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch)
-		}
-	}
-	walk(root)
-	return out
-}
-
-func phpSessionFlashInfoWrite(left string) bool {
-	compact := strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, left)
-	return strings.Contains(compact, "$_SESSION['info']") ||
-		strings.Contains(compact, "$_SESSION[\"info\"]") ||
-		strings.Contains(compact, "$_SESSION['message']") ||
-		strings.Contains(compact, "$_SESSION[\"message\"]") ||
-		strings.Contains(compact, "$_SESSION['flash']") ||
-		strings.Contains(compact, "$_SESSION[\"flash\"]")
-}
-
-func phpLooksHtmlEscaped(s string) bool {
-	lower := strings.ToLower(s)
-	return strings.Contains(lower, "htmlspecialchars") ||
-		strings.Contains(lower, "htmlentities") ||
-		strings.Contains(lower, "esc_html") ||
-		strings.Contains(lower, "strip_tags")
-}
-
-func (c *phConv) phpUnscannedPdfPreview(root *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node, string)
-	walk = func(n *tree_sitter.Node, scope string) {
-		if n == nil {
-			return
-		}
-		if n.Kind() == "function_definition" || n.Kind() == "method_declaration" {
-			scope = c.text(n)
-		}
-		if n.Kind() == "object_creation_expression" {
-			text := c.text(n)
-			if strings.Contains(text, "StreamedResponse") &&
-				strings.Contains(strings.ToLower(text), "application/pdf") &&
-				!phpPdfScanGateBefore(scope, text) {
-				loc := c.loc(n)
-				if !seen[loc] {
-					seen[loc] = true
-					path := "security.php.pdf_preview.unscanned"
-					out = append(out, nir.ExprStmt{Value: nir.Call{
-						Callee: nir.Name{ID: path, Loc: loc},
-						Path:   path,
-						Method: lastSeg(path),
-						Loc:    loc,
-					}})
-				}
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch, scope)
-		}
-	}
-	walk(root, "")
-	return out
-}
-
-func phpPdfScanGateBefore(scope, objectText string) bool {
-	if scope == "" {
-		return false
-	}
-	idx := strings.Index(scope, objectText)
-	if idx < 0 {
-		idx = len(scope)
-	}
-	prefix := strings.ToLower(scope[:idx])
-	return strings.Contains(prefix, "getresponsebyscanstatus") ||
-		strings.Contains(prefix, "getscanstatus") ||
-		strings.Contains(prefix, "scan_pdf")
-}
-
-func (c *phConv) phpUnrestrictedVariableVariableAssignment(root *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind() == "foreach_statement" {
-			text := c.text(n)
-			if strings.Contains(text, "$_GET") &&
-				strings.Contains(text, "$$") &&
-				!phpVariableVariableKeyGuardBefore(text) {
-				loc := c.phpVariableVariableAssignLoc(n)
-				if !seen[loc] {
-					seen[loc] = true
-					path := "security.php.variable_variable.unrestricted"
-					out = append(out, nir.ExprStmt{Value: nir.Call{
-						Callee: nir.Name{ID: path, Loc: loc},
-						Path:   path,
-						Method: lastSeg(path),
-						Loc:    loc,
-					}})
-				}
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch)
-		}
-	}
-	walk(root)
-	return out
-}
-
-func phpVariableVariableKeyGuardBefore(foreachText string) bool {
-	idx := strings.Index(foreachText, "$$")
-	if idx < 0 {
-		return false
-	}
-	prefix := strings.ToLower(foreachText[:idx])
-	return strings.Contains(prefix, "preg_match") ||
-		strings.Contains(prefix, "in_array") ||
-		strings.Contains(prefix, "array_key_exists")
-}
-
-func (c *phConv) phpVariableVariableAssignLoc(n *tree_sitter.Node) string {
-	loc := c.loc(n)
-	var walk func(*tree_sitter.Node)
-	walk = func(cur *tree_sitter.Node) {
-		if cur == nil {
-			return
-		}
-		if cur.Kind() == "assignment_expression" && strings.Contains(c.text(cur), "$$") {
-			loc = c.loc(cur)
-			return
-		}
-		for _, ch := range namedChildren(cur) {
-			walk(ch)
-		}
-	}
-	walk(n)
-	return loc
 }
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —

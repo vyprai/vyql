@@ -100,8 +100,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
-		body = append(body, c.rsUnsafeMutableAliasCasts(n)...)
-		body = append(body, c.rsIncompleteIPv4DenylistChecks(n)...)
+		body = append(body, c.rsFunctionContext(n)...)
 		if handler {
 			var seed []nir.Stmt
 			for _, p := range params {
@@ -153,124 +152,30 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 }
 
-func (c *rsConv) rsIncompleteIPv4DenylistChecks(fn *tree_sitter.Node) []nir.Stmt {
+func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
 	}
-	type seenSet map[string]bool
-	byReceiver := map[string]seenSet{}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind() == "call_expression" {
-			path := c.dotted(field(n, "function"))
-			if recv, meth, ok := rustReceiverMethod(path); ok && rustIPv4DenylistMethod(meth) {
-				if byReceiver[recv] == nil {
-					byReceiver[recv] = seenSet{}
-				}
-				byReceiver[recv][meth] = true
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch)
-		}
-	}
-	walk(body)
-
-	var out []nir.Stmt
-	for _, seen := range byReceiver {
-		if !rustLooksLikeIPv4Denylist(seen) {
-			continue
-		}
-		var missing []string
-		for _, meth := range []string{"is_unspecified", "is_broadcast"} {
-			if !seen[meth] {
-				missing = append(missing, meth)
-			}
-		}
-		if len(missing) == 0 {
-			continue
-		}
-		path := "security.ipv4.denylist.incomplete." + strings.Join(missing, ".")
-		out = append(out, nir.ExprStmt{Value: nir.Call{
-			Callee: nir.Name{ID: path, Loc: c.loc(fn)},
-			Path:   path,
-			Method: lastSeg(path),
-			Loc:    c.loc(fn),
-		}})
-	}
-	return out
+	loc := c.loc(fn)
+	text := c.text(body)
+	path := "analysis.function.context"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=rust"},
+			nir.Const{Loc: loc, Value: "name=" + c.text(field(fn, "name"))},
+			nir.Const{Loc: loc, Value: text},
+			nir.Const{Loc: loc, Value: rustCompactText(text)},
+		},
+		Path:   path,
+		Method: "context",
+		Loc:    loc,
+	}}}
 }
 
-func rustReceiverMethod(path string) (string, string, bool) {
-	i := strings.LastIndex(path, ".")
-	if i <= 0 || i == len(path)-1 {
-		return "", "", false
-	}
-	return path[:i], path[i+1:], true
-}
-
-func rustIPv4DenylistMethod(meth string) bool {
-	switch meth {
-	case "is_private", "is_loopback", "is_link_local", "is_multicast", "is_documentation",
-		"is_unspecified", "is_broadcast":
-		return true
-	default:
-		return false
-	}
-}
-
-func rustLooksLikeIPv4Denylist(seen map[string]bool) bool {
-	core := 0
-	for _, meth := range []string{"is_private", "is_loopback", "is_link_local", "is_multicast", "is_documentation"} {
-		if seen[meth] {
-			core++
-		}
-	}
-	return core >= 3
-}
-
-func (c *rsConv) rsUnsafeMutableAliasCasts(fn *tree_sitter.Node) []nir.Stmt {
-	body := field(fn, "body")
-	if body == nil {
-		return nil
-	}
-	var out []nir.Stmt
-	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind() == "reference_expression" && rustUnsafeMutableAliasText(c.text(n)) {
-			loc := c.loc(n)
-			if !seen[loc] {
-				seen[loc] = true
-				path := "security.rust.unsafe.mutable_alias"
-				out = append(out, nir.ExprStmt{Value: nir.Call{
-					Callee: nir.Name{ID: path, Loc: loc},
-					Path:   path,
-					Method: lastSeg(path),
-					Loc:    loc,
-				}})
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch)
-		}
-	}
-	walk(body)
-	return out
-}
-
-func rustUnsafeMutableAliasText(s string) bool {
-	return strings.Contains(s, "&mut") &&
-		strings.Contains(s, "*") &&
-		strings.Contains(s, "as *const") &&
-		strings.Contains(s, "as *mut")
+func rustCompactText(s string) string {
+	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
 }
 
 func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {

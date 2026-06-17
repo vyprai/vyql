@@ -27,8 +27,14 @@ adapter php {
   source "getenv" val "REQUEST_" -> code.HttpInput
   source "getenv" val "REMOTE_ADDR" -> code.HttpInput
   source "getenv" val "PATH_INFO" -> code.HttpInput
-  mark "security.php.server_port_validation.incomplete" -> code.IncompleteServerPortValidation
-  mark "security.php.session_flash.unescaped" -> code.UnescapedSessionFlash
+  mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "$port<1024" -> code.IncompleteServerPortValidation
+  mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "1024>$port" -> code.IncompleteServerPortValidation
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION['info']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"info\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION['message']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"message\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION['flash']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"flash\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
   // Review-only access-policy config: nested PHP arrays such as
   // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]
   // carry key-path tokens, so broad role grants on sensitive resource groups can
@@ -264,8 +270,9 @@ adapter php {
   control "fclose" -> core.ResourceRelease
   // PDF previews can execute embedded script in-browser when streamed/rendered before
   // content scanning. Match only explicit PDF responses and suppress once a scan gate runs.
-  mark "security.php.pdf_preview.unscanned" -> code.UnscannedPdfPreview
-  mark "security.php.variable_variable.unrestricted" -> code.UnrestrictedVariableVariableAssignment
+  mark exact "analysis.function.context" val "lang=php" val "StreamedResponse" val "application/pdf" nval "getResponseByScanStatus" nval "getScanStatus" nval "scan_pdf" -> code.UnscannedPdfPreview
+  mark exact "analysis.module.context" val "lang=php" val "foreach" val "$_GET" val "$$" nval "preg_match" nval "in_array" nval "array_key_exists" -> code.UnrestrictedVariableVariableAssignment
+  mark exact "analysis.function.context" val "lang=php" val "foreach" val "$_GET" val "$$" nval "preg_match" nval "in_array" nval "array_key_exists" -> code.UnrestrictedVariableVariableAssignment
   control method "getScanStatus" -> core.PdfScanCheck
   control "getResponseByScanStatus" -> core.PdfScanCheck
 

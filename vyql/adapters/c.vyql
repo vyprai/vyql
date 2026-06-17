@@ -87,8 +87,8 @@ adapter c {
   sink path "realloc" arg 1 -> code.SizeComputation
   mark "alloca" -> code.StackAllocationSmell
   mark "__subscript" -> code.IndexAccess
-  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
-  mark "security.cpp.failure_path_owned_buffer_free" -> code.FailurePathOwnedBufferFree
+  mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
+  mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree

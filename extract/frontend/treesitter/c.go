@@ -66,7 +66,7 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext)}
 			body := c.decls(tree.RootNode())
-			body = append(body, c.ccFailurePathOwnedBufferFree(tree.RootNode())...)
+			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -88,7 +88,7 @@ var (
 	ccDeleteRe    = regexp.MustCompile(`delete\s*(?:\[\]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*;`)
 )
 
-func (c *ccConv) ccFailurePathOwnedBufferFree(root *tree_sitter.Node) []nir.Stmt {
+func (c *ccConv) ccLifetimeReleaseReturnObservations(root *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	seen := map[string]bool{}
 	var walk func(*tree_sitter.Node)
@@ -121,11 +121,16 @@ func (c *ccConv) ccFailurePathOwnedBufferFree(root *tree_sitter.Node) []nir.Stmt
 					continue
 				}
 				seen[loc] = true
-				path := "security.cpp.failure_path_owned_buffer_free"
+				path := "analysis.lifetime.release_then_return"
 				out = append(out, nir.ExprStmt{Value: nir.Call{
 					Callee: nir.Name{ID: path, Loc: loc},
+					Args: []nir.Expr{
+						nir.Const{Loc: loc, Value: "release=delete"},
+						nir.Const{Loc: loc, Value: "return=false"},
+						nir.Const{Loc: loc, Value: "storage=nonlocal"},
+					},
 					Path:   path,
-					Method: lastSeg(path),
+					Method: "release_then_return",
 					Loc:    loc,
 				}})
 			}
@@ -253,7 +258,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			Name:       c.declName(decl),
 			Params:     params,
 			ParamTypes: paramTypes,
-			Body:       append(c.block(field(n, "body")), c.ccUncheckedFieldIndexAccesses(n)...),
+			Body:       append(c.block(field(n, "body")), c.ccIndexAccessObservations(n)...),
 			Loc:        L,
 		}}
 	case "struct_specifier", "union_specifier", "enum_specifier":
@@ -749,7 +754,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	return nir.Seq{Parts: parts, Loc: L}
 }
 
-func (c *ccConv) ccUncheckedFieldIndexAccesses(fn *tree_sitter.Node) []nir.Stmt {
+func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
@@ -766,15 +771,24 @@ func (c *ccConv) ccUncheckedFieldIndexAccesses(fn *tree_sitter.Node) []nir.Stmt 
 			idx := field(n, "index")
 			idxText := c.text(idx)
 			compactIdx := compactCExprText(idxText)
-			if ccFieldDerivedIndex(idxText) && compactIdx != "" && !ccHasUpperBoundGuard(bodyText, compactIdx) {
+			if ccStructuredIndex(idxText) && compactIdx != "" {
 				loc := c.loc(n)
 				if !seen[loc] {
 					seen[loc] = true
-					path := "security.index.field_derived.unchecked"
+					guard := "guard=missing_upper_bound"
+					if ccHasUpperBoundGuard(bodyText, compactIdx) {
+						guard = "guard=upper_bound"
+					}
+					path := "analysis.index.access"
 					out = append(out, nir.ExprStmt{Value: nir.Call{
 						Callee: nir.Name{ID: path, Loc: loc},
+						Args: []nir.Expr{
+							nir.Const{Loc: loc, Value: "index_kind=field_derived"},
+							nir.Const{Loc: loc, Value: guard},
+							nir.Const{Loc: loc, Value: "index=" + compactIdx},
+						},
 						Path:   path,
-						Method: lastSeg(path),
+						Method: "access",
 						Loc:    loc,
 					}})
 				}
@@ -788,7 +802,7 @@ func (c *ccConv) ccUncheckedFieldIndexAccesses(fn *tree_sitter.Node) []nir.Stmt 
 	return out
 }
 
-func ccFieldDerivedIndex(s string) bool {
+func ccStructuredIndex(s string) bool {
 	return strings.Contains(s, "->") || strings.Contains(s, ".")
 }
 

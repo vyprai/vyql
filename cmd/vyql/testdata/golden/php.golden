@@ -1,1 +1,2 @@
+call analysis.module.context
 call mysqli_query

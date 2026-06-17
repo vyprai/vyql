@@ -72,8 +72,8 @@ adapter cpp {
   mark "curl_easy_setopt" val "CURLOPT_SSL_VERIFYPEER" val "0" -> code.CertValidationDisabled
   mark "setsslverify" val "false" -> code.CertValidationDisabled
   mark "__subscript" -> code.IndexAccess
-  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
-  mark "security.cpp.failure_path_owned_buffer_free" -> code.FailurePathOwnedBufferFree
+  mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
+  mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree
