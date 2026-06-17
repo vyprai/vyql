@@ -1,10 +1,11 @@
 // solidity framework adapter (docs/07) — smart-contract sinks/sources.
-// External/public function params are attacker-controllable (seeded http_input);
-// for to.call/to.transfer the RECEIVER address is modeled as arg0 (the danger).
+// For to.call/to.transfer the receiver address is modeled as arg0.
 adapter solidity {
   meta { fidelity: resolved }
 
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_visibility:public" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_visibility:external" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_visibility:implicit_public" -> code.HttpInput
   source "msg.data" -> code.HttpInput
   source "msg.value" -> code.HttpInput
 
