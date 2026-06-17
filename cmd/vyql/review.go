@@ -92,6 +92,12 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		expected: []string{"core.AuthorizationCheck"},
 		review:   "review workflow or status checks before this protected business action",
 	},
+	"code.IdorPolicyReview": {
+		category: "auth",
+		kind:     "attention",
+		expected: []string{"core.OwnershipCheck", "core.AuthorizationCheck"},
+		review:   "review object lookup or delete criteria for a current-principal ownership constraint",
+	},
 	"code.IncompleteIpDenylist": {
 		category: "request",
 		kind:     "attention",

@@ -344,6 +344,13 @@ concept WorkflowPolicyReview : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_841, CWE_862, CWE_863]
 }
+// Review-only: object lookup/update/delete criteria that identify a user-owned
+// record but omit the current-principal ownership constraint. Used for IDOR
+// patch-review cases without promoting broad authz heuristics to scan findings.
+concept IdorPolicyReview : sink {
+  vulnerable_to: [access_control.Idor]
+  cwe: [CWE_639]
+}
 // A network address denylist that recognizes special/private address classes but omits
 // ranges needed to keep SSRF fetches away from local or nonsensical endpoints.
 concept IncompleteIpDenylist : sink {

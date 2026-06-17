@@ -38,6 +38,10 @@ adapter php {
   // customer and product attribute but has no order.statuspayment term, surface it
   // for AI/manual review instead of emitting a confirmed scan finding.
   mark exact "__object_literal" val "order.customerid" val "order.product.attribute.id" nval "order.statuspayment" -> code.WorkflowPolicyReview
+  // Review-only IDOR policy: Aimeos review deletes must constrain the selected
+  // review ids by the current customer. Missing review.customerid is the
+  // CVE-2024-39319 pattern; the confirmed authz rule remains untouched.
+  mark exact "__object_literal" val "review.id" nval "review.customerid" -> code.IdorPolicyReview
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   sink path "mysqli_query" arg 1 -> code.SqlExecution

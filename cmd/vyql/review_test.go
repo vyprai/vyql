@@ -182,6 +182,22 @@ class Download {
   }
 }`
 
+const phpIdorPolicyReview = `<?php
+class Review {
+  public function vulnerable($ids) {
+    $filter = $this->manager->filter()->add(['review.id' => $ids]);
+    $this->manager->delete($this->manager->search($filter)->toArray());
+  }
+
+  public function fixed($ids) {
+    $filter = $this->manager->filter()->add([
+      'review.id' => $ids,
+      'review.customerid' => $this->context()->user(),
+    ]);
+    $this->manager->delete($this->manager->search($filter)->toArray());
+  }
+}`
+
 func TestCollectReviewItemsAuthCategory(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "Admin.java"), []byte(authReviewJava), 0o644); err != nil {
@@ -386,6 +402,25 @@ func TestCollectReviewItemsPhpWorkflowPolicyConfig(t *testing.T) {
 	}
 	if !hasReviewKind(rows, "auth", "attention", "code.WorkflowPolicyReview") {
 		t.Fatalf("expected auth attention item for workflow policy config, got %#v", rows)
+	}
+}
+
+func TestCollectReviewItemsPhpIdorPolicyConfig(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Review.php"), []byte(phpIdorPolicyReview), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if got := countReviewConcept(rows, "code.IdorPolicyReview"); got != 1 {
+		t.Fatalf("expected one IDOR policy review item, got %d: %#v", got, rows)
+	}
+	if !hasReviewKind(rows, "auth", "attention", "code.IdorPolicyReview") {
+		t.Fatalf("expected auth attention item for IDOR policy config, got %#v", rows)
 	}
 }
 
