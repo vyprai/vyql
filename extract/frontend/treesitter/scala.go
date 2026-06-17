@@ -317,7 +317,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		return c.expr(field(n, "function"))
 	case "instance_expression":
 		// `new Type(args)` — model as a constructor call so type/arg sinks and marks match
-		// (e.g. new java.io.File(p), new java.util.Random()). Grammar nests a call_expression
+		// (e.g. new pkg.Widget(p), new pkg.Builder()). Grammar nests a call_expression
 		// (type applied to arguments) or carries the type + arguments directly.
 		for _, ch := range namedChildren(n) {
 			if k := ch.Kind(); k == "call_expression" || k == "generic_function" {
@@ -326,7 +326,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		kids := namedChildren(n)
 		if len(kids) >= 1 {
-			// the type may be a stable_type_identifier (`java.io.File`) that c.dotted can't
+			// the type may be a stable_type_identifier (`pkg.Widget`) that c.dotted can't
 			// resolve (returns "?"); fall back to its source text for the constructor path.
 			path := c.dotted(kids[0])
 			if path == "" || path == "?" {

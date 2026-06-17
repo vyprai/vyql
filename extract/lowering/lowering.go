@@ -1994,16 +1994,16 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		l.flow(av, an)
 		args = append(args, an)
 		collectValTokens(a, "", &valToks)
-		// value-flow: fold a const-propped variable, an array-literal index (['sha1'][0]),
-		// or an object-literal property ({name:'md5'}.name) to its string so it value-matches
-		// like the inline literal — `getInstance(algo)`, `createHash(['sha1'][0])`, etc.
+		// value-flow: fold a const-propped variable, an array-literal index (['kind'][0]),
+		// or an object-literal property ({name:'mode'}.name) to its string so it value-matches
+		// like the inline literal — `factory(kind)`, `make(['kind'][0])`, etc.
 		if sv, ok := l.constStrVal(a, sc); ok {
 			valToks = append(valToks, sv)
 		}
 	}
 	// A bare call to a `from mod import sym` alias is matched by adapters under its
-	// resolved dotted path, so imported sinks/sanitizers (e.g. `escape` from
-	// `markupsafe.escape`, `system` from `os.system`) are recognized.
+	// resolved dotted path, so imported adapter targets (e.g. `normalize` from
+	// `pkg.normalize`, `run` from `runtime.run`) are recognized.
 	calleePath := call.Path
 	if l.resolveImports {
 		if nm, ok := call.Callee.(nir.Name); ok {
