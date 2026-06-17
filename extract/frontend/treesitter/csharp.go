@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tscs "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
 
@@ -9,10 +11,11 @@ import (
 
 // csConv walks a tree-sitter C# CST into NIR.
 type csConv struct {
-	src          []byte
-	file         string
-	key          string
-	inController bool // inside an MVC controller → action params are user input
+	src           []byte
+	file          string
+	key           string
+	inController  bool // inside an MVC controller → action params are user input
+	boundGetProps []string
 }
 
 var csHTTPAttrs = map[string]bool{
@@ -83,10 +86,14 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return c.decls(n) // flatten namespace / declaration-list bodies
 	case "class_declaration", "struct_declaration", "interface_declaration", "record_declaration", "enum_declaration":
 		prev := c.inController
+		prevBound := c.boundGetProps
 		c.inController = prev || c.isController(n)
-		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L,
-			Bases: c.classBases(n), Members: c.classMembers(field(n, "body"))}
+		bodyNode := field(n, "body")
+		c.boundGetProps = c.razorGetBoundProperties(bodyNode)
+		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(bodyNode), Loc: L,
+			Bases: c.classBases(n), Members: c.classMembers(bodyNode)}
 		c.inController = prev
+		c.boundGetProps = prevBound
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration", "local_function_statement", "operator_declaration":
 		params := c.params(field(n, "parameters"))
@@ -98,6 +105,17 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if n.Kind() == "method_declaration" && (c.inController || c.hasHTTPAttr(n)) {
 			var seed []nir.Stmt
 			for _, p := range params {
+				seed = append(seed, nir.Assign{Targets: []string{p},
+					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+			}
+			body = append(seed, body...)
+		}
+		// Razor Pages [BindProperty(SupportsGet = true)] properties are populated from the
+		// request query/route before handler methods run. Seed those member reads so page
+		// handlers like OnPostAsync can flow ReturnUrl into redirect sinks.
+		if n.Kind() == "method_declaration" && len(c.boundGetProps) > 0 {
+			var seed []nir.Stmt
+			for _, p := range c.boundGetProps {
 				seed = append(seed, nir.Assign{Targets: []string{p},
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
@@ -209,6 +227,27 @@ func (c *csConv) hasHTTPAttr(n *tree_sitter.Node) bool {
 		}
 	}
 	return false
+}
+
+func (c *csConv) razorGetBoundProperties(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	var out []string
+	for _, m := range namedChildren(body) {
+		if m.Kind() != "property_declaration" {
+			continue
+		}
+		txt := c.text(m)
+		if !strings.Contains(txt, "BindProperty") || !strings.Contains(txt, "SupportsGet") ||
+			!strings.Contains(strings.ToLower(txt), "true") {
+			continue
+		}
+		if nm := field(m, "name"); nm != nil {
+			out = append(out, c.text(nm))
+		}
+	}
+	return out
 }
 
 // isController reports whether a class is an MVC controller (by base type,

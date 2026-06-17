@@ -103,6 +103,14 @@ adapter csharp {
   // BTCPay ConfirmModel(title, description, action): the Description (arg 1) is rendered as
   // RAW HTML in the Confirm view, so an untrusted value interpolated into it is reflected XSS.
   sink path "ConfirmModel" arg 1 -> code.HtmlRender
+  // Open redirect: ASP.NET-style redirect APIs and ABP's single-argument RedirectSafelyAsync
+  // take a destination URL/path as arg0.
+  sink path "Response.Redirect" -> code.RedirectTarget
+  sink method "Redirect" -> code.RedirectTarget
+  sink method "RedirectPermanent" -> code.RedirectTarget
+  sink method "RedirectPreserveMethod" -> code.RedirectTarget
+  sink method "RedirectPermanentPreserveMethod" -> code.RedirectTarget
+  sink method "RedirectSafelyAsync" -> code.RedirectTarget
   // HTTP response splitting / header injection (CWE-113).
   sink path "Response.Headers.Add" arg 1 -> code.ResponseHeaderWrite
   sink path "Response.Headers.Append" arg 1 -> code.ResponseHeaderWrite
