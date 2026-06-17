@@ -1413,7 +1413,27 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		for _, a := range ex.Args {
 			collectValTokens(a, key, out)
 		}
+	case nir.Name:
+		// enum / named constant arg (QSslSocket::VerifyNone, SSL_VERIFY_NONE, DES,
+		// Algorithm.none). Value-matched marks/sinks key off these symbolic values, not
+		// just string literals, so capture the identifier for `val`/`nval` matching.
+		if ex.ID != "" {
+			*out = append(*out, ex.ID)
+			if key != "" {
+				*out = append(*out, key+"="+ex.ID)
+			}
+		}
 	case nir.Attr:
+		// a qualified constant like Foo::Bar / pkg.CONST — match on the dotted path and leaf.
+		if ex.Path != "" {
+			*out = append(*out, ex.Path)
+		}
+		if ex.Attr != "" {
+			*out = append(*out, ex.Attr)
+			if key != "" {
+				*out = append(*out, key+"="+ex.Attr)
+			}
+		}
 		collectValTokens(ex.Base, key, out)
 	case nir.Thru:
 		collectValTokens(ex.Inner, key, out)
