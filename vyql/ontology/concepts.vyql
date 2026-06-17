@@ -438,6 +438,10 @@ concept HtmlRender : sink {
   cwe: [CWE_79]
   dangerous_chars: "<>&\"'"
 }
+concept StoredHtmlWrite : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
 concept UnsafeEmbeddableAllowlist : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

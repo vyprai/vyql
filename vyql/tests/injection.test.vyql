@@ -909,6 +909,36 @@ test "php: non-request variable-variable assignment is not request XSS"
   }
   ```
 
+test "php: stored CMS HTML write without purifier is XSS-relevant"
+  lang php
+  expect VYQL-INJ-028
+  code
+  ```
+  <?php
+  foreach ($data as $entry) {
+      if (trim($this->val($entry, 'text.content', '')) === '') {
+          continue;
+      }
+      $refItem->fromArray($entry, true)->setType('content');
+  }
+  ```
+
+test "php: stored CMS HTML write after purifier is clean"
+  lang php
+  reject VYQL-INJ-028
+  code
+  ```
+  <?php
+  foreach ($data as $entry) {
+      if (!( $content = trim($this->val($entry, 'text.content', '')))) {
+          continue;
+      }
+      $purifier = new HTMLPurifier();
+      $entry['text.content'] = $purifier->purify($content);
+      $refItem->fromArray($entry, true)->setType('content');
+  }
+  ```
+
 test "javascript: environment value in webpack shell plugin script is command injection"
   lang javascript
   expect VYQL-INJ-002

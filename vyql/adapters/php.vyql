@@ -120,6 +120,9 @@ adapter php {
   sink path "Html.rawElement" arg 2 -> code.HtmlRender
   sink path "Html.element" arg 1 -> code.HtmlRender
   sink "wp.list_table.render" -> code.HtmlRender
+  // Stored CMS/page HTML writes. Aimeos text reference items are later rendered as page
+  // content, so writing editor-controlled HTML through the ref item must be sanitized.
+  mark "$refItem.fromArray" -> code.StoredHtmlWrite
 
   // server-side template injection (CWE-1336) — Twig compiles a STRING template
   sink method "createTemplate" -> code.TemplateRender
@@ -144,6 +147,7 @@ adapter php {
   control "wp_kses" -> core.HtmlEscape
   control "wp_kses_post" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape
+  control method "purify" -> core.HtmlEscape
   control "escapeshellarg" -> core.ShellEscape
   control "escapeshellcmd" -> core.ShellEscape
   control "mysqli_real_escape_string" -> core.SqlParameterization

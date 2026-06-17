@@ -67,6 +67,12 @@ rule UnrestrictedVariableVariableAssignment {
   match code.UnrestrictedVariableVariableAssignment as sink
 }
 
+rule StoredHtmlWriteRequiresSanitization {
+  meta { id: "VYQL-INJ-028", severity: high, cwe: [CWE_79], confidence_floor: low }
+  match code.StoredHtmlWrite as sink
+  unless guarded_by core.HtmlEscape
+}
+
 // Stored / second-order XSS — data read back from the database (assumed attacker-
 // influenced) rendered WITHOUT escaping (Markup/mark_safe/html_safe/raw). Auto-escaped
 // renders (render_template / Jinja default) are not sinks, so they don't fire. Medium

@@ -231,6 +231,59 @@ const vulnReplaceInsert = `function handler(req, res) {
 }
 `
 
+const vulnerablePhpStoredHtmlWrite = `<?php
+class Standard {
+  protected function fromArray($item, array $data) {
+    foreach ($data as $entry) {
+      if (trim($this->val($entry, 'text.content', '')) === '') {
+        continue;
+      }
+      $refItem->fromArray($entry, true)->setType('content');
+    }
+  }
+}`
+
+const fixedPhpStoredHtmlWrite = `<?php
+class Standard {
+  protected function fromArray($item, array $data) {
+    foreach ($data as $entry) {
+      if (!( $content = trim($this->val($entry, 'text.content', '')))) {
+        continue;
+      }
+      $purifier = new HTMLPurifier();
+      $entry['text.content'] = $purifier->purify($content);
+      $refItem->fromArray($entry, true)->setType('content');
+    }
+  }
+}`
+
+func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "vuln.php"), []byte(vulnerablePhpStoredHtmlWrite), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "fixed.php"), []byte(fixedPhpStoredHtmlWrite), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var stored []findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-INJ-028" {
+			stored = append(stored, *f)
+		}
+	}
+	if len(stored) != 1 {
+		t.Fatalf("expected one stored HTML write finding, got %d: %#v", len(stored), fs)
+	}
+	if !strings.Contains(stored[0].Bindings[0].Loc, "vuln.php") {
+		t.Fatalf("stored HTML write finding should be in vuln.php, got %#v", stored[0].Bindings)
+	}
+}
+
 func TestScanReplaceReplacementNotFiltered(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "x.js"), []byte(vulnReplaceInsert), 0o644); err != nil {
