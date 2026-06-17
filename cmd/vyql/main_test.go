@@ -225,6 +225,19 @@ def plain():
     return Response(value, mimetype="text/plain")
 `
 
+const pyPathlibParentsContainmentGuard = `from pathlib import Path
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+
+@router.get("/static-files/{path:path}/")
+async def serve_static_files(path):
+    root = "/app/ui/build"
+    static_file_name = "/".join((root, path))
+    if not Path(root) in Path(static_file_name).resolve().parents:
+        raise HTTPException(404)
+    return FileResponse(static_file_name)
+`
+
 func TestScanPythonInOperatorIdioms(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "files.py"), []byte(pyBlocklistGuard), 0o644); err != nil {
@@ -292,6 +305,23 @@ func TestScanPythonRouteReturnTextPlainResponse(t *testing.T) {
 	}
 	if len(xss) != 1 {
 		t.Fatalf("expected exactly one XSS finding for raw route return, not text/plain Response; got %d: %#v", len(xss), fs)
+	}
+}
+
+func TestScanPythonPathlibParentsContainmentGuard(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "static.py"), []byte(pyPathlibParentsContainmentGuard), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	for _, f := range fs {
+		if f.RuleID == "VYQL-PATH-001" || f.RuleID == "VYQL-INJ-004" {
+			t.Fatalf("pathlib parents containment and FileResponse route return should be clean, got %+v", f)
+		}
 	}
 }
 

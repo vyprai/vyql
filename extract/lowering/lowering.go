@@ -677,13 +677,21 @@ func (l *lowerer) routeReturnRawBody(id string) bool {
 	for _, safe := range []string{
 		"abort", "jsonify", "redirect", "render_template", "render_template_string",
 		"send_file", "send_from_directory", "url_for",
-		"Response", "HttpResponse", "make_response",
+		"FileResponse", "Response", "HttpResponse", "make_response",
 	} {
 		if method == safe || strings.HasSuffix(path, "."+safe) || path == safe {
 			return false
 		}
 	}
 	return true
+}
+
+func isPathResolveParents(expr nir.Expr) bool {
+	attr, ok := expr.(nir.Attr)
+	if !ok || attr.Attr != "parents" {
+		return false
+	}
+	return strings.HasSuffix(attr.Path, ".resolve.parents")
 }
 
 // Lower lowers a Program into a fresh in-memory USG. When resolveImports is
@@ -1464,6 +1472,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		l.flow(rightArg, n)
 		l.flow(left, n)
 		l.flow(right, n)
+		if ex.Op == "in" && isPathResolveParents(ex.Right) {
+			l.g.AddLabel(n, usg.Label{Concept: "core.PathAccessCheck",
+				Provenance: usg.Provenance{Adapter: "pathlib.parents", Fidelity: "semantic", Confidence: "high"}})
+		}
 		return n
 	case nir.Unary:
 		operand := l.eval(ex.Operand, sc)

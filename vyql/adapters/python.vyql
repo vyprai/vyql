@@ -330,7 +330,6 @@ adapter python {
   sink path "tarfile.open" -> code.FilePathAccess
   sink method "extract" -> code.ArchiveEntryWrite
   sink method "extractall" -> code.ArchiveEntryWrite
-  sink path "pathlib.Path" -> code.FilePathAccess
   // os.path predicates/normalizers fed a tainted path (CWE-22): the path is arg 0.
   sink path "os.path.exists" -> code.FilePathAccess
   sink path "os.path.isfile" -> code.FilePathAccess
