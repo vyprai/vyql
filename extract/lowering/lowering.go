@@ -664,11 +664,14 @@ func (l *lowerer) markPathContainment(call nir.Call, sc *scope) {
 	}
 }
 
-func (l *lowerer) functionReturn(id, loc string, decorators []string) {
-	if id == "" || len(decorators) == 0 {
+func (l *lowerer) contextualReturnEvent(id, loc string, contextTokens []string) {
+	if id == "" || len(contextTokens) == 0 {
 		return
 	}
-	valToks := append([]string{}, decorators...)
+	// This is intentionally domain-neutral: lowering only records that a value was
+	// returned from a function carrying frontend-provided context tokens. Adapters
+	// decide whether that event is a source, sink, control, review signal, or inert.
+	valToks := append([]string{}, contextTokens...)
 	n, ok, _ := l.g.GetNode(id)
 	if ok {
 		if loc == "" {
@@ -1357,7 +1360,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 		}
-		l.functionReturn(rv, "", l.curDecorators)
+		l.contextualReturnEvent(rv, "", l.curDecorators)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
 		if call, ok := st.Value.(nir.Call); ok {
