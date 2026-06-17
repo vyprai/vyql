@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -617,6 +618,60 @@ func TestScanPathsWiresSCA(t *testing.T) {
 			if strings.Contains(b.Loc, "requests") {
 				t.Errorf("trusted requests should not be flagged: %s @ %s", f.RuleID, b.Loc)
 			}
+		}
+	}
+}
+
+func TestScanPathsWiresGitSubmoduleSCA(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	dir := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runGit("init", "-q")
+	runGit("config", "user.email", "test@example.invalid")
+	runGit("config", "user.name", "VyQL Test")
+	if err := os.WriteFile(filepath.Join(dir, "app.py"), []byte("import aiohttp\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitmodules"), []byte(`[submodule "vendor/llhttp"]
+	path = vendor/llhttp
+	url = https://github.com/nodejs/llhttp.git
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", "app.py", ".gitmodules")
+	runGit("update-index", "--add", "--cacheinfo", "160000,69d6db2008508489d19267a0dcab30602b16fc5b,vendor/llhttp")
+	runGit("commit", "-q", "-m", "fixture")
+
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	byRule := map[string]int{}
+	for _, f := range fs {
+		byRule[f.RuleID]++
+	}
+	if byRule["VYQL-SCA-005"] == 0 {
+		t.Fatalf("expected HTTP request smuggling dependency finding for vulnerable llhttp gitlink, got %v", byRule)
+	}
+
+	runGit("update-index", "--add", "--cacheinfo", "160000,7e18596bae8f63692ded9d3250d5d984fe90dcfb,vendor/llhttp")
+	runGit("commit", "-q", "-m", "fixed")
+	fs, _, err = scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("fixed scan: %v", err)
+	}
+	for _, f := range fs {
+		if f.RuleID == "VYQL-SCA-005" {
+			t.Fatalf("patched llhttp gitlink should be clean, got %#v", f)
 		}
 	}
 }

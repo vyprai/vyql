@@ -22,6 +22,17 @@ func TestParseRequirements(t *testing.T) {
 	}
 }
 
+func TestParseGitmodules(t *testing.T) {
+	got := ParseGitmodules(`[submodule "vendor/llhttp"]
+	path = vendor/llhttp
+	url = https://github.com/nodejs/llhttp.git
+`, map[string]string{"vendor/llhttp": "69d6db2008508489d19267a0dcab30602b16fc5b"})
+	want := []Dep{{"github.com/nodejs/llhttp", "69d6db2008508489d19267a0dcab30602b16fc5b"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseGitmodules() = %+v, want %+v", got, want)
+	}
+}
+
 func hasConcept(t *testing.T, g usg.Store, concept string) []string {
 	ids, err := g.NodesWithConcept(concept)
 	if err != nil {

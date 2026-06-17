@@ -822,6 +822,7 @@ module sbom;
 
 concept ReachableSymbol : exposure { }
 concept VulnerableDependency : asset { }
+concept HttpRequestSmugglingDependency : asset { }
 // A dependency whose name typosquats a popular package, or an unreviewed version of a
 // package with malicious history (CWE-1357 reliance on an undesirable component).
 concept SuspiciousDependency : asset { }

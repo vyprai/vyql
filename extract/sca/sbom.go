@@ -79,6 +79,60 @@ func ParsePackageJSON(content string) []Dep {
 	return out
 }
 
+// ParseGitmodules turns git submodule pins into SBOM dependencies. .gitmodules carries
+// identity (path/url); the checked-out git tree carries the immutable gitlink commit.
+func ParseGitmodules(content string, commits map[string]string) []Dep {
+	var out []Dep
+	var path, url string
+	flush := func() {
+		if path == "" || url == "" {
+			return
+		}
+		commit := commits[path]
+		if commit == "" {
+			return
+		}
+		if name := normalizeGitURL(url); name != "" {
+			out = append(out, Dep{NormalizePackageName(name), commit})
+		}
+	}
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "[") {
+			flush()
+			path, url = "", ""
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		switch strings.TrimSpace(k) {
+		case "path":
+			path = strings.TrimSpace(v)
+		case "url":
+			url = strings.TrimSpace(v)
+		}
+	}
+	flush()
+	return out
+}
+
+func normalizeGitURL(url string) string {
+	url = strings.TrimSpace(strings.TrimSuffix(url, ".git"))
+	url = strings.TrimPrefix(url, "https://")
+	url = strings.TrimPrefix(url, "http://")
+	url = strings.TrimPrefix(url, "ssh://")
+	if strings.HasPrefix(url, "git@") {
+		url = strings.TrimPrefix(url, "git@")
+		url = strings.Replace(url, ":", "/", 1)
+	}
+	return url
+}
+
 // normalizeVersion strips an npm/semver range prefix (^ ~ >= <= > < =, whitespace) to a
 // bare version for exact advisory/malware/trusted matching; "*"/"" /"latest" -> "*".
 func normalizeVersion(v string) string {

@@ -13,8 +13,9 @@ import (
 
 // advisoryEntry is one vulnerable (version, advisory-id) for a package.
 type advisoryEntry struct {
-	Version string `json:"version"`
-	ID      string `json:"id"`
+	Version string   `json:"version"`
+	ID      string   `json:"id"`
+	CWE     []string `json:"cwe,omitempty"`
 }
 
 // scaData is the merged, parsed reference set, keyed by ecosystem ("pypi"/"npm").

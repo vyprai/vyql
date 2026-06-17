@@ -38,9 +38,16 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 		trusted := isTrusted(d, eco, name, version)
 
 		// 1. known-vulnerable version (CVE feed)
-		if adv := matchAdvisory(d, eco, name, version); adv != "" {
-			if e := label(g, nd.ID, "sbom.VulnerableDependency", map[string]string{"advisory": adv}); e != nil {
+		if adv, ok := matchAdvisory(d, eco, name, version); ok {
+			if e := label(g, nd.ID, "sbom.VulnerableDependency", map[string]string{"advisory": adv.ID}); e != nil {
 				return vuln, malicious, suspicious, e
+			}
+			for _, cwe := range adv.CWE {
+				if cwe == "CWE_444" || cwe == "CWE-444" {
+					if e := label(g, nd.ID, "sbom.HttpRequestSmugglingDependency", map[string]string{"advisory": adv.ID}); e != nil {
+						return vuln, malicious, suspicious, e
+					}
+				}
 			}
 			vuln++
 		}
@@ -85,11 +92,11 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 
 // matchAdvisory returns the advisory id if (name, version) is a known-vulnerable
 // release for the ecosystem, else "".
-func matchAdvisory(d *scaData, eco, name, version string) string {
+func matchAdvisory(d *scaData, eco, name, version string) (advisoryEntry, bool) {
 	for _, a := range d.advisories[eco][name] {
 		if a.Version == version || a.Version == "*" {
-			return a.ID
+			return a, true
 		}
 	}
-	return ""
+	return advisoryEntry{}, false
 }

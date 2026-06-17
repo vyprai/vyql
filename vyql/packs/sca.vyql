@@ -12,6 +12,11 @@ rule ReachableVulnerableDependency {
   where p has sbom.ReachableSymbol
 }
 
+rule HttpRequestSmugglingDependency {
+  meta { id: "VYQL-SCA-005", severity: high, cwe: [CWE_444] }
+  match sbom.HttpRequestSmugglingDependency as p
+}
+
 // A dependency name that typosquats a popular package, or an unreviewed version of a
 // package with malicious history — name-intelligence, not a CVE feed (CWE-1357).
 rule SuspiciousDependency {
