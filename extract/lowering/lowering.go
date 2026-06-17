@@ -664,6 +664,28 @@ func (l *lowerer) markPathContainment(call nir.Call, sc *scope) {
 	}
 }
 
+func (l *lowerer) routeReturnRawBody(id string) bool {
+	n, ok, _ := l.g.GetNode(id)
+	if !ok {
+		return false
+	}
+	if n.Type != "code.Call" {
+		return true
+	}
+	path := n.Prop("callee_path")
+	method := n.Prop("method")
+	for _, safe := range []string{
+		"abort", "jsonify", "redirect", "render_template", "render_template_string",
+		"send_file", "send_from_directory", "url_for",
+		"Response", "HttpResponse", "make_response",
+	} {
+		if method == safe || strings.HasSuffix(path, "."+safe) || path == safe {
+			return false
+		}
+	}
+	return true
+}
+
 // Lower lowers a Program into a fresh in-memory USG. When resolveImports is
 // false, calls resolve by SHORT NAME (the over-connecting baseline that case 16
 // contrasts against).
@@ -1231,15 +1253,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 		}
-		// reflected XSS: a route handler returning a freshly-built string (an f-string or
-		// concatenation) writes it straight to the response body unescaped. Only string-build
-		// nodes qualify — returning a template render / Response object / redirect (all Calls)
-		// is not a raw-string sink, so secure handlers that render templates stay clean.
-		if l.curRoute && rv != "" {
-			if n, ok, _ := l.g.GetNode(rv); ok && (n.Type == "code.Concat" || n.Type == "code.Format") {
-				l.g.AddLabel(rv, usg.Label{Concept: "code.HtmlRender",
-					Provenance: usg.Provenance{Adapter: "route.return", Fidelity: "syntactic", Confidence: "medium"}})
-			}
+		// Reflected/stored XSS: Flask route handlers that return a raw string send it as
+		// HTML by default. Framework response/template/redirect helpers are modeled by
+		// adapters instead, so only non-wrapper return values get this route-return sink.
+		if l.curRoute && rv != "" && l.routeReturnRawBody(rv) {
+			l.g.AddLabel(rv, usg.Label{Concept: "code.HtmlRender",
+				Provenance: usg.Provenance{Adapter: "route.return", Fidelity: "syntactic", Confidence: "medium"}})
 		}
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)

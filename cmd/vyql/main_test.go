@@ -210,6 +210,21 @@ def get_prompt(filename: str):
         return f.read()
 `
 
+const pyFlaskRouteReturnXSS = `from flask import Flask, Response, request
+
+app = Flask(__name__)
+
+@app.route("/raw")
+def raw():
+    value = request.args.get("x", "")
+    return value
+
+@app.route("/plain")
+def plain():
+    value = request.args.get("y", "")
+    return Response(value, mimetype="text/plain")
+`
+
 func TestScanPythonInOperatorIdioms(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "files.py"), []byte(pyBlocklistGuard), 0o644); err != nil {
@@ -256,6 +271,27 @@ func TestScanPythonPathlibRelativeToGuard(t *testing.T) {
 		if f.RuleID == "VYQL-PATH-001" {
 			t.Fatalf("pathlib resolve+relative_to containment should suppress path traversal finding: %+v", f)
 		}
+	}
+}
+
+func TestScanPythonRouteReturnTextPlainResponse(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "app.py"), []byte(pyFlaskRouteReturnXSS), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var xss []*findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-INJ-004" {
+			xss = append(xss, f)
+		}
+	}
+	if len(xss) != 1 {
+		t.Fatalf("expected exactly one XSS finding for raw route return, not text/plain Response; got %d: %#v", len(xss), fs)
 	}
 }
 
