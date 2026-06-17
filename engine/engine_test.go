@@ -8,10 +8,9 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// helper: build a store, compile a rule program, evaluate the single rule.
 func runRule(t *testing.T, src string, build func(s usg.Store)) ([]int, []CompileError) {
 	t.Helper()
-	onto := ontology.Seed()
+	onto := testOntology()
 	decls, err := parser.Parse(src)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
@@ -31,12 +30,62 @@ func runRule(t *testing.T, src string, build func(s usg.Store)) ([]int, []Compil
 	return counts, errs
 }
 
-const sqliRule = `
-package vypr.injection;
-rule Sql {
-  meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89] }
-  taint code.HttpInput -> code.SqlExecution
-  unless sanitized_by core.SqlParameterization
+func testOntology() *ontology.Ontology {
+	return addFlowConcepts(ontology.New())
+}
+
+func seededTestOntology() *ontology.Ontology {
+	return addFlowConcepts(ontology.Seed())
+}
+
+func addFlowConcepts(onto *ontology.Ontology) *ontology.Ontology {
+	onto.Add(ontology.Concept{
+		Name:    "ParentInput",
+		Package: "custom",
+		Kind:    "source",
+		Taint:   []string{"custom.Taint"},
+	})
+	onto.Add(ontology.Concept{
+		Name:    "Input",
+		Package: "custom",
+		Kind:    "source",
+		Taint:   []string{"custom.Taint"},
+		Refines: "custom.ParentInput",
+	})
+	onto.Add(ontology.Concept{
+		Name:         "Target",
+		Package:      "custom",
+		Kind:         "sink",
+		VulnerableTo: []string{"custom.Condition"},
+		EnabledBy:    []string{"custom.Taint"},
+	})
+	onto.Add(ontology.Concept{
+		Name:        "Transform",
+		Package:     "custom",
+		Kind:        "control",
+		Neutralizes: []string{"custom.Condition"},
+	})
+	onto.Add(ontology.Concept{
+		Name:        "AlternateTransform",
+		Package:     "custom",
+		Kind:        "control",
+		Neutralizes: []string{"custom.Condition"},
+	})
+	onto.Add(ontology.Concept{
+		Name:        "OtherTransform",
+		Package:     "custom",
+		Kind:        "control",
+		Neutralizes: []string{"custom.OtherCondition"},
+	})
+	return onto
+}
+
+const flowRule = `
+package test;
+rule Flow {
+  meta { id: "TEST-FLOW", severity: high }
+  taint custom.Input -> custom.Target
+  unless sanitized_by custom.Transform
 }
 `
 
@@ -76,55 +125,49 @@ func TestPossibilityFindingsUseConceptReviewData(t *testing.T) {
 	}
 }
 
-// Mirrors poc/cases/case_01 (universality) + case_03: a tainted source reaching
-// an unparameterized SQL sink is a finding.
 func TestTaintFindingAndSanitizer(t *testing.T) {
-	// vulnerable: HttpInput -> SqlExecution, no sanitizer -> 1 finding
-	counts, errs := runRule(t, sqliRule, func(s usg.Store) {
-		label(s, "in", "code.HttpInput")
-		label(s, "q", "code.SqlExecution")
+	counts, errs := runRule(t, flowRule, func(s usg.Store) {
+		label(s, "in", "custom.Input")
+		label(s, "q", "custom.Target")
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
 	})
 	if len(errs) != 0 {
 		t.Fatalf("unexpected compile errors: %v", errs)
 	}
 	if counts[0] != 1 {
-		t.Fatalf("vulnerable case: expected 1 finding, got %d", counts[0])
+		t.Fatalf("direct flow case: expected 1 finding, got %d", counts[0])
 	}
 
-	// sanitized: only path passes through SqlParameterization -> 0 findings
-	counts, _ = runRule(t, sqliRule, func(s usg.Store) {
-		label(s, "in", "code.HttpInput")
-		label(s, "p", "core.SqlParameterization")
-		label(s, "q", "code.SqlExecution")
+	counts, _ = runRule(t, flowRule, func(s usg.Store) {
+		label(s, "in", "custom.Input")
+		label(s, "p", "custom.Transform")
+		label(s, "q", "custom.Target")
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "p"})
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "p", Dst: "q"})
 	})
 	if counts[0] != 0 {
-		t.Fatalf("sanitized case: expected 0 findings, got %d", counts[0])
+		t.Fatalf("transformed case: expected 0 findings, got %d", counts[0])
 	}
 
-	// branch-around: tainted value flows around the sanitizer -> 1 finding
-	counts, _ = runRule(t, sqliRule, func(s usg.Store) {
-		label(s, "in", "code.HttpInput")
-		label(s, "p", "core.SqlParameterization")
-		label(s, "q", "code.SqlExecution")
+	counts, _ = runRule(t, flowRule, func(s usg.Store) {
+		label(s, "in", "custom.Input")
+		label(s, "p", "custom.Transform")
+		label(s, "q", "custom.Target")
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "p"})
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "p", Dst: "q"})
-		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"}) // bypass
+		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
 	})
 	if counts[0] != 1 {
-		t.Fatalf("branch-around case: expected 1 finding, got %d", counts[0])
+		t.Fatalf("alternate path case: expected 1 finding, got %d", counts[0])
 	}
 }
 
-// Mirrors poc/cases/case_02/03: a mistyped sanitizer is a COMPILE error.
 func TestMistypedSanitizerRejected(t *testing.T) {
 	src := `
 package bad;
-rule SqliWithHtmlEscape {
-  taint code.HttpInput -> code.SqlExecution
-  unless sanitized_by core.HtmlEscape
+rule MismatchedTransform {
+  taint custom.Input -> custom.Target
+  unless sanitized_by custom.OtherTransform
 }
 `
 	_, errs := runRule(t, src, func(s usg.Store) {})
@@ -136,11 +179,10 @@ rule SqliWithHtmlEscape {
 	}
 }
 
-// Wrong-role endpoint (sink as source) is a compile error.
 func TestWrongRoleEndpoint(t *testing.T) {
 	src := `
 package bad;
-rule Reversed { taint code.SqlExecution -> code.HttpInput }
+rule Reversed { taint custom.Target -> custom.Input }
 `
 	_, errs := runRule(t, src, func(s usg.Store) {})
 	if len(errs) != 1 || !contains(errs[0].Msg, "wrong role") {

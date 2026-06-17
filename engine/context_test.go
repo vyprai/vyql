@@ -9,9 +9,6 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// buildContextGraph mirrors case_10's graph(): the SAME code subgraph (in->q
-// SQLi) with optional cloud exposure (internet -> svc) and a PII database, so the
-// finding's cross-domain context changes with where the code is deployed.
 func buildContextGraph(exposed, pii bool) usg.Store {
 	s := usg.NewInMemStore()
 	s.AddNode(usg.Node{ID: "svc", Type: "cloud.Container", Props: map[string]string{"loc": "svc"}})
@@ -21,8 +18,8 @@ func buildContextGraph(exposed, pii bool) usg.Store {
 	}
 	s.AddNode(usg.Node{ID: "in", Type: "code.X", Props: map[string]string{"loc": "h.py:1"}})
 	s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "h.py:2", "service": "svc", "database": "db"}})
-	s.AddLabel("in", usg.Label{Concept: "code.HttpInput"})
-	s.AddLabel("q", usg.Label{Concept: "code.SqlExecution"})
+	s.AddLabel("in", usg.Label{Concept: "custom.Input"})
+	s.AddLabel("q", usg.Label{Concept: "custom.Target"})
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
 	if exposed {
 		s.AddNode(usg.Node{ID: "internet", Type: "cloud.Internet", Props: map[string]string{"loc": "0.0.0.0/0"}})
@@ -33,14 +30,9 @@ func buildContextGraph(exposed, pii bool) usg.Store {
 	return s
 }
 
-// Mirrors poc/cases/case_10_context.py — identical SQLi rule + identical code
-// subgraph, different cloud/asset context => different finding context. Exposure
-// (internet-reachable service) and asset (PII database) lines appear on the
-// finding only when the deployment warrants; otherwise the finding stands with
-// empty context (same vulnerability, lower priority).
 func TestCrossDomainContext(t *testing.T) {
-	onto := ontology.Seed()
-	decls, err := parser.Parse(sqliRule)
+	onto := seededTestOntology()
+	decls, err := parser.Parse(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -101,15 +93,14 @@ concept PublicEdgeObservation : observation {
   context_confirm_flag_value: yes
   context_confirm_label: "confirmed by public edge observation"
 }
-module code;
-concept Input : source { taint: [taint.UntrustedData] }
-concept Sink : sink { vulnerable_to: [injection.SqlInjection] }
+concept Input : source { taint: [custom.Taint] }
+concept Target : sink { vulnerable_to: [custom.Condition] }
 module t;
 rule Flow {
-  taint code.Input -> code.Sink
+  taint custom.Input -> custom.Target
 }
 `
-	onto := ontology.Seed()
+	onto := ontology.New()
 	cs, err := ontology.LoadConceptText(src)
 	if err != nil {
 		t.Fatalf("load concepts: %v", err)
@@ -127,9 +118,9 @@ rule Flow {
 	s.AddLabel("edge", usg.Label{Concept: "custom.PublicEdge"})
 	s.AddNode(usg.Node{ID: "svc", Type: "runtime.Service"})
 	s.AddNode(usg.Node{ID: "in", Type: "code.Call", Props: map[string]string{"loc": "h:1"}})
-	s.AddLabel("in", usg.Label{Concept: "code.Input"})
+	s.AddLabel("in", usg.Label{Concept: "custom.Input"})
 	s.AddNode(usg.Node{ID: "sink", Type: "code.Call", Props: map[string]string{"loc": "h:2", "service": "svc"}})
-	s.AddLabel("sink", usg.Label{Concept: "code.Sink"})
+	s.AddLabel("sink", usg.Label{Concept: "custom.Target"})
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "sink"})
 	s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "svc", Props: map[string]string{"rule": "edge-rule", "proto": "tcp", "port": "443"}})
 	s.AddNode(usg.Node{ID: "obs", Type: "custom.Observation", Props: map[string]string{"target": "svc", "observed": "yes"}})

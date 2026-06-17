@@ -86,8 +86,8 @@ rule WorkloadDrift {
 // predicted internet exposure that is OBSERVED in the runtime snapshot is
 // "confirmed", and the risk layer escalates the finding's priority band.
 func TestRuntimeConfirmationEscalatesRisk(t *testing.T) {
-	onto := ontology.Seed()
-	decls, _ := parser.Parse(sqliRule)
+	onto := seededTestOntology()
+	decls, _ := parser.Parse(flowRule)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -98,8 +98,8 @@ func TestRuntimeConfirmationEscalatesRisk(t *testing.T) {
 		s.AddNode(usg.Node{ID: "svc", Type: "cloud.Container", Props: map[string]string{"loc": "svc"}})
 		s.AddNode(usg.Node{ID: "in", Type: "code.X", Props: map[string]string{"loc": "h.py:1"}})
 		s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "h.py:2", "service": "svc"}})
-		s.AddLabel("in", usg.Label{Concept: "code.HttpInput"})
-		s.AddLabel("q", usg.Label{Concept: "code.SqlExecution"})
+		s.AddLabel("in", usg.Label{Concept: "custom.Input"})
+		s.AddLabel("q", usg.Label{Concept: "custom.Target"})
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
 		s.AddNode(usg.Node{ID: "internet", Type: "cloud.Internet", Props: map[string]string{"loc": "0.0.0.0/0"}})
 		s.AddLabel("internet", usg.Label{Concept: "cloud.Internet"})
