@@ -40,9 +40,34 @@ const accumuloPermissionReviewJava = `class MasterClientServiceHandler {
   }
 }`
 
+const accurevReviewJava = `class DescriptorImpl {
+  FormValidation doFillCredentialsIdItems(String credentialsId) {
+    if (!Jenkins.getInstance().hasPermission(Jenkins.ADMINISTER)) {
+      return FormValidation.ok();
+    }
+    return FormValidation.ok();
+  }
+
+  FormValidation doTest(String name, String host, int port, String credentialsId) {
+    AccurevServer server = new AccurevServer("", name, host);
+    server.setCredentialsId(credentialsId);
+    if (Login.accurevLoginFromGlobalConfig(server)) {
+      return FormValidation.ok("SUCCESS");
+    }
+    return FormValidation.error("FAILURE");
+  }
+}`
+
 const authReviewC = `int run_post_create(char *path);
 int perform_http_xact(char *messagebuf_data) {
   return run_post_create(messagebuf_data);
+}`
+
+const memoryAttentionC = `struct bar { unsigned long addr; unsigned long size; };
+struct dev { struct bar bar[8]; };
+int pci_emul_mem_handler(struct dev *pdi, unsigned long addr, int size, long arg2) {
+  int bidx = (int) arg2;
+  return addr + size <= pdi->bar[bidx].addr + pdi->bar[bidx].size;
 }`
 
 func TestCollectReviewItemsAuthCategory(t *testing.T) {
@@ -100,6 +125,25 @@ func TestCollectReviewItemsAccumuloPermissionChecks(t *testing.T) {
 	}
 }
 
+func TestCollectReviewItemsAccurevCredentialTest(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AccurevSCM.java"), []byte(accurevReviewJava), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if !hasReviewCall(rows, "Jenkins.getInstance.hasPermission", "core.AuthorizationCheck") {
+		t.Fatalf("expected Jenkins hasPermission authorization review item, got %#v", rows)
+	}
+	if !hasReviewCall(rows, "Login.accurevLoginFromGlobalConfig", "code.SensitiveOperation") {
+		t.Fatalf("expected AccuRev global-config login review target, got %#v", rows)
+	}
+}
+
 func TestCollectReviewItemsCPostCreate(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "abrt-server.c"), []byte(authReviewC), 0o644); err != nil {
@@ -119,9 +163,37 @@ func TestCollectReviewItemsCPostCreate(t *testing.T) {
 	}
 }
 
+func TestCollectReviewItemsMemoryAttention(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "core.c"), []byte(memoryAttentionC), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if !hasReviewKind(rows, "memory", "attention", "code.IndexAccess") {
+		t.Fatalf("expected memory attention item for index access, got %#v", rows)
+	}
+	if !hasReviewKind(rows, "memory", "attention", "code.IntegerSizeArithmetic") {
+		t.Fatalf("expected memory attention item for integer/address arithmetic, got %#v", rows)
+	}
+}
+
 func hasReviewCall(rows []reviewItem, call, concept string) bool {
 	for _, r := range rows {
 		if r.Call == call && r.Concept == concept {
+			return true
+		}
+	}
+	return false
+}
+
+func hasReviewKind(rows []reviewItem, category, kind, concept string) bool {
+	for _, r := range rows {
+		if r.Category == category && r.Kind == kind && r.Concept == concept {
 			return true
 		}
 	}

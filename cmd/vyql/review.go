@@ -121,19 +121,70 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		expected: []string{"core.XmlHardening"},
 		review:   "verify parser factory hardening disables dangerous XML features",
 	},
+	"code.UnboundedCopy": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review copy bounds and whether attacker-controlled data can reach the copied length or source",
+	},
+	"code.UnboundedCopySmell": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review unbounded string copy usage and surrounding length constraints",
+	},
+	"code.RawMemoryCopySize": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review raw memory copy size calculations and bounds checks",
+	},
+	"code.SizeComputation": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review allocation or size computation for overflow and untrusted dimensions",
+	},
+	"code.StackAllocationSmell": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review stack allocation size and whether it is bounded",
+	},
+	"code.IndexAccess": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review index/subscript access and the dominating bounds checks",
+	},
+	"code.IntegerSizeArithmetic": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review integer arithmetic used for address, size, or bounds calculations",
+	},
+	"code.PointerFree": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review pointer lifetime: frees, aliases, and later uses",
+	},
+	"code.PointerUse": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review pointer use and whether lifetime/initialization is guaranteed",
+	},
+	"code.NullableDeref": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review dereference and nearby null checks",
+	},
 }
 
 func cmdReview(args []string) error {
 	fs := flag.NewFlagSet("review", flag.ExitOnError)
 	format := fs.String("format", "text", "output format: text | json")
 	profileName := fs.String("profile", "auto", "threat-model profile")
-	category := fs.String("category", "all", "category filter: all | auth | request | crypto | resource | permission | concurrency | xml")
+	category := fs.String("category", "all", "category filter: all | auth | request | crypto | resource | permission | concurrency | xml | memory")
+	loc := fs.String("loc", "", "location substring filter, e.g. core.c:422")
 	checksOnly := fs.Bool("checks", false, "show only check/control sites")
 	targetsOnly := fs.Bool("targets", false, "show only review targets")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql review [-format text|json] [-category all|auth|request|crypto|resource|permission|concurrency|xml] [-checks|-targets] <path>...")
+		return fmt.Errorf("usage: vyql review [-format text|json] [-category all|auth|request|crypto|resource|permission|concurrency|xml|memory] [-loc SUBSTR] [-checks|-targets] <path>...")
 	}
 	if *checksOnly && *targetsOnly {
 		return fmt.Errorf("-checks and -targets are mutually exclusive")
@@ -152,6 +203,15 @@ func cmdReview(args []string) error {
 		filtered := rows[:0]
 		for _, r := range rows {
 			if r.Category == *category {
+				filtered = append(filtered, r)
+			}
+		}
+		rows = filtered
+	}
+	if *loc != "" {
+		filtered := rows[:0]
+		for _, r := range rows {
+			if strings.Contains(r.Loc, *loc) {
 				filtered = append(filtered, r)
 			}
 		}

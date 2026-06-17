@@ -633,10 +633,6 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
-		if op == "+" {
-			// C++ string concat with + builds tainted strings; treat as Format.
-			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
-		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {

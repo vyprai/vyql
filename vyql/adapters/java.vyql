@@ -171,6 +171,10 @@ adapter java {
   control "hasPermission" -> core.AuthorizationCheck
   control "hasAuthority" -> core.AuthorizationCheck
   control "hasRole" -> core.AuthorizationCheck
+  control method "hasPermission" -> core.AuthorizationCheck
+  control method "hasAuthority" -> core.AuthorizationCheck
+  control method "hasRole" -> core.AuthorizationCheck
+  mark "Login.accurevLoginFromGlobalConfig" -> code.SensitiveOperation
   // Accumulo-style permission gates: review-only context for authz CVEs where the bug is
   // an ignored/unenforced boolean result rather than taint reaching a sink.
   control method "canFlush" -> core.AuthorizationCheck
