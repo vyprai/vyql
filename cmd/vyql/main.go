@@ -234,6 +234,12 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 		}
 		all = append(all, got...)
 	}
+	// Possibility mode (opt-in, for the AI/triage pass): surface every dangerous-concept
+	// site the confirmed rules did not flag, as low-confidence "possibility" findings. OFF
+	// by default so the protected benchmarks are unaffected.
+	if os.Getenv("VYQL_POSSIBILITY") != "" {
+		all = append(all, eng.PossibilityFindings(all)...)
+	}
 	tk.mark("evaluate")
 	return all, stats, nil
 }

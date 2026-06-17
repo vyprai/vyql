@@ -21,7 +21,7 @@ func New(onto *ontology.Ontology, store usg.Store) *Engine {
 	return &Engine{Onto: onto, Store: store}
 }
 
-var confOrder = map[string]int{"low": 1, "medium": 2, "high": 3}
+var confOrder = map[string]int{"possibility": 0, "low": 1, "medium": 2, "high": 3}
 
 // Evaluate runs a compiled rule, returning deduplicated findings filtered by the
 // rule's confidence floor.
@@ -31,6 +31,56 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 		return nil, err
 	}
 	return e.applyConfidenceFloor(cr, dedup(fs)), nil
+}
+
+// PossibilityFindings emits low-confidence "possibility" findings for the AI/triage pass:
+// one per dangerous-concept node (any sink in the ontology) that the confirmed rules did
+// NOT already report. The idea — "if VyQL can't prove exploitability, surface the site as a
+// possibility and let a later AI pass decide" — trades precision for recall. Each carries an
+// exploit condition describing what to verify, and confidence "possibility" (below "low"),
+// so it is OFF by default and never affects the protected benchmarks; the AI-pass pipeline
+// opts in. `confirmed` is the set of findings already produced by the normal rules.
+func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.Finding {
+	covered := map[string]bool{}
+	for _, f := range confirmed {
+		for _, b := range f.Bindings {
+			covered[b.NodeID] = true
+		}
+	}
+	var out []*findings.Finding
+	seen := map[string]bool{}
+	for _, c := range e.Onto.AllConcepts() {
+		if c.Kind != "sink" || len(c.VulnerableTo) == 0 {
+			continue
+		}
+		qn := c.QualifiedName()
+		nodes, _ := e.Store.NodesWithConcept(qn)
+		for _, id := range nodes {
+			if covered[id] || seen[id] {
+				continue
+			}
+			seen[id] = true
+			threat := c.VulnerableTo[0]
+			cwe := ""
+			if len(c.CWE) > 0 {
+				cwe = c.CWE[0]
+			}
+			out = append(out, &findings.Finding{
+				RuleID:      "VYQL-POSS-" + c.Name,
+				Severity:    "info",
+				Confidence:  "possibility",
+				WitnessKind: "possibility",
+				Bindings:    []findings.Binding{{Name: "sink", NodeID: id, Concept: qn, Loc: e.loc(id)}},
+				ExploitConditions: []findings.ExploitCondition{{
+					Category:   threat,
+					Condition:  "a " + c.Name + " sink (" + threat + ", " + cwe + ") with no proven sanitized untrusted-input flow — verify whether attacker-controlled data can reach it",
+					Assumption: "exploitable only if untrusted input reaches this site unsanitized",
+					Confidence: "possibility",
+				}},
+			})
+		}
+	}
+	return out
 }
 
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
