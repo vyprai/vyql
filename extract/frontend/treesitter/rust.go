@@ -106,7 +106,14 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+		exported := handler // `pub fn` is the public API; trait methods are public too
+		for _, ch := range children(n) {
+			if ch.Kind() == "visibility_modifier" {
+				exported = true
+				break
+			}
+		}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: exported}}
 	case "impl_item", "mod_item", "trait_item":
 		return c.decls(field(n, "body"))
 	case "struct_item", "enum_item", "use_declaration", "const_item", "static_item":

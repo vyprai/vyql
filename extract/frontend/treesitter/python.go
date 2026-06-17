@@ -261,7 +261,9 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if strings.HasPrefix(name, "resolve_") {
 			body = append(c.seedResolverParams(params, L), body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, IsValidator: c.hasValidatorComment(n)}}
+		// public API = no leading underscore, OR a dunder (__init__/__call__ are entry points).
+		exported := !strings.HasPrefix(name, "_") || (strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__"))
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, IsValidator: c.hasValidatorComment(n), Exported: exported}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -288,7 +290,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				seed = append(seed, nir.Assign{Targets: []string{p},
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
-			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, ParamTypes: paramTypes, Body: append(seed, body...), Loc: L, IsRoute: true}}
+			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, ParamTypes: paramTypes, Body: append(seed, body...), Loc: L, IsRoute: true, Exported: true}}
 		}
 		return c.stmt(def)
 	case "class_definition":

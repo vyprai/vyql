@@ -447,6 +447,33 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
+		conf := e.conf(fl.SourceID, fl.SinkID)
+		exploit := e.exploitConditions(fl.SinkID, snkC)
+		if srcC == "code.ExternalEntryInput" {
+			// Library/SDK trust boundary: the source is a public-API parameter, not a proven
+			// untrusted input. The flow is real, but exploitability depends on whether a CALLER
+			// forwards attacker-controlled data here — which can't be decided from the library
+			// alone. Emit it as caller-conditional (capped confidence) so a later triage/AI phase
+			// assesses exploitability against actual usage, rather than asserting it.
+			n, _, _ := e.Store.GetNode(fl.SourceID)
+			param := ""
+			if n.ID != "" {
+				param = n.Prop("name")
+			}
+			cond := "a caller forwards attacker-controlled data into the public-API parameter"
+			if param != "" {
+				cond += " '" + param + "'"
+			}
+			exploit = append(exploit, findings.ExploitCondition{
+				Category:   "caller-controlled-input",
+				Condition:  cond,
+				Assumption: "the library is invoked with untrusted input at this entry point",
+				Confidence: "medium",
+			})
+			if confOrder[conf] > confOrder["medium"] {
+				conf = "medium" // caller-dependent: never assert high confidence from a param source
+			}
+		}
 		f := &findings.Finding{
 			RuleID:   e.ruleID(cr),
 			Severity: cr.Severity,
@@ -458,9 +485,9 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			PathLocs:          e.pathLocs(fl.Path),
 			WitnessKind:       "taint",
 			NegationEvidence:  ne,
-			Confidence:        e.conf(fl.SourceID, fl.SinkID),
+			Confidence:        conf,
 			Context:           e.crossDomainContext(fl.SinkID),
-			ExploitConditions: e.exploitConditions(fl.SinkID, snkC),
+			ExploitConditions: exploit,
 		}
 		if idx, seen := bySink[fl.SinkID]; seen {
 			// same sink already reported for this rule — keep whichever source gives the

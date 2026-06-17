@@ -4,8 +4,9 @@ adapter javascript {
   meta { fidelity: resolved }
 
   source "process.argv" -> code.CliArgument
-  // Public JS package APIs: callers can pass attacker-controlled values into exported funcs.
-  source "public_api_input" -> core.UserControlledData
+  // Public-API params are now handled by the cross-language library param-source
+  // (FuncDef.Exported -> code.ExternalEntryInput, library-profile-gated, caller-conditional;
+  // see adapters/library.vyql). The old ungated public_api_input seed was retired.
   // Library option bags are caller-controlled under the library profile. These option
   // fields have appeared in code-generation CVEs where the public API reaches an internal
   // compiler callback through a cache/helper the analyzer cannot inline.

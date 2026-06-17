@@ -9,6 +9,7 @@ import (
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
+	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
@@ -41,6 +42,7 @@ type vyqlSpec struct {
 	lang     string
 	expect   []string
 	reject   []string
+	profile  string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
 	files    []specFile // one or more code blocks (multi-file specs supported)
 	graphSrc string     // a `graph` block: an asset/identity graph (mutually exclusive with code)
 	src      string     // source spec filename (for messages)
@@ -113,6 +115,8 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			cur = &vyqlSpec{name: strings.Trim(rest, `"`), src: rel, line: i + 1}
 		case "lang":
 			cur.lang = rest
+		case "profile":
+			cur.profile = rest
 		case "expect":
 			cur.expect = append(cur.expect, rest)
 		case "reject":
@@ -213,6 +217,12 @@ func TestVyqlSpecs(t *testing.T) {
 						if err := os.WriteFile(filepath.Join(dir, name), []byte(fl.code), 0o644); err != nil {
 							t.Fatal(err)
 						}
+					}
+					// optional `profile` directive: set the trust boundary (e.g. library) so
+					// profile-gated sources like ExternalEntryInput are active for this spec.
+					if s.profile != "" {
+						applyProfile([]string{dir}, s.profile)
+						defer frontend.SetActiveSources(nil)
 					}
 					found, _, err := scanPaths([]string{dir}, rules)
 					if err != nil {

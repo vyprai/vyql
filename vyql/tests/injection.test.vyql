@@ -272,6 +272,7 @@ test "js: _.merge with a constant source is clean"
 
 test "js: tainted dynamic object key is prototype pollution"
   lang javascript
+  profile library
   expect VYQL-INJ-013
   code
   ```
@@ -284,6 +285,7 @@ test "js: tainted dynamic object key is prototype pollution"
 
 test "js: taint enters function-expression assigned to a variable"
   lang javascript
+  profile library
   expect VYQL-INJ-013
   code
   ```
@@ -631,6 +633,7 @@ test "javascript: encoded error message sent as HTML is clean"
 
 test "javascript: generate-function builder receives tainted source"
   lang javascript
+  profile library
   expect VYQL-INJ-003
   code
   ```

@@ -1211,8 +1211,13 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 				return nil
 			}
 			ids, _ := s.NodesOfType("code.Param")
-			out := make([]adapters.Mapping, 0, len(ids)*len(active))
+			out := make([]adapters.Mapping, 0, len(active))
 			for _, id := range ids {
+				n, ok, _ := s.GetNode(id)
+				if !ok || n.Prop("exported") != "true" {
+					continue // only PUBLIC-API params are entry points; internal helpers are
+					// reached by ordinary interprocedural propagation (precision).
+				}
 				for _, c := range active {
 					out = append(out, adapters.Mapping{NodeID: id, Concept: c, Specificity: 0})
 				}

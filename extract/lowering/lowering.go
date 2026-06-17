@@ -804,6 +804,10 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		if typ := st.ParamTypes[p]; typ != "" {
 			props["decl_type"] = typ
 		}
+		if st.Exported {
+			// public-API parameter: a library entry point (see ParamSourceAdapter).
+			props["exported"] = "true"
+		}
 		params[p] = l.nodeWithID(sigID(ns, rel, "param", p), "Param", st.Loc, props)
 		order = append(order, p)
 	}

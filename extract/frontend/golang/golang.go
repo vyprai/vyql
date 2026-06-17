@@ -218,7 +218,7 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 			if fn.Body != nil {
 				body = c.stmts(fn.Body.List)
 			}
-			out = append(out, nir.FuncDef{Name: fn.Name.Name, Params: params, ParamTypes: paramTypes, Body: body, Loc: c.loc(fn.Pos())})
+			out = append(out, nir.FuncDef{Name: fn.Name.Name, Params: params, ParamTypes: paramTypes, Body: body, Loc: c.loc(fn.Pos()), Exported: fn.Name.IsExported()})
 		}
 	}
 	return out
@@ -304,7 +304,19 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 				}
 			}
 			if len(outs) > 0 {
-				return nir.Assign{Targets: outs, Value: c.expr(st.X)}
+				// taint-JOIN, not a redefinition: `x = combine(x, call)`. A plain `x = call`
+				// would SHADOW any taint x already had, so f(&taintedVar) would clear it
+				// (false negative). The join adds the call's taint AND preserves x's.
+				callExpr := c.expr(st.X)
+				var stmts []nir.Stmt
+				for _, o := range outs {
+					stmts = append(stmts, nir.Assign{Targets: []string{o},
+						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: o, Loc: c.loc(st.Pos())}, callExpr}, Loc: c.loc(st.Pos())}})
+				}
+				if len(stmts) == 1 {
+					return stmts[0]
+				}
+				return nir.Block{Stmts: stmts}
 			}
 		}
 		return nir.ExprStmt{Value: c.expr(st.X)}

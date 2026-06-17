@@ -188,6 +188,12 @@ type FuncDef struct {
 	// treated as validated (clears the trust-boundary threat), so storing it across a
 	// trust boundary is legitimate.
 	IsValidator bool
+	// Exported marks a function/method as part of the PUBLIC API surface (per the
+	// language's visibility rules: Go capitalization, `pub`, `public`, `export`, no
+	// leading underscore, …). The library/SDK archetype treats exported-function
+	// parameters as an external-entry taint source; internal helpers are reached by
+	// ordinary interprocedural propagation, so they must NOT be entry points.
+	Exported bool
 }
 
 // ClassDef is a class definition.

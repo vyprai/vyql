@@ -67,6 +67,22 @@ func (c *jvConv) hasHandlerAnn(n *tree_sitter.Node) bool {
 	return found
 }
 
+// javaPublic reports whether a method/constructor is part of the public API surface:
+// it carries a `public` modifier (package-private/private/protected are not the API a
+// library exposes to arbitrary callers). Used to scope the library param-source.
+func (c *jvConv) javaPublic(n *tree_sitter.Node) bool {
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "modifiers" {
+			t := c.text(ch)
+			if strings.Contains(t, "private") || strings.Contains(t, "protected") {
+				return false
+			}
+			return strings.Contains(t, "public")
+		}
+	}
+	return false
+}
+
 // ExtractJava parses Java files into one NIR Program (one module per file, keyed
 // by source-root-relative dotted path).
 func ExtractJava(files []string, root string) (nir.Program, error) {
@@ -172,7 +188,8 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
+			Exported: c.inController || c.hasHandlerAnn(n) || c.javaPublic(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
 		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution
