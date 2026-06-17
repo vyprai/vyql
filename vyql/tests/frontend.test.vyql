@@ -75,6 +75,36 @@ test "clean: a constant innerHTML assignment"
   el.innerHTML = "<b>welcome</b>";
   ```
 
+test "DOM-XSS: data-original-title tooltip text -> innerHTML"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  function getTextHeight(text) {
+    const tag = document.createElement('div');
+    tag.innerHTML = text;
+  }
+  function isTitleEllipsized(node) {
+    const title = node.dataset.originalTitle;
+    getTextHeight(title);
+  }
+  ```
+
+test "clean: data-original-title tooltip text -> innerText"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  function getTextHeight(text) {
+    const tag = document.createElement('div');
+    tag.innerText = text;
+  }
+  function isTitleEllipsized(node) {
+    const title = node.dataset.originalTitle;
+    getTextHeight(title);
+  }
+  ```
+
 test "clean: a same-origin constant redirect"
   lang javascript
   reject VYQL-RF-002

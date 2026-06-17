@@ -76,6 +76,10 @@ adapter javascript {
   source method "data" -> code.DomInput
   // Browser UI helper option bags can be populated from attacker-controlled markup/URLs.
   source "opt.title" -> code.DomInput
+  // Tooltip title metadata is copied from attacker-controlled DOM attributes in common
+  // Bootstrap-style helpers, then often measured/rendered through HTML sinks.
+  source method "originalTitle" -> code.DomInput
+  source method "tooltipTitle" -> code.DomInput
   // Parsed browser XML/HTML often comes from network responses; values extracted from it
   // are attacker-controlled unless independently verified.
   source method "parseFromString" -> core.UserControlledData
