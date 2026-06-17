@@ -5,6 +5,6 @@
 profile library {
   title: "Library / SDK"
   detect: ["file:setup.py", "file:pyproject.toml", "npm:library",
-           "dep:rollup", "dep:tsup"]
+           "dep:rollup", "dep:tsup", "manifest:library"]
   entrypoints: [UserControlledData, ExternalEntryInput, DomInput, ExternalApiResponse, HttpInput, DatabaseRead, SecretValue]
 }

@@ -120,6 +120,10 @@ func Detect(paths []string, profiles []Profile) Profile {
 					// incidental docs/demo frontend files inside the same repository.
 					score += 2
 				}
+			case "manifest":
+				if val == "library" && manifestLibrary(paths) {
+					score += 2 // a non-npm/python ecosystem library manifest (gem/crate/composer/pod)
+				}
 			case "ext":
 				if exts[strings.ToLower(val)] {
 					score++
@@ -131,6 +135,51 @@ func Detect(paths []string, profiles []Profile) Profile {
 		}
 	}
 	return best
+}
+
+// manifestLibrary reports whether the project is a library/SDK in a non-npm/python
+// ecosystem, by its PUBLISH manifest: a *.gemspec (Ruby gem), *.podspec (CocoaPods),
+// Cargo.toml with a [lib] target (Rust crate lib), or composer.json with "type":"library"
+// (PHP). These are unambiguous library signals (apps don't ship them), so they won't flip
+// applications — and the OWASP ports have none of them.
+func manifestLibrary(paths []string) bool {
+	for _, root := range roots(paths) {
+		found := false
+		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil || found {
+				return nil
+			}
+			if d.IsDir() {
+				if path != root && (d.Name() == "node_modules" || d.Name() == "vendor" || strings.HasPrefix(d.Name(), ".")) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			name := d.Name()
+			switch {
+			case strings.HasSuffix(name, ".gemspec"), strings.HasSuffix(name, ".podspec"):
+				found = true
+			case name == "Cargo.toml":
+				if data, err := os.ReadFile(path); err == nil && strings.Contains(string(data), "[lib]") {
+					found = true
+				}
+			case name == "composer.json":
+				if data, err := os.ReadFile(path); err == nil {
+					var pkg struct {
+						Type string `json:"type"`
+					}
+					if json.Unmarshal(data, &pkg) == nil && pkg.Type == "library" {
+						found = true // explicit only — absent type is ambiguous (PHP apps omit it)
+					}
+				}
+			}
+			return nil
+		})
+		if found {
+			return true
+		}
+	}
+	return false
 }
 
 func depMatch(manifests, dep string) bool {
