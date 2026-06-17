@@ -153,7 +153,17 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	// branch-structured (B1); Cond nil (C# did not evaluate the predicate) -> byte-identical.
 	case "if_statement":
 		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.csBranch(field(n, "consequence")), Else: c.csBranch(field(n, "alternative"))}}
-	case "while_statement", "for_statement", "for_each_statement", "foreach_statement", "do_statement":
+	case "for_each_statement", "foreach_statement":
+		// `foreach (var p in coll) { … }` — bind the loop variable to the collection so it
+		// inherits the collection's element taint (the var/collection were dropped before,
+		// so element taint never reached the body).
+		body := c.collectBlocks(n)
+		if lv, coll := field(n, "left"), field(n, "right"); lv != nil && coll != nil {
+			bind := nir.Assign{Targets: []string{c.text(lv)}, Value: nir.Format{Parts: []nir.Expr{c.expr(coll)}, Loc: L}}
+			body = append([]nir.Stmt{bind}, body...)
+		}
+		return []nir.Stmt{nir.Loop{Body: body}}
+	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement", "using_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
