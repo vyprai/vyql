@@ -88,6 +88,7 @@ adapter c {
   mark "alloca" -> code.StackAllocationSmell
   mark "__subscript" -> code.IndexAccess
   mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
+  mark "security.cpp.failure_path_owned_buffer_free" -> code.FailurePathOwnedBufferFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree

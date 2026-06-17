@@ -258,6 +258,10 @@ concept UnsafeMutableAlias : sink {
   vulnerable_to: [memory.OobWrite, memory.UseAfterFree]
   cwe: [CWE_787, CWE_416]
 }
+concept FailurePathOwnedBufferFree : sink {
+  vulnerable_to: [memory.DoubleFree]
+  cwe: [CWE_415]
+}
 concept SizeComputation : sink {
   vulnerable_to: [memory.IntegerOverflow]
   enabled_by: [taint.UntrustedData]

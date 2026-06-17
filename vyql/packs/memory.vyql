@@ -52,3 +52,8 @@ rule PotentialFieldDerivedIndexAccess {
   meta { id: "VYQL-MEM-010", severity: medium, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: low }
   match code.FieldDerivedIndexAccess as idx
 }
+
+rule FailurePathOwnedBufferFree {
+  meta { id: "VYQL-MEM-011", severity: high, cwe: [CWE_415], confidence_floor: low }
+  match code.FailurePathOwnedBufferFree as free
+}

@@ -92,3 +92,36 @@ test "memory: repeated free is reported as potential double-free (c)"
       free(p);
   }
   ```
+
+test "memory: C++ owned buffer freed on failure path is double-free relevant"
+  lang cpp
+  expect VYQL-MEM-011
+  code
+  ```
+  class Player {
+    unsigned char *song_data;
+    bool load(bool ok, int n) {
+      song_data = new unsigned char[n];
+      if (!ok) {
+        delete[] song_data;
+        return false;
+      }
+      return true;
+    }
+  };
+  ```
+
+test "memory: C++ local temporary freed on failure path is clean"
+  lang cpp
+  reject VYQL-MEM-011
+  code
+  ```
+  bool load(bool ok, int n) {
+    unsigned char *tmp = new unsigned char[n];
+    if (!ok) {
+      delete[] tmp;
+      return false;
+    }
+    return true;
+  }
+  ```

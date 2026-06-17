@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"regexp"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -64,7 +65,9 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext)}
-			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+			body := c.decls(tree.RootNode())
+			body = append(body, c.ccFailurePathOwnedBufferFree(tree.RootNode())...)
+			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
@@ -78,6 +81,87 @@ func (c *ccConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+var (
+	ccNewAssignRe = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\b`)
+	ccDeleteRe    = regexp.MustCompile(`delete\s*(?:\[\]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*;`)
+)
+
+func (c *ccConv) ccFailurePathOwnedBufferFree(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "function_definition" {
+			text := c.text(n)
+			allocated := map[string]bool{}
+			for _, m := range ccNewAssignRe.FindAllStringSubmatch(text, -1) {
+				if len(m) == 2 && !ccFunctionDeclaresLocal(text, m[1]) {
+					allocated[m[1]] = true
+				}
+			}
+			for _, m := range ccDeleteRe.FindAllStringSubmatchIndex(text, -1) {
+				if len(m) < 4 {
+					continue
+				}
+				name := text[m[2]:m[3]]
+				if !allocated[name] {
+					continue
+				}
+				after := strings.ToLower(text[m[1]:minInt(len(text), m[1]+160)])
+				if !strings.Contains(after, "return(false)") && !strings.Contains(after, "return false") {
+					continue
+				}
+				loc := c.locAt(n, text, m[0])
+				if seen[loc] {
+					continue
+				}
+				seen[loc] = true
+				path := "security.cpp.failure_path_owned_buffer_free"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Path:   path,
+					Method: lastSeg(path),
+					Loc:    loc,
+				}})
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func ccFunctionDeclaresLocal(fnText, name string) bool {
+	for _, line := range strings.Split(fnText, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, name) || !strings.Contains(line, "=") {
+			continue
+		}
+		if strings.Contains(line, "* "+name) || strings.Contains(line, "*"+name) ||
+			strings.Contains(line, "& "+name) || strings.Contains(line, "&"+name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *ccConv) locAt(fn *tree_sitter.Node, fnText string, offset int) string {
+	line := int(fn.StartPosition().Row) + 1 + strings.Count(fnText[:offset], "\n")
+	return c.file + ":" + itoa(line)
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (c *ccConv) decls(n *tree_sitter.Node) []nir.Stmt {
