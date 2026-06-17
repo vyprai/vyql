@@ -337,8 +337,6 @@ adapter python {
   sink path "os.path.isdir" -> code.FilePathAccess
   sink path "os.path.islink" -> code.FilePathAccess
   sink path "os.path.getsize" -> code.FilePathAccess
-  sink path "os.path.abspath" -> code.FilePathAccess
-  sink path "os.path.realpath" -> code.FilePathAccess
   sink path "os.stat" -> code.FilePathAccess
   sink path "os.lstat" -> code.FilePathAccess
   sink path "os.scandir" -> code.FilePathAccess
@@ -434,6 +432,9 @@ adapter python {
   control "yaml.safe_load" -> core.SafeDeserialization
   control "ldap.filter.escape_filter_chars" -> core.LdapEscape
   control "ldap3.utils.conv.escape_filter_chars" -> core.LdapEscape
+  // Boundary check for realpath/common workspace guards: `resolved.startswith(base + os.sep)`
+  // requires a path separator after the base, unlike plain prefix checks.
+  control method "startswith" val "os.sep" -> core.PathAccessCheck
 
   // UNSOUND neutralizers (`assume`) — never suppress; emit an assumption note. The dominant
   // Python OWASP idiom is the `if '<bad>' in tainted:` substring blocklist, recognized
