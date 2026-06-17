@@ -12,12 +12,12 @@ adapter auditreview {
   meta { fidelity: syntactic, cross_language: true }
 
   // --- privileged / destructive operations (authz review) ---
-  mark method "delete" -> code.SensitiveOperation
-  mark method "destroy" -> code.SensitiveOperation
-  mark method "remove" -> code.SensitiveOperation
-  mark method "drop" -> code.SensitiveOperation
-  mark method "truncate" -> code.SensitiveOperation
+  // NOTE: bare delete/remove/destroy/drop omitted — too generic (match every collection
+  // method AND the JS `delete` operator). Keep specific destructive + privileged verbs.
   mark method "deleteById" -> code.SensitiveOperation
+  mark method "deleteAll" -> code.SensitiveOperation
+  mark method "dropTable" -> code.SensitiveOperation
+  mark method "truncateTable" -> code.SensitiveOperation
   mark method "deleteUser" -> code.SensitiveOperation
   mark method "grant" -> code.SensitiveOperation
   mark method "revoke" -> code.SensitiveOperation
