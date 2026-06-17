@@ -21,6 +21,7 @@ adapter go {
   type "support.NewSession" -> session.Store
   type "csv.NewWriter" -> csv.Writer
 
+  source "http_input" -> code.HttpInput  // seeded on *http.Request params
   source "os.Args" -> code.CliArgument
   source "os.Getenv" -> code.EnvVariable
   source "flag.Arg" -> code.CliArgument

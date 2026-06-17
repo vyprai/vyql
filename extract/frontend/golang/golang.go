@@ -218,10 +218,89 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 			if fn.Body != nil {
 				body = c.stmts(fn.Body.List)
 			}
+			// A function taking an *http.Request receives attacker-controlled request data
+			// (route/query/body/headers). Seed each such param as an http_input source at the
+			// top of the body — symmetric with the Java/C# handler-param seeding — so request
+			// data carried via the raw request object (custom helpers, not just recognized
+			// accessor methods) is tainted.
+			var seed []nir.Stmt
+			for _, p := range params {
+				if paramTypes[p] == "http.Request" {
+					seed = append(seed, nir.Assign{Targets: []string{p},
+						Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: c.loc(fn.Pos())}, Path: "http_input", Method: "http_input", Loc: c.loc(fn.Pos())}})
+				}
+			}
+			if len(seed) > 0 {
+				body = append(seed, body...)
+			}
 			out = append(out, nir.FuncDef{Name: fn.Name.Name, Params: params, ParamTypes: paramTypes, Body: body, Loc: c.loc(fn.Pos()), Exported: fn.Name.IsExported()})
 		}
 	}
 	return out
+}
+
+// callOutParams returns the identifiers a call writes THROUGH as out-parameters:
+// every `&x` address-of arg (`json.Unmarshal(b,&v)`, `c.Bind(&form)`), plus — when the
+// callee name is a bind/parse verb — every plain-identifier arg (`parseForm(r, form)`).
+// These are the destination variables a request is decoded into.
+func (c *conv) callOutParams(call *ast.CallExpr) []string {
+	var outs []string
+	for _, a := range call.Args {
+		if u, ok := a.(*ast.UnaryExpr); ok && u.Op == token.AND {
+			if id, ok := u.X.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
+				outs = append(outs, id.Name)
+			}
+		}
+	}
+	if isBindName(calleeName(call.Fun)) {
+		for _, a := range call.Args {
+			if id, ok := a.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
+				outs = append(outs, id.Name)
+			}
+		}
+	}
+	return outs
+}
+
+// outParamJoins emits `o = combine(o, call)` for each out-param o. It is a taint-JOIN,
+// not a redefinition: a plain `o = call` would SHADOW any taint o already had, so
+// f(&taintedVar) would clear it (false negative). The join adds the call's taint AND
+// preserves o's.
+func outParamJoins(outs []string, callExpr nir.Expr, loc string) []nir.Stmt {
+	var stmts []nir.Stmt
+	for _, o := range outs {
+		stmts = append(stmts, nir.Assign{Targets: []string{o},
+			Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: o, Loc: loc}, callExpr}, Loc: loc}})
+	}
+	return stmts
+}
+
+// calleeName returns the last identifier of a call's function expression
+// (`pkg.parseForm` → "parseForm", `parseForm` → "parseForm").
+func calleeName(fun ast.Expr) string {
+	switch f := fun.(type) {
+	case *ast.Ident:
+		return f.Name
+	case *ast.SelectorExpr:
+		return f.Sel.Name
+	}
+	return ""
+}
+
+// isBindName reports whether a function name reads external/request data into a
+// destination argument (a custom bind/parse/decode helper). Scoped to these verbs
+// so the no-`&` out-param treatment stays precise.
+func isBindName(name string) bool {
+	if name == "" {
+		return false
+	}
+	low := strings.ToLower(name)
+	for _, p := range []string{"parse", "decode", "unmarshal", "bind", "scan", "populate", "deserialize", "readinto", "readbody"} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *conv) typeName(e ast.Expr) string {
@@ -283,7 +362,18 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 			}
 		}
 		if len(st.Rhs) == 1 {
-			return nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0])}
+			assign := nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0])}
+			// `err := bind(&v)` / `err := parseForm(r, form)`: the result goes to err, but the
+			// call also writes through its out-param destinations — taint those too. The
+			// dominant idiom is `if err := decode(...); err != nil`, an AssignStmt (the ExprStmt
+			// path below only covers the discarded-result form).
+			if call, ok := st.Rhs[0].(*ast.CallExpr); ok {
+				if outs := c.callOutParams(call); len(outs) > 0 {
+					stmts := append([]nir.Stmt{assign}, outParamJoins(outs, c.expr(st.Rhs[0]), c.loc(st.Pos()))...)
+					return nir.Block{Stmts: stmts}
+				}
+			}
+			return assign
 		}
 		// parallel assignment: pair element-wise where possible
 		blk := nir.Block{}
@@ -306,28 +396,13 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		// the struct the request is decoded into — the dominant web-handler
 		// pattern — instead of the (discarded) error return.
 		if call, ok := st.X.(*ast.CallExpr); ok {
-			var outs []string
-			for _, a := range call.Args {
-				if u, ok := a.(*ast.UnaryExpr); ok && u.Op == token.AND {
-					if id, ok := u.X.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
-						outs = append(outs, id.Name)
-					}
-				}
-			}
-			if len(outs) > 0 {
-				// taint-JOIN, not a redefinition: `x = combine(x, call)`. A plain `x = call`
-				// would SHADOW any taint x already had, so f(&taintedVar) would clear it
-				// (false negative). The join adds the call's taint AND preserves x's.
+			if outs := c.callOutParams(call); len(outs) > 0 {
 				callExpr := c.expr(st.X)
-				var stmts []nir.Stmt
-				for _, o := range outs {
-					stmts = append(stmts, nir.Assign{Targets: []string{o},
-						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: o, Loc: c.loc(st.Pos())}, callExpr}, Loc: c.loc(st.Pos())}})
-				}
-				if len(stmts) == 1 {
+				if stmts := outParamJoins(outs, callExpr, c.loc(st.Pos())); len(stmts) == 1 {
 					return stmts[0]
+				} else {
+					return nir.Block{Stmts: stmts}
 				}
-				return nir.Block{Stmts: stmts}
 			}
 		}
 		return nir.ExprStmt{Value: c.expr(st.X)}
