@@ -8,8 +8,14 @@ adapter rust {
   source "env.var" -> code.EnvVariable
   source "env.vars" -> code.EnvVariable
   source "env.args" -> code.CliArgument
-  // web handler params (actix/axum/rocket) seeded by the frontend
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:get" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:post" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:put" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:delete" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:patch" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:head" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:route" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:handler" -> code.HttpInput
 
   // command execution — Command::new(prog) + .arg(x)/.args(x)
   sink path "Command.new" -> code.CommandExecution

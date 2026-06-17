@@ -22,12 +22,6 @@ var rsFormatMacros = map[string]bool{
 	"eprint": true, "write": true, "writeln": true, "panic": true, "format_args": true,
 }
 
-// rsHandlerAttrs mark a function as a web request handler (actix/rocket/axum).
-var rsHandlerAttrs = map[string]bool{
-	"get": true, "post": true, "put": true, "delete": true, "patch": true,
-	"head": true, "route": true, "handler": true,
-}
-
 // ExtractRust parses Rust files into one NIR Program (one module per file).
 func ExtractRust(files []string, root string) (nir.Program, error) {
 	mods := parseModules(files, root,
@@ -54,46 +48,54 @@ func (c *rsConv) text(n *tree_sitter.Node) string {
 	return string(c.src[n.StartByte():n.EndByte()])
 }
 
-// decls walks a list, tracking a preceding attribute_item so request-handler
-// functions can seed their params as sources.
+// decls walks a list, tracking preceding attribute_item syntax for the next item.
 func (c *rsConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	handler := false
+	var attrs []string
 	for _, ch := range namedChildren(n) {
 		if ch.Kind() == "attribute_item" {
-			handler = handler || c.isHandlerAttr(ch)
+			attrs = append(attrs, c.rsAttrTokens(ch)...)
 			continue
 		}
-		out = append(out, c.stmtH(ch, handler)...)
-		handler = false
+		out = append(out, c.stmtH(ch, attrs)...)
+		attrs = nil
 	}
 	return out
 }
 
-func (c *rsConv) isHandlerAttr(n *tree_sitter.Node) bool {
-	// #[get("/..")] → attribute_item > attribute > identifier "get"
-	var name string
+func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		if m.Kind() == "attribute" {
 			for _, ch := range namedChildren(m) {
 				if ch.Kind() == "identifier" || ch.Kind() == "scoped_identifier" {
-					name = lastSeg(c.dotted(ch))
-					return
+					path := c.dotted(ch)
+					add("attr_path:" + path)
+					add("attr_name:" + lastSeg(path))
 				}
 			}
+			return
 		}
 		for _, ch := range namedChildren(m) {
 			walk(ch)
 		}
 	}
 	walk(n)
-	return rsHandlerAttrs[name]
+	return out
 }
 
-func (c *rsConv) stmt(n *tree_sitter.Node) []nir.Stmt { return c.stmtH(n, false) }
+func (c *rsConv) stmt(n *tree_sitter.Node) []nir.Stmt { return c.stmtH(n, nil) }
 
-func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
+func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "function_item":
@@ -101,22 +103,14 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		body = append(body, c.rsFunctionContext(n)...)
-		if handler {
-			var seed []nir.Stmt
-			for _, p := range params {
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-			}
-			body = append(seed, body...)
-		}
-		exported := handler // `pub fn` is the public API; trait methods are public too
+		exported := false
 		for _, ch := range children(n) {
 			if ch.Kind() == "visibility_modifier" {
 				exported = true
 				break
 			}
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: exported}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
 	case "impl_item", "mod_item", "trait_item":
 		return c.decls(field(n, "body"))
 	case "struct_item", "enum_item", "use_declaration", "const_item", "static_item":
@@ -150,6 +144,19 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 	}
 	// a bare tail expression (block value) still matters for taint
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *rsConv) rsParamEntries(name string, params []string, attrs []string) []nir.ParamEntry {
+	if len(params) == 0 || len(attrs) == 0 {
+		return nil
+	}
+	var out []nir.ParamEntry
+	for i, p := range params {
+		tokens := append([]string{}, attrs...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return out
 }
 
 func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
