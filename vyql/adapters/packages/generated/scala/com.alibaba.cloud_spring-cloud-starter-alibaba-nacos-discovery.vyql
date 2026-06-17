@@ -1,0 +1,9 @@
+import code.{SecretValue}
+adapter scala {
+  package "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery" {
+    source method "getSecretKey" -> code.SecretValue
+    source method "setSecretKey" -> code.SecretValue
+    source method "getPassword" -> code.SecretValue
+    source method "setPassword" -> code.SecretValue
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization, NosqlQuery}
+
+adapter perl {
+  package "Attean" {
+    sink method "parse" -> code.Deserialization
+    sink method "query" -> code.NosqlQuery
+  }
+}

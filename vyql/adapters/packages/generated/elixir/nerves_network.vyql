@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter elixir {
+  package "nerves_network" {
+    sink path "Nerves.Network.udhcpc_wrapper.execv" -> code.CommandExecution
+    sink path "Nerves.Network.Resolvconf.write_resolvconf" -> code.FilePathAccess
+  }
+}

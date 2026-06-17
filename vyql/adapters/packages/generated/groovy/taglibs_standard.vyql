@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter groovy {
+  package "taglibs:standard" {
+    sink method "addSQLParameter" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,10 @@
+import code.{Deserialization}
+adapter java {
+  package "javax.json:javax.json-api" {
+    sink method "read" -> code.Deserialization
+    sink method "readObject" -> code.Deserialization
+    sink method "readArray" -> code.Deserialization
+    sink method "readValue" -> code.Deserialization
+    sink method "createParser" -> code.Deserialization
+  }
+}

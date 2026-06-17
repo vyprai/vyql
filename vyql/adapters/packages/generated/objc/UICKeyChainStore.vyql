@@ -1,0 +1,20 @@
+import code.{SecretValue}
+adapter objc {
+  package "UICKeyChainStore" {
+    source method "stringForKey" -> code.SecretValue
+    source method "dataForKey" -> code.SecretValue
+    source method "objectForKeyedSubscript" -> code.SecretValue
+    source method "sharedPasswordWithCompletion" -> code.SecretValue
+    source method "sharedPasswordForAccount" -> code.SecretValue
+    source method "requestSharedWebCredentialWithCompletion" -> code.SecretValue
+    source method "requestSharedWebCredentialForDomain" -> code.SecretValue
+
+    source method "setString" -> code.SecretValue
+    source method "setData" -> code.SecretValue
+    source method "setObject:forKeyedSubscript" -> code.SecretValue
+    source method "removeItemForKey" -> code.SecretValue
+    source method "generatePassword" -> code.SecretValue
+    source method "setSharedPassword" -> code.SecretValue
+    source method "removeSharedPasswordForAccount" -> code.SecretValue
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter ruby {
+  package "jwt" {
+    sink method "decode" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

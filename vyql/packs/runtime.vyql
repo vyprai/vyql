@@ -1,5 +1,5 @@
 // Runtime — rules over a pre-aggregated runtime snapshot (docs/11 Part B).
-package vypr.runtime;
+module vypr.runtime;
 
 rule CryptoMiningEgress {
   meta { id: "VYQL-RTM-001", severity: high }

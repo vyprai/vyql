@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter java {
+  package "org.mortbay.jetty:jetty-util" {
+    sink method "parse" -> code.Deserialization
+    sink method "delete" -> code.FilePathAccess
+  }
+}

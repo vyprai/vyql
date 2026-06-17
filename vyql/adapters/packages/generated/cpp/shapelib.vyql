@@ -1,0 +1,10 @@
+import code.{FilePathAccess}
+adapter cpp {
+  package "shapelib" {
+    sink method "SHPOpen" -> code.FilePathAccess
+    sink method "SHPOpenLL" -> code.FilePathAccess
+    sink method "SHPOpenLLEx" -> code.FilePathAccess
+    sink method "DBFOpen" -> code.FilePathAccess
+    sink method "DBFOpenLL" -> code.FilePathAccess
+  }
+}

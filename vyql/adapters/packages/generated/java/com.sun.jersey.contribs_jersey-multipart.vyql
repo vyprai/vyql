@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter java {
+  package "com.sun.jersey.contribs:jersey-multipart" {
+    sink method "MultiPartReaderClientSide.readFrom" -> code.Deserialization
+    sink method "MultiPartReaderServerSide.readFrom" -> code.Deserialization
+  }
+}

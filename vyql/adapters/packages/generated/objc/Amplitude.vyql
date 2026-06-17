@@ -1,0 +1,16 @@
+import code.{NetworkConnect}
+import core.{UserControlledData}
+
+adapter objc {
+  package "Amplitude" {
+    source method "logEvent:withEventProperties:" -> core.UserControlledData
+    source method "logEvent:withEventProperties:withMiddlewareExtra:" -> core.UserControlledData
+    source method "logEvent:withEventProperties:withUserProperties:" -> core.UserControlledData
+    source method "logEvent:withEventProperties:withUserProperties:withMiddlewareExtra:" -> core.UserControlledData
+    source method "logEvent:withEventProperties:outOfSession:" -> core.UserControlledData
+    source method "logEvent:withEventProperties:withGroups:withLongLongTimestamp:outOfSession:" -> core.UserControlledData
+    source method "setUserId:" -> core.UserControlledData
+    source method "setUserId:startNewSession:" -> core.UserControlledData
+    sink method "setServerUrl:" -> code.NetworkConnect
+  }
+}

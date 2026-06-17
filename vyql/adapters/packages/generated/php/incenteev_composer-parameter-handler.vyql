@@ -1,0 +1,8 @@
+import code.{Deserialization, FileUse}
+
+adapter php {
+  package "incenteev/composer-parameter-handler" {
+    sink method "processFile" -> code.Deserialization
+    sink method "processFile" -> code.FileUse
+  }
+}

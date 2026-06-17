@@ -1,0 +1,9 @@
+import code.{FilePathAccess}
+import core.{InputValidation}
+
+adapter perl {
+  package "NET-IPFilterSimple" {
+    sink method "_init" -> code.FilePathAccess
+    control method "isValid" -> core.InputValidation
+  }
+}

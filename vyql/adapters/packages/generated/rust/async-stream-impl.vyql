@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "async-stream-impl" {
+    sink method "parse_input" -> code.Deserialization
+    sink method "stream_inner" -> code.Deserialization
+    sink method "try_stream_inner" -> code.Deserialization
+  }
+}

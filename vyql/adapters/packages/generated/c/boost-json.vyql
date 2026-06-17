@@ -1,0 +1,5 @@
+adapter c {
+  package "boost-json" {
+    sink method "value" -> code.Deserialization
+  }
+}

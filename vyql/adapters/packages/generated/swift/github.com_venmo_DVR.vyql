@@ -1,0 +1,9 @@
+import code.{NetworkSend}
+
+adapter swift {
+  package "github.com/venmo/DVR" {
+    sink method "dataTask" -> code.NetworkSend
+    sink method "downloadTask" -> code.NetworkSend
+    sink method "uploadTask" -> code.NetworkSend
+  }
+}

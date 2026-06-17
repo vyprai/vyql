@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/grpc-ecosystem/go-grpc-middleware" {
+    sink method "TagBasedRequestFieldExtractor" -> code.UrlFetch
+  }
+}

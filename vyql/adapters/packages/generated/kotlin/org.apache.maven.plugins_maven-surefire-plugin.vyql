@@ -1,0 +1,8 @@
+adapter kotlin {
+  package "org.apache.maven.plugins:maven-surefire-plugin" {
+    sink method "setBasedir" -> code.FilePathAccess
+    sink method "setTestClassesDirectory" -> code.FilePathAccess
+    sink method "setReportsDirectory" -> code.FilePathAccess
+    sink method "setSystemPropertiesFile" -> code.FilePathAccess
+  }
+}

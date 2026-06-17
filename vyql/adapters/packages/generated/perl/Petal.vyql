@@ -1,0 +1,15 @@
+import code.{FilePathAccess, Deserialization, TemplateRender, XmlParse, HtmlRender}
+import core.{PathCanonicalization, InputValidation}
+
+adapter perl {
+  package "Petal" {
+    sink method "input" -> code.Deserialization
+    sink method "output" -> code.HtmlRender
+    sink method "output" -> code.XmlParse
+    sink method "process" -> code.TemplateRender
+    sink method "_file" -> code.FilePathAccess
+    sink method "_file_path" -> code.FilePathAccess
+    sink method "_file_data_ref" -> code.FilePathAccess
+    control method "_canonicalize" -> core.PathCanonicalization
+  }
+}

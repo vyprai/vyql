@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter java {
+  package "org.springframework.data:spring-data-redis" {
+    sink method "exec" -> code.CommandExecution
+  }
+}

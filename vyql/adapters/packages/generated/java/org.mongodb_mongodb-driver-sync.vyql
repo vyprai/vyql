@@ -1,0 +1,6 @@
+adapter java {
+  package "org.mongodb:mongodb-driver-sync" {
+    sink method "find" -> code.NosqlQuery
+    sink method "delete" -> code.StoredDataWrite
+  }
+}

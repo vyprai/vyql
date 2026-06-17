@@ -1,0 +1,9 @@
+adapter elixir {
+  package "core" {
+    sink method "spawn" -> code.CommandExecution
+    sink method "spawn_link" -> code.CommandExecution
+    source method "send" -> core.UserControlledData
+    source method "call" -> core.UserControlledData
+    source method "cast" -> core.UserControlledData
+  }
+}

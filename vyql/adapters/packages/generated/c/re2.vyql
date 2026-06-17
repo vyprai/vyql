@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter c {
+  package "re2" {
+    mark method "compile" -> code.RegexCompile
+  }
+}

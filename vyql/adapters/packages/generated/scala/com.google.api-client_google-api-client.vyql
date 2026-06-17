@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "com.google.api-client:google-api-client" {
+    sink method "parse" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+adapter python {
+  package "rdflib" {
+    sink method "parse" -> code.Deserialization
+    sink method "query" -> code.SqlExecution
+    source method "read" -> core.UserControlledData
+    sink method "loads" -> code.Deserialization
+  }
+}

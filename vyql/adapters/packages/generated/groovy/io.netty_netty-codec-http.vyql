@@ -1,0 +1,9 @@
+import code.{HttpInput, Deserialization, UrlFetch}
+adapter groovy {
+  package "io.netty:netty-codec-http" {
+    source method "decode" -> code.HttpInput
+    source method "get" -> code.HttpInput
+    sink method "decode" -> code.Deserialization
+    sink method "get" -> code.UrlFetch
+  }
+}

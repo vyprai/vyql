@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter c {
+  package "cjson" {
+    sink method "cJSON_Parse" -> code.Deserialization
+    sink method "cJSON_ParseWithLength" -> code.Deserialization
+    sink method "cJSON_ParseWithOpts" -> code.Deserialization
+    sink method "cJSON_ParseWithLengthOpts" -> code.Deserialization
+  }
+}

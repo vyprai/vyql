@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter elixir {
+  package "ex_admin" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter perl {
+  package "Rcs" {
+    sink method "system" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,10 @@
+import code.{HttpInput, FilePathAccess, NetworkData}
+
+adapter swift {
+  package "github.com/BiAtoms/Http.swift" {
+    source method "parse" -> code.HttpInput
+    sink method "init" -> code.FilePathAccess
+    sink method "serveFile" -> code.FilePathAccess
+    source method "write" -> code.NetworkData
+  }
+}

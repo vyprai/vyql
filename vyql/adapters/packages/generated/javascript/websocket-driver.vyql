@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "websocket-driver" {
+    sink method "parse" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+  }
+}

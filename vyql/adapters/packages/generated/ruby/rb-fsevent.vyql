@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess, CliArgument}
+
+adapter ruby {
+  package "rb-fsevent" {
+    sink method "FSEvent.parse" -> code.Deserialization
+    sink method "FSEvent.watch" -> code.FilePathAccess
+    sink method "FSEvent.watcher_path" -> code.FilePathAccess
+    sink method "append_path" -> code.FilePathAccess
+    source method "parse_cli_settings" -> code.CliArgument
+  }
+}

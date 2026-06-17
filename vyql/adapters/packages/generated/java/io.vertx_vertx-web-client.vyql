@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend, Deserialization}
+
+adapter java {
+  package "io.vertx:vertx-web-client" {
+    sink method "send" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+    sink method "parse" -> code.Deserialization
+  }
+}

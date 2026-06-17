@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "taglib" {
+    sink method "parse" -> code.Deserialization
+  }
+}

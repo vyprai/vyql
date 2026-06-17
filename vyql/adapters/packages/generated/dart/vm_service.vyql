@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "vm_service" {
+    sink method "RPCError.parse" -> code.Deserialization
+  }
+}

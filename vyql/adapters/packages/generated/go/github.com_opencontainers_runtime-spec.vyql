@@ -1,0 +1,7 @@
+adapter go {
+  package "github.com/opencontainers/runtime-spec" {
+    source method "main" -> code.CliArgument
+    source method "main" -> code.StdinInput
+    control method "formatFilePath" -> core.PathCanonicalization
+  }
+}

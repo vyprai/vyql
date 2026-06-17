@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "drupal/console-core" {
+    sink method "exec" -> code.CommandExecution
+  }
+}

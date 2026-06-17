@@ -1,0 +1,8 @@
+import code.{PrivilegedOp}
+adapter dart {
+  package "permission" {
+    mark method "requestPermissions" -> code.PrivilegedOp
+    mark method "requestSinglePermission" -> code.PrivilegedOp
+    mark method "openSettings" -> code.PrivilegedOp
+  }
+}

@@ -1,0 +1,5 @@
+adapter php {
+  package "facade/ignition" {
+    mark path "facade.ignition.hash" -> code.WeakHash
+  }
+}

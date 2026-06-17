@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/migueldeicaza/SwiftGodot" {
+    sink method "_fromRawArgument" -> code.Deserialization
+    sink method "withUnsafeAccessToData" -> code.Deserialization
+    sink method "withUnsafeMutableAccessToData" -> code.Deserialization
+    sink method "withUnsafeConstAccessToData" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{FilePathAccess, Deserialization}
+adapter perl {
+  package "JSON_File" {
+    sink method "load_file" -> code.FilePathAccess
+    sink method "load_file" -> code.Deserialization
+    sink method "save_file" -> code.FilePathAccess
+  }
+}

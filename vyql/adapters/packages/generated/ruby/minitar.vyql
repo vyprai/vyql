@@ -1,0 +1,8 @@
+import code.{ArchiveEntryWrite, FilePathAccess}
+
+adapter ruby {
+  package "minitar" {
+    sink method "pack" -> code.ArchiveEntryWrite
+    sink method "unpack" -> code.FilePathAccess
+  }
+}

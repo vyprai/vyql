@@ -1,0 +1,9 @@
+adapter go {
+  package "github.com/containerd/typeurl" {
+    sink method "UnmarshalAny" -> code.Deserialization
+    sink method "UnmarshalByTypeURL" -> code.Deserialization
+    sink method "UnmarshalTo" -> code.Deserialization
+    sink method "UnmarshalToByTypeURL" -> code.Deserialization
+    sink method "unmarshal" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "hashie" {
+    sink method "Hashie::Mash.load" -> code.Deserialization
+  }
+}

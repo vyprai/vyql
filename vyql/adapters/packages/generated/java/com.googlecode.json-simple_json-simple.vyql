@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter java {
+  package "com.googlecode.json-simple:json-simple" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseWithException" -> code.Deserialization
+    control method "escape" -> core.HtmlEscape
+  }
+}

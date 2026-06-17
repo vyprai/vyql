@@ -1,0 +1,7 @@
+import code.{CliArgument}
+adapter kotlin {
+  package "io.dropwizard:dropwizard-core" {
+    source method "Cli.parseArgs" -> CliArgument
+    source method "Application.run" -> CliArgument
+  }
+}

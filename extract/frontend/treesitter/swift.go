@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 
 	sw "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/swift"
@@ -17,27 +19,17 @@ type swConv struct {
 
 // ExtractSwift parses .swift files into one NIR Program (one module per file).
 func ExtractSwift(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(sw.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "self"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &swConv{src: src, file: rel, key: moduleKey(root, f, ".swift")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(sw.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &swConv{src: src, file: rel, key: moduleKey(root, abs, ".swift")}
+			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func (c *swConv) loc(n *tree_sitter.Node) string {
@@ -71,6 +63,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		for _, p := range pairs {
 			params = append(params, p[1])
 		}
+		paramTypes := c.paramTypes(n)
 		body := c.block(c.swBody(n))
 		// iOS attacker-controlled entry points seeded as URL-scheme input:
 		//   application(_:open:) — deep-link URL param `open url:`
@@ -86,7 +79,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				Value: nir.Call{Callee: nir.Name{ID: "url_scheme_input", Loc: L}, Path: "url_scheme_input", Method: "url_scheme_input", Loc: L}}
 			body = append([]nir.Stmt{seed}, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "property_declaration":
 		v := field(n, "value")
 		if v == nil {
@@ -279,6 +272,25 @@ func (c *swConv) params(n *tree_sitter.Node) []string {
 	return out
 }
 
+func (c *swConv) paramTypes(n *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "parameter" {
+			continue
+		}
+		var ids []string
+		for _, id := range namedChildren(ch) {
+			if id.Kind() == "simple_identifier" {
+				ids = append(ids, c.text(id))
+			}
+		}
+		if len(ids) > 0 {
+			putParamType(out, ids[len(ids)-1], paramTypeFromField(c, ch))
+		}
+	}
+	return out
+}
+
 // labeledInternal returns the internal name of the parameter with the given
 // external label, or "" if none.
 func labeledInternal(pairs [][2]string, label string) string {
@@ -347,6 +359,34 @@ func (c *swConv) callArgs(suffix *tree_sitter.Node) []nir.Expr {
 	return out
 }
 
+func (c *swConv) callArgLabels(suffix *tree_sitter.Node) []string {
+	var out []string
+	var va *tree_sitter.Node
+	for _, ch := range namedChildren(suffix) {
+		if ch.Kind() == "value_arguments" {
+			va = ch
+		}
+	}
+	if va == nil {
+		return nil
+	}
+	for _, a := range namedChildren(va) {
+		if a.Kind() != "value_argument" {
+			continue
+		}
+		for _, ch := range namedChildren(a) {
+			if ch.Kind() != "value_argument_label" {
+				continue
+			}
+			if ids := namedChildren(ch); len(ids) > 0 {
+				out = append(out, c.text(ids[0]))
+			}
+			break
+		}
+	}
+	return out
+}
+
 func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 	if n == nil {
 		return nir.Const{Loc: "?:0"}
@@ -389,13 +429,17 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "call_expression":
 		callee := c.swCallee(n)
 		path := c.dotted(callee)
+		method := lastSeg(path)
 		var args []nir.Expr
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "call_suffix" {
 				args = c.callArgs(ch)
+				if labels := c.callArgLabels(ch); len(labels) > 0 {
+					path += "." + strings.Join(labels, ".")
+				}
 			}
 		}
-		return nir.Call{Callee: c.expr(callee), Args: args, Path: path, Method: lastSeg(path), Loc: L}
+		return nir.Call{Callee: c.expr(callee), Args: args, Path: path, Method: method, Loc: L}
 	case "additive_expression":
 		l, r := c.expr(field(n, "lhs")), c.expr(field(n, "rhs"))
 		op := c.swOp(n)

@@ -1,0 +1,7 @@
+import code.{StoredDataRead}
+
+adapter swift {
+  package "github.com/TokamakUI/Tokamak" {
+    source method "read" -> code.StoredDataRead
+  }
+}

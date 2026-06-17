@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter java {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

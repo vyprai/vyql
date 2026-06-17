@@ -1,0 +1,12 @@
+import code.{FileUse, NetworkConnect, NetworkSend, NetworkBind, UrlFetch}
+
+adapter groovy {
+  package "com.badlogicgames.gdx:gdx-backend-android" {
+    sink method "read" -> code.FileUse
+    sink method "sendHttpRequest" -> code.NetworkConnect
+    sink method "sendHttpRequest" -> code.NetworkSend
+    sink method "newServerSocket" -> code.NetworkBind
+    sink method "newClientSocket" -> code.NetworkConnect
+    sink method "openURI" -> code.UrlFetch
+  }
+}

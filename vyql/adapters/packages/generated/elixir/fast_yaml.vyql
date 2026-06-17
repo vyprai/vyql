@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter elixir {
+  package "fast_yaml" {
+    sink method "decode" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

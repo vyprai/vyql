@@ -1,0 +1,9 @@
+import code.{WeakHash}
+adapter cpp {
+  package "xtl" {
+    mark method "hash_bytes" -> code.WeakHash
+    mark method "murmur2_x86" -> code.WeakHash
+    mark method "murmur2_x64" -> code.WeakHash
+    mark method "murmur_hash" -> code.WeakHash
+  }
+}

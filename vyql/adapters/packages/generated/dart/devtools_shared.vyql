@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter dart {
+  package "devtools_shared" {
+    source method "handle" -> code.HttpInput
+  }
+}

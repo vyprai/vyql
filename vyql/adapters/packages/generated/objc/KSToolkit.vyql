@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter objc {
+  package "KSToolkit" {
+    sink method "base64DecodedString" -> code.Deserialization
+    sink method "base64DecodedData" -> code.Deserialization
+    source method "getUrlParams" -> core.UserControlledData
+  }
+}

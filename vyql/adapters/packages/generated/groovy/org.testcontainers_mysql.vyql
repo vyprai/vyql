@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+
+adapter groovy {
+  package "org.testcontainers:mysql" {
+    sink method "getJdbcUrl" -> code.SqlExecution
+    sink method "constructUrlForConnection" -> code.SqlExecution
+    sink method "getTestQueryString" -> code.SqlExecution
+  }
+}

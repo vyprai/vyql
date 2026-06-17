@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter elixir {
+  package "edown" {
+    control method "escape_pre_with_a" -> core.HtmlEscape
+  }
+}

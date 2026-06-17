@@ -1,0 +1,7 @@
+import code.{WeakRandomValue}
+adapter go {
+  package "github.com/sean-/seed" {
+    mark method "Init" -> code.WeakRandomValue
+    mark method "MustInit" -> code.WeakRandomValue
+  }
+}

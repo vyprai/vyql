@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter python {
+  package "win32-setctime" {
+    sink method "setctime" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,9 @@
+adapter php {
+  package "laravel/framework" {
+    source method "getRequest" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "onConnection" -> code.NetworkConnect
+    source method "token" -> code.SecretValue
+    mark path "laravel.framework.hash" -> code.WeakHash
+  }
+}

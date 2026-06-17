@@ -1,0 +1,10 @@
+adapter java {
+  package "org.jooq:jooq-codegen" {
+    source method "GenerationTool.load" -> core.UserControlledData
+    sink method "GenerationTool.run" -> code.CodeEval
+    sink method "GenerationTool.compile" -> code.CodeEval
+    control method "GenerationUtil.escape" -> core.InputValidation
+    sink method "Files.list" -> code.FilePathAccess
+    sink method "Files.mkdirs" -> code.FilePathAccess
+  }
+}

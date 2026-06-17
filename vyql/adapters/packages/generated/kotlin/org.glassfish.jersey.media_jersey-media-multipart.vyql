@@ -1,0 +1,8 @@
+import code.{Deserialization, HttpInput}
+
+adapter kotlin {
+  package "org.glassfish.jersey.media:jersey-media-multipart" {
+    sink method "setEntity" -> code.Deserialization
+    sink method "entity" -> code.Deserialization
+  }
+}

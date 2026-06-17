@@ -1,0 +1,14 @@
+import code.{Cookie, HttpInput, SecretValue}
+import core.{HtmlEscape}
+
+adapter perl {
+  package "Gantry" {
+    source method "get_cookies" -> code.Cookie
+    source method "params" -> code.HttpInput
+    source method "uf_params" -> code.HttpInput
+    source method "get_param_hash" -> code.HttpInput
+    source method "get_uf_param_hash" -> code.HttpInput
+    source method "gantry_secret" -> code.SecretValue
+    control method "escape_html" -> core.HtmlEscape
+  }
+}

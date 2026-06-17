@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter scala {
+  package "net.sf.opencsv:opencsv" {
+    sink method "parse" -> code.Deserialization
+    source method "readNext" -> core.UserControlledData
+    sink method "parseLine" -> code.Deserialization
+  }
+}

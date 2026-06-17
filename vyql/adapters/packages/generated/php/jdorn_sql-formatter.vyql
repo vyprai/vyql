@@ -1,0 +1,11 @@
+import core.{UserControlledData}
+adapter php {
+  package "jdorn/sql-formatter" {
+    source method "SqlFormatter::format" -> core.UserControlledData
+    source method "SqlFormatter::highlight" -> core.UserControlledData
+    source method "SqlFormatter::splitQuery" -> core.UserControlledData
+    source method "SqlFormatter::removeComments" -> core.UserControlledData
+    source method "SqlFormatter::compress" -> core.UserControlledData
+    source method "SqlFormatter::tokenize" -> core.UserControlledData
+  }
+}

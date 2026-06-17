@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter rust {
+  package "android-tzdata" {
+    source method "find_tz_data" -> core.UserControlledData
+  }
+}

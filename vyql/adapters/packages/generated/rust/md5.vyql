@@ -1,0 +1,10 @@
+import code.{WeakHash}
+
+adapter rust {
+  package "md5" {
+    mark method "new" -> code.WeakHash
+    mark method "consume" -> code.WeakHash
+    mark method "finalize" -> code.WeakHash
+    mark method "compute" -> code.WeakHash
+  }
+}

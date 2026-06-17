@@ -1,0 +1,10 @@
+import code.{FilePathAccess}
+import core.{PathCanonicalization}
+
+adapter javascript {
+  package "jest-resolve" {
+    sink method "baseResolver" -> code.FilePathAccess
+    sink method "defaultAsyncResolver" -> code.FilePathAccess
+    control method "replaceRootDirInPath" -> core.PathCanonicalization
+  }
+}

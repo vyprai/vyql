@@ -1,0 +1,7 @@
+import code.{DatabaseRead}
+
+adapter perl {
+  package "Metabase" {
+    sink method "query" -> code.DatabaseRead
+  }
+}

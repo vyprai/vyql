@@ -1,0 +1,6 @@
+adapter perl {
+  package "Ark" {
+    source method "make_cookie" -> code.HttpInput
+    sink method "load_plugins" -> code.Deserialization
+  }
+}

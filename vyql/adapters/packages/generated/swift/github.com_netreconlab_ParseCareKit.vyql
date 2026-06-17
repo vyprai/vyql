@@ -1,0 +1,6 @@
+import code.{StoredDataRead}
+adapter swift {
+  package "github.com/netreconlab/ParseCareKit" {
+    source method "configureParse" -> code.StoredDataRead
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter php {
+  package "zendframework/zendxml" {
+    sink method "ZendXml\Security::scan" -> code.Deserialization
+    sink method "ZendXml\Security::scanHtml" -> code.Deserialization
+    sink method "ZendXml\Security::scanFile" -> code.Deserialization
+  }
+}

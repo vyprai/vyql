@@ -1,0 +1,6 @@
+adapter groovy {
+  package "org.apache.cxf:cxf-rt-frontend-jaxrs" {
+    source method "invoke" -> code.HttpInput
+    control method "parseAcceptEnc" -> core.InputValidation
+  }
+}

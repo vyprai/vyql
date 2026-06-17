@@ -1,0 +1,7 @@
+adapter swift {
+  package "github.com/schwa/Everything" {
+    source method "handle" -> code.NetworkData
+    sink method "read" -> code.FilePathAccess
+    mark method "update" -> code.WeakHash
+  }
+}

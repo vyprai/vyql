@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter swift {
+  package "github.com/emma-k-alexandra/GTFS" {
+    sink method "init" -> code.FilePathAccess
+  }
+}

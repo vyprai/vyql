@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter c {
+  package "libwebm" {
+    sink method "Parse" -> code.Deserialization
+    sink method "Init" -> code.Deserialization
+    sink method "Open" -> code.FilePathAccess
+  }
+}

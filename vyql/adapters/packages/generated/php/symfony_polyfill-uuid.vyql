@@ -1,0 +1,6 @@
+adapter php {
+  package "symfony/polyfill-uuid" {
+    sink method "uuid_parse" -> code.Deserialization
+    sink method "uuid_unparse" -> code.Deserialization
+  }
+}

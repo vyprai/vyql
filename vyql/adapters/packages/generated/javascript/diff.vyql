@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter javascript {
+  package "diff" {
+    sink method "parsePatch" -> code.Deserialization
+    source method "applyPatch" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/RevenueCat/purchases-ios" {
+    sink method "parse" -> code.Deserialization
+  }
+}

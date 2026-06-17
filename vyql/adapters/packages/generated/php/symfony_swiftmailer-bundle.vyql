@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter php {
+  package "symfony/swiftmailer-bundle" {
+    source method "NewEmailCommand::execute" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,13 @@
+import code.{NetworkBind, NetworkConnect, NetworkData, NetworkSend}
+
+adapter c {
+  package "qtconnectivity" {
+    source method "QBluetoothSocket::read" -> code.NetworkData
+    source method "QBluetoothSocket::readAll" -> code.NetworkData
+    sink method "QBluetoothSocket::write" -> code.NetworkSend
+    sink method "QBluetoothSocket::connectToService" -> code.NetworkConnect
+    sink method "QBluetoothSocket::connectToHost" -> code.NetworkConnect
+    sink method "QBluetoothSocket::listen" -> code.NetworkBind
+    sink method "QBluetoothSocket::bind" -> code.NetworkBind
+  }
+}

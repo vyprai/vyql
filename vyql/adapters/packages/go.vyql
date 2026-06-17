@@ -1,0 +1,100 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter go {
+  package "net/http" {
+    source receiver "Query" on "http.Request" -> HttpInput
+    source receiver "FormValue" on "http.Request" -> HttpInput
+    sink path "http.Get" -> UrlFetch
+  }
+  package "github.com/gin-gonic/gin" {
+    source receiver "Param" on "gin.Context" -> HttpInput
+    source receiver "Query" on "gin.Context" -> HttpInput
+  }
+  package "github.com/gofiber/fiber" {
+    source receiver "Params" on "fiber.Ctx" -> HttpInput
+  }
+  package "github.com/labstack/echo" {
+    source receiver "QueryParam" on "echo.Context" -> HttpInput
+  }
+  package "os" {
+    source "os.Getenv" -> SecretValue
+    sink path "os.Open" -> FilePathAccess
+  }
+  package "github.com/go-resty/resty" {
+    source method "Body" -> ExternalApiResponse
+    sink method "R" -> UrlFetch
+  }
+  package "database/sql" {
+    sink method "Query" -> SqlExecution
+    sink method "Exec" -> SqlExecution
+    control method "Prepare" -> SqlParameterization
+  }
+  package "gorm.io/gorm" {
+    sink method "Raw" -> SqlExecution
+    sink method "Where" -> SqlExecution
+  }
+  package "github.com/jmoiron/sqlx" {
+    sink method "Select" -> SqlExecution
+  }
+  package "go.mongodb.org/mongo-driver" {
+    sink method "Find" -> NosqlQuery
+  }
+  package "os/exec" {
+    sink path "exec.Command" -> CommandExecution
+  }
+  package "text/template" {
+    sink path "template.New" -> CodeEval
+  }
+  package "gopkg.in/yaml.v3" {
+    sink path "yaml.Unmarshal" -> Deserialization
+  }
+  package "encoding/json" {
+    sink path "json.Unmarshal" -> Deserialization
+  }
+  package "archive/zip" {
+    sink path "zip.File.Open" -> ArchiveEntryWrite
+  }
+  package "encoding/xml" {
+    sink path "xml.Unmarshal" -> XmlParse
+    control "xml.NewDecoder" -> XmlHardening
+  }
+  package "github.com/antchfx/xpath" {
+    sink path "xpath.Compile" -> XpathQuery
+  }
+  package "github.com/go-ldap/ldap" {
+    sink method "Search" arg 1 -> LdapQuery
+    control "ldap.EscapeFilter" -> LdapEscape
+  }
+  package "html/template" {
+    sink method "Execute" -> HtmlRender
+    control "template.HTMLEscapeString" -> HtmlEscape
+  }
+  package "regexp" {
+    sink path "regexp.Compile" -> RegexCompile
+  }
+  package "html" {
+    control "html.EscapeString" -> HtmlEscape
+  }
+  package "github.com/alessio/shellescape" {
+    control "shellescape.Quote" -> ShellEscape
+  }
+  package "path/filepath" {
+    control "filepath.Clean" -> PathCanonicalization
+  }
+  package "github.com/microcosm-cc/bluemonday" {
+    control "bluemonday.UGCPolicy" -> HtmlEscape
+  }
+  package "net/url" {
+    control "url.ParseRequestURI" -> RedirectAllowlist
+  }
+  package "github.com/golang-jwt/jwt" {
+    control method "RequireAuth" -> AuthenticationCheck
+  }
+  package "github.com/gorilla/csrf" {
+    control "csrf.Protect" -> CsrfProtection
+  }
+  package "github.com/casbin/casbin" {
+    control method "Can" -> AuthorizationCheck
+  }
+}

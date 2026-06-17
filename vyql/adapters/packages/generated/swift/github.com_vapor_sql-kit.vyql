@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+import core.{InputValidation}
+
+adapter swift {
+  package "github.com/vapor/sql-kit" {
+    sink method "execute" -> code.SqlExecution
+    control method "serialize" -> core.InputValidation
+  }
+}

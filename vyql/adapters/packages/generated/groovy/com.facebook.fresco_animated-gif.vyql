@@ -1,0 +1,8 @@
+adapter groovy {
+  package "com.facebook.fresco:animated-gif" {
+    sink method "createFromByteBuffer" -> code.Deserialization
+    sink method "createFromFileDescriptor" -> code.Deserialization
+    sink method "nativeCreateFromDirectByteBuffer" -> code.Deserialization
+    sink method "nativeCreateFromFileDescriptor" -> code.Deserialization
+  }
+}

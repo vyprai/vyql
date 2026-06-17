@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter groovy {
+  package "org.apache.zookeeper:zookeeper" {
+    sink method "execCommand" -> code.CommandExecution
+  }
+}

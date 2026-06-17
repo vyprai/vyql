@@ -23,6 +23,7 @@ adapter swift {
   sink method "evaluateJavaScript" -> code.WebViewLoad
   sink method "loadHTMLString" -> code.WebViewLoad
   sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
+  mark "add.name" -> code.WebViewJsInterface
 
   // SQL — sqlite3 C API (query is arg1) + ORM execute (raw query is arg0)
   sink path "sqlite3_exec" arg 1 -> code.SqlExecution
@@ -41,6 +42,7 @@ adapter swift {
   sink method "contentsOfFile" -> code.FilePathAccess
   sink method "contents" -> code.FilePathAccess
   sink path "FileHandle" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
 
   // SSRF
   sink path "URL" -> code.UrlFetch
@@ -62,6 +64,17 @@ adapter swift {
   // trust boundary (CWE-501) — untrusted data into the session
   sink method "setAttribute" arg all -> code.TrustBoundary
   sink method "putValue" arg all -> code.TrustBoundary
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // weak hash (CWE-328) — CryptoKit Insecure.* + CommonCrypto CC_MD5/CC_SHA1
   mark "Insecure.MD5" -> code.WeakHash
@@ -73,6 +86,8 @@ adapter swift {
   mark "Cipher" val "DES" -> code.WeakCipher
   mark "Cipher" val "RC4" -> code.WeakCipher
   mark "Cipher" val "Blowfish" -> code.WeakCipher
+  mark "Cipher" val "0000000000000000" -> code.StaticIv
+  mark "AES.GCM.Nonce" val "000000000000" -> code.StaticIv
 
   // insecure randomness (CWE-330) — arc4random / Int.random (SecRandomCopyBytes is safe)
   mark "arc4random" -> code.WeakRandomValue
@@ -81,6 +96,15 @@ adapter swift {
   // insecure cookie (CWE-614) — cookie configured insecurely (setter-method idiom)
   mark "setSecure" val "false" -> code.InsecureCookie
   mark "setHttpOnly" val "false" -> code.InsecureCookie
+  mark "allowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
+  mark "serverTrustPolicy" val "disableEvaluation" -> code.CertValidationDisabled
+  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "URLRequest" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  mark "FileHandle.forReadingAtPath" -> code.ResourceHandle
+  mark "FileHandle.forWritingAtPath" -> code.ResourceHandle
+  control method "closeFile" -> core.ResourceRelease
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
@@ -89,6 +113,10 @@ adapter swift {
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization
   control "validateRole" -> core.InputValidation
+  control "requireAuth" -> core.AuthenticationCheck
+  control "ensureAuthenticated" -> core.AuthenticationCheck
+  control "checkOwnership" -> core.OwnershipCheck
+  control "requireOwner" -> core.OwnershipCheck
 
   // NOTE: addingPercentEncoding maps to no wired neutralizer (OutputEncoding is unused
   // by any rule and percent-encoding doesn't neutralize cmd/SQL/HTML) — omitted.

@@ -1,0 +1,8 @@
+import code.{Deserialization, CodeEval}
+
+adapter elixir {
+  package "exq" {
+    sink method "Exq.Support.Job.decode" -> code.Deserialization
+    sink method "Exq.Redis.Script.eval!" -> code.CodeEval
+  }
+}

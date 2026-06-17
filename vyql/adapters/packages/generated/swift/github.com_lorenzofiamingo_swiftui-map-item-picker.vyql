@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/lorenzofiamingo/swiftui-map-item-picker" {
+    source method "mapItemPicker" -> core.UserControlledData
+  }
+}

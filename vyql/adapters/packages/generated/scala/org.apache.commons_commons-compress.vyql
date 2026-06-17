@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "org.apache.commons:commons-compress" {
+    sink method "parse" -> code.Deserialization
+  }
+}

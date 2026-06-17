@@ -1,0 +1,8 @@
+import code.{HttpInput}
+
+adapter java {
+  package "javax.servlet:javax.servlet-api" {
+    source method "service" -> code.HttpInput
+    source method "doFilter" -> code.HttpInput
+  }
+}

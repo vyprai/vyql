@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter python {
+  package "astroid" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_function_type_comment" -> code.Deserialization
+    sink method "extract_node" -> code.Deserialization
+  }
+}

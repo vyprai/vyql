@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "org.apache.tomcat.embed:tomcat-embed-el" {
+    sink method "ELParser.parse" -> code.Deserialization
+  }
+}

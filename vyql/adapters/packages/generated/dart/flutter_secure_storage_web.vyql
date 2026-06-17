@@ -1,0 +1,21 @@
+import code.{SecretValue, WeakCipher}
+
+adapter dart {
+  package "flutter_secure_storage_web" {
+    source method "read" -> code.SecretValue
+    source method "readAll" -> code.SecretValue
+    source method "write" -> code.SecretValue
+    source method "delete" -> code.SecretValue
+    source method "deleteAll" -> code.SecretValue
+    mark method "_getEncryptionKey" -> code.WeakCipher
+    mark method "_getWrapKey" -> code.WeakCipher
+    mark method "_decryptValue" -> code.WeakCipher
+    mark method "_crypto" -> code.WeakCipher
+    source method "encryptionKey" -> code.SecretValue
+    source method "jwk" -> code.SecretValue
+    source method "wrapKey" -> code.SecretValue
+    source method "encryptedContent" -> code.SecretValue
+    source method "decryptedContent" -> code.SecretValue
+    source method "plainText" -> code.SecretValue
+  }
+}

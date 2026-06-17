@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter bash {
+  package "amazon-ecs-cli" {
+    sink path "ecs-cli" -> code.CommandExecution
+  }
+}

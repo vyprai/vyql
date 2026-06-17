@@ -1,0 +1,6 @@
+adapter python {
+  package "yamllint" {
+    source method "get" -> code.SecretValue
+    sink method "parse" -> code.Deserialization
+  }
+}

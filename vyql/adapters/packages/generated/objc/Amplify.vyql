@@ -1,0 +1,5 @@
+adapter objc {
+  package "Amplify" {
+    mark path "amplify.hash" -> code.WeakHash
+  }
+}

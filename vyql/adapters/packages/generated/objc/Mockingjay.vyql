@@ -1,0 +1,18 @@
+import code.{HttpInput, NetworkSend}
+
+adapter objc {
+  package "Mockingjay" {
+    source method "canInit" -> code.HttpInput
+    source method "startLoading" -> code.HttpInput
+    source method "uri" -> core.UserControlledData
+    source method "extractRangeFromHTTPHeaders" -> code.HttpInput
+    source method "applyRangeFromHTTPHeaders" -> code.HttpInput
+
+    sink method "json" -> code.NetworkSend
+    sink method "jsonData" -> code.NetworkSend
+    sink method "http" -> code.NetworkSend
+    sink method "failure" -> code.NetworkSend
+    sink method "sendResponse" -> code.NetworkSend
+    sink method "download" -> code.NetworkSend
+  }
+}

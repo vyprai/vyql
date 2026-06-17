@@ -1,0 +1,6 @@
+adapter ruby {
+  package "twilio-ruby" {
+    sink method "send" -> code.NetworkSend
+    control method "validate" -> core.InputValidation
+  }
+}

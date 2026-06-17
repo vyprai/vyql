@@ -1,0 +1,13 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/tsolomko/BitByteData" {
+    sink method "int" -> code.Deserialization
+    sink method "signedInt" -> code.Deserialization
+    sink method "bits" -> code.Deserialization
+    sink method "byte" -> code.Deserialization
+    sink method "uint16" -> code.Deserialization
+    sink method "uint32" -> code.Deserialization
+    sink method "uint64" -> code.Deserialization
+    sink method "bytes" -> code.Deserialization
+  }
+}

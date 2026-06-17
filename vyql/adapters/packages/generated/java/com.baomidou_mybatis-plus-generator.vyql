@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+
+adapter java {
+  package "com.baomidou:mybatis-plus-generator" {
+    sink method "tablesSql" -> code.SqlExecution
+    sink method "tableFieldsSql" -> code.SqlExecution
+    sink method "queryTables" -> code.SqlExecution
+  }
+}

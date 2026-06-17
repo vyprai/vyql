@@ -1,0 +1,7 @@
+import code.{CommandExecution, HttpInput}
+adapter go {
+  package "github.com/smartystreets/goconvey" {
+    sink method "launchBrowser" -> code.CommandExecution
+    source method "serveHTTP" -> code.HttpInput
+  }
+}

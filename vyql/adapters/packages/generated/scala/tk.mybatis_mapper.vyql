@@ -1,0 +1,32 @@
+adapter scala {
+  package "tk.mybatis:mapper" {
+    sink method "andIsNull" -> code.SqlExecution
+    sink method "andIsNotNull" -> code.SqlExecution
+    sink method "andEqualTo" -> code.SqlExecution
+    sink method "andNotEqualTo" -> code.SqlExecution
+    sink method "andGreaterThan" -> code.SqlExecution
+    sink method "andGreaterThanOrEqualTo" -> code.SqlExecution
+    sink method "andLessThan" -> code.SqlExecution
+    sink method "andLessThanOrEqualTo" -> code.SqlExecution
+    sink method "andIn" -> code.SqlExecution
+    sink method "andNotIn" -> code.SqlExecution
+    sink method "andBetween" -> code.SqlExecution
+    sink method "andNotBetween" -> code.SqlExecution
+    sink method "andLike" -> code.SqlExecution
+    sink method "andNotLike" -> code.SqlExecution
+    sink method "orIsNull" -> code.SqlExecution
+    sink method "orIsNotNull" -> code.SqlExecution
+    sink method "orEqualTo" -> code.SqlExecution
+    sink method "orNotEqualTo" -> code.SqlExecution
+    sink method "orGreaterThan" -> code.SqlExecution
+    sink method "orGreaterThanOrEqualTo" -> code.SqlExecution
+    sink method "orLessThan" -> code.SqlExecution
+    sink method "orLessThanOrEqualTo" -> code.SqlExecution
+    sink method "orIn" -> code.SqlExecution
+    sink method "orNotIn" -> code.SqlExecution
+    sink method "orBetween" -> code.SqlExecution
+    sink method "orNotBetween" -> code.SqlExecution
+    sink method "orLike" -> code.SqlExecution
+    sink method "orNotLike" -> code.SqlExecution
+  }
+}

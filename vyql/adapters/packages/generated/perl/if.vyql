@@ -1,0 +1,9 @@
+import code.{CodeEval}
+
+adapter perl {
+  package "if" {
+    sink method "work" -> code.CodeEval
+    sink method "import" -> code.CodeEval
+    sink method "unimport" -> code.CodeEval
+  }
+}

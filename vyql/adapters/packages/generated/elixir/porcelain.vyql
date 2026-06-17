@@ -1,0 +1,10 @@
+import code.{CommandExecution}
+
+adapter elixir {
+  package "porcelain" {
+    sink method "exec" -> code.CommandExecution
+    sink method "spawn" -> code.CommandExecution
+    sink method "shell" -> code.CommandExecution
+    sink method "spawn_shell" -> code.CommandExecution
+  }
+}

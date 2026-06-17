@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/groue/GRDB.swift" {
+    sink method "read" -> code.FilePathAccess
+    mark method "hash" -> code.WeakHash
+  }
+}

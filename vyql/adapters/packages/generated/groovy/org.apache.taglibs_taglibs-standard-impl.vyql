@@ -1,0 +1,12 @@
+import code.{XmlParse}
+import core.{HtmlEscape, InputValidation}
+
+adapter groovy {
+  package "org.apache.taglibs:taglibs-standard-impl" {
+    sink method "newXMLReader" -> code.XmlParse
+    sink method "newSAXSource" -> code.XmlParse
+    control method "resolveEntity" -> core.InputValidation
+    control method "checkProtocol" -> core.InputValidation
+    control method "escapeXml" -> core.HtmlEscape
+  }
+}

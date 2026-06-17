@@ -1,0 +1,14 @@
+import code.{NetworkSend}
+
+adapter kotlin {
+  package "javax.websocket:javax.websocket-api" {
+    source method "getRequestURI" -> core.UserControlledData
+    source method "getRequestParameterMap" -> core.UserControlledData
+    source method "getQueryString" -> core.UserControlledData
+    source method "getPathParameters" -> core.UserControlledData
+
+    sink method "sendText" -> code.NetworkSend
+    sink method "sendBinary" -> code.NetworkSend
+    sink method "sendObject" -> code.NetworkSend
+  }
+}

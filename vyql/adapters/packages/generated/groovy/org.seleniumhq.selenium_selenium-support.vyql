@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter groovy {
+  package "org.seleniumhq.selenium:selenium-support" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

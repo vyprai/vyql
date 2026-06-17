@@ -1,0 +1,8 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter cpp {
+  package "hdf5" {
+    source method "H5A__read" -> code.StoredDataRead
+    sink method "H5A__write" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter rust {
+  package "dlib" {
+    sink method "open" -> code.CodeEval
+  }
+}

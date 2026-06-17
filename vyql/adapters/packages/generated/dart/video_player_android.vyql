@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+adapter dart {
+  package "video_player_android" {
+    source method "fromAssetUrl" -> core.UserControlledData
+    source method "fromRemoteUrl" -> core.UserControlledData
+    source method "fromRtspUrl" -> core.UserControlledData
+  }
+}

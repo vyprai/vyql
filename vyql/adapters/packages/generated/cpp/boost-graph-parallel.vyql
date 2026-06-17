@@ -1,0 +1,9 @@
+import code.{FilePathAccess, Deserialization}
+adapter cpp {
+  package "boost-graph-parallel" {
+    sink method "load" -> code.FilePathAccess
+    sink method "out" -> code.FilePathAccess
+    sink method "serialize" -> code.Deserialization
+    sink method "unsafe_serialize" -> code.Deserialization
+  }
+}

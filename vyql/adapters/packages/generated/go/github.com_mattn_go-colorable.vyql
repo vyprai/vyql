@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter go {
+  package "github.com/mattn/go-colorable" {
+    control method "NewColorable" -> core.InputValidation
+    control method "NewColorableStdout" -> core.InputValidation
+    control method "NewColorableStderr" -> core.InputValidation
+  }
+}

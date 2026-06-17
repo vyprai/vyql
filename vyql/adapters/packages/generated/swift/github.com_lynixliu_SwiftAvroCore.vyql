@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/lynixliu/SwiftAvroCore" {
+    sink method "decode" -> code.Deserialization
+    mark method "compress" -> code.WeakHash
+  }
+}

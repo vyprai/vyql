@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter ruby {
+  package "nenv" {
+    source method "Nenv" -> core.UserControlledData
+    source method "method_missing" -> core.UserControlledData
+  }
+}

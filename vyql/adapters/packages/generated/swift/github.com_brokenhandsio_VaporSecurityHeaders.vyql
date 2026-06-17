@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter swift {
+  package "github.com/brokenhandsio/VaporSecurityHeaders" {
+    control method "respond" -> core.InputValidation
+  }
+}

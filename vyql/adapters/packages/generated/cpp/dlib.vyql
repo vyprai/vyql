@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "dlib" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "javax:javaee-web-api" {
+    sink method "read" -> code.Deserialization
+  }
+}

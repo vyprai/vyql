@@ -1,0 +1,9 @@
+import core.{AuthenticationCheck, AuthorizationCheck}
+adapter php {
+  package "nette/security" {
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "login" -> core.AuthenticationCheck
+    control method "isLoggedIn" -> core.AuthenticationCheck
+    control method "searchRolePrivileges" -> core.AuthorizationCheck
+  }
+}

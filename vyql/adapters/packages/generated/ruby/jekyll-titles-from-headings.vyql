@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter ruby {
+  package "jekyll-titles-from-headings" {
+    source method "generate" -> core.UserControlledData
+  }
+}

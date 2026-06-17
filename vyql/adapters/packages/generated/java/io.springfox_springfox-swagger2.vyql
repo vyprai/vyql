@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter java {
+  package "io.springfox:springfox-swagger2" {
+    source method "getDocumentation" -> code.HttpInput
+  }
+}

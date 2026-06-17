@@ -1,0 +1,8 @@
+import code.{CommandExecution, Deserialization}
+
+adapter ruby {
+  package "librarian" {
+    sink method "run!" -> code.CommandExecution
+    sink method "parse" -> code.Deserialization
+  }
+}

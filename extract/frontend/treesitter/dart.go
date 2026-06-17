@@ -20,27 +20,17 @@ type dartConv struct {
 
 // ExtractDart parses Dart files into one NIR Program (one module per file).
 func ExtractDart(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(dart.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &dartConv{src: src, file: rel, key: moduleKey(root, f, ".dart")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(dart.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &dartConv{src: src, file: rel, key: moduleKey(root, abs, ".dart")}
+			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *dartConv) loc(n *tree_sitter.Node) string {
@@ -92,12 +82,17 @@ func (c *dartConv) funcDef(sig, body *tree_sitter.Node) nir.Stmt {
 	}
 	name := c.text(field(fs, "name"))
 	var params []string
+	paramTypes := map[string]string{}
 	if pl := lastChildKind(fs, "formal_parameter_list"); pl != nil {
 		for _, p := range namedChildren(pl) {
 			if nm := field(p, "name"); nm != nil {
-				params = append(params, c.text(nm))
+				name := c.text(nm)
+				params = append(params, name)
+				putParamType(paramTypes, name, paramTypeFromField(c, p))
 			} else if id := lastChildKind(p, "identifier"); id != nil {
-				params = append(params, c.text(id))
+				name := c.text(id)
+				params = append(params, name)
+				putParamType(paramTypes, name, paramTypeFromField(c, p))
 			}
 		}
 	}
@@ -105,7 +100,7 @@ func (c *dartConv) funcDef(sig, body *tree_sitter.Node) nir.Stmt {
 	if body != nil {
 		bstmts = c.block(body)
 	}
-	return nir.FuncDef{Name: name, Params: params, Body: bstmts, Loc: L}
+	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: bstmts, Loc: L}
 }
 
 func (c *dartConv) block(n *tree_sitter.Node) []nir.Stmt {
@@ -209,6 +204,32 @@ func (c *dartConv) assignTargetName(left *tree_sitter.Node) string {
 		}
 	}
 	return ""
+}
+
+func (c *dartConv) assignTargetPath(left *tree_sitter.Node) string {
+	if left == nil {
+		return ""
+	}
+	ex := c.foldChain(namedChildren(left))
+	switch t := ex.(type) {
+	case nir.Attr:
+		return t.Path
+	case nir.Index:
+		return t.Path
+	case nir.Name:
+		if raw := dartAssignTargetText(c.text(left)); strings.Contains(raw, ".") {
+			return raw
+		}
+		return t.ID
+	}
+	return dartAssignTargetText(c.text(left))
+}
+
+func dartAssignTargetText(raw string) string {
+	raw = strings.TrimSpace(raw)
+	raw = strings.ReplaceAll(raw, "?.", ".")
+	raw = strings.ReplaceAll(raw, "!", "")
+	return raw
 }
 
 // dartBranch lowers an if branch: a block's statements, or a single/else-if statement.
@@ -447,6 +468,13 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
+	case "assignment_expression":
+		path := c.assignTargetPath(field(n, "left"))
+		right := c.expr(field(n, "right"))
+		if path != "" {
+			return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: []nir.Expr{right}, Path: path, Method: lastSeg(path), Loc: L}
+		}
+		return right
 	case "new_expression", "const_object_expression":
 		// `new File(p)` / `const File(p)` — model as a constructor call so type/arg
 		// sinks and marks match (e.g. new File(userPath)). The grammar nests the type

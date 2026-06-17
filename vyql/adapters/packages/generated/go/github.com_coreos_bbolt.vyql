@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/coreos/bbolt" {
+    sink method "Open" -> code.FilePathAccess
+  }
+}

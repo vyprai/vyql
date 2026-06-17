@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "php-cs-fixer/diff" {
+    sink method "parse" -> code.Deserialization
+  }
+}

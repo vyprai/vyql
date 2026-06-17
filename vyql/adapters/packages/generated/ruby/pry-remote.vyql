@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "pry-remote" {
+    sink method "PryRemote::CLI.run" -> code.CommandExecution
+  }
+}

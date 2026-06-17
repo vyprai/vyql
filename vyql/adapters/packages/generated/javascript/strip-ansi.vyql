@@ -1,0 +1,5 @@
+adapter javascript {
+  package "strip-ansi" {
+    control method "stripAnsi" -> core.InputValidation
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.apache.tomcat:tomcat-catalina" {
+    sink method "parse" -> code.Deserialization
+  }
+}

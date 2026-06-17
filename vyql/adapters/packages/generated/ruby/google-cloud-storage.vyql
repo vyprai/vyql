@@ -1,0 +1,5 @@
+adapter ruby {
+  package "google-cloud-storage" {
+    sink method "File" -> code.FilePathAccess
+  }
+}

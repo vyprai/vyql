@@ -1,0 +1,6 @@
+import code.{RegexCompile}
+adapter ruby {
+  package "rack-mount" {
+    mark method "compile" -> code.RegexCompile
+  }
+}

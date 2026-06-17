@@ -1,0 +1,5 @@
+adapter bash {
+  package "zsh" {
+    sink path "zsh.eval" -> code.CodeEval
+  }
+}

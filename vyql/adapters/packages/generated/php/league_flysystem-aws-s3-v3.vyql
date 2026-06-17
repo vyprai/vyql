@@ -1,0 +1,13 @@
+import code.{FilePathAccess, StoredDataRead, StoredDataWrite}
+adapter php {
+  package "league/flysystem-aws-s3-v3" {
+    sink method "write" -> code.StoredDataWrite
+    sink method "writeStream" -> code.StoredDataWrite
+    source method "read" -> code.StoredDataRead
+    source method "readStream" -> code.StoredDataRead
+    sink method "delete" -> code.FilePathAccess
+    sink method "deleteDirectory" -> code.FilePathAccess
+    sink method "move" -> code.FilePathAccess
+    sink method "copy" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+adapter scala {
+  package "commons-digester:commons-digester" {
+    sink method "parse" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+    source method "body" -> core.UserControlledData
+  }
+}

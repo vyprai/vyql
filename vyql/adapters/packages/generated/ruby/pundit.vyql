@@ -1,0 +1,11 @@
+import core.{AuthorizationCheck}
+
+adapter ruby {
+  package "pundit" {
+    control method "authorize" -> core.AuthorizationCheck
+    control method "policy_scope" -> core.AuthorizationCheck
+    control method "policy_scope!" -> core.AuthorizationCheck
+    control method "policy" -> core.AuthorizationCheck
+    control method "policy!" -> core.AuthorizationCheck
+  }
+}

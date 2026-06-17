@@ -1,0 +1,5 @@
+adapter groovy {
+  package "org.apache.thrift:libthrift" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

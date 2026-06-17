@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter php {
+  package "psr/http-server-handler" {
+    source method "handle" -> code.HttpInput
+  }
+}

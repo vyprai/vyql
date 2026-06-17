@@ -1,0 +1,8 @@
+import code.{Deserialization, NetworkSend}
+
+adapter rust {
+  package "soketto" {
+    sink method "decode_header" -> code.Deserialization
+    sink method "write" -> code.NetworkSend
+  }
+}

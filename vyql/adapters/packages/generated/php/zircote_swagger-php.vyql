@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter php {
+  package "zircote/swagger-php" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "scanFile" -> code.FilePathAccess
+  }
+}

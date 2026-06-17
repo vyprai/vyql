@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter php {
+  package "laravel/serializable-closure" {
+    source method "setSecretKey" -> code.SecretValue
+  }
+}

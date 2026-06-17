@@ -1,0 +1,9 @@
+import code.{SqlExecution, CommandExecution}
+
+adapter php {
+  package "itsgoingd/clockwork" {
+    sink method "query" -> code.SqlExecution
+    sink method "exec" -> code.SqlExecution
+    sink method "resolveAsCommand" -> code.CommandExecution
+  }
+}

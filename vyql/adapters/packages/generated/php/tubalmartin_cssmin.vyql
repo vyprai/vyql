@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "tubalmartin/cssmin" {
+    sink method "run" -> code.Deserialization
+  }
+}

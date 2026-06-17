@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter java {
+  package "org.elasticsearch:elasticsearch" {
+    sink method "spawnNativeController" -> code.CommandExecution
+  }
+}

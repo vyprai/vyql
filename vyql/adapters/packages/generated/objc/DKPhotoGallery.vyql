@@ -1,0 +1,8 @@
+import code.{UrlFetch, NetworkConnect}
+
+adapter objc {
+  package "DKPhotoGallery" {
+    sink method "DKPhotoImageWebDownloader.downloadImage" -> code.UrlFetch
+    sink method "SDWebImageDownloader.downloadImage" -> code.NetworkConnect
+  }
+}

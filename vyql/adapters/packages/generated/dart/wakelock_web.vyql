@@ -1,0 +1,8 @@
+import code.{FilePathAccess, PrivilegedOp}
+
+adapter dart {
+  package "wakelock_web" {
+    mark method "toggle" -> code.PrivilegedOp
+    sink method "enabled" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,11 @@
+import code.{CodeEval, Deserialization, UrlFetch}
+
+adapter java {
+  package "org.seleniumhq.selenium:selenium-htmlunit-driver" {
+    sink method "get" -> code.UrlFetch
+    sink method "executeScript" -> code.CodeEval
+    sink method "executeAsyncScript" -> code.CodeEval
+    sink method "findElementByXPath" -> code.Deserialization
+    sink method "findElementsByXPath" -> code.Deserialization
+  }
+}

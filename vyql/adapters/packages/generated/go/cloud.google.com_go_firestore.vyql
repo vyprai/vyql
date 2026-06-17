@@ -1,0 +1,6 @@
+adapter go {
+  package "cloud.google.com/go/firestore" {
+    sink method "newQueryDocumentIterator" -> code.NosqlQuery
+    sink method "Set" -> code.StoredDataWrite
+  }
+}

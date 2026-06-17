@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter cpp {
+  package "tiny-process-library" {
+    sink method "Process" -> code.CommandExecution
+  }
+}

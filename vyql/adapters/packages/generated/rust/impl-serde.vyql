@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "impl-serde" {
+    sink method "from_hex" -> code.Deserialization
+  }
+}

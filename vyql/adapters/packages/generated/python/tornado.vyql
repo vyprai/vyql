@@ -1,0 +1,7 @@
+adapter python {
+  package "tornado" {
+    source path "stream_request_body" -> code.HttpInput
+    sink path "start_response" -> code.ResponseHeaderWrite
+    source method "cookies" -> code.HttpInput
+  }
+}

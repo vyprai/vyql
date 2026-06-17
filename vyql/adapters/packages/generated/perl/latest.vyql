@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter perl {
+  package "latest" {
+    sink method "import" -> code.CodeEval
+  }
+}

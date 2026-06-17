@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter ruby {
+  package "activerecord-import" {
+    sink method "bulk_import" -> code.SqlExecution
+    sink method "insert_many" -> code.SqlExecution
+  }
+}

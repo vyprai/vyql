@@ -1,0 +1,10 @@
+import code.{UrlFetch, HtmlRender, CodeEval, Cookie}
+
+adapter cpp {
+  package "qtwebview" {
+    sink method "setUrl" -> code.UrlFetch
+    sink method "loadHtml" -> code.HtmlRender
+    sink method "runJavaScript" -> code.CodeEval
+    source method "setCookie" -> code.Cookie
+  }
+}

@@ -1,0 +1,6 @@
+adapter elixir {
+  package "mongo" {
+    sink method "Mongo.Db.cmd_sync" -> code.NosqlQuery
+    sink method "Mongo.Db.cmd" -> code.NosqlQuery
+  }
+}

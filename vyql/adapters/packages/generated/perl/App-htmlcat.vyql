@@ -1,0 +1,9 @@
+import code.{CommandExecution, HtmlRender, StdinInput}
+
+adapter perl {
+  package "App-htmlcat" {
+    sink method "run" -> code.CommandExecution
+    sink method "run" -> code.HtmlRender
+    source method "run" -> code.StdinInput
+  }
+}

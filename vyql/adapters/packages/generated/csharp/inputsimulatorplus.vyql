@@ -1,0 +1,11 @@
+import code.{CommandExecution}
+import core.{UserControlledData}
+
+adapter csharp {
+  package "inputsimulatorplus" {
+    source method "TextEntry" -> core.UserControlledData
+    source method "AddCharacter" -> core.UserControlledData
+    source method "AddCharacters" -> core.UserControlledData
+    source method "ModifiedKeyStroke" -> core.UserControlledData
+  }
+}

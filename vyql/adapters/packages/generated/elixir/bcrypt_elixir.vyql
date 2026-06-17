@@ -1,0 +1,9 @@
+import code.{WeakHash}
+import core.{AuthenticationCheck}
+
+adapter elixir {
+  package "bcrypt_elixir" {
+    mark method "hash_pwd_salt" -> code.WeakHash
+    control method "verify_pass" -> core.AuthenticationCheck
+  }
+}

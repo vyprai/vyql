@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter swift {
+  package "github.com/pointfreeco/swift-composable-architecture" {
+    sink method "LiveFileStorage" -> code.FilePathAccess
+    sink method "InMemoryFileStorage" -> code.FilePathAccess
+  }
+}

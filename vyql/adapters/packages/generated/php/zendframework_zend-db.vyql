@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter php {
+  package "zendframework/zend-db" {
+    sink method "Zend\\Db\\Adapter\\Adapter::query" -> code.SqlExecution
+  }
+}

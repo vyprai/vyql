@@ -16,27 +16,17 @@ type scConvScala struct {
 
 // ExtractScala parses Scala files into one NIR Program (one module per file).
 func ExtractScala(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsscala.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &scConvScala{src: src, file: rel, key: moduleKey(root, f, ".scala")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsscala.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &scConvScala{src: src, file: rel, key: moduleKey(root, abs, ".scala")}
+			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *scConvScala) loc(n *tree_sitter.Node) string {
@@ -69,11 +59,13 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "object_definition", "class_definition", "trait_definition", "enum_definition":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}}
 	case "function_definition":
+		params := c.params(field(n, "parameters"))
 		return []nir.Stmt{nir.FuncDef{
-			Name:   c.text(field(n, "name")),
-			Params: c.params(field(n, "parameters")),
-			Body:   c.bodyStmts(field(n, "body")),
-			Loc:    L,
+			Name:       c.text(field(n, "name")),
+			Params:     params,
+			ParamTypes: c.paramTypes(field(n, "parameters")),
+			Body:       c.bodyStmts(field(n, "body")),
+			Loc:        L,
 		}}
 	case "val_definition", "var_definition", "val_declaration", "var_declaration":
 		name := c.patName(field(n, "pattern"))
@@ -207,6 +199,21 @@ func (c *scConvScala) params(params *tree_sitter.Node) []string {
 		if ch.Kind() == "parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
+			}
+		}
+	}
+	return out
+}
+
+func (c *scConvScala) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() == "parameter" {
+			if nm := field(ch, "name"); nm != nil {
+				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
 			}
 		}
 	}

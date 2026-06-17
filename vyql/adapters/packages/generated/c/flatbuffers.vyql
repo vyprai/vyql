@@ -1,0 +1,6 @@
+adapter c {
+  package "flatbuffers" {
+    sink method "file" -> code.FilePathAccess
+    sink method "parser" -> code.Deserialization
+  }
+}

@@ -1,0 +1,12 @@
+import code.{FilePathAccess}
+adapter ruby {
+  package "bootsnap" {
+    sink method "precompile_command" -> code.FilePathAccess
+    sink method "precompile_yaml_files" -> code.FilePathAccess
+    sink method "precompile_yaml" -> code.FilePathAccess
+    sink method "precompile_ruby_files" -> code.FilePathAccess
+    sink method "precompile_ruby" -> code.FilePathAccess
+    sink method "bs_rb_fetch" -> code.FilePathAccess
+    sink method "bs_rb_precompile" -> code.FilePathAccess
+  }
+}

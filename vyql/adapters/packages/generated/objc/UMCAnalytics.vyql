@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter objc {
+  package "UMCAnalytics" {
+    source method "setSecret:" -> code.SecretValue
+    source method "onDeepLinkReceived:" -> core.UserControlledData
+  }
+}

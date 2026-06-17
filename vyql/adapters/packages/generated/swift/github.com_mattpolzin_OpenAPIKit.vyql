@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter swift {
+  package "github.com/mattpolzin/OpenAPIKit" {
+    sink method "externallyDereferenced" -> code.UrlFetch
+  }
+}

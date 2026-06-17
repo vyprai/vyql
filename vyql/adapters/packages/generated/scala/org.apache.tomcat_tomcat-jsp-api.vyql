@@ -1,0 +1,10 @@
+import code.{HttpInput, RedirectTarget}
+
+adapter scala {
+  package "org.apache.tomcat:tomcat-jsp-api" {
+    mark method "forward" -> code.RedirectTarget
+    mark method "include" -> code.RedirectTarget
+    source method "getRequestURI" -> code.HttpInput
+    source method "getQueryString" -> code.HttpInput
+  }
+}

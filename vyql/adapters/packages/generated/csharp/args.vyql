@@ -1,0 +1,8 @@
+import code.{CliArgument}
+adapter csharp {
+  package "args" {
+    source method "ParsesArgumentWith" -> code.CliArgument
+    source method "WatchesFor" -> code.CliArgument
+    source method "UsingSwitchDelimiter" -> code.CliArgument
+  }
+}

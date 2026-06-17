@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter elixir {
+  package "spandex_phoenix" {
+    source method "customize_metadata" -> code.NetworkData
+    source method "default_metadata" -> code.NetworkData
+  }
+}

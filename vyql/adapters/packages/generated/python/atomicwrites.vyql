@@ -1,0 +1,11 @@
+import code.{FilePathAccess}
+
+adapter python {
+  package "atomicwrites" {
+    sink method "atomic_write" -> code.FilePathAccess
+    sink method "replace_atomic" -> code.FilePathAccess
+    sink method "move_atomic" -> code.FilePathAccess
+    sink method "AtomicWriter.open" -> code.FilePathAccess
+    sink method "AtomicWriter.get_fileobject" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "codeception/codeception" {
+    sink method "exec" -> code.CommandExecution
+  }
+}

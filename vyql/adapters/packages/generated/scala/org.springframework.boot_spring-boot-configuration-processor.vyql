@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.springframework.boot:spring-boot-configuration-processor" {
+    sink method "read" -> code.Deserialization
+    sink method "readLiteral" -> code.Deserialization
+    sink method "readObject" -> code.Deserialization
+    sink method "readArray" -> code.Deserialization
+  }
+}

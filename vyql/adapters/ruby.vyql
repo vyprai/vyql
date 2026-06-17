@@ -51,6 +51,9 @@ adapter ruby {
   sink method "exec_update" -> code.SqlExecution
   sink method "exec_delete" -> code.SqlExecution
   sink method "exec_insert" -> code.SqlExecution
+  sink method "find" -> code.ObjectLookupByUserInput
+  sink method "find_by_id" -> code.ObjectLookupByUserInput
+  sink method "find_by!" -> code.ObjectLookupByUserInput
   // CSRF (CWE-352, RF-003) — security-sensitive state-changing operations (low-FP scope)
   sink method "change_password" -> code.StateChangingOp
   sink method "update_password" -> code.StateChangingOp
@@ -60,12 +63,27 @@ adapter ruby {
   sink method "delete_account" -> code.StateChangingOp
   sink method "grant_role" -> code.StateChangingOp
   sink method "make_admin" -> code.StateChangingOp
+  mark "change_password" -> code.AuthenticationRequiredOp
+  mark "update_password" -> code.AuthenticationRequiredOp
+  mark "reset_password" -> code.AuthenticationRequiredOp
+  mark "change_email" -> code.AuthenticationRequiredOp
+  mark "transfer_funds" -> code.AuthenticationRequiredOp
+  mark "delete_account" -> code.AuthenticationRequiredOp
+  mark "grant_role" -> code.AuthenticationRequiredOp
+  mark "make_admin" -> code.AuthenticationRequiredOp
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verify_authenticity_token" -> core.CsrfProtection
   control "validate_csrf_token" -> core.CsrfProtection
+  control "authenticate_user!" -> core.AuthenticationCheck
+  control "require_auth" -> core.AuthenticationCheck
+  control "ensure_authenticated" -> core.AuthenticationCheck
+  control "signed_in?" -> core.AuthenticationCheck
   // authorization checks (guards BIZ-001) — Pundit/CanCan predicates (path-sensitive via B1).
   control "authorize" -> core.AuthorizationCheck
   control "authorize!" -> core.AuthorizationCheck
+  control "check_ownership" -> core.OwnershipCheck
+  control "require_owner" -> core.OwnershipCheck
+  control "owns_resource?" -> core.OwnershipCheck
   // Sequel raw SQL (DB.fetch / DB.run / DB['...'])
   sink path "DB.fetch" -> code.SqlExecution
   sink path "DB.run" -> code.SqlExecution
@@ -131,6 +149,14 @@ adapter ruby {
   sink path "Dir.entries" -> code.FilePathAccess
   sink path "send_file" -> code.FilePathAccess
   sink path "send_data" -> code.FilePathAccess
+  sink path "require" -> code.DynamicCodeLoad
+  sink path "load" -> code.DynamicCodeLoad
+  // unrestricted upload (CWE-434) — common uploaded file helpers and direct writes.
+  sink path "uploaded_file.save" -> code.UnsafeUpload
+  sink path "file.save" -> code.UnsafeUpload
+  sink path "File.write" -> code.UnsafeUpload
+  sink method "extract" -> code.ArchiveEntryWrite
+  sink path "Zip.File.extract" -> code.ArchiveEntryWrite
   sink path "raw" -> code.HtmlRender
   sink path "html_safe" -> code.HtmlRender
   sink path "render" -> code.HtmlRender
@@ -144,6 +170,26 @@ adapter ruby {
   sink path "Tilt.new" -> code.TemplateRender
   sink path "redirect_to" -> code.RedirectTarget
   sink path "redirect" -> code.RedirectTarget
+  // HTTP response splitting / header injection (CWE-113).
+  sink path "response.set_header" arg 1 -> code.ResponseHeaderWrite
+  sink path "headers.__setitem__" arg 1 -> code.ResponseHeaderWrite
+  // log injection (CWE-117) + secret-in-log (CWE-532).
+  sink path "Rails.logger.info" arg all -> code.LogOutput
+  sink path "Rails.logger.warn" arg all -> code.LogOutput
+  sink path "Rails.logger.error" arg all -> code.LogOutput
+  sink path "logger.info" arg all -> code.LogOutput
+  sink path "logger.warn" arg all -> code.LogOutput
+  sink path "logger.error" arg all -> code.LogOutput
+  mark "Rails.logger.info" -> code.LogWrite
+  mark "Rails.logger.warn" -> code.LogWrite
+  mark "Rails.logger.error" -> code.LogWrite
+  mark "logger.info" -> code.LogWrite
+  mark "logger.warn" -> code.LogWrite
+  mark "logger.error" -> code.LogWrite
+  // CSV/formula injection (CWE-1236).
+  sink path "csv.write_row" arg all -> code.CsvCell
+  sink path "CSV.generate_line" arg all -> code.CsvCell
+  sink path "CSV.open" arg all -> code.CsvCell
 
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "CGI.escapeHTML" -> core.HtmlEscape
@@ -169,6 +215,8 @@ adapter ruby {
   mark "OpenSSL.Cipher.new" val "rc2" -> code.WeakCipher
   mark "OpenSSL.Cipher.new" val "bf" -> code.WeakCipher
   mark "OpenSSL.Cipher.new" val "ecb" -> code.WeakCipher
+  mark "OpenSSL.Cipher.new" val "0000000000000000" -> code.StaticIv
+  mark "cipher.iv" val "0000000000000000" -> code.StaticIv
 
   // weak hash (CWE-327) — MD5/SHA1 digests
   mark "Digest.MD5" -> code.WeakHash
@@ -180,6 +228,14 @@ adapter ruby {
   mark "JWT.decode" val "false" -> code.JwtUnverified
   mark "JWT.decode" val "algorithm=none" -> code.JwtUnverified
   mark "JWT.encode" val "algorithm=none" -> code.JwtUnverified
+  mark "skip_before_action" val "verify_authenticity_token" -> code.CsrfDisabled
+  mark "verify_mode" val "VERIFY_NONE" -> code.CertValidationDisabled
+  mark "File.chmod" val "0777" -> code.InsecurePermission
+  mark "File.chmod" val "0666" -> code.InsecurePermission
+  mark "File.open" val "/tmp/" val "w" -> code.InsecureTempFile
+  mark "TCPSocket.open" -> code.ResourceHandle
+  mark "File.open" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
 
   // XPath injection (CWE-643) — Nokogiri doc.xpath(expr) / at_xpath(expr) (distinctive)
   sink method "xpath" -> code.XpathQuery
@@ -200,6 +256,7 @@ adapter ruby {
   mark "rand" -> code.WeakRandomValue
   mark "set_cookie" val "false" -> code.InsecureCookie
   control "validate_role" -> core.InputValidation
+  control "ldap_escape" -> core.LdapEscape
   control "xpath_escape" -> core.XpathEscape
   control "File.basename" -> core.PathCanonicalization
 }

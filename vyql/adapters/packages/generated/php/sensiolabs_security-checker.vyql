@@ -1,0 +1,9 @@
+import code.{UrlFetch, SecretValue, NetworkData}
+
+adapter php {
+  package "sensiolabs/security-checker" {
+    sink method "SensioLabs\Security\Crawler.check" -> code.UrlFetch
+    source method "SensioLabs\Security\Crawler.setToken" -> code.SecretValue
+    source method "SensioLabs\Security\Crawler.addHeader" -> code.NetworkData
+  }
+}

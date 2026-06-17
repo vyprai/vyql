@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess, UrlFetch}
+adapter groovy {
+  package "org.codehaus.groovy:groovy-json" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseText" -> code.Deserialization
+    sink method "toJson" -> code.UrlFetch
+  }
+}

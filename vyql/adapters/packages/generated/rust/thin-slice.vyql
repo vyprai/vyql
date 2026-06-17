@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "thin-slice" {
+    sink method "from_raw" -> code.Deserialization
+  }
+}

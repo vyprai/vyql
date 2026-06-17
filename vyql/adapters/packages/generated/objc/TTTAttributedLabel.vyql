@@ -1,0 +1,7 @@
+adapter objc {
+  package "TTTAttributedLabel" {
+    source method "setText:" -> core.UserControlledData
+    mark method "addLinkToURL:" -> code.RedirectTarget
+    mark method "addLinkWithTextCheckingResult:" -> code.RedirectTarget
+  }
+}

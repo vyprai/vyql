@@ -1,0 +1,7 @@
+import code.{StoredDataRead}
+adapter kotlin {
+  package "org.springframework.cloud:spring-cloud-localconfig-connector" {
+    source method "readServicesData" -> code.StoredDataRead
+    source method "readServices" -> code.StoredDataRead
+  }
+}

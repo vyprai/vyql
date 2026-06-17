@@ -1,0 +1,11 @@
+import code.{NosqlQuery}
+
+adapter php {
+  package "mongodb/mongodb" {
+    sink method "query" -> code.NosqlQuery
+    sink method "bulkWrite" -> code.NosqlQuery
+    sink method "createSearchIndexes" -> code.NosqlQuery
+    sink method "dropSearchIndex" -> code.NosqlQuery
+    sink method "listSearchIndexes" -> code.NosqlQuery
+  }
+}

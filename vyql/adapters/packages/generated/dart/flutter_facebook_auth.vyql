@@ -1,0 +1,8 @@
+import code.{SecretValue, StoredDataRead}
+adapter dart {
+  package "flutter_facebook_auth" {
+    source method "getAccessToken" -> code.SecretValue
+    source method "login" -> core.UserControlledData
+    source method "getUserData" -> code.StoredDataRead
+  }
+}

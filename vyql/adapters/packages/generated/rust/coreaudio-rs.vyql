@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter rust {
+  package "coreaudio-rs" {
+    sink method "set_stream_format" -> code.FilePathAccess
+  }
+}

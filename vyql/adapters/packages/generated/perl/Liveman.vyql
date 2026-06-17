@@ -1,0 +1,7 @@
+import code.{CommandExecution, Deserialization, FilePathAccess}
+adapter perl {
+  package "Liveman" {
+    sink method "parse_from_file" -> code.Deserialization
+    source method "parse_options" -> core.UserControlledData
+  }
+}

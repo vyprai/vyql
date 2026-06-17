@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter ruby {
+  package "aws-sdk-ses" {
+    sink method "send_email" -> code.NetworkSend
+    sink method "send_raw_email" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+
+adapter scala {
+  package "org.thymeleaf:thymeleaf" {
+    sink method "process" -> code.HtmlRender
+  }
+}

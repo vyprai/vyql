@@ -1,0 +1,12 @@
+import code.{Deserialization, NosqlQuery}
+
+adapter kotlin {
+  package "org.springframework.data:spring-data-mongodb" {
+    sink method "query" -> code.NosqlQuery
+    sink method "parse" -> code.Deserialization
+    sink method "updateOne" -> code.NosqlQuery
+    sink method "updateMulti" -> code.NosqlQuery
+    sink method "upsert" -> code.NosqlQuery
+    sink method "remove" -> code.NosqlQuery
+  }
+}

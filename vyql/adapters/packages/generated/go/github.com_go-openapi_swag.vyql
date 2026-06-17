@@ -1,0 +1,15 @@
+import code.{Deserialization, FilePathAccess, UrlFetch}
+
+adapter go {
+  package "github.com/go-openapi/swag" {
+    sink method "LoadFromFileOrHTTP" -> code.UrlFetch
+    sink method "LoadFromFileOrHTTP" -> code.FilePathAccess
+    sink method "LoadFromFileOrHTTPWithTimeout" -> code.UrlFetch
+    sink method "LoadFromFileOrHTTPWithTimeout" -> code.FilePathAccess
+    sink method "YAMLDoc" -> code.Deserialization
+    sink method "YAMLData" -> code.Deserialization
+    sink method "ReadJSON" -> code.Deserialization
+    sink method "DynamicJSONToStruct" -> code.Deserialization
+    sink method "FromDynamicJSON" -> code.Deserialization
+  }
+}

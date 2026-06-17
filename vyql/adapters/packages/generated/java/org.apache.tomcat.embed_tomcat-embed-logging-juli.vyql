@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter java {
+  package "org.apache.tomcat.embed:tomcat-embed-logging-juli" {
+    sink method "FileHandler" -> FilePathAccess
+  }
+}

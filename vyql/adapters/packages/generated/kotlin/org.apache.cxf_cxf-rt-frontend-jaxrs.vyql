@@ -1,0 +1,10 @@
+import code.{NetworkData, FileUse}
+import core.{InputValidation}
+
+adapter kotlin {
+  package "org.apache.cxf:cxf-rt-frontend-jaxrs" {
+    source method "invoke" -> code.NetworkData
+    sink method "write" -> code.FileUse
+    control method "validate" -> core.InputValidation
+  }
+}

@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter rust {
+  package "winit" {
+    source method "read_token_from_env" -> code.SecretValue
+    source method "set_activation_token_env" -> code.SecretValue
+  }
+}

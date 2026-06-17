@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter elixir {
+  package "doteki" {
+    sink method "set_env_from_file" -> code.FilePathAccess
+    sink method "set_env_from_config" -> code.FilePathAccess
+  }
+}

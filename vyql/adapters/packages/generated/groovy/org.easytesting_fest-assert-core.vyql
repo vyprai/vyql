@@ -1,0 +1,18 @@
+import code.{FilePathAccess}
+
+adapter groovy {
+  package "org.easytesting:fest-assert-core" {
+    sink method "exists" -> code.FilePathAccess
+    sink method "doesNotExist" -> code.FilePathAccess
+    sink method "isFile" -> code.FilePathAccess
+    sink method "isDirectory" -> code.FilePathAccess
+    sink method "isAbsolute" -> code.FilePathAccess
+    sink method "isRelative" -> code.FilePathAccess
+    sink method "canRead" -> code.FilePathAccess
+    sink method "canWrite" -> code.FilePathAccess
+    sink method "hasContentEqualTo" -> code.FilePathAccess
+    sink method "hasBinaryContent" -> code.FilePathAccess
+    sink method "hasContent" -> code.FilePathAccess
+    sink method "usingCharset" -> code.FilePathAccess
+  }
+}

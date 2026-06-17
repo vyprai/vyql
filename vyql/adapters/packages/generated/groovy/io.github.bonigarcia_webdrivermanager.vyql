@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter groovy {
+  package "io.github.bonigarcia:webdrivermanager" {
+    sink method "parse" -> code.Deserialization
+    sink method "setCachePath" -> code.FilePathAccess
+  }
+}

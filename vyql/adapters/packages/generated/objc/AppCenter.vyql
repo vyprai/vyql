@@ -1,0 +1,8 @@
+import code.{SecretValue, NetworkData}
+
+adapter objc {
+  package "AppCenter" {
+    source method "configureWithAppSecret:" -> code.SecretValue
+    source method "start:withServices:" -> code.SecretValue
+  }
+}

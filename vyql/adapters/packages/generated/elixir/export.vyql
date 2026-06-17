@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter elixir {
+  package "export" {
+    sink method "Export.Python.call" -> code.CodeEval
+    sink method "Export.Ruby.call" -> code.CodeEval
+  }
+}

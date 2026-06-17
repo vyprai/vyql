@@ -1,0 +1,6 @@
+adapter python {
+  package "oslo.config" {
+    source method "parse" -> code.CliArgument
+    source method "parse_args" -> code.CliArgument
+  }
+}

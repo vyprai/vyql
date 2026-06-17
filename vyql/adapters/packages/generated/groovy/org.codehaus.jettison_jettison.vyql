@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter groovy {
+  package "org.codehaus.jettison:jettison" {
+    sink method "parse" -> code.Deserialization
+    sink method "JSONObject" -> code.Deserialization
+    sink method "JSONArray" -> code.Deserialization
+  }
+}

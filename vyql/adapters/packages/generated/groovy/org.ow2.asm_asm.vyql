@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "org.ow2.asm:asm" {
+    sink method "accept" -> code.Deserialization
+  }
+}

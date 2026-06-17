@@ -1,0 +1,10 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter python {
+  package "firebase-admin" {
+    source method "create_custom_token" -> code.SecretValue
+    control method "verify_id_token" -> core.AuthenticationCheck
+    source method "create_session_cookie" -> code.SecretValue
+  }
+}

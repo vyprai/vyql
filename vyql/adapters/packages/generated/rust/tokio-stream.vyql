@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter rust {
+  package "tokio-stream" {
+    sink method "ReadDirStream.new" -> FilePathAccess
+  }
+}

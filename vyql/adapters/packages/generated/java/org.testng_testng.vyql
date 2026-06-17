@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter java {
+  package "org.testng:testng" {
+    sink method "org.testng.internal.Yaml.parse" -> code.Deserialization
+    control method "org.testng.reporters.XMLUtils.escape" -> core.HtmlEscape
+  }
+}

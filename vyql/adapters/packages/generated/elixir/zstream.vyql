@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "zstream" {
+    sink method "Zstream.Unzip.Extra.parse" -> code.Deserialization
+  }
+}

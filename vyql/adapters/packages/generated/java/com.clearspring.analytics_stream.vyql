@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "com.clearspring.analytics:stream" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

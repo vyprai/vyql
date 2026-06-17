@@ -1,0 +1,11 @@
+import code.{CommandExecution, Deserialization}
+import core.{HtmlEscape}
+
+adapter perl {
+  package "Swim" {
+    sink method "parse" -> code.Deserialization
+    sink method "run" -> code.CommandExecution
+    sink method "exec" -> code.CommandExecution
+    control method "escape_html" -> core.HtmlEscape
+  }
+}

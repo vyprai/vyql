@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/SvenTiigi/ValidatedPropertyKit" {
+    control method "isValid" -> core.InputValidation
+  }
+}

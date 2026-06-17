@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter c {
+  package "tinyxml2" {
+    sink method "XMLDocument.Parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter dart {
+  package "fluttertoast" {
+    sink method "showToast" -> code.HtmlRender
+  }
+}

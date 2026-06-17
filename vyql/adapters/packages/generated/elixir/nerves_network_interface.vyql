@@ -1,0 +1,6 @@
+adapter elixir {
+  package "nerves_network_interface" {
+    source method "handle_async_response" -> code.NetworkData
+    sink method "erlcmd_send" -> code.NetworkSend
+  }
+}

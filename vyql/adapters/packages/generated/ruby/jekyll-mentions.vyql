@@ -1,0 +1,6 @@
+adapter ruby {
+  package "jekyll-mentions" {
+    sink method "mentionify" -> code.HtmlRender
+    sink method "filter_with_mention" -> code.HtmlRender
+  }
+}

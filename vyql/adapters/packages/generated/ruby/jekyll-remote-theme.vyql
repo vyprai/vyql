@@ -1,0 +1,8 @@
+import code.{UrlFetch}
+
+adapter ruby {
+  package "jekyll-remote-theme" {
+    sink method "Downloader#request!" -> code.UrlFetch
+    sink method "Theme#make_api_request" -> code.UrlFetch
+  }
+}

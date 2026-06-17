@@ -1,0 +1,13 @@
+adapter go {
+  package "github.com/btcsuite/btcutil" {
+    sink method "DecodeAddress" -> code.Deserialization
+    sink method "DecodeWIF" -> code.Deserialization
+    sink method "NewBlockFromBytes" -> code.Deserialization
+    sink method "NewBlockFromReader" -> code.Deserialization
+    mark method "Hash160" -> code.WeakHash
+    source method "NewAddressPubKeyHash" -> core.UserControlledData
+    source method "NewAddressScriptHash" -> core.UserControlledData
+    source method "NewAddressWitnessPubKeyHash" -> core.UserControlledData
+    source method "NewAddressWitnessScriptHash" -> core.UserControlledData
+  }
+}

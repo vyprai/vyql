@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter php {
+  package "jaybizzle/crawler-detect" {
+    source method "isCrawler" -> core.UserControlledData
+  }
+}

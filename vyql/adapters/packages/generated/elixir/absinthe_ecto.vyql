@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+
+adapter elixir {
+  package "absinthe_ecto" {
+    sink method "assoc" -> code.SqlExecution
+    sink method "ecto_batch" -> code.SqlExecution
+    sink method "resolve_query" -> code.SqlExecution
+  }
+}

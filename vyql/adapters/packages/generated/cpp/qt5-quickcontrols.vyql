@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter cpp {
+  package "qt5-quickcontrols" {
+    sink method "QQuickAndroid9Patch1.setSource" -> code.FilePathAccess
+  }
+}

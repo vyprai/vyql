@@ -1,0 +1,9 @@
+import code.{XmlParse}
+import core.{InputValidation}
+
+adapter groovy {
+  package "org.springframework.batch:spring-batch-core" {
+    sink method "parse" -> code.XmlParse
+    control method "validate" -> core.InputValidation
+  }
+}

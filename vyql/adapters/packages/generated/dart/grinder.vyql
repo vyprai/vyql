@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+
+adapter dart {
+  package "grinder" {
+    sink method "run" -> code.CommandExecution
+    sink method "runAsync" -> code.CommandExecution
+  }
+}

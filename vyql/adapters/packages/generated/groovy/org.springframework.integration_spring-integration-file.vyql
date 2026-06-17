@@ -1,0 +1,6 @@
+import code.{FileUse}
+adapter groovy {
+  package "org.springframework.integration:spring-integration-file" {
+    sink method "FileWritingMessageHandler.handleRequestMessage" -> code.FileUse
+  }
+}

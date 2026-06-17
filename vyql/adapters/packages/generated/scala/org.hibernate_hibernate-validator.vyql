@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter scala {
+  package "org.hibernate:hibernate-validator" {
+    mark method "regexp" -> code.RegexCompile
+  }
+}

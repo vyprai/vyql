@@ -1,0 +1,5 @@
+adapter elixir {
+  package "file_system" {
+    sink path "file_system.open" -> code.FilePathAccess
+  }
+}

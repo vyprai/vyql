@@ -1,0 +1,5 @@
+adapter elixir {
+  package "system_registry_term_storage" {
+    sink method "persist" -> code.FileUse
+  }
+}

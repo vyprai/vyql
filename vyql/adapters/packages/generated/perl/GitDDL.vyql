@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter perl {
+  package "GitDDL" {
+    sink method "_do_sql" -> code.SqlExecution
+  }
+}

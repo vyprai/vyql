@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+adapter rust {
+  package "gcc" {
+    sink method "run" -> code.CommandExecution
+    sink method "spawn" -> code.CommandExecution
+  }
+}

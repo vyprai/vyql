@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter go {
+  package "github.com/andybalholm/brotli" {
+    source method "parseAccept" -> code.HttpInput
+  }
+}

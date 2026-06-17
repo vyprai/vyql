@@ -1,0 +1,10 @@
+import code.{CommandExecution}
+adapter ruby {
+  package "posix-spawn" {
+    sink method "spawn" -> code.CommandExecution
+    sink method "system" -> code.CommandExecution
+    sink method "pspawn" -> code.CommandExecution
+    sink method "fspawn" -> code.CommandExecution
+    sink method "popen4" -> code.CommandExecution
+  }
+}

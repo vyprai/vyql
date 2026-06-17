@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "zendframework/zend-serializer" {
+    sink method "unserialize" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "pylibmc" {
+    sink method "Client.deserialize" -> code.Deserialization
+  }
+}

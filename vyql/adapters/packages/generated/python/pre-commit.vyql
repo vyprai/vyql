@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "pre-commit" {
+    sink method "cmd_output_b" -> code.CommandExecution
+  }
+}

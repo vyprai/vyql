@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "resolve-url-loader" {
+    source method "resolveUrlLoader" -> core.UserControlledData
+  }
+}

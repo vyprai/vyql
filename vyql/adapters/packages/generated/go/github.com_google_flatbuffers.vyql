@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/google/flatbuffers" {
+    sink method "GetRootAs" -> code.Deserialization
+    sink method "GetSizePrefixedRootAs" -> code.Deserialization
+    sink method "GetBufferIdentifier" -> code.Deserialization
+    sink method "GetSizePrefixedBufferIdentifier" -> code.Deserialization
+  }
+}

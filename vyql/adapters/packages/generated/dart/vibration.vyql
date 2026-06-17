@@ -1,0 +1,5 @@
+adapter dart {
+  package "vibration" {
+    mark method "vibrate" -> code.PrivilegedOp
+  }
+}

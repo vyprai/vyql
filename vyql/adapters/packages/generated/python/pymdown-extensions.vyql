@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter python {
+  package "pymdown-extensions" {
+    control method "html_escape" -> core.HtmlEscape
+  }
+}

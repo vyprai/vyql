@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "libcbor" {
+    sink method "cbor_stream_decode" -> code.Deserialization
+  }
+}

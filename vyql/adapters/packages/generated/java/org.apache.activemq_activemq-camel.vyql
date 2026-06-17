@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter java {
+  package "org.apache.activemq:activemq-camel" {
+    sink method "process" -> code.CodeEval
+  }
+}

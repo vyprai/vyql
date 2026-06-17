@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter swift {
+  package "github.com/yonaskolb/Genesis" {
+    source method "GenesisCLI.run" -> code.CliArgument
+  }
+}

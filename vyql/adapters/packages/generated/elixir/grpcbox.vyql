@@ -1,0 +1,9 @@
+import code.{NetworkData, Deserialization}
+
+adapter elixir {
+  package "grpcbox" {
+    source method "grpcbox_client:recv_data" -> code.NetworkData
+    sink method "grpcbox_frame:split" -> code.Deserialization
+    sink method "grpcbox_utils:decode_header" -> code.Deserialization
+  }
+}

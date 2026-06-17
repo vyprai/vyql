@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/bugsnag/bugsnag-go" {
+    sink method "get" -> code.UrlFetch
+  }
+}

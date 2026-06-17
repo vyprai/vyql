@@ -1,0 +1,8 @@
+import code.{FileUse, Deserialization}
+adapter python {
+  package "tifffile" {
+    sink method "read" -> code.FileUse
+    sink method "write" -> code.FileUse
+    sink method "parse" -> code.Deserialization
+  }
+}

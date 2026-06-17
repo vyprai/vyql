@@ -1,0 +1,7 @@
+import code.{CliArgument, CommandExecution}
+
+adapter bash {
+  package "screenfetch" {
+    source method "screenfetch" -> code.CliArgument
+  }
+}

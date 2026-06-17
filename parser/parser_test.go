@@ -3,11 +3,11 @@ package parser
 import "testing"
 
 // Mirrors the Python parser smoke test: every docs/05 rule form parses.
-// VyQL conventions: `package <ns>;` declares the namespace (Go-style), rule
-// names are short PascalCase, concepts are qualified cross-package refs,
+// VyQL conventions: `module <ns>;` declares the namespace, rule
+// names are short PascalCase, concepts are qualified cross-module refs,
 // CWE refs are CWE_NNN, states are PascalCase.
 const program = `
-package vypr.injection;
+module vypr.injection;
 
 rule Sql {
   meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89], owasp: ["A03:2021"] }
@@ -15,7 +15,7 @@ rule Sql {
   unless sanitized_by core.SqlParameterization
 }
 
-package vypr.cloud;
+module vypr.cloud;
 
 rule PublicDatabase {
   meta { id: "VYQL-CLD-003", severity: critical }
@@ -28,7 +28,7 @@ rule UnencryptedStorage {
   unless guarded_by core.CompensatingEncryption
 }
 
-package vypr.identity;
+module vypr.identity;
 
 rule ExternalToAdmin { assume identity.ExternalPrincipal -> identity.AdminPrivilege }
 rule ToxicCombinationLateral {
@@ -36,7 +36,7 @@ rule ToxicCombinationLateral {
   where reach(cloud.Internet, w.workload) and assume(w, identity.AdminPrivilege)
 }
 
-package vypr.bizlogic;
+module vypr.bizlogic;
 
 rule UnauthorizedRefund {
   match business.Refund as a
@@ -127,11 +127,11 @@ func TestParseAllForms(t *testing.T) {
 	}
 }
 
-// Namespacing via a `package` declaration (Go-style): short rule names within
-// the package; cross-package concept refs stay qualified.
-func TestPackageDecl(t *testing.T) {
+// Namespacing via a `module` declaration: short rule names within the module;
+// cross-module concept refs stay qualified.
+func TestModuleDecl(t *testing.T) {
 	src := `
-package vypr.injection;
+module vypr.injection;
 
 rule Sql {
   meta { id: "VYQL-INJ-001" }
@@ -163,7 +163,7 @@ rule Command {
 
 func TestParseErrors(t *testing.T) {
 	bad := []string{
-		`rule x { taint A -> }`,            // missing endpoint
+		`rule x { taint A -> }`,             // missing endpoint
 		`rule x { meta { id "no-colon" } }`, // missing colon
 		`rule`,                              // truncated
 		`gibberish foo`,                     // bad top-level
@@ -178,15 +178,19 @@ func TestParseErrors(t *testing.T) {
 // The adapter + threat declarations (docs/05/07) parse into the right AST.
 func TestParseAdapterAndThreatDecls(t *testing.T) {
 	src := `
-package injection;
+module injection;
 threat SqlInjection { cwe: [CWE_89], desc: "Untrusted data in a SQL command" }
 
 adapter python {
   meta { fidelity: resolved }
   source "request.form" -> code.HttpInput
+  source path "request.cookies" -> code.Cookie
+  source receiver "body" on "express.Request" -> code.HttpInput
   sink method "execute" -> code.SqlExecution
   sink path "os.system" -> code.CommandExecution
   sink receiver "openConnection" -> code.UrlFetch
+  mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
+  mark exact "Random" -> code.WeakRandomValue
 }
 `
 	decls, err := Parse(src)
@@ -206,17 +210,93 @@ adapter python {
 	if th == nil || th.QualifiedName() != "injection.SqlInjection" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 4 {
+	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 8 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "code.HttpInput" {
 		t.Fatalf("source mapping wrong: %+v", ad.Mappings[0])
 	}
-	if ad.Mappings[1].Kind != "sink_method" || ad.Mappings[2].Kind != "sink_path" {
-		t.Fatalf("sink mapping kinds wrong: %+v", ad.Mappings[1:])
+	if ad.Mappings[1].Kind != "source" || ad.Mappings[1].Pattern != "request.cookies" || ad.Mappings[1].Concept != "code.Cookie" {
+		t.Fatalf("source path mapping wrong: %+v", ad.Mappings[1])
 	}
-	if ad.Mappings[3].Kind != "sink_receiver" || ad.Mappings[3].Concept != "code.UrlFetch" {
-		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[3])
+	if ad.Mappings[2].Kind != "source_receiver" || ad.Mappings[2].Constraint != "express.Request" {
+		t.Fatalf("source_receiver mapping wrong: %+v", ad.Mappings[2])
+	}
+	if ad.Mappings[3].Kind != "sink_method" || ad.Mappings[4].Kind != "sink_path" {
+		t.Fatalf("sink mapping kinds wrong: %+v", ad.Mappings[3:])
+	}
+	if ad.Mappings[5].Kind != "sink_receiver" || ad.Mappings[5].Concept != "code.UrlFetch" {
+		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[5])
+	}
+	if ad.Mappings[6].Kind != "mark_method" || ad.Mappings[6].Pattern != "setAllowsAnyHTTPSCertificate" ||
+		ad.Mappings[6].Concept != "code.CertValidationDisabled" || len(ad.Mappings[6].ValMatches) != 1 {
+		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[6])
+	}
+	if ad.Mappings[7].Kind != "mark" || !ad.Mappings[7].Exact || ad.Mappings[7].Pattern != "Random" {
+		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[7])
+	}
+}
+
+func TestConceptImportsResolveInRulesAndAdapters(t *testing.T) {
+	src := `
+import code.{HttpInput, SqlExecution, FilePathAccess};
+import core.SqlParameterization as SqlParam;
+import core.*;
+
+adapter python {
+  source "request.form" -> HttpInput
+  sink method "execute" -> SqlExecution
+  package "pg" {
+    sink method "raw" -> SqlExecution
+  }
+  control "bind" -> SqlParam
+  assume guard method "startsWith" -> FilePathAccess
+}
+
+rule Sql {
+  taint HttpInput -> SqlExecution
+  unless sanitized_by SqlParam
+}
+
+rule Storage {
+  match Storage as s
+  unless guarded_by EncryptionAtRest
+}
+`
+	decls, err := Parse(src)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	ad := decls[0].(*AdapterDecl)
+	if got := ad.Mappings[0].Concept; got != "code.HttpInput" {
+		t.Fatalf("source import = %q", got)
+	}
+	if got := ad.Mappings[1].Concept; got != "code.SqlExecution" {
+		t.Fatalf("sink import = %q", got)
+	}
+	if got := ad.Mappings[2].Packages; len(got) != 1 || got[0] != "pg" {
+		t.Fatalf("package gate = %#v", got)
+	}
+	if got := ad.Mappings[3].Concept; got != "core.SqlParameterization" {
+		t.Fatalf("alias import = %q", got)
+	}
+	if got := ad.Mappings[4].About; got != "code.FilePathAccess" {
+		t.Fatalf("assume target import = %q", got)
+	}
+	sql := decls[1].(*Rule)
+	fs := sql.Body.(*FlowStmt)
+	if fs.Src.Concept != "code.HttpInput" || fs.Dst.Concept != "code.SqlExecution" {
+		t.Fatalf("rule endpoint imports wrong: %+v", fs)
+	}
+	if sb := sql.Clauses[0].Unless.(SanitizedBy); sb.Concept != "core.SqlParameterization" {
+		t.Fatalf("rule alias import wrong: %+v", sb)
+	}
+	storage := decls[2].(*Rule)
+	if m := storage.Body.(*MatchStmt); m.Concept != "core.Storage" {
+		t.Fatalf("wildcard match import wrong: %+v", m)
+	}
+	if gb := storage.Clauses[0].Unless.(GuardedBy); gb.Concept != "core.EncryptionAtRest" {
+		t.Fatalf("wildcard guard import wrong: %+v", gb)
 	}
 }
 
@@ -225,12 +305,12 @@ adapter python {
 // The escape-free fast path must return the raw text unchanged.
 func TestLexStringEscapes(t *testing.T) {
 	cases := []struct{ src, want string }{
-		{`"plain"`, "plain"},                               // fast path, no escapes
-		{`"a=\"b\""`, `a="b"`},                             // escaped quotes don't terminate
-		{`"back\\slash"`, `back\slash`},                    // literal backslash
-		{`"tab\tend"`, "tab\tend"},                         // \t
-		{`"line\nbreak"`, "line\nbreak"},                   // \n
-		{`"x\qy"`, "xqy"},                                  // unknown escape → literal char
+		{`"plain"`, "plain"},             // fast path, no escapes
+		{`"a=\"b\""`, `a="b"`},           // escaped quotes don't terminate
+		{`"back\\slash"`, `back\slash`},  // literal backslash
+		{`"tab\tend"`, "tab\tend"},       // \t
+		{`"line\nbreak"`, "line\nbreak"}, // \n
+		{`"x\qy"`, "xqy"},                // unknown escape → literal char
 	}
 	for _, c := range cases {
 		toks, err := lex(c.src)

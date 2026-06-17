@@ -1,0 +1,9 @@
+import code.{FilePathAccess, FileUse}
+adapter go {
+  package "github.com/dgraph-io/badger" {
+    sink method "OpenExistingFile" -> code.FilePathAccess
+    sink method "CreateSyncedFile" -> code.FilePathAccess
+    sink method "OpenSyncedFile" -> code.FilePathAccess
+    sink method "OpenTruncFile" -> code.FilePathAccess
+  }
+}

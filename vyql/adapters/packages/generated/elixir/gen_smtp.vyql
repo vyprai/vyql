@@ -1,0 +1,17 @@
+import code.{Deserialization, NetworkConnect, NetworkSend}
+
+adapter elixir {
+  package "gen_smtp" {
+    sink method "decode_component" -> code.Deserialization
+    sink method "decode_quoted_printable" -> code.Deserialization
+    sink method "decode_header_tokens_permissive" -> code.Deserialization
+    sink method "parse_with_comments" -> code.Deserialization
+    sink method "decode_body" -> code.Deserialization
+    sink method "decode_base64" -> code.Deserialization
+    sink method "parse_rfc5322_addresses" -> code.Deserialization
+    sink method "parse_rfc822_addresses" -> code.Deserialization
+    sink method "connect" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+    sink method "send_it" -> code.NetworkSend
+  }
+}

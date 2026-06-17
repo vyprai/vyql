@@ -1,0 +1,6 @@
+import code.{CliArgument, CommandExecution}
+adapter cpp {
+  package "boost-test" {
+    source method "main" -> code.CliArgument
+  }
+}

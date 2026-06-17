@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter elixir {
+  package "extwitter" {
+    sink method "request" -> code.NetworkSend
+    sink method "request_async" -> code.NetworkSend
+    sink method "oauth_get" -> code.NetworkSend
+    sink method "oauth_post" -> code.NetworkSend
+  }
+}

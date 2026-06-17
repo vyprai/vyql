@@ -1,0 +1,9 @@
+import code.{FormatString}
+
+adapter elixir {
+  package "exprintf" {
+    sink method "printf" -> code.FormatString
+    sink method "sprintf" -> code.FormatString
+    sink method "parse_printf" -> code.FormatString
+  }
+}

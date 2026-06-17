@@ -1,0 +1,13 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter ruby {
+  package "CFPropertyList" {
+    sink method "load_xml" -> code.FilePathAccess
+    sink method "load_binary" -> code.FilePathAccess
+    sink method "load_plain" -> code.FilePathAccess
+    sink method "load_xml_str" -> code.Deserialization
+    sink method "load_binary_str" -> code.Deserialization
+    sink method "load_plain_str" -> code.Deserialization
+    sink method "load_str" -> code.Deserialization
+  }
+}

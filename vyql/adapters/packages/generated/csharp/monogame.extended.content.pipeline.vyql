@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter csharp {
+  package "monogame.extended.content.pipeline" {
+    sink method "Import" -> code.Deserialization
+    sink method "Process" -> code.Deserialization
+  }
+}

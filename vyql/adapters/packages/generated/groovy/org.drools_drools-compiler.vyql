@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+adapter groovy {
+  package "org.drools:drools-compiler" {
+    sink method "analyzeBlock" -> code.ExpressionEval
+    sink method "normalizeEval" -> code.ExpressionEval
+  }
+}

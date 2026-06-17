@@ -1,0 +1,5 @@
+adapter elixir {
+  package "file_only_logger" {
+    sink method "File.Only.Logger.Proxy.log" -> code.FileUse
+  }
+}

@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "org.apache.commons:commons-lang3" {
+    mark path "org.apache.commons.commons.lang3.random" -> code.WeakRandomValue
+  }
+}

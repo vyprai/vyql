@@ -1,0 +1,9 @@
+import code.{HttpInput}
+
+adapter rust {
+  package "http-body" {
+    source method "poll_frame" -> code.HttpInput
+    source method "into_data" -> code.HttpInput
+    source method "into_trailers" -> code.HttpInput
+  }
+}

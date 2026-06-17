@@ -1,0 +1,12 @@
+import code.{Deserialization, ExpressionEval, FilePathAccess, UrlFetch}
+import core.{HtmlEscape, PathCanonicalization}
+
+adapter kotlin {
+  package "xom:xom" {
+    sink method "build" -> code.Deserialization
+    sink method "query" -> code.ExpressionEval
+    sink method "setSystemID" -> code.UrlFetch
+    control method "escape" -> core.HtmlEscape
+    control method "canonicalizeURL" -> core.PathCanonicalization
+  }
+}

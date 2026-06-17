@@ -1,0 +1,7 @@
+adapter perl {
+  package "Pinto" {
+    sink method "request" -> code.UrlFetch
+    source method "auth" -> code.SecretValue
+    mark path "pinto.hash" -> code.WeakHash
+  }
+}

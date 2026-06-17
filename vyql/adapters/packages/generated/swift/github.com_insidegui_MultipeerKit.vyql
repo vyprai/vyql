@@ -1,0 +1,8 @@
+import code.{Deserialization, NetworkSend}
+
+adapter swift {
+  package "github.com/insidegui/MultipeerKit" {
+    sink method "MultipeerTransceiver.send" -> code.NetworkSend
+    sink method "MultipeerTransceiver.receive" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "petitparser" {
+    sink method "parse" -> code.Deserialization
+  }
+}

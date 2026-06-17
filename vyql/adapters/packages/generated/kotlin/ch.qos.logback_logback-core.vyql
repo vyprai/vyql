@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "ch.qos.logback:logback-core" {
+    sink method "tokenize" -> code.Deserialization
+  }
+}

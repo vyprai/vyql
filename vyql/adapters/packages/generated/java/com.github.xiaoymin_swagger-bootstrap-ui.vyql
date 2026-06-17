@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter java {
+  package "com.github.xiaoymin:swagger-bootstrap-ui" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

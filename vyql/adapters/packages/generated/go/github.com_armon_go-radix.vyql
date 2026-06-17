@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/armon/go-radix" {
+    source method "NewFromMap" -> code.StoredDataRead
+  }
+}

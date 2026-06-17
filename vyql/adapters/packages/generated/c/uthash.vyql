@@ -1,0 +1,7 @@
+import code.{FormatString}
+
+adapter c {
+  package "uthash" {
+    sink method "utstring_printf" -> code.FormatString
+  }
+}

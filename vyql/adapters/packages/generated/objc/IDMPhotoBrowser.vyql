@@ -1,0 +1,13 @@
+import code.{FilePathAccess, UrlFetch}
+
+adapter objc {
+  package "IDMPhotoBrowser" {
+    sink method "photoWithFilePath" -> code.FilePathAccess
+    sink method "photoWithURL" -> code.UrlFetch
+    sink method "photosWithFilePaths" -> code.FilePathAccess
+    sink method "photosWithURLs" -> code.UrlFetch
+    sink method "initWithFilePath" -> code.FilePathAccess
+    sink method "initWithURL" -> code.UrlFetch
+    sink method "initWithPhotoURLs" -> code.UrlFetch
+  }
+}

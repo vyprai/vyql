@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter dart {
+  package "ffigen" {
+    sink method "generate" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

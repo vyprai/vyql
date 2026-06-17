@@ -1,0 +1,11 @@
+import code.{UrlFetch}
+import core.{AuthenticationCheck}
+
+adapter elixir {
+  package "nerves_hub_user_api" {
+    sink method "request" -> code.UrlFetch
+    sink method "file_request" -> code.UrlFetch
+    control method "auth" -> core.AuthenticationCheck
+    control method "login" -> core.AuthenticationCheck
+  }
+}

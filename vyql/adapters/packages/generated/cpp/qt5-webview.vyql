@@ -1,0 +1,9 @@
+import code.{CodeEval, HttpInput}
+
+adapter cpp {
+  package "qt5-webview" {
+    sink method "runJavaScriptPrivate" -> code.CodeEval
+    source method "setUrl" -> code.HttpInput
+    source method "loadHtml" -> code.HttpInput
+  }
+}

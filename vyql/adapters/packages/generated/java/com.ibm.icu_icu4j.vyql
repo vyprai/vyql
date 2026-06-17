@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "com.ibm.icu:icu4j" {
+    sink method "parse" -> code.Deserialization
+  }
+}

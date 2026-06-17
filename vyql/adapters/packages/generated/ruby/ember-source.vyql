@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter ruby {
+  package "ember-source" {
+    sink method "Ember::Source.bundled_path_for" -> code.FilePathAccess
+  }
+}

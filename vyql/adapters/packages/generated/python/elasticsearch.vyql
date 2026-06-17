@@ -1,0 +1,7 @@
+import code.{SqlExecution, Deserialization}
+adapter python {
+  package "elasticsearch" {
+    sink method "query" -> code.SqlExecution
+    sink method "loads" -> code.Deserialization
+  }
+}

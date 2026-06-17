@@ -1,0 +1,7 @@
+import code.{CommandExecution, CliArgument}
+
+adapter kotlin {
+  package "org.apache.commons:commons-exec" {
+    source method "parse" -> code.CliArgument
+  }
+}

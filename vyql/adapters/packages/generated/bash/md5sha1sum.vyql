@@ -1,0 +1,5 @@
+adapter bash {
+  package "md5sha1sum" {
+    mark method "md5sum" -> code.WeakHash
+  }
+}

@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter groovy {
+  package "org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven" {
+    sink method "fileFromClassLoaderResource" -> code.FilePathAccess
+  }
+}

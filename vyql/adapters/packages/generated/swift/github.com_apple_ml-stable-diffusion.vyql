@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/apple/ml-stable-diffusion" {
+    sink method "tokenize" -> code.Deserialization
+  }
+}

@@ -1,0 +1,26 @@
+import code.{Deserialization, FilePathAccess}
+adapter kotlin {
+  package "io.rest-assured:xml-path" {
+    sink method "XmlPath" -> code.Deserialization
+    sink method "from" -> code.Deserialization
+    sink method "get" -> code.Deserialization
+    sink method "getList" -> code.Deserialization
+    sink method "getMap" -> code.Deserialization
+    sink method "getObject" -> code.Deserialization
+    sink method "getNode" -> code.Deserialization
+    sink method "getNodeChildren" -> code.Deserialization
+    sink method "getString" -> code.Deserialization
+    sink method "getUUID" -> code.Deserialization
+    sink method "getInt" -> code.Deserialization
+    sink method "getBoolean" -> code.Deserialization
+    sink method "getChar" -> code.Deserialization
+    sink method "getByte" -> code.Deserialization
+    sink method "getShort" -> code.Deserialization
+    sink method "getFloat" -> code.Deserialization
+    sink method "getDouble" -> code.Deserialization
+    sink method "getLong" -> code.Deserialization
+    sink method "using" -> code.Deserialization
+    sink method "with" -> code.Deserialization
+    sink method "given" -> code.Deserialization
+  }
+}

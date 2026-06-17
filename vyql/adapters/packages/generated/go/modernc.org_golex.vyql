@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter go {
+  package "modernc.org/golex" {
+    sink method "New" -> code.Deserialization
+  }
+}

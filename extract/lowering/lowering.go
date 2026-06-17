@@ -23,6 +23,7 @@ import (
 type funcInfo struct {
 	paramNames []string
 	params     map[string]string // name -> param node id
+	paramTypes map[string]string // name -> declared/inferred receiver type
 	ret        string            // return node id
 	module     string
 	cls        string
@@ -44,30 +45,32 @@ type lowerer struct {
 	resolveImports bool
 	ctorTypes      map[string]string // constructor callee-path -> returned type name
 	g              usg.Store
-	ctr            int
+	modCtr         map[string]int // per-module node-id counter (stable, module-local ids)
 
 	funcQual     map[string]*funcInfo         // "modkey::qual" -> info
 	funcShort    map[string][]*funcInfo       // short name -> infos
 	classQual    map[string]bool              // "modkey::Class"
-	classDefs    map[string][]string          // bare class name -> modules that define it
+	classDefs    map[string]map[string]bool   // bare class name -> SET of modules that define it
 	classFields  map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables map[string]map[string]importEntry
 
-	curModule string
+	curModule string // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
+	curNS     string // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
 	curClass  string // "" = none
 	curRoute  bool   // lowering the body of a web request handler (FuncDef.IsRoute)
 	curFunc   string // id of the code.Function node enclosing the nodes being lowered ("" = top level)
-	funcCtr   int    // side counter for code.Function node ids — kept OFF the shared ctr/order so
-	//        adding function records never perturbs existing dataflow node ids/ordering
 
-	// B1 structured-CFG metadata. `region` is the current control-region path (e.g.
-	// "/if3.t/loop5"); every node is stamped with it plus a monotonic `order`. For
-	// goto-free structured control flow this encodes the dominator tree directly:
-	// G dominates S iff region(G) is an ancestor of region(S) and order(G) < order(S)
-	// (see solvers.Dominates). Pure metadata — inert until a path-sensitive rule reads it.
-	region   string
-	order    int
-	branchCt int
+	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
+	// module key (e.g. "app/utils.go/fn3/loop5"); every node is stamped with it plus a
+	// per-module monotonic `order`. For goto-free structured control flow this encodes the
+	// dominator tree directly: G dominates S iff region(G) is an ancestor of region(S) and
+	// order(G) < order(S) (see solvers.Dominates). order and the branch counter are MODULE-
+	// LOCAL (keyed by curModule) and regions are module-namespaced, so a module's CFG metadata
+	// is deterministic from its own content alone — the same whether it is lowered in
+	// isolation (incremental) or alongside others (full). Pure metadata until a rule reads it.
+	region    string
+	modOrder  map[string]int
+	modBranch map[string]int
 
 	// container element-sensitivity: per-container-node taint of individual constant
 	// keys/indices, so `m.put("kB", tainted); m.get("kA")` reads a clean element rather
@@ -78,6 +81,14 @@ type lowerer struct {
 	// node ids, so a higher-order call (arr.map(cb), p.then(cb)) can route the receiver's
 	// taint into the callback's parameters.
 	lambdaParams map[string][]string
+
+	// p1, when non-nil, captures the symbol-table contributions of the module currently being
+	// registered (pass 1), so they can be cached and replayed without re-reading the module's
+	// NIR. nil on the full (non-incremental) path — zero cost there.
+	p1 *pass1Delta
+	// parseCache, when set (incremental path), lets bodyOf decode a stub module's full NIR on
+	// demand from the parse cache. nil on the full path.
+	parseCache DeltaCache
 }
 
 type containerInfo struct {
@@ -95,8 +106,8 @@ func (l *lowerer) inRegion(seg string, f func()) {
 }
 
 func (l *lowerer) nextBranch() string {
-	l.branchCt++
-	return strconv.Itoa(l.branchCt)
+	l.modBranch[l.curNS]++
+	return strconv.Itoa(l.modBranch[l.curNS])
 }
 
 // mutatorMethods add a value into their receiver (collection/builder), so the receiver
@@ -612,32 +623,55 @@ func Lower(prog nir.Program, resolveImports bool) (usg.Store, error) {
 // assigned from a known constructor lets the lowering stamp `recv_type` on its
 // method calls, which type-constrained sink adapters use for precision.
 func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]string) (usg.Store, error) {
-	l := &lowerer{
-		prog:           prog,
-		selfName:       prog.Self(),
-		resolveImports: resolveImports,
-		ctorTypes:      ctorTypes,
-		g:              usg.NewInMemStore(),
-		funcQual:       map[string]*funcInfo{},
-		funcShort:      map[string][]*funcInfo{},
-		classQual:      map[string]bool{},
-		classDefs:      map[string][]string{},
-		classFields:    map[string]map[string]string{},
-		importTables:   map[string]map[string]importEntry{},
-		containers:     map[string]*containerInfo{},
-		lambdaParams:   map[string][]string{},
-	}
+	l := newLowerer(prog, resolveImports, ctorTypes)
 	if err := l.run(); err != nil {
 		return nil, err
 	}
 	return l.g, nil
 }
 
+// newLowerer builds a fresh lowerer with all maps initialised. Shared by LowerTyped and the
+// incremental lowerer.
+func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]string) *lowerer {
+	return &lowerer{
+		prog:           prog,
+		selfName:       prog.Self(),
+		resolveImports: resolveImports,
+		ctorTypes:      ctorTypes,
+		g:              newGraphStore(0),
+		modCtr:         map[string]int{},
+		modOrder:       map[string]int{},
+		modBranch:      map[string]int{},
+		funcQual:       map[string]*funcInfo{},
+		funcShort:      map[string][]*funcInfo{},
+		classQual:      map[string]bool{},
+		classDefs:      map[string]map[string]bool{},
+		classFields:    map[string]map[string]string{},
+		importTables:   map[string]map[string]importEntry{},
+		containers:     map[string]*containerInfo{},
+		lambdaParams:   map[string][]string{},
+	}
+}
+
 // --- graph helpers ------------------------------------------------------
 
+// nid mints a node id that is STABLE per module: a module-local counter, namespaced by the
+// module key. So a node's id depends only on its own module's content and processing order,
+// not on global cross-module ordering — the prerequisite for reusing an unchanged module's
+// lowered sub-graph (incremental dataflow). Distinct module keys can never collide.
 func (l *lowerer) nid(prefix string) string {
-	l.ctr++
-	return prefix + "#" + strconv.Itoa(l.ctr)
+	l.modCtr[l.curNS]++
+	return l.curNS + "\x1f" + prefix + "#" + strconv.Itoa(l.modCtr[l.curNS])
+}
+
+// ModuleNS is a module's per-FILE node-id namespace: the file path (unique per file) so node
+// ids stay file-local and stable even for languages whose resolution Key is "" (PHP, Ruby,
+// …). Cross-module references use the resolution Key; node ids use this.
+func ModuleNS(m nir.Module) string {
+	if m.File != "" {
+		return m.File
+	}
+	return m.Key
 }
 
 func boolProp(b bool) string {
@@ -648,41 +682,96 @@ func boolProp(b bool) string {
 }
 
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
-	id := l.nid(kind)
-	p := map[string]string{"loc": loc, "region": l.region, "order": strconv.Itoa(l.order), "func": l.curFunc}
-	l.order++
-	for k, v := range props {
-		p[k] = v
+	if l.curFunc != "" {
+		// stamp the enclosing code.Function id on every body node (the node→function map
+		// VyPr keys off). Copy so the caller's props map is never mutated.
+		merged := make(map[string]string, len(props)+1)
+		for k, v := range props {
+			merged[k] = v
+		}
+		merged["func"] = l.curFunc
+		props = merged
 	}
-	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Props: p})
+	return l.nodeWithID(l.nid(kind), kind, loc, props)
+}
+
+// nodeWithID creates a node with an explicit id — used for signature nodes (Param/Return)
+// whose ids are NAME-derived (sigID) so they survive a body edit and remain valid targets for
+// cross-module call edges from other (possibly cached) modules.
+func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) string {
+	ord := l.modOrder[l.curNS]
+	l.modOrder[l.curNS]++
+	// loc/region/order live inline on the Node; props (the freshly-built extras map, often empty)
+	// becomes Props directly — nil/empty when there are no extras, so most nodes carry no map.
+	var extras map[string]string
+	if len(props) > 0 {
+		extras = props
+	}
+	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
+		Order: int32(ord), HasOrder: true, Props: extras})
 	return id
+}
+
+// sigID is the stable, name-derived id of a function's signature node (a Param or Return).
+// Independent of the function body and of other modules, so cross-module references to it
+// stay valid when the body changes or another module is reused from cache.
+func sigID(modkey, qual, kind, name string) string {
+	return modkey + "\x1f" + qual + "#" + kind + "#" + name
 }
 
 func (l *lowerer) flow(a, b string) {
 	if a == "" || b == "" {
 		return
 	}
-	if _, ok, _ := l.g.GetNode(a); !ok {
-		return
-	}
-	if _, ok, _ := l.g.GetNode(b); !ok {
+	if !l.exists(a) || !l.exists(b) {
 		return
 	}
 	l.g.AddEdge(usg.Edge{Type: "FLOWS", Src: a, Dst: b})
+}
+
+// exists is an existence-only check; on a disk-backed store it uses Has (no detail decode) so the
+// build never reads node payload back from disk.
+func (l *lowerer) exists(id string) bool {
+	if h, ok := l.g.(interface{ Has(string) bool }); ok {
+		return h.Has(id)
+	}
+	_, ok, _ := l.g.GetNode(id)
+	return ok
 }
 
 // --- entry --------------------------------------------------------------
 
 func (l *lowerer) run() error {
 	for _, m := range l.prog.Modules {
+		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		l.importTables[m.Key] = importTable(m)
+		for _, imp := range m.Imports {
+			l.importNode(m, imp)
+		}
 		l.register(m.Key, m.Body, "")
 	}
 	for _, m := range l.prog.Modules {
-		l.curModule, l.curClass = m.Key, ""
+		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		l.block(m.Body, newScope())
 	}
 	return nil
+}
+
+func (l *lowerer) importNode(m nir.Module, imp nir.Import) {
+	props := map[string]string{
+		"local":   imp.Local,
+		"module":  imp.Module,
+		"package": importPackageRoot(imp.Module),
+	}
+	if imp.Symbol != "" {
+		props["symbol"] = imp.Symbol
+	}
+	if imp.IsModule {
+		props["is_module"] = "true"
+	} else {
+		props["is_module"] = "false"
+	}
+	l.node("Import", m.File, props)
 }
 
 func importTable(m nir.Module) map[string]importEntry {
@@ -697,6 +786,74 @@ func importTable(m nir.Module) map[string]importEntry {
 	return out
 }
 
+func importPackageRoot(module string) string {
+	module = strings.TrimSpace(module)
+	if module == "" {
+		return ""
+	}
+	if strings.HasPrefix(module, "@") {
+		parts := strings.Split(module, "/")
+		if len(parts) >= 2 {
+			return parts[0] + "/" + parts[1]
+		}
+	}
+	if i := strings.IndexByte(module, '/'); i > 0 {
+		return module[:i]
+	}
+	return module
+}
+
+// makeFuncInfo creates a function's signature nodes (Param/Return) with stable, name-derived
+// ids and returns its funcInfo. Shared by pass-1 registration and the pass-2 nested-function
+// fallback so both mint identical, body-independent signature ids — the anchor cross-module
+// call edges (and reused modules) point at.
+func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
+	prefix := ""
+	if cls != "" {
+		prefix = cls + "."
+	}
+	rel := prefix + st.Name // module-relative qualified name
+	// signature node ids use the per-FILE namespace (curNS), so they are file-local and stable
+	// even when the resolution key (modkey) is shared ("") across files.
+	ns := l.curNS
+	// first-class function record: a code.Function node every node in this function points at
+	// via its `func` prop (the node→function map VyPr's CodeFunction / call-edge / path-function
+	// tables key off). Its id is NAME-derived (sigID), like the Param/Return signature nodes — so
+	// it is stable and module-namespaced: an incremental rebuild that re-lowers only one module
+	// reproduces the same id (no collision with cached modules, no build-order dependence).
+	fid := sigID(ns, rel, "func", "")
+	l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Loc: st.Loc, Region: l.region, Props: map[string]string{
+		"name":         rel,
+		"end_loc":      st.EndLoc,
+		"module":       modkey,
+		"class":        cls,
+		"is_route":     boolProp(st.IsRoute),
+		"is_validator": boolProp(st.IsValidator),
+	}})
+	params := map[string]string{}
+	order := make([]string, 0, len(st.Params))
+	for _, p := range st.Params {
+		props := map[string]string{"name": p, "func": fid}
+		if typ := st.ParamTypes[p]; typ != "" {
+			props["decl_type"] = typ
+		}
+		params[p] = l.nodeWithID(sigID(ns, rel, "param", p), "Param", st.Loc, props)
+		order = append(order, p)
+	}
+	return &funcInfo{
+		paramNames: order,
+		params:     params,
+		paramTypes: st.ParamTypes,
+		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": fid}),
+		module:     modkey, cls: cls, name: st.Name,
+		funcID:    fid,
+		validator: st.IsValidator,
+		// an empty body marks an interface/abstract method: a call typed to it must dispatch
+		// to the concrete implementations (whose bodies carry the taint).
+		abstract: len(st.Body) == 0,
+	}
+}
+
 // --- pass 1: registration ----------------------------------------------
 
 func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
@@ -704,7 +861,14 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 		switch st := s.(type) {
 		case nir.ClassDef:
 			l.classQual[modkey+"::"+st.Name] = true
-			l.classDefs[st.Name] = appendUniq(l.classDefs[st.Name], modkey)
+			if l.classDefs[st.Name] == nil {
+				l.classDefs[st.Name] = map[string]bool{}
+			}
+			l.classDefs[st.Name][modkey] = true
+			if l.p1 != nil {
+				l.p1.ClassQual = append(l.p1.ClassQual, modkey+"::"+st.Name)
+				l.p1.ClassDefs = append(l.p1.ClassDefs, st.Name)
+			}
 			// record field -> declared class type (for cross-file method resolution
 			// on field receivers, e.g. Spring `@Autowired UserService svc; svc.m()`).
 			for _, bs := range st.Body {
@@ -713,6 +877,9 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 						l.classFields[modkey+"::"+st.Name] = map[string]string{}
 					}
 					l.classFields[modkey+"::"+st.Name][a.Targets[0]] = a.Type
+					if l.p1 != nil {
+						l.p1.ClassFields = append(l.p1.ClassFields, cfGob{modkey + "::" + st.Name, a.Targets[0], a.Type})
+					}
 				}
 			}
 			l.register(modkey, st.Body, st.Name)
@@ -722,43 +889,16 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				prefix = cls + "."
 			}
 			qual := modkey + "::" + prefix + st.Name
-			// first-class function record: a code.Function node every node in this
-			// function points at via its `func` prop (the node→function map VyPr's
-			// CodeFunction / call-edge / path-function tables key off). Run-local id,
-			// unique within one export document — that's all the contract requires.
-			// Minted off a SIDE counter (not l.nid/l.node) so it consumes neither the
-			// shared id counter nor an order slot: adding function records leaves every
-			// dataflow node's id and order byte-identical to before (no taint perturbation).
-			l.funcCtr++
-			fid := "Function#" + strconv.Itoa(l.funcCtr)
-			l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Props: map[string]string{
-				"loc":          st.Loc,
-				"name":         prefix + st.Name,
-				"end_loc":      st.EndLoc,
-				"module":       modkey,
-				"class":        cls,
-				"is_route":     boolProp(st.IsRoute),
-				"is_validator": boolProp(st.IsValidator),
-			}})
-			params := map[string]string{}
-			var order []string
-			for _, p := range st.Params {
-				params[p] = l.node("Param", st.Loc, map[string]string{"name": p, "func": fid})
-				order = append(order, p)
-			}
-			info := &funcInfo{
-				paramNames: order,
-				params:     params,
-				ret:        l.node("Return", st.Loc, map[string]string{"func": fid}),
-				module:     modkey, cls: cls, name: st.Name,
-				funcID:    fid,
-				validator: st.IsValidator,
-				// an empty body marks an interface/abstract method: a call typed to it must
-				// dispatch to the concrete implementations (whose bodies carry the taint).
-				abstract: len(st.Body) == 0,
-			}
+			info := l.makeFuncInfo(modkey, cls, st)
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
+			if l.p1 != nil {
+				l.p1.Funcs = append(l.p1.Funcs, fiGob{
+					Qual: qual, Short: st.Name, ParamNames: info.paramNames, Params: info.params,
+					ParamTypes: info.paramTypes, Ret: info.ret, Module: info.module, Cls: info.cls,
+					Name: info.name, Validator: info.validator, Abstract: info.abstract,
+				})
+			}
 		}
 	}
 }
@@ -786,20 +926,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		qual := l.curModule + "::" + prefix + st.Name
 		info := l.funcQual[qual]
 		if info == nil {
-			params := map[string]string{}
-			var order []string
-			for _, p := range st.Params {
-				params[p] = l.node("Param", st.Loc, map[string]string{"name": p, "func": st.Name})
-				order = append(order, p)
-			}
-			info = &funcInfo{
-				paramNames: order,
-				params:     params,
-				ret:        l.node("Return", st.Loc, map[string]string{"func": st.Name}),
-				module:     l.curModule, cls: l.curClass, name: st.Name,
-				validator: st.IsValidator,
-				abstract:  len(st.Body) == 0,
-			}
+			info = l.makeFuncInfo(l.curModule, l.curClass, st)
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
 		}
@@ -809,6 +936,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if info != nil {
 			for name, id := range info.params {
 				inner.node[name] = id
+				if typ := info.paramTypes[name]; typ != "" {
+					if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
+						inner.typ[name] = [2]string{cm, typ}
+					}
+				}
 			}
 			inner.node["__ret__"] = info.ret
 		}
@@ -824,7 +956,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// each function gets a distinct region ROOT, so structural dominance never spans
 		// functions (cross-function flows fall back to presence semantics — conservative).
 		saveRegion := l.region
-		l.region = "/fn" + l.nextBranch()
+		l.region = l.curNS + "/fn" + l.nextBranch()
 		saveRoute := l.curRoute
 		l.curRoute = st.IsRoute
 		saveFunc := l.curFunc
@@ -992,7 +1124,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
 		}
-		return l.node("Const", ex.Loc, nil)
+		return l.node("Name", ex.Loc, map[string]string{"callee_path": ex.ID, "method": ex.ID})
 	case nir.Const:
 		return l.node("Const", ex.Loc, nil)
 	case nir.Thru:
@@ -1002,7 +1134,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// `method` carries the attribute NAME (last segment) so `source method "ssn"`
 		// matches a field read like `user.ssn` regardless of receiver. Golden-neutral
 		// (the NIR golden serializes callee_path, not method).
-		n := l.node("Attr", ex.Loc, map[string]string{"callee_path": ex.Path, "method": ex.Attr})
+		props := map[string]string{"callee_path": ex.Path, "method": ex.Attr}
+		if t := l.recvType(base); t != "" {
+			props["recv_type"] = t
+		}
+		n := l.node("Attr", ex.Loc, props)
 		l.flow(base, n)
 		// field-sensitive read: if obj.field was written element-sensitively (directly or via
 		// an alias sharing this base node), pull that slot's taint too.
@@ -1012,7 +1148,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return n
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
-		n := l.node("Subscript", ex.Loc, map[string]string{"callee_path": ex.Path})
+		key := l.eval(ex.Key, sc)
+		n := l.node("Subscript", ex.Loc, map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key})
+		l.flow(key, n)
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
 			l.flow(base, n)
@@ -1039,13 +1177,24 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		}
 		return n
 	case nir.BinOp:
-		n := l.node("BinOp", ex.Loc, nil)
-		l.flow(l.eval(ex.Left, sc), n)
-		l.flow(l.eval(ex.Right, sc), n)
+		left := l.eval(ex.Left, sc)
+		right := l.eval(ex.Right, sc)
+		leftArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Left)})
+		rightArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Right)})
+		l.flow(left, leftArg)
+		l.flow(right, rightArg)
+		method := binopMethod(ex.Op)
+		n := l.node("BinOp", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg})
+		l.flow(leftArg, n)
+		l.flow(rightArg, n)
+		l.flow(left, n)
+		l.flow(right, n)
 		return n
 	case nir.Unary:
-		n := l.node("Unary", ex.Loc, nil)
-		l.flow(l.eval(ex.Operand, sc), n)
+		operand := l.eval(ex.Operand, sc)
+		method := unaryMethod(ex.Op)
+		n := l.node("Unary", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__unary." + method, "method": method, "arg0": operand})
+		l.flow(operand, n)
 		return n
 	case nir.Ternary:
 		// `cond ? then : else` — prune the dead arm when the condition is a compile-time
@@ -1085,8 +1234,17 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		inner := sc.clone()
 		var paramNodes []string
 		for _, p := range ex.Params {
-			pn := l.node("Param", ex.Loc, map[string]string{"name": p})
+			props := map[string]string{"name": p}
+			if typ := ex.ParamTypes[p]; typ != "" {
+				props["decl_type"] = typ
+			}
+			pn := l.node("Param", ex.Loc, props)
 			inner.node[p] = pn
+			if typ := ex.ParamTypes[p]; typ != "" {
+				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
+					inner.typ[p] = [2]string{cm, typ}
+				}
+			}
 			paramNodes = append(paramNodes, pn)
 		}
 		l.block(ex.Body, inner)
@@ -1095,6 +1253,64 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return fn
 	}
 	return l.node("Const", "?:0", nil)
+}
+
+func binopMethod(op string) string {
+	switch op {
+	case "+":
+		return "add"
+	case "-":
+		return "sub"
+	case "*":
+		return "mul"
+	case "/":
+		return "div"
+	case "%":
+		return "mod"
+	case "<<":
+		return "shl"
+	case ">>":
+		return "shr"
+	case "==":
+		return "eq"
+	case "!=":
+		return "ne"
+	case "<":
+		return "lt"
+	case "<=":
+		return "le"
+	case ">":
+		return "gt"
+	case ">=":
+		return "ge"
+	case "&&":
+		return "and"
+	case "||":
+		return "or"
+	}
+	if op == "" {
+		return "op"
+	}
+	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub").Replace(op)
+}
+
+func unaryMethod(op string) string {
+	switch op {
+	case "*":
+		return "deref"
+	case "&":
+		return "addr"
+	case "!":
+		return "not"
+	case "-":
+		return "neg"
+	case "+":
+		return "pos"
+	}
+	if op == "" {
+		return "op"
+	}
+	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "deref", "+", "pos", "-", "neg").Replace(op)
 }
 
 // allowlistMembershipVar recognizes a constant-set membership test — `["a","b"].includes(x)`,
@@ -1227,6 +1443,17 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		for _, p := range ex.Parts {
 			collectValTokens(p, key, out) // inherit key so list elements pair with it
 		}
+	case nir.Format:
+		for _, p := range ex.Parts {
+			collectValTokens(p, key, out)
+		}
+	case nir.Call:
+		collectValTokens(ex.Callee, key, out)
+		for _, a := range ex.Args {
+			collectValTokens(a, key, out)
+		}
+	case nir.Attr:
+		collectValTokens(ex.Base, key, out)
 	case nir.Thru:
 		collectValTokens(ex.Inner, key, out)
 	}
@@ -1280,11 +1507,18 @@ func nirKind(e nir.Expr) string {
 // recvType returns the inferred type of a receiver node if it was produced by a
 // known constructor call (its callee path is in the constructor→type table).
 func (l *lowerer) recvType(nodeID string) string {
-	if len(l.ctorTypes) == 0 || nodeID == "" {
+	if nodeID == "" {
 		return ""
 	}
 	if n, ok, _ := l.g.GetNode(nodeID); ok {
-		return l.ctorTypes[n.Prop("callee_path")]
+		for _, key := range []string{"recv_type", "decl_type", "type"} {
+			if t := n.Prop(key); t != "" {
+				return t
+			}
+		}
+		if len(l.ctorTypes) > 0 {
+			return l.ctorTypes[n.Prop("callee_path")]
+		}
 	}
 	return ""
 }
@@ -1506,6 +1740,14 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 				return []*funcInfo{m}
 			}
 		}
+		// Cross-file fallback: the receiver type is unresolved (common with dynamically-typed
+		// `$this->getIp()` / `obj.helper()` where the helper lives in another file), but the
+		// method name is UNIQUE across the whole program. Route through it so a tainted return
+		// value connects to the call result — the canonical interprocedural-across-files miss.
+		// The uniqueness guard avoids mis-resolving same-named methods on different types.
+		if infos := l.funcShort[c.Attr]; len(infos) == 1 {
+			return infos
+		}
 	}
 	return nil
 }
@@ -1523,19 +1765,11 @@ func (l *lowerer) classModule(name string, imports map[string]importEntry) (stri
 	// same-package classes). Only when EXACTLY ONE module defines that name, to
 	// avoid wrongly linking same-named classes in unrelated files.
 	if mods := l.classDefs[name]; len(mods) == 1 {
-		return mods[0], true
-	}
-	return "", false
-}
-
-// appendUniq appends s to xs if not already present.
-func appendUniq(xs []string, s string) []string {
-	for _, x := range xs {
-		if x == s {
-			return xs
+		for m := range mods {
+			return m, true
 		}
 	}
-	return append(xs, s)
+	return "", false
 }
 
 func (l *lowerer) resolveCtor(callee nir.Expr) ([2]string, bool) {

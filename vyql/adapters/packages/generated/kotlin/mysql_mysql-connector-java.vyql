@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter kotlin {
+  package "mysql:mysql-connector-java" {
+    sink method "query" -> code.SqlExecution
+  }
+}

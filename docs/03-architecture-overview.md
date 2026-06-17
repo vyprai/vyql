@@ -73,7 +73,7 @@ Concepts define security meaning and form the controlled vocabulary
 bindings, and standards mappings.
 
 ```vyql
-package code;
+module code;
 
 concept HttpInput : source {
   taint: [taint.UntrustedData]
@@ -85,7 +85,7 @@ concept SqlExecution : sink {
   cwe: [CWE_89]
 }
 
-package core;
+module core;
 
 concept SqlParameterization : control {
   neutralizes: [injection.SqlInjection]

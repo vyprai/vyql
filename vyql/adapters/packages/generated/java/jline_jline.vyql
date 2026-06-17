@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter java {
+  package "jline:jline" {
+    source method "org.jline.builtins.Options.parse" -> code.CliArgument
+  }
+}

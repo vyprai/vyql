@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+
+adapter ruby {
+  package "jekyll-octicons" {
+    sink method "render" -> code.HtmlRender
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter python {
+  package "munch" {
+    sink method "from_yaml" -> code.Deserialization
+    sink method "fromYAML" -> code.Deserialization
+  }
+}

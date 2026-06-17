@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.bouncycastle:bcprov-jdk15on" {
+    sink method "parse" -> code.Deserialization
+  }
+}

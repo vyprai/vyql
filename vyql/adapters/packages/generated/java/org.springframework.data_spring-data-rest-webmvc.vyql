@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.springframework.data:spring-data-rest-webmvc" {
+    sink method "read" -> code.Deserialization
+  }
+}

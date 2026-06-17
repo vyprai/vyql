@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "fabric" {
+    sink method "run" -> code.CommandExecution
+  }
+}

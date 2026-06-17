@@ -1,0 +1,11 @@
+import code.{SqlExecution}
+import core.{SqlParameterization}
+
+adapter scala {
+  package "javax.persistence:javax.persistence-api" {
+    sink method "createQuery" -> code.SqlExecution
+    sink method "createNativeQuery" -> code.SqlExecution
+    sink method "createNamedQuery" -> code.SqlExecution
+    control method "setParameter" -> core.SqlParameterization
+  }
+}

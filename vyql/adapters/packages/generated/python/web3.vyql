@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter python {
+  package "web3" {
+    sink method "send" -> code.NetworkSend
+  }
+}

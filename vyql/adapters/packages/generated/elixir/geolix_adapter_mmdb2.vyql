@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter elixir {
+  package "geolix_adapter_mmdb2" {
+    sink method "read_database" -> code.UrlFetch
+  }
+}

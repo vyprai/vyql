@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "htmlentities" {
+    sink method "decode" -> code.Deserialization
+    control method "encode" -> core.HtmlEscape
+  }
+}

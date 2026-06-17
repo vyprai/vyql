@@ -1,0 +1,5 @@
+adapter python {
+  package "django-rest-swagger" {
+    sink method "SwaggerSchemaView.get" -> code.HtmlRender
+  }
+}

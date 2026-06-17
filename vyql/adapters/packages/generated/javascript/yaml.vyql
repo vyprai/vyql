@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter javascript {
+  package "yaml" {
+    sink method "parse" -> code.Deserialization
+  }
+}

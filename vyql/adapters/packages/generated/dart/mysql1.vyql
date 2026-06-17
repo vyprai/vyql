@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter dart {
+  package "mysql1" {
+    sink method "query" -> code.SqlExecution
+  }
+}

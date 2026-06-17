@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "exmoji" {
+    sink method "Exmoji.Scanner.scan" -> code.Deserialization
+  }
+}

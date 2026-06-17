@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.apache.maven:maven-settings" {
+    sink method "read" -> code.Deserialization
+  }
+}

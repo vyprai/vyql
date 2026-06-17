@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter swift {
+  package "github.com/brokenhandsio/leaf-error-middleware" {
+    source method "respond" -> code.HttpInput
+  }
+}

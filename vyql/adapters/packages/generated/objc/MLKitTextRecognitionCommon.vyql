@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter objc {
+  package "MLKitTextRecognitionCommon" {
+    source method "resultsInImage:error:" -> core.UserControlledData
+    source method "processImage:" -> core.UserControlledData
+  }
+}

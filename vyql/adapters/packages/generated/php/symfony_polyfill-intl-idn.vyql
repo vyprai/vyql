@@ -1,0 +1,6 @@
+adapter php {
+  package "symfony/polyfill-intl-idn" {
+    sink method "idn_to_ascii" -> code.Deserialization
+    sink method "idn_to_utf8" -> code.Deserialization
+  }
+}

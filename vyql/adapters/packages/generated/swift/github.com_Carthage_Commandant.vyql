@@ -1,0 +1,6 @@
+import code.{CommandExecution, CliArgument}
+adapter swift {
+  package "github.com/Carthage/Commandant" {
+    sink method "run" -> code.CommandExecution
+  }
+}

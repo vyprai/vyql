@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter php {
+  package "nette/di" {
+    control method "escape" -> core.InputValidation
+  }
+}

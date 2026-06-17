@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter c {
+  package "libnop" {
+    sink method "Read" -> code.Deserialization
+  }
+}

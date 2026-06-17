@@ -1,0 +1,28 @@
+import code.{FilePathAccess, FileUse, StoredDataRead, RegexCompile}
+
+adapter cpp {
+  package "gklib" {
+    sink method "gk_fopen" -> code.FilePathAccess
+    sink method "gk_fclose" -> code.FileUse
+    source method "gk_read" -> code.StoredDataRead
+    sink method "gk_write" -> code.FileUse
+    source method "gk_getline" -> code.StoredDataRead
+    source method "gk_i32readfile" -> code.StoredDataRead
+    source method "gk_i64readfile" -> code.StoredDataRead
+    source method "gk_zreadfile" -> code.StoredDataRead
+    source method "gk_creadfilebin" -> code.StoredDataRead
+    sink method "gk_cwritefilebin" -> code.FileUse
+    source method "gk_i32readfilebin" -> code.StoredDataRead
+    sink method "gk_i32writefilebin" -> code.FileUse
+    source method "gk_i64readfilebin" -> code.StoredDataRead
+    sink method "gk_i64writefilebin" -> code.FileUse
+    source method "gk_zreadfilebin" -> code.StoredDataRead
+    mark method "re_compile_fastmap" -> code.RegexCompile
+    mark method "re_search" -> code.RegexCompile
+    mark method "re_search_2" -> code.RegexCompile
+    mark method "re_match" -> code.RegexCompile
+    mark method "re_match_2" -> code.RegexCompile
+    mark method "re_exec" -> code.RegexCompile
+    mark method "regexec" -> code.RegexCompile
+  }
+}

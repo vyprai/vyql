@@ -1,0 +1,6 @@
+adapter c {
+  package "llfio" {
+    sink method "file" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+  }
+}

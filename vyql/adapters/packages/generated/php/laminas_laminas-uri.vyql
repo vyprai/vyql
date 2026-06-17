@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter php {
+  package "laminas/laminas-uri" {
+    sink method "parse" -> code.UrlFetch
+  }
+}

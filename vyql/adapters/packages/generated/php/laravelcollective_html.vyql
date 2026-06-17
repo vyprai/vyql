@@ -1,0 +1,22 @@
+import code.{HtmlRender}
+import core.{HtmlEscape}
+
+adapter php {
+  package "laravelcollective/html" {
+    sink method "decode" -> code.HtmlRender
+    sink method "label" -> code.HtmlRender
+    sink method "text" -> code.HtmlRender
+    sink method "password" -> code.HtmlRender
+    sink method "textarea" -> code.HtmlRender
+    sink method "email" -> code.HtmlRender
+    sink method "url" -> code.HtmlRender
+    sink method "number" -> code.HtmlRender
+    sink method "date" -> code.HtmlRender
+    sink method "time" -> code.HtmlRender
+    sink method "range" -> code.HtmlRender
+    sink method "search" -> code.HtmlRender
+    sink method "link_to" -> code.HtmlRender
+    sink method "link_to_asset" -> code.HtmlRender
+    sink method "link_to_route" -> code.HtmlRender
+  }
+}

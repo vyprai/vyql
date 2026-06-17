@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter elixir {
+  package "benchee_csv" {
+    sink method "write" -> code.FilePathAccess
+  }
+}

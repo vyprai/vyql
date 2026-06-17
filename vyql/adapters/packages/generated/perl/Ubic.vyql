@@ -1,0 +1,10 @@
+import code.{CommandExecution, Deserialization}
+adapter perl {
+  package "Ubic" {
+    sink method "system" -> code.CommandExecution
+    sink method "do_cmd" -> code.CommandExecution
+    sink method "forked_call" -> code.CommandExecution
+    sink method "run" -> code.CommandExecution
+    sink method "load" -> code.Deserialization
+  }
+}

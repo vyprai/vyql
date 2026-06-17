@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/neelance/sourcemap" {
+    sink method "ReadFrom" -> code.Deserialization
+  }
+}

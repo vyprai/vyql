@@ -1,0 +1,9 @@
+import code.{HttpInput, Deserialization, NetworkConnect}
+
+adapter rust {
+  package "tonic" {
+    source method "Request.from_http" -> code.HttpInput
+    sink path "tonic::codec::decode::decode" -> code.Deserialization
+    sink path "tonic::transport::channel::endpoint::connect" -> code.NetworkConnect
+  }
+}

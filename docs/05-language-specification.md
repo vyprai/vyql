@@ -133,7 +133,7 @@ rule vypr.cloud.unencrypted_storage {
 // Business logic (research track; declared model). `business.Refund` is an
 // action concept (kind: action in the ontology) — no redundant `action`
 // keyword; the kind comes from the ontology.
-package vypr.bizlogic;
+module vypr.bizlogic;
 rule UnauthorizedRefund {
   meta { id: "VYQL-BIZ-001", severity: high }
   match business.Refund as a
@@ -254,28 +254,28 @@ documented in [13](13-attack-path-analysis.md).
 VyQL uses a Go-style namespace model. **Identifiers are `[A-Za-z_][A-Za-z0-9_]*`,
 namespaced with `.`; no dashes.**
 
-- **`package <namespace>`** declares the namespace for the declarations that
+- **`module <namespace>`** declares the namespace for the declarations that
   follow. Definitions (concepts, threat kinds, rules) are written with **short
-  PascalCase names** inside their package; the canonical id is
-  `<package>.<Name>`.
+  PascalCase names** inside their module; the canonical id is
+  `<module>.<Name>`.
 
   ```vyql
-  package code;
+  module code;
   concept HttpInput : source    { taint: [taint.UntrustedData]; cwe: [CWE_20] }
   concept SqlExecution : sink   { vulnerable_to: [injection.SqlInjection]; cwe: [CWE_89] }
 
-  package vypr.injection;
+  module vypr.injection;
   rule Sql {
     meta { cwe: CWE_89 }
-    taint code.HttpInput -> code.SqlExecution      // cross-package refs: qualified
+    taint code.HttpInput -> code.SqlExecution      // cross-module refs: qualified
     unless sanitized_by core.SqlParameterization
   }
   ```
 
-  A `package <namespace>;` declaration (terminated by `;`) applies to all
-  declarations until the next `package`. Rule/concept names are the short
+  A `module <namespace>;` declaration (terminated by `;`) applies to all
+  declarations until the next `module`. Rule/concept names are the short
   PascalCase token (`Sql`, `HttpInput`); their canonical id is
-  `<package>.<Name>` (`vypr.injection.Sql`, `code.HttpInput`).
+  `<module>.<Name>` (`vypr.injection.Sql`, `code.HttpInput`).
 
 - **PascalCase**, not ALL_CAPS, for all named entities: concepts
   (`code.HttpInput`), threat kinds (`injection.SqlInjection`), taint kinds
@@ -288,7 +288,7 @@ namespaced with `.`; no dashes.**
 - **CWE/CAPEC refs use the underscore form** — `CWE_89`, `CAPEC_66` — so they are
   bare identifiers (no dashes, no quotes). They normalize to the catalog
   ([16](16-standards-alignment.md), `go/taxonomy`).
-- **Cross-package references are qualified** (`code.HttpInput`); same-package
+- **Cross-module references are qualified** (`code.HttpInput`); same-module
   references may be short. This is exactly Go's `pkg.Name` model.
 
 ## Module system
@@ -301,7 +301,7 @@ import vypr.rules.injection.*
 - Rule packs are versioned bundles: rules + tests + a manifest pinning
   ontology and minimum engine versions ([15](15-rule-lifecycle-governance.md)).
 - Name resolution is explicit; there is no global namespace — names resolve
-  within the current `package`, then via qualified `namespace.Name`.
+  within the current `module`, then via qualified `namespace.Name`.
 
 ## Open questions
 

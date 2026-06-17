@@ -1,0 +1,5 @@
+adapter groovy {
+  package "org.thymeleaf:thymeleaf-spring4" {
+    sink method "setEnableSpringELCompiler" -> code.CodeEval
+  }
+}

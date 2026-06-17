@@ -1,0 +1,5 @@
+adapter bash {
+  package "yamllint" {
+    source path "yamllint.argv" -> code.CliArgument
+  }
+}

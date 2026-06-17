@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter groovy {
+  package "org.flywaydb:flyway-core" {
+    sink method "migrate" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter python {
+  package "backports.zoneinfo" {
+    sink method "load_tzdata" -> code.FilePathAccess
+  }
+}

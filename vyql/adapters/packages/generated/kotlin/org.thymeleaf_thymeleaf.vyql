@@ -1,0 +1,7 @@
+import code.{TemplateRender}
+
+adapter kotlin {
+  package "org.thymeleaf:thymeleaf" {
+    sink method "process" -> code.TemplateRender
+  }
+}

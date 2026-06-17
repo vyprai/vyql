@@ -1,0 +1,28 @@
+import code.{CommandExecution, Deserialization, FilePathAccess, FileUse, NetworkConnect, NetworkData, NetworkSend}
+adapter ruby {
+  package "net-sftp" {
+    sink method "upload" -> code.NetworkSend
+    sink method "upload!" -> code.NetworkSend
+    sink method "download" -> code.FileUse
+    source method "download" -> code.NetworkData
+    sink method "download!" -> code.FileUse
+    source method "download!" -> code.NetworkData
+    sink method "open" -> code.FilePathAccess
+    sink method "open!" -> code.FilePathAccess
+    source method "read" -> code.NetworkData
+    source method "read!" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+    sink method "write!" -> code.NetworkSend
+    sink method "opendir" -> code.FilePathAccess
+    sink method "opendir!" -> code.FilePathAccess
+    source method "readdir" -> code.NetworkData
+    source method "readdir!" -> code.NetworkData
+    source method "readlink" -> code.NetworkData
+    sink method "readlink" -> code.FilePathAccess
+    source method "readlink!" -> code.NetworkData
+    sink method "readlink!" -> code.FilePathAccess
+    sink method "connect" -> code.NetworkConnect
+    sink method "connect!" -> code.NetworkConnect
+    sink method "parse" -> code.Deserialization
+  }
+}

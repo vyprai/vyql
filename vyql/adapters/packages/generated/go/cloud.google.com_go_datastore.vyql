@@ -1,0 +1,7 @@
+adapter go {
+  package "cloud.google.com/go/datastore" {
+    sink method "DecodeKey" -> code.Deserialization
+    sink method "decodeCloudKey" -> code.Deserialization
+    sink method "NewQuery" -> code.NosqlQuery
+  }
+}

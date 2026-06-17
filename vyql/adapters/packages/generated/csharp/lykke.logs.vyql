@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter csharp {
+  package "lykke.logs" {
+    control method "AddSanitizingFilter" -> core.InputValidation
+    control method "Sanitize" -> core.InputValidation
+  }
+}

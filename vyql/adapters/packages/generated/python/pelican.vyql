@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter python {
+  package "pelican" {
+    sink method "read" -> code.Deserialization
+    sink method "pelican_open" -> code.FilePathAccess
+  }
+}

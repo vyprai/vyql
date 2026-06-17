@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter c {
+  package "opentelemetry-cpp" {
+    control method "UrlEncode" -> core.InputValidation
+    control method "UrlDecode" -> core.InputValidation
+  }
+}

@@ -1,0 +1,10 @@
+import code.{HttpInput}
+
+adapter swift {
+  package "github.com/swift-server/swift-aws-lambda-events" {
+    source method "path" -> code.HttpInput
+    source method "queryStringParameters" -> code.HttpInput
+    source method "headers" -> code.HttpInput
+    source method "body" -> code.HttpInput
+  }
+}

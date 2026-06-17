@@ -1,0 +1,5 @@
+adapter dart {
+  package "rive" {
+    sink method "createState" -> code.FilePathAccess
+  }
+}

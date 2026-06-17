@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "open4" {
+    sink method "pfork4" -> code.CommandExecution
+    sink method "popen4" -> code.CommandExecution
+    sink method "popen4ext" -> code.CommandExecution
+  }
+}

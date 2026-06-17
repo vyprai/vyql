@@ -1,0 +1,6 @@
+adapter elixir {
+  package "espec_phoenix" {
+    sink method "create_espec_phoenix_files" -> code.FilePathAccess
+    sink method "append_to" -> code.FilePathAccess
+  }
+}

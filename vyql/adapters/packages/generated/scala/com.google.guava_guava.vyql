@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+adapter scala {
+  package "com.google.guava:guava" {
+    mark method "compilePattern" -> code.RegexCompile
+    mark method "compile" -> code.RegexCompile
+  }
+}

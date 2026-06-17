@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter dart {
+  package "google_mlkit_commons" {
+    sink method "fromJson" -> code.Deserialization
+  }
+}

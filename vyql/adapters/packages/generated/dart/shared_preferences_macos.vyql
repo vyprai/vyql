@@ -1,0 +1,9 @@
+import code.{StoredDataRead, StoredDataWrite}
+adapter dart {
+  package "shared_preferences_macos" {
+    sink method "setValue" -> code.StoredDataWrite
+    sink method "setBool" -> code.StoredDataWrite
+    sink method "setDouble" -> code.StoredDataWrite
+    source method "getAll" -> code.StoredDataRead
+  }
+}

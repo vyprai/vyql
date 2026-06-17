@@ -1,0 +1,7 @@
+import code.{StoredDataRead}
+
+adapter csharp {
+  package "cldrjs" {
+    source method "lookup" -> code.StoredDataRead
+  }
+}

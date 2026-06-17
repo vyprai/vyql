@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter ruby {
+  package "kwalify" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_file" -> code.Deserialization
+    sink method "parse_file" -> code.FilePathAccess
+  }
+}

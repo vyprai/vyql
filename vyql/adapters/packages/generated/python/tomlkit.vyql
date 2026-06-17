@@ -1,0 +1,9 @@
+import code.{Deserialization, FilePathAccess}
+adapter python {
+  package "tomlkit" {
+    sink method "loads" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+  }
+}

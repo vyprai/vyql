@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter elixir {
+  package "conform" {
+    sink method "parse" -> code.Deserialization
+    sink method "file" -> code.FilePathAccess
+  }
+}

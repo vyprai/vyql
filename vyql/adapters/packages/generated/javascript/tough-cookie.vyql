@@ -1,0 +1,5 @@
+adapter javascript {
+  package "tough-cookie" {
+    sink method "parse" -> code.Deserialization
+  }
+}

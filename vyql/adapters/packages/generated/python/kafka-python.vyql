@@ -1,0 +1,13 @@
+import code.{Deserialization, NetworkConnect, NetworkSend}
+
+adapter python {
+  package "kafka-python" {
+    sink method "gzip_decode" -> code.Deserialization
+    sink method "snappy_decode" -> code.Deserialization
+    sink method "lz4f_decode" -> code.Deserialization
+    sink method "lz4_decode_old_kafka" -> code.Deserialization
+    sink method "zstd_decode" -> code.Deserialization
+    sink method "connect" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+  }
+}

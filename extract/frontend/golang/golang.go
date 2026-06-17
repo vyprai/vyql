@@ -202,10 +202,15 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 		switch fn := d.(type) {
 		case *ast.FuncDecl:
 			var params []string
+			paramTypes := map[string]string{}
 			if fn.Type.Params != nil {
 				for _, p := range fn.Type.Params.List {
+					typ := c.typeName(p.Type)
 					for _, n := range p.Names {
 						params = append(params, n.Name)
+						if typ != "" {
+							paramTypes[n.Name] = typ
+						}
 					}
 				}
 			}
@@ -213,10 +218,31 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 			if fn.Body != nil {
 				body = c.stmts(fn.Body.List)
 			}
-			out = append(out, nir.FuncDef{Name: fn.Name.Name, Params: params, Body: body, Loc: c.loc(fn.Pos())})
+			out = append(out, nir.FuncDef{Name: fn.Name.Name, Params: params, ParamTypes: paramTypes, Body: body, Loc: c.loc(fn.Pos())})
 		}
 	}
 	return out
+}
+
+func (c *conv) typeName(e ast.Expr) string {
+	switch t := e.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		if base := c.typeName(t.X); base != "" {
+			return base + "." + t.Sel.Name
+		}
+		return t.Sel.Name
+	case *ast.StarExpr:
+		return c.typeName(t.X)
+	case *ast.ArrayType:
+		return c.typeName(t.Elt)
+	case *ast.IndexExpr:
+		return c.typeName(t.X)
+	case *ast.IndexListExpr:
+		return c.typeName(t.X)
+	}
+	return ""
 }
 
 func (c *conv) stmts(list []ast.Stmt) []nir.Stmt {

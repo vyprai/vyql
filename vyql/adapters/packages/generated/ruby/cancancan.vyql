@@ -1,0 +1,8 @@
+import core.{AuthorizationCheck}
+adapter ruby {
+  package "cancancan" {
+    control method "can" -> core.AuthorizationCheck
+    control method "cannot" -> core.AuthorizationCheck
+    control method "authorize!" -> core.AuthorizationCheck
+  }
+}

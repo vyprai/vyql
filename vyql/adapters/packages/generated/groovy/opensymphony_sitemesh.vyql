@@ -1,0 +1,9 @@
+import code.{Deserialization, HtmlRender}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "opensymphony:sitemesh" {
+    sink method "parse" -> code.Deserialization
+    sink method "write" -> code.HtmlRender
+  }
+}

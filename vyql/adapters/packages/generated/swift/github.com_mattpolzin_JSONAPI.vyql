@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/mattpolzin/JSONAPI" {
+    control method "validate" -> core.InputValidation
+    mark method "hash" -> code.WeakHash
+  }
+}

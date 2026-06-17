@@ -1,0 +1,11 @@
+import code.{NetworkData}
+
+adapter cpp {
+  package "zug" {
+    source method "read_" -> code.NetworkData
+    source method "read" -> code.NetworkData
+    source method "readbuf" -> code.NetworkData
+    source method "write_inputs" -> code.NetworkData
+    source method "write" -> code.NetworkData
+  }
+}

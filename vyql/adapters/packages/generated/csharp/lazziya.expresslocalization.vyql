@@ -1,0 +1,16 @@
+import code.{HtmlRender}
+import core.{InputValidation}
+
+adapter csharp {
+  package "lazziya.expresslocalization" {
+    control method "ExCompareAttribute" -> core.InputValidation
+    control method "ExMaxLengthAttribute" -> core.InputValidation
+    control method "ExMinLengthAttribute" -> core.InputValidation
+    control method "ExRangeAttribute" -> core.InputValidation
+    control method "ExRegularExpressionAttribute" -> core.InputValidation
+    control method "ExStringLengthAttribute" -> core.InputValidation
+
+    sink method "GetHtmlString" -> code.HtmlRender
+    sink method "GetLocalizedHtmlString" -> code.HtmlRender
+  }
+}

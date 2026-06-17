@@ -1,0 +1,12 @@
+import code.{Deserialization, RedirectTarget}
+import core.{AuthenticationCheck}
+
+adapter swift {
+  package "github.com/p2/OAuth2" {
+    control method "authorize" -> core.AuthenticationCheck
+    control method "authorizeEmbedded" -> core.AuthenticationCheck
+    mark method "handleRedirectURL" -> code.RedirectTarget
+    sink method "parseAccessTokenResponse" -> code.Deserialization
+    control method "doRefreshToken" -> core.AuthenticationCheck
+  }
+}

@@ -1,0 +1,13 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/vektah/gqlparser" {
+    sink method "LoadSchema" -> code.Deserialization
+    sink method "MustLoadSchema" -> code.Deserialization
+    sink method "LoadQuery" -> code.Deserialization
+    sink method "MustLoadQuery" -> code.Deserialization
+    sink method "ParseQuery" -> code.Deserialization
+    sink method "ParseSchema" -> code.Deserialization
+    sink method "ParseSchemas" -> code.Deserialization
+  }
+}

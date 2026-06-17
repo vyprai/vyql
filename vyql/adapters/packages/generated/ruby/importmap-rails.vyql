@@ -1,0 +1,7 @@
+import code.{NetworkConnect, NetworkData}
+
+adapter ruby {
+  package "importmap-rails" {
+    sink method "post_json" -> code.NetworkConnect
+  }
+}

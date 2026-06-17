@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter php {
+  package "wikimedia/composer-merge-plugin" {
+    sink method "readPackageJson" -> code.Deserialization
+    sink method "mergeFile" -> code.Deserialization
+  }
+}

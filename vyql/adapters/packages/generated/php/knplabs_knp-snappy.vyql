@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess}
+adapter php {
+  package "knplabs/knp-snappy" {
+    sink method "executeCommand" -> code.CommandExecution
+    sink method "generate" -> code.FilePathAccess
+    sink method "generateFromHtml" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter elixir {
+  package "nerves_hub" {
+    source method "NervesHub.Certificate.ca_certs" -> code.SecretValue
+    source method "NervesHub.Certificate.fwup_public_keys" -> code.SecretValue
+  }
+}

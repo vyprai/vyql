@@ -1,0 +1,15 @@
+import code.{UrlFetch, HttpInput}
+adapter php {
+  package "kriswallsmith/buzz" {
+    sink method "get" -> code.UrlFetch
+    sink method "post" -> code.UrlFetch
+    sink method "head" -> code.UrlFetch
+    sink method "patch" -> code.UrlFetch
+    sink method "put" -> code.UrlFetch
+    sink method "delete" -> code.UrlFetch
+    sink method "request" -> code.UrlFetch
+    sink method "submitForm" -> code.UrlFetch
+    sink method "sendRequest" -> code.UrlFetch
+    sink method "addPushHandle" -> code.UrlFetch
+  }
+}

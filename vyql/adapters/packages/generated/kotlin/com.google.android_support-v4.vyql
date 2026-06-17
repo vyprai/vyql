@@ -1,0 +1,8 @@
+import code.{RedirectTarget}
+
+adapter kotlin {
+  package "com.google.android:support-v4" {
+    mark method "startActivity" -> code.RedirectTarget
+    mark method "startActivityForResult" -> code.RedirectTarget
+  }
+}

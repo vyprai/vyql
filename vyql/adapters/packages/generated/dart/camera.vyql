@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter dart {
+  package "camera" {
+    source method "takePicture" -> core.UserControlledData
+  }
+}

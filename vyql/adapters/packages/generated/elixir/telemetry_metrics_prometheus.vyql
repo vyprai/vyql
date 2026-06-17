@@ -1,0 +1,5 @@
+adapter elixir {
+  package "telemetry_metrics_prometheus" {
+    sink method "execute_pre_scrape_handler" -> code.CodeEval
+  }
+}

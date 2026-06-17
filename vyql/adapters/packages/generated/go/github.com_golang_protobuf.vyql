@@ -1,0 +1,10 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/golang/protobuf" {
+    sink method "Unmarshal" -> code.Deserialization
+    sink method "UnmarshalMerge" -> code.Deserialization
+    sink method "UnmarshalNext" -> code.Deserialization
+    sink method "UnmarshalString" -> code.Deserialization
+    sink method "DecodeVarint" -> code.Deserialization
+  }
+}

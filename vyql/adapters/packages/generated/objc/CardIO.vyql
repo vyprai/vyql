@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter objc {
+  package "CardIO" {
+    source method "userDidProvideCreditCardInfo:inPaymentViewController:" -> code.SecretValue
+  }
+}

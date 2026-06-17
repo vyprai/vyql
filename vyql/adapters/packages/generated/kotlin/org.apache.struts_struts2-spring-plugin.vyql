@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.apache.struts:struts2-spring-plugin" {
+    sink method "setApplicationContextPath" -> code.Deserialization
+  }
+}

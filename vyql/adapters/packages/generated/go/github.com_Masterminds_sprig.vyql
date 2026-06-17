@@ -1,0 +1,9 @@
+import code.{WeakHash, RegexCompile}
+
+adapter go {
+  package "github.com/Masterminds/sprig" {
+    mark method "sha1sum" -> code.WeakHash
+    mark method "derivePassword" -> code.WeakHash
+    mark method "regexMatch" -> code.RegexCompile
+  }
+}

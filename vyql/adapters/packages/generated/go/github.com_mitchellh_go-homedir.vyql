@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/mitchellh/go-homedir" {
+    source method "Dir" -> core.UserControlledData
+    source method "Expand" -> core.UserControlledData
+  }
+}

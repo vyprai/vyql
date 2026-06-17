@@ -1,0 +1,8 @@
+import code.{Deserialization, NetworkConnect}
+
+adapter rust {
+  package "gdk" {
+    sink method "open" -> code.NetworkConnect
+    sink method "parse" -> code.Deserialization
+  }
+}

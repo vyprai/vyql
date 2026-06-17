@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "recommonmark" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "Base64" {
+    sink method "stringFromBase64String" -> code.Deserialization
+    sink method "stringFromBase64UrlEncodedString" -> code.Deserialization
+    sink method "dataWithBase64String" -> code.Deserialization
+    sink method "dataWithBase64UrlEncodedString" -> code.Deserialization
+    sink method "dataFromBase64String" -> code.Deserialization
+  }
+}

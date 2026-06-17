@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "debugpy" {
+    sink method "spawn" -> code.CommandExecution
+  }
+}

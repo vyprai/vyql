@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+adapter ruby {
+  package "babosa" {
+    source method "initialize" -> core.UserControlledData
+    source method "transliterate!" -> core.UserControlledData
+    source method "normalize!" -> core.UserControlledData
+    source method "truncate!" -> core.UserControlledData
+    source method "with_separators!" -> core.UserControlledData
+  }
+}

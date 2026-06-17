@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "libpng" {
+    sink method "png_read_data" -> code.Deserialization
+  }
+}

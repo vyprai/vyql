@@ -1,0 +1,10 @@
+import code.{FilePathAccess, Deserialization}
+
+adapter cpp {
+  package "rapidcsv" {
+    sink method "Load" -> code.FilePathAccess
+    sink method "Save" -> code.FilePathAccess
+    sink method "ParseCsv" -> code.Deserialization
+    sink method "ReadCsv" -> code.Deserialization
+  }
+}

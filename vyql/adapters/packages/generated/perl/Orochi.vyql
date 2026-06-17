@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter perl {
+  package "Orochi" {
+    sink method "expand" -> code.CodeEval
+  }
+}

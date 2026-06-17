@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter elixir {
+  package "pre_commit_hook" {
+    sink method "run_mix_cmd" -> code.CommandExecution
+    sink method "copy" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+adapter groovy {
+  package "net.minidev:json-smart" {
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.HtmlEscape
+  }
+}

@@ -1,0 +1,11 @@
+import code.{SqlExecution, Deserialization}
+adapter elixir {
+  package "sqlite_ecto2" {
+    sink method "execute" -> code.SqlExecution
+    sink method "prepare_execute" -> code.SqlExecution
+    sink method "update_all" -> code.SqlExecution
+    sink method "delete_all" -> code.SqlExecution
+    sink method "insert" -> code.SqlExecution
+    sink method "parse" -> code.Deserialization
+  }
+}

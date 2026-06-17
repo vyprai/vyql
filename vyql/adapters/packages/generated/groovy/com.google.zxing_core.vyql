@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.google.zxing:core" {
+    sink method "parse" -> code.Deserialization
+  }
+}

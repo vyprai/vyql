@@ -28,27 +28,17 @@ var rsHandlerAttrs = map[string]bool{
 
 // ExtractRust parses Rust files into one NIR Program (one module per file).
 func ExtractRust(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsrust.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "self"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &rsConv{src: src, file: rel, key: moduleKey(root, f, ".rs")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsrust.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &rsConv{src: src, file: rel, key: moduleKey(root, abs, ".rs")}
+			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func (c *rsConv) loc(n *tree_sitter.Node) string {
@@ -106,6 +96,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 	switch n.Kind() {
 	case "function_item":
 		params := c.params(field(n, "parameters"))
+		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		if handler {
 			var seed []nir.Stmt
@@ -115,7 +106,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "impl_item", "mod_item", "trait_item":
 		return c.decls(field(n, "body"))
 	case "struct_item", "enum_item", "use_declaration", "const_item", "static_item":
@@ -212,6 +203,21 @@ func (c *rsConv) params(params *tree_sitter.Node) []string {
 	return out
 }
 
+func (c *rsConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() == "parameter" {
+			if nm := c.patName(field(ch, "pattern")); nm != "" {
+				putParamType(out, nm, paramTypeFromField(c, ch))
+			}
+		}
+	}
+	return out
+}
+
 // patName extracts the bound identifier from a pattern (unwrapping ref/mut).
 func (c *rsConv) patName(p *tree_sitter.Node) string {
 	for p != nil {
@@ -255,7 +261,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "integer_literal", "float_literal", "char_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "raw_string_literal":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: rustStringValue(c.text(n))}
 	case "field_expression":
 		return nir.Attr{Base: c.expr(field(n, "value")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "index_expression":
@@ -339,6 +345,52 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+// rustStringValue returns a quoted string literal whose inner text reflects the
+// Rust literal payload. It covers normal, byte, raw, and byte-raw strings well
+// enough for adapter `val` matching; escape handling is intentionally simple
+// because security mappings match substrings such as "/tmp/" or static IV bytes.
+func rustStringValue(raw string) string {
+	s := raw
+	for len(s) > 0 {
+		switch s[0] {
+		case 'b':
+			s = s[1:]
+		case 'r':
+			hashes := 0
+			i := 1
+			for i < len(s) && s[i] == '#' {
+				hashes++
+				i++
+			}
+			if i < len(s) && s[i] == '"' {
+				start := i + 1
+				end := len(s) - 1 - hashes
+				if end >= start && end < len(s) {
+					return "\"" + s[start:end] + "\""
+				}
+			}
+			return "\"" + raw + "\""
+		default:
+			goto unquote
+		}
+	}
+unquote:
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		body := s[1 : len(s)-1]
+		out := make([]byte, 0, len(body))
+		for i := 0; i < len(body); i++ {
+			if body[i] == '\\' && i+1 < len(body) {
+				out = append(out, body[i+1])
+				i++
+				continue
+			}
+			out = append(out, body[i])
+		}
+		return "\"" + string(out) + "\""
+	}
+	return "\"" + raw + "\""
 }
 
 // rsIf lowers a statement-position if with its predicate so constant-false arms prune.

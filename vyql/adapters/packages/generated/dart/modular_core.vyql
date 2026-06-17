@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter dart {
+  package "modular_core" {
+    source method "setArguments" -> core.UserControlledData
+  }
+}

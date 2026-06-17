@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter objc {
+  package "SwiftDate" {
+    sink method "toSQL" -> code.SqlExecution
+  }
+}

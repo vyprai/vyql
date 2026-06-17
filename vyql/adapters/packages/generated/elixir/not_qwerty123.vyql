@@ -1,0 +1,8 @@
+import code.{WeakRandomValue}
+import core.{InputValidation}
+
+adapter elixir {
+  package "not_qwerty123" {
+    mark method "gen_password" -> code.WeakRandomValue
+  }
+}

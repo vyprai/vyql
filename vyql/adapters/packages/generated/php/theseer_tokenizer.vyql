@@ -1,0 +1,10 @@
+import code.{CodeEval, XmlParse}
+
+adapter php {
+  package "theseer/tokenizer" {
+    sink method "parse" -> code.CodeEval
+    sink method "toDom" -> code.XmlParse
+    sink method "toXML" -> code.XmlParse
+    sink method "appendToWriter" -> code.XmlParse
+  }
+}

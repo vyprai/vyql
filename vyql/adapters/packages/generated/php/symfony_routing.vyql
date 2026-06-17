@@ -1,0 +1,8 @@
+import code.{HttpInput}
+
+adapter php {
+  package "symfony/routing" {
+    sink method "match" -> code.UrlFetch
+    sink method "matchRequest" -> code.UrlFetch
+  }
+}

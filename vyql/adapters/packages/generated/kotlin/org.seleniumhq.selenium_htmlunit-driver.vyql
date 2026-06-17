@@ -1,0 +1,10 @@
+import code.{UrlFetch, CodeEval, NetworkConnect}
+
+adapter kotlin {
+  package "org.seleniumhq.selenium:htmlunit-driver" {
+    sink method "get" -> code.UrlFetch
+    sink method "executeScript" -> code.CodeEval
+    sink method "setHTTPProxy" -> code.NetworkConnect
+    sink method "setProxySettings" -> code.NetworkConnect
+  }
+}

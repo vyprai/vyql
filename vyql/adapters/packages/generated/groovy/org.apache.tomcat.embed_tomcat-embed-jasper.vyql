@@ -1,0 +1,6 @@
+adapter groovy {
+  package "org.apache.tomcat.embed:tomcat-embed-jasper" {
+    source method "Token" -> code.SecretValue
+    sink method "parse" -> code.Deserialization
+  }
+}

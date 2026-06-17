@@ -1,0 +1,9 @@
+import code.{Deserialization, TemplateRender}
+
+adapter scala {
+  package "org.apache.velocity:velocity" {
+    sink method "parse" -> code.Deserialization
+    sink method "merge" -> code.TemplateRender
+    sink method "process" -> code.TemplateRender
+  }
+}

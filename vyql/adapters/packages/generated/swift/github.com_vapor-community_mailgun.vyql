@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+adapter swift {
+  package "github.com/vapor-community/mailgun" {
+    sink method "send" -> code.NetworkSend
+    sink method "setup" -> code.NetworkSend
+    sink method "createTemplate" -> code.NetworkSend
+  }
+}

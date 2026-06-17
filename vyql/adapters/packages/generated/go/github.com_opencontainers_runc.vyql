@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter go {
+  package "github.com/opencontainers/runc" {
+    sink method "execProcess" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,12 @@
+import code.{WeakHash}
+adapter go {
+  package "github.com/dgryski/go-farm" {
+    mark method "Hash32" -> code.WeakHash
+    mark method "Hash32WithSeed" -> code.WeakHash
+    mark method "Hash64" -> code.WeakHash
+    mark method "Hash64WithSeed" -> code.WeakHash
+    mark method "Hash64WithSeeds" -> code.WeakHash
+    mark method "Hash128" -> code.WeakHash
+    mark method "Hash128WithSeed" -> code.WeakHash
+  }
+}

@@ -1,0 +1,9 @@
+import code.{NetworkSend}
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/swift-server/swift-aws-lambda-runtime" {
+    source method "run" -> core.UserControlledData
+    sink method "write" -> code.NetworkSend
+  }
+}

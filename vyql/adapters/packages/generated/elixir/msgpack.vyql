@@ -1,0 +1,5 @@
+adapter elixir {
+  package "msgpack" {
+    sink method "parse_options" -> code.Deserialization
+  }
+}

@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess}
+adapter dart {
+  package "barback" {
+    sink method "read" -> code.FilePathAccess
+    sink method "readAsString" -> code.FilePathAccess
+    sink method "openRead" -> code.FilePathAccess
+    sink method "deserializeId" -> code.Deserialization
+    sink method "deserializeStream" -> code.Deserialization
+  }
+}

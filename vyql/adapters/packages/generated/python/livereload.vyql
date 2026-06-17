@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "livereload" {
+    sink method "shell" -> code.CommandExecution
+  }
+}

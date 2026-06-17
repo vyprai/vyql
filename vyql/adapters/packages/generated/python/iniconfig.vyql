@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter python {
+  package "iniconfig" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_ini_data" -> code.Deserialization
+  }
+}

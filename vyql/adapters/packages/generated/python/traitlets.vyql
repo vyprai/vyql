@@ -1,0 +1,8 @@
+import code.{CliArgument, CommandExecution, FilePathAccess}
+adapter python {
+  package "traitlets" {
+    source method "parse_command_line" -> code.CliArgument
+    sink method "load_config" -> code.FilePathAccess
+    sink method "load_subconfig" -> code.FilePathAccess
+  }
+}

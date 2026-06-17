@@ -34,27 +34,17 @@ func shSourceVar(name string) bool {
 
 // ExtractBash parses shell scripts into one NIR Program (one module per file).
 func ExtractBash(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsbash.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "self"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &shConv{src: src, file: rel, key: moduleKey(root, f, ".sh")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.block(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsbash.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &shConv{src: src, file: rel, key: moduleKey(root, abs, ".sh")}
+			return nir.Module{Key: c.key, File: rel, Body: c.block(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func (c *shConv) loc(n *tree_sitter.Node) string {
@@ -178,7 +168,7 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: shLiteralValue(c.text(n))}
 	case "command_substitution":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
@@ -219,6 +209,16 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func shLiteralValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 2 {
+		if q := raw[0]; (q == '"' || q == '\'') && raw[len(raw)-1] == q {
+			return raw[1 : len(raw)-1]
+		}
+	}
+	return raw
 }
 
 // shTestOp maps bash test operators to C-style symbols const-eval understands.

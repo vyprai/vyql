@@ -1,0 +1,6 @@
+adapter c {
+  package "cxxopts" {
+    sink method "IsFalseText" -> code.StoredDataWrite
+    sink method "Value" -> code.Deserialization
+  }
+}

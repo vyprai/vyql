@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter ruby {
+  package "countries" {
+    source method "search" -> core.UserControlledData
+  }
+}

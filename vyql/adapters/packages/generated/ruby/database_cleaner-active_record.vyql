@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter ruby {
+  package "database_cleaner-active_record" {
+    sink method "delete_tables" -> code.SqlExecution
+  }
+}

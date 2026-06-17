@@ -1,0 +1,17 @@
+adapter dart {
+  package "shelf_router" {
+    source method "call" -> code.HttpInput
+    source method "add" -> code.HttpInput
+    source method "params" -> core.UserControlledData
+    source method "get" -> code.HttpInput
+    source method "head" -> code.HttpInput
+    source method "post" -> code.HttpInput
+    source method "put" -> code.HttpInput
+    source method "delete" -> code.HttpInput
+    source method "connect" -> code.HttpInput
+    source method "options" -> code.HttpInput
+    source method "trace" -> code.HttpInput
+    source method "patch" -> code.HttpInput
+    source method "mount" -> code.HttpInput
+  }
+}

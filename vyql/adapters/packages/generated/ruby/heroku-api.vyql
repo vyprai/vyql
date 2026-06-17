@@ -1,0 +1,10 @@
+import code.{NetworkConnect, SecretValue}
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "heroku-api" {
+    sink method "request" -> code.NetworkConnect
+    control method "escape" -> core.HtmlEscape
+    source method "post_login" -> code.SecretValue
+  }
+}

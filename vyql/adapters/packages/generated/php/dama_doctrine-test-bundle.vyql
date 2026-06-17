@@ -1,0 +1,9 @@
+import code.{DatabaseRead, NetworkConnect, SqlExecution}
+adapter php {
+  package "dama/doctrine-test-bundle" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "connect" -> code.DatabaseRead
+    sink method "beginTransaction" -> code.SqlExecution
+    sink method "rollBack" -> code.SqlExecution
+  }
+}

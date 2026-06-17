@@ -1,0 +1,5 @@
+adapter groovy {
+  package "com.esotericsoftware:kryo" {
+    sink method "read" -> code.Deserialization
+  }
+}

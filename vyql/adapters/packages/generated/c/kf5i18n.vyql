@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter c {
+  package "kf5i18n" {
+    sink method "addDomainLocaleDir" -> code.FilePathAccess
+  }
+}

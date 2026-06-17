@@ -1,0 +1,9 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter ruby {
+  package "moneta" {
+    source method "load" -> code.StoredDataRead
+    sink method "store" -> code.StoredDataWrite
+    sink method "delete" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter groovy {
+  package "com.squareup.retrofit2:retrofit" {
+    source method "baseUrl" -> code.NetworkData
+  }
+}

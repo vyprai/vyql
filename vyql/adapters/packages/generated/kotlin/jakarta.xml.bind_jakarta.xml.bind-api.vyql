@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "jakarta.xml.bind:jakarta.xml.bind-api" {
+    sink method "unmarshal" -> code.Deserialization
+  }
+}

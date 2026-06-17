@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter scala {
+  package "com.aventstack:extentreports" {
+    sink method "addScreenCaptureFromPath" -> code.FilePathAccess
+    sink method "addVideoFromPath" -> code.FilePathAccess
+    sink method "createDomainFromJsonArchive" -> code.Deserialization
+    sink method "loadJSONConfig" -> code.Deserialization
+  }
+}

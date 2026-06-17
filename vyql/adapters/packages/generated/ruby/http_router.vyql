@@ -1,0 +1,14 @@
+import code.{HttpInput, RedirectTarget}
+adapter ruby {
+  package "http_router" {
+    source method "add_route" -> code.HttpInput
+    source method "url" -> code.HttpInput
+    source method "path" -> code.HttpInput
+    mark method "process_destination_path" -> code.RedirectTarget
+    mark method "rewrite_partial_path_info" -> code.RedirectTarget
+    mark method "rewrite_path_info" -> code.RedirectTarget
+    mark method "raw_url" -> code.RedirectTarget
+    mark method "raw_path" -> code.RedirectTarget
+    mark method "raw_call" -> code.RedirectTarget
+  }
+}

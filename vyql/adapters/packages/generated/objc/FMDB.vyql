@@ -1,0 +1,10 @@
+import code.{SqlExecution}
+adapter objc {
+  package "FMDB" {
+    sink method "executeUpdate:withErrorAndBindings:" -> code.SqlExecution
+    sink method "executeUpdateWithFormat:" -> code.SqlExecution
+    sink method "executeStatements:" -> code.SqlExecution
+    sink method "executeQuery:" -> code.SqlExecution
+    sink method "executeQueryWithFormat:" -> code.SqlExecution
+  }
+}

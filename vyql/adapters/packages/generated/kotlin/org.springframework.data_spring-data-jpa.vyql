@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter kotlin {
+  package "org.springframework.data:spring-data-jpa" {
+    sink method "query" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,13 @@
+import code.{FileUse, FilePathAccess}
+adapter objc {
+  package "CocoaLumberjack" {
+    sink method "createNewLogFileWithError:" -> code.FileUse
+    sink method "createNewLogFile" -> code.FileUse
+    sink method "cleanupLogFilesWithError:" -> code.FileUse
+    sink method "rollLogFileWithCompletionBlock:" -> code.FileUse
+    sink method "rollLogFile" -> code.FileUse
+    sink method "logFileWithPath:" -> code.FilePathAccess
+    sink method "unsortedLogFilePaths" -> code.FilePathAccess
+    sink method "sortedLogFilePaths" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter javascript {
+  package "is-regexp" {
+    mark method "isRegexp" -> code.RegexCompile
+  }
+}

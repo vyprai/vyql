@@ -1,0 +1,6 @@
+adapter go {
+  package "go.mongodb.org/mongo-driver" {
+    sink method "findJSONFilesInDir" -> code.NosqlQuery
+    sink method "setRewrapManyDataKeyWriteModels" -> code.StoredDataWrite
+  }
+}

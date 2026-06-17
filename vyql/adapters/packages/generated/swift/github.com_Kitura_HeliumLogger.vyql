@@ -1,0 +1,6 @@
+import code.{LogOutput}
+adapter swift {
+  package "github.com/Kitura/HeliumLogger" {
+    sink method "log" -> code.LogOutput
+  }
+}

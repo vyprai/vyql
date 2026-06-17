@@ -1,0 +1,9 @@
+import code.{WeakHash}
+adapter cpp {
+  package "aws-c-cal" {
+    mark method "aws_md5_new" -> code.WeakHash
+    mark method "aws_sha1_new" -> code.WeakHash
+    mark method "aws_md5_compute" -> code.WeakHash
+    mark method "aws_sha1_compute" -> code.WeakHash
+  }
+}

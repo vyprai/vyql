@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter scala {
+  package "net.java.dev.jna:jna-platform" {
+    sink method "moveToTrash" -> code.FilePathAccess
+  }
+}

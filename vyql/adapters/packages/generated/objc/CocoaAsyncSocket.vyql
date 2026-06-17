@@ -1,0 +1,16 @@
+import code.{NetworkData, NetworkConnect, NetworkSend}
+adapter objc {
+  package "CocoaAsyncSocket" {
+    source method "readDataWithTimeout" -> code.NetworkData
+    source method "readDataToLength" -> code.NetworkData
+    source method "readDataToData" -> code.NetworkData
+
+    sink method "acceptOnUrl" -> code.NetworkConnect
+    sink method "connectToHost" -> code.NetworkConnect
+    sink method "connectToAddress" -> code.NetworkConnect
+    sink method "connectToUrl" -> code.NetworkConnect
+    sink method "connectToNetService" -> code.NetworkConnect
+
+    sink method "writeData" -> code.NetworkSend
+  }
+}

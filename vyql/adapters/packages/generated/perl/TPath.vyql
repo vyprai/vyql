@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "TPath" {
+    sink method "parse" -> code.Deserialization
+  }
+}

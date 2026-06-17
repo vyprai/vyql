@@ -1,0 +1,6 @@
+import code.{NetworkData}
+adapter java {
+  package "org.springframework:spring-websocket" {
+    source method "getPayload" -> code.NetworkData
+  }
+}

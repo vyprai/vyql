@@ -1,0 +1,10 @@
+import code.{SqlExecution}
+
+adapter elixir {
+  package "ash_postgres" {
+    sink method "run_query" -> code.SqlExecution
+    sink method "run_aggregate_query" -> code.SqlExecution
+    sink method "run_aggregate_query_with_lateral_join" -> code.SqlExecution
+    sink method "run_query_with_lateral_join" -> code.SqlExecution
+  }
+}

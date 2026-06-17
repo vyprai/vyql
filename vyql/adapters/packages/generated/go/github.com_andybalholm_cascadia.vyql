@@ -1,0 +1,10 @@
+adapter go {
+  package "github.com/andybalholm/cascadia" {
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseWithPseudoElement" -> code.Deserialization
+    sink method "ParseGroup" -> code.Deserialization
+    sink method "ParseGroupWithPseudoElements" -> code.Deserialization
+    sink method "Compile" -> code.Deserialization
+    sink method "MustCompile" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter perl {
+  package "Apache-Session" {
+    source method "FETCH" -> code.StoredDataRead
+    sink method "STORE" -> code.StoredDataWrite
+    sink method "DELETE" -> code.StoredDataWrite
+  }
+}

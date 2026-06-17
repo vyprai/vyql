@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter elixir {
+  package "ex_cldr_dates_times" {
+    sink method "tokenize" -> code.Deserialization
+    sink method "compile" -> code.Deserialization
+  }
+}

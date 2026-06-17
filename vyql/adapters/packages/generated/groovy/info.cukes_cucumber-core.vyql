@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "info.cukes:cucumber-core" {
+    source method "parse" -> core.UserControlledData
+    sink method "run" -> code.CommandExecution
+  }
+}

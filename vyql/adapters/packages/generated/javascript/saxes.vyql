@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "saxes" {
+    sink method "write" -> code.Deserialization
+    sink method "parseEntity" -> code.Deserialization
+  }
+}

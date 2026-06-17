@@ -1,0 +1,8 @@
+import code.{WeakHash}
+adapter cpp {
+  package "libpq" {
+    mark method "pg_md5_init" -> code.WeakHash
+    mark method "pg_md5_update" -> code.WeakHash
+    mark method "pg_md5_final" -> code.WeakHash
+  }
+}

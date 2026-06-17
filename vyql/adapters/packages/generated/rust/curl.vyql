@@ -1,0 +1,6 @@
+adapter rust {
+  package "curl" {
+    source method "token" -> code.SecretValue
+    source method "cookie" -> code.HttpInput
+  }
+}

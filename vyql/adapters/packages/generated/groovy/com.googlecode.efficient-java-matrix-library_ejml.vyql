@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.googlecode.efficient-java-matrix-library:ejml" {
+    sink method "parseMatrix" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter dart {
+  package "camera_platform_interface" {
+    sink method "takePicture" -> code.FilePathAccess
+    sink method "stopVideoRecording" -> code.FilePathAccess
+  }
+}

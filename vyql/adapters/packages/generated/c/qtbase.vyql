@@ -1,0 +1,9 @@
+import code.{CommandExecution, FilePathAccess}
+adapter c {
+  package "qtbase" {
+    sink method "installFile" -> code.FilePathAccess
+    sink method "installFileOrDirectory" -> code.FilePathAccess
+    sink method "doQInstall" -> code.FilePathAccess
+    sink method "doInstall" -> code.FilePathAccess
+  }
+}

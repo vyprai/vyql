@@ -1,0 +1,5 @@
+adapter rust {
+  package "polyval" {
+    mark method "finalize" -> code.WeakHash
+  }
+}

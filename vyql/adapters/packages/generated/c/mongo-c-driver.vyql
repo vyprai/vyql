@@ -1,0 +1,6 @@
+adapter c {
+  package "mongo-c-driver" {
+    sink method "here" -> code.NosqlQuery
+    sink method "deflateSetHeader" -> code.StoredDataWrite
+  }
+}

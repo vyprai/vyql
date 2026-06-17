@@ -1,0 +1,6 @@
+adapter objc {
+  package "Unbox" {
+    sink path "unbox.parse" -> code.Deserialization
+    source path "unbox.key" -> code.SecretValue
+  }
+}

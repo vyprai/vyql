@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter python {
+  package "flask-cors" {
+    control method "sanitize_regex_param" -> core.InputValidation
+  }
+}

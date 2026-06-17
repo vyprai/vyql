@@ -1,0 +1,12 @@
+import core.{UserControlledData}
+
+adapter csharp {
+  package "microsoft.lightswitch.client.javascript.runtime" {
+    source method "getUrlParameter" -> core.UserControlledData
+    source method "removeUrlParameter" -> core.UserControlledData
+    source method "getCookieValue" -> core.UserControlledData
+    source method "getAllCookieValues" -> core.UserControlledData
+    source method "parseUrl" -> core.UserControlledData
+    source method "parseUrlHash" -> core.UserControlledData
+  }
+}

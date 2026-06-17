@@ -1,0 +1,9 @@
+import code.{CliArgument, CommandExecution}
+
+adapter php {
+  package "zendframework/zend-console" {
+    source method "Zend\Console\Getopt::parse" -> code.CliArgument
+    sink method "Zend\Console\Adapter\Posix::shell_exec" -> code.CommandExecution
+    sink method "Zend\Console\Adapter\Windows::shell_exec" -> code.CommandExecution
+  }
+}

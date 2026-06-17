@@ -1,0 +1,7 @@
+import code.{FilePathAccess, PrivilegedOp}
+adapter dart {
+  package "permission_handler" {
+    sink method "openAppSettings" -> code.FilePathAccess
+    mark method "request" -> code.PrivilegedOp
+  }
+}

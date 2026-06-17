@@ -1,0 +1,8 @@
+import code.{UrlFetch, HtmlRender, CodeEval}
+adapter c {
+  package "qt5-webview" {
+    sink method "setUrl" -> code.UrlFetch
+    sink method "loadHtml" -> code.HtmlRender
+    sink method "runJavaScriptPrivate" -> code.CodeEval
+  }
+}

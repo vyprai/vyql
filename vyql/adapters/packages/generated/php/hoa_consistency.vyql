@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter php {
+  package "hoa/consistency" {
+    sink method "load" -> code.FilePathAccess
+    sink method "requireFile" -> code.FilePathAccess
+  }
+}

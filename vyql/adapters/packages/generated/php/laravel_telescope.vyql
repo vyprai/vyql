@@ -1,0 +1,9 @@
+import code.{CommandExecution, SqlExecution, HttpInput}
+adapter php {
+  package "laravel/telescope" {
+    sink method "recordCommand" -> code.CommandExecution
+    sink method "recordQuery" -> code.SqlExecution
+    sink method "recordRequest" -> code.UrlFetch
+    sink method "recordClientRequest" -> code.UrlFetch
+  }
+}

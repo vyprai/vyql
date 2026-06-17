@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter objc {
+  package "Gifu" {
+    sink method "prepareForAnimation" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import core.{UserControlledData}
+adapter groovy {
+  package "org.glassfish.jersey.media:jersey-media-multipart" {
+    source method "getHeaders" -> core.UserControlledData
+    source method "getParameterizedHeaders" -> core.UserControlledData
+    source method "getEntity" -> core.UserControlledData
+    source method "getFileName" -> core.UserControlledData
+    source method "getField" -> core.UserControlledData
+    source method "getFields" -> core.UserControlledData
+  }
+}

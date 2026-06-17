@@ -1,0 +1,26 @@
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "io.rest-assured:json-path" {
+    sink method "parseText" -> code.Deserialization
+    sink method "parseURL" -> code.Deserialization
+    sink method "parseInputStream" -> code.Deserialization
+    sink method "parseFile" -> code.Deserialization
+    sink method "parseReader" -> code.Deserialization
+
+    source method "get" -> core.UserControlledData
+    source method "getObject" -> core.UserControlledData
+    source method "getList" -> core.UserControlledData
+    source method "getMap" -> core.UserControlledData
+    source method "getString" -> core.UserControlledData
+    source method "getBoolean" -> core.UserControlledData
+    source method "getChar" -> core.UserControlledData
+    source method "getInt" -> core.UserControlledData
+    source method "getByte" -> core.UserControlledData
+    source method "getShort" -> core.UserControlledData
+    source method "getFloat" -> core.UserControlledData
+    source method "getDouble" -> core.UserControlledData
+    source method "getLong" -> core.UserControlledData
+    source method "getUUID" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,5 @@
+adapter perl {
+  package "Kwiki" {
+    sink method "system" -> code.CommandExecution
+  }
+}

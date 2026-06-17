@@ -1,0 +1,10 @@
+import code.{HttpInput}
+import core.{UserControlledData}
+
+adapter go {
+  package "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp" {
+    source method "NewHandler" -> code.HttpInput
+    source method "NewTransport" -> code.HttpInput
+    source method "WithSpanNameFormatter" -> core.UserControlledData
+  }
+}

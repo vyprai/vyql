@@ -1,0 +1,5 @@
+adapter rust {
+  package "sqlx" {
+    sink method "let" -> code.SqlExecution
+  }
+}

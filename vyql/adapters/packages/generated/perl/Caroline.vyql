@@ -1,0 +1,9 @@
+adapter perl {
+  package "Caroline" {
+    source method "readline" -> core.UserControlledData
+    source method "readkey" -> core.UserControlledData
+    source method "read_raw" -> core.UserControlledData
+    sink method "read_history_file" -> code.FilePathAccess
+    sink method "write_history_file" -> code.FilePathAccess
+  }
+}

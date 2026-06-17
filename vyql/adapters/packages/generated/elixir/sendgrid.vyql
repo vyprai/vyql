@@ -1,0 +1,11 @@
+import code.{NetworkSend}
+
+adapter elixir {
+  package "sendgrid" {
+    sink method "send" -> code.NetworkSend
+    sink method "get" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "patch" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+  }
+}

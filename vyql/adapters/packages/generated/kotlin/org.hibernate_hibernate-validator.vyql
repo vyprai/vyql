@@ -1,0 +1,9 @@
+adapter kotlin {
+  package "org.hibernate:hibernate-validator" {
+    sink method "hash" -> code.SqlExecution
+    control method "prepareValidatedExecutableTypes" -> core.SqlParameterization
+    control method "normalize" -> core.InputValidation
+    mark method "hash" -> code.WeakHash
+    mark method "regexp" -> code.RegexCompile
+  }
+}

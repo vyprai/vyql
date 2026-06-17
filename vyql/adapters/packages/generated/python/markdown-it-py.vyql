@@ -1,0 +1,10 @@
+import code.{Deserialization, HtmlRender}
+
+adapter python {
+  package "markdown-it-py" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseInline" -> code.Deserialization
+    sink method "render" -> code.HtmlRender
+    control method "escape" -> core.HtmlEscape
+  }
+}

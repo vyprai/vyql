@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "source": {
+    "name": "ecosyste.ms packages API",
+    "base_url": "https://packages.ecosyste.ms/api/v1",
+    "rank_by": "dependent_repos_count",
+    "order": "desc",
+    "target_per_language": 1000,
+    "notes": [
+      "dependent_repos_count is used as the default popularity signal because downloads are not comparable across every registry.",
+      "Languages may list multiple registries; the generator de-duplicates by package name and keeps the highest-ranked occurrence.",
+      "Project types are scanner coverage buckets, not package registry facets."
+    ]
+  },
+  "project_types": ["webapp", "api", "cli", "worker", "library", "mobile", "desktop", "data", "devops", "embedded"],
+  "languages": {
+    "bash": {
+      "registries": ["formulae.brew.sh", "debian-13", "ubuntu-24.04"],
+      "project_types": ["cli", "devops", "worker", "library"]
+    },
+    "c": {
+      "registries": ["vcpkg.io", "conan.io"],
+      "project_types": ["cli", "api", "worker", "desktop", "embedded", "library"]
+    },
+    "cpp": {
+      "registries": ["vcpkg.io", "conan.io"],
+      "project_types": ["cli", "api", "worker", "desktop", "embedded", "library"]
+    },
+    "csharp": {
+      "registries": ["nuget.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "desktop", "mobile", "library"]
+    },
+    "dart": {
+      "registries": ["pub.dev"],
+      "project_types": ["webapp", "api", "cli", "mobile", "desktop", "library"]
+    },
+    "elixir": {
+      "registries": ["hex.pm"],
+      "project_types": ["webapp", "api", "cli", "worker", "library"]
+    },
+    "go": {
+      "registries": ["proxy.golang.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "devops", "library"]
+    },
+    "groovy": {
+      "registries": ["repo1.maven.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "devops", "library"]
+    },
+    "java": {
+      "registries": ["repo1.maven.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "desktop", "mobile", "data", "library"]
+    },
+    "javascript": {
+      "registries": ["npmjs.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "desktop", "mobile", "devops", "library"]
+    },
+    "kotlin": {
+      "registries": ["repo1.maven.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "mobile", "library"]
+    },
+    "lua": {
+      "registries": ["nixpkgs-unstable", "formulae.brew.sh"],
+      "project_types": ["webapp", "api", "cli", "worker", "embedded", "library"]
+    },
+    "objc": {
+      "registries": ["cocoapods.org"],
+      "project_types": ["mobile", "desktop", "library"]
+    },
+    "perl": {
+      "registries": ["metacpan.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "devops", "library"]
+    },
+    "php": {
+      "registries": ["packagist.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "library"]
+    },
+    "powershell": {
+      "registries": ["nuget.org"],
+      "project_types": ["cli", "devops", "worker", "library"]
+    },
+    "python": {
+      "registries": ["pypi.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "data", "devops", "library"]
+    },
+    "ruby": {
+      "registries": ["rubygems.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "devops", "library"]
+    },
+    "rust": {
+      "registries": ["crates.io"],
+      "project_types": ["webapp", "api", "cli", "worker", "desktop", "embedded", "library"]
+    },
+    "scala": {
+      "registries": ["repo1.maven.org"],
+      "project_types": ["webapp", "api", "cli", "worker", "data", "library"]
+    },
+    "solidity": {
+      "registries": ["npmjs.org"],
+      "project_types": ["api", "cli", "worker", "library"]
+    },
+    "swift": {
+      "registries": ["swiftpackageindex.com", "cocoapods.org"],
+      "project_types": ["api", "cli", "mobile", "desktop", "library"]
+    }
+  }
+}

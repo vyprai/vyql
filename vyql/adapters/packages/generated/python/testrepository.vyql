@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter python {
+  package "testrepository" {
+    sink method "subprocess_Popen" -> code.CommandExecution
+  }
+}

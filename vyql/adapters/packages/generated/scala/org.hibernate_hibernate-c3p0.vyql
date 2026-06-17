@@ -1,0 +1,7 @@
+import code.{CodeEval, SqlExecution}
+adapter scala {
+  package "org.hibernate:hibernate-c3p0" {
+    sink method "loadDriverClass" -> code.CodeEval
+    sink method "configure" -> code.SqlExecution
+  }
+}

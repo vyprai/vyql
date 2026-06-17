@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "com.github.xiaoymin:swagger-bootstrap-ui" {
+    sink method "parse" -> code.Deserialization
+  }
+}

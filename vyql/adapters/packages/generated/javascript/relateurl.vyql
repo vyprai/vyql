@@ -1,0 +1,6 @@
+adapter javascript {
+  package "relateurl" {
+    source method "RelateUrl" -> core.UserControlledData
+    source method "RelateUrl.relate" -> core.UserControlledData
+  }
+}

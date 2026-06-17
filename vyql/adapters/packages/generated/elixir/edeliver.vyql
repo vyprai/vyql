@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter elixir {
+  package "edeliver" {
+    sink method "shell_command" -> code.CommandExecution
+  }
+}

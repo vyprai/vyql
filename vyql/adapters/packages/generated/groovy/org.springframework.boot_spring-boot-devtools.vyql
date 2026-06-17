@@ -1,0 +1,5 @@
+adapter groovy {
+  package "org.springframework.boot:spring-boot-devtools" {
+    sink method "load" -> code.Deserialization
+  }
+}

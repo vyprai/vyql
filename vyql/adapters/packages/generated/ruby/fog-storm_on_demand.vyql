@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend, HttpInput}
+
+adapter ruby {
+  package "fog-storm_on_demand" {
+    sink method "request" -> code.NetworkConnect
+    sink method "request" -> code.NetworkSend
+    source method "request" -> code.HttpInput
+  }
+}

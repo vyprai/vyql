@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "gl_generator" {
+    sink method "parse" -> code.Deserialization
+  }
+}

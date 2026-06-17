@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "snappy" {
+    sink method "snappy_validate_compressed_buffer" -> code.Deserialization
+    sink method "Uncompress" -> code.Deserialization
+    sink method "RawUncompress" -> code.Deserialization
+    sink method "RawUncompressToIOVec" -> code.Deserialization
+  }
+}

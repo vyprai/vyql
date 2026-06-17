@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/apple/FHIRModels" {
+    sink method "init(from:)" -> code.Deserialization
+  }
+}

@@ -1,0 +1,10 @@
+adapter php {
+  package "nette/http" {
+    source method "getQuery" -> code.HttpInput
+    source method "getPost" -> code.HttpInput
+    mark method "getFiles" -> code.FileUpload
+    source method "getCookies" -> code.Cookie
+    source method "getHeader" -> code.HttpInput
+    source method "getHeaders" -> code.HttpInput
+  }
+}

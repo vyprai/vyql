@@ -1,0 +1,10 @@
+import code.{StoredDataRead, CliArgument}
+
+adapter rust {
+  package "system-configuration" {
+    source method "SCDynamicStoreCopyValue" -> code.StoredDataRead
+    source method "get_proxies" -> code.StoredDataRead
+    source method "default" -> code.CliArgument
+    source method "group" -> code.CliArgument
+  }
+}

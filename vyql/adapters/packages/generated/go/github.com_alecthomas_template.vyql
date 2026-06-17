@@ -1,0 +1,10 @@
+adapter go {
+  package "github.com/alecthomas/template" {
+    control method "HTMLEscape" -> core.HtmlEscape
+    control method "HTMLEscapeString" -> core.HtmlEscape
+    control method "HTMLEscaper" -> core.HtmlEscape
+    sink method "ParseFiles" -> code.TemplateRender
+    sink method "ParseGlob" -> code.TemplateRender
+    sink method "Parse" -> code.TemplateRender
+  }
+}

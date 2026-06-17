@@ -1,0 +1,12 @@
+import code.{Deserialization, FilePathAccess, StoredDataWrite}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "uboot_env" {
+    source method "read" -> core.UserControlledData
+    sink method "write" -> code.StoredDataWrite
+    sink method "from_file" -> code.FilePathAccess
+    sink method "from_file!" -> code.FilePathAccess
+    sink method "decode" -> code.Deserialization
+  }
+}

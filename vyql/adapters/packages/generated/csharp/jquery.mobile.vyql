@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter csharp {
+  package "jquery.mobile" {
+    source method "parseUrl" -> code.NetworkData
+  }
+}

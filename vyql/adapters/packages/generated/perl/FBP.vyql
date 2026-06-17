@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "FBP" {
+    sink method "parse_file" -> code.Deserialization
+  }
+}

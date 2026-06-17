@@ -1,0 +1,14 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/influxdata/influxdb" {
+    sink method "ParsePoints" -> code.Deserialization
+    sink method "ParsePointsString" -> code.Deserialization
+    sink method "ParseKey" -> code.Deserialization
+    sink method "ParseKeyBytes" -> code.Deserialization
+    sink method "ParseKeyBytesWithTags" -> code.Deserialization
+    sink method "ParseTags" -> code.Deserialization
+    sink method "ParseName" -> code.Deserialization
+    sink method "ParsePointsWithPrecision" -> code.Deserialization
+  }
+}

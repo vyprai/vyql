@@ -1,0 +1,14 @@
+import code.{SecretValue}
+adapter objc {
+  package "AFOAuth2Manager" {
+    source method "managerWithBaseURL:clientID:secret:" -> code.SecretValue
+    source method "initWithBaseURL:clientID:secret:" -> code.SecretValue
+    source method "setSecret:" -> code.SecretValue
+    source method "setAuthorizationHeaderFieldWithCredential:" -> code.SecretValue
+    source method "credentialWithOAuthToken:" -> code.SecretValue
+    source method "initWithOAuthToken:" -> code.SecretValue
+    source method "setRefreshToken:" -> code.SecretValue
+    source method "storeCredential:" -> code.SecretValue
+    source method "retrieveCredentialWithIdentifier:" -> code.SecretValue
+  }
+}

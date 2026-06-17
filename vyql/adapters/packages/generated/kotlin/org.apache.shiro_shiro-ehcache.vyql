@@ -1,0 +1,8 @@
+import code.{FilePathAccess, FileUse}
+
+adapter kotlin {
+  package "org.apache.shiro:shiro-ehcache" {
+    sink method "getCacheManagerConfigFile" -> code.FilePathAccess
+    sink method "setCacheManagerConfigFile" -> code.FileUse
+  }
+}

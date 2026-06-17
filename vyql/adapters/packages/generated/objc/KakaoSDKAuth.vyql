@@ -1,0 +1,12 @@
+import code.{SecretValue, HttpInput}
+import core.{AuthenticationCheck}
+
+adapter objc {
+  package "KakaoSDKAuth" {
+    source method "getToken" -> code.SecretValue
+    source method "token" -> code.SecretValue
+    source method "refreshToken" -> code.SecretValue
+    control method "authorizeRequest" -> core.AuthenticationCheck
+    control method "setToken" -> core.AuthenticationCheck
+  }
+}

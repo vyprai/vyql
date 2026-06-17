@@ -1,0 +1,12 @@
+import code.{WeakHash, Deserialization}
+adapter c {
+  package "libpq" {
+    mark method "pg_md5_init" -> code.WeakHash
+    mark method "pg_md5_update" -> code.WeakHash
+    mark method "pg_md5_final" -> code.WeakHash
+    mark method "pg_sha1_init" -> code.WeakHash
+    mark method "pg_sha1_update" -> code.WeakHash
+    mark method "pg_sha1_final" -> code.WeakHash
+    sink method "seg_yyparse" -> code.Deserialization
+  }
+}

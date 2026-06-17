@@ -1,0 +1,7 @@
+import code.{LogOutput}
+
+adapter objc {
+  package "cdebug" {
+    sink method "test" -> code.LogOutput
+  }
+}

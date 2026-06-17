@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "String-Tagged-Markdown" {
+    sink method "parse_markdown" -> code.Deserialization
+  }
+}

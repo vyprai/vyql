@@ -1,0 +1,7 @@
+import code.{XmlParse}
+
+adapter ruby {
+  package "extlib" {
+    sink method "from_xml" -> code.XmlParse
+  }
+}

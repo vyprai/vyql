@@ -1,0 +1,7 @@
+import core.{AuthenticationCheck}
+
+adapter ruby {
+  package "doorkeeper" {
+    control method "authenticate" -> core.AuthenticationCheck
+  }
+}

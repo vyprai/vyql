@@ -1,0 +1,10 @@
+import code.{SecretValue, HttpInput}
+
+adapter objc {
+  package "GTMAppAuth" {
+    source method "authorizeRequest" -> code.HttpInput
+    source method "save" -> code.SecretValue
+    source method "removeAuthSession" -> code.SecretValue
+    source method "retrieveAuthSession" -> code.SecretValue
+  }
+}

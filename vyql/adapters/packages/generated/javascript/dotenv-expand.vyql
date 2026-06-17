@@ -1,0 +1,6 @@
+import code.{ExpressionEval}
+adapter javascript {
+  package "dotenv-expand" {
+    sink method "expand" -> code.ExpressionEval
+  }
+}

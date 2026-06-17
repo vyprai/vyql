@@ -1,0 +1,25 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter perl {
+  package "HackaMol" {
+    sink method "read_file_push_coords_mol" -> code.Deserialization
+    sink method "read_file_atoms" -> code.Deserialization
+    sink method "read_file_pdb_parts" -> code.Deserialization
+    sink method "read_file_mol" -> code.Deserialization
+    sink method "read_string_mol" -> code.Deserialization
+    sink method "read_string_atoms" -> code.Deserialization
+    sink method "read_pdb_parts" -> code.Deserialization
+    sink method "read_pdb_header" -> code.Deserialization
+    sink method "read_pdb_atoms" -> code.Deserialization
+    sink method "read_xyz_atoms" -> code.Deserialization
+    sink method "read_cif_info" -> code.Deserialization
+    sink method "read_cif_atoms" -> code.Deserialization
+    sink method "read_yaml_atoms" -> code.Deserialization
+    sink method "parse_zmat_atoms" -> code.Deserialization
+    sink method "read_zmat_atoms" -> code.Deserialization
+    sink method "read_pdbqt_atoms" -> code.Deserialization
+    sink method "_open_file_unless_fh" -> code.FilePathAccess
+    sink method "rcsb_ftp_fetch" -> code.NetworkConnect
+    sink method "ftp_connect" -> code.NetworkConnect
+  }
+}

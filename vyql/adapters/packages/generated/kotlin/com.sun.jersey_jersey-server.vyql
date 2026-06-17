@@ -1,0 +1,7 @@
+import code.{ResponseHeaderWrite}
+
+adapter kotlin {
+  package "com.sun.jersey:jersey-server" {
+    sink method "ContainerResponse.write" -> code.ResponseHeaderWrite
+  }
+}

@@ -1,0 +1,8 @@
+adapter php {
+  package "zendframework/zend-mime" {
+    sink method "Zend\Mime\Decode::splitMime" -> code.Deserialization
+    sink method "Zend\Mime\Decode::splitMessage" -> code.Deserialization
+    sink method "Zend\Mime\Decode::splitHeaderField" -> code.Deserialization
+    sink method "Zend\Mime\Decode::decodeQuotedPrintable" -> code.Deserialization
+  }
+}

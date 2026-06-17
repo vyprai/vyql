@@ -1,0 +1,6 @@
+adapter objc {
+  package "WeexSDK" {
+    sink method "open" -> code.FilePathAccess
+    mark path "weexsdk.hash" -> code.WeakHash
+  }
+}

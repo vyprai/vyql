@@ -1,0 +1,9 @@
+import code.{CodeEval, HtmlRender}
+
+adapter dart {
+  package "webview_flutter_platform_interface" {
+    sink method "loadHtmlString" -> code.HtmlRender
+    sink method "runJavaScript" -> code.CodeEval
+    sink method "runJavaScriptReturningResult" -> code.CodeEval
+  }
+}

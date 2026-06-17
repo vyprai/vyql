@@ -1,0 +1,8 @@
+import code.{Deserialization, FileUse}
+
+adapter python {
+  package "biopython" {
+    sink method "parse" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+  }
+}

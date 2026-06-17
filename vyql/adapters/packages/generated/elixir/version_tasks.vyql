@@ -1,0 +1,8 @@
+import code.{LogOutput, CodeEval}
+adapter elixir {
+  package "version_tasks" {
+    sink method "VersionTasks.Shell.info" -> code.LogOutput
+    sink method "VersionTasks.Shell.error" -> code.LogOutput
+    sink method "VersionTasks.Shell.raise" -> code.CodeEval
+  }
+}

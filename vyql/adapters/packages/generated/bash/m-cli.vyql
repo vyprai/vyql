@@ -1,0 +1,5 @@
+adapter bash {
+  package "m-cli" {
+    source path "m.argv" -> code.CliArgument
+  }
+}

@@ -1,0 +1,5 @@
+adapter javascript {
+  package "postcss-value-parser" {
+    sink method "ValueParser" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter php {
+  package "league/glide" {
+    sink method "League\Glide\Api\Api::run" -> code.Deserialization
+    sink method "League\Glide\Server::outputImage" -> code.FilePathAccess
+    sink method "League\Glide\Server::getSourcePath" -> code.FilePathAccess
+  }
+}

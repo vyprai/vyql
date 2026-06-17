@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/google/JacquardSDKiOS" {
+    sink method "parseOuterResponse" -> code.Deserialization
+    sink method "parseNotification" -> code.Deserialization
+  }
+}

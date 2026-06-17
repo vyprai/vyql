@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter go {
+  package "golang.org/x/exp" {
+    sink method "Open" -> code.FilePathAccess
+  }
+}

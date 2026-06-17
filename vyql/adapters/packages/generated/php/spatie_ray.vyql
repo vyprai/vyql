@@ -1,0 +1,9 @@
+import code.{NetworkSend, Deserialization, NetworkConnect}
+
+adapter php {
+  package "spatie/ray" {
+    sink method "send" -> code.NetworkSend
+    sink method "json_decode" -> code.Deserialization
+    sink method "url" -> code.NetworkConnect
+  }
+}

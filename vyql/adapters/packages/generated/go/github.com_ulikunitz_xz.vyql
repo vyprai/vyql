@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/ulikunitz/xz" {
+    sink method "NewReader" -> code.Deserialization
+  }
+}

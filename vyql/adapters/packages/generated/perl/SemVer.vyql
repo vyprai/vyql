@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "SemVer" {
+    sink method "parse" -> code.Deserialization
+  }
+}

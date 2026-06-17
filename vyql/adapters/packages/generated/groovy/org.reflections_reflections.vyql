@@ -1,0 +1,8 @@
+adapter groovy {
+  package "org.reflections:reflections" {
+    sink method "read" -> code.Deserialization
+    sink method "save" -> code.FilePathAccess
+    sink method "fromURL" -> code.UrlFetch
+    sink method "getFile" -> code.FilePathAccess
+  }
+}

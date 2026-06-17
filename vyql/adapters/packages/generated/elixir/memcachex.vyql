@@ -1,0 +1,10 @@
+import code.{NetworkData, NetworkSend}
+
+adapter elixir {
+  package "memcachex" {
+    sink method "send" -> code.NetworkSend
+    source method "recv" -> code.NetworkData
+    sink method "connect" -> code.NetworkConnect
+    source method "read" -> code.NetworkData
+  }
+}

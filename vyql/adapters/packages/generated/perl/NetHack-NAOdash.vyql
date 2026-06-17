@@ -1,0 +1,12 @@
+import code.{FilePathAccess, Deserialization}
+import core.{UserControlledData}
+
+adapter perl {
+  package "NetHack-NAOdash" {
+    source method "run" -> core.UserControlledData
+    sink method "run" -> code.FilePathAccess
+    sink method "naodash_xlog" -> code.Deserialization
+    source method "naodash_user" -> core.UserControlledData
+    sink method "naodash_user" -> code.Deserialization
+  }
+}

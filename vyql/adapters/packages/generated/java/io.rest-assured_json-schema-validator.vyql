@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter java {
+  package "io.rest-assured:json-schema-validator" {
+    sink method "matchesJsonSchema" -> code.Deserialization
+    sink method "matchesJsonSchemaInClasspath" -> code.Deserialization
+    sink method "matchesSafely" -> code.Deserialization
+  }
+}

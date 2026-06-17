@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "io.jsonwebtoken:jjwt-jackson" {
+    sink method "doDeserialize" -> code.Deserialization
+    sink method "deserialize" -> code.Deserialization
+  }
+}

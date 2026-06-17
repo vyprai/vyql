@@ -1,0 +1,5 @@
+adapter java {
+  package "org.springframework.social:spring-social-web" {
+    sink method "fetchRequestToken" -> code.UrlFetch
+  }
+}

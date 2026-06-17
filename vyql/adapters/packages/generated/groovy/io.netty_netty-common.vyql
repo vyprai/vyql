@@ -1,0 +1,6 @@
+import code.{NetworkData}
+adapter groovy {
+  package "io.netty:netty-common" {
+    source method "createByteArrayFromIpAddressString" -> code.NetworkData
+  }
+}

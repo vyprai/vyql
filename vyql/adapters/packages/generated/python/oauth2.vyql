@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter python {
+  package "oauth2" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

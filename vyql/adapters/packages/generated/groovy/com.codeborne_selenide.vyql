@@ -1,0 +1,11 @@
+import code.{CodeEval, RedirectTarget, UrlFetch, SecretValue}
+
+adapter groovy {
+  package "com.codeborne:selenide" {
+    mark method "open" -> code.RedirectTarget
+    sink method "executeJavaScript" -> CodeEval
+    sink method "executeAsyncJavaScript" -> CodeEval
+    sink method "download" -> UrlFetch
+    source method "sessionId" -> code.SecretValue
+  }
+}

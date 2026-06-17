@@ -1,0 +1,13 @@
+import code.{Deserialization}
+import core.{InputValidation, UserControlledData}
+
+adapter ruby {
+  package "github_api" {
+    sink method "MimeType.parse" -> code.Deserialization
+    control method "Utils::Url.escape_uri" -> core.InputValidation
+    control method "Utils::Url.escape" -> core.InputValidation
+    source method "Utils::Url.unescape" -> core.UserControlledData
+    source method "Utils::Url.parse_query" -> core.UserControlledData
+    source method "Utils::Url.parse_query_for_param" -> core.UserControlledData
+  }
+}

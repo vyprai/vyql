@@ -1,0 +1,12 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter perl {
+  package "CracTools" {
+    sink method "parseBedLine" -> code.Deserialization
+    sink method "parseGFFLine" -> code.Deserialization
+    sink method "parseVCFLine" -> code.Deserialization
+    sink method "parseChimCTLine" -> code.Deserialization
+    sink method "parseSAMLineLite" -> code.Deserialization
+    sink method "getReadingFileHandle" -> code.FilePathAccess
+  }
+}

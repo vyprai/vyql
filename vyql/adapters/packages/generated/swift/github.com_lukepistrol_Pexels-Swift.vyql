@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter swift {
+  package "github.com/lukepistrol/Pexels-Swift" {
+    source method "setup" -> code.SecretValue
+  }
+}

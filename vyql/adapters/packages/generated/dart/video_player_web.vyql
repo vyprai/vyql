@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter dart {
+  package "video_player_web" {
+    sink method "VideoPlayerPlugin.setDataSource" -> code.UrlFetch
+  }
+}

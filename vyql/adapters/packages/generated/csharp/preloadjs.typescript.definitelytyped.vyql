@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter csharp {
+  package "preloadjs.typescript.definitelytyped" {
+    sink method "parseJSON" -> code.Deserialization
+    sink method "parseXML" -> code.Deserialization
+  }
+}

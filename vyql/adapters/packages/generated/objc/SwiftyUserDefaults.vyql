@@ -1,0 +1,8 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter objc {
+  package "SwiftyUserDefaults" {
+    source method "subscript" -> code.StoredDataRead
+    sink method "subscript" -> code.StoredDataWrite
+  }
+}

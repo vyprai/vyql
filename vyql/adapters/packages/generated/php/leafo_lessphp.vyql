@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter php {
+  package "leafo/lessphp" {
+    sink method "compile" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

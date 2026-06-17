@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "CHI" {
+    sink method "json_decode" -> code.Deserialization
+  }
+}

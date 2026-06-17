@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "kartik-v/yii2-widget-datetimepicker" {
+    sink method "parseMarkup" -> code.Deserialization
+  }
+}

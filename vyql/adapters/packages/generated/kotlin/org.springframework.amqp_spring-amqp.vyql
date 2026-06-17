@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.springframework.amqp:spring-amqp" {
+    sink method "deserialize" -> code.Deserialization
+    mark path "org.springframework.amqp.spring.amqp.random" -> code.WeakRandomValue
+  }
+}

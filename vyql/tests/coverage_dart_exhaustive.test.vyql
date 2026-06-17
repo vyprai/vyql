@@ -1,0 +1,366 @@
+# Dart language-gap narrowing: exhaustive coverage for adapter-claimed idioms.
+
+test "dart exhaustive: environment input reaches raw sqflite methods"
+  lang dart
+  expect VYQL-INJ-001
+  code
+  ```
+  void f(db) {
+    final q = Platform.environment["Q"];
+    db.rawQuery(q);
+    db.rawInsert(q);
+    db.rawUpdate(q);
+    db.rawDelete(q);
+    db.execute(q);
+  }
+  ```
+
+test "dart exhaustive: constant raw sqflite methods are clean"
+  lang dart
+  reject VYQL-INJ-001
+  code
+  ```
+  void f(db) {
+    db.rawQuery("select 1");
+    db.execute("select 1");
+  }
+  ```
+
+test "dart exhaustive: package http methods fetch tainted URLs"
+  lang dart
+  expect VYQL-RF-001
+  code
+  ```
+  void f() {
+    final url = Platform.environment["URL"];
+    http.get(url);
+    http.post(url);
+    http.put(url);
+    http.head(url);
+    http.read(url);
+    http.delete(url);
+  }
+  ```
+
+test "dart exhaustive: constant package http URLs are clean for SSRF"
+  lang dart
+  reject VYQL-RF-001
+  code
+  ```
+  void f() {
+    http.get("https://example.com");
+    http.post("https://example.com");
+  }
+  ```
+
+test "dart exhaustive: cleartext package http methods are reported"
+  lang dart
+  expect VYQL-CFG-006
+  code
+  ```
+  void f() {
+    http.get("http://example.com");
+    http.post("http://example.com");
+    http.put("http://example.com");
+    http.head("http://example.com");
+    http.read("http://example.com");
+    http.delete("http://example.com");
+  }
+  ```
+
+test "dart exhaustive: localhost and HTTPS URLs are clean for cleartext"
+  lang dart
+  reject VYQL-CFG-006
+  code
+  ```
+  void f() {
+    http.get("http://127.0.0.1:8080/health");
+    http.post("https://example.com");
+  }
+  ```
+
+test "dart exhaustive: Process APIs execute tainted command data"
+  lang dart
+  expect VYQL-INJ-002
+  code
+  ```
+  void f() {
+    final cmd = Platform.environment["CMD"];
+    Process.run("sh", ["-c", cmd]);
+    Process.runSync("sh", ["-c", cmd]);
+    Process.start("sh", ["-c", cmd]);
+  }
+  ```
+
+test "dart exhaustive: constant Process APIs are clean"
+  lang dart
+  reject VYQL-INJ-002
+  code
+  ```
+  void f() {
+    Process.run("sh", ["-c", "echo safe"]);
+    Process.start("sh", ["-c", "echo safe"]);
+  }
+  ```
+
+test "dart exhaustive: File and Directory constructors use tainted paths"
+  lang dart
+  expect VYQL-PATH-001
+  code
+  ```
+  void f() {
+    final p = Platform.environment["PATH_INFO"];
+    File(p);
+    Directory(p);
+  }
+  ```
+
+test "dart exhaustive: constant File and Directory constructors are clean"
+  lang dart
+  reject VYQL-PATH-001
+  code
+  ```
+  void f() {
+    File("./safe.txt");
+    Directory("./safe");
+  }
+  ```
+
+test "dart exhaustive: archive extraction receives tainted entry paths"
+  lang dart
+  expect VYQL-PATH-004
+  code
+  ```
+  void f(archive) {
+    final entry = Platform.environment["ENTRY"];
+    archive.extractEntry(entry);
+    archive.extractFile(entry);
+    extractArchiveToDisk(archive, entry);
+  }
+  ```
+
+test "dart exhaustive: safePath suppresses archive traversal"
+  lang dart
+  reject VYQL-PATH-004
+  code
+  ```
+  void f(archive) {
+    final entry = safePath(Platform.environment["ENTRY"]);
+    archive.extractEntry(entry);
+  }
+  ```
+
+test "dart exhaustive: weak hash and cipher primitives are reported"
+  lang dart
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  code
+  ```
+  void f(data) {
+    md5.convert(data);
+    sha1.convert(data);
+    BlockCipher("DES");
+    BlockCipher("RC4");
+  }
+  ```
+
+test "dart exhaustive: stronger hash and cipher primitives are clean"
+  lang dart
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  code
+  ```
+  void f(data) {
+    sha256.convert(data);
+    BlockCipher("AES");
+  }
+  ```
+
+test "dart exhaustive: static IV and weak randomness are reported"
+  lang dart
+  expect VYQL-CRY-004
+  expect VYQL-CRY-003
+  code
+  ```
+  void f(key) {
+    ParametersWithIV(key, "0000000000000000");
+    Random();
+  }
+  ```
+
+test "dart exhaustive: runtime IV and Random.secure are clean"
+  lang dart
+  reject VYQL-CRY-004
+  reject VYQL-CRY-003
+  code
+  ```
+  void f(key, iv) {
+    ParametersWithIV(key, iv);
+    Random.secure();
+  }
+  ```
+
+test "dart exhaustive: response writers render tainted HTML"
+  lang dart
+  expect VYQL-INJ-004
+  code
+  ```
+  void f(response) {
+    final html = Platform.environment["HTML"];
+    response.write(html);
+    response.writeln(html);
+  }
+  ```
+
+test "dart exhaustive: escaped response writers are clean"
+  lang dart
+  reject VYQL-INJ-004
+  code
+  ```
+  void f(response) {
+    response.write(escapeHtml(Platform.environment["HTML"]));
+  }
+  ```
+
+test "dart exhaustive: LDAP and XPath queries receive tainted expressions"
+  lang dart
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  code
+  ```
+  void f(ldap, xpath) {
+    ldap.search("base", Platform.environment["FILTER"]);
+    xpath.evaluate(Platform.environment["XPATH"]);
+  }
+  ```
+
+test "dart exhaustive: escaped LDAP and XPath expressions are clean"
+  lang dart
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  code
+  ```
+  void f(ldap, xpath) {
+    ldap.search("base", encodeForLDAP(Platform.environment["FILTER"]));
+    xpath.evaluate(escapeXPath(Platform.environment["XPATH"]));
+  }
+  ```
+
+test "dart exhaustive: trust boundary stores tainted session values"
+  lang dart
+  expect VYQL-CFG-014
+  code
+  ```
+  void f(session) {
+    session.setAttribute("user_id", Platform.environment["USER_ID"]);
+    session.putValue("role", Platform.environment["ROLE"]);
+  }
+  ```
+
+test "dart exhaustive: validated trust-boundary values are clean"
+  lang dart
+  reject VYQL-CFG-014
+  code
+  ```
+  void f(session) {
+    session.setAttribute("role", validateRole(Platform.environment["ROLE"]));
+  }
+  ```
+
+test "dart exhaustive: auth and IDOR findings are reported"
+  lang dart
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  void f(repo) {
+    changePassword();
+    repo.findById(Platform.environment["ID"]);
+  }
+  ```
+
+test "dart exhaustive: auth and ownership guards suppress findings"
+  lang dart
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-002
+  code
+  ```
+  void f(repo) {
+    requireAuth();
+    changePassword();
+    checkOwnership(Platform.environment["ID"]);
+    repo.findById(Platform.environment["ID"]);
+  }
+  ```
+
+test "dart exhaustive: tainted regular expression is ReDoS"
+  lang dart
+  expect VYQL-DOS-001
+  code
+  ```
+  void f() {
+    RegExp(Platform.environment["PATTERN"]);
+  }
+  ```
+
+test "dart exhaustive: constant regular expression is clean"
+  lang dart
+  reject VYQL-DOS-001
+  code
+  ```
+  void f() {
+    RegExp("^[a-z]+\$");
+  }
+  ```
+
+test "dart exhaustive: insecure cookie flags and bad cert callback are reported"
+  lang dart
+  expect VYQL-CFG-007
+  expect VYQL-CFG-004
+  code
+  ```
+  void f(cookie) {
+    cookie.setSecure(false);
+    cookie.setHttpOnly(false);
+    final client = HttpClient();
+    client.badCertificateCallback = true;
+  }
+  ```
+
+test "dart exhaustive: secure cookie flags and cert callback are clean"
+  lang dart
+  reject VYQL-CFG-007
+  reject VYQL-CFG-004
+  code
+  ```
+  void f(cookie) {
+    cookie.setSecure(true);
+    cookie.setHttpOnly(true);
+    final client = HttpClient();
+    client.badCertificateCallback = false;
+  }
+  ```
+
+test "dart exhaustive: resource handles closed are clean"
+  lang dart
+  reject VYQL-RES-001
+  code
+  ```
+  void f() {
+    final socket = Socket.connect("example.com", 443);
+    socket.close();
+    final file = File("./safe.txt").open();
+    file.close();
+  }
+  ```
+
+test "dart exhaustive: resource handles leak"
+  lang dart
+  expect VYQL-RES-001
+  code
+  ```
+  void f() {
+    final file = File("./safe.txt").open();
+    file.readByte();
+  }
+  ```

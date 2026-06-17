@@ -1,0 +1,6 @@
+adapter objc {
+  package "SwiftProtobuf" {
+    sink method "decodeSingularFloatField" -> code.Deserialization
+    mark path "swiftprotobuf.hash" -> code.WeakHash
+  }
+}

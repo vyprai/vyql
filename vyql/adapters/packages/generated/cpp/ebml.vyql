@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "ebml" {
+    sink method "ReadData" -> code.Deserialization
+  }
+}

@@ -1,0 +1,12 @@
+import code.{LogOutput}
+
+adapter csharp {
+  package "ubiety.logging.core" {
+    sink method "Log" -> code.LogOutput
+    sink method "Debug" -> code.LogOutput
+    sink method "Warning" -> code.LogOutput
+    sink method "Error" -> code.LogOutput
+    sink method "Critical" -> code.LogOutput
+    sink method "Information" -> code.LogOutput
+  }
+}

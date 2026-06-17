@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "has-unicode" {
+    source method "module.exports" -> core.UserControlledData
+  }
+}

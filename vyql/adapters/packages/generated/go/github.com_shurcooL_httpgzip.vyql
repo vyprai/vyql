@@ -1,0 +1,9 @@
+import code.{FilePathAccess, HttpInput, NetworkSend}
+
+adapter go {
+  package "github.com/shurcooL/httpgzip" {
+    source method "FileServer" -> code.HttpInput
+    sink method "FileServer" -> code.FilePathAccess
+    sink method "ServeContent" -> code.NetworkSend
+  }
+}

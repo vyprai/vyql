@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter java {
+  package "org.seleniumhq.selenium:selenium-chrome-driver" {
+    sink method "getAdditionalCommands" -> code.CommandExecution
+  }
+}

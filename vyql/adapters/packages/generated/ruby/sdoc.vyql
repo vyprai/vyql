@@ -1,0 +1,10 @@
+import code.{CodeEval}
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "sdoc" {
+    sink method "eval_template" -> code.CodeEval
+    sink method "render_template" -> code.CodeEval
+    control method "strip_tags" -> core.HtmlEscape
+  }
+}

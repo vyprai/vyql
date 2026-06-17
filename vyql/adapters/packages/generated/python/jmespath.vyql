@@ -1,0 +1,6 @@
+adapter python {
+  package "jmespath" {
+    sink method "parse" -> code.Deserialization
+    sink method "search" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{DatabaseRead}
+
+adapter elixir {
+  package "ecto_mnesia" {
+    sink method "execute" -> code.DatabaseRead
+    sink method "select" -> code.DatabaseRead
+  }
+}

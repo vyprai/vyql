@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/yaslab/CSV.swift" {
+    sink method "decode" -> code.Deserialization
+  }
+}

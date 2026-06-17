@@ -1,0 +1,7 @@
+import code.{NetworkBind, NetworkConnect}
+adapter python {
+  package "pyzmq" {
+    sink method "zmq_bind" -> code.NetworkBind
+    sink method "zmq_connect" -> code.NetworkConnect
+  }
+}

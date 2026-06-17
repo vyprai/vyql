@@ -1,0 +1,8 @@
+adapter groovy {
+  package "org.springframework.data:spring-data-rest-webmvc" {
+    sink method "read" -> code.Deserialization
+    source method "getBody" -> code.HttpInput
+    sink method "write" -> code.UrlFetch
+    source method "findMappingVariable" -> code.HttpInput
+  }
+}

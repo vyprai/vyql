@@ -1,0 +1,6 @@
+adapter php {
+  package "league/flysystem-cached-adapter" {
+    sink method "getMetadata" -> code.NosqlQuery
+    sink method "update" -> code.StoredDataWrite
+  }
+}

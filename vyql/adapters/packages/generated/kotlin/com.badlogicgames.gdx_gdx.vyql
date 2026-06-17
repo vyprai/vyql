@@ -1,0 +1,15 @@
+import code.{FilePathAccess, NetworkConnect, NetworkSend, UrlFetch, StoredDataRead, NetworkData, CommandExecution}
+import core.{InputValidation}
+
+adapter kotlin {
+  package "com.badlogicgames.gdx:gdx" {
+    source method "read" -> code.StoredDataRead
+    sink method "write" -> code.FilePathAccess
+    sink method "setUrl" -> code.UrlFetch
+    sink method "sendHttpRequest" -> code.NetworkSend
+    sink method "newServerSocket" -> code.NetworkConnect
+    sink method "newClientSocket" -> code.NetworkConnect
+    sink method "openURI" -> code.UrlFetch
+    control method "validate" -> core.InputValidation
+  }
+}

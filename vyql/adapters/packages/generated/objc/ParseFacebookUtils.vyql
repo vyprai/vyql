@@ -1,0 +1,7 @@
+adapter objc {
+  package "ParseFacebookUtils" {
+    source method "initializeWithApplicationId" -> code.SecretValue
+    source method "initializeFacebookWithUrlShemeSuffix" -> code.SecretValue
+    source method "handleOpenURL" -> core.UserControlledData
+  }
+}

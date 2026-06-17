@@ -1,0 +1,6 @@
+adapter php {
+  package "doctrine/doctrine-orm-module" {
+    sink method "setQueryCache" -> code.SqlExecution
+    control method "prepareEvent" -> core.SqlParameterization
+  }
+}

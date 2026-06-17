@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter python {
+  package "yt-dlp" {
+    control method "sanitize_info" -> core.InputValidation
+  }
+}

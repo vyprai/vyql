@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter groovy {
+  package "org.fusesource.jansi:jansi" {
+    sink method "org.fusesource.jansi.io.AnsiOutputStream.write" -> code.CodeEval
+  }
+}

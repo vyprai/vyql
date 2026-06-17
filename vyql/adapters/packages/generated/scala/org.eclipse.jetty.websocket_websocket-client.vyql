@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter scala {
+  package "org.eclipse.jetty.websocket:websocket-client" {
+    sink method "connect" -> code.NetworkConnect
+  }
+}

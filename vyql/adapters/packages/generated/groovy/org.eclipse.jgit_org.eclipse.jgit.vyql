@@ -1,0 +1,10 @@
+import code.{UrlFetch, FilePathAccess, ArchiveEntryWrite}
+adapter groovy {
+  package "org.eclipse.jgit:org.eclipse.jgit" {
+    sink method "cloneRepository" -> code.UrlFetch
+    sink method "cloneRepository" -> code.ArchiveEntryWrite
+    sink method "add" -> code.FilePathAccess
+    sink method "submoduleAdd" -> code.UrlFetch
+    sink method "submoduleAdd" -> code.ArchiveEntryWrite
+  }
+}

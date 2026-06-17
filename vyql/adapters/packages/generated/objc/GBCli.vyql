@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter objc {
+  package "GBCli" {
+    source method "main" -> code.CliArgument
+  }
+}

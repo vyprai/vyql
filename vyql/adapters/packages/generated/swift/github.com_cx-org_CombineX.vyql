@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/cx-org/CombineX" {
+    sink method "decode" -> code.Deserialization
+  }
+}

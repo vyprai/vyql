@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter elixir {
+  package "torch" {
+    sink method "paginate" -> code.SqlExecution
+  }
+}

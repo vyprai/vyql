@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter swift {
+  package "github.com/dmrschmidt/DSWaveformImage" {
+    sink method "samples" -> code.FilePathAccess
+  }
+}

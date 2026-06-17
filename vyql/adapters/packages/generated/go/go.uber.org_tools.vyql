@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+
+adapter go {
+  package "go.uber.org/tools" {
+    sink method "ExecCmd" -> code.CommandExecution
+    sink method "ExecCmds" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter objc {
+  package "OpenSSL-Universal" {
+    sink method "ASN1_item_d2i_fp" -> code.Deserialization
+  }
+}

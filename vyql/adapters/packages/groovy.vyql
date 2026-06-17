@@ -1,0 +1,72 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter groovy {
+  package "grails" {
+    source "params" -> HttpInput
+    sink method "render" -> TemplateRender
+    control "withForm" -> CsrfProtection
+  }
+  package "javax.servlet" {
+    source receiver "getParameter" on "HttpServletRequest" -> HttpInput
+  }
+  package "groovy" {
+    source "System.getenv" -> SecretValue
+    sink method "execute" -> CommandExecution
+    sink path "Eval.me" -> CodeEval
+    sink method "evaluate" -> CodeEval
+  }
+  package "http-builder" {
+    source method "getText" -> ExternalApiResponse
+    sink path "HTTPBuilder.request" -> UrlFetch
+  }
+  package "groovy-sql" {
+    sink method "execute" -> SqlExecution
+    sink method "rows" -> SqlExecution
+  }
+  package "java.sql" {
+    sink method "executeQuery" -> SqlExecution
+    control method "setParameter" -> SqlParameterization
+  }
+  package "mongodb-driver-sync" {
+    sink method "find" -> NosqlQuery
+  }
+  package "java.io" {
+    sink method "readObject" -> Deserialization
+    sink path "File" -> FilePathAccess
+  }
+  package "snakeyaml" {
+    sink path "Yaml.load" -> Deserialization
+    control "Yaml.safeLoad" -> SafeDeserialization
+  }
+  package "commons-compress" {
+    sink method "extract" -> ArchiveEntryWrite
+  }
+  package "groovy-xml" {
+    sink method "parse" -> XmlParse
+    control "XmlSlurper" val "allowDocTypeDeclaration=false" -> XmlHardening
+  }
+  package "javax.xml.xpath" {
+    sink method "evaluate" arg 0 -> XpathQuery
+  }
+  package "spring-ldap" {
+    sink method "search" arg 1 -> LdapQuery
+    control "LdapEncoder.filterEncode" -> LdapEscape
+  }
+  package "java.util.regex" {
+    sink path "Pattern.compile" -> RegexCompile
+  }
+  package "commons-text" {
+    control "StringEscapeUtils.escapeHtml4" -> HtmlEscape
+  }
+  package "owasp-java-encoder" {
+    control "Encode.forHtml" -> HtmlEscape
+  }
+  package "commons-io" {
+    control "FilenameUtils.normalize" -> PathCanonicalization
+  }
+  package "grails-spring-security-core" {
+    control "springSecurityService.isLoggedIn" -> AuthenticationCheck
+    control "SpringSecurityUtils.ifAllGranted" -> AuthorizationCheck
+  }
+}

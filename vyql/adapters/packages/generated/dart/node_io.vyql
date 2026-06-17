@@ -1,0 +1,5 @@
+adapter dart {
+  package "node_io" {
+    sink method "open" -> code.FilePathAccess
+  }
+}

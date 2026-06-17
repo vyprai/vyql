@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/mchakravarty/CodeEditorView" {
+    sink method "tokenise" -> code.Deserialization
+  }
+}

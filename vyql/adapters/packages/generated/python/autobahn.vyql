@@ -1,0 +1,7 @@
+adapter python {
+  package "autobahn" {
+    source method "onMessage" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "abortConnection" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "asciidoctor" {
+    sink method "Asciidoctor::Parser.parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,12 @@
+import core.{InputValidation}
+
+adapter scala {
+  package "org.apache.tomcat.embed:tomcat-embed-core" {
+    source method "read" -> code.NetworkData
+    source method "getSubmittedFileName" -> core.UserControlledData
+    source method "getHeader" -> code.HttpInput
+    source method "getHeaders" -> code.HttpInput
+    source method "getHeaderNames" -> code.HttpInput
+    control method "validate" -> core.InputValidation
+  }
+}

@@ -1,0 +1,5 @@
+adapter python {
+  package "flask" {
+    source method "get_cookie_name" -> code.HttpInput
+  }
+}

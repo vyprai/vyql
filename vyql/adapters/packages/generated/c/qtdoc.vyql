@@ -1,0 +1,9 @@
+import code.{ArchiveEntryWrite, FilePathAccess}
+
+adapter c {
+  package "qtdoc" {
+    sink method "unzip" -> code.ArchiveEntryWrite
+    sink method "writeAsset" -> code.FilePathAccess
+    sink method "copyAndCheck" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter elixir {
+  package "rollbax" {
+    sink method "report" -> code.NetworkSend
+    sink method "report_message" -> code.NetworkSend
+  }
+}

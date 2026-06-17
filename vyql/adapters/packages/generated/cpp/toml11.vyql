@@ -1,0 +1,5 @@
+adapter cpp {
+  package "toml11" {
+    sink path "toml11.parse" -> code.Deserialization
+  }
+}

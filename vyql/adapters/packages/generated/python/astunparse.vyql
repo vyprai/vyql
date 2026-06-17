@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "astunparse" {
+    sink method "unparse" -> code.Deserialization
+  }
+}

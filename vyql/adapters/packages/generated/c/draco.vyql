@@ -1,0 +1,13 @@
+import code.{FilePathAccess, FileUse, Deserialization}
+
+adapter c {
+  package "draco" {
+    sink method "ReadFileToBuffer" -> code.FilePathAccess
+    sink method "ReadFileToString" -> code.FilePathAccess
+    sink method "WriteBufferToFile" -> code.FileUse
+    sink method "DecodeFromFile" -> code.Deserialization
+    sink method "DecodeFromBuffer" -> code.Deserialization
+    sink method "DecodeFromFileToScene" -> code.Deserialization
+    sink method "DecodeFromBufferToScene" -> code.Deserialization
+  }
+}

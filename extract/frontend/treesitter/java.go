@@ -70,29 +70,18 @@ func (c *jvConv) hasHandlerAnn(n *tree_sitter.Node) bool {
 // ExtractJava parses Java files into one NIR Program (one module per file, keyed
 // by source-root-relative dotted path).
 func ExtractJava(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsjava.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &jvConv{src: src, root: root, file: rel, key: moduleKey(root, f, ".java")}
-		r := tree.RootNode()
-		mod := nir.Module{Key: c.key, File: rel, Imports: c.imports(r), Body: c.decls(r)}
-		prog.Modules = append(prog.Modules, mod)
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsjava.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &jvConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".java")}
+			r := tree.RootNode()
+			return nir.Module{Key: c.key, File: rel, Imports: c.imports(r), Body: c.decls(r)}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *jvConv) loc(n *tree_sitter.Node) string {
@@ -179,6 +168,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration":
 		params := c.params(field(n, "parameters"))
+		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		// Spring handler params (e.g. @RequestParam/@PathVariable) are request input.
 		if c.inController || c.hasHandlerAnn(n) {
@@ -189,7 +179,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L, EndLoc: c.endloc(n)}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
 		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution
@@ -393,6 +383,21 @@ func (c *jvConv) params(params *tree_sitter.Node) []string {
 		if ch.Kind() == "formal_parameter" || ch.Kind() == "spread_parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
+			}
+		}
+	}
+	return out
+}
+
+func (c *jvConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() == "formal_parameter" || ch.Kind() == "spread_parameter" {
+			if nm := field(ch, "name"); nm != nil {
+				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
 			}
 		}
 	}

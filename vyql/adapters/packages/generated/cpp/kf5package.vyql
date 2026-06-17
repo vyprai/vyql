@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter cpp {
+  package "kf5package" {
+    sink method "filePath" -> code.FilePathAccess
+  }
+}

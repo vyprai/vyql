@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter c {
+  package "kf5solid" {
+    sink method "Solid::Predicate::fromString" -> code.Deserialization
+  }
+}

@@ -1,0 +1,10 @@
+import code.{HttpInput}
+import core.{InputValidation}
+
+adapter java {
+  package "org.springframework.restdocs:spring-restdocs-mockmvc" {
+    source method "parse" -> code.HttpInput
+    control method "urlEncode" -> core.InputValidation
+    control method "decode" -> core.InputValidation
+  }
+}

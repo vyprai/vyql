@@ -1,0 +1,8 @@
+import code.{SqlExecution, NetworkConnect}
+
+adapter java {
+  package "mysql:mysql-connector-java" {
+    sink method "query" -> code.SqlExecution
+    sink method "connect" -> code.NetworkConnect
+  }
+}

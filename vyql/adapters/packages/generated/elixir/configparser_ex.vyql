@@ -1,0 +1,11 @@
+adapter elixir {
+  package "configparser_ex" {
+    sink method "parse_file" -> code.Deserialization
+    sink method "parse_string" -> code.Deserialization
+    sink method "parse_stream" -> code.Deserialization
+    source method "get" -> core.UserControlledData
+    source method "getint" -> core.UserControlledData
+    source method "getfloat" -> core.UserControlledData
+    source method "getboolean" -> core.UserControlledData
+  }
+}

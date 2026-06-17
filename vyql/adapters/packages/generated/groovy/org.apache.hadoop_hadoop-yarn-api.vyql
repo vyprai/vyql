@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter groovy {
+  package "org.apache.hadoop:hadoop-yarn-api" {
+    source method "getDelegationToken" -> code.SecretValue
+  }
+}

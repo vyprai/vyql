@@ -1,0 +1,9 @@
+import code.{FilePathAccess, Deserialization}
+adapter cpp {
+  package "alsa" {
+    sink method "snd_pcm_open" -> code.FilePathAccess
+    sink method "snd_pcm_open_lconf" -> code.FilePathAccess
+    sink method "snd_pcm_open_fallback" -> code.FilePathAccess
+    sink method "snd_pcm_chmap_parse_string" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "curvy" {
+    sink method "Curvy.Signature.parse" -> code.Deserialization
+  }
+}

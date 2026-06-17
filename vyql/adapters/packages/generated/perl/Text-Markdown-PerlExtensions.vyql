@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter perl {
+  package "Text-Markdown-PerlExtensions" {
+    sink method "markdown" -> code.HtmlRender
+  }
+}

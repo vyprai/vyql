@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/xo/terminfo" {
+    source method "Load" -> core.UserControlledData
+    sink method "Decode" -> code.Deserialization
+  }
+}

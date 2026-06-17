@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter perl {
+  package "Process" {
+    sink method "run" -> code.CodeEval
+    sink method "run3" -> code.CodeEval
+  }
+}

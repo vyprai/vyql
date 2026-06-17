@@ -1,0 +1,10 @@
+import code.{FilePathAccess, NetworkData}
+
+adapter python {
+  package "smart-open" {
+    sink method "open" -> code.FilePathAccess
+    source method "open" -> code.NetworkData
+    source method "read" -> code.NetworkData
+    source method "write" -> code.NetworkData
+  }
+}

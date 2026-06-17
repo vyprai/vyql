@@ -1,0 +1,6 @@
+import code.{WeakRandomValue}
+adapter javascript {
+  package "randombytes" {
+    mark method "randomBytes" -> code.WeakRandomValue
+  }
+}

@@ -1,0 +1,18 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "fixnum" {
+    sink method "Int32.parseRadix" -> code.Deserialization
+    sink method "Int32.tryParseRadix" -> code.Deserialization
+    sink method "Int32.parseInt" -> code.Deserialization
+    sink method "Int32.tryParseInt" -> code.Deserialization
+    sink method "Int32.parseHex" -> code.Deserialization
+    sink method "Int32.tryParseHex" -> code.Deserialization
+    sink method "Int64.parseRadix" -> code.Deserialization
+    sink method "Int64.tryParseRadix" -> code.Deserialization
+    sink method "Int64.parseInt" -> code.Deserialization
+    sink method "Int64.tryParseInt" -> code.Deserialization
+    sink method "Int64.parseHex" -> code.Deserialization
+    sink method "Int64.tryParseHex" -> code.Deserialization
+  }
+}

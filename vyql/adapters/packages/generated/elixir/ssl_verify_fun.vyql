@@ -1,0 +1,6 @@
+import core.{CertificateValidation}
+adapter elixir {
+  package "ssl_verify_fun" {
+    control method "maybe_verify_cert_pk" -> core.CertificateValidation
+  }
+}

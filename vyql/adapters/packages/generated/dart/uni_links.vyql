@@ -1,0 +1,8 @@
+adapter dart {
+  package "uni_links" {
+    source method "getInitialLink" -> core.UserControlledData
+    source method "getInitialUri" -> core.UserControlledData
+    source method "getLinksStream" -> core.UserControlledData
+    source method "getUriLinksStream" -> core.UserControlledData
+  }
+}

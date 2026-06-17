@@ -1,0 +1,8 @@
+import code.{RawMemoryCopySize}
+adapter rust {
+  package "safemem" {
+    mark method "copy_over" -> code.RawMemoryCopySize
+    mark method "write_bytes" -> code.RawMemoryCopySize
+    mark method "prepend" -> code.RawMemoryCopySize
+  }
+}

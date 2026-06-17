@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter ruby {
+  package "monetize" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse!" -> code.Deserialization
+    sink method "parse_collection" -> code.Deserialization
+  }
+}

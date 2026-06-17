@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter perl {
+  package "DBIx-Class-UserStamp" {
+    source method "get_current_user_id" -> core.UserControlledData
+  }
+}

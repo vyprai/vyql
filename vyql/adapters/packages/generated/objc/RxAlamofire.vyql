@@ -1,0 +1,18 @@
+import code.{HttpInput, NetworkData, FilePathAccess}
+
+adapter objc {
+  package "RxAlamofire" {
+    source method "urlRequest" -> code.HttpInput
+    source method "request" -> code.HttpInput
+    source method "requestResponse" -> code.HttpInput
+    source method "response" -> code.HttpInput
+    source method "requestData" -> code.HttpInput
+    source method "data" -> code.NetworkData
+    source method "requestString" -> code.HttpInput
+    source method "string" -> code.NetworkData
+    source method "requestJSON" -> code.HttpInput
+    source method "json" -> code.NetworkData
+    source method "upload" -> code.HttpInput
+    sink method "download" -> code.FilePathAccess
+  }
+}

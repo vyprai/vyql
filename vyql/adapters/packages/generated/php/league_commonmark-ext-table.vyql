@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "league/commonmark-ext-table" {
+    sink method "parse" -> code.Deserialization
+  }
+}

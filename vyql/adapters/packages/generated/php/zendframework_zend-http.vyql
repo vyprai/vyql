@@ -1,0 +1,13 @@
+import code.{Cookie, HttpInput, NetworkSend, UrlFetch, FileUpload}
+
+adapter php {
+  package "zendframework/zend-http" {
+    sink method "setUri" -> code.UrlFetch
+    sink method "setRawBody" -> code.UrlFetch
+    sink method "setParameterPost" -> code.UrlFetch
+    source method "addCookie" -> code.Cookie
+    sink method "setHeaders" -> code.UrlFetch
+    sink method "send" -> code.NetworkSend
+    mark method "setFileUpload" -> code.FileUpload
+  }
+}

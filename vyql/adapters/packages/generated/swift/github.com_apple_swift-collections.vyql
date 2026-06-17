@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/apple/swift-collections" {
+    sink method "init(from:)" -> code.Deserialization
+  }
+}

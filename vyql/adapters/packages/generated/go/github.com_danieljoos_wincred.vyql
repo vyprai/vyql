@@ -1,0 +1,11 @@
+import code.{SecretValue, StoredDataWrite}
+adapter go {
+  package "github.com/danieljoos/wincred" {
+    source method "GetGenericCredential" -> code.SecretValue
+    source method "GetDomainPassword" -> code.SecretValue
+    source method "List" -> code.SecretValue
+    source method "FilteredList" -> code.SecretValue
+    source method "sysCredRead" -> code.SecretValue
+    sink method "sysCredWrite" -> code.StoredDataWrite
+  }
+}

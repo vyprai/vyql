@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+
+adapter python {
+  package "alembic" {
+    sink method "upgrade" -> code.SqlExecution
+    sink method "downgrade" -> code.SqlExecution
+    sink method "run_cmd" -> code.SqlExecution
+  }
+}

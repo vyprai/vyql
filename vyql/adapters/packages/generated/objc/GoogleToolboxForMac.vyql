@@ -1,0 +1,13 @@
+import code.{CommandExecution, SqlExecution}
+import core.{SqlParameterization}
+
+adapter objc {
+  package "GoogleToolboxForMac" {
+    sink method "run" -> code.CommandExecution
+    sink method "executeSQL" -> code.SqlExecution
+    sink method "statementWithSQL" -> code.SqlExecution
+    sink method "initWithSQL" -> code.SqlExecution
+    control method "bindStringAtPosition" -> core.SqlParameterization
+    control method "quoteAndEscapeString" -> core.SqlParameterization
+  }
+}

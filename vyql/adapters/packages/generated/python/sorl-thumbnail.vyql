@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter python {
+  package "sorl-thumbnail" {
+    sink method "deserialize_image_file" -> code.Deserialization
+    sink method "parse_geometry" -> code.Deserialization
+    sink method "parse_crop" -> code.Deserialization
+    sink method "parse_cropbox" -> code.Deserialization
+  }
+}

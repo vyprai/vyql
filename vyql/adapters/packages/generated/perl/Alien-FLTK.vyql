@@ -1,0 +1,10 @@
+import code.{CommandExecution, FilePathAccess, FileUse, StoredDataRead, StoredDataWrite}
+adapter perl {
+  package "Alien-FLTK" {
+    sink method "system" -> code.CommandExecution
+    sink method "write_file" -> code.StoredDataWrite
+    source method "read_file" -> code.StoredDataRead
+    sink method "chdir" -> code.FilePathAccess
+    sink method "mkpath" -> code.FileUse
+  }
+}

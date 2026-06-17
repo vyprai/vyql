@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter python {
+  package "base58" {
+    source method "b58decode" -> core.UserControlledData
+    source method "b58decode_check" -> core.UserControlledData
+  }
+}

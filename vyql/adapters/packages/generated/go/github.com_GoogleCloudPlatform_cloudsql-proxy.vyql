@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+import code.{SecretValue}
+
+adapter go {
+  package "github.com/GoogleCloudPlatform/cloudsql-proxy" {
+    source method "ParseInstanceConnectionName" -> core.UserControlledData
+    source method "refreshToken" -> code.SecretValue
+    source method "refreshToken" -> code.SecretValue
+  }
+}

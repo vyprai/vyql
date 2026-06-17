@@ -1,0 +1,9 @@
+import code.{NetworkData, NetworkSend}
+
+adapter java {
+  package "com.squareup.retrofit2:retrofit" {
+    sink method "Call.execute" -> code.NetworkSend
+    sink method "Call.enqueue" -> code.NetworkSend
+    source method "Response.body" -> code.NetworkData
+  }
+}

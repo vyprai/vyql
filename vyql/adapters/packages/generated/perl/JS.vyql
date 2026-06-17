@@ -1,0 +1,8 @@
+import code.{CommandExecution, FilePathAccess}
+
+adapter perl {
+  package "JS" {
+    sink method "run" -> code.CommandExecution
+    sink method "find_js_path" -> code.FilePathAccess
+  }
+}

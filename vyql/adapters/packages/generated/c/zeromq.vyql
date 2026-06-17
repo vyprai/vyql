@@ -1,0 +1,12 @@
+import code.{NetworkConnect, NetworkData, NetworkSend}
+adapter c {
+  package "zeromq" {
+    sink method "send" -> code.NetworkSend
+    sink method "sendpipe" -> code.NetworkSend
+    source method "recv" -> code.NetworkData
+    source method "recvpipe" -> code.NetworkData
+    sink method "open_socket" -> code.NetworkConnect
+    sink method "connect" -> code.NetworkConnect
+    sink method "bind_to_device" -> code.NetworkConnect
+  }
+}

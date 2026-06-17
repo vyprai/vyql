@@ -1,0 +1,6 @@
+import code.{WeakHash}
+adapter elixir {
+  package "ex_hash_ring" {
+    mark method "ExHashRing.Hash.of" -> code.WeakHash
+  }
+}

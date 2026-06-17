@@ -1,0 +1,5 @@
+adapter bash {
+  package "fx" {
+    source path "fx.argv" -> code.CliArgument
+  }
+}

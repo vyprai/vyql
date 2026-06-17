@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter python {
+  package "django-filter" {
+    sink method "filter" -> code.SqlExecution
+  }
+}

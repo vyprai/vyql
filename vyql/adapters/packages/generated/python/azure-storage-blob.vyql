@@ -1,0 +1,7 @@
+import code.{StoredDataRead}
+
+adapter python {
+  package "azure-storage-blob" {
+    source method "read" -> code.StoredDataRead
+  }
+}

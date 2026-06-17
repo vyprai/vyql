@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter go {
+  package "k8s.io/apiserver" {
+    control method "Escape" -> core.InputValidation
+    control method "Unescape" -> core.InputValidation
+  }
+}

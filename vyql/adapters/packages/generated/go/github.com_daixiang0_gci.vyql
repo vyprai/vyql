@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter go {
+  package "github.com/daixiang0/gci" {
+    sink method "WriteFormattedFiles" -> code.FilePathAccess
+  }
+}

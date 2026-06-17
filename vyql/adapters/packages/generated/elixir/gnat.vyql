@@ -1,0 +1,10 @@
+import code.{NetworkSend, Deserialization}
+
+adapter elixir {
+  package "gnat" {
+    sink method "request" -> code.NetworkSend
+    sink method "request_multi" -> code.NetworkSend
+    sink method "socket_write" -> code.NetworkSend
+    sink method "parse" -> code.Deserialization
+  }
+}

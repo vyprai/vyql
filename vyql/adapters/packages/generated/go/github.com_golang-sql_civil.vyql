@@ -1,0 +1,7 @@
+adapter go {
+  package "github.com/golang-sql/civil" {
+    sink method "ParseDate" -> code.Deserialization
+    sink method "ParseTime" -> code.Deserialization
+    sink method "ParseDateTime" -> code.Deserialization
+  }
+}

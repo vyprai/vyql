@@ -1,0 +1,7 @@
+import code.{CommandExecution, FilePathAccess}
+adapter scala {
+  package "junit:junit-dep" {
+    sink method "runMainAndExit" -> code.CommandExecution
+    sink method "runMain" -> code.CommandExecution
+  }
+}

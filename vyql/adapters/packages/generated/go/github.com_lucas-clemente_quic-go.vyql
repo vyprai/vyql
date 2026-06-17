@@ -1,0 +1,10 @@
+import code.{NetworkConnect}
+
+adapter go {
+  package "github.com/lucas-clemente/quic-go" {
+    sink method "ListenAddr" -> code.NetworkConnect
+    sink method "ListenAddrEarly" -> code.NetworkConnect
+    sink method "Listen" -> code.NetworkConnect
+    sink method "ListenEarly" -> code.NetworkConnect
+  }
+}

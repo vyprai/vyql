@@ -1,0 +1,7 @@
+import code.{NetworkData}
+
+adapter groovy {
+  package "org.springframework:spring-websocket" {
+    source method "handleMessage" -> code.NetworkData
+  }
+}

@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/shurcooL/sanitized_anchor_name" {
+    control method "Create" -> core.HtmlEscape
+  }
+}

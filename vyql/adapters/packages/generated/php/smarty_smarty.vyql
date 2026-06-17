@@ -1,0 +1,10 @@
+import code.{TemplateRender}
+import core.{InputValidation}
+
+adapter php {
+  package "smarty/smarty" {
+    sink method "fetch" -> code.TemplateRender
+    sink method "display" -> code.TemplateRender
+    control method "sanitize" -> core.InputValidation
+  }
+}

@@ -1,0 +1,11 @@
+import code.{CommandExecution, FilePathAccess, FileUse, NetworkConnect}
+
+adapter java {
+  package "io.appium:java-client" {
+    sink method "pullFile" -> code.FilePathAccess
+    sink method "pullFolder" -> code.FilePathAccess
+    sink method "pushFile" -> code.FileUse
+    sink method "executeCdpCommand" -> code.CommandExecution
+    sink method "connect" -> code.NetworkConnect
+  }
+}

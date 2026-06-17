@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter rust {
+  package "idna" {
+    sink method "decode_to_string" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+  }
+}

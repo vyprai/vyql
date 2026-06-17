@@ -1,0 +1,8 @@
+adapter rust {
+  package "security-framework-sys" {
+    mark method "SecRandomCopyBytes" -> code.WeakRandomValue
+    source method "SecKeyCreateRandomKey" -> code.SecretValue
+    source method "SecCertificateCreateWithData" -> core.UserControlledData
+    mark method "SSLCreateContext" -> code.CleartextChannel
+  }
+}

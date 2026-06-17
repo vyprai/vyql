@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+adapter elixir {
+  package "briefly" {
+    sink method "create" -> code.FilePathAccess
+    sink method "create!" -> code.FilePathAccess
+    sink method "cleanup" -> code.FilePathAccess
+  }
+}

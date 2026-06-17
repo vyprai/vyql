@@ -1,0 +1,14 @@
+import code.{StoredDataRead, StoredDataWrite}
+import core.{AuthorizationCheck, UserControlledData}
+
+adapter swift {
+  package "github.com/vinhnx/Shift" {
+    source method "configureWithAppName" -> core.UserControlledData
+    source method "fetchEventsForToday" -> code.StoredDataRead
+    source method "fetchEvents" -> code.StoredDataRead
+    source method "fetchEventsRangeUntilEndOfDay" -> code.StoredDataRead
+    sink method "createEvent" -> code.StoredDataWrite
+    sink method "deleteEvent" -> code.StoredDataWrite
+    control method "requestEventStoreAuthorization" -> core.AuthorizationCheck
+  }
+}

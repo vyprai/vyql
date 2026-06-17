@@ -1,0 +1,6 @@
+adapter bash {
+  package "argon2" {
+    source path "argon2.argv" -> code.CliArgument
+    source path "argon2" -> code.SecretValue
+  }
+}

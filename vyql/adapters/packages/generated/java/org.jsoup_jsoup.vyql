@@ -1,0 +1,12 @@
+import code.{Deserialization, NetworkConnect, NetworkSend}
+import core.{HtmlEscape, InputValidation}
+
+adapter java {
+  package "org.jsoup:jsoup" {
+    sink method "parse" -> code.Deserialization
+    sink method "connect" -> code.NetworkConnect
+    control method "clean" -> core.HtmlEscape
+    control method "isValid" -> core.InputValidation
+    sink method "execute" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,11 @@
+import code.{XmlParse}
+import core.{HtmlEscape}
+
+adapter scala {
+  package "org.codehaus.groovy:groovy-xml" {
+    sink method "parse" -> code.XmlParse
+    sink method "parseText" -> code.XmlParse
+    control method "escapeXml" -> core.HtmlEscape
+    control method "escapeControlCharacters" -> core.HtmlEscape
+  }
+}

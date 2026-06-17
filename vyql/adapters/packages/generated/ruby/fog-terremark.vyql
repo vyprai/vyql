@@ -1,0 +1,7 @@
+import code.{NetworkConnect, Deserialization}
+adapter ruby {
+  package "fog-terremark" {
+    sink method "request" -> code.NetworkConnect
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter rust {
+  package "backtrace-sys" {
+    sink method "backtrace_create_state" -> code.FilePathAccess
+  }
+}

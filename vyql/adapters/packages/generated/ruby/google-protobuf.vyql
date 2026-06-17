@@ -1,0 +1,5 @@
+adapter ruby {
+  package "google-protobuf" {
+    sink method "decode_options" -> code.Deserialization
+  }
+}

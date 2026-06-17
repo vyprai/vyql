@@ -1,0 +1,10 @@
+import code.{SecretValue, UrlFetch, XmlParse}
+import core.{UserControlledData}
+
+adapter perl {
+  package "WWW-Wunderground-API" {
+    sink method "update" -> code.UrlFetch
+    sink method "update" -> code.XmlParse
+    sink method "api_call" -> code.UrlFetch
+  }
+}

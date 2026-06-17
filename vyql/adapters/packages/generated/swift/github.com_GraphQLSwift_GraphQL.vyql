@@ -1,0 +1,9 @@
+import code.{Deserialization, ExpressionEval}
+
+adapter swift {
+  package "github.com/GraphQLSwift/GraphQL" {
+    sink method "parse" -> code.Deserialization
+    sink method "graphql" -> code.ExpressionEval
+    sink method "execute" -> code.ExpressionEval
+  }
+}

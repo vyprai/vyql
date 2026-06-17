@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "whatwg-mimetype" {
+    sink method "MIMEType.parse" -> code.Deserialization
+  }
+}

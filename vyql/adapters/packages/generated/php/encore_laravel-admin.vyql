@@ -1,0 +1,13 @@
+import code.{CommandExecution, FilePathAccess, NetworkConnect, SqlExecution, UrlFetch}
+
+adapter php {
+  package "encore/laravel-admin" {
+    sink method "query" -> code.SqlExecution
+    sink method "open" -> code.UrlFetch
+    sink method "send" -> code.NetworkConnect
+    sink method "handleFileDelete" -> code.FilePathAccess
+    sink method "handleFileSort" -> code.FilePathAccess
+    sink method "prepareUpdate" -> code.SqlExecution
+    sink method "prepareInsert" -> code.SqlExecution
+  }
+}

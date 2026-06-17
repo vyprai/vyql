@@ -1,0 +1,7 @@
+import core.{AuthorizationCheck}
+adapter groovy {
+  package "org.thymeleaf.extras:thymeleaf-extras-springsecurity4" {
+    control method "authorizeUsingAccessExpression" -> core.AuthorizationCheck
+    control method "authorizeUsingUrlCheck" -> core.AuthorizationCheck
+  }
+}

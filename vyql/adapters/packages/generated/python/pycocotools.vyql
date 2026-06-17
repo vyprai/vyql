@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter python {
+  package "pycocotools" {
+    sink method "jsonParse" -> code.Deserialization
+    sink method "loadRes" -> code.FilePathAccess
+  }
+}

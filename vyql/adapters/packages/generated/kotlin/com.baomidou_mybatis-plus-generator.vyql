@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter kotlin {
+  package "com.baomidou:mybatis-plus-generator" {
+    sink method "queryTables" -> code.SqlExecution
+    sink method "tablesSql" -> code.SqlExecution
+  }
+}

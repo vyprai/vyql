@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "source-map-resolve" {
+    sink method "parseMapToJSON" -> code.Deserialization
+  }
+}

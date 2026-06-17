@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "cfitsio" {
+    sink method "fits_parser_yyparse" -> code.Deserialization
+  }
+}

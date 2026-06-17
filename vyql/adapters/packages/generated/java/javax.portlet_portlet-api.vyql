@@ -1,0 +1,9 @@
+import code.{HttpInput, RedirectTarget, HtmlRender}
+adapter java {
+  package "javax.portlet:portlet-api" {
+    source method "getReader" -> code.HttpInput
+    mark method "sendRedirect" -> code.RedirectTarget
+    sink method "write" -> code.HtmlRender
+    sink method "append" -> code.HtmlRender
+  }
+}

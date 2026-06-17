@@ -1,0 +1,9 @@
+import code.{NetworkSend, NetworkConnect}
+
+adapter php {
+  package "graylog2/gelf-php" {
+    sink method "send" -> code.NetworkSend
+    sink method "write" -> code.NetworkSend
+    sink method "read" -> code.NetworkConnect
+  }
+}

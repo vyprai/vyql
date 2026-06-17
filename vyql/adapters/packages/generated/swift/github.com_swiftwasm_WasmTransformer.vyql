@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter swift {
+  package "github.com/swiftwasm/WasmTransformer" {
+    source method "read" -> core.UserControlledData
+    source method "readVarUInt32" -> core.UserControlledData
+  }
+}

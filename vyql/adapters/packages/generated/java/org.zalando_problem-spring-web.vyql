@@ -1,0 +1,10 @@
+import code.{HttpInput, ResponseHeaderWrite}
+
+adapter java {
+  package "org.zalando:problem-spring-web" {
+    source method "negotiate" -> code.HttpInput
+    sink method "commence" -> code.ResponseHeaderWrite
+    sink method "onAuthenticationFailure" -> code.ResponseHeaderWrite
+    sink method "handle" -> code.ResponseHeaderWrite
+  }
+}

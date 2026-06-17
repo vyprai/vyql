@@ -1,0 +1,5 @@
+adapter php {
+  package "jeroennoten/laravel-adminlte" {
+    sink method "copyDirectory" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter scala {
+  package "org.apache.cxf:cxf-rt-transports-http" {
+    sink method "write" -> code.NetworkSend
+    source method "read" -> code.NetworkData
+  }
+}

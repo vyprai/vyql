@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter c {
+  package "matroska" {
+    sink method "FileMatroska.ReadFrame" -> code.Deserialization
+  }
+}

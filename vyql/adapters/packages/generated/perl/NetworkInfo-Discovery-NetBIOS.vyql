@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+import code.{NetworkConnect}
+
+adapter perl {
+  package "NetworkInfo-Discovery-NetBIOS" {
+    source method "hosts" -> core.UserControlledData
+    sink method "do_it" -> code.NetworkConnect
+  }
+}

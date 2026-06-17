@@ -1,0 +1,20 @@
+import code.{FilePathAccess, NetworkConnect, NetworkSend}
+adapter objc {
+  package "NSLogger" {
+    sink method "LoggerSetBufferFile" -> code.FilePathAccess
+    sink method "LoggerStart" -> code.NetworkConnect
+    sink method "LogDataF" -> code.NetworkSend
+    sink method "LogImageDataF" -> code.NetworkSend
+    sink method "LogMessageRaw" -> code.NetworkSend
+    sink method "LogMessageRawF" -> code.NetworkSend
+    sink method "LogMessageRawToF" -> code.NetworkSend
+    sink method "LogMessageF" -> code.NetworkSend
+    sink method "LogMessageToF" -> code.NetworkSend
+    sink method "LogMessageF_va" -> code.NetworkSend
+    sink method "LogMessageToF_va" -> code.NetworkSend
+    sink method "LogDataToF" -> code.NetworkSend
+    sink method "LogImageDataToF" -> code.NetworkSend
+    sink method "LogStartBlock" -> code.NetworkSend
+    sink method "LogStartBlockTo" -> code.NetworkSend
+  }
+}

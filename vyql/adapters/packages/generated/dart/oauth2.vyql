@@ -1,0 +1,8 @@
+import code.{NetworkSend, SecretValue, Deserialization}
+
+adapter dart {
+  package "oauth2" {
+    sink method "send" -> code.NetworkSend
+    sink method "parseJsonParameters" -> code.Deserialization
+  }
+}

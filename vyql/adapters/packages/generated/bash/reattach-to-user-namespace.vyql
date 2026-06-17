@@ -1,0 +1,5 @@
+adapter bash {
+  package "reattach-to-user-namespace" {
+    sink path "reattach-to-user-namespace" -> code.CommandExecution
+  }
+}

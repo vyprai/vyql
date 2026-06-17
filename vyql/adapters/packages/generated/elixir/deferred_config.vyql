@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter elixir {
+  package "deferred_config" {
+    source method "get_system_tuple" -> code.SecretValue
+  }
+}

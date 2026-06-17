@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter perl {
+  package "Term-VT102-Boundless" {
+    source method "_process_text" -> core.UserControlledData
+  }
+}

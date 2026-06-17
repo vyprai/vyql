@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+
+adapter go {
+  package "github.com/gobuffalo/depgen" {
+    sink method "Update" -> code.CommandExecution
+    sink method "InstallDep" -> code.CommandExecution
+  }
+}

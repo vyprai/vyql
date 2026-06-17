@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "multicast-dns-service-types" {
+    sink method "parse" -> code.Deserialization
+  }
+}

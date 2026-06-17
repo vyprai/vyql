@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "beaker-rspec" {
+    sink method "run_command" -> code.CommandExecution
+  }
+}

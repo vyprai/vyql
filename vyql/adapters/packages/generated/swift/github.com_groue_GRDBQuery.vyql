@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+adapter swift {
+  package "github.com/groue/GRDBQuery" {
+    sink method "insert" -> code.SqlExecution
+    sink method "update" -> code.SqlExecution
+    sink method "deleteAllPlayer" -> code.SqlExecution
+  }
+}

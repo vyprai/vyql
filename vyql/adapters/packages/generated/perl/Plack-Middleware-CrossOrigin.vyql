@@ -1,0 +1,10 @@
+import code.{ResponseHeaderWrite}
+
+adapter perl {
+  package "Plack-Middleware-CrossOrigin" {
+    sink method "prepare_app" -> code.ResponseHeaderWrite
+    sink method "call" -> code.ResponseHeaderWrite
+    sink method "_response_forbidden" -> code.ResponseHeaderWrite
+    sink method "_response_success" -> code.ResponseHeaderWrite
+  }
+}

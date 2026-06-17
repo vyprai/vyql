@@ -1,0 +1,10 @@
+import code.{FilePathAccess}
+import core.{UserControlledData}
+
+adapter perl {
+  package "GD-Map-Mercator" {
+    source path "bin/wdb2merc.pl::read_wdb" -> core.UserControlledData
+    source method "new" -> core.UserControlledData
+    sink method "save" -> code.FilePathAccess
+  }
+}

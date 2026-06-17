@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "net.sf.ehcache:ehcache-core" {
+    source method "load" -> core.UserControlledData
+    sink method "parse" -> code.Deserialization
+  }
+}

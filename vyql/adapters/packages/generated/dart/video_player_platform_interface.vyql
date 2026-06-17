@@ -1,0 +1,10 @@
+adapter dart {
+  package "video_player_platform_interface" {
+    source method "DataSource.uri" -> core.UserControlledData
+    source method "DataSource.httpHeaders" -> core.UserControlledData
+    sink method "create" -> code.FilePathAccess
+    sink method "create" -> code.NetworkConnect
+    sink method "createWithOptions" -> code.FilePathAccess
+    sink method "createWithOptions" -> code.NetworkConnect
+  }
+}

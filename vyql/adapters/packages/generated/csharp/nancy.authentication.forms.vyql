@@ -1,0 +1,23 @@
+import code.{Cookie, SecretValue, RedirectTarget}
+import core.{AuthenticationCheck}
+
+adapter csharp {
+  package "nancy.authentication.forms" {
+    source method "GetAuthenticatedUserFromCookie" -> code.Cookie
+    source method "GetAuthenticatedUserFromCookie" -> code.SecretValue
+    source method "EncryptAndSignCookie" -> code.SecretValue
+    mark method "UserLoggedInRedirectResponse" -> code.RedirectTarget
+    mark method "LogOutAndRedirectResponse" -> code.RedirectTarget
+    control method "BuildCookie" -> core.AuthenticationCheck
+    control method "DecryptAndValidateAuthenticationCookie" -> core.AuthenticationCheck
+    control method "UserLoggedInResponse" -> core.AuthenticationCheck
+    control method "LogOutResponse" -> core.AuthenticationCheck
+    control method "Login" -> core.AuthenticationCheck
+    control method "LoginAndRedirect" -> core.AuthenticationCheck
+    control method "LoginWithoutRedirect" -> core.AuthenticationCheck
+    control method "Logout" -> core.AuthenticationCheck
+    control method "LogoutAndRedirect" -> core.AuthenticationCheck
+    control method "LogoutWithoutRedirect" -> core.AuthenticationCheck
+    control method "Enable" -> core.AuthenticationCheck
+  }
+}

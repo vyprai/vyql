@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "com.thoughtworks.xstream:xstream" {
+    sink method "fromXML" -> code.Deserialization
+    sink method "unmarshal" -> code.Deserialization
+    sink method "readFromStream" -> code.Deserialization
+    sink method "createObjectInputStream" -> code.Deserialization
+  }
+}

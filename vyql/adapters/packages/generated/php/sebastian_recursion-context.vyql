@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter php {
+  package "sebastian/recursion-context" {
+    source method "add" -> core.UserControlledData
+    source method "contains" -> core.UserControlledData
+  }
+}

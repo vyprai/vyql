@@ -1,0 +1,15 @@
+import code.{UrlFetch, CodeEval, CommandExecution, FilePathAccess, Cookie, HttpInput, NetworkSend}
+
+adapter ruby {
+  package "poltergeist" {
+    sink method "visit" -> code.UrlFetch
+    sink method "evaluate_script" -> code.CodeEval
+    sink method "execute_script" -> code.CodeEval
+    sink method "evaluate_async_script" -> code.CodeEval
+    sink method "command" -> code.CommandExecution
+    sink method "save_screenshot" -> code.FilePathAccess
+    source method "set_cookie" -> code.Cookie
+    sink method "add_header" -> code.NetworkSend
+    sink method "add_headers" -> code.NetworkSend
+  }
+}

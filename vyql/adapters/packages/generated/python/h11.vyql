@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter python {
+  package "h11" {
+    source method "Connection.receive_data" -> code.NetworkData
+    sink method "Connection.send" -> code.NetworkSend
+  }
+}

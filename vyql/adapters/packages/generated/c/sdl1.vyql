@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter c {
+  package "sdl1" {
+    sink method "SDL_ParseAudioFormat" -> code.Deserialization
+  }
+}

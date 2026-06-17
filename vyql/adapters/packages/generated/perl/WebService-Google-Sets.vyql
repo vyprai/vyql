@@ -1,0 +1,9 @@
+import code.{UrlFetch}
+
+adapter perl {
+  package "WebService-Google-Sets" {
+    sink method "get_gset" -> code.UrlFetch
+    sink method "get_small_gset" -> code.UrlFetch
+    sink method "get_large_gset" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/behrang/YamlSwift" {
+    sink method "load" -> code.Deserialization
+    sink method "loadMultiple" -> code.Deserialization
+  }
+}

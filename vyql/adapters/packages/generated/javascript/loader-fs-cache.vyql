@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess, WeakHash}
+adapter javascript {
+  package "loader-fs-cache" {
+    sink method "read" -> code.Deserialization
+    sink method "write" -> code.FilePathAccess
+    mark method "filename" -> code.WeakHash
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CommandExecution, Deserialization}
+adapter scala {
+  package "org.apache.maven.plugins:maven-compiler-plugin" {
+    sink method "run" -> code.CommandExecution
+    sink method "load" -> code.Deserialization
+  }
+}

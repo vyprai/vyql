@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/golang/snappy" {
+    sink method "Decode" -> code.Deserialization
+    sink method "NewReader" -> code.Deserialization
+  }
+}

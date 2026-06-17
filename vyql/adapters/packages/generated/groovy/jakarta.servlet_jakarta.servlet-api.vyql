@@ -1,0 +1,5 @@
+adapter groovy {
+  package "jakarta.servlet:jakarta.servlet-api" {
+    source method "Cookie" -> code.HttpInput
+  }
+}

@@ -1,0 +1,8 @@
+import code.{CliArgument}
+
+adapter cpp {
+  package "zycore" {
+    source method "ZyanArgParse" -> code.CliArgument
+    source method "ZyanArgParseEx" -> code.CliArgument
+  }
+}

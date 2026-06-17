@@ -1,0 +1,10 @@
+import code.{WeakHash}
+
+adapter cpp {
+  package "xxhash" {
+    mark method "XXH3_64bits" -> code.WeakHash
+    mark method "XXH3_128bits" -> code.WeakHash
+    mark method "XXH64" -> code.WeakHash
+    mark method "XXH32" -> code.WeakHash
+  }
+}

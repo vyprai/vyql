@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter rust {
+  package "gdk-pixbuf" {
+    sink method "init_modules" -> code.FilePathAccess
+  }
+}

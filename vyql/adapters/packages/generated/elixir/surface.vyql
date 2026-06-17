@@ -1,0 +1,5 @@
+adapter elixir {
+  package "surface" {
+    mark path "surface.hash" -> code.WeakHash
+  }
+}

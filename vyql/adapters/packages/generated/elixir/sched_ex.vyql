@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+adapter elixir {
+  package "sched_ex" {
+    sink method "run" -> code.CommandExecution
+    sink method "run_at" -> code.CommandExecution
+    sink method "run_in" -> code.CommandExecution
+    sink method "run_every" -> code.CommandExecution
+  }
+}

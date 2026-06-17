@@ -1,0 +1,10 @@
+import code.{HtmlRender, TemplateRender, RedirectTarget}
+
+adapter python {
+  package "django-bootstrap3" {
+    sink method "render_script_tag" -> code.HtmlRender
+    sink method "render_link_tag" -> code.HtmlRender
+    sink method "render_template_file" -> code.TemplateRender
+    mark method "url_replace_param" -> code.RedirectTarget
+  }
+}

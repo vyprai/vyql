@@ -18,28 +18,17 @@ type phConv struct {
 
 // ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
 func ExtractPHP(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsphp.LanguagePHP()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &phConv{src: src, root: root, file: rel}
-		mod := nir.Module{Key: "", File: rel, Body: c.block(tree.RootNode())}
-		prog.Modules = append(prog.Modules, mod)
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsphp.LanguagePHP()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &phConv{src: src, root: root, file: rel}
+			return nir.Module{Key: "", File: rel, Body: c.block(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *phConv) loc(n *tree_sitter.Node) string {
@@ -65,11 +54,13 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "function_definition", "method_declaration":
+		params := c.params(field(n, "parameters"))
 		return []nir.Stmt{nir.FuncDef{
-			Name:   c.text(field(n, "name")),
-			Params: c.params(field(n, "parameters")),
-			Body:   c.block(field(n, "body")),
-			Loc:    L,
+			Name:       c.text(field(n, "name")),
+			Params:     params,
+			ParamTypes: c.paramTypes(field(n, "parameters")),
+			Body:       c.block(field(n, "body")),
+			Loc:        L,
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
@@ -278,6 +269,30 @@ func (c *phConv) params(params *tree_sitter.Node) []string {
 					}
 				}
 			}
+		}
+	}
+	return out
+}
+
+func (c *phConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() == "simple_parameter" || ch.Kind() == "variadic_parameter" || ch.Kind() == "property_promotion_parameter" {
+			name := ""
+			if nm := field(ch, "name"); nm != nil {
+				name = c.text(nm)
+			} else {
+				for _, cc := range namedChildren(ch) {
+					if cc.Kind() == "variable_name" {
+						name = c.text(cc)
+						break
+					}
+				}
+			}
+			putParamType(out, name, paramTypeFromField(c, ch))
 		}
 	}
 	return out

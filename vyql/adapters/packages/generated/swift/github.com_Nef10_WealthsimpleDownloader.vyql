@@ -1,0 +1,14 @@
+import code.{NetworkConnect, NetworkSend, SecretValue}
+
+adapter swift {
+  package "github.com/Nef10/WealthsimpleDownloader" {
+    sink method "authenticate" -> code.NetworkConnect
+    sink method "authenticate" -> code.NetworkSend
+    sink method "getTransactions" -> code.NetworkConnect
+    sink method "getTransactions" -> code.NetworkSend
+    sink method "getAccounts" -> code.NetworkConnect
+    sink method "getAccounts" -> code.NetworkSend
+    sink method "getPositions" -> code.NetworkConnect
+    sink method "getPositions" -> code.NetworkSend
+  }
+}

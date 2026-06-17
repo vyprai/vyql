@@ -1,0 +1,5 @@
+adapter rust {
+  package "regex-automata" {
+    mark method "search" -> code.RegexCompile
+  }
+}

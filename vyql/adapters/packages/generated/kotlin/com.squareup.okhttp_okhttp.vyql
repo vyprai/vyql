@@ -1,0 +1,8 @@
+import code.{UrlFetch}
+adapter kotlin {
+  package "com.squareup.okhttp:okhttp" {
+    sink method "parse" -> code.UrlFetch
+    sink method "execute" -> code.UrlFetch
+    sink method "enqueue" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,6 @@
+adapter bash {
+  package "bash" {
+    source path "bash.argv" -> code.CliArgument
+    sink path "bash.eval" -> code.CodeEval
+  }
+}

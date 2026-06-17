@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter csharp {
+  package "structuremap.web" {
+    source method "HttpContextScoped" -> code.HttpInput
+  }
+}

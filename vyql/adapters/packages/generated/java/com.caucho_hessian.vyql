@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter java {
+  package "com.caucho:hessian" {
+    sink method "readObject" -> code.Deserialization
+    sink method "readMap" -> code.Deserialization
+  }
+}

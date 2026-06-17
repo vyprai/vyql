@@ -1,0 +1,12 @@
+import code.{Cookie}
+
+adapter ruby {
+  package "cookiejar" {
+    source method "set_cookie" -> code.Cookie
+    source method "set_cookie2" -> code.Cookie
+    source method "set_cookies_from_headers" -> code.Cookie
+    source method "add_cookie" -> code.Cookie
+    source method "get_cookies" -> code.Cookie
+    source method "get_cookie_header" -> code.Cookie
+  }
+}

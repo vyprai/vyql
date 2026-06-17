@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter dart {
+  package "sign_in_with_apple" {
+    source method "getAppleIDCredential" -> code.SecretValue
+    source method "getKeychainCredential" -> code.SecretValue
+  }
+}

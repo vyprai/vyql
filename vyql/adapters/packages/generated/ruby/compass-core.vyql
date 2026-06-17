@@ -1,0 +1,11 @@
+import code.{FilePathAccess}
+
+adapter ruby {
+  package "compass-core" {
+    sink method "manifest_file" -> code.FilePathAccess
+    sink method "projectize" -> code.FilePathAccess
+    sink method "deprojectize" -> code.FilePathAccess
+    sink method "image_width" -> code.FilePathAccess
+    sink method "image_height" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "grpcio-status" {
+    sink method "from_call" -> code.Deserialization
+  }
+}

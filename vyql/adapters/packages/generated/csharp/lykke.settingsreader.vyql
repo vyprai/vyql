@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter csharp {
+  package "lykke.settingsreader" {
+    sink method "HttpSettingsLoader.Load" -> code.UrlFetch
+  }
+}

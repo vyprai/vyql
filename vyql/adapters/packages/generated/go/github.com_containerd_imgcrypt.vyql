@@ -1,0 +1,14 @@
+import code.{SecretValue, WeakCipher}
+adapter go {
+  package "github.com/containerd/imgcrypt" {
+    source method "processPwdString" -> code.SecretValue
+    source method "processPrivateKeyFiles" -> code.SecretValue
+    source method "getGPGPrivateKeys" -> code.SecretValue
+    source method "CreateDecryptCryptoConfig" -> code.SecretValue
+    source method "CreateCryptoConfig" -> code.SecretValue
+    mark method "EncryptImage" -> code.WeakCipher
+    mark method "DecryptImage" -> code.WeakCipher
+    mark method "encryptLayer" -> code.WeakCipher
+    mark method "decryptLayer" -> code.WeakCipher
+  }
+}

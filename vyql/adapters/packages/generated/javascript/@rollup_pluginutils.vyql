@@ -1,0 +1,11 @@
+import code.{CliArgument, HttpInput, NetworkData, SecretValue, StoredDataRead, Deserialization, CommandExecution}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, InputValidation}
+
+adapter javascript {
+  package "@rollup/pluginutils" {
+    control method "addExtension" -> core.PathCanonicalization
+    control method "normalizePath" -> core.PathCanonicalization
+    control method "escapeRegex" -> core.InputValidation
+    source method "createFilter" -> core.UserControlledData
+  }
+}

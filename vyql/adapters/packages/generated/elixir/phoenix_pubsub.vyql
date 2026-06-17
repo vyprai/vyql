@@ -1,0 +1,6 @@
+adapter elixir {
+  package "phoenix_pubsub" {
+    sink method "broadcast" -> code.NetworkSend
+    sink method "dispatch" -> code.CodeEval
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "actiontext" {
+    sink method "load" -> code.Deserialization
+  }
+}

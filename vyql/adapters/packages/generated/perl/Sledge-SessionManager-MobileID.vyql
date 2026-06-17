@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter perl {
+  package "Sledge-SessionManager-MobileID" {
+    source method "get_session_id" -> code.HttpInput
+  }
+}

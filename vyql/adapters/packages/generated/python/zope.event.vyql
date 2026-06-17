@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter python {
+  package "zope.event" {
+    source method "notify" -> core.UserControlledData
+  }
+}

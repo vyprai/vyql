@@ -1,0 +1,5 @@
+adapter ruby {
+  package "gherkin" {
+    sink method "parse" -> code.Deserialization
+  }
+}

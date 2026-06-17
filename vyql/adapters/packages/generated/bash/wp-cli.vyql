@@ -1,0 +1,6 @@
+import code.{CliArgument, CommandExecution}
+adapter bash {
+  package "wp-cli" {
+    source "wp" -> code.CliArgument
+  }
+}

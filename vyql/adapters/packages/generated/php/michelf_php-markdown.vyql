@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter php {
+  package "michelf/php-markdown" {
+    sink method "transform" -> code.HtmlRender
+  }
+}

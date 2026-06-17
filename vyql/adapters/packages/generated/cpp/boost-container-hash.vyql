@@ -1,0 +1,9 @@
+import code.{WeakHash}
+adapter cpp {
+  package "boost-container-hash" {
+    mark method "hash_value" -> code.WeakHash
+    mark method "hash_combine" -> code.WeakHash
+    mark method "hash_range" -> code.WeakHash
+    mark method "hash_unordered_range" -> code.WeakHash
+  }
+}

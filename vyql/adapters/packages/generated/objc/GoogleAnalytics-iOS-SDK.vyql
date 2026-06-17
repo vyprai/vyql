@@ -1,0 +1,12 @@
+import code.{NetworkSend}
+import core.{UserControlledData}
+
+adapter objc {
+  package "GoogleAnalytics-iOS-SDK" {
+    sink method "send" -> code.NetworkSend
+    source method "setCampaignParametersFromUrl" -> core.UserControlledData
+    source method "previewWithUrl" -> core.UserControlledData
+    source method "execute" -> core.UserControlledData
+    source method "pushValue" -> core.UserControlledData
+  }
+}

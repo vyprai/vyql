@@ -1,0 +1,12 @@
+import code.{HttpInput}
+import core.{UserControlledData}
+
+adapter scala {
+  package "org.apache.tiles:tiles-servlet" {
+    source method "doGet" -> code.HttpInput
+    source method "doPost" -> code.HttpInput
+    source method "getDefinitionName" -> core.UserControlledData
+    source method "mutate" -> core.UserControlledData
+    source method "doFilter" -> code.HttpInput
+  }
+}

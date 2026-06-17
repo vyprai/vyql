@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter kotlin {
+  package "com.android.volley:volley" {
+    sink method "performRequest" -> code.NetworkSend
+  }
+}

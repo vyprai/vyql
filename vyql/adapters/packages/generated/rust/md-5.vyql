@@ -1,0 +1,7 @@
+import code.{WeakHash, Deserialization}
+
+adapter rust {
+  package "md-5" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

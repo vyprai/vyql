@@ -1,0 +1,11 @@
+import code.{SecretValue, HttpInput}
+import core.{InputValidation, CertificateValidation}
+adapter kotlin {
+  package "com.twilio.sdk:twilio" {
+    source method "init" -> code.SecretValue
+    source method "setPassword" -> code.SecretValue
+    source method "toJwt" -> code.SecretValue
+    control method "validate" -> core.InputValidation
+    control method "validateSslCertificate" -> core.CertificateValidation
+  }
+}

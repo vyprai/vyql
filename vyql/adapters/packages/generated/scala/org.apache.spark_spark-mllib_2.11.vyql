@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.apache.spark:spark-mllib_2.11" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter dart {
+  package "pub_semver" {
+    sink method "Version.parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter dart {
+  package "angular" {
+    control method "internalSanitizeUrl" -> core.InputValidation
+  }
+}

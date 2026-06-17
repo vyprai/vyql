@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter python {
+  package "cssselect" {
+    sink method "parse" -> code.Deserialization
+    sink method "css_to_xpath" -> code.Deserialization
+  }
+}

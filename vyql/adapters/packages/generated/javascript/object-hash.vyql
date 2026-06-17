@@ -1,0 +1,5 @@
+adapter javascript {
+  package "object-hash" {
+    mark path "object.hash.hash" -> code.WeakHash
+  }
+}

@@ -1,0 +1,14 @@
+import code.{Cookie, HttpInput, NetworkData, NetworkSend, ResponseHeaderWrite}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "org.apache.cxf:cxf-rt-transports-http" {
+    source method "read" -> code.NetworkData
+    source method "readFromHeaders" -> code.HttpInput
+    source method "readFromConnection" -> code.HttpInput
+    source method "Cookie" -> code.Cookie
+    sink method "write" -> code.NetworkSend
+    sink method "writeToMessageHeaders" -> code.ResponseHeaderWrite
+    source method "setPath" -> code.Cookie
+  }
+}

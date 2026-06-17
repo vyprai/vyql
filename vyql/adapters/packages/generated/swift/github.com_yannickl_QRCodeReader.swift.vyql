@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/yannickl/QRCodeReader.swift" {
+    source method "reader" -> core.UserControlledData
+    source method "didFindCode" -> core.UserControlledData
+  }
+}

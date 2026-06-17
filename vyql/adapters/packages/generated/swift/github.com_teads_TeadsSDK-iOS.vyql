@@ -1,0 +1,7 @@
+import code.{CodeEval, DomInput}
+adapter swift {
+  package "github.com/teads/TeadsSDK-iOS" {
+    sink method "injectJS" -> code.CodeEval
+    source method "userContentController" -> code.DomInput
+  }
+}

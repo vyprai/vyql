@@ -1,0 +1,9 @@
+import core.{InputValidation, UserControlledData}
+adapter elixir {
+  package "slugger" {
+    control method "slugify" -> core.InputValidation
+    source method "slugify" -> core.UserControlledData
+    control method "slugify_downcase" -> core.InputValidation
+    source method "slugify_downcase" -> core.UserControlledData
+  }
+}

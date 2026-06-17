@@ -1,0 +1,15 @@
+import code.{CodeEval, UrlFetch}
+adapter objc {
+  package "youtube-ios-player-helper" {
+    sink method "evaluateJavaScript" -> code.CodeEval
+    source method "loadWithVideoId" -> core.UserControlledData
+    source method "loadWithPlaylistId" -> core.UserControlledData
+    source method "loadWithPlayerParams" -> core.UserControlledData
+    source method "loadVideoById" -> core.UserControlledData
+    source method "cueVideoByURL" -> core.UserControlledData
+    source method "loadVideoByURL" -> core.UserControlledData
+    source method "loadPlaylistByPlaylistId" -> core.UserControlledData
+    source method "loadPlaylistByVideos" -> core.UserControlledData
+    sink method "handleHttpNavigationToUrl" -> code.UrlFetch
+  }
+}

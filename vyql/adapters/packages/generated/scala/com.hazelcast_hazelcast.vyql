@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter scala {
+  package "com.hazelcast:hazelcast" {
+    source method "AwsConfig.getSecretKey" -> code.SecretValue
+  }
+}

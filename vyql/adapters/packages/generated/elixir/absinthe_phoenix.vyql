@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+adapter elixir {
+  package "absinthe_phoenix" {
+    source method "handle_in" -> core.UserControlledData
+    source method "parse_variables" -> core.UserControlledData
+    source method "do_parse_variables" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter java {
+  package "org.apache.spark:spark-streaming_2.11" {
+    sink method "Checkpoint.read" -> code.Deserialization
+    sink method "PythonDStream.loads" -> code.Deserialization
+  }
+}

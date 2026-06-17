@@ -1,0 +1,12 @@
+import code.{UrlFetch}
+import core.{UserControlledData}
+
+adapter dart {
+  package "firebase_admob" {
+    source method "MobileAdTargetingInfo.contentUrl" -> core.UserControlledData
+    sink method "MobileAd.load" -> code.UrlFetch
+    sink method "NativeAd.load" -> code.UrlFetch
+    sink method "InterstitialAd.load" -> code.UrlFetch
+    sink method "RewardedVideoAd.load" -> code.UrlFetch
+  }
+}

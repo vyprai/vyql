@@ -1,0 +1,9 @@
+import code.{HttpInput}
+adapter cpp {
+  package "aws-sdk-cpp" {
+    source method "GetBody" -> code.HttpInput
+    source method "AddQueryStringParameters" -> code.HttpInput
+    source method "GetAdditionalCustomHeaders" -> code.HttpInput
+    source method "SetAdditionalCustomHeaderValue" -> code.HttpInput
+  }
+}

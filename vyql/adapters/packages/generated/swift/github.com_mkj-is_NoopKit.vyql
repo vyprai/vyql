@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter swift {
+  package "github.com/mkj-is/NoopKit" {
+    sink method "undefined" -> code.CodeEval
+  }
+}

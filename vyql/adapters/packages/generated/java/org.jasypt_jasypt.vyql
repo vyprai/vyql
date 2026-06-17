@@ -1,0 +1,11 @@
+import code.{SecretValue, WeakCipher, WeakHash}
+
+adapter java {
+  package "org.jasypt:jasypt" {
+    mark method "encrypt" -> code.WeakCipher
+    mark method "decrypt" -> code.WeakCipher
+    mark method "digest" -> code.WeakHash
+    source method "setPassword" -> code.SecretValue
+    source method "getPassword" -> code.SecretValue
+  }
+}

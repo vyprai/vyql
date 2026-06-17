@@ -1,0 +1,6 @@
+adapter cpp {
+  package "lua" {
+    sink method "luaD_protectedparser" -> code.Deserialization
+    sink method "f_parser" -> code.Deserialization
+  }
+}

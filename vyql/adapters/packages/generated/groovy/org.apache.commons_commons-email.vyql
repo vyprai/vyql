@@ -1,0 +1,10 @@
+import code.{NetworkSend, ResponseHeaderWrite, SecretValue, Deserialization}
+
+adapter groovy {
+  package "org.apache.commons:commons-email" {
+    sink method "send" -> code.NetworkSend
+    sink method "addHeader" -> code.ResponseHeaderWrite
+    source method "setAuthentication" -> code.SecretValue
+    sink method "setMailSessionFromJNDI" -> code.Deserialization
+  }
+}

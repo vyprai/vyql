@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter cpp {
+  package "qtquick3d" {
+    sink method "import" -> code.FilePathAccess
+  }
+}

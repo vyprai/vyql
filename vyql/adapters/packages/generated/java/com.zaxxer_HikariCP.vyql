@@ -1,0 +1,12 @@
+import code.{SqlExecution, SecretValue}
+
+adapter java {
+  package "com.zaxxer:HikariCP" {
+    sink method "setConnectionTestQuery" -> code.SqlExecution
+    sink method "setConnectionInitSql" -> code.SqlExecution
+    source method "getPassword" -> code.SecretValue
+    source method "getCredentials" -> code.SecretValue
+    source method "setPassword" -> code.SecretValue
+    source method "setCredentials" -> code.SecretValue
+  }
+}

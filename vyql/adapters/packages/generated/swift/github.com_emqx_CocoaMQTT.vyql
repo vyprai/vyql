@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkData, NetworkSend, SecretValue}
+
+adapter swift {
+  package "github.com/emqx/CocoaMQTT" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "write" -> code.NetworkSend
+    source method "readData" -> code.NetworkData
+    sink method "buildConnection" -> code.NetworkConnect
+  }
+}

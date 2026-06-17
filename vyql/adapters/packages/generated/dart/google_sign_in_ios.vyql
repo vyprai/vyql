@@ -1,0 +1,10 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter dart {
+  package "google_sign_in_ios" {
+    source method "signIn" -> code.SecretValue
+    source method "getRefreshedAuthorizationTokens" -> code.SecretValue
+    control method "signOut" -> core.AuthenticationCheck
+  }
+}

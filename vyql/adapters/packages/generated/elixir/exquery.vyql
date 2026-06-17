@@ -1,0 +1,11 @@
+import code.{Deserialization}
+adapter elixir {
+  package "exquery" {
+    sink method "tokenize" -> code.Deserialization
+    sink method "to_attributes" -> code.Deserialization
+    sink method "tree" -> code.Deserialization
+    sink method "to_tree" -> code.Deserialization
+    sink method "normalize_css" -> code.Deserialization
+    sink method "css_to_spec" -> code.Deserialization
+  }
+}

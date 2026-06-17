@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter rust {
+  package "walkdir" {
+    sink method "path" -> code.FilePathAccess
+    sink method "into_path" -> code.FilePathAccess
+  }
+}

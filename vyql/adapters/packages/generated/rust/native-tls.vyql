@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "native-tls" {
+    sink method "from_pkcs12" -> code.Deserialization
+  }
+}

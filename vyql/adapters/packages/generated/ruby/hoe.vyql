@@ -1,0 +1,5 @@
+adapter ruby {
+  package "hoe" {
+    sink method "read_utf" -> code.FilePathAccess
+  }
+}

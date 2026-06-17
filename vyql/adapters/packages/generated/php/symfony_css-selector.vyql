@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "symfony/css-selector" {
+    sink method "cssToXPath" -> code.Deserialization
+  }
+}

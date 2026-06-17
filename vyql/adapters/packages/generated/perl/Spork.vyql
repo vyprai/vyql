@@ -1,0 +1,9 @@
+import code.{UrlFetch}
+
+adapter perl {
+  package "Spork" {
+    sink method "wget_download" -> code.UrlFetch
+    sink method "curl_download" -> code.UrlFetch
+    sink method "lwp_download" -> code.UrlFetch
+  }
+}

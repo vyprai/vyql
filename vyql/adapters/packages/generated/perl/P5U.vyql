@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "P5U" {
+    sink method "YAML::Tiny::Load" -> code.Deserialization
+    sink method "YAML::Tiny::LoadFile" -> code.Deserialization
+    sink method "YAML::Tiny::read_string" -> code.Deserialization
+  }
+}

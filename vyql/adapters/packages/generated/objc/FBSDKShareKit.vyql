@@ -1,0 +1,8 @@
+import code.{NetworkSend, UrlFetch}
+
+adapter objc {
+  package "FBSDKShareKit" {
+    sink method "startGraphRequestWithGraphPath" -> code.NetworkSend
+    sink method "handle" -> code.UrlFetch
+  }
+}

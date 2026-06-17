@@ -1,0 +1,5 @@
+adapter ruby {
+  package "websocket" {
+    source method "Handler03" -> code.NetworkData
+  }
+}

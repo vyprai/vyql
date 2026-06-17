@@ -1,0 +1,14 @@
+import core.{UserControlledData}
+
+adapter python {
+  package "google-auth-httplib2" {
+    sink method "Request.__call__" -> code.NetworkConnect
+    sink method "Request.__call__" -> code.NetworkSend
+    sink method "Request.__call__" -> code.UrlFetch
+    source method "Request.__call__" -> core.UserControlledData
+    sink method "AuthorizedHttp.request" -> code.NetworkConnect
+    sink method "AuthorizedHttp.request" -> code.NetworkSend
+    sink method "AuthorizedHttp.request" -> code.UrlFetch
+    source method "AuthorizedHttp.request" -> core.UserControlledData
+  }
+}

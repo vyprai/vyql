@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter groovy {
+  package "org.jboss.resteasy:resteasy-jackson2-provider" {
+    sink method "readFrom" -> code.Deserialization
+    sink method "writeTo" -> code.Deserialization
+  }
+}

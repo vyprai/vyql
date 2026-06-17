@@ -1,0 +1,6 @@
+import code.{StoredDataWrite}
+adapter dart {
+  package "states_rebuilder" {
+    sink method "storageInitializer" -> code.StoredDataWrite
+  }
+}

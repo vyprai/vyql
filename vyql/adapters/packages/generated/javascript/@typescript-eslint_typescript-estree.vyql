@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter javascript {
+  package "@typescript-eslint/typescript-estree" {
+    sink method "parse" -> code.Deserialization
+  }
+}

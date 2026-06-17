@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "data-encoding" {
+    sink method "decode_len" -> code.Deserialization
+    sink method "decode_mut" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+  }
+}

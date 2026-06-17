@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess, FileUse}
+adapter scala {
+  package "org.bouncycastle:bcprov-jdk16" {
+    sink method "parse" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+  }
+}

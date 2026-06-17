@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/leif-ibsen/ASN1" {
+    sink method "build" -> code.Deserialization
+  }
+}

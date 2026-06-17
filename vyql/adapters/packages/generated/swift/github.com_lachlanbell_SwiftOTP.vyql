@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter swift {
+  package "github.com/lachlanbell/SwiftOTP" {
+    source method "HOTP.init" -> code.SecretValue
+    source method "TOTP.init" -> code.SecretValue
+  }
+}

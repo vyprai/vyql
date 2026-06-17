@@ -1,0 +1,8 @@
+import code.{NetworkData}
+adapter dart {
+  package "geolocator" {
+    source method "getLastKnownPosition" -> code.NetworkData
+    source method "getCurrentPosition" -> code.NetworkData
+    source method "getPositionStream" -> code.NetworkData
+  }
+}

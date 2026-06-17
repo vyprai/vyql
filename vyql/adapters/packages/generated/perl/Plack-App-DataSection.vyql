@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter perl {
+  package "Plack-App-DataSection" {
+    source method "call" -> code.HttpInput
+  }
+}

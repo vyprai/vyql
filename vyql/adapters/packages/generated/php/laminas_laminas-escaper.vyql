@@ -1,0 +1,11 @@
+import core.{HtmlEscape, InputValidation}
+
+adapter php {
+  package "laminas/laminas-escaper" {
+    control method "escapeHtml" -> core.HtmlEscape
+    control method "escapeHtmlAttr" -> core.HtmlEscape
+    control method "escapeJs" -> core.InputValidation
+    control method "escapeUrl" -> core.InputValidation
+    control method "escapeCss" -> core.InputValidation
+  }
+}

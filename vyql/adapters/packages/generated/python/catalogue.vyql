@@ -1,0 +1,8 @@
+import code.{CodeEval, ExpressionEval}
+
+adapter python {
+  package "catalogue" {
+    sink method "load" -> code.CodeEval
+    sink method "parse_condition" -> code.ExpressionEval
+  }
+}

@@ -1,0 +1,8 @@
+import code.{HttpInput, Deserialization}
+
+adapter kotlin {
+  package "io.springfox:springfox-swagger2" {
+    source method "getDocumentation" -> code.HttpInput
+    sink method "getDocumentation" -> code.Deserialization
+  }
+}

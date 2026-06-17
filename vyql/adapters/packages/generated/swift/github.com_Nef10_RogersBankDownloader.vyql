@@ -1,0 +1,8 @@
+import code.{SecretValue, UrlFetch}
+adapter swift {
+  package "github.com/Nef10/RogersBankDownloader" {
+    sink method "downloadStatement" -> code.UrlFetch
+    sink method "searchStatements" -> code.UrlFetch
+    sink method "downloadActivities" -> code.UrlFetch
+  }
+}

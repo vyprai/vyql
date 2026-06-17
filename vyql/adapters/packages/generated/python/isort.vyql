@@ -1,0 +1,10 @@
+import code.{CliArgument, CommandExecution, Deserialization, FileUse}
+adapter python {
+  package "isort" {
+    source method "parse_args" -> core.UserControlledData
+    sink method "read" -> code.FileUse
+    sink method "write" -> code.FileUse
+    sink method "load" -> code.Deserialization
+    sink method "loads" -> code.Deserialization
+  }
+}

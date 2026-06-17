@@ -1,0 +1,10 @@
+import code.{Deserialization, HttpInput}
+import core.{AuthenticationCheck, InputValidation}
+
+adapter groovy {
+  package "org.springframework.security:spring-security-web" {
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "encode" -> core.InputValidation
+    sink method "decode" -> code.Deserialization
+  }
+}

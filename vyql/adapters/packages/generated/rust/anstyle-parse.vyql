@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "anstyle-parse" {
+    sink method "add" -> code.Deserialization
+  }
+}

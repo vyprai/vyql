@@ -1,0 +1,6 @@
+adapter rust {
+  package "zvariant_derive" {
+    source method "parse" -> core.UserControlledData
+    sink method "expand_deserialize_derive" -> code.Deserialization
+  }
+}

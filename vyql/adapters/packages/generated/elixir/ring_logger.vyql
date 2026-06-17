@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter elixir {
+  package "ring_logger" {
+    sink method "load" -> code.FilePathAccess
+  }
+}

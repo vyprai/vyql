@@ -1,0 +1,10 @@
+import code.{CodeEval}
+import core.{UserControlledData}
+
+adapter perl {
+  package "Reply" {
+    source method "_read" -> core.UserControlledData
+    sink method "_eval" -> code.CodeEval
+    sink method "execute" -> code.CodeEval
+  }
+}

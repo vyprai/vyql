@@ -1,0 +1,8 @@
+adapter elixir {
+  package "myxql" {
+    sink method "query" -> code.SqlExecution
+    sink method "query!" -> code.SqlExecution
+    sink method "query_many" -> code.SqlExecution
+    sink method "query_many!" -> code.SqlExecution
+  }
+}

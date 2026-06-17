@@ -1,0 +1,14 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/clbanning/x2j" {
+    sink method "ToJson" -> code.Deserialization
+    sink method "ToJsonIndent" -> code.Deserialization
+    sink method "XmlMsgsFromFileAsJson" -> code.Deserialization
+    sink method "XmlBufferToJson" -> code.Deserialization
+    sink method "XmlMsgsFromReaderAsJson" -> code.Deserialization
+    sink method "PathsForTag" -> code.Deserialization
+    sink method "PathForTagShortest" -> code.Deserialization
+    sink method "BytePathsForTag" -> code.Deserialization
+    sink method "BytePathForTagShortest" -> code.Deserialization
+  }
+}

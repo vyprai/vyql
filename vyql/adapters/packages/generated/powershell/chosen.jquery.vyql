@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter powershell {
+  package "chosen.jquery" {
+    control method "SelectParser.prototype.escapeExpression" -> core.HtmlEscape
+  }
+}

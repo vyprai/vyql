@@ -1,12 +1,11 @@
 package treesitter
 
 import (
-	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tskotlin "github.com/tree-sitter-grammars/tree-sitter-kotlin/bindings/go"
+	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 
 	"github.com/vyprai/vyql/extract/nir"
 )
-
 
 // ktConv walks a tree-sitter Kotlin CST into NIR.
 type ktConv struct {
@@ -24,27 +23,17 @@ var ktHandlerAnns = map[string]bool{
 
 // ExtractKotlin parses Kotlin files into one NIR Program (one module per file).
 func ExtractKotlin(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tskotlin.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &ktConv{src: src, file: rel, key: moduleKey(root, f, ".kt")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tskotlin.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &ktConv{src: src, file: rel, key: moduleKey(root, abs, ".kt")}
+			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *ktConv) loc(n *tree_sitter.Node) string {
@@ -77,6 +66,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{cd}
 	case "function_declaration":
 		params := c.params(n)
+		paramTypes := c.paramTypes(n)
 		body := c.block(c.funcBody(n))
 		if c.inController || c.hasHandlerAnn(n) {
 			var seed []nir.Stmt
@@ -86,7 +76,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "property_declaration":
 		name := c.propName(n)
 		val := c.propValue(n)
@@ -299,6 +289,29 @@ func (c *ktConv) params(n *tree_sitter.Node) []string {
 					}
 				}
 			}
+		}
+	}
+	return out
+}
+
+func (c *ktConv) paramTypes(n *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "function_value_parameters" {
+			continue
+		}
+		for _, p := range namedChildren(ch) {
+			if p.Kind() != "parameter" {
+				continue
+			}
+			name := ""
+			for _, id := range namedChildren(p) {
+				if id.Kind() == "identifier" {
+					name = c.text(id)
+					break
+				}
+			}
+			putParamType(out, name, paramTypeFromField(c, p))
 		}
 	}
 	return out

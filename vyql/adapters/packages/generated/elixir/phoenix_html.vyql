@@ -1,0 +1,10 @@
+import core.{HtmlEscape}
+
+adapter elixir {
+  package "phoenix_html" {
+    control method "html_escape" -> core.HtmlEscape
+    control method "attributes_escape" -> core.HtmlEscape
+    control method "javascript_escape" -> core.HtmlEscape
+    control method "css_escape" -> core.HtmlEscape
+  }
+}

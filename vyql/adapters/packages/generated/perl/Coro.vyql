@@ -1,0 +1,7 @@
+adapter perl {
+  package "Coro" {
+    source method "recv" -> code.NetworkData
+    sink method "close" -> code.NetworkSend
+    source method "session" -> code.HttpInput
+  }
+}

@@ -1,0 +1,8 @@
+adapter elixir {
+  package "websockex" {
+    sink method "spawn" -> code.CommandExecution
+    sink method "send" -> code.UrlFetch
+    source method "handle_cast" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+  }
+}

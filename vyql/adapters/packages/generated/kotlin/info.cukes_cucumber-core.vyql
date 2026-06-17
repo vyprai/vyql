@@ -1,0 +1,8 @@
+import code.{CommandExecution, HttpInput}
+import core.{HtmlEscape}
+
+adapter kotlin {
+  package "info.cukes:cucumber-core" {
+    control method "htmlEscape" -> core.HtmlEscape
+  }
+}

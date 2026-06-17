@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter python {
+  package "flask-restplus" {
+    source method "RequestParser.parse_args" -> code.HttpInput
+  }
+}

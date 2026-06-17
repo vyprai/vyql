@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "aws-sdk-v1" {
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "com.google.gwt:gwt-user" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "deserializeInstance" -> code.Deserialization
+  }
+}

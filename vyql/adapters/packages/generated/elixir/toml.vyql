@@ -1,0 +1,13 @@
+import code.{Deserialization, FilePathAccess}
+adapter elixir {
+  package "toml" {
+    sink method "Toml.Decoder.decode!" -> code.Deserialization
+    sink method "Toml.Decoder.decode" -> code.Deserialization
+    sink method "Toml.Decoder.decode_stream!" -> code.Deserialization
+    sink method "Toml.Decoder.decode_stream" -> code.Deserialization
+    sink method "Toml.Decoder.decode_file!" -> code.Deserialization
+    sink method "Toml.Decoder.decode_file" -> code.Deserialization
+    sink method "Toml.Decoder.decode_file!" -> code.FilePathAccess
+    sink method "Toml.Decoder.decode_file" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,9 @@
+import code.{FilePathAccess, NetworkData, NetworkSend}
+adapter rust {
+  package "tokio" {
+    sink method "open" -> code.FilePathAccess
+    sink method "read" -> code.FilePathAccess
+    sink method "send" -> code.NetworkSend
+    source method "recv" -> code.NetworkData
+  }
+}

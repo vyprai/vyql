@@ -1,0 +1,16 @@
+import code.{NetworkData, SecretValue}
+import core.{UserControlledData, AuthenticationCheck}
+
+adapter swift {
+  package "github.com/supabase-community/supabase-swift" {
+    source method "session" -> core.UserControlledData
+    source method "signInWithIdToken" -> code.SecretValue
+    source method "exchangeCodeForSession" -> code.SecretValue
+    source method "setSession" -> code.SecretValue
+    source method "generateLink" -> code.SecretValue
+    control method "enroll" -> core.AuthenticationCheck
+    control method "challenge" -> core.AuthenticationCheck
+    control method "verify" -> core.AuthenticationCheck
+    control method "unenroll" -> core.AuthenticationCheck
+  }
+}

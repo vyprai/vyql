@@ -1,0 +1,7 @@
+import code.{Deserialization, NetworkSend}
+adapter scala {
+  package "org.springframework.amqp:spring-rabbit" {
+    sink method "parseArguments" -> code.Deserialization
+    sink method "sendAndReceive" -> code.NetworkSend
+  }
+}

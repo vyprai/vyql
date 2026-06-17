@@ -1,0 +1,10 @@
+import code.{FileUse, LogOutput}
+
+adapter ruby {
+  package "mixlib-log" {
+    sink method "write" -> code.FileUse
+    sink method "open_logfile" -> code.FileUse
+    sink method "create_logfile" -> code.FileUse
+    sink method "add" -> code.LogOutput
+  }
+}

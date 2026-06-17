@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter objc {
+  package "TensorFlowLite" {
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseFlexBuffer" -> code.Deserialization
+    sink method "ParseString" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import code.{Deserialization}
+adapter c {
+  package "symengine" {
+    sink method "parse_0" -> code.Deserialization
+    sink method "parse_double" -> code.Deserialization
+    sink method "parse_many_doubles" -> code.Deserialization
+    sink method "parse_many_doubles_implicit_mul" -> code.Deserialization
+    sink method "parse_long_expr1" -> code.Deserialization
+    sink method "parse_long_expr2" -> code.Deserialization
+  }
+}

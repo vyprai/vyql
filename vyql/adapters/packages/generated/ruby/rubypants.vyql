@@ -1,0 +1,14 @@
+import core.{HtmlEscape, InputValidation}
+
+adapter ruby {
+  package "rubypants" {
+    control method "educate_dashes" -> core.HtmlEscape
+    control method "educate_dashes_oldschool" -> core.HtmlEscape
+    control method "educate_dashes_inverted" -> core.HtmlEscape
+    control method "educate_ellipses" -> core.HtmlEscape
+    control method "educate_backticks" -> core.HtmlEscape
+    control method "educate_single_backticks" -> core.HtmlEscape
+    control method "educate_quotes" -> core.HtmlEscape
+    control method "educate" -> core.InputValidation
+  }
+}

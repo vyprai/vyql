@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "http-parser" {
+    sink method "parse" -> code.Deserialization
+  }
+}

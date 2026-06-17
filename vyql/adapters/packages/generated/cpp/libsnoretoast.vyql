@@ -1,0 +1,6 @@
+import code.{CommandExecution, FilePathAccess}
+adapter cpp {
+  package "libsnoretoast" {
+    sink method "startProcess" -> code.CommandExecution
+  }
+}

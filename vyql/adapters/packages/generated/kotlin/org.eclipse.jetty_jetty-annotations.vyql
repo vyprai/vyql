@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "org.eclipse.jetty:jetty-annotations" {
+    sink method "parse" -> code.Deserialization
+  }
+}

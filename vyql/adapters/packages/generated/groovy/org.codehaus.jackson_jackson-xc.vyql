@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "org.codehaus.jackson:jackson-xc" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "deserializeWithType" -> code.Deserialization
+  }
+}

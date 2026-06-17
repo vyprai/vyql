@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.apache.lucene:lucene-core" {
+    sink method "parse" -> code.Deserialization
+  }
+}

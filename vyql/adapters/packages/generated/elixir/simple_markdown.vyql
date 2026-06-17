@@ -1,0 +1,7 @@
+import code.{Deserialization, HtmlRender}
+adapter elixir {
+  package "simple_markdown" {
+    sink method "parse" -> code.Deserialization
+    sink method "convert" -> code.HtmlRender
+  }
+}

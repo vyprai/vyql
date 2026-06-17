@@ -1,0 +1,13 @@
+import core.{HtmlEscape}
+import code.{XmlParse}
+
+adapter kotlin {
+  package "org.apache.taglibs:taglibs-standard-impl" {
+    control method "escape" -> core.HtmlEscape
+    control method "escapeXml" -> core.HtmlEscape
+    sink method "newInputSource" -> code.XmlParse
+    sink method "newXMLReader" -> code.XmlParse
+    sink method "newSAXSource" -> code.XmlParse
+    sink method "resolveEntity" -> code.XmlParse
+  }
+}

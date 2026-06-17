@@ -1,0 +1,18 @@
+import code.{CommandExecution}
+import core.{InputValidation, UserControlledData}
+
+adapter swift {
+  package "github.com/jakeheis/SwiftCLI" {
+    sink method "run" -> code.CommandExecution
+    sink method "execvp" -> code.CommandExecution
+    source method "read" -> core.UserControlledData
+    source method "readLine" -> core.UserControlledData
+    source method "readInt" -> core.UserControlledData
+    source method "readDouble" -> core.UserControlledData
+    source method "readBool" -> core.UserControlledData
+    source method "readObject" -> core.UserControlledData
+    source method "parse" -> core.UserControlledData
+    control method "validate" -> core.InputValidation
+    control method "contains" -> core.InputValidation
+  }
+}

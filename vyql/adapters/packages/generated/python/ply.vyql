@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter python {
+  package "ply" {
+    sink method "parse" -> code.Deserialization
+    sink method "tokenize" -> code.Deserialization
+  }
+}

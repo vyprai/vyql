@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter python {
+  package "django-js-asset" {
+    sink method "render" -> code.HtmlRender
+  }
+}

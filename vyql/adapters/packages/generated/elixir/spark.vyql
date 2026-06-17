@@ -1,0 +1,6 @@
+adapter elixir {
+  package "spark" {
+    sink method "find" -> code.NosqlQuery
+    sink method "set_option" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,8 @@
+adapter ruby {
+  package "Ascii85" {
+    sink method "decode" -> code.Deserialization
+    sink method "decode_raw" -> code.Deserialization
+    sink method "encode" -> code.Deserialization
+    sink method "write" -> code.Deserialization
+  }
+}

@@ -1,0 +1,15 @@
+import code.{FilePathAccess, FileUse}
+adapter python {
+  package "flax" {
+    sink method "GFile" -> code.FilePathAccess
+    sink method "listdir" -> code.FilePathAccess
+    sink method "isdir" -> code.FilePathAccess
+    sink method "copy" -> code.FileUse
+    sink method "rename" -> code.FileUse
+    sink method "exists" -> code.FilePathAccess
+    sink method "makedirs" -> code.FilePathAccess
+    sink method "remove" -> code.FileUse
+    sink method "rmtree" -> code.FileUse
+    sink method "getsize" -> code.FilePathAccess
+  }
+}

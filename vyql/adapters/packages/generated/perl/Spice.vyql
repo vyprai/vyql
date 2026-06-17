@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+adapter perl {
+  package "Spice" {
+    sink method "spiceInit" -> code.FilePathAccess
+    sink method "processSpice" -> code.FilePathAccess
+    sink method "readSpice" -> code.FilePathAccess
+  }
+}

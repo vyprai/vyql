@@ -1,0 +1,6 @@
+adapter elixir {
+  package "explorer" {
+    sink method "from_query" -> code.SqlExecution
+    sink method "deserialize" -> code.Deserialization
+  }
+}

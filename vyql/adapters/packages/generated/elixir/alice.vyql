@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter elixir {
+  package "alice" {
+    control method "sanitize_message" -> core.InputValidation
+    control method "sanitize_text" -> core.InputValidation
+  }
+}

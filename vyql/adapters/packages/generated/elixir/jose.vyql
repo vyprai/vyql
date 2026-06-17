@@ -1,0 +1,14 @@
+import code.{Deserialization, FilePathAccess}
+adapter elixir {
+  package "jose" {
+    sink method "from_file" -> code.FilePathAccess
+    sink method "from_der_file" -> code.FilePathAccess
+    sink method "from_oct_file" -> code.FilePathAccess
+    sink method "from_openssh_key_file" -> code.FilePathAccess
+    sink method "from_pem_file" -> code.FilePathAccess
+    sink method "to_file" -> code.FilePathAccess
+    sink method "to_der_file" -> code.FilePathAccess
+    sink method "to_oct_file" -> code.FilePathAccess
+    sink method "uncompress" -> code.Deserialization
+  }
+}

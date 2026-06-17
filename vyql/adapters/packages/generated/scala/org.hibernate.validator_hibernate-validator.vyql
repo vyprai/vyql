@@ -1,0 +1,6 @@
+import code.{ExpressionEval}
+adapter scala {
+  package "org.hibernate.validator:hibernate-validator" {
+    sink method "regexp" -> code.ExpressionEval
+  }
+}

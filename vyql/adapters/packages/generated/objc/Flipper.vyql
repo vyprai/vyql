@@ -1,0 +1,10 @@
+import code.{NetworkSend, Deserialization, CommandExecution}
+
+adapter objc {
+  package "Flipper" {
+    sink method "send" -> code.NetworkSend
+    sink method "parse" -> code.Deserialization
+    sink method "exec" -> code.CommandExecution
+    sink method "spawn" -> code.CommandExecution
+  }
+}

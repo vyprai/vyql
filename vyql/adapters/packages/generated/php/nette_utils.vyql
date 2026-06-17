@@ -1,0 +1,12 @@
+import code.{CommandExecution, Deserialization}
+import core.{HtmlEscape, InputValidation}
+
+adapter php {
+  package "nette/utils" {
+    sink method "Nette\Utils\Process::exec" -> code.CommandExecution
+    sink method "Nette\Utils\Json::decode" -> code.Deserialization
+    control method "Nette\Utils\Html::html_entity_decode" -> core.HtmlEscape
+    control method "Nette\Utils\Strings::replace" -> core.InputValidation
+    control method "Nette\Utils\Strings::split" -> core.InputValidation
+  }
+}

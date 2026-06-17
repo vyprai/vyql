@@ -1,0 +1,5 @@
+adapter groovy {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-hibernate4" {
+    sink method "setupModule" -> code.Deserialization
+  }
+}

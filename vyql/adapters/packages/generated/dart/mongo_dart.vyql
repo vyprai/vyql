@@ -1,0 +1,13 @@
+import code.{NosqlQuery}
+adapter dart {
+  package "mongo_dart" {
+    sink method "createFindAndModifyCommand" -> code.NosqlQuery
+    sink method "createQueryDbCommand" -> code.NosqlQuery
+    sink method "createDBSlaveOKCommand" -> code.NosqlQuery
+    sink method "createCountCommand" -> code.NosqlQuery
+    sink method "createSaslStartCommand" -> code.NosqlQuery
+    sink method "createSaslContinueCommand" -> code.NosqlQuery
+    sink method "createDistinctCommand" -> code.NosqlQuery
+    sink method "createAggregateCommand" -> code.NosqlQuery
+  }
+}

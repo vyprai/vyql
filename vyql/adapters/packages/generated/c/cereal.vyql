@@ -1,0 +1,6 @@
+adapter c {
+  package "cereal" {
+    sink method "start" -> code.ArchiveEntryWrite
+    sink method "load" -> code.XmlParse
+  }
+}

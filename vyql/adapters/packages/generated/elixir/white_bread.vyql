@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "white_bread" {
+    sink method "parse_task" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "sensio/distribution-bundle" {
+    sink method "executeCommand" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+adapter elixir {
+  package "nerves_system_br" {
+    sink method "System.Env.path_add" -> code.CommandExecution
+    sink method "System.Env.ld_library_path_add" -> code.CommandExecution
+  }
+}

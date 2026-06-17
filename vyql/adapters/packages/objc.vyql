@@ -1,0 +1,60 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile, WeakHash, WeakCipher, CleartextChannel, CertValidationDisabled}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck}
+
+adapter objc {
+  package "AFNetworking" {
+    source method "param" -> HttpInput
+    source method "responseObject" -> ExternalApiResponse
+    sink method "GET" -> UrlFetch
+    mark method "setAllowsAnyHTTPSCertificate" val "true" -> CertValidationDisabled
+  }
+  package "Foundation" {
+    source method "header" -> HttpInput
+    source ".environment" -> SecretValue
+    sink method "launch" -> CommandExecution
+    sink path "NSKeyedUnarchiver.unarchiveObject" -> Deserialization
+    sink method "contentsOfFile" -> FilePathAccess
+    sink method "dataTaskWithURL" -> UrlFetch
+    sink path "NSXMLDocument" -> XmlParse
+    sink method "nodesForXPath" -> XpathQuery
+    sink method "regularExpressionWithPattern" -> RegexCompile
+    mark "NSURL" val "http://" nval "127.0" -> CleartextChannel
+    control "stringByAddingPercentEncodingWithAllowedCharacters" -> RedirectAllowlist
+    control "stringByStandardizingPath" -> PathCanonicalization
+    control "NSXMLDocument" val "NSXMLNodeLoadExternalEntitiesNever" -> XmlHardening
+    control "requireAuth" -> AuthenticationCheck
+    control "authorize" -> AuthorizationCheck
+  }
+  package "sqlite" {
+    sink path "sqlite3_exec" arg 1 -> SqlExecution
+    control "sqlite3_prepare_v2" -> SqlParameterization
+  }
+  package "FMDB" {
+    sink path "FMDatabase.executeQuery" -> SqlExecution
+  }
+  package "libc" {
+    sink path "system" -> CommandExecution
+  }
+  package "WebKit" {
+    sink method "evaluateJavaScript" -> CodeEval
+    sink method "loadHTMLString" -> HtmlRender
+  }
+  package "SSZipArchive" {
+    sink method "unzipFileAtPath" -> ArchiveEntryWrite
+  }
+  package "openldap" {
+    sink path "ldap_search_ext_s" arg 3 -> LdapQuery
+    control "ldap_escape" -> LdapEscape
+  }
+  package "GRMustache" {
+    sink method "render" -> TemplateRender
+  }
+  package "CommonCrypto" {
+    mark "CC_MD5" -> WeakHash
+    mark "CC_SHA1" -> WeakHash
+    mark "CCCrypt" val "DES" -> WeakCipher
+  }
+  package "hpple" {
+    control "NSString.stringByEscapingHTML" -> HtmlEscape
+  }
+}

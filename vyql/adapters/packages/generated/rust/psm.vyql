@@ -1,0 +1,6 @@
+adapter rust {
+  package "psm" {
+    sink method "rust_psm_replace_stack" -> code.CodeEval
+    sink method "rust_psm_on_stack" -> code.CodeEval
+  }
+}

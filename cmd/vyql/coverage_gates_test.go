@@ -47,7 +47,7 @@ var (
 	conceptKind = regexp.MustCompile(`(?m)^concept\s+([A-Za-z0-9_]+)\s*:\s*(sink|source|control)`)
 	conceptRef  = regexp.MustCompile(`(?:code|core)\.([A-Z][A-Za-z0-9_]+)`)
 	quoted      = regexp.MustCompile(`"[^"]*"`)
-	pkgLine     = regexp.MustCompile(`(?m)^package\s+([A-Za-z0-9_.]+)\s*;`)
+	pkgLine     = regexp.MustCompile(`(?m)^(?:module|package)\s+([A-Za-z0-9_.]+)\s*;`)
 	threatDef   = regexp.MustCompile(`(?m)^threat\s+([A-Za-z0-9_]+)`)
 	threatRef   = regexp.MustCompile(`(?:vulnerable_to|neutralizes):\s*\[([^\]]+)\]`)
 )
@@ -116,6 +116,9 @@ func TestConceptRefsResolveGate(t *testing.T) {
 	}
 	check := func(sub, suffix string) {
 		for f, c := range readDataFiles(t, sub, suffix) {
+			if isGeneratedAdapter(f) {
+				continue // generated corpus validated separately below
+			}
 			bare := quoted.ReplaceAllString(c, `""`)
 			for _, m := range conceptRef.FindAllStringSubmatch(bare, -1) {
 				if !defined[m[1]] {
@@ -126,14 +129,38 @@ func TestConceptRefsResolveGate(t *testing.T) {
 	}
 	check("adapters", ".vyql")
 	check("packs", ".vyql")
+	// the dynamically-loaded generated package corpus must also reference only real
+	// concepts (a dead label otherwise), but it is excluded from the curated coherence
+	// gates below because it legitimately wires broad concepts that have no curated rule.
+	for f, c := range readDataFiles(t, "adapters", ".vyql") {
+		if !isGeneratedAdapter(f) {
+			continue
+		}
+		bare := quoted.ReplaceAllString(c, `""`)
+		for _, m := range conceptRef.FindAllStringSubmatch(bare, -1) {
+			if !defined[m[1]] {
+				t.Errorf("generated adapter %s references concept %q not defined in concepts.vyql", f, m[1])
+			}
+		}
+	}
 	t.Logf("concept refs: %d concepts defined", len(defined))
+}
+
+// isGeneratedAdapter reports whether a data-file path is part of the dynamically-loaded
+// generated package-adapter corpus (adapters/packages/generated/<lang>/<pkg>.vyql), which
+// is auxiliary content gated at scan time and excluded from the curated coherence gates.
+func isGeneratedAdapter(path string) bool {
+	return strings.Contains(filepath.ToSlash(path), "/adapters/packages/generated/")
 }
 
 // conceptRefsIn returns the set of code/core concept names referenced (as targets or
 // in rule clauses) across the given vyql/<sub> files, quoted strings stripped.
 func conceptRefsIn(t *testing.T, sub string) map[string]bool {
 	out := map[string]bool{}
-	for _, c := range readDataFiles(t, sub, ".vyql") {
+	for f, c := range readDataFiles(t, sub, ".vyql") {
+		if isGeneratedAdapter(f) {
+			continue // curated-coherence gates ignore the dynamically-loaded generated corpus
+		}
 		bare := quoted.ReplaceAllString(c, `""`)
 		for _, m := range conceptRef.FindAllStringSubmatch(bare, -1) {
 			out[m[1]] = true
@@ -364,6 +391,13 @@ func TestNoDuplicateNamesGate(t *testing.T) {
 // panicking, for every adapter shipped under vyql/adapters/.
 func TestAllAdaptersLoadGate(t *testing.T) {
 	for f := range readDataFiles(t, "adapters", ".vyql") {
+		// Files under adapters/packages/ are dependency catalogs keyed by package name,
+		// not standalone tech adapters: the per-language catalog is merged into its tech
+		// by AdaptersFor, and the generated/<lang>/<pkg>.vyql corpus loads dynamically via
+		// GeneratedPackageAdaptersFor. Their basenames are package names, not techs.
+		if strings.Contains(filepath.ToSlash(f), "/adapters/packages/") {
+			continue
+		}
 		tech := strings.TrimSuffix(filepath.Base(f), ".vyql")
 		t.Run(tech, func(t *testing.T) {
 			defer func() {

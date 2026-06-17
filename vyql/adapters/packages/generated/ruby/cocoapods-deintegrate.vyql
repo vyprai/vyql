@@ -1,0 +1,13 @@
+import code.{CliArgument, FilePathAccess}
+adapter ruby {
+  package "cocoapods-deintegrate" {
+    source method "initialize" -> code.CliArgument
+    sink method "deintegrate_project" -> code.FilePathAccess
+    sink method "deintegrate_target" -> code.FilePathAccess
+    sink method "delete_pods_file_references" -> code.FilePathAccess
+    sink method "deintegrate_pods_libraries" -> code.FilePathAccess
+    sink method "deintegrate_configuration_file_references" -> code.FilePathAccess
+    sink method "deintegrate_shell_script_phase" -> code.FilePathAccess
+    sink method "delete_empty_group" -> code.FilePathAccess
+  }
+}

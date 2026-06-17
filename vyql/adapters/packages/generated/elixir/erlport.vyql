@@ -1,0 +1,9 @@
+import code.{CommandExecution, Deserialization}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "erlport" {
+    source method "parse" -> core.UserControlledData
+    sink method "decode" -> code.Deserialization
+  }
+}

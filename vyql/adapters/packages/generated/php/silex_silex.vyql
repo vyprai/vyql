@@ -1,0 +1,13 @@
+import code.{CodeEval, FilePathAccess, HttpInput, RedirectTarget, ResponseHeaderWrite}
+import core.{HtmlEscape}
+
+adapter php {
+  package "silex/silex" {
+    source method "handle" -> code.HttpInput
+    sink method "match" -> code.CodeEval
+    mark method "redirect" -> code.RedirectTarget
+    control method "escape" -> core.HtmlEscape
+    sink method "json" -> code.ResponseHeaderWrite
+    sink method "sendFile" -> code.FilePathAccess
+  }
+}

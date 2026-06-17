@@ -1,0 +1,5 @@
+adapter bash {
+  package "k9s" {
+    source path "k9s.argv" -> code.CliArgument
+  }
+}

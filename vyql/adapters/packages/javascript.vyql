@@ -1,0 +1,163 @@
+import code.{HttpInput, DomInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, ProtoPollute, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter javascript {
+  package "express" {
+    source receiver "body" on "express.Request" -> HttpInput
+    source receiver "query" on "express.Request" -> HttpInput
+    source receiver "params" on "express.Request" -> HttpInput
+    source receiver "headers" on "express.Request" -> HttpInput
+  }
+  package "koa" {
+    source "ctx.request.body" -> HttpInput
+  }
+  package "fastify" {
+    source "request.body" -> HttpInput
+  }
+  package "@hapi/hapi" {
+    source "request.payload" -> HttpInput
+  }
+  package "next" {
+    source "searchParams" -> HttpInput
+  }
+  package "@nestjs/common" {
+    source "context.params" -> HttpInput
+  }
+  package "dotenv" {
+    source "process.env" -> SecretValue
+  }
+  package "react" {
+    source "location.search" -> DomInput
+  }
+  package "node-fetch" {
+    source method "json" -> ExternalApiResponse
+    sink path "fetch" -> UrlFetch
+  }
+  package "axios" {
+    source method "json" -> ExternalApiResponse
+    sink path "axios.get" -> UrlFetch
+  }
+  package "got" {
+    source method "json" -> ExternalApiResponse
+    sink path "got" -> UrlFetch
+  }
+  package "sequelize" {
+    sink path "sequelize.query" -> SqlExecution
+  }
+  package "knex" {
+    sink path "knex.raw" -> SqlExecution
+  }
+  package "@prisma/client" {
+    sink method "$queryRawUnsafe" -> SqlExecution
+  }
+  package "pg" {
+    sink method "query" -> SqlExecution
+  }
+  package "mysql2" {
+    sink method "query" -> SqlExecution
+  }
+  package "sqlite3" {
+    sink method "all" -> SqlExecution
+  }
+  package "better-sqlite3" {
+    sink method "prepare" -> SqlExecution
+  }
+  package "mongoose" {
+    sink method "find" -> NosqlQuery
+  }
+  package "mongodb" {
+    sink method "aggregate" -> NosqlQuery
+  }
+  package "child_process" {
+    sink path "child_process.exec" -> CommandExecution
+  }
+  package "execa" {
+    sink path "execa.command" -> CommandExecution
+  }
+  package "vm" {
+    sink path "vm.runInNewContext" -> CodeEval
+  }
+  package "lodash" {
+    sink path "lodash.template" -> CodeEval
+    sink path "merge" -> ProtoPollute
+    sink path "Object.assign" arg all collection -> ProtoPollute
+    control "_.escape" -> HtmlEscape
+  }
+  package "node-serialize" {
+    sink path "serialize.unserialize" -> Deserialization
+  }
+  package "yaml" {
+    sink path "yaml.parse" -> Deserialization
+  }
+  package "js-yaml" {
+    sink path "js-yaml.load" -> Deserialization
+  }
+  package "fs" {
+    sink path "fs.readFile" -> FilePathAccess
+  }
+  package "adm-zip" {
+    sink path "admZip.extractAllTo" -> ArchiveEntryWrite
+  }
+  package "xmldom" {
+    sink path "DOMParser.parseFromString" -> XmlParse
+  }
+  package "xpath" {
+    sink path "xpath.select" -> XpathQuery
+    control "xpath.escape" -> XpathEscape
+  }
+  package "ldapjs" {
+    sink method "search" arg 1 collection -> LdapQuery
+    control "ldapjs.escapeFilter" -> LdapEscape
+  }
+  package "ejs" {
+    sink method "render" -> TemplateRender
+  }
+  package "handlebars" {
+    sink method "compile" -> TemplateRender
+  }
+  package "jquery" {
+    sink method "html" -> HtmlRender
+  }
+  package "regexp" {
+    sink path "RegExp" -> RegexCompile
+  }
+  package "dompurify" {
+    control "DOMPurify.sanitize" -> HtmlEscape
+  }
+  package "escape-html" {
+    control "escapeHtml" -> HtmlEscape
+  }
+  package "he" {
+    control "he.encode" -> HtmlEscape
+  }
+  package "sqlstring" {
+    control "sqlstring.escape" -> SqlParameterization
+  }
+  package "pg-promise" {
+    control method "parameterized" -> SqlParameterization
+  }
+  package "shell-quote" {
+    control "shellQuote.quote" -> ShellEscape
+  }
+  package "path" {
+    control "path.normalize" -> PathCanonicalization
+  }
+  package "sanitize-filename" {
+    control "sanitizeFilename" -> PathCanonicalization
+  }
+  package "validator" {
+    control "validator.isURL" -> RedirectAllowlist
+  }
+  package "sax" {
+    control "sax.parser" -> XmlHardening
+  }
+  package "passport" {
+    control "passport.authenticate" -> AuthenticationCheck
+  }
+  package "csurf" {
+    control "csrf" -> CsrfProtection
+  }
+  package "acl" {
+    control "acl.isAllowed" -> AuthorizationCheck
+  }
+}

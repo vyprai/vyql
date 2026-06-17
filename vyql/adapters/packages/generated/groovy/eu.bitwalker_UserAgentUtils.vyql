@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter groovy {
+  package "eu.bitwalker:UserAgentUtils" {
+    sink method "parseUserAgentString" -> code.Deserialization
+  }
+}

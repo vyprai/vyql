@@ -1,0 +1,9 @@
+import code.{NetworkData, CodeEval}
+import core.{UserControlledData}
+
+adapter java {
+  package "org.apache.activemq:activemq-all" {
+    source method "receiveBody" -> code.NetworkData
+    source method "send" -> code.NetworkData
+  }
+}

@@ -1,0 +1,10 @@
+import code.{StoredDataRead, StoredDataWrite, FilePathAccess}
+adapter objc {
+  package "MMKV" {
+    source method "getDataForKey" -> code.StoredDataRead
+    sink method "setDataForKey" -> code.StoredDataWrite
+    sink method "writeActualSize" -> code.FilePathAccess
+    sink method "expandAndWriteBack" -> code.FilePathAccess
+    sink method "fullWriteback" -> code.FilePathAccess
+  }
+}

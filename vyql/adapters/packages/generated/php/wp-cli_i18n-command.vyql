@@ -1,0 +1,13 @@
+import code.{Deserialization, FilePathAccess}
+adapter php {
+  package "wp-cli/i18n-command" {
+    sink method "FileDataExtractor::get_file_data" -> code.FilePathAccess
+    sink method "JsonSchemaExtractor::load_schema" -> code.FilePathAccess
+    sink method "JsonSchemaExtractor::load_schema" -> code.Deserialization
+    sink method "JsonSchemaExtractor::extract_strings_using_i18n_schema" -> code.Deserialization
+    sink method "MakeJsonCommand::build_map" -> code.Deserialization
+    sink method "MakeJsonCommand::make_json" -> code.FilePathAccess
+    sink method "MakeJsonCommand::make_json" -> code.Deserialization
+    sink method "UpdatePoCommand::restore_file_comments" -> code.FilePathAccess
+  }
+}

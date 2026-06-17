@@ -1,0 +1,8 @@
+adapter go {
+  package "github.com/gogo/protobuf" {
+    sink method "Unmarshal" -> code.Deserialization
+    sink method "UnmarshalMerge" -> code.Deserialization
+    sink method "UnmarshalNext" -> code.Deserialization
+    sink method "UnmarshalString" -> code.Deserialization
+  }
+}

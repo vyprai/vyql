@@ -1,0 +1,10 @@
+import code.{FilePathAccess, StoredDataRead}
+
+adapter objc {
+  package "YYWebImage" {
+    sink method "initWithPath:" -> code.FilePathAccess
+    source method "initWithPath:" -> code.StoredDataRead
+    sink method "imageWithContentsOfFile:" -> code.FilePathAccess
+    source method "imageWithContentsOfFile:" -> code.StoredDataRead
+  }
+}

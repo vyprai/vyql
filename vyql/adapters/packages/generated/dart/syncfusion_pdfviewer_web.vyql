@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess, NetworkConnect, UrlFetch, CommandExecution}
+import core.{UserControlledData, InputValidation}
+
+adapter dart {
+  package "syncfusion_pdfviewer_web" {
+    sink method "getDocument" -> code.Deserialization
+  }
+}

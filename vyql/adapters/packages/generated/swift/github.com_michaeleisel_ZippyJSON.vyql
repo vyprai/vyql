@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/michaeleisel/ZippyJSON" {
+    sink method "decode" -> code.Deserialization
+    source method "userInfo" -> core.UserControlledData
+  }
+}

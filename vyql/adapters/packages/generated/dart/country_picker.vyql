@@ -1,0 +1,15 @@
+import code.{Deserialization}
+adapter dart {
+  package "country_picker" {
+    sink method "Country.parse" -> code.Deserialization
+    sink method "Country.tryParse" -> code.Deserialization
+    sink method "CountryParser.parse" -> code.Deserialization
+    sink method "CountryParser.tryParse" -> code.Deserialization
+    sink method "CountryParser.parseCountryCode" -> code.Deserialization
+    sink method "CountryParser.parsePhoneCode" -> code.Deserialization
+    sink method "CountryParser.tryParseCountryCode" -> code.Deserialization
+    sink method "CountryParser.tryParsePhoneCode" -> code.Deserialization
+    sink method "CountryParser.parseCountryName" -> code.Deserialization
+    sink method "CountryParser.tryParseCountryName" -> code.Deserialization
+  }
+}

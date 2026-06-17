@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.apache.thrift:libthrift" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

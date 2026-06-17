@@ -1,0 +1,7 @@
+adapter c {
+  package "igraph" {
+    source method "igraph_fatal_handler_t" -> code.NetworkData
+    sink method "igraph_sparsemat_add" -> code.NetworkSend
+    sink method "igraph_st_vertex_connectivity" -> code.NetworkConnect
+  }
+}

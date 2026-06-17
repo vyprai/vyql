@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter scala {
+  package "org.apache.httpcomponents:httpcore-nio" {
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,6 @@
+import code.{WeakHash}
+adapter rust {
+  package "sha1_smol" {
+    mark method "new" -> code.WeakHash
+  }
+}

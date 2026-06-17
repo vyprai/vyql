@@ -1,0 +1,11 @@
+import code.{NetworkConnect, NetworkSend}
+import core.{InputValidation}
+
+adapter ruby {
+  package "excon" {
+    sink method "Excon.new" -> code.NetworkConnect
+    sink method "Excon::Connection.request" -> code.NetworkSend
+    control method "Excon::Utils.escape_uri" -> core.InputValidation
+    control method "Excon::Utils.unescape_uri" -> core.InputValidation
+  }
+}

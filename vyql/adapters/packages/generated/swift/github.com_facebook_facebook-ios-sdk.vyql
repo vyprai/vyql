@@ -1,0 +1,8 @@
+import code.{UrlFetch, RedirectTarget}
+
+adapter swift {
+  package "github.com/facebook/facebook-ios-sdk" {
+    sink method "open" -> code.UrlFetch
+    mark method "openURLWithSafariViewController" -> code.RedirectTarget
+  }
+}

@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter ruby {
+  package "gmaps4rails" {
+    sink method "infowindow" -> code.HtmlRender
+  }
+}

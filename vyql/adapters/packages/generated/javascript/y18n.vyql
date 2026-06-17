@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "y18n" {
+    source method "y18n" -> core.UserControlledData
+    source method "setLocale" -> core.UserControlledData
+    source method "getLocale" -> core.UserControlledData
+    source method "updateLocale" -> core.UserControlledData
+  }
+}

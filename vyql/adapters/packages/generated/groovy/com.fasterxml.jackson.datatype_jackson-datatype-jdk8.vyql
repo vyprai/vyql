@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-jdk8" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

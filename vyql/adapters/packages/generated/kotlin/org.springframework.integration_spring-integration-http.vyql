@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "org.springframework.integration:spring-integration-http" {
+    sink method "read" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,12 @@
+import code.{NetworkConnect, NetworkSend, SecretValue}
+adapter ruby {
+  package "fog-brightbox" {
+    sink method "request" -> code.NetworkSend
+    sink method "wrapped_request" -> code.NetworkSend
+    sink method "make_request" -> code.NetworkSend
+    sink method "authenticated_request" -> code.NetworkSend
+    source method "request_access_token" -> code.SecretValue
+    source method "update_tokens" -> code.SecretValue
+    source method "update_credentials_from_response" -> code.SecretValue
+  }
+}

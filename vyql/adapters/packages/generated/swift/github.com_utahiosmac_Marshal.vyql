@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/utahiosmac/Marshal" {
+    sink method "JSONObjectWithData" -> code.Deserialization
+    sink method "JSONArrayWithData" -> code.Deserialization
+  }
+}

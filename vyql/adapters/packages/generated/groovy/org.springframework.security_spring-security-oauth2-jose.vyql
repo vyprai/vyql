@@ -1,0 +1,8 @@
+import code.{Deserialization, SecretValue}
+
+adapter groovy {
+  package "org.springframework.security:spring-security-oauth2-jose" {
+    sink method "decode" -> code.Deserialization
+    source method "encode" -> code.SecretValue
+  }
+}

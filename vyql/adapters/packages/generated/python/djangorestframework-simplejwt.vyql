@@ -1,0 +1,11 @@
+import code.{Deserialization, StateChangingOp}
+import core.{AuthenticationCheck}
+
+adapter python {
+  package "djangorestframework-simplejwt" {
+    control method "authenticate" -> core.AuthenticationCheck
+    sink method "decode" -> code.Deserialization
+    control method "check_blacklist" -> core.AuthenticationCheck
+    mark method "blacklist" -> code.StateChangingOp
+  }
+}

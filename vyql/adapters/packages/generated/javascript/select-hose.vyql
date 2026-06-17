@@ -1,0 +1,6 @@
+adapter javascript {
+  package "select-hose" {
+    source method "Hose" -> code.NetworkData
+    source method "data" -> code.NetworkData
+  }
+}

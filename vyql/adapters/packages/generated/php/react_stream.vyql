@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+adapter php {
+  package "react/stream" {
+    sink method "write" -> code.NetworkSend
+    sink method "handleWrite" -> code.NetworkSend
+  }
+}

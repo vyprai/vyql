@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.eclipse.jetty:jetty-webapp" {
+    sink method "Descriptor.parse" -> code.Deserialization
+  }
+}

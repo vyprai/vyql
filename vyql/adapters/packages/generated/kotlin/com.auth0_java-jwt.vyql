@@ -1,0 +1,11 @@
+import code.{Deserialization, WeakHash, SecretValue}
+
+adapter kotlin {
+  package "com.auth0:java-jwt" {
+    sink method "decode" -> code.Deserialization
+    sink method "verify" -> code.Deserialization
+    source method "getSubject" -> code.SecretValue
+    source method "getAudience" -> code.SecretValue
+    source method "getClaim" -> code.SecretValue
+  }
+}

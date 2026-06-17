@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter rust {
+  package "sha1" {
+    mark method "Sha1Core" -> code.WeakHash
+    mark method "compress" -> code.WeakHash
+  }
+}

@@ -1,0 +1,7 @@
+adapter go {
+  package "github.com/jmespath/go-jmespath" {
+    sink method "Compile" -> code.ExpressionEval
+    sink method "MustCompile" -> code.ExpressionEval
+    sink method "Search" -> code.ExpressionEval
+  }
+}

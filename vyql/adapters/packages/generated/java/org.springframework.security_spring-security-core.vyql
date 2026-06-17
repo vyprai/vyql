@@ -1,0 +1,5 @@
+adapter java {
+  package "org.springframework.security:spring-security-core" {
+    sink method "UserDeserializer.deserialize" -> code.Deserialization
+  }
+}

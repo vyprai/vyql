@@ -1,0 +1,8 @@
+import code.{XmlParse, DatabaseRead}
+
+adapter perl {
+  package "PLUTO" {
+    sink method "parse_file" -> code.XmlParse
+    sink method "query" -> code.DatabaseRead
+  }
+}

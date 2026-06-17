@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+import core.{SqlParameterization}
+
+adapter ruby {
+  package "geocoder" {
+    sink method "insert_into_table" -> code.SqlExecution
+    control method "sql_escaped_value" -> core.SqlParameterization
+  }
+}

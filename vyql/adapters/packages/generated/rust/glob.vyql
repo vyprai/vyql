@@ -1,0 +1,10 @@
+import code.{FilePathAccess}
+import core.{InputValidation}
+
+adapter rust {
+  package "glob" {
+    sink method "glob" -> code.FilePathAccess
+    sink method "glob_with" -> code.FilePathAccess
+    control method "escape" -> core.InputValidation
+  }
+}

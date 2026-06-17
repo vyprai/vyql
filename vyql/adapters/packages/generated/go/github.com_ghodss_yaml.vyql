@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/ghodss/yaml" {
+    sink method "Unmarshal" -> code.Deserialization
+  }
+}

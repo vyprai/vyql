@@ -1,0 +1,11 @@
+import core.{AuthorizationCheck, AuthenticationCheck}
+
+adapter java {
+  package "org.springframework.security:spring-security-acl" {
+    control method "hasPermission" -> core.AuthorizationCheck
+    control method "checkPermission" -> core.AuthorizationCheck
+    sink method "readAclsById" -> code.SqlExecution
+    sink method "readAces" -> code.SqlExecution
+    sink method "setupLookupObjectIdentitiesStatement" -> code.SqlExecution
+  }
+}

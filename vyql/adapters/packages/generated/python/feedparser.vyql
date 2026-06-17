@@ -1,0 +1,8 @@
+import code.{Deserialization, HttpInput}
+
+adapter python {
+  package "feedparser" {
+    sink method "parse" -> code.Deserialization
+    control method "sanitize_style" -> core.InputValidation
+  }
+}

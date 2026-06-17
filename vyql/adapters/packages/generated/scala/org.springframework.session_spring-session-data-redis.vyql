@@ -1,0 +1,9 @@
+import code.{StoredDataWrite, StoredDataRead}
+
+adapter scala {
+  package "org.springframework.session:spring-session-data-redis" {
+    sink method "save" -> code.StoredDataWrite
+    source method "findById" -> code.StoredDataRead
+    sink method "deleteById" -> code.StoredDataWrite
+  }
+}

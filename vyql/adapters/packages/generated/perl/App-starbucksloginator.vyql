@@ -1,0 +1,11 @@
+import code.{NetworkSend, CliArgument}
+
+adapter perl {
+  package "App-starbucksloginator" {
+    sink method "run" -> code.NetworkSend
+    sink method "try" -> code.NetworkSend
+    sink method "try_to_get_out" -> code.NetworkSend
+    source path "starbucksloginator" -> code.CliArgument
+    source method "run" -> code.CliArgument
+  }
+}

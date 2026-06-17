@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter java {
+  package "com.mysql:mysql-connector-j" {
+    sink method "query" -> code.SqlExecution
+  }
+}

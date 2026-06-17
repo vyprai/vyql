@@ -1,0 +1,12 @@
+import code.{Deserialization, StoredDataRead}
+
+adapter objc {
+  package "nanopb" {
+    sink method "pb_decode" -> code.Deserialization
+    sink method "pb_decode_noinit" -> code.Deserialization
+    sink method "pb_decode_delimited" -> code.Deserialization
+    sink method "pb_decode_delimited_noinit" -> code.Deserialization
+    sink method "pb_decode_nullterminated" -> code.Deserialization
+    source method "pb_istream_from_buffer" -> code.StoredDataRead
+  }
+}

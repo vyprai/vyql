@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "capstone" {
+    sink method "cs_disasm" -> code.Deserialization
+  }
+}

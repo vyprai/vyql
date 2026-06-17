@@ -1,0 +1,7 @@
+import code.{WeakHash}
+
+adapter swift {
+  package "github.com/zcash-hackworks/MnemonicSwift" {
+    mark method "PKCS5.PBKDF2SHA512" -> code.WeakHash
+  }
+}

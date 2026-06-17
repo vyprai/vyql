@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "dateparser" {
+    sink method "parse" -> code.Deserialization
+  }
+}

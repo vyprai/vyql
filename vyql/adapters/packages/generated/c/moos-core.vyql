@@ -1,0 +1,12 @@
+import code.{CliArgument, Deserialization, HttpInput, NetworkConnect, NetworkData, NetworkSend, ResponseHeaderWrite}
+adapter c {
+  package "moos-core" {
+    source method "CMOOSApp::Run" -> code.CliArgument
+    source method "CMOOSCommClient::Receive" -> code.NetworkData
+    sink method "CMOOSCommClient::Send" -> code.NetworkSend
+    sink method "CMOOSCommClient::ParseAndHandleMessages" -> code.Deserialization
+    sink method "XPCTcpSocket" -> code.NetworkConnect
+    source method "HTTPConnection::Open" -> code.HttpInput
+    sink method "HTTPConnection::Print" -> code.ResponseHeaderWrite
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/tadija/AEXML" {
+    sink method "loadXML" -> code.Deserialization
+  }
+}

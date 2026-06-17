@@ -1,0 +1,12 @@
+import code.{CliArgument, CommandExecution, FilePathAccess}
+adapter swift {
+  package "github.com/MakeAWishFoundation/SwiftyMocky" {
+    sink method "setup" -> code.FilePathAccess
+    sink method "migrate" -> code.FilePathAccess
+    sink method "doctor" -> code.FilePathAccess
+    sink method "assetizeTemplates" -> code.FilePathAccess
+    source method "setup" -> code.CliArgument
+    source method "migrate" -> code.CliArgument
+    source method "doctor" -> code.CliArgument
+  }
+}

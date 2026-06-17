@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter dart {
+  package "onesignal_flutter" {
+    source method "loginWithJWT" -> code.SecretValue
+  }
+}

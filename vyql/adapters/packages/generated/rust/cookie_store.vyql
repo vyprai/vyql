@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "cookie_store" {
+    sink method "parse" -> code.Deserialization
+  }
+}

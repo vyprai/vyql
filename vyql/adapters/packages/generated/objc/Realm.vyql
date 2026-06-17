@@ -1,0 +1,11 @@
+import code.{SqlExecution}
+import core.{InputValidation}
+
+adapter objc {
+  package "Realm" {
+    sink method "RLMPredicateToQuery" -> code.SqlExecution
+    control method "RLMDynamicValidatedSet" -> core.InputValidation
+    control method "RLMValidateValueForProperty" -> core.InputValidation
+    control method "RLMValidateValue" -> core.InputValidation
+  }
+}

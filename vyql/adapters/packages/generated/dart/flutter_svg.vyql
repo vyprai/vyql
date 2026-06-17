@@ -1,0 +1,12 @@
+import code.{NetworkData}
+import core.{UserControlledData}
+
+adapter dart {
+  package "flutter_svg" {
+    source method "SvgStringLoader" -> core.UserControlledData
+    source method "SvgBytesLoader" -> core.UserControlledData
+    source method "SvgFileLoader" -> core.UserControlledData
+    source method "SvgAssetLoader" -> core.UserControlledData
+    source method "SvgNetworkLoader" -> code.NetworkData
+  }
+}

@@ -1,0 +1,6 @@
+adapter scala {
+  package "org.springframework.boot:spring-boot" {
+    source method "run" -> core.UserControlledData
+    sink method "parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "Badger" {
+    sink method "decode" -> code.Deserialization
+  }
+}

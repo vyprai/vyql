@@ -16,10 +16,10 @@ adapter elixir {
   // command execution — System.shell takes the shell string as arg0 (tainted);
   // System.cmd("sh", ["-c", cmd]) buries the command in an args list, so prefer
   // the shell-string form so the tainted payload lands in arg0.
-  sink path "System.cmd" -> code.CommandExecution
+  sink path "System.cmd" arg all -> code.CommandExecution
   sink path "System.shell" -> code.CommandExecution
   sink path "os.cmd" -> code.CommandExecution
-  sink method "cmd" -> code.CommandExecution
+  sink method "cmd" arg all -> code.CommandExecution
   sink method "shell" -> code.CommandExecution
 
   // SQL — Ecto raw query / fragment (SQL.query takes Repo as arg0, query as arg1)
@@ -28,6 +28,18 @@ adapter elixir {
   sink method "query" arg 1 -> code.SqlExecution
   sink method "query!" arg 1 -> code.SqlExecution
   sink method "fragment" -> code.SqlExecution
+  sink method "get_user" -> code.ObjectLookupByUserInput
+  sink method "get_account" -> code.ObjectLookupByUserInput
+  sink method "get_order" -> code.ObjectLookupByUserInput
+  sink method "get_by_id" -> code.ObjectLookupByUserInput
+  mark "change_password" -> code.AuthenticationRequiredOp
+  mark "update_password" -> code.AuthenticationRequiredOp
+  mark "reset_password" -> code.AuthenticationRequiredOp
+  mark "change_email" -> code.AuthenticationRequiredOp
+  mark "transfer_funds" -> code.AuthenticationRequiredOp
+  mark "delete_account" -> code.AuthenticationRequiredOp
+  mark "grant_role" -> code.AuthenticationRequiredOp
+  mark "make_admin" -> code.AuthenticationRequiredOp
 
   // code evaluation / dynamic (CWE-95) + deserialization (CWE-502)
   sink path "Code.eval_string" -> code.CodeEval
@@ -35,14 +47,29 @@ adapter elixir {
   sink path "Code.compile_string" -> code.CodeEval
   sink path "erlang.binary_to_term" -> code.Deserialization
   sink path ":erlang.binary_to_term" -> code.Deserialization
+  sink path "Regex.compile" -> code.RegexCompile
+  sink path "Regex.compile!" -> code.RegexCompile
 
   // path / file — the tainted path is the first argument.
   sink path "File.read" -> code.FilePathAccess
   sink path "File.read!" -> code.FilePathAccess
   sink path "File.write" -> code.FilePathAccess
+  sink path "File.write!" -> code.FilePathAccess
   sink path "File.open" -> code.FilePathAccess
+  sink path "File.open!" -> code.FilePathAccess
   sink path "File.rm" -> code.FilePathAccess
+  sink path "File.rm!" -> code.FilePathAccess
   sink path "File.stream!" -> code.FilePathAccess
+  sink path "File.cp" -> code.FilePathAccess
+  sink path "File.cp!" -> code.FilePathAccess
+  sink path "File.rename" -> code.FilePathAccess
+  sink path "File.rename!" -> code.FilePathAccess
+  sink path "File.chmod" -> code.FilePathAccess
+  sink path "File.chmod!" -> code.FilePathAccess
+  mark "File.chmod" val "0o777" -> code.InsecurePermission
+  mark "File.chmod!" val "0o777" -> code.InsecurePermission
+  mark "File.chmod" val "511" -> code.InsecurePermission
+  mark "File.chmod!" val "511" -> code.InsecurePermission
 
   // weak hash (CWE-328) — :crypto.hash(:md5|:sha, …). `:sha` is SHA-1; exclude
   // :sha224/:sha256/:sha384/:sha512 (safe) via nval so they don't substring-match.
@@ -53,6 +80,8 @@ adapter elixir {
   mark ":crypto.crypto_one_time" val ":des" -> code.WeakCipher
   mark ":crypto.crypto_one_time" val ":rc4" -> code.WeakCipher
   mark ":crypto.crypto_one_time" val ":blowfish" -> code.WeakCipher
+  mark ":crypto.crypto_one_time" val "0000000000000000" -> code.StaticIv
+  mark "crypto_one_time" val "0000000000000000" -> code.StaticIv
   mark ":crypto.block_encrypt" val ":des" -> code.WeakCipher
   mark ":crypto.block_encrypt" val ":blowfish" -> code.WeakCipher
 
@@ -64,6 +93,11 @@ adapter elixir {
 
   // insecure cookie (CWE-614) — Plug.Conn.put_resp_cookie(conn, name, val, secure: false).
   mark "put_resp_cookie" val "false" -> code.InsecureCookie
+  mark "HTTPoison.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "HTTPoison.post" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "HTTPoison.request" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "Req.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "Req.request" val "http://" nval "127.0" -> code.CleartextChannel
 
   // trust boundary (CWE-501) — untrusted data written into the session (arg2 = value).
   sink method "put_session" arg 2 -> code.TrustBoundary
@@ -82,9 +116,15 @@ adapter elixir {
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escape_html" -> core.HtmlEscape
-  control "escape_xpath" -> core.HtmlEscape
+  control "escape_xpath" -> core.XpathEscape
   control "encode_for_ldap" -> core.LdapEscape
   control "escape_shell" -> core.ShellEscape
   control "safe_path" -> core.PathCanonicalization
   control "validate_role" -> core.InputValidation
+  control "require_auth" -> core.AuthenticationCheck
+  control "ensure_authenticated" -> core.AuthenticationCheck
+  control "authenticated?" -> core.AuthenticationCheck
+  control "check_ownership" -> core.OwnershipCheck
+  control "require_owner" -> core.OwnershipCheck
+  control "owner?" -> core.OwnershipCheck
 }

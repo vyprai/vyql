@@ -1,0 +1,10 @@
+import code.{NetworkSend}
+import core.{InputValidation}
+
+adapter elixir {
+  package "telemetry_influxdb" {
+    sink method "TelemetryInfluxDB.UDP.Socket.send" -> code.NetworkSend
+    sink method "TelemetryInfluxDB.HTTP.EventHandler.send_event" -> code.NetworkSend
+    control method "TelemetryInfluxDB.Formatter.format" -> core.InputValidation
+  }
+}

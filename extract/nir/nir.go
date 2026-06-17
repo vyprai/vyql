@@ -14,6 +14,21 @@
 // used for resolution (may differ from display paths).
 package nir
 
+import "encoding/gob"
+
+// register every concrete Expr/Stmt so gob can (de)serialize the interface fields of Module
+// — used by the parse cache and the incremental-lowering delta cache.
+func init() {
+	for _, v := range []any{
+		Name{}, Const{}, Attr{}, Index{}, Call{}, Format{}, Seq{}, Pair{}, Lambda{}, Thru{},
+		BinOp{}, Unary{}, Ternary{},
+		Assign{}, AugAssign{}, Return{}, ExprStmt{}, FuncDef{}, ClassDef{}, Block{}, If{},
+		Loop{}, Switch{}, Try{},
+	} {
+		gob.Register(v)
+	}
+}
+
 // Expr is the NIR expression interface (a closed set, switched on in lowering).
 type Expr interface{ isExpr() }
 
@@ -84,9 +99,10 @@ type Pair struct {
 
 // Lambda is an inline anonymous function (e.g. an Express arrow handler).
 type Lambda struct {
-	Params []string
-	Body   []Stmt
-	Loc    string
+	Params     []string
+	ParamTypes map[string]string
+	Body       []Stmt
+	Loc        string
 }
 
 // Thru is a transparent wrapper (await, starred) that passes taint through.
@@ -115,14 +131,14 @@ type Ternary struct {
 	Loc              string
 }
 
-func (Name) isExpr()   {}
-func (Const) isExpr()  {}
-func (Attr) isExpr()   {}
-func (Index) isExpr()  {}
-func (Call) isExpr()   {}
-func (Format) isExpr() {}
-func (Seq) isExpr()    {}
-func (Pair) isExpr()   {}
+func (Name) isExpr()    {}
+func (Const) isExpr()   {}
+func (Attr) isExpr()    {}
+func (Index) isExpr()   {}
+func (Call) isExpr()    {}
+func (Format) isExpr()  {}
+func (Seq) isExpr()     {}
+func (Pair) isExpr()    {}
 func (Lambda) isExpr()  {}
 func (Thru) isExpr()    {}
 func (BinOp) isExpr()   {}
@@ -157,10 +173,11 @@ type ExprStmt struct{ Value Expr }
 
 // FuncDef is a function/method definition.
 type FuncDef struct {
-	Name   string
-	Params []string
-	Body   []Stmt
-	Loc    string
+	Name       string
+	Params     []string
+	ParamTypes map[string]string
+	Body       []Stmt
+	Loc        string
 	// EndLoc is the file:line of the function's last line (closing brace / dedent).
 	// With Loc it gives the full line range VyPr reconciles against its
 	// structural_functions rows. Empty if the frontend doesn't yet emit it.
@@ -255,6 +272,15 @@ type Module struct {
 	File    string
 	Imports []Import
 	Body    []Stmt
+	// Hash is a content hash of the source file this module was parsed from (set by the
+	// frontend). It identifies the module's parse result for the incremental lowering cache;
+	// empty means "not content-addressed" (e.g. the native Go frontend) → always re-lowered.
+	Hash string
+	// CacheKey is TRANSIENT (excluded from gob via being set only post-decode): when a module is
+	// returned as a stub (Body/Imports nil, to skip decoding an unchanged file), it carries the
+	// parse cache's content key so the lowerer can decode the full NIR on demand if a signature
+	// change elsewhere invalidates this module's cached body sub-graph.
+	CacheKey string
 }
 
 // Program is a set of modules plus the receiver name used for self/this

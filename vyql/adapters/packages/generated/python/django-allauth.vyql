@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter python {
+  package "django-allauth" {
+    source method "get_request_param" -> code.HttpInput
+  }
+}

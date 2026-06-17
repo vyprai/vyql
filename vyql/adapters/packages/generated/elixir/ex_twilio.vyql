@@ -1,0 +1,21 @@
+import code.{NetworkConnect, NetworkSend, SecretValue}
+import core.{InputValidation, UserControlledData}
+
+adapter elixir {
+  package "ex_twilio" {
+    source method "ExTwilio.Config.from_env" -> code.SecretValue
+    source method "ExTwilio.RequestValidator.validate" -> core.UserControlledData
+    sink method "ExTwilio.API.request" -> code.NetworkConnect
+    sink method "ExTwilio.API.request" -> code.NetworkSend
+    sink method "ExTwilio.API.get" -> code.NetworkConnect
+    sink method "ExTwilio.API.get" -> code.NetworkSend
+    sink method "ExTwilio.API.post" -> code.NetworkConnect
+    sink method "ExTwilio.API.post" -> code.NetworkSend
+    sink method "ExTwilio.API.put" -> code.NetworkConnect
+    sink method "ExTwilio.API.put" -> code.NetworkSend
+    sink method "ExTwilio.API.delete" -> code.NetworkConnect
+    sink method "ExTwilio.API.delete" -> code.NetworkSend
+    source method "ExTwilio.Capability.token" -> code.SecretValue
+    control method "ExTwilio.RequestValidator.validate" -> core.InputValidation
+  }
+}

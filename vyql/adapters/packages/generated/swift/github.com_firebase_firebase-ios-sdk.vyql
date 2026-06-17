@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+adapter swift {
+  package "github.com/firebase/firebase-ios-sdk" {
+    sink method "sendMessage" -> code.ExpressionEval
+    sink method "sendMessageStream" -> code.ExpressionEval
+  }
+}

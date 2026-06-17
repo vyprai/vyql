@@ -1,0 +1,6 @@
+import code.{ResponseHeaderWrite}
+adapter php {
+  package "barryvdh/laravel-cors" {
+    sink method "addHeaders" -> code.ResponseHeaderWrite
+  }
+}

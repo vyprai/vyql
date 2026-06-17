@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter powershell {
+  package "jquery.color" {
+    sink method "parse" -> code.Deserialization
+  }
+}

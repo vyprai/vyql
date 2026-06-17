@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+adapter elixir {
+  package "phoenix_swoosh" {
+    sink method "render_body" -> code.HtmlRender
+    sink method "do_render_body" -> code.HtmlRender
+  }
+}

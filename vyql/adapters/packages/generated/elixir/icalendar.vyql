@@ -1,0 +1,5 @@
+adapter elixir {
+  package "icalendar" {
+    sink method "ICalendar.Deserialize.from_ics" -> code.Deserialization
+  }
+}

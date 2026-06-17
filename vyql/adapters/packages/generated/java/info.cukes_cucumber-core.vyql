@@ -1,0 +1,12 @@
+import code.{CliArgument, CodeEval, UrlFetch}
+import core.{HtmlEscape, UserControlledData}
+
+adapter java {
+  package "info.cukes:cucumber-core" {
+    source method "cucumber.api.cli.Main.run" -> code.CliArgument
+    source method "cucumber.runtime.Shellwords.parse" -> core.UserControlledData
+    sink method "cucumber.runtime.Utils.invoke" -> code.CodeEval
+    sink method "cucumber.runtime.Utils.toURL" -> code.UrlFetch
+    control method "cucumber.runtime.Utils.htmlEscape" -> core.HtmlEscape
+  }
+}

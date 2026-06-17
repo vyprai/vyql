@@ -1,0 +1,9 @@
+import core.{AuthenticationCheck}
+
+adapter ruby {
+  package "warden" {
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "authenticate!" -> core.AuthenticationCheck
+    control method "set_user" -> core.AuthenticationCheck
+  }
+}

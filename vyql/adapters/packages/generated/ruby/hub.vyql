@@ -1,0 +1,8 @@
+import code.{CommandExecution, CliArgument}
+
+adapter ruby {
+  package "hub" {
+    sink method "run" -> code.CommandExecution
+    source method "to_exec" -> code.CliArgument
+  }
+}

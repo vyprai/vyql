@@ -1,0 +1,10 @@
+import code.{NetworkData, NetworkSend}
+
+adapter java {
+  package "org.apache.tomcat.embed:tomcat-embed-websocket" {
+    source method "addMessageHandler" -> code.NetworkData
+    sink method "sendText" -> code.NetworkSend
+    sink method "sendBinary" -> code.NetworkSend
+    sink method "sendObject" -> code.NetworkSend
+  }
+}

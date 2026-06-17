@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter php {
+  package "ircmaxell/random-lib" {
+    source method "RandomLib\Generator::generate" -> code.SecretValue
+    source method "RandomLib\Generator::generateString" -> code.SecretValue
+  }
+}

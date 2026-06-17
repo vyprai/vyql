@@ -1,0 +1,5 @@
+adapter javascript {
+  package "deep-extend" {
+    mark method "RegExp" -> code.RegexCompile
+  }
+}

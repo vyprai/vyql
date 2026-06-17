@@ -1,0 +1,10 @@
+import code.{HttpInput}
+
+adapter php {
+  package "slim/psr7" {
+    source method "getCookieParams" -> code.HttpInput
+    source method "getQueryParams" -> code.HttpInput
+    source method "getParsedBody" -> code.HttpInput
+    source method "getHeaderLine" -> code.HttpInput
+  }
+}

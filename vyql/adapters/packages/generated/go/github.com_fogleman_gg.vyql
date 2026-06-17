@@ -1,0 +1,12 @@
+import code.{FilePathAccess}
+
+adapter go {
+  package "github.com/fogleman/gg" {
+    sink method "LoadImage" -> code.FilePathAccess
+    sink method "LoadPNG" -> code.FilePathAccess
+    sink method "SavePNG" -> code.FilePathAccess
+    sink method "LoadJPG" -> code.FilePathAccess
+    sink method "SaveJPG" -> code.FilePathAccess
+    sink method "LoadFontFace" -> code.FilePathAccess
+  }
+}

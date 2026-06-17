@@ -25,6 +25,12 @@ adapter powershell {
   sink path "iwr" -> code.UrlFetch
   sink path "wget" -> code.UrlFetch
   sink path "curl" -> code.UrlFetch
+  sink path "Select-String" -> code.RegexCompile
+  mark "Invoke-WebRequest" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "Invoke-RestMethod" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "iwr" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "wget" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "curl" val "http://" nval "127.0" -> code.CleartextChannel
 
   // SQL
   sink path "Invoke-Sqlcmd" -> code.SqlExecution
@@ -41,6 +47,11 @@ adapter powershell {
   sink path "Add-Content" -> code.FilePathAccess
   sink path "Out-File" -> code.FilePathAccess
   sink path "Remove-Item" -> code.FilePathAccess
-  sink path "Import-Module" -> code.FilePathAccess
+  sink path "Copy-Item" -> code.FilePathAccess
+  sink path "Move-Item" -> code.FilePathAccess
+  sink path "Rename-Item" -> code.FilePathAccess
+  sink path "New-Item" -> code.FilePathAccess
+  sink path "Test-Path" -> code.FilePathAccess
+  sink path "Import-Module" -> code.DynamicCodeLoad
 
 }

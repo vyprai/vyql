@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter ruby {
+  package "faraday-httpclient" {
+    sink method "call" -> code.NetworkConnect
+    sink method "call" -> code.NetworkSend
+  }
+}

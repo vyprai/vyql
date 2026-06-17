@@ -1,0 +1,7 @@
+import core.{InputValidation}
+adapter go {
+  package "github.com/DataDog/datadog-go" {
+    control method "appendEscapedEventText" -> core.InputValidation
+    control method "appendEscapedServiceCheckText" -> core.InputValidation
+  }
+}

@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter java {
+  package "org.osgi:org.osgi.compendium" {
+    sink method "open" -> code.NetworkConnect
+  }
+}

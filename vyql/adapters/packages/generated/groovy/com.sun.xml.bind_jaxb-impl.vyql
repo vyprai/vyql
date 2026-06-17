@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter groovy {
+  package "com.sun.xml.bind:jaxb-impl" {
+    sink method "unmarshal" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

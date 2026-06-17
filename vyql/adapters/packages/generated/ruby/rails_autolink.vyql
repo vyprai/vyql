@@ -1,0 +1,12 @@
+import code.{HtmlRender}
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "rails_autolink" {
+    sink method "auto_link" -> code.HtmlRender
+    sink method "auto_link_urls" -> code.HtmlRender
+    sink method "auto_link_email_addresses" -> code.HtmlRender
+    control method "conditional_sanitize" -> core.HtmlEscape
+    control method "conditional_html_safe" -> core.HtmlEscape
+  }
+}

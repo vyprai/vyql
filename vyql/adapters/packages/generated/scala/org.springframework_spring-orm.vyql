@@ -1,0 +1,6 @@
+adapter scala {
+  package "org.springframework:spring-orm" {
+    sink method "DeferredQueryInvocationHandler" -> code.SqlExecution
+    control method "setPrepareConnection" -> core.SqlParameterization
+  }
+}

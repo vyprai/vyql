@@ -1,0 +1,5 @@
+adapter scala {
+  package "org.apache.hadoop:hadoop-mapreduce-client-core" {
+    sink method "JobClient.run" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/apple/swift-openapi-runtime" {
+    sink method "decode" -> code.Deserialization
+    sink method "getResponseBodyAsJSON" -> code.Deserialization
+    sink method "getResponseBodyAsXML" -> code.Deserialization
+    sink method "getResponseBodyAsBinary" -> code.Deserialization
+    sink method "getResponseBodyAsMultipart" -> code.Deserialization
+  }
+}

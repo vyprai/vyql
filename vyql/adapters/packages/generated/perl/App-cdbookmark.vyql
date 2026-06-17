@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+import core.{UserControlledData}
+
+adapter perl {
+  package "App-cdbookmark" {
+    source method "cdbookmark_backend" -> core.UserControlledData
+  }
+}

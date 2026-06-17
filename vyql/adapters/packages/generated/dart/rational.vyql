@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "rational" {
+    sink method "parse" -> code.Deserialization
+    sink method "tryParse" -> code.Deserialization
+  }
+}

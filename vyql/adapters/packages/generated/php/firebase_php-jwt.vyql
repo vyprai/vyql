@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter php {
+  package "firebase/php-jwt" {
+    sink method "decode" -> code.Deserialization
+    sink method "jsonDecode" -> code.Deserialization
+  }
+}

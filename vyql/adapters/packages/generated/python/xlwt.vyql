@@ -1,0 +1,7 @@
+import code.{FileUse}
+
+adapter python {
+  package "xlwt" {
+    sink method "write" -> code.FileUse
+  }
+}

@@ -1,0 +1,10 @@
+import core.{InputValidation}
+
+adapter rust {
+  package "stringprep" {
+    control method "saslprep" -> core.InputValidation
+    control method "nameprep" -> core.InputValidation
+    control method "nodeprep" -> core.InputValidation
+    control method "x520prep" -> core.InputValidation
+  }
+}

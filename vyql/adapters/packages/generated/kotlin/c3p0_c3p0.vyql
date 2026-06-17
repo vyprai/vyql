@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "c3p0:c3p0" {
+    mark path "c3p0.c3p0.hash" -> code.WeakHash
+  }
+}

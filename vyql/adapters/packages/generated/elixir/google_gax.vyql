@@ -1,0 +1,7 @@
+import code.{NetworkSend, NetworkConnect}
+adapter elixir {
+  package "google_gax" {
+    sink method "GoogleApi.Gax.Connection.execute" -> code.NetworkSend
+    sink method "GoogleApi.Gax.Connection.build_request" -> code.NetworkConnect
+  }
+}

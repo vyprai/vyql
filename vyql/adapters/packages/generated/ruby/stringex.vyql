@@ -1,0 +1,6 @@
+adapter ruby {
+  package "stringex" {
+    source method "decode" -> core.UserControlledData
+    source method "to_url" -> core.UserControlledData
+  }
+}

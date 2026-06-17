@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "unicase" {
+    sink method "from_str" -> code.Deserialization
+  }
+}

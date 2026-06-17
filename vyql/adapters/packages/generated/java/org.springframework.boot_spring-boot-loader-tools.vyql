@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter java {
+  package "org.springframework.boot:spring-boot-loader-tools" {
+    sink method "run" -> code.CommandExecution
+  }
+}

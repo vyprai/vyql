@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter dart {
+  package "json_path" {
+    sink method "JsonPathParser.parse" -> code.Deserialization
+  }
+}

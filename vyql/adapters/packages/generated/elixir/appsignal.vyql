@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter elixir {
+  package "appsignal" {
+    sink method "Appsignal.Diagnose.Report.send" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+adapter java {
+  package "io.micrometer:micrometer-core" {
+    sink method "send" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+    source method "withHeader" -> code.NetworkData
+    source method "withBasicAuthentication" -> code.NetworkData
+    source method "withAuthentication" -> code.NetworkData
+  }
+}

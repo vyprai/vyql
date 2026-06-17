@@ -1,0 +1,6 @@
+adapter dart {
+  package "build_cli_annotations" {
+    source method "CliOptions" -> core.UserControlledData
+    source method "CliOption" -> core.UserControlledData
+  }
+}

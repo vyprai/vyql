@@ -1,0 +1,5 @@
+adapter python {
+  package "grpcio" {
+    sink method "Spawn" -> code.CommandExecution
+  }
+}

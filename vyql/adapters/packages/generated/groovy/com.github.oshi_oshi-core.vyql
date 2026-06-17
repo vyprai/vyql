@@ -1,0 +1,8 @@
+adapter groovy {
+  package "com.github.oshi:oshi-core" {
+    sink method "readFile" -> code.FilePathAccess
+    sink method "readAllBytes" -> code.FilePathAccess
+    sink method "readAllBytesAsBuffer" -> code.FilePathAccess
+    sink method "readFileAsBytes" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,10 @@
+import code.{UrlFetch, FilePathAccess}
+
+adapter php {
+  package "laravel/dusk" {
+    sink method "visit" -> code.UrlFetch
+    sink method "visitRoute" -> code.UrlFetch
+    sink method "mkdir" -> code.FilePathAccess
+    sink method "file_put_contents" -> code.FilePathAccess
+  }
+}

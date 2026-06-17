@@ -1,0 +1,7 @@
+import code.{DatabaseRead, FileUse}
+adapter kotlin {
+  package "org.mybatis.generator:mybatis-generator-core" {
+    sink method "generateFiles" -> code.FileUse
+    sink method "getConnection" -> code.DatabaseRead
+  }
+}

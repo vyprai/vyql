@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.apache.poi:poi-scratchpad" {
+    sink method "HSLFParser.parse" -> code.Deserialization
+  }
+}

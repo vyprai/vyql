@@ -1,0 +1,7 @@
+adapter objc {
+  package "MSAL" {
+    source method "token" -> code.SecretValue
+    sink method "load" -> code.Deserialization
+    mark path "msal.hash" -> code.WeakHash
+  }
+}

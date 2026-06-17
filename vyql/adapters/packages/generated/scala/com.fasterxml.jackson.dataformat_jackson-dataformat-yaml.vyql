@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml" {
+    sink method "createParser" -> code.Deserialization
+  }
+}

@@ -117,15 +117,33 @@ adapter python {
   sink method "delete_account" -> code.StateChangingOp
   sink method "grant_role" -> code.StateChangingOp
   sink method "make_admin" -> code.StateChangingOp
+  mark "change_password" -> code.AuthenticationRequiredOp
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "update_password" -> code.AuthenticationRequiredOp
+  mark "reset_password" -> code.AuthenticationRequiredOp
+  mark "change_email" -> code.AuthenticationRequiredOp
+  mark "transfer_funds" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "delete_account" -> code.AuthenticationRequiredOp
+  mark "grant_role" -> code.AuthenticationRequiredOp
+  mark "make_admin" -> code.AuthenticationRequiredOp
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "validate_csrf_token" -> core.CsrfProtection
   control "verify_authenticity_token" -> core.CsrfProtection
+  control method "login_required" -> core.AuthenticationCheck
+  control method "require_auth" -> core.AuthenticationCheck
+  control method "ensure_authenticated" -> core.AuthenticationCheck
+  control method "is_authenticated" -> core.AuthenticationCheck
+  control method "authenticate" -> core.AuthenticationCheck
   // authorization checks (guards BIZ-001) — high-precision permission predicates. With B1
   // the labelled check suppresses only the sinks it DOMINATES (path-sensitive).
   control "has_perm" -> core.AuthorizationCheck
   control "has_permission" -> core.AuthorizationCheck
   control "permission_required" -> core.AuthorizationCheck
   control "user_passes_test" -> core.AuthorizationCheck
+  control method "check_ownership" -> core.OwnershipCheck
+  control method "require_owner" -> core.OwnershipCheck
+  control method "is_owner" -> core.OwnershipCheck
   // SSRF / open-redirect allowlist validators — guard the fetch/redirect they dominate
   // (validators gate via control flow; B1 connects them to the sink). Django's
   // url_has_allowed_host_and_scheme / is_safe_url is the canonical redirect check.
@@ -275,11 +293,25 @@ adapter python {
   // InputValidation controls below), which is the legitimate `session['user'] = login(...)`
   // pattern. The TrustBoundary rule's `unless sanitized_by core.InputValidation` clears it.
   sink path "session.__setitem__" arg all -> code.TrustBoundary
+  // HTTP response splitting / header injection (CWE-113).
+  sink path "headers.add" arg 1 -> code.ResponseHeaderWrite
+  sink path "headers.setdefault" arg 1 -> code.ResponseHeaderWrite
+  sink path "set_header" arg 1 -> code.ResponseHeaderWrite
+  sink path "response.set_header" arg 1 -> code.ResponseHeaderWrite
+  // mass assignment (CWE-915) — framework/model bulk bind from request data.
+  sink path "User.update" -> code.MassAssign
+  sink path "User.objects.create" arg all -> code.MassAssign
+  sink path "Model.objects.create" arg all -> code.MassAssign
+  sink path "serializer.save" arg all -> code.MassAssign
 
   sink path "open" -> code.FilePathAccess
   sink path "io.open" -> code.FilePathAccess
   sink path "os.open" -> code.FilePathAccess
   sink path "codecs.open" -> code.FilePathAccess
+  sink path "__import__" -> code.DynamicCodeLoad
+  sink path "importlib.import_module" -> code.DynamicCodeLoad
+  sink path "imp.load_source" -> code.DynamicCodeLoad
+  sink path "SourceFileLoader" -> code.DynamicCodeLoad
   sink path "os.remove" -> code.FilePathAccess
   sink path "os.unlink" -> code.FilePathAccess
   sink path "os.rename" -> code.FilePathAccess
@@ -296,6 +328,8 @@ adapter python {
   sink path "flask.send_file" -> code.FilePathAccess
   sink path "zipfile.ZipFile.extractall" -> code.FilePathAccess
   sink path "tarfile.open" -> code.FilePathAccess
+  sink method "extract" -> code.ArchiveEntryWrite
+  sink method "extractall" -> code.ArchiveEntryWrite
   sink path "pathlib.Path" -> code.FilePathAccess
   // os.path predicates/normalizers fed a tainted path (CWE-22): the path is arg 0.
   sink path "os.path.exists" -> code.FilePathAccess
@@ -310,6 +344,10 @@ adapter python {
   sink path "os.scandir" -> code.FilePathAccess
   sink path "os.listdir" -> code.FilePathAccess
   sink path "fileinput.FileInput" -> code.FilePathAccess
+  // unrestricted upload (CWE-434) — uploaded-file save/copy destination or filename.
+  sink path "uploaded_file.save" -> code.UnsafeUpload
+  sink path "file.save" -> code.UnsafeUpload
+  sink path "werkzeug.datastructures.FileStorage.save" -> code.UnsafeUpload
   // pathlib operations on a tainted Path object — the path is the RECEIVER, so the call
   // node carries the taint (e.g. `(Path(DIR)/userinput).exists()` / `.read_text()`).
   sink receiver "exists" -> code.FilePathAccess
@@ -362,6 +400,11 @@ adapter python {
   sink path "collection.where" -> code.NosqlQuery
   sink path "find" -> code.NosqlQuery
   sink path "aggregate" -> code.NosqlQuery
+  sink method "get_user" -> code.ObjectLookupByUserInput
+  sink method "get_account" -> code.ObjectLookupByUserInput
+  sink method "get_order" -> code.ObjectLookupByUserInput
+  sink method "find_by_id" -> code.ObjectLookupByUserInput
+  sink method "get_by_id" -> code.ObjectLookupByUserInput
 
   // XPath injection (CWE-643) — lxml: tree.xpath(expr) / etree.XPath(expr) compile a
   // tainted query string. `.xpath` is a distinctive lxml method; taint-gated.
@@ -461,8 +504,8 @@ adapter python {
   mark "csrf_exempt" -> code.CsrfDisabled
 
   // CSV injection (CWE-1236)
-  sink method "writerow" -> code.CsvCell
-  sink method "writerows" -> code.CsvCell
+  sink method "writerow" collection -> code.CsvCell
+  sink method "writerows" collection -> code.CsvCell
 
   // weak cipher (CWE-327) — named broken ciphers
   mark "DES.new" -> code.WeakCipher
@@ -475,6 +518,10 @@ adapter python {
   mark "DES.MODE_ECB" -> code.WeakCipher
   mark "DES3.MODE_ECB" -> code.WeakCipher
   mark "modes.ECB" -> code.WeakCipher
+  mark "AES.new" val "0000000000000000" -> code.StaticIv
+  mark "DES3.new" val "00000000" -> code.StaticIv
+  mark "Cipher" val "0000000000000000" -> code.StaticIv
+  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
 
   // insecure temp file (CWE-377) — tempfile.mktemp is documented-insecure (race)
   mark "tempfile.mktemp" -> code.InsecureTempFile

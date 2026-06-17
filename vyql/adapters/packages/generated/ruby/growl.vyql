@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "growl" {
+    sink method "exec" -> code.CommandExecution
+  }
+}

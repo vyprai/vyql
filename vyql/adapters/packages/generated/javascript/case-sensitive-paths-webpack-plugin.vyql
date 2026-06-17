@@ -1,0 +1,6 @@
+import core.{PathAccessCheck}
+adapter javascript {
+  package "case-sensitive-paths-webpack-plugin" {
+    control method "CaseSensitivePathsPlugin" -> core.PathAccessCheck
+  }
+}

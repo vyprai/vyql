@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter objc {
+  package "KIF" {
+    source method "enterText" -> core.UserControlledData
+  }
+}

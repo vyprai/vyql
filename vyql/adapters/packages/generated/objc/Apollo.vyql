@@ -1,0 +1,9 @@
+import code.{SqlExecution, FilePathAccess, Deserialization}
+
+adapter objc {
+  package "Apollo" {
+    sink method "exec" -> code.SqlExecution
+    sink method "open" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+  }
+}

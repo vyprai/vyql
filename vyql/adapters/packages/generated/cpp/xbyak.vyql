@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter cpp {
+  package "xbyak" {
+    sink method "call" -> code.CodeEval
+  }
+}

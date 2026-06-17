@@ -1,0 +1,5 @@
+adapter scala {
+  package "javax.ws.rs:jsr311-api" {
+    source method "Cookie" -> code.HttpInput
+  }
+}

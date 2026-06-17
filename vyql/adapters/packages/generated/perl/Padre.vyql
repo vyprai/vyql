@@ -1,0 +1,8 @@
+import code.{CodeEval, CliArgument}
+
+adapter perl {
+  package "Padre" {
+    sink method "Padre::TaskWorker::spawn" -> code.CodeEval
+    source method "Padre::run" -> code.CliArgument
+  }
+}

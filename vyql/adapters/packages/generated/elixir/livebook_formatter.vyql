@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter elixir {
+  package "livebook_formatter" {
+    source method "reformat" -> core.UserControlledData
+  }
+}

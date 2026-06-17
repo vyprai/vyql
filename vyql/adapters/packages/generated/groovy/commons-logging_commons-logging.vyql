@@ -1,0 +1,5 @@
+adapter groovy {
+  package "commons-logging:commons-logging" {
+    sink method "write" -> code.LogOutput
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "h2" {
+    sink method "parse" -> code.Deserialization
+  }
+}

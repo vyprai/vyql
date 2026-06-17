@@ -1,0 +1,7 @@
+import code.{SecretValue, CliArgument}
+adapter groovy {
+  package "com.twilio.sdk:twilio" {
+    source method "init" -> code.SecretValue
+    source method "setPassword" -> code.SecretValue
+  }
+}

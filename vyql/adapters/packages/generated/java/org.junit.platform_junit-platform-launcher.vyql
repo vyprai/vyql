@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.junit.platform:junit-platform-launcher" {
+    sink method "TagFilter.parse" -> code.Deserialization
+  }
+}

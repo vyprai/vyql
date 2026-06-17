@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "org.springframework.cloud:spring-cloud-sleuth-zipkin" {
+    sink method "sendSpans" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "postcss-minify-gradients" {
+    sink method "pluginCreator" -> code.Deserialization
+  }
+}

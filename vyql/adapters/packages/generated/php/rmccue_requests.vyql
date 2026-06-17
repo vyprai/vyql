@@ -1,0 +1,11 @@
+import code.{UrlFetch}
+adapter php {
+  package "rmccue/requests" {
+    sink method "get" -> code.UrlFetch
+    sink method "delete" -> code.UrlFetch
+    sink method "post" -> code.UrlFetch
+    sink method "put" -> code.UrlFetch
+    sink method "patch" -> code.UrlFetch
+    sink method "request" -> code.UrlFetch
+  }
+}

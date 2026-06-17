@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "league/uri" {
+    sink method "Uri::parse" -> code.Deserialization
+  }
+}

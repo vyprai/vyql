@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter dart {
+  package "razorpay_flutter" {
+    sink method "open" -> code.NetworkSend
+  }
+}

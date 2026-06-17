@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+
+adapter dart {
+  package "sensors_plus_web" {
+    source method "accelerometerEvents" -> core.UserControlledData
+    source method "gyroscopeEvents" -> core.UserControlledData
+    source method "userAccelerometerEvents" -> core.UserControlledData
+    source method "magnetometerEvents" -> core.UserControlledData
+  }
+}

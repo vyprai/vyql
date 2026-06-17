@@ -1,0 +1,15 @@
+import code.{UrlFetch, HttpInput, NetworkConnect, NetworkData}
+
+adapter kotlin {
+  package "com.loopj.android:android-async-http" {
+    sink method "get" -> code.UrlFetch
+    sink method "post" -> code.UrlFetch
+    sink method "put" -> code.UrlFetch
+    sink method "delete" -> code.UrlFetch
+    sink method "head" -> code.UrlFetch
+    sink method "options" -> code.UrlFetch
+    sink method "patch" -> code.UrlFetch
+    sink method "sendRequest" -> code.UrlFetch
+    sink method "sendRequest" -> code.NetworkConnect
+  }
+}

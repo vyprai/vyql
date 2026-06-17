@@ -1,0 +1,8 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter java {
+  package "org.springframework.session:spring-session-data-redis" {
+    source method "findById" -> code.StoredDataRead
+    sink method "setAttribute" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,5 @@
+adapter ruby {
+  package "aws-eventstream" {
+    sink method "decode" -> code.Deserialization
+  }
+}

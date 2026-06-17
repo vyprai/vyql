@@ -1,0 +1,20 @@
+import code.{Deserialization}
+adapter elixir {
+  package "erlavro" {
+    sink method "parse" -> code.Deserialization
+    sink method "make_simple_decoder" -> code.Deserialization
+    sink method "decode_block" -> code.Deserialization
+    sink method "do_decode" -> code.Deserialization
+    sink method "parse_type" -> code.Deserialization
+    sink method "parse_union_type" -> code.Deserialization
+    sink method "parse_record_type" -> code.Deserialization
+    sink method "parse_enum_type" -> code.Deserialization
+    sink method "parse_array_type" -> code.Deserialization
+    sink method "parse_map_type" -> code.Deserialization
+    sink method "parse_fixed_type" -> code.Deserialization
+    sink method "parse_record" -> code.Deserialization
+    sink method "parse_array" -> code.Deserialization
+    sink method "parse_map" -> code.Deserialization
+    sink method "parse_union_ex" -> code.Deserialization
+  }
+}

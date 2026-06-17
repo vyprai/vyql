@@ -1,0 +1,10 @@
+import code.{HttpInput, NetworkSend}
+
+adapter swift {
+  package "github.com/CodyFlame/CodyFire" {
+    sink method "execute" -> code.NetworkSend
+    sink method "start" -> code.NetworkSend
+    sink method "emit" -> code.NetworkSend
+    source method "query" -> code.HttpInput
+  }
+}

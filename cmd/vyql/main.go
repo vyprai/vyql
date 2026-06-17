@@ -20,14 +20,19 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"runtime/pprof"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
+	"github.com/vyprai/vyql/extract/lowering"
+	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/graphsync"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/profile"
@@ -74,8 +79,12 @@ func main() {
 		err = cmdGraph(args)
 	case "adapters":
 		err = cmdAdapters(args)
+	case "validate-adapter":
+		err = cmdValidateAdapter(args)
 	case "diff":
 		err = cmdDiff(args)
+	case "cache":
+		err = cmdCache(args)
 	default:
 		usage()
 		os.Exit(2)
@@ -94,6 +103,7 @@ func cmdScan(args []string) error {
 	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
 	exclude := fs.String("exclude", "", "comma-separated glob patterns to skip, layered on the built-in deps/build skips (e.g. test,examples,*.spec.js)")
+	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -101,7 +111,70 @@ func cmdScan(args []string) error {
 		os.Exit(2)
 	}
 	treesitter.SetExcludes(strings.Split(*exclude, ","))
+	cleanup := applyMaxRAM(*maxRAM)
+	defer cleanup()
 	return run(paths, *rulesPath, *format, *profileName, *stats)
+}
+
+// applyMaxRAM honors --max-ram (or $VYQL_MAX_RAM): set the soft heap limit and route the graph
+// through the disk-backed BadgerGraph store (graph on disk, RAM bounded by badger's cache, sized
+// to ~half the budget) so a scan stays under the ceiling even when the graph exceeds it. Returns
+// a cleanup func that removes the temporary graph db. Overrides the auto-80% default; an invalid
+// value is reported and ignored.
+func applyMaxRAM(v string) func() {
+	noop := func() {}
+	if v == "" {
+		v = os.Getenv("VYQL_MAX_RAM")
+	}
+	if v == "" {
+		return noop
+	}
+	n, err := parseBytes(v)
+	if err != nil || n <= 0 {
+		fmt.Fprintf(os.Stderr, "vyql: invalid --max-ram %q (use e.g. 8GB, 16GiB)\n", v)
+		return noop
+	}
+	dir, err := os.MkdirTemp("", "vyql-graph-")
+	if err != nil {
+		debug.SetMemoryLimit(n)
+		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
+		return noop
+	}
+	// Program-controlled budget: the graph lives on disk and RAM is bounded by badger's (off-heap)
+	// cache, sized here — NOT by a tight GOMEMLIMIT, which would make the GC thrash whenever the
+	// resident core approaches the limit. Most of the budget is the cache (the dominant, tunable
+	// consumer); the resident structural core sits on top.
+	lowering.DiskCacheBytes = n * 3 / 4
+	lowering.DiskStorePath = dir
+	return func() { os.RemoveAll(dir) }
+}
+
+// parseBytes parses a human size like "8GB", "512MiB", "2G", "1048576". Decimal (KB/MB/GB) and
+// binary (KiB/MiB/GiB) units are accepted; a bare number is bytes.
+func parseBytes(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	mult := int64(1)
+	upper := strings.ToUpper(s)
+	for _, u := range []struct {
+		suf string
+		m   int64
+	}{
+		{"KIB", 1 << 10}, {"MIB", 1 << 20}, {"GIB", 1 << 30}, {"TIB", 1 << 40},
+		{"KB", 1e3}, {"MB", 1e6}, {"GB", 1e9}, {"TB", 1e12},
+		{"K", 1 << 10}, {"M", 1 << 20}, {"G", 1 << 30}, {"T", 1 << 40},
+		{"B", 1},
+	} {
+		if strings.HasSuffix(upper, u.suf) {
+			mult = u.m
+			s = strings.TrimSpace(s[:len(s)-len(u.suf)])
+			break
+		}
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+	return int64(f * float64(mult)), nil
 }
 
 // applyProfile selects the threat-model profile (explicit name or auto-detected),
@@ -165,6 +238,7 @@ func scanPathsFull(paths []string, rulesSrc string) ([]*findings.Finding, usg.St
 	eng := engine.New(onto, g)
 	var all []*findings.Finding
 	meta := map[string]map[string]any{}
+	tk := newTimer()
 	for _, cr := range compiled {
 		id, _ := cr.Rule.Meta["id"].(string)
 		if id == "" {
@@ -177,18 +251,73 @@ func scanPathsFull(paths []string, rulesSrc string) ([]*findings.Finding, usg.St
 		}
 		all = append(all, got...)
 	}
+	tk.mark("evaluate")
 	return all, g, meta, stats, nil
 }
 
 func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
+	if cp := os.Getenv("VYQL_CPUPROFILE"); cp != "" {
+		f, _ := os.Create(cp)
+		_ = pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+	peakHeapPath = os.Getenv("VYQL_MEMPROFILE") // captured at peak (graph built) in buildGraphWith
 	prof := applyProfile(paths, profileName)
 	src, err := loadRules(rulesPath)
 	if err != nil {
 		return err
 	}
-	all, g, ruleMeta, stats, err := scanPathsFull(paths, src)
-	if err != nil {
-		return err
+	var all []*findings.Finding
+	var stats scanStats
+	var g usg.Store
+	var ruleMeta map[string]map[string]any
+
+	if format == "graph-json" {
+		// graph-json needs the live graph + per-rule meta; the whole-scan findings cache can't
+		// serve those, so always run the full pipeline for it (no cache replay).
+		all, g, ruleMeta, stats, err = scanPathsFull(paths, src)
+		if err != nil {
+			return err
+		}
+	} else {
+		// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
+		// changed — no source file edit and no vyql/ data change — replay the cached findings and
+		// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
+		// reparse only the files that actually changed.
+		cache := parsecache.Shared()
+		tk := newTimer()
+		// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force the
+		// full pipeline (skip the whole-scan findings cache) so the collector is populated.
+		syncPath := syncOutputPath()
+		if syncPath != "" {
+			syncCollector = graphsync.New()
+		}
+		var rkey string
+		hit := false
+		if cache != nil && syncCollector == nil {
+			rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
+			if cs, ok := loadCachedScan(cache, rkey); ok {
+				all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
+			}
+		}
+		tk.mark("fingerprint")
+		if !hit {
+			all, stats, err = scanPaths(paths, src)
+			if err != nil {
+				return err
+			}
+			if cache != nil && syncCollector == nil {
+				storeCachedScan(cache, rkey, all, stats)
+			}
+		}
+		if syncPath != "" {
+			n, e, l, d, serr := writeSyncDelta(syncPath)
+			if serr != nil {
+				return fmt.Errorf("graph sync: %w", serr)
+			}
+			fmt.Fprintf(os.Stderr, "[sync] wrote %s: %d node, %d edge, %d label upserts; %d module tombstones\n",
+				syncPath, n, e, l, d)
+		}
 	}
 
 	// output
@@ -308,5 +437,6 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
 	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
 	fmt.Fprintln(os.Stderr, "  adapters   list an adapter's source/sink/control/mark/assume vocabulary   [-lang go]")
+	fmt.Fprintln(os.Stderr, "  validate-adapter parse and summarize a VyQL adapter file   [-file adapter.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }

@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+adapter elixir {
+  package "ex_doc_simple_markdown" {
+    sink method "to_html" -> code.HtmlRender
+    sink method "to_ast" -> code.HtmlRender
+  }
+}

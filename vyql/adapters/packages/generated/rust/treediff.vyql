@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "treediff" {
+    sink method "from_str" -> code.Deserialization
+  }
+}

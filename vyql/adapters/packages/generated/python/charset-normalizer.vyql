@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter python {
+  package "charset-normalizer" {
+    source method "from_bytes" -> core.UserControlledData
+    source method "from_path" -> core.UserControlledData
+  }
+}

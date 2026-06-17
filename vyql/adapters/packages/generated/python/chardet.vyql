@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter python {
+  package "chardet" {
+    sink method "detect" -> code.Deserialization
+    sink method "detect_all" -> code.Deserialization
+  }
+}

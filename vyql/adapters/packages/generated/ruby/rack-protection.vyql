@@ -1,0 +1,7 @@
+adapter ruby {
+  package "rack-protection" {
+    source method "token" -> code.SecretValue
+    source method "remove_bad_cookies" -> code.HttpInput
+    sink method "decode_token" -> code.XmlParse
+  }
+}

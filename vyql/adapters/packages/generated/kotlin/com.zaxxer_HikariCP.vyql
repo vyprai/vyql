@@ -1,0 +1,9 @@
+import code.{SecretValue, SqlExecution}
+
+adapter kotlin {
+  package "com.zaxxer:HikariCP" {
+    source method "getPassword" -> code.SecretValue
+    sink method "setConnectionTestQuery" -> code.SqlExecution
+    sink method "setConnectionInitSql" -> code.SqlExecution
+  }
+}

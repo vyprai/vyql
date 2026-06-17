@@ -1,0 +1,7 @@
+import code.{StdinInput}
+adapter javascript {
+  package "get-stdin" {
+    source method "getStdin" -> code.StdinInput
+    source method "getStdinBuffer" -> code.StdinInput
+  }
+}

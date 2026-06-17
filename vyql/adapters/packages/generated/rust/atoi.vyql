@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "atoi" {
+    sink method "from_radix_10" -> code.Deserialization
+    sink method "from_radix_10_checked" -> code.Deserialization
+    sink method "from_radix_16" -> code.Deserialization
+    sink method "from_radix_16_checked" -> code.Deserialization
+  }
+}

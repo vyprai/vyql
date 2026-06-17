@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter go {
+  package "github.com/gorilla/mux" {
+    source method "Vars" -> core.UserControlledData
+  }
+}

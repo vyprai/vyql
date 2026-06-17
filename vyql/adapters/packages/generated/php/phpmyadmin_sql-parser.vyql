@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{SqlParameterization}
+
+adapter php {
+  package "phpmyadmin/sql-parser" {
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.SqlParameterization
+    control method "escapeAll" -> core.SqlParameterization
+  }
+}

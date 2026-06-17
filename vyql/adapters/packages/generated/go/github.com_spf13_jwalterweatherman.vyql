@@ -1,0 +1,8 @@
+import code.{LogOutput}
+
+adapter go {
+  package "github.com/spf13/jwalterweatherman" {
+    sink method "SetLogOutput" -> code.LogOutput
+    sink method "SetStdoutOutput" -> code.LogOutput
+  }
+}

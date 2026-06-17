@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "feeder_ex" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_file" -> code.Deserialization
+    sink method "parse!" -> code.Deserialization
+  }
+}

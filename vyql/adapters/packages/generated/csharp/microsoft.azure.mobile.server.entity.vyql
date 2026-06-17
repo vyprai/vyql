@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter csharp {
+  package "microsoft.azure.mobile.server.entity" {
+    sink method "GetSqlCommand" -> code.SqlExecution
+  }
+}

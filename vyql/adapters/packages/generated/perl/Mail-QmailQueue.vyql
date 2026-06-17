@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+import core.{UserControlledData}
+
+adapter perl {
+  package "Mail-QmailQueue" {
+    source method "mail" -> core.UserControlledData
+    source method "recipient" -> core.UserControlledData
+  }
+}

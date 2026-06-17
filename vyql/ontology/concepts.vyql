@@ -1,12 +1,12 @@
 // VyQL ontology — the curated analysis vocabulary (docs/06).
 
-package business;
+module business;
 
 concept Order : asset { }
 concept PaymentSystem : asset { }
 concept Refund : action { }
 
-package cloud;
+module cloud;
 
 concept Database : asset { }
 concept Internet : exposure { }
@@ -14,7 +14,7 @@ concept ObjectStore : asset { }
 concept PublicStorage : exposure { }
 concept SecretStore : asset { }
 
-package code;
+module code;
 
 concept CliArgument : source {
   taint: [taint.UntrustedData]
@@ -24,6 +24,11 @@ concept CodeEval : sink {
   vulnerable_to: [injection.CodeInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_94]
+}
+concept DynamicCodeLoad : sink {
+  vulnerable_to: [injection.UnsafeDynamicLoading]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_829]
 }
 concept PackageInstallExecution : sink {
   vulnerable_to: [injection.CodeInjection]
@@ -209,6 +214,90 @@ concept ResourceHandle : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_772]
 }
+concept LockAcquire : sink {
+  vulnerable_to: [concurrency.Deadlock]
+  cwe: [CWE_667]
+}
+concept UnboundedCopy : sink {
+  vulnerable_to: [memory.OobWrite]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_787, CWE_120]
+}
+concept UnboundedCopySmell : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_787, CWE_120]
+}
+concept RawMemoryCopySize : sink {
+  vulnerable_to: [memory.OobWrite]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_787]
+}
+concept SizeComputation : sink {
+  vulnerable_to: [memory.IntegerOverflow]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_190]
+}
+concept StackAllocationSmell : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+}
+concept FileCheck : sink {
+  vulnerable_to: [concurrency.Toctou]
+  cwe: [CWE_367]
+}
+concept FileUse : sink {
+  vulnerable_to: [concurrency.Toctou]
+  cwe: [CWE_367]
+}
+concept LocklessSharedMutation : sink {
+  vulnerable_to: [concurrency.RaceCondition]
+  cwe: [CWE_362]
+}
+concept IndexAccess : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_125, CWE_787]
+}
+concept DivisionDenominator : sink {
+  vulnerable_to: [numeric.DivideByZero]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_369]
+}
+concept IntegerSizeArithmetic : sink {
+  vulnerable_to: [memory.IntegerOverflow]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_190]
+}
+concept PointerFree : sink {
+  vulnerable_to: [memory.UseAfterFree, memory.DoubleFree]
+  cwe: [CWE_416, CWE_415]
+}
+concept PointerUse : sink {
+  vulnerable_to: [memory.UseAfterFree]
+  cwe: [CWE_416]
+}
+concept NullableDeref : sink {
+  vulnerable_to: [memory.NullDereference]
+  cwe: [CWE_476]
+}
+concept AuthenticationRequiredOp : sink {
+  vulnerable_to: [authentication.MissingAuthentication]
+  cwe: [CWE_306]
+}
+concept ObjectLookupByUserInput : sink {
+  vulnerable_to: [access_control.Idor]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_639]
+}
+concept ArchiveEntryWrite : sink {
+  vulnerable_to: [path.PathTraversal, path.LinkFollowing]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_22, CWE_59]
+}
+concept StaticIv : sink {
+  vulnerable_to: [crypto.StaticIv]
+  cwe: [CWE_329]
+}
 concept TxOriginAuth : sink {
   vulnerable_to: [smartcontract.TxOriginAuth]
   cwe: [CWE_477]
@@ -231,6 +320,10 @@ concept EnvVariable : source {
   refines: core.UserControlledData
 }
 concept StdinInput : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
+concept StoredDataRead : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
 }
@@ -366,6 +459,28 @@ concept NosqlQuery : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_943]
 }
+concept NetworkBind : sink {
+  vulnerable_to: [iac.PublicNetworkExposure]
+  cwe: [CWE_200]
+}
+concept NetworkConnect : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_918]
+}
+concept NetworkData : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
+concept NetworkDisconnect : sink {
+  vulnerable_to: [resource.ResourceLeak]
+  cwe: [CWE_772]
+}
+concept NetworkSend : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_918]
+}
 concept RedirectTarget : sink {
   vulnerable_to: [request_forgery.OpenRedirect]
   enabled_by: [taint.UntrustedData]
@@ -395,6 +510,11 @@ concept StateChangingOp : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_352]
 }
+concept StoredDataWrite : sink {
+  vulnerable_to: [crypto.CleartextStorage]
+  enabled_by: [taint.SecretValue]
+  cwe: [CWE_312]
+}
 concept TemplateRender : sink {
   vulnerable_to: [injection.TemplateInjection]
   enabled_by: [taint.UntrustedData]
@@ -416,11 +536,15 @@ concept XpathQuery : sink {
   cwe: [CWE_643]
 }
 
-package core;
+module core;
 
 concept ResourceRelease : control {
   neutralizes: [resource.ResourceLeak]
   cwe: [CWE_772]
+}
+concept LockRelease : control {
+  neutralizes: [concurrency.Deadlock]
+  cwe: [CWE_667]
 }
 concept AllowlistValidation : control {
   neutralizes: [injection.CommandInjection, request_forgery.Ssrf]
@@ -445,6 +569,15 @@ concept AuthorizationCheck : control {
 concept CsrfProtection : control {
   neutralizes: [request_forgery.Csrf]
   applies: endpoint
+}
+// Privacy/data-collection opt-in or opt-out controls exposed by SDKs.
+concept DataCollectionControl : control {
+  applies: scope
+}
+concept CertificateValidation : control {
+  neutralizes: [crypto.ImproperCertValidation]
+  cwe: [CWE_295]
+  applies: scope
 }
 concept EncryptionAtRest : control {
   neutralizes: [crypto.CleartextStorage]
@@ -481,7 +614,7 @@ concept OutputEncoding : control {
   applies: path
 }
 concept OwnershipCheck : control {
-  neutralizes: [access_control.BrokenAccess]
+  neutralizes: [access_control.BrokenAccess, access_control.Idor]
   applies: endpoint
 }
 concept PathCanonicalization : control {
@@ -541,7 +674,7 @@ concept XmlHardening : control {
   applies: path
 }
 
-package identity;
+module identity;
 
 concept AdminPrivilege : privilege { }
 concept Anonymous : principal { }
@@ -551,7 +684,7 @@ concept ExternalPrincipal : principal { }
 concept SuperAdminPrivilege : privilege { }
 concept WorkloadIdentity : principal { }
 
-package runtime;
+module runtime;
 
 concept Connection : observation { }
 concept HttpRequest : source {
@@ -563,7 +696,7 @@ concept ShellExecution : sink {
   enabled_by: [taint.UntrustedData]
 }
 
-package sbom;
+module sbom;
 
 concept ReachableSymbol : exposure { }
 concept VulnerableDependency : asset { }
@@ -573,7 +706,7 @@ concept SuspiciousDependency : asset { }
 // A dependency on a confirmed-malicious package version (CWE-506 embedded malicious code).
 concept MaliciousDependency : asset { }
 
-package threat;
+module threat;
 
 concept MiningPool : indicator { }
 

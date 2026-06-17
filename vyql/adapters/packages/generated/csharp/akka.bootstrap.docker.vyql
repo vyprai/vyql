@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter csharp {
+  package "akka.bootstrap.docker" {
+    source method "EnvironmentVariableConfigLoader.FromEnvironment" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,11 @@
+import code.{CliArgument}
+adapter perl {
+  package "App-Bin4TSV-6" {
+    source path "colgrep" -> CliArgument
+    source path "csel" -> CliArgument
+    source path "freq" -> CliArgument
+    source path "venn" -> CliArgument
+    source path "colsummary" -> CliArgument
+    source path "crosstable" -> CliArgument
+  }
+}

@@ -1,0 +1,12 @@
+import code.{NetworkConnect, NetworkData, NetworkBind, SecretValue}
+adapter rust {
+  package "wayland-sys" {
+    sink method "wl_display_connect" -> code.NetworkConnect
+    sink method "wl_display_connect_to_fd" -> code.NetworkConnect
+    source method "wl_display_read_events" -> code.NetworkData
+    source method "wl_display_dispatch" -> code.NetworkData
+    source method "wl_client_get_credentials" -> code.SecretValue
+    sink method "wl_display_add_socket" -> code.NetworkBind
+    sink method "wl_display_add_socket_auto" -> code.NetworkBind
+  }
+}

@@ -1,0 +1,17 @@
+import code.{HttpInput}
+
+adapter php {
+  package "psr/http-message" {
+    source method "getQueryParams" -> code.HttpInput
+    source method "getParsedBody" -> code.HttpInput
+    source method "getCookieParams" -> code.HttpInput
+    source method "getUploadedFiles" -> code.HttpInput
+    source method "getServerParams" -> code.HttpInput
+    source method "getHeaders" -> code.HttpInput
+    source method "getHeader" -> code.HttpInput
+    source method "getHeaderLine" -> code.HttpInput
+    source method "getBody" -> code.HttpInput
+    source method "getPath" -> code.HttpInput
+    source method "getQuery" -> code.HttpInput
+  }
+}

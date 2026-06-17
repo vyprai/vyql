@@ -1,0 +1,11 @@
+import code.{RegexCompile}
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "oro:oro" {
+    mark method "compile" -> code.RegexCompile
+    source method "match" -> core.UserControlledData
+    source method "contains" -> core.UserControlledData
+    mark method "substitute" -> code.RegexCompile
+  }
+}

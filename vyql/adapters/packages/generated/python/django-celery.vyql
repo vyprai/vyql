@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter python {
+  package "django-celery" {
+    sink method "apply" -> code.CodeEval
+  }
+}

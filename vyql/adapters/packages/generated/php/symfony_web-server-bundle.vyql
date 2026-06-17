@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "symfony/web-server-bundle" {
+    sink method "run" -> code.CommandExecution
+    sink method "createServerProcess" -> code.CommandExecution
+  }
+}

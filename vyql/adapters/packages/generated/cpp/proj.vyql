@@ -1,0 +1,7 @@
+import code.{NetworkConnect}
+
+adapter cpp {
+  package "proj" {
+    sink method "pj_network_file_open" -> code.NetworkConnect
+  }
+}

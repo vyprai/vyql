@@ -1,0 +1,12 @@
+import core.{UserControlledData}
+adapter scala {
+  package "org.twitter4j:twitter4j-stream" {
+    source method "count" -> core.UserControlledData
+    source method "follow" -> core.UserControlledData
+    source method "track" -> core.UserControlledData
+    source method "locations" -> core.UserControlledData
+    source method "language" -> core.UserControlledData
+    source method "filterLevel" -> core.UserControlledData
+    source method "filter" -> core.UserControlledData
+  }
+}

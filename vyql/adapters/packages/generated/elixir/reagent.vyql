@@ -1,0 +1,9 @@
+import code.{NetworkBind}
+import core.{AuthenticationCheck}
+
+adapter elixir {
+  package "reagent" {
+    sink method "Reagent.Listener.start" -> code.NetworkBind
+    sink method "Reagent.Listener.start_link" -> code.NetworkBind
+  }
+}

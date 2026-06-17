@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "invoke" {
+    sink method "run" -> code.CommandExecution
+  }
+}

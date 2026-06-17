@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "io.rest-assured:json-schema-validator" {
+    sink method "matchesJsonSchema" -> code.Deserialization
+    sink method "matchesJsonSchemaInClasspath" -> code.Deserialization
+  }
+}

@@ -1,0 +1,11 @@
+import code.{CodeEval, Deserialization, SqlExecution}
+adapter ruby {
+  package "ancestry" {
+    sink method "unscoped_where" -> code.SqlExecution
+    sink method "scope_depth" -> code.SqlExecution
+    sink method "check_ancestry_integrity!" -> code.CodeEval
+    sink method "arrange" -> code.SqlExecution
+    sink method "arrange_nodes" -> code.SqlExecution
+    sink method "parse_ancestry_column" -> code.Deserialization
+  }
+}

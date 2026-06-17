@@ -1,0 +1,9 @@
+import code.{NetworkSend, UrlFetch}
+
+adapter ruby {
+  package "faraday-em_http" {
+    sink method "perform_request" -> code.NetworkSend
+    sink method "perform_single_request" -> code.NetworkSend
+    sink method "create_request" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,5 @@
+adapter rust {
+  package "rocket_http" {
+    control method "html_escape" -> core.HtmlEscape
+  }
+}

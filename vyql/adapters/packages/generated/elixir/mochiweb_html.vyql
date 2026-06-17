@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+adapter elixir {
+  package "mochiweb_html" {
+    control method "escape" -> core.HtmlEscape
+    control method "escape_attr" -> core.HtmlEscape
+  }
+}

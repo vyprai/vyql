@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter java {
+  package "org.springframework.kafka:spring-kafka" {
+    sink method "send" -> code.NetworkSend
+    source method "receive" -> code.NetworkData
+  }
+}

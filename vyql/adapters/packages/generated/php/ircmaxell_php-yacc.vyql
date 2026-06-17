@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "ircmaxell/php-yacc" {
+    sink method "PhpYacc\\Yacc\\Parser::parse" -> code.Deserialization
+  }
+}

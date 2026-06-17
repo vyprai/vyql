@@ -1,0 +1,8 @@
+import code.{Deserialization, FileUse}
+
+adapter elixir {
+  package "matrex" {
+    sink method "load" -> code.Deserialization
+    sink method "read!" -> code.Deserialization
+  }
+}

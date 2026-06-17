@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter perl {
+  package "SDL" {
+    sink method "system" -> code.CommandExecution
+  }
+}

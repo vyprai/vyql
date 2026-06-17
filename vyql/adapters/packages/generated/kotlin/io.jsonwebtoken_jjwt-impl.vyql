@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "io.jsonwebtoken:jjwt-impl" {
+    sink method "parse" -> code.Deserialization
+    source method "decode" -> core.UserControlledData
+  }
+}

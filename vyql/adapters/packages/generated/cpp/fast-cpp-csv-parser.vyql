@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter cpp {
+  package "fast-cpp-csv-parser" {
+    sink method "open_file" -> code.FilePathAccess
+    sink method "SynchronousReader::finish_read" -> code.Deserialization
+  }
+}

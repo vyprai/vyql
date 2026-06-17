@@ -1,0 +1,9 @@
+import code.{Deserialization, NetworkData, NetworkConnect, NetworkSend}
+adapter python {
+  package "python-engineio" {
+    sink method "loads" -> code.Deserialization
+    source method "connect" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "disconnect" -> code.NetworkConnect
+  }
+}

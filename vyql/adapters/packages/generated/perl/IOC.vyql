@@ -1,0 +1,7 @@
+import code.{XmlParse}
+
+adapter perl {
+  package "IOC" {
+    sink method "IOC::Config::XML.read" -> code.XmlParse
+  }
+}

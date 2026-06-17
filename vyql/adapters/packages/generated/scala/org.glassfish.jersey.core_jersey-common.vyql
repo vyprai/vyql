@@ -1,0 +1,8 @@
+import code.{SecretValue}
+adapter scala {
+  package "org.glassfish.jersey.core:jersey-common" {
+    source method "SslConfigurator.trustStorePassword" -> code.SecretValue
+    source method "SslConfigurator.keyStorePassword" -> code.SecretValue
+    source method "SslConfigurator.keyPassword" -> code.SecretValue
+  }
+}

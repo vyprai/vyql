@@ -1,0 +1,8 @@
+import core.{PathCanonicalization}
+
+adapter go {
+  package "github.com/moby/sys/symlink" {
+    control method "FollowSymlinkInScope" -> core.PathCanonicalization
+    control method "EvalSymlinks" -> core.PathCanonicalization
+  }
+}

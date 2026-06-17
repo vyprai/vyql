@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter objc {
+  package "RxSwift" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

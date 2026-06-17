@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter kotlin {
+  package "de.flapdoodle.embed:de.flapdoodle.embed.mongo" {
+    source method "query" -> code.CliArgument
+  }
+}

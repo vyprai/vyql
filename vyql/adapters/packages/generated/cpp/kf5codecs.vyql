@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "kf5codecs" {
+    sink method "quotedPrintableDecode" -> code.Deserialization
+    sink method "uudecode" -> code.Deserialization
+    sink method "base64Decode" -> code.Deserialization
+    sink method "base45Decode" -> code.Deserialization
+    sink method "decodeRFC2047String" -> code.Deserialization
+  }
+}

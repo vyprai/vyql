@@ -1,0 +1,8 @@
+import code.{RegexCompile}
+import core.{UserControlledData}
+
+adapter objc {
+  package "REFormattedNumberField" {
+    mark method "re_stringWithNumberFormat:" -> code.RegexCompile
+  }
+}

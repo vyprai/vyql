@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter ruby {
+  package "subexec" {
+    sink method "run" -> code.CommandExecution
+  }
+}

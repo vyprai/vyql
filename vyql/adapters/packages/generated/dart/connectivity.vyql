@@ -1,0 +1,6 @@
+import code.{NetworkData}
+adapter dart {
+  package "connectivity" {
+    source method "checkConnectivity" -> code.NetworkData
+  }
+}

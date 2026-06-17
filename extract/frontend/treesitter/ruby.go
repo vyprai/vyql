@@ -23,28 +23,17 @@ type rbConv struct {
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
 func ExtractRuby(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tsruby.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "self"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &rbConv{src: src, root: root, file: rel}
-		mod := nir.Module{Key: "", File: rel, Body: c.blockChildren(tree.RootNode())}
-		prog.Modules = append(prog.Modules, mod)
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tsruby.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &rbConv{src: src, root: root, file: rel}
+			return nir.Module{Key: "", File: rel, Body: c.blockChildren(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func (c *rbConv) loc(n *tree_sitter.Node) string {
@@ -144,6 +133,9 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Block{Stmts: c.collectBodies(n)}}
 	case "comment":
 		return nil
+	case "identifier", "constant":
+		name := c.text(n)
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: name, Loc: L}, Path: name, Method: name, Loc: L}}}
 	}
 	// any other expression used as a statement
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
@@ -250,8 +242,10 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "constant", "instance_variable", "global_variable":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "nil", "simple_symbol", "hash_key_symbol":
+	case "nil":
 		return nir.Const{Loc: L}
+	case "simple_symbol", "hash_key_symbol":
+		return nir.Const{Loc: L, Value: strings.TrimSuffix(strings.TrimPrefix(c.text(n), ":"), ":")}
 	case "integer", "float":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "true", "false":
@@ -303,8 +297,9 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		// a keyword argument (foo(k: v)) appearing directly in an argument_list
 		return nir.Pair{Key: c.keyName(field(n, "key")), Value: c.expr(field(n, "value")), Loc: L}
 	case "scope_resolution":
-		// A::B → treat as a Name on the dotted path
-		return nir.Name{ID: c.dotted(n), Loc: L}
+		// A::B used as a value is a constant token; carry it for `val` matching
+		// while call-path construction still uses dotted(AST) directly.
+		return nir.Const{Loc: L, Value: c.dotted(n)}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {

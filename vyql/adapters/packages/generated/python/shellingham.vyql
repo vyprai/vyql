@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "shellingham" {
+    sink method "detect_shell" -> code.CommandExecution
+    sink method "get_shell" -> code.CommandExecution
+    sink method "iter_process_parents" -> code.CommandExecution
+  }
+}

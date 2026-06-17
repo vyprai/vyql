@@ -1,0 +1,16 @@
+import code.{ResponseHeaderWrite, FileUse, CommandExecution, FilePathAccess, NetworkConnect, NetworkSend, UrlFetch, Cookie}
+
+adapter perl {
+  package "Prancer" {
+    source method "path" -> core.UserControlledData
+    source method "body" -> core.UserControlledData
+    source method "headers" -> core.UserControlledData
+    source method "params" -> core.UserControlledData
+    source method "cookie" -> code.Cookie
+    source method "cookies" -> code.Cookie
+    source method "upload" -> core.UserControlledData
+    source method "uploads" -> core.UserControlledData
+    source method "filename" -> core.UserControlledData
+    sink method "header" -> code.ResponseHeaderWrite
+  }
+}

@@ -1,0 +1,13 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter swift {
+  package "github.com/socketio/socket.io-client-swift" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "emit" -> code.NetworkSend
+    source method "handleEvent" -> code.NetworkData
+    source method "handlePacket" -> code.NetworkData
+    source method "parseEngineData" -> code.NetworkData
+    source method "parseEngineMessage" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+  }
+}

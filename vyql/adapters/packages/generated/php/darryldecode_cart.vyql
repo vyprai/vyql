@@ -1,0 +1,5 @@
+adapter php {
+  package "darryldecode/cart" {
+    source method "get" -> code.HttpInput
+  }
+}

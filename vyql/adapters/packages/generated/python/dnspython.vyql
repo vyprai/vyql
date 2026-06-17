@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter python {
+  package "dnspython" {
+    source method "e164.query" -> core.UserControlledData
+  }
+}

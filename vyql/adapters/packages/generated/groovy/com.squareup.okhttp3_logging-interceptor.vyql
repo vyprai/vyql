@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter groovy {
+  package "com.squareup.okhttp3:logging-interceptor" {
+    control method "redactHeader" -> core.InputValidation
+    control method "redactQueryParams" -> core.InputValidation
+  }
+}

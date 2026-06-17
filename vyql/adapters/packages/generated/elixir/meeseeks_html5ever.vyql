@@ -1,0 +1,6 @@
+adapter elixir {
+  package "meeseeks_html5ever" {
+    sink method "parse_html" -> code.Deserialization
+    sink method "parse_xml" -> code.Deserialization
+  }
+}

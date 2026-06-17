@@ -1,0 +1,9 @@
+import code.{Cookie, SecretValue}
+adapter groovy {
+  package "org.springframework.session:spring-session-core" {
+    source method "changeSessionId" -> code.SecretValue
+    source method "setAttribute" -> code.SecretValue
+    source method "readCookieValues" -> code.Cookie
+    source method "writeCookieValue" -> code.Cookie
+  }
+}

@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter c {
+  package "oatpp" {
+    sink method "parseScheme" -> code.Deserialization
+    sink method "parseAuthority" -> code.Deserialization
+    sink method "parsePath" -> code.Deserialization
+    sink method "parseQueryParams" -> code.Deserialization
+    sink method "parseUrl" -> code.Deserialization
+  }
+}

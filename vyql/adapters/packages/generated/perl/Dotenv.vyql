@@ -1,0 +1,7 @@
+adapter perl {
+  package "Dotenv" {
+    sink method "parse" -> code.FilePathAccess
+    sink method "load" -> code.FilePathAccess
+    source method "load" -> code.EnvVariable
+  }
+}

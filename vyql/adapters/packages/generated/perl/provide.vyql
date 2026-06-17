@@ -1,0 +1,6 @@
+adapter perl {
+  package "provide" {
+    source method "pick_module_to_load" -> core.UserControlledData
+    sink method "load" -> code.CodeEval
+  }
+}

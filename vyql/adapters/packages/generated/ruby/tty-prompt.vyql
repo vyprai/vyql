@@ -1,0 +1,18 @@
+import code.{CliArgument}
+import core.{InputValidation}
+
+adapter ruby {
+  package "tty-prompt" {
+    source method "ask" -> code.CliArgument
+    source method "keypress" -> code.CliArgument
+    source method "multiline" -> code.CliArgument
+    source method "mask" -> code.CliArgument
+    source method "select" -> code.CliArgument
+    source method "multi_select" -> code.CliArgument
+    source method "enum_select" -> code.CliArgument
+    source method "expand" -> code.CliArgument
+    source method "slider" -> code.CliArgument
+    source method "collect" -> code.CliArgument
+    control method "validate" -> core.InputValidation
+  }
+}

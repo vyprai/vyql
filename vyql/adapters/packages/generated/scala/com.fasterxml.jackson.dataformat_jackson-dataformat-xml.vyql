@@ -1,0 +1,5 @@
+adapter scala {
+  package "com.fasterxml.jackson.dataformat:jackson-dataformat-xml" {
+    sink method "readValue" -> code.Deserialization
+  }
+}

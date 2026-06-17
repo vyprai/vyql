@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter c {
+  package "directxtex" {
+    sink method "InputStream" -> code.Deserialization
+    sink method "InputFileStream" -> code.Deserialization
+    sink method "JPEGDecompress" -> code.Deserialization
+    sink method "PNGDecompress" -> code.Deserialization
+  }
+}

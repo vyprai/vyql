@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/maxsokolov/TableKit" {
+    source method "invokeActionOn" -> core.UserControlledData
+    source method "invoke" -> core.UserControlledData
+  }
+}

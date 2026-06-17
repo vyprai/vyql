@@ -1,0 +1,7 @@
+import code.{ResponseHeaderWrite}
+
+adapter php {
+  package "symfony/error-handler" {
+    sink method "header" -> code.ResponseHeaderWrite
+  }
+}

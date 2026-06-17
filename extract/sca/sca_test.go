@@ -10,8 +10,8 @@ import (
 )
 
 func TestParseRequirements(t *testing.T) {
-	got := ParseRequirements("flask==2.0.1\n# a comment\nrequests\n-r dev.txt\n\n  django == 4.2  \n")
-	want := []Dep{{"flask", "2.0.1"}, {"requests", "*"}, {"django", "4.2"}}
+	got := ParseRequirements("Flask==2.0.1\n# a comment\nrequests\n-r dev.txt\n\n  django == 4.2  \npyyaml>=6.0\n")
+	want := []Dep{{"flask", "2.0.1"}, {"requests", "*"}, {"django", "4.2"}, {"pyyaml", "6.0"}}
 	if len(got) != len(want) {
 		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
 	}
@@ -87,5 +87,29 @@ func TestLinkReachability(t *testing.T) {
 	}
 	if n, _, _ := g.GetNode(reach[0]); n.Prop("name") != "requests" {
 		t.Errorf("reachable package = %q, want requests", n.Prop("name"))
+	}
+}
+
+func TestLinkReachabilityUsesImportNodesAndEdges(t *testing.T) {
+	g := usg.NewInMemStore()
+	_ = BuildSBOM(g, "npm", []Dep{{"@scope/pkg", "1.0.0"}, {"unused", "1.0.0"}}, "")
+	_ = g.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
+		"loc": "app.js:1", "module": "@scope/pkg/lib", "package": "@scope/pkg",
+	}})
+
+	if err := LinkReachability(g); err != nil {
+		t.Fatal(err)
+	}
+	reach := hasConcept(t, g, "sbom.ReachableSymbol")
+	if len(reach) != 1 {
+		t.Fatalf("expected exactly 1 ReachableSymbol via import, got %d: %v", len(reach), reach)
+	}
+	n, _, _ := g.GetNode(reach[0])
+	if n.Prop("name") != "@scope/pkg" || n.Prop("package") != "@scope/pkg" || n.Prop("purl") != "pkg:npm/@scope/pkg@1.0.0" {
+		t.Fatalf("reachable package props wrong: %+v", n.Props)
+	}
+	edges, _ := g.OutEdges("imp", "DEPENDS_ON")
+	if len(edges) != 1 || edges[0].Dst != reach[0] {
+		t.Fatalf("import should DEPENDS_ON reachable package, got %+v", edges)
 	}
 }

@@ -1,0 +1,10 @@
+import core.{InputValidation}
+import code.{XmlParse}
+
+adapter groovy {
+  package "org.springframework.security:spring-security-config" {
+    control method "validateHttpRedirect" -> core.InputValidation
+    sink method "parse" -> code.XmlParse
+    sink method "decorate" -> code.XmlParse
+  }
+}

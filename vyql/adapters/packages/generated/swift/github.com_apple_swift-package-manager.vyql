@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/apple/swift-package-manager" {
+    sink method "parse" -> code.Deserialization
+  }
+}

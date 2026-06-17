@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/go-redis/redis/v8" {
+    sink method "getUserPassword" -> code.NosqlQuery
+    sink method "setCmdsErr" -> code.StoredDataWrite
+  }
+}

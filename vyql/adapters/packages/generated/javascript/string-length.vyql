@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter javascript {
+  package "string-length" {
+    control method "stringLength" -> core.InputValidation
+  }
+}

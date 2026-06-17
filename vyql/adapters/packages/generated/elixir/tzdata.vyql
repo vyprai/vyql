@@ -1,0 +1,10 @@
+adapter elixir {
+  package "tzdata" {
+    sink method "read_file" -> code.Deserialization
+    sink method "process_file" -> code.Deserialization
+    sink method "process_tz_list" -> code.Deserialization
+    sink method "process_rule" -> code.Deserialization
+    sink method "process_link" -> code.Deserialization
+    sink method "process_zone" -> code.Deserialization
+  }
+}

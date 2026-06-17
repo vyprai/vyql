@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter java {
+  package "io.rest-assured:json-path" {
+    sink method "JsonPath" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

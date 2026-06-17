@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "org.glassfish:javax.json" {
+    sink method "read" -> code.Deserialization
+  }
+}

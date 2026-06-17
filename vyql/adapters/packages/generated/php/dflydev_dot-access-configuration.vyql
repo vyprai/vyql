@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "dflydev/dot-access-configuration" {
+    sink method "internalBuild" -> code.Deserialization
+  }
+}

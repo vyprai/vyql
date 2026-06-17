@@ -1,0 +1,9 @@
+import code.{SecretValue}
+
+adapter dart {
+  package "flutter_secure_storage_macos" {
+    source method "write" -> code.SecretValue
+    source method "read" -> code.SecretValue
+    source method "readAll" -> code.SecretValue
+  }
+}

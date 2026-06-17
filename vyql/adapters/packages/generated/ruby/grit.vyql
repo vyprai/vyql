@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+import core.{ShellEscape}
+
+adapter ruby {
+  package "grit" {
+    control method "shell_escape" -> core.ShellEscape
+    sink method "run" -> code.CommandExecution
+  }
+}

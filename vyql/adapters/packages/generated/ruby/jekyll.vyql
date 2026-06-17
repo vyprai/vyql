@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter ruby {
+  package "jekyll" {
+    sink method "run" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter javascript {
+  package "node-forge" {
+    mark path "forge.md5.create" -> code.WeakHash
+    mark path "forge.sha1.create" -> code.WeakHash
+  }
+}

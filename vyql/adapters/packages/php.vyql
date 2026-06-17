@@ -1,0 +1,74 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter php {
+  package "php" {
+    source "$_GET" -> HttpInput
+    source "$_POST" -> HttpInput
+    source "$_REQUEST" -> HttpInput
+    sink path "system" -> CommandExecution
+    sink path "shell_exec" -> CommandExecution
+    sink path "eval" -> CodeEval
+    sink path "unserialize" -> Deserialization
+    sink path "file_get_contents" -> FilePathAccess
+    control "htmlspecialchars" -> HtmlEscape
+    control "htmlentities" -> HtmlEscape
+    control "escapeshellarg" -> ShellEscape
+    control "realpath" -> PathCanonicalization
+    control "filter_var" -> RedirectAllowlist
+  }
+  package "symfony/http-foundation" {
+    source receiver "get" on "Request" -> HttpInput
+  }
+  package "laravel/framework" {
+    source receiver "input" on "Request" -> HttpInput
+    sink method "raw" -> SqlExecution
+    sink method "whereRaw" -> SqlExecution
+    control "e" -> HtmlEscape
+    control method "check" -> AuthenticationCheck
+    control method "authorize" -> AuthorizationCheck
+    control "csrf_field" -> CsrfProtection
+  }
+  package "vlucas/phpdotenv" {
+    source "$_ENV" -> SecretValue
+  }
+  package "mysqli" {
+    sink path "mysqli_query" arg 1 -> SqlExecution
+  }
+  package "doctrine/dbal" {
+    sink method "query" -> SqlExecution
+  }
+  package "mongodb/mongodb" {
+    sink method "find" -> NosqlQuery
+  }
+  package "yaml" {
+    sink path "yaml_parse" -> Deserialization
+  }
+  package "ext-zip" {
+    sink method "extractTo" -> ArchiveEntryWrite
+  }
+  package "curl" {
+    sink path "curl_exec" -> UrlFetch
+  }
+  package "simplexml" {
+    sink path "simplexml_load_string" -> XmlParse
+    sink method "xpath" -> XpathQuery
+  }
+  package "ldap" {
+    sink path "ldap_search" arg 2 -> LdapQuery
+    control "ldap_escape" -> LdapEscape
+  }
+  package "twig/twig" {
+    sink method "render" -> TemplateRender
+    control "twig_escape_filter" -> HtmlEscape
+  }
+  package "pcre" {
+    sink path "preg_match" -> RegexCompile
+  }
+  package "pdo" {
+    control method "prepare" -> SqlParameterization
+  }
+  package "libxml" {
+    control "libxml_disable_entity_loader" -> XmlHardening
+  }
+}

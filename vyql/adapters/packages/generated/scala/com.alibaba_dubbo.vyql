@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+adapter scala {
+  package "com.alibaba:dubbo" {
+    sink method "valueOf" -> code.UrlFetch
+    sink method "decode" -> code.UrlFetch
+  }
+}

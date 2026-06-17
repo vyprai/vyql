@@ -1,0 +1,5 @@
+adapter perl {
+  package "PPR" {
+    source method "slurp" -> code.StdinInput
+  }
+}

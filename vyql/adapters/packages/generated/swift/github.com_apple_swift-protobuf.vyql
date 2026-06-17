@@ -1,0 +1,13 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/apple/swift-protobuf" {
+    sink method "parse" -> code.Deserialization
+    sink method "decodeMessage" -> code.Deserialization
+    sink method "decodeExtensionFieldsAsMessageSet" -> code.Deserialization
+    sink method "decodeSingular" -> code.Deserialization
+    sink method "decodeRepeated" -> code.Deserialization
+    sink method "decodeExtensionField" -> code.Deserialization
+    sink method "_protobuf_newField" -> code.Deserialization
+  }
+}

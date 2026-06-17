@@ -1,0 +1,11 @@
+import code.{FilePathAccess, Deserialization}
+adapter rust {
+  package "core-foundation" {
+    sink method "from_file_system_path" -> code.FilePathAccess
+    sink method "to_path" -> code.FilePathAccess
+    sink method "get_file_system_path" -> code.FilePathAccess
+    sink method "path" -> code.FilePathAccess
+    sink method "resources_path" -> code.FilePathAccess
+    sink method "from_buffer" -> code.Deserialization
+  }
+}

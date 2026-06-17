@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter go {
+  package "golang.org/x/mod" {
+    sink method "parse" -> code.Deserialization
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseLax" -> code.Deserialization
+  }
+}

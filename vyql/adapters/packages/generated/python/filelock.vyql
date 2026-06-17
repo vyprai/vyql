@@ -1,0 +1,12 @@
+import code.{FilePathAccess}
+
+adapter python {
+  package "filelock" {
+    sink method "lock_file" -> code.FilePathAccess
+    sink method "acquire_read" -> code.FilePathAccess
+    sink method "acquire_write" -> code.FilePathAccess
+    sink method "read_lock" -> code.FilePathAccess
+    sink method "write_lock" -> code.FilePathAccess
+    sink method "break_lock_file" -> code.FilePathAccess
+  }
+}

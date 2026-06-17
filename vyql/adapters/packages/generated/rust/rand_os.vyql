@@ -1,0 +1,6 @@
+import code.{WeakRandomValue}
+adapter rust {
+  package "rand_os" {
+    mark method "new" -> code.WeakRandomValue
+  }
+}

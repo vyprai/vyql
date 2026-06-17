@@ -60,6 +60,7 @@ adapter csharp {
   sink path "File.ReadAllBytes" -> code.FilePathAccess
   sink path "File.ReadAllLines" -> code.FilePathAccess
   sink path "File.WriteAllText" -> code.FilePathAccess
+  sink path "File.WriteAllBytes" -> code.UnsafeUpload
   sink path "File.Delete" -> code.FilePathAccess
   sink path "File.Open" -> code.FilePathAccess
   sink path "File.OpenRead" -> code.FilePathAccess
@@ -67,17 +68,51 @@ adapter csharp {
   sink path "File.Move" -> code.FilePathAccess
   sink path "FileStream" -> code.FilePathAccess
   sink path "StreamReader" -> code.FilePathAccess
+  sink path "Assembly.Load" -> code.DynamicCodeLoad
+  sink path "Assembly.LoadFrom" -> code.DynamicCodeLoad
+  sink path "Assembly.LoadFile" -> code.DynamicCodeLoad
+  sink path "ExtractToFile" -> code.ArchiveEntryWrite
 
   // SSRF
   sink method "DownloadString" -> code.UrlFetch
   sink method "DownloadData" -> code.UrlFetch
   sink method "GetAsync" -> code.UrlFetch
   sink path "WebClient" -> code.UrlFetch
+  sink method "FindAsync" -> code.ObjectLookupByUserInput
+  sink method "Find" -> code.ObjectLookupByUserInput
+  sink method "GetUser" -> code.ObjectLookupByUserInput
+  sink method "GetAccount" -> code.ObjectLookupByUserInput
+  sink method "GetOrder" -> code.ObjectLookupByUserInput
+  mark "ChangePassword" -> code.AuthenticationRequiredOp
+  mark "UpdatePassword" -> code.AuthenticationRequiredOp
+  mark "ResetPassword" -> code.AuthenticationRequiredOp
+  mark "ChangeEmail" -> code.AuthenticationRequiredOp
+  mark "TransferFunds" -> code.AuthenticationRequiredOp
+  mark "DeleteAccount" -> code.AuthenticationRequiredOp
+  mark "GrantRole" -> code.AuthenticationRequiredOp
+  mark "MakeAdmin" -> code.AuthenticationRequiredOp
 
   // reflected XSS — Response.Write, Razor @Html.Raw, Blazor MarkupString
   sink path "Response.Write" -> code.HtmlRender
   sink method "Raw" -> code.HtmlRender
   sink path "MarkupString" -> code.HtmlRender
+  // HTTP response splitting / header injection (CWE-113).
+  sink path "Response.Headers.Add" arg 1 -> code.ResponseHeaderWrite
+  sink path "Response.Headers.Append" arg 1 -> code.ResponseHeaderWrite
+  // log injection (CWE-117) + secret-in-log (CWE-532).
+  sink method "LogInformation" arg all -> code.LogOutput
+  sink method "LogWarning" arg all -> code.LogOutput
+  sink method "LogError" arg all -> code.LogOutput
+  sink method "LogDebug" arg all -> code.LogOutput
+  mark "LogInformation" -> code.LogWrite
+  mark "LogWarning" -> code.LogWrite
+  mark "LogError" -> code.LogWrite
+  mark "LogDebug" -> code.LogWrite
+  // CSV/formula injection (CWE-1236) and ASP.NET MVC mass assignment (CWE-915).
+  sink method "WriteField" arg all -> code.CsvCell
+  sink method "WriteRecords" arg all -> code.CsvCell
+  sink method "TryUpdateModelAsync" arg all -> code.MassAssign
+  sink method "UpdateModel" arg all -> code.MassAssign
 
   // XXE (CWE-611) — legacy parsers that resolve external entities by default
   // (XmlDocument/XmlReader/XPathDocument). LINQ-to-XML (XDocument/XElement) prohibits
@@ -94,6 +129,16 @@ adapter csharp {
   control "AntiXss.HtmlEncode" -> core.HtmlEscape
   control "Path.GetFullPath" -> core.PathCanonicalization
   control "Path.GetFileName" -> core.PathCanonicalization
+  control method "RequireAuth" -> core.AuthenticationCheck
+  control method "EnsureAuthenticated" -> core.AuthenticationCheck
+  control method "IsAuthenticated" -> core.AuthenticationCheck
+  control method "Authenticate" -> core.AuthenticationCheck
+  control method "CheckOwnership" -> core.OwnershipCheck
+  control method "RequireOwner" -> core.OwnershipCheck
+  control method "IsOwner" -> core.OwnershipCheck
+  mark "Monitor.Enter" -> code.LockAcquire
+  mark "lock" -> code.LockAcquire
+  control "Monitor.Exit" -> core.LockRelease
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "Regex" -> code.RegexCompile
@@ -107,6 +152,19 @@ adapter csharp {
   mark "RC2CryptoServiceProvider" -> code.WeakCipher
   // ECB mode (CWE-327) — CipherMode.ECB assigned to a cipher's .Mode.
   mark "CipherMode.ECB" -> code.WeakCipher
+  mark "CreateEncryptor" val "0000000000000000" -> code.StaticIv
+  mark "AesGcm" val "000000000000" -> code.StaticIv
+  mark "DangerousAcceptAnyServerCertificateValidator" -> code.CertValidationDisabled
+  mark "ServerCertificateCustomValidationCallback" val "true" -> code.CertValidationDisabled
+  mark "TokenValidationParameters" val "RequireSignedTokens=false" -> code.JwtUnverified
+  mark "TokenValidationParameters" val "ValidateIssuerSigningKey=false" -> code.JwtUnverified
+  mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
+  mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
+  mark "File.Open" -> code.ResourceHandle
+  mark "File.OpenRead" -> code.ResourceHandle
+  mark "TcpClient" -> code.ResourceHandle
+  control method "Close" -> core.ResourceRelease
+  control method "Dispose" -> core.ResourceRelease
   mark "MD5.Create" -> code.WeakHash
   mark "SHA1.Create" -> code.WeakHash
   mark "MD5CryptoServiceProvider" -> code.WeakHash
@@ -138,7 +196,7 @@ adapter csharp {
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
-  control "escapeXPath" -> core.HtmlEscape
+  control "escapeXPath" -> core.XpathEscape
   control "encodeForLDAP" -> core.LdapEscape
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization

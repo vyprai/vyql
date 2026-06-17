@@ -1,0 +1,6 @@
+import code.{WeakHash}
+adapter perl {
+  package "Digest-Adler32" {
+    mark method "add" -> code.WeakHash
+  }
+}

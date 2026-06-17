@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "PYX" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_file" -> code.Deserialization
+    sink method "parse_handler" -> code.Deserialization
+  }
+}

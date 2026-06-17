@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.threeten:threetenbp" {
+    sink method "parse" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+    sink method "readExternal" -> code.Deserialization
+    sink method "readResolve" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{CommandExecution}
+import core.{HtmlEscape}
+
+adapter python {
+  package "dominate" {
+    sink method "system" -> code.CommandExecution
+    control method "escape" -> core.HtmlEscape
+  }
+}

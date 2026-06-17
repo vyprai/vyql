@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter c {
+  package "qtlottie" {
+    sink method "QLottieBase::parse" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+adapter objc {
+  package "CapacitorDevice" {
+    source method "read" -> code.NetworkData
+    sink method "sendPending" -> code.NetworkSend
+    sink method "translatedConnection" -> code.NetworkConnect
+    sink method "open" -> code.FilePathAccess
+  }
+}

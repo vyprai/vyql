@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter javascript {
+  package "istanbul-lib-instrument" {
+    sink method "instrumentSync" -> code.CodeEval
+  }
+}

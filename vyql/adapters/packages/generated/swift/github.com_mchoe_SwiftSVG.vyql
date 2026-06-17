@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/mchoe/SwiftSVG" {
+    sink method "NSXMLSVGParser.init(svgURL:supportedElements:completion:)" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter csharp {
+  package "lodash" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

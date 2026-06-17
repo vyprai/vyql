@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter rust {
+  package "build_const" {
+    sink method "add_raw" -> code.CodeEval
+    sink method "add_value_raw" -> code.CodeEval
+  }
+}

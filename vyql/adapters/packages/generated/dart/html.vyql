@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter dart {
+  package "html" {
+    control method "htmlSerializeEscape" -> core.HtmlEscape
+  }
+}

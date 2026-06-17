@@ -1,0 +1,6 @@
+adapter objc {
+  package "MLKitFaceDetection" {
+    sink method "processImage" -> code.Deserialization
+    source method "processImage" -> core.UserControlledData
+  }
+}

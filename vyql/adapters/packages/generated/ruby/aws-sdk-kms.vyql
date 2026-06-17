@@ -1,0 +1,14 @@
+import code.{SecretValue}
+
+adapter ruby {
+  package "aws-sdk-kms" {
+    source method "decrypt" -> code.SecretValue
+    source method "generate_data_key" -> code.SecretValue
+    source method "generate_data_key_pair" -> code.SecretValue
+    source method "generate_data_key_pair_without_plaintext" -> code.SecretValue
+    source method "generate_data_key_without_plaintext" -> code.SecretValue
+    source method "get_parameters_for_import" -> code.SecretValue
+
+    source method "encrypt" -> code.SecretValue
+  }
+}

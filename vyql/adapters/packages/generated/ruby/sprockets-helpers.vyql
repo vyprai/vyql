@@ -1,0 +1,11 @@
+adapter ruby {
+  package "sprockets-helpers" {
+    sink method "asset_path" -> code.FilePathAccess
+    sink method "audio_path" -> code.FilePathAccess
+    sink method "font_path" -> code.FilePathAccess
+    sink method "image_path" -> code.FilePathAccess
+    sink method "javascript_path" -> code.FilePathAccess
+    sink method "stylesheet_path" -> code.FilePathAccess
+    sink method "video_path" -> code.FilePathAccess
+  }
+}

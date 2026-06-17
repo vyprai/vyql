@@ -1,0 +1,22 @@
+import code.{NetworkConnect, NetworkData, NetworkSend}
+import core.{UserControlledData}
+
+adapter python {
+  package "trio-websocket" {
+    sink method "send_message" -> code.NetworkSend
+    sink method "open_websocket" -> code.NetworkConnect
+    sink method "connect_websocket" -> code.NetworkConnect
+    sink method "open_websocket_url" -> code.NetworkConnect
+    sink method "connect_websocket_url" -> code.NetworkConnect
+    sink method "serve_websocket" -> code.NetworkConnect
+    sink method "accept" -> code.NetworkConnect
+
+    source method "headers" -> core.UserControlledData
+    source method "path" -> core.UserControlledData
+    source method "url" -> core.UserControlledData
+    source method "proposed_subprotocols" -> core.UserControlledData
+    source method "local" -> core.UserControlledData
+    source method "remote" -> core.UserControlledData
+
+  }
+}

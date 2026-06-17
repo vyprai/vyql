@@ -1,0 +1,5 @@
+adapter php {
+  package "dompdf/dompdf" {
+    sink method "parsePdfDate" -> code.XmlParse
+  }
+}

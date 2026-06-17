@@ -1,0 +1,7 @@
+import code.{FileUse}
+adapter python {
+  package "pyaml" {
+    sink method "dump" -> code.FileUse
+    sink method "dump_all" -> code.FileUse
+  }
+}

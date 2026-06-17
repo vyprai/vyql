@@ -1,0 +1,11 @@
+import code.{NetworkData, NetworkSend, StoredDataRead, StoredDataWrite}
+
+adapter ruby {
+  package "dalli" {
+    source method "read" -> code.NetworkData
+    sink method "write" -> code.NetworkSend
+    sink method "replace" -> code.StoredDataWrite
+    source method "fetch" -> code.StoredDataRead
+    source method "get_multi_hash" -> code.StoredDataRead
+  }
+}

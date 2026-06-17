@@ -1,0 +1,5 @@
+adapter php {
+  package "amphp/parser" {
+    sink method "push" -> code.Deserialization
+  }
+}

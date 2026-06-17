@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter swift {
+  package "github.com/vapor/apns" {
+    sink method "client" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,10 @@
+import code.{HttpInput, UrlFetch}
+import core.{UserControlledData}
+
+adapter scala {
+  package "com.amazonaws:aws-java-sdk-core" {
+    source method "setHeaders" -> code.HttpInput
+    sink method "setResourcePath" -> code.UrlFetch
+    source method "withParameter" -> code.HttpInput
+  }
+}

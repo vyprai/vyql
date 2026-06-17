@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/vmihailenco/msgpack/v5" {
+    sink method "NewDecoder" -> code.Deserialization
+  }
+}

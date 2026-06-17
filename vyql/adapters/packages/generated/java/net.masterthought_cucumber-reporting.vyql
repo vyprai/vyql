@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess}
+adapter java {
+  package "net.masterthought:cucumber-reporting" {
+    sink method "ReportParser.parseJsonFiles" -> code.Deserialization
+    sink method "ReportParser.parseForFeature" -> code.Deserialization
+    sink method "Configuration.getReportDirectory" -> code.FilePathAccess
+    sink method "Configuration.getTrendsStatsFile" -> code.FilePathAccess
+    sink method "Configuration.setTrendsStatsFile" -> code.FilePathAccess
+    control method "Util.toValidFileName" -> core.InputValidation
+  }
+}

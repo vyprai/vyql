@@ -1,0 +1,13 @@
+import code.{TemplateRender}
+adapter elixir {
+  package "phoenix_view" {
+    sink method "render" -> code.TemplateRender
+    sink method "render_layout" -> code.TemplateRender
+    sink method "render_within" -> code.TemplateRender
+    sink method "render_existing" -> code.TemplateRender
+    sink method "render_many" -> code.TemplateRender
+    sink method "render_one" -> code.TemplateRender
+    sink method "render_to_iodata" -> code.TemplateRender
+    sink method "render_to_string" -> code.TemplateRender
+  }
+}

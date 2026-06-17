@@ -1,0 +1,33 @@
+import code.{NetworkSend}
+import core.{AuthenticationCheck}
+
+adapter php {
+  package "pestphp/pest-plugin-laravel" {
+    sink method "withHeaders" -> code.NetworkSend
+    sink method "withHeader" -> code.NetworkSend
+    sink method "withToken" -> code.NetworkSend
+    sink method "withBasicAuth" -> code.NetworkSend
+    sink method "withoutToken" -> code.NetworkSend
+    sink method "flushHeaders" -> code.NetworkSend
+    sink method "withCookies" -> code.NetworkSend
+    sink method "withCookie" -> code.NetworkSend
+    sink method "withUnencryptedCookies" -> code.NetworkSend
+    sink method "withUnencryptedCookie" -> code.NetworkSend
+    sink method "withCredentials" -> code.NetworkSend
+    sink method "disableCookieEncryption" -> code.NetworkSend
+    sink method "from" -> code.NetworkSend
+    sink method "get" -> code.NetworkSend
+    sink method "getJson" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "postJson" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "putJson" -> code.NetworkSend
+    sink method "patch" -> code.NetworkSend
+    sink method "patchJson" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+    sink method "deleteJson" -> code.NetworkSend
+
+    control method "withToken" -> core.AuthenticationCheck
+    control method "withBasicAuth" -> core.AuthenticationCheck
+  }
+}

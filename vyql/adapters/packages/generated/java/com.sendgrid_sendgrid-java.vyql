@@ -1,0 +1,14 @@
+import code.{NetworkSend, SecretValue}
+import core.{UserControlledData}
+
+adapter java {
+  package "com.sendgrid:sendgrid-java" {
+    source method "SendGrid" -> code.SecretValue
+    source method "TwilioEmail" -> code.SecretValue
+    source method "addPathParam" -> core.UserControlledData
+    source method "addHeaderParam" -> core.UserControlledData
+    source method "addQueryParam" -> core.UserControlledData
+    source method "addBody" -> core.UserControlledData
+    sink method "makeCall" -> code.NetworkSend
+  }
+}

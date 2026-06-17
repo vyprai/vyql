@@ -1,0 +1,7 @@
+import code.{CodeEval, Deserialization}
+adapter python {
+  package "pandas" {
+    sink method "query" -> code.CodeEval
+    sink method "loads" -> code.Deserialization
+  }
+}

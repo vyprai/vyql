@@ -1,0 +1,11 @@
+adapter php {
+  package "voku/portable-ascii" {
+    control method "to_filename" -> core.PathCanonicalization
+    control method "clean" -> core.InputValidation
+    control method "to_ascii" -> core.InputValidation
+    control method "normalize_msword" -> core.InputValidation
+    control method "normalize_whitespace" -> core.InputValidation
+    control method "to_slugify" -> core.InputValidation
+    control method "to_transliterate" -> core.InputValidation
+  }
+}

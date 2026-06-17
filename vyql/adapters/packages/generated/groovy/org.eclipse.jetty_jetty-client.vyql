@@ -1,0 +1,6 @@
+import code.{NetworkSend}
+adapter groovy {
+  package "org.eclipse.jetty:jetty-client" {
+    sink method "send" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter python {
+  package "jsonpatch" {
+    sink method "apply_patch" -> code.Deserialization
+    sink method "from_string" -> code.Deserialization
+  }
+}

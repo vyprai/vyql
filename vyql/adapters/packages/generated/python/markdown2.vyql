@@ -1,0 +1,8 @@
+import code.{HtmlRender}
+
+adapter python {
+  package "markdown2" {
+    sink method "markdown" -> code.HtmlRender
+    sink method "convert" -> code.HtmlRender
+  }
+}

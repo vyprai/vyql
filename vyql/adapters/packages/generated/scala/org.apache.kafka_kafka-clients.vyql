@@ -1,0 +1,9 @@
+import code.{NetworkSend}
+import core.{InputValidation}
+
+adapter scala {
+  package "org.apache.kafka:kafka-clients" {
+    control method "parse" -> core.InputValidation
+    sink method "send" -> code.NetworkSend
+  }
+}

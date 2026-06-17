@@ -1,0 +1,9 @@
+import code.{WeakHash}
+import core.{AuthenticationCheck}
+
+adapter elixir {
+  package "comeonin" {
+    mark method "add_hash" -> code.WeakHash
+    control method "check_pass" -> core.AuthenticationCheck
+  }
+}

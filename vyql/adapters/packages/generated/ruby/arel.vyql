@@ -1,0 +1,8 @@
+adapter ruby {
+  package "arel" {
+    sink method "Row" -> code.SqlExecution
+    control method "Bind" -> core.SqlParameterization
+    sink method "Binary" -> code.DynamicCodeLoad
+    mark method "Regexp" -> code.RegexCompile
+  }
+}

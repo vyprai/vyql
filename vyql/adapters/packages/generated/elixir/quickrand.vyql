@@ -1,0 +1,10 @@
+import code.{WeakRandomValue}
+adapter elixir {
+  package "quickrand" {
+    mark method "lcg35x_32" -> code.WeakRandomValue
+    mark method "mwc256" -> code.WeakRandomValue
+    mark method "mwc256_64" -> code.WeakRandomValue
+    mark method "mwc256_128" -> code.WeakRandomValue
+    mark method "seed_algorithms" -> code.WeakRandomValue
+  }
+}

@@ -1,0 +1,7 @@
+import code.{WeakHash}
+adapter perl {
+  package "MD5" {
+    mark method "hash" -> code.WeakHash
+    mark method "hexhash" -> code.WeakHash
+  }
+}

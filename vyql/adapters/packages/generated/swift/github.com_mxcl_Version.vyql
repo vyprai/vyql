@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/mxcl/Version" {
+    mark method "hash" -> code.WeakHash
+  }
+}

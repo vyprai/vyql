@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter groovy {
+  package "org.primefaces:primefaces" {
+    sink method "executeInitScript" -> code.CodeEval
+    sink method "executeScript" -> code.CodeEval
+  }
+}

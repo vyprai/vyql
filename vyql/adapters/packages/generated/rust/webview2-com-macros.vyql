@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter rust {
+  package "webview2-com-macros" {
+    source method "parse" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,9 @@
+import code.{NetworkData, NetworkSend}
+
+adapter rust {
+  package "wasm-streams" {
+    source method "ReadableStreamBYOBReader.read" -> code.NetworkData
+    source method "ReadableStreamBYOBReader.read_with_buffer" -> code.NetworkData
+    sink method "WritableStreamDefaultWriter.write" -> code.NetworkSend
+  }
+}

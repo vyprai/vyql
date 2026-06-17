@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter csharp {
+  package "plugin.share" {
+    sink method "OpenBrowser" -> code.UrlFetch
+  }
+}

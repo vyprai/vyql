@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter elixir {
+  package "joken" {
+    source method "peek_header" -> core.UserControlledData
+    source method "peek_claims" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,10 @@
+import code.{FilePathAccess, StoredDataRead, StoredDataWrite, UrlFetch}
+adapter dart {
+  package "i18n_extension" {
+    sink method "defaultLoadByFile" -> code.FilePathAccess
+    sink method "defaultLoadByHttp" -> code.UrlFetch
+    source method "loadLocale" -> code.StoredDataRead
+    sink method "saveLocale" -> code.StoredDataWrite
+    sink method "deleteLocale" -> code.StoredDataWrite
+  }
+}

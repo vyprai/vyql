@@ -1,0 +1,6 @@
+adapter elixir {
+  package "fun_with_flags" {
+    source method "enable" -> core.UserControlledData
+    source method "disable" -> core.UserControlledData
+  }
+}

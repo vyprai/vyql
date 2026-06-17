@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter rust {
+  package "sqlx-macros" {
+    sink method "expand_query" -> code.SqlExecution
+    sink method "migrate" -> code.SqlExecution
+  }
+}

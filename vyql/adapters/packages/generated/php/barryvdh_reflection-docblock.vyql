@@ -1,0 +1,5 @@
+adapter php {
+  package "barryvdh/reflection-docblock" {
+    sink method "parseTags" -> code.Deserialization
+  }
+}

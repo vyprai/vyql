@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "ex_struct_translator" {
+    sink method "str_to_map" -> code.Deserialization
+  }
+}

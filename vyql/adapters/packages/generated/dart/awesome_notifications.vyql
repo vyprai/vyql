@@ -1,0 +1,8 @@
+import code.{WeakHash}
+adapter dart {
+  package "awesome_notifications" {
+    mark method "MD5" -> code.WeakHash
+    mark method "hex_md5" -> code.WeakHash
+    mark method "rstr_md5" -> code.WeakHash
+  }
+}

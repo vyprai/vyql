@@ -1,0 +1,8 @@
+adapter dart {
+  package "app_links" {
+    source method "getInitialLink" -> core.UserControlledData
+    source method "getInitialLinkString" -> core.UserControlledData
+    source method "getLatestLink" -> core.UserControlledData
+    source method "getLatestLinkString" -> core.UserControlledData
+  }
+}

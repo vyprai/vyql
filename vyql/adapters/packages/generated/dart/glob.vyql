@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess, RegexCompile}
+
+adapter dart {
+  package "glob" {
+    sink method "parse" -> code.Deserialization
+    sink method "list" -> code.FilePathAccess
+    sink method "listSync" -> code.FilePathAccess
+    mark method "matchAsPrefix" -> code.RegexCompile
+    mark method "matches" -> code.RegexCompile
+  }
+}

@@ -1,0 +1,7 @@
+adapter objc {
+  package "GRDB.swift" {
+    sink method "execute" -> code.SqlExecution
+    control method "bind" -> core.SqlParameterization
+    mark path "grdb.swift.hash" -> code.WeakHash
+  }
+}

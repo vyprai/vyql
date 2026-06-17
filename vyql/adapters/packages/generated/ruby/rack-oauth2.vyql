@@ -1,0 +1,6 @@
+import code.{RedirectTarget}
+adapter ruby {
+  package "rack-oauth2" {
+    mark method "redirect_uri" -> code.RedirectTarget
+  }
+}

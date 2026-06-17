@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+adapter perl {
+  package "AppConfig" {
+    source method "file" -> core.UserControlledData
+    source method "args" -> core.UserControlledData
+    source method "getopt" -> core.UserControlledData
+    source method "cgi" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,14 @@
+import code.{Deserialization, FilePathAccess}
+adapter php {
+  package "zendframework/zend-config" {
+    sink method "Zend\Config\Reader\Json::fromFile" -> code.FilePathAccess
+    sink method "Zend\Config\Reader\Json::fromString" -> code.Deserialization
+    sink method "Zend\Config\Reader\Ini::fromFile" -> code.FilePathAccess
+    sink method "Zend\Config\Reader\Ini::fromString" -> code.Deserialization
+    sink method "Zend\Config\Reader\Xml::fromFile" -> code.FilePathAccess
+    sink method "Zend\Config\Reader\Xml::fromString" -> code.Deserialization
+    sink method "Zend\Config\Reader\Yaml::fromFile" -> code.FilePathAccess
+    sink method "Zend\Config\Reader\Yaml::fromString" -> code.Deserialization
+    sink method "Zend\Config\Reader\PhpArray::fromFile" -> code.FilePathAccess
+  }
+}

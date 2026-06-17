@@ -1,0 +1,8 @@
+import code.{UrlFetch, Deserialization}
+
+adapter dart {
+  package "translator" {
+    sink method "GoogleTranslator.translate" -> code.UrlFetch
+    sink method "GoogleTranslator.translate" -> code.Deserialization
+  }
+}

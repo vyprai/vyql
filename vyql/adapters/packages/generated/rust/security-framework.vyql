@@ -1,0 +1,11 @@
+import code.{SecretValue, StoredDataRead}
+
+adapter rust {
+  package "security-framework" {
+    source method "generic_password" -> code.SecretValue
+    source method "internet_password" -> code.SecretValue
+    source method "search" -> code.StoredDataRead
+    source method "add_item" -> code.SecretValue
+    source method "update_item" -> code.SecretValue
+  }
+}

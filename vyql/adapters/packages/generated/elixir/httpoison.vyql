@@ -1,0 +1,20 @@
+import code.{UrlFetch, NetworkSend}
+
+adapter elixir {
+  package "httpoison" {
+    sink method "request" -> code.NetworkSend
+    sink method "request!" -> code.NetworkSend
+    sink method "get" -> code.NetworkSend
+    sink method "get!" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "put!" -> code.NetworkSend
+    sink method "head" -> code.NetworkSend
+    sink method "head!" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "post!" -> code.NetworkSend
+    sink method "patch" -> code.NetworkSend
+    sink method "patch!" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+    sink method "delete!" -> code.NetworkSend
+  }
+}

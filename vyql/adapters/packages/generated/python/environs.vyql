@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter python {
+  package "environs" {
+    source method "read_env" -> core.UserControlledData
+  }
+}

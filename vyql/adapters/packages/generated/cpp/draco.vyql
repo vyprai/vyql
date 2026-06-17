@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess, StoredDataRead}
+
+adapter cpp {
+  package "draco" {
+    sink method "DecodeFromFile" -> code.Deserialization
+    sink method "DecodeFromBuffer" -> code.Deserialization
+    sink method "ReadFileToBuffer" -> code.FilePathAccess
+    source method "ReadFileToString" -> code.StoredDataRead
+  }
+}

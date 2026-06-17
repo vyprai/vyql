@@ -1,0 +1,94 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter kotlin {
+  package "javax.servlet" {
+    source receiver "getParameter" on "HttpServletRequest" -> HttpInput
+    source receiver "getHeader" on "HttpServletRequest" -> HttpInput
+  }
+  package "ktor-server-core" {
+    source receiver "queryParameters" on "ApplicationRequest" -> HttpInput
+    source receiver "receive" on "ApplicationCall" -> HttpInput
+  }
+  package "spark-kotlin" {
+    source receiver "param" on "Request" -> HttpInput
+  }
+  package "kotlin-stdlib" {
+    source "System.getenv" -> SecretValue
+    sink path "Regex" -> RegexCompile
+  }
+  package "okhttp" {
+    source method "body" -> ExternalApiResponse
+    sink receiver "newCall" -> UrlFetch
+  }
+  package "java.sql" {
+    sink method "executeQuery" -> SqlExecution
+  }
+  package "android.database" {
+    sink method "execSQL" -> SqlExecution
+    sink method "rawQuery" -> SqlExecution
+  }
+  package "hibernate-core" {
+    sink method "createQuery" -> SqlExecution
+  }
+  package "mongodb-driver-kotlin" {
+    sink method "find" -> NosqlQuery
+  }
+  package "java.lang" {
+    sink path "ProcessBuilder" -> CommandExecution
+  }
+  package "kotlin-script-util" {
+    sink method "eval" -> CodeEval
+  }
+  package "java.io" {
+    sink method "readObject" -> Deserialization
+    sink path "File" -> FilePathAccess
+  }
+  package "jackson-module-kotlin" {
+    sink method "readValue" -> Deserialization
+  }
+  package "snakeyaml" {
+    sink path "Yaml.load" -> Deserialization
+    control "Yaml.safeLoad" -> SafeDeserialization
+  }
+  package "commons-compress" {
+    sink method "extractEntry" -> ArchiveEntryWrite
+  }
+  package "ktor-client-core" {
+    sink method "request" -> UrlFetch
+  }
+  package "dom4j" {
+    sink method "parse" -> XmlParse
+  }
+  package "javax.xml.xpath" {
+    sink method "evaluate" arg 0 -> XpathQuery
+  }
+  package "spring-ldap" {
+    sink method "search" arg 1 -> LdapQuery
+    control "LdapEncoder.filterEncode" -> LdapEscape
+  }
+  package "thymeleaf" {
+    sink method "render" -> TemplateRender
+  }
+  package "commons-text" {
+    control "StringEscapeUtils.escapeHtml4" -> HtmlEscape
+  }
+  package "owasp-java-encoder" {
+    control "Encode.forHtml" -> HtmlEscape
+    control "Encode.forXPath" -> XpathEscape
+  }
+  package "jakarta.persistence" {
+    control method "setParameter" -> SqlParameterization
+  }
+  package "commons-io" {
+    control "FilenameUtils.normalize" -> PathCanonicalization
+  }
+  package "javax.xml.parsers" {
+    control "DocumentBuilderFactory.setFeature" -> XmlHardening
+  }
+  package "spring-security" {
+    control "authenticate" -> AuthenticationCheck
+    control "PreAuthorize" -> AuthorizationCheck
+    control "CsrfToken" -> CsrfProtection
+  }
+}

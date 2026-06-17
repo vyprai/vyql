@@ -1,0 +1,9 @@
+import code.{DatabaseRead}
+adapter java {
+  package "org.apache.tomcat:tomcat-jdbc" {
+    sink method "ConnectionPool" -> code.DatabaseRead
+    sink method "getConnection" -> code.DatabaseRead
+    sink method "getConnectionAsync" -> code.DatabaseRead
+    sink method "createConnection" -> code.DatabaseRead
+  }
+}

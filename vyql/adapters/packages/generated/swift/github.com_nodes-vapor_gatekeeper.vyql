@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter swift {
+  package "github.com/nodes-vapor/gatekeeper" {
+    source method "respond" -> code.HttpInput
+  }
+}

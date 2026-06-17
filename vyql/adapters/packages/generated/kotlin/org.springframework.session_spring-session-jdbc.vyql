@@ -1,0 +1,16 @@
+import code.{Deserialization, SqlExecution}
+
+adapter kotlin {
+  package "org.springframework.session:spring-session-jdbc" {
+    sink method "setCreateSessionQuery" -> code.SqlExecution
+    sink method "setCreateSessionAttributeQuery" -> code.SqlExecution
+    sink method "setGetSessionQuery" -> code.SqlExecution
+    sink method "setUpdateSessionQuery" -> code.SqlExecution
+    sink method "setUpdateSessionAttributeQuery" -> code.SqlExecution
+    sink method "setDeleteSessionAttributeQuery" -> code.SqlExecution
+    sink method "setDeleteSessionQuery" -> code.SqlExecution
+    sink method "setListSessionsByPrincipalNameQuery" -> code.SqlExecution
+    sink method "setDeleteSessionsByExpiryTimeQuery" -> code.SqlExecution
+    sink method "deserialize" -> code.Deserialization
+  }
+}

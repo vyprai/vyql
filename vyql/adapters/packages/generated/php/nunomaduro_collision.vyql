@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter php {
+  package "nunomaduro/collision" {
+    source method "ArgumentFormatter.format" -> code.CliArgument
+  }
+}

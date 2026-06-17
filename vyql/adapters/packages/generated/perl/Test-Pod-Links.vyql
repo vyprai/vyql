@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter perl {
+  package "Test-Pod-Links" {
+    sink method "head" -> code.UrlFetch
+  }
+}

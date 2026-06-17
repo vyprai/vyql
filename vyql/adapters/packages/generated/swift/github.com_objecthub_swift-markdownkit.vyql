@@ -1,0 +1,7 @@
+import code.{Deserialization, HtmlRender}
+adapter swift {
+  package "github.com/objecthub/swift-markdownkit" {
+    sink method "parse" -> code.Deserialization
+    sink method "generate" -> code.HtmlRender
+  }
+}

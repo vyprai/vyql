@@ -1,0 +1,21 @@
+import code.{NetworkSend}
+import core.{UserControlledData}
+
+adapter python {
+  package "python-telegram-bot" {
+    source method "send_message" -> core.UserControlledData
+    source method "send_photo" -> core.UserControlledData
+    source method "send_audio" -> core.UserControlledData
+    source method "send_document" -> core.UserControlledData
+    source method "send_sticker" -> core.UserControlledData
+    source method "send_video" -> core.UserControlledData
+    source method "send_video_note" -> core.UserControlledData
+    source method "send_animation" -> core.UserControlledData
+    source method "send_voice" -> core.UserControlledData
+    source method "send_media_group" -> core.UserControlledData
+    source method "send_location" -> core.UserControlledData
+    source method "send_venue" -> core.UserControlledData
+    source method "send_contact" -> core.UserControlledData
+    sink method "do_api_request" -> code.NetworkSend
+  }
+}

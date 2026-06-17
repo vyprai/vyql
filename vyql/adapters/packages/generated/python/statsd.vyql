@@ -1,0 +1,11 @@
+import code.{NetworkSend}
+
+adapter python {
+  package "statsd" {
+    sink method "timing" -> code.NetworkSend
+    sink method "incr" -> code.NetworkSend
+    sink method "decr" -> code.NetworkSend
+    sink method "gauge" -> code.NetworkSend
+    sink method "set" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,11 @@
+import code.{CodeEval, FilePathAccess}
+import core.{UserControlledData}
+
+adapter perl {
+  package "filtered" {
+    source method "new" -> core.UserControlledData
+    sink method "import" -> code.CodeEval
+    sink method "filtered::hook::INC" -> code.CodeEval
+    sink method "filtered::hook::INC" -> code.FilePathAccess
+  }
+}

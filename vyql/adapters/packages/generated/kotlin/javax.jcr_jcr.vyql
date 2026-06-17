@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter kotlin {
+  package "javax.jcr:jcr" {
+    sink method "createQuery" -> code.SqlExecution
+  }
+}

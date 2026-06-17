@@ -1,0 +1,7 @@
+adapter kotlin {
+  package "redis.clients:jedis" {
+    sink method "exec" -> code.CommandExecution
+    sink method "get" -> code.NosqlQuery
+    sink method "set" -> code.StoredDataWrite
+  }
+}

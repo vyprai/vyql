@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter kotlin {
+  package "org.apache.maven.plugins:maven-compiler-plugin" {
+    sink method "run" -> code.CommandExecution
+  }
+}

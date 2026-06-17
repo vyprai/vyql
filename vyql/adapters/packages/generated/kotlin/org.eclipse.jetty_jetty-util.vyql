@@ -1,0 +1,9 @@
+adapter kotlin {
+  package "org.eclipse.jetty:jetty-util" {
+    sink method "copy" -> code.FilePathAccess
+    sink method "copyDir" -> code.FilePathAccess
+    sink method "copyFile" -> code.FilePathAccess
+    sink method "resolvePath" -> code.FilePathAccess
+    sink method "delete" -> code.FilePathAccess
+  }
+}

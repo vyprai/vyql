@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "jms/di-extra-bundle" {
+    sink method "exec" -> code.CommandExecution
+  }
+}

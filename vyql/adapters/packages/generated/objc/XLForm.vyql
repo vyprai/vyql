@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter objc {
+  package "XLForm" {
+    source method "httpParameters" -> code.HttpInput
+  }
+}

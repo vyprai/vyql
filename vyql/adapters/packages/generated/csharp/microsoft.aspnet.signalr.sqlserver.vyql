@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter csharp {
+  package "microsoft.aspnet.signalr.sqlserver" {
+    sink method "ObservableDbOperation.ExecuteReaderWithUpdates" -> code.SqlExecution
+  }
+}

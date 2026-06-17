@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter elixir {
+  package "nostrum" {
+    source method "Nostrum.Token.check_token!" -> code.SecretValue
+  }
+}

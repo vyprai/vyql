@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/pointfreeco/swift-snapshot-testing" {
+    sink method "decode" -> code.Deserialization
+  }
+}

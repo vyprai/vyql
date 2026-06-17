@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/klauspost/pgzip" {
+    sink method "NewReader" -> code.Deserialization
+    sink method "NewReaderN" -> code.Deserialization
+  }
+}

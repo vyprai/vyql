@@ -1,0 +1,5 @@
+adapter objc {
+  package "XMPPFramework" {
+    mark path "xmppframework.hash" -> code.WeakHash
+  }
+}

@@ -1,0 +1,6 @@
+adapter cpp {
+  package "freeglut" {
+    source method "fghParseCommandLineArguments" -> code.CliArgument
+    source method "parseCriteria" -> core.UserControlledData
+  }
+}

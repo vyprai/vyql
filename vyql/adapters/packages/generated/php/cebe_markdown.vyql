@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter php {
+  package "cebe/markdown" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseInline" -> code.Deserialization
+    sink method "parseBlock" -> code.Deserialization
+  }
+}

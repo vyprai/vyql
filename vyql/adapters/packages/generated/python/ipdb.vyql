@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter python {
+  package "ipdb" {
+    sink method "run" -> code.CodeEval
+    sink method "runeval" -> code.CodeEval
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter javascript {
+  package "@nodelib/fs.scandir" {
+    sink method "scandir" -> code.FilePathAccess
+    sink method "scandirSync" -> code.FilePathAccess
+  }
+}

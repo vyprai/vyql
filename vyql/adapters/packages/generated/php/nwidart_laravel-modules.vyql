@@ -1,0 +1,5 @@
+adapter php {
+  package "nwidart/laravel-modules" {
+    sink method "run" -> code.CommandExecution
+  }
+}

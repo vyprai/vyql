@@ -40,7 +40,7 @@ adapter c {
   sink path "opendir" -> code.FilePathAccess
 
   // dynamic loading (untrusted path -> code load)
-  sink path "dlopen" -> code.FilePathAccess
+  sink path "dlopen" -> code.DynamicCodeLoad
 
   // XSS (CWE-79) — writing untrusted HTML to a response/output stream (arg0 is the text)
   sink path "fputs" -> code.HtmlRender
@@ -58,6 +58,60 @@ adapter c {
   mark "mktemp" -> code.InsecureTempFile
   mark "tmpnam" -> code.InsecureTempFile
   mark "tempnam" -> code.InsecureTempFile
+  mark "chmod" val "0777" -> code.InsecurePermission
+  mark "chmod" val "0666" -> code.InsecurePermission
+  mark "open" val "0777" -> code.InsecurePermission
+  mark "open" val "0666" -> code.InsecurePermission
+
+  // memory safety (exploitability-aware). Taint rules fire when attacker input reaches
+  // the dangerous operand; smell rules keep an explicit exploit assumption.
+  sink path "strcpy" arg 1 -> code.UnboundedCopy
+  sink path "strcat" arg 1 -> code.UnboundedCopy
+  sink path "sprintf" arg all -> code.UnboundedCopy
+  sink path "vsprintf" arg all -> code.UnboundedCopy
+  mark "strcpy" -> code.UnboundedCopySmell
+  mark "strcat" -> code.UnboundedCopySmell
+  mark "sprintf" -> code.UnboundedCopySmell
+  mark "vsprintf" -> code.UnboundedCopySmell
+  sink path "memcpy" arg 2 -> code.RawMemoryCopySize
+  sink path "memmove" arg 2 -> code.RawMemoryCopySize
+  sink path "strncpy" arg 2 -> code.RawMemoryCopySize
+  sink path "strncat" arg 2 -> code.RawMemoryCopySize
+  sink path "malloc" -> code.SizeComputation
+  sink path "calloc" arg all -> code.SizeComputation
+  sink path "realloc" arg 1 -> code.SizeComputation
+  mark "alloca" -> code.StackAllocationSmell
+  mark "__subscript" -> code.IndexAccess
+  mark "__deref" -> code.PointerUse
+  mark "__deref" -> code.NullableDeref
+  mark "free" -> code.PointerFree
+  sink path "__binop.div" arg 1 -> code.DivisionDenominator
+  sink path "__binop.mod" arg 1 -> code.DivisionDenominator
+  mark "__binop.add" -> code.IntegerSizeArithmetic
+  mark "__binop.sub" -> code.IntegerSizeArithmetic
+  mark "__binop.mul" -> code.IntegerSizeArithmetic
+  mark "__binop.shl" -> code.IntegerSizeArithmetic
+
+  // TOCTOU / race (CWE-367): check before use on the same CFG path. The rule is
+  // assumption-gated because same-path ordering is not yet same-object proof.
+  mark "access" -> code.FileCheck
+  mark "stat" -> code.FileCheck
+  mark "lstat" -> code.FileCheck
+  mark "fopen" -> code.FileUse
+  mark "open" -> code.FileUse
+  mark "open64" -> code.FileUse
+  mark "unlink" -> code.FileUse
+  mark "remove" -> code.FileUse
+  mark "rename" -> code.FileUse
+  mark "chmod" -> code.FileUse
+  mark "chown" -> code.FileUse
+
+  // lifecycle / concurrency
+  mark "pthread_mutex_lock" -> code.LockAcquire
+  mark "mtx_lock" -> code.LockAcquire
+  control "pthread_mutex_unlock" -> core.LockRelease
+  control "mtx_unlock" -> core.LockRelease
+  mark "pthread_create" -> code.LocklessSharedMutation
 
   // format string (CWE-134) — tainted FORMAT argument
   sink path "printf" arg 0 -> code.FormatString
@@ -93,6 +147,8 @@ adapter c {
   mark "DES_set_key" -> code.WeakCipher
   mark "RC4" -> code.WeakCipher
   mark "BF_set_key" -> code.WeakCipher
+  mark "EVP_EncryptInit_ex" val "0000000000000000" -> code.StaticIv
+  mark "EVP_DecryptInit_ex" val "0000000000000000" -> code.StaticIv
 
   // insecure randomness (CWE-330) — rand()/random() (presence); getrandom()/RAND_bytes safe
   mark "rand" -> code.WeakRandomValue

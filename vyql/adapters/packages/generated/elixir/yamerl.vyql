@@ -1,0 +1,5 @@
+adapter elixir {
+  package "yamerl" {
+    sink method "parse_comment" -> code.Deserialization
+  }
+}

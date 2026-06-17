@@ -1,0 +1,7 @@
+import code.{Deserialization, NetworkConnect}
+adapter go {
+  package "github.com/vmware/govmomi" {
+    sink method "Unmarshal" -> code.Deserialization
+    sink method "NewClient" -> code.NetworkConnect
+  }
+}

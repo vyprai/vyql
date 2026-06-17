@@ -1,0 +1,5 @@
+adapter objc {
+  package "SQLCipher" {
+    sink method "Jim_FindHashEntry" -> code.SqlExecution
+  }
+}

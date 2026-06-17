@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter rust {
+  package "nanorand" {
+    source method "system" -> code.SecretValue
+  }
+}

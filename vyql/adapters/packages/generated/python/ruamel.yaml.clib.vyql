@@ -1,0 +1,5 @@
+adapter python {
+  package "ruamel.yaml.clib" {
+    sink method "yaml_parser_set_input" -> code.Deserialization
+  }
+}

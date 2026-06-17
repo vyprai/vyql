@@ -1,0 +1,7 @@
+import code.{HttpInput, Deserialization}
+adapter ruby {
+  package "journey" {
+    sink path "Parser.parse" -> code.Deserialization
+    source path "Router.call" -> code.HttpInput
+  }
+}

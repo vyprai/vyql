@@ -1,0 +1,6 @@
+adapter javascript {
+  package "fs.realpath" {
+    sink method "realpath" -> code.FilePathAccess
+    sink method "realpathSync" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,18 @@
+import core.{HtmlEscape, InputValidation}
+
+adapter java {
+  package "org.apache.commons:commons-text" {
+    control method "escapeHtml4" -> core.HtmlEscape
+    control method "escapeXml11" -> core.HtmlEscape
+    control method "escapeJson" -> core.HtmlEscape
+    control method "escapeEcmaScript" -> core.HtmlEscape
+    control method "escapeJava" -> core.HtmlEscape
+    control method "escapeCsv" -> core.HtmlEscape
+    control method "unescapeHtml4" -> core.InputValidation
+    control method "unescapeXml" -> core.InputValidation
+    control method "unescapeJson" -> core.InputValidation
+    control method "unescapeEcmaScript" -> core.InputValidation
+    control method "unescapeJava" -> core.InputValidation
+    control method "unescapeCsv" -> core.InputValidation
+  }
+}

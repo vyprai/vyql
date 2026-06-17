@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+
+adapter go {
+  package "gonum.org/v1/plot" {
+    sink method "vg.ParseLength" -> code.ExpressionEval
+  }
+}

@@ -1,0 +1,12 @@
+import core.{UserControlledData}
+adapter swift {
+  package "github.com/devxoul/URLNavigator" {
+    source method "urlValue" -> core.UserControlledData
+    source method "urlStringValue" -> core.UserControlledData
+    source method "queryParameters" -> core.UserControlledData
+    source method "open" -> core.UserControlledData
+    source method "push" -> core.UserControlledData
+    source method "present" -> core.UserControlledData
+    source method "match" -> core.UserControlledData
+  }
+}

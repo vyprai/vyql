@@ -1,0 +1,13 @@
+import code.{FilePathAccess}
+adapter elixir {
+  package "membrane_file_plugin" {
+    sink method "open!" -> code.FilePathAccess
+    sink method "write" -> code.FilePathAccess
+    sink method "seek" -> code.FilePathAccess
+    sink method "seek!" -> code.FilePathAccess
+    sink method "copy" -> code.FilePathAccess
+    sink method "copy!" -> code.FilePathAccess
+    sink method "truncate!" -> code.FilePathAccess
+    sink method "binread!" -> code.FilePathAccess
+  }
+}

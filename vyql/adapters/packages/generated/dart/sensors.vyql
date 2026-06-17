@@ -1,0 +1,7 @@
+adapter dart {
+  package "sensors" {
+    source method "AccelerometerEvent" -> core.UserControlledData
+    source method "UserAccelerometerEvent" -> core.UserControlledData
+    source method "GyroscopeEvent" -> core.UserControlledData
+  }
+}

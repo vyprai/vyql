@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "AlamofireObjectMapper" {
+    sink method "serialize" -> code.Deserialization
+  }
+}

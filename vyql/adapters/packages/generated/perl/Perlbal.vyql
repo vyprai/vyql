@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter perl {
+  package "Perlbal" {
+    source method "parse" -> code.CliArgument
+  }
+}

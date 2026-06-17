@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "cssparser-macros" {
+    sink method "parse" -> code.Deserialization
+  }
+}

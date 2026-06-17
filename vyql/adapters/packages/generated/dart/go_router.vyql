@@ -1,0 +1,8 @@
+import code.{UrlFetch, FilePathAccess, CommandExecution, Deserialization, NetworkConnect, RedirectTarget, CodeEval, ExpressionEval}
+import core.{UserControlledData, InputValidation}
+
+adapter dart {
+  package "go_router" {
+    source method "extractPathParams" -> core.UserControlledData
+  }
+}

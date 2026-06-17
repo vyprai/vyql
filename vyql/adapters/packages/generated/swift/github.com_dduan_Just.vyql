@@ -1,0 +1,25 @@
+import code.{NetworkConnect, NetworkData, NetworkSend, UrlFetch}
+
+adapter swift {
+  package "github.com/dduan/Just" {
+    sink method "request" -> code.NetworkConnect
+    sink method "delete" -> code.NetworkConnect
+    sink method "get" -> code.NetworkConnect
+    sink method "head" -> code.NetworkConnect
+    sink method "options" -> code.NetworkConnect
+    sink method "patch" -> code.NetworkConnect
+    sink method "post" -> code.NetworkConnect
+    sink method "put" -> code.NetworkConnect
+    sink method "synthesizeRequest" -> code.NetworkConnect
+    sink method "request" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+    sink method "get" -> code.NetworkSend
+    sink method "head" -> code.NetworkSend
+    sink method "options" -> code.NetworkSend
+    sink method "patch" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "synthesizeRequest" -> code.NetworkSend
+    source method "init" -> code.NetworkData
+  }
+}

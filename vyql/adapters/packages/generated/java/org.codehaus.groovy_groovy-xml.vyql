@@ -1,0 +1,9 @@
+adapter java {
+  package "org.codehaus.groovy:groovy-xml" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseText" -> code.Deserialization
+    sink method "newSAXParser" -> code.XmlParse
+    control method "escapeXml" -> core.HtmlEscape
+    control method "escapeControlCharacters" -> core.InputValidation
+  }
+}

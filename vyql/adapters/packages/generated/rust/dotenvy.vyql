@@ -1,0 +1,7 @@
+import code.{CodeEval, Deserialization}
+adapter rust {
+  package "dotenvy" {
+    sink method "parse_line" -> code.Deserialization
+    sink method "load" -> code.CodeEval
+  }
+}

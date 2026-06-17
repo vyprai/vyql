@@ -1,0 +1,6 @@
+adapter perl {
+  package "Config-Onion" {
+    sink method "load" -> code.FilePathAccess
+    sink method "load_glob" -> code.FilePathAccess
+  }
+}

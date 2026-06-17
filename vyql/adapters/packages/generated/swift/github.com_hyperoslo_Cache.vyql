@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/hyperoslo/Cache" {
+    sink method "setObject" -> code.StoredDataWrite
+    mark method "MD5" -> code.WeakHash
+  }
+}

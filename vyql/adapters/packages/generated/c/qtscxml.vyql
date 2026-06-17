@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter c {
+  package "qtscxml" {
+    sink method "parse" -> code.UrlFetch
+  }
+}

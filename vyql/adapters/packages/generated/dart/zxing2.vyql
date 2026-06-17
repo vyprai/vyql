@@ -1,0 +1,5 @@
+adapter dart {
+  package "zxing2" {
+    sink method "parseString" -> code.Deserialization
+  }
+}

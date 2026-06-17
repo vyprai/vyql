@@ -1,0 +1,5 @@
+adapter dart {
+  package "sembast" {
+    sink method "file" -> code.FilePathAccess
+  }
+}

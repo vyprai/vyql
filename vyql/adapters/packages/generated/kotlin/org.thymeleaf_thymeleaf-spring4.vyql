@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.thymeleaf:thymeleaf-spring4" {
+    sink method "render" -> code.HtmlRender
+    control method "setRedirectHttp10Compatible" -> core.InputValidation
+  }
+}

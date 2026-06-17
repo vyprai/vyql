@@ -1,0 +1,7 @@
+adapter python {
+  package "portalocker" {
+    sink method "lock" -> code.FilePathAccess
+    sink method "unlock" -> code.FilePathAccess
+    sink method "open_atomic" -> code.FilePathAccess
+  }
+}

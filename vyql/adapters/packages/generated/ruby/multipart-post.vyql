@@ -1,0 +1,6 @@
+import code.{FileUse}
+adapter ruby {
+  package "multipart-post" {
+    sink method "UploadIO.initialize" -> code.FileUse
+  }
+}

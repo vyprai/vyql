@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess}
+adapter python {
+  package "qtpy" {
+    sink method "readResources" -> code.Deserialization
+    sink method "loadUi" -> code.Deserialization
+    sink method "loadUiType" -> code.Deserialization
+    sink method "getopenfilename" -> code.FilePathAccess
+    sink method "getopenfilenames" -> code.FilePathAccess
+    sink method "getsavefilename" -> code.FilePathAccess
+  }
+}

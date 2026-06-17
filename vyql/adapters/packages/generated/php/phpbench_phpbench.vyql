@@ -1,0 +1,7 @@
+import code.{ExpressionEval, XmlParse}
+adapter php {
+  package "phpbench/phpbench" {
+    sink method "query" -> code.XmlParse
+    sink method "parse" -> code.ExpressionEval
+  }
+}

@@ -1,0 +1,5 @@
+adapter scala {
+  package "com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider" {
+    sink method "value" -> code.Deserialization
+  }
+}

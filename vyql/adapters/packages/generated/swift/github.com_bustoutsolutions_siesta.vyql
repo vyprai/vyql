@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/bustoutsolutions/siesta" {
+    source method "session" -> code.HttpInput
+    mark method "hash" -> code.WeakHash
+  }
+}

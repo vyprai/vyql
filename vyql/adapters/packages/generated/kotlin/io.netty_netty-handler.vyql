@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter kotlin {
+  package "io.netty:netty-handler" {
+    sink method "readCertificates" -> code.FilePathAccess
+    sink method "readPrivateKey" -> code.FilePathAccess
+  }
+}

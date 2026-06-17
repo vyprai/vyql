@@ -1,0 +1,20 @@
+import code.{Deserialization, FilePathAccess}
+adapter kotlin {
+  package "com.facebook.fresco:webpsupport" {
+    sink method "decodeByteBuffer" -> code.Deserialization
+    sink method "decodeInputStream" -> code.Deserialization
+    sink method "decodeFileDescriptor" -> code.Deserialization
+    sink method "decodeStream" -> code.Deserialization
+    sink method "decodeFile" -> code.Deserialization
+    sink method "decodeByteArray" -> code.Deserialization
+    sink method "hookDecodeByteArray" -> code.Deserialization
+    sink method "hookDecodeStream" -> code.Deserialization
+    sink method "hookDecodeFile" -> code.Deserialization
+    sink method "hookDecodeResourceStream" -> code.Deserialization
+    sink method "hookDecodeResource" -> code.Deserialization
+    sink method "hookDecodeFileDescriptor" -> code.Deserialization
+    sink method "nativeDecodeStream" -> code.Deserialization
+    sink method "nativeDecodeByteArray" -> code.Deserialization
+    sink method "nativeSeek" -> code.FilePathAccess
+  }
+}

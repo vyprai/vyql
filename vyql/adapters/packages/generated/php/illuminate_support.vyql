@@ -1,0 +1,10 @@
+import code.{FilePathAccess}
+import core.{InputValidation}
+
+adapter php {
+  package "illuminate/support" {
+    sink method "Env::writeVariables" -> code.FilePathAccess
+    sink method "Env::writeVariable" -> code.FilePathAccess
+    control method "Str::json_validate" -> core.InputValidation
+  }
+}

@@ -1,0 +1,11 @@
+import code.{FilePathAccess, FileUse}
+adapter objc {
+  package "CapacitorFilesystem" {
+    sink method "readFile" -> code.FilePathAccess
+    sink method "writeFile" -> code.FileUse
+    sink method "appendFile" -> code.FileUse
+    sink method "deleteFile" -> code.FileUse
+    sink method "readdir" -> code.FilePathAccess
+    sink method "copy" -> code.FileUse
+  }
+}

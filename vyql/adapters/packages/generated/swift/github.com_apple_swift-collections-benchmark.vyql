@@ -1,0 +1,8 @@
+import code.{CliArgument, FilePathAccess}
+
+adapter swift {
+  package "github.com/apple/swift-collections-benchmark" {
+    sink method "load(from:)" -> code.FilePathAccess
+    sink method "save(to:)" -> code.FilePathAccess
+  }
+}

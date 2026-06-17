@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/apple/swift-nio-ssl" {
+    source method "privateKey" -> code.SecretValue
+    mark method "hash" -> code.WeakHash
+  }
+}

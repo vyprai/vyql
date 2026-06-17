@@ -1,0 +1,14 @@
+import code.{WeakHash, Deserialization, NetworkData, CommandExecution, FilePathAccess, UrlFetch}
+import core.{AuthenticationCheck, AuthorizationCheck, InputValidation}
+
+adapter objc {
+  package "RHCategoryKit" {
+    sink method "AES256EncryptWithKey" -> code.StoredDataWrite
+    source method "AES256DecryptWithKey" -> code.StoredDataRead
+    sink method "RSAEncryptWithPublicKey" -> code.StoredDataWrite
+    sink method "RSAEncryptWithPublicKeyData" -> code.StoredDataWrite
+    source method "RSADecryptWithPrivateKey" -> code.StoredDataRead
+    source method "RSADecryptWithPrivateKeyData" -> code.StoredDataRead
+    mark method "rh_stringWithMD5Encode" -> code.WeakHash
+  }
+}

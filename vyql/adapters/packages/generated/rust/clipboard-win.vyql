@@ -1,0 +1,9 @@
+adapter rust {
+  package "clipboard-win" {
+    source method "read_clipboard" -> core.UserControlledData
+    source method "get_file_list_path" -> core.UserControlledData
+    source method "get_file_list" -> core.UserControlledData
+    sink method "write_clipboard" -> code.StoredDataWrite
+    sink method "set_file_list" -> code.StoredDataWrite
+  }
+}

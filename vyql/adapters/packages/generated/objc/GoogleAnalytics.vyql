@@ -1,0 +1,9 @@
+import code.{NetworkSend}
+import core.{InputValidation}
+
+adapter objc {
+  package "GoogleAnalytics" {
+    sink method "send" -> code.NetworkSend
+    control method "setCampaignParametersFromUrl" -> core.InputValidation
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/grpc-ecosystem/grpc-gateway" {
+    sink method "ParseRequest" -> code.Deserialization
+  }
+}

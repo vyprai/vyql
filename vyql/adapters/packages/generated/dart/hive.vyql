@@ -1,0 +1,14 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter dart {
+  package "hive" {
+    sink method "BoxImpl.put" -> code.StoredDataWrite
+    sink method "BoxImpl.putAll" -> code.StoredDataWrite
+    sink method "BoxImpl.deleteAll" -> code.StoredDataWrite
+    source method "BoxImpl.get" -> code.StoredDataRead
+    source method "BoxImpl.getAt" -> code.StoredDataRead
+    source method "BoxImpl.values" -> code.StoredDataRead
+    source method "BoxImpl.valuesBetween" -> code.StoredDataRead
+    source method "LazyBoxImpl.get" -> code.StoredDataRead
+  }
+}

@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter ruby {
+  package "temple" {
+    control method "escape_html" -> core.HtmlEscape
+  }
+}

@@ -1,0 +1,10 @@
+import code.{FilePathAccess, HttpInput, HtmlRender, NetworkSend}
+adapter perl {
+  package "Flea" {
+    source method "request" -> code.HttpInput
+    sink method "json" -> code.NetworkSend
+    sink method "html" -> code.HtmlRender
+    sink method "text" -> code.NetworkSend
+    sink method "file" -> code.FilePathAccess
+  }
+}

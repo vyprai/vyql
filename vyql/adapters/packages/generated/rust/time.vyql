@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "time" {
+    sink method "parse" -> code.Deserialization
+  }
+}

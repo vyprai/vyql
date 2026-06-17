@@ -1,0 +1,7 @@
+import code.{TemplateRender}
+adapter perl {
+  package "Pod-Template" {
+    sink method "parse" -> code.TemplateRender
+    sink method "_parse_include" -> code.TemplateRender
+  }
+}

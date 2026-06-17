@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "html5ever" {
+    sink method "tokenize" -> code.Deserialization
+    sink method "process" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+adapter c {
+  package "wxwidgets" {
+    source method "OnInitCmdLine" -> code.CliArgument
+    source method "OnCmdLineParsed" -> code.CliArgument
+    source method "OnCmdLineHelp" -> code.CliArgument
+    source method "OnCmdLineError" -> code.CliArgument
+    source method "ParseAccel" -> core.UserControlledData
+  }
+}

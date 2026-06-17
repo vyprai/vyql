@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter php {
+  package "seld/jsonlint" {
+    sink method "parse" -> code.Deserialization
+    sink method "lint" -> code.Deserialization
+  }
+}

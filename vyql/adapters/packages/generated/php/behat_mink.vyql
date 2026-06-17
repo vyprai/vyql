@@ -1,0 +1,12 @@
+import code.{UrlFetch, HttpInput, NetworkSend, Cookie, CodeEval}
+
+adapter php {
+  package "behat/mink" {
+    sink method "visit" -> code.UrlFetch
+    sink method "setBasicAuth" -> code.UrlFetch
+    sink method "setRequestHeader" -> code.NetworkSend
+    source method "setCookie" -> code.Cookie
+    sink method "executeScript" -> code.CodeEval
+    sink method "evaluateScript" -> code.CodeEval
+  }
+}

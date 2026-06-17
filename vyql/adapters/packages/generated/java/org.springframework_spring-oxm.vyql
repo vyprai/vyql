@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter java {
+  package "org.springframework:spring-oxm" {
+    sink method "unmarshal" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    control method "setProcessExternalEntities" -> core.InputValidation
+  }
+}

@@ -1,0 +1,8 @@
+import code.{CodeEval, FileUse}
+
+adapter elixir {
+  package "phoenix_haml" {
+    sink method "compile" -> code.CodeEval
+    sink method "read!" -> code.FileUse
+  }
+}

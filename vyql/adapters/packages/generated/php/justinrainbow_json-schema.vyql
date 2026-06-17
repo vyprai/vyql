@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "justinrainbow/json-schema" {
+    sink method "JsonSchema\Validator::validate" -> code.Deserialization
+  }
+}

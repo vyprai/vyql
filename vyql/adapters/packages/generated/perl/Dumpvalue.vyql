@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter perl {
+  package "Dumpvalue" {
+    sink method "matchvar" -> code.CodeEval
+  }
+}

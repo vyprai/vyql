@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "exconstructor" {
+    sink method "new" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{SecretValue}
+
+adapter elixir {
+  package "phoenix" {
+    source method "connect" -> code.SecretValue
+  }
+}

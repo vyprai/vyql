@@ -1,0 +1,10 @@
+import code.{HtmlRender, UrlFetch}
+
+adapter dart {
+  package "webkit_inspection_protocol" {
+    sink method "navigate" -> code.UrlFetch
+    sink method "createTarget" -> code.UrlFetch
+    sink method "setAttributeValue" -> code.HtmlRender
+    sink method "setNodeValue" -> code.HtmlRender
+  }
+}

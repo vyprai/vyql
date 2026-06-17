@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter perl {
+  package "Gungho" {
+    sink method "sprintf" -> code.CodeEval
+  }
+}

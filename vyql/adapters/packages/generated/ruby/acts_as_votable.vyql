@@ -1,0 +1,6 @@
+adapter ruby {
+  package "acts_as_votable" {
+    source method "voter_params" -> code.HttpInput
+    source method "votable_params" -> code.HttpInput
+  }
+}

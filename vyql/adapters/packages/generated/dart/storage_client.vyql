@@ -1,0 +1,16 @@
+import code.{FilePathAccess, SecretValue, UrlFetch}
+adapter dart {
+  package "storage_client" {
+    source method "setAuth" -> code.SecretValue
+    source method "createSignedUploadUrl" -> code.SecretValue
+    sink method "listBuckets" -> code.FilePathAccess
+    sink method "getBucket" -> code.FilePathAccess
+    sink method "emptyBucket" -> code.FilePathAccess
+    sink method "deleteBucket" -> code.FilePathAccess
+    sink method "info" -> code.FilePathAccess
+    sink method "exists" -> code.FilePathAccess
+    sink method "remove" -> code.FilePathAccess
+    sink method "head" -> code.UrlFetch
+    sink method "get" -> code.UrlFetch
+  }
+}

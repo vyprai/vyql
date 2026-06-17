@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "html2text" {
+    sink method "html2text" -> code.Deserialization
+  }
+}

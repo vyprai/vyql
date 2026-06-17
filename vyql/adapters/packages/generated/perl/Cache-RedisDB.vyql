@@ -1,0 +1,9 @@
+import code.{Deserialization, StoredDataWrite}
+adapter perl {
+  package "Cache-RedisDB" {
+    sink method "get" -> code.Deserialization
+    sink method "mget" -> code.Deserialization
+    sink method "set" -> code.StoredDataWrite
+    sink method "set_nw" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,293 @@
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"hash"
+	"io"
+	"path/filepath"
+	"sort"
+
+	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/extract/frontend"
+	"github.com/vyprai/vyql/extract/lowering"
+	"github.com/vyprai/vyql/extract/parsecache"
+	"github.com/vyprai/vyql/usg"
+)
+
+// encodeLabels/decodeLabels are a compact length-prefixed codec for one module's adapter-label
+// output — far faster than gob (no reflection, fewer allocations), the dominant cost of replaying
+// thousands of modules' cached labels per warm scan. The bytes are a cache value (never hashed),
+// so encoding order is free; round-trip fidelity is gated by the findings-equivalence harness.
+func encodeLabels(recs []usg.LabelRec) []byte {
+	w := &lblWriter{b: make([]byte, 0, 128)}
+	w.uvar(len(recs))
+	for _, lr := range recs {
+		w.str(lr.NodeID)
+		w.str(lr.Label.Concept)
+		p := lr.Label.Provenance
+		w.str(p.Extractor)
+		w.str(p.Adapter)
+		w.str(p.SourceRef)
+		w.str(p.Confidence)
+		w.str(p.Fidelity)
+		w.smap(lr.Label.Detail)
+	}
+	return w.b
+}
+
+func decodeLabels(raw []byte) (recs []usg.LabelRec, ok bool) {
+	defer func() {
+		if recover() != nil {
+			recs, ok = nil, false
+		}
+	}()
+	r := &lblReader{b: raw}
+	n := r.uvar()
+	if n == 0 {
+		return nil, true
+	}
+	recs = make([]usg.LabelRec, n)
+	for i := range recs {
+		nodeID := r.str()
+		lbl := usg.Label{Concept: r.str()}
+		lbl.Provenance = usg.Provenance{
+			Extractor: r.str(), Adapter: r.str(), SourceRef: r.str(),
+			Confidence: r.str(), Fidelity: r.str(),
+		}
+		lbl.Detail = r.smap()
+		recs[i] = usg.LabelRec{NodeID: nodeID, Label: lbl}
+	}
+	return recs, true
+}
+
+type lblWriter struct{ b []byte }
+
+func (w *lblWriter) uvar(n int) {
+	for n >= 0x80 {
+		w.b = append(w.b, byte(n)|0x80)
+		n >>= 7
+	}
+	w.b = append(w.b, byte(n))
+}
+func (w *lblWriter) str(s string) { w.uvar(len(s)); w.b = append(w.b, s...) }
+func (w *lblWriter) smap(m map[string]string) {
+	w.uvar(len(m))
+	for k, v := range m {
+		w.str(k)
+		w.str(v)
+	}
+}
+
+type lblReader struct {
+	b []byte
+	i int
+}
+
+func (r *lblReader) uvar() int {
+	var x int
+	var s uint
+	for {
+		c := r.b[r.i]
+		r.i++
+		x |= int(c&0x7f) << s
+		if c < 0x80 {
+			return x
+		}
+		s += 7
+	}
+}
+func (r *lblReader) str() string {
+	n := r.uvar()
+	s := string(r.b[r.i : r.i+n])
+	r.i += n
+	return s
+}
+func (r *lblReader) smap() map[string]string {
+	n := r.uvar()
+	if n == 0 {
+		return nil
+	}
+	m := make(map[string]string, n)
+	for j := 0; j < n; j++ {
+		k := r.str()
+		m[k] = r.str()
+	}
+	return m
+}
+
+// applyAdaptersIncremental runs the adapter labeling phase reusing the cached concept labels of
+// modules whose content AND the global adapter inputs are unchanged, re-running adapters only on
+// the rest. This is the adapter analogue of incremental lowering.
+//
+// Soundness rests on adapters.Apply resolving precedence strictly per-(node, concept): a node's
+// final labels depend only on proposals targeting that exact node (its own properties plus the
+// global package/import evidence), never on other code nodes. Since each node belongs to exactly
+// one module, restricting the adapter pass to a subset of modules yields labels byte-identical
+// to a full pass for those modules. Import and SBOM nodes stay fully visible (RestrictStore),
+// so package-evidence gating is unaffected by which modules are in the relabel set.
+//
+// The per-module cache key folds in adapterFingerprint — the active source set (profile), the
+// package-evidence set, and a stat-hash of the loaded adapter data — so any change to a global
+// adapter input misses every module and re-labels the whole graph. modHash maps each module's
+// namespace (lowering.ModuleNS) to its content hash; a module absent from it (e.g. a native
+// frontend with no Hash) is always relabeled and never cached.
+func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) (map[string]bool, error) {
+	fp := adapterFingerprint(deps)
+
+	// decide which modules must be (re)labeled: those whose adapter-cache key misses. Read all
+	// module keys in one batched transaction — thousands of individual badger reads here was the
+	// dominant cost of a large incremental scan (I/O-bound, invisible to a CPU profile).
+	keys := make([]string, 0, len(modHash))
+	for ns, h := range modHash {
+		keys = append(keys, adapterKey(fp, ns, h))
+	}
+	raws := batchGet(cache, keys)
+	relabel := map[string]bool{}
+	cachedFor := map[string][]usg.LabelRec{}
+	for ns, h := range modHash {
+		if raw, ok := raws[adapterKey(fp, ns, h)]; ok {
+			if recs, ok := decodeLabels(raw); ok {
+				cachedFor[ns] = recs
+				continue
+			}
+		}
+		relabel[ns] = true
+	}
+
+	// run adapters over a view that exposes only relabel-set modules (plus nodes with no module
+	// and all Import/SBOM evidence), recording the labels each produces. The subset is computed
+	// once; each adapter then iterates O(subset) instead of re-filtering the whole graph.
+	rec := &usg.RecordingStore{Store: g}
+	view, err := usg.NewSubsetStore(rec, func(id, _ string) bool {
+		mod, ok := lowering.NodeModule(id)
+		if !ok {
+			return true // not module-scoped — always process, never cached
+		}
+		if _, hashed := modHash[mod]; !hashed {
+			return true // hashless module (native frontend, no content hash) — always relabel
+		}
+		return relabel[mod]
+	})
+	if err != nil {
+		return nil, err
+	}
+	if _, _, err := adapters.Apply(view, ads, nil); err != nil {
+		return nil, err
+	}
+
+	// bucket recorded labels by module, then persist one entry per relabeled module — even an
+	// empty one, so a label-free module hits next time instead of re-running every scan.
+	buckets := map[string][]usg.LabelRec{}
+	for _, lr := range rec.Recs {
+		if mod, ok := lowering.NodeModule(lr.NodeID); ok && relabel[mod] {
+			buckets[mod] = append(buckets[mod], lr)
+		}
+	}
+	writes := make(map[string][]byte, len(relabel))
+	for ns := range relabel {
+		writes[adapterKey(fp, ns, modHash[ns])] = encodeLabels(buckets[ns])
+	}
+	batchPut(cache, writes)
+
+	// replay cached labels for the unchanged modules onto the real store.
+	for _, recs := range cachedFor {
+		for _, lr := range recs {
+			_ = g.AddLabel(lr.NodeID, lr.Label)
+		}
+	}
+	return relabel, nil
+}
+
+func adapterKey(fp, moduleNS, moduleHash string) string {
+	return "adapt\x00" + fp + "\x00" + moduleNS + "\x00" + moduleHash
+}
+
+// batchReader / batchWriter are the optional fast paths a real (badger-backed) DeltaCache
+// implements: reading/writing thousands of keys in one transaction. In-memory test caches
+// don't, so batchGet/batchPut fall back to per-key access.
+type batchReader interface {
+	GetManyRaw(keys []string) map[string][]byte
+}
+type batchWriter interface {
+	PutManyRaw(kv map[string][]byte)
+}
+
+func batchGet(cache lowering.DeltaCache, keys []string) map[string][]byte {
+	if br, ok := cache.(batchReader); ok {
+		return br.GetManyRaw(keys)
+	}
+	out := make(map[string][]byte, len(keys))
+	for _, k := range keys {
+		if v, ok := cache.GetRaw(k); ok {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func batchPut(cache lowering.DeltaCache, kv map[string][]byte) {
+	if bw, ok := cache.(batchWriter); ok {
+		bw.PutManyRaw(kv)
+		return
+	}
+	for k, v := range kv {
+		cache.PutRaw(k, v)
+	}
+}
+
+// adapterFingerprint hashes every global input the adapter phase depends on besides a module's
+// own nodes: the binary salt (a rebuilt scanner re-labels everything), the active source set,
+// the package-evidence set (which package-gated adapters fire), and a stat-hash of the loaded
+// adapter data (static per-language adapters + the generated per-package files for present
+// deps). If this is unchanged, a module's adapter labels are reproducible from its content.
+func adapterFingerprint(deps map[string]bool) string {
+	h := sha256.New()
+	if salt := parsecache.Shared().Salt(); salt != nil {
+		h.Write(salt)
+	}
+	io.WriteString(h, "\x00sources\x00")
+	io.WriteString(h, frontend.ActiveSourcesKey())
+
+	io.WriteString(h, "\x00deps\x00")
+	keys := make([]string, 0, len(deps))
+	for k := range deps {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		io.WriteString(h, k)
+		io.WriteString(h, "\x00")
+	}
+
+	io.WriteString(h, "\x00adata\x00")
+	statAdapterData(h, deps)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// statAdapterData folds the identity (path+size+mtime) of the adapter data that actually loads
+// into h: the static top-level <data>/adapters/*.vyql, plus the generated per-package files for
+// packages in deps. It deliberately avoids stat-walking the full ~9k-file generated corpus —
+// only the matched files matter, and walking all of them every scan would cost what this cache
+// saves.
+func statAdapterData(h hash.Hash, deps map[string]bool) {
+	root := filepath.Join(datadir.Root(), "adapters")
+	statGlob(h, filepath.Join(root, "*.vyql"))
+	if len(deps) == 0 {
+		return
+	}
+	gen := frontend.GeneratedRoot()
+	pkgs := make([]string, 0, len(deps))
+	for p := range deps {
+		pkgs = append(pkgs, p)
+	}
+	sort.Strings(pkgs)
+	langs, _ := filepath.Glob(filepath.Join(gen, "*"))
+	sort.Strings(langs)
+	for _, langDir := range langs {
+		for _, p := range pkgs {
+			statFile(h, filepath.Join(langDir, p+".vyql"))
+		}
+	}
+}

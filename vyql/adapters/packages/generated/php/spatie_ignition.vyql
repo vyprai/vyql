@@ -1,0 +1,10 @@
+import code.{FilePathAccess, TemplateRender}
+import core.{UserControlledData}
+
+adapter php {
+  package "spatie/ignition" {
+    sink method "render" -> code.TemplateRender
+
+    sink method "renderAsString" -> code.TemplateRender
+  }
+}

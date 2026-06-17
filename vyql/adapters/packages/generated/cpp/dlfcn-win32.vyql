@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter cpp {
+  package "dlfcn-win32" {
+    sink method "dlopen" -> code.CodeEval
+  }
+}

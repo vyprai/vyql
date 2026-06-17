@@ -1,0 +1,6 @@
+import code.{SecretValue}
+adapter rust {
+  package "fuchsia-zircon" {
+    source method "cprng_draw" -> code.SecretValue
+  }
+}

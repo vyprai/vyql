@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter cpp {
+  package "vulkan-memory-allocator" {
+    sink method "ReadFile" -> code.FilePathAccess
+    sink method "SaveFile" -> code.FilePathAccess
+  }
+}

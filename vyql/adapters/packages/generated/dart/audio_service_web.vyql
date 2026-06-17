@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter dart {
+  package "audio_service_web" {
+    sink method "setState" -> code.HtmlRender
+  }
+}

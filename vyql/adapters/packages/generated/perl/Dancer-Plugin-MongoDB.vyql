@@ -1,0 +1,8 @@
+import code.{NosqlQuery}
+
+adapter perl {
+  package "Dancer-Plugin-MongoDB" {
+    sink method "_get_connection" -> code.NosqlQuery
+    sink method "_mango_connection" -> code.NosqlQuery
+  }
+}

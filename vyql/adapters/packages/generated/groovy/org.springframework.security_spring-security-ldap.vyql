@@ -1,0 +1,7 @@
+import code.{DatabaseRead, SecretValue}
+adapter groovy {
+  package "org.springframework.security:spring-security-ldap" {
+    sink method "search" -> code.DatabaseRead
+    source method "setPassword" -> code.SecretValue
+  }
+}

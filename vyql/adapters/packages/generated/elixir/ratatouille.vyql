@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter elixir {
+  package "ratatouille" {
+    sink method "Ratatouille.Runtime.process_command_async" -> code.CommandExecution
+  }
+}

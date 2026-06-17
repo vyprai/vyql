@@ -1,0 +1,14 @@
+import core.{UserControlledData}
+import code.{UrlFetch}
+
+adapter elixir {
+  package "ueberauth_twitter" {
+    source method "handle_request!" -> core.UserControlledData
+    source method "handle_callback!" -> core.UserControlledData
+    source method "credentials" -> core.UserControlledData
+    source method "uid" -> core.UserControlledData
+    source method "info" -> core.UserControlledData
+    source method "extra" -> core.UserControlledData
+    sink method "Twitter.OAuth.get" -> code.UrlFetch
+  }
+}

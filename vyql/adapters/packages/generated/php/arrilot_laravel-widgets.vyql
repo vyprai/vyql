@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "arrilot/laravel-widgets" {
+    sink method "decryptWidgetParams" -> code.Deserialization
+  }
+}

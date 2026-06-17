@@ -1,0 +1,9 @@
+import code.{HtmlRender}
+
+adapter dart {
+  package "google_maps_flutter_web" {
+    sink method "trustedInnerHTML" -> code.HtmlRender
+    sink method "innerHTMLString" -> code.HtmlRender
+    sink method "createHTMLNoArgs" -> code.HtmlRender
+  }
+}

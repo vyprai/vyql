@@ -1,0 +1,8 @@
+import code.{CodeEval}
+
+adapter ruby {
+  package "wisper" {
+    sink method "on" -> code.CodeEval
+    sink method "broadcast" -> code.CodeEval
+  }
+}

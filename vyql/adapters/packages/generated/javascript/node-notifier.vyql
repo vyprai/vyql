@@ -1,0 +1,10 @@
+import code.{CommandExecution}
+
+adapter javascript {
+  package "node-notifier" {
+    sink method "command" -> code.CommandExecution
+    sink method "fileCommand" -> code.CommandExecution
+    sink method "fileCommandJson" -> code.CommandExecution
+    sink method "immediateFileCommand" -> code.CommandExecution
+  }
+}

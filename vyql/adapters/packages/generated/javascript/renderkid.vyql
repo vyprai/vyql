@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter javascript {
+  package "renderkid" {
+    sink method "stringToDom" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{DomInput}
+
+adapter csharp {
+  package "rxjs-lite" {
+    source method "createEventListener" -> code.DomInput
+  }
+}

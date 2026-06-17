@@ -1,0 +1,6 @@
+import code.{WeakHash}
+adapter elixir {
+  package "jumper" {
+    mark method "slot" -> code.WeakHash
+  }
+}

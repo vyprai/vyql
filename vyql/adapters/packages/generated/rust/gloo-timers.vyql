@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter rust {
+  package "gloo-timers" {
+    sink method "set_timeout" -> code.CodeEval
+    sink method "set_interval" -> code.CodeEval
+  }
+}

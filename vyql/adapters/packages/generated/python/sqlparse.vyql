@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter python {
+  package "sqlparse" {
+    sink method "parse" -> code.Deserialization
+    sink method "parsestream" -> code.Deserialization
+    sink method "split" -> code.Deserialization
+    sink method "tokenize" -> code.Deserialization
+  }
+}

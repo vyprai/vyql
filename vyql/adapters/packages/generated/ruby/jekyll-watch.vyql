@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter ruby {
+  package "jekyll-watch" {
+    source method "watch" -> core.UserControlledData
+  }
+}

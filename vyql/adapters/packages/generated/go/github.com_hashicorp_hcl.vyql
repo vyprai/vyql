@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/hashicorp/hcl" {
+    sink method "Unmarshal" -> code.Deserialization
+    sink method "Decode" -> code.Deserialization
+    sink method "ParseBytes" -> code.Deserialization
+    sink method "ParseString" -> code.Deserialization
+    sink method "Parse" -> code.Deserialization
+  }
+}

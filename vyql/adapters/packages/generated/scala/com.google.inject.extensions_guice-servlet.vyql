@@ -1,0 +1,7 @@
+adapter scala {
+  package "com.google.inject.extensions:guice-servlet" {
+    source method "getOriginalRequest" -> code.HttpInput
+    source method "getRequest" -> code.HttpInput
+    sink method "getResponse" -> code.ResponseHeaderWrite
+  }
+}

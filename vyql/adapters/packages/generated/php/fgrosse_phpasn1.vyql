@@ -1,0 +1,9 @@
+import code.{Deserialization, NetworkData}
+
+adapter php {
+  package "fgrosse/phpasn1" {
+    sink method "FG\ASN1\TemplateParser::parseBase64" -> code.Deserialization
+    sink method "FG\ASN1\TemplateParser::parseBinary" -> code.Deserialization
+    sink method "FG\ASN1\ASNObject::fromBinary" -> code.Deserialization
+  }
+}

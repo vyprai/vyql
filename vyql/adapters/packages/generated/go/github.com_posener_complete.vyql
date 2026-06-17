@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter go {
+  package "github.com/posener/complete" {
+    sink method "PredictFiles" -> code.FilePathAccess
+    sink method "PredictFilesSet" -> code.FilePathAccess
+  }
+}

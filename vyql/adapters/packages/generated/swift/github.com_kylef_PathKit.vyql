@@ -1,0 +1,8 @@
+import code.{FilePathAccess, FileUse}
+
+adapter swift {
+  package "github.com/kylef/PathKit" {
+    sink method "read" -> code.FilePathAccess
+    sink method "write" -> code.FileUse
+  }
+}

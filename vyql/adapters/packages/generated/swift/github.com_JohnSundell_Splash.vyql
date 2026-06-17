@@ -1,0 +1,8 @@
+adapter swift {
+  package "github.com/JohnSundell/Splash" {
+    source method "highlight" -> core.UserControlledData
+    sink method "addToken" -> code.HtmlRender
+    sink method "addPlainText" -> code.HtmlRender
+    sink method "build" -> code.HtmlRender
+  }
+}

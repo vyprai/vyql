@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter javascript {
+  package "jest-docblock" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseWithComments" -> code.Deserialization
+  }
+}

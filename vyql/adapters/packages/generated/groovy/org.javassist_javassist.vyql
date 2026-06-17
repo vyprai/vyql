@@ -1,0 +1,7 @@
+import code.{CodeEval, Deserialization}
+adapter groovy {
+  package "org.javassist:javassist" {
+    sink method "toClass" -> code.CodeEval
+    sink method "makeClass" -> code.Deserialization
+  }
+}

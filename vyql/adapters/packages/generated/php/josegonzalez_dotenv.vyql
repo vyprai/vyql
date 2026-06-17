@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "josegonzalez/dotenv" {
+    sink method "josegonzalez\Dotenv\Loader::parse" -> code.Deserialization
+  }
+}

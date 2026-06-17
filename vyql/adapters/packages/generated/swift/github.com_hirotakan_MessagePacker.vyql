@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/hirotakan/MessagePacker" {
+    sink method "decode" -> code.Deserialization
+    source method "encode" -> core.UserControlledData
+  }
+}

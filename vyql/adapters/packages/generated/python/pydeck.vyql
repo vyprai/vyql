@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+adapter python {
+  package "pydeck" {
+    sink method "Deck.to_html" -> code.HtmlRender
+    sink method "deck_to_html" -> code.HtmlRender
+  }
+}

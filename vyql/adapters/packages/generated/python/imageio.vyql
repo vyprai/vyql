@@ -1,0 +1,14 @@
+import code.{FilePathAccess, XmlParse}
+adapter python {
+  package "imageio" {
+    sink method "imread" -> code.FilePathAccess
+    sink method "imwrite" -> code.FilePathAccess
+    sink method "mimread" -> code.FilePathAccess
+    sink method "mimwrite" -> code.FilePathAccess
+    sink method "volread" -> code.FilePathAccess
+    sink method "volwrite" -> code.FilePathAccess
+    sink method "mvolread" -> code.FilePathAccess
+    sink method "mvolwrite" -> code.FilePathAccess
+    sink method "parse" -> code.XmlParse
+  }
+}

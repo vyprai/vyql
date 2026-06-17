@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter kotlin {
+  package "org.jetbrains.kotlinx:kotlinx-coroutines-test" {
+    source method "systemProperty" -> core.UserControlledData
+  }
+}

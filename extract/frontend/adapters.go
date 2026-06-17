@@ -6,11 +6,13 @@
 package frontend
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
@@ -20,8 +22,11 @@ type inputSpec struct {
 	Paths      []string
 	Methods    []string // receiver-agnostic: match the call's `method` prop (last segment)
 	Match      string   // "prefix" (default) | "contains"
+	Receiver   bool     // match a receiver attribute/method with a recv_type constraint
+	Constraint string   // optional `on <type>` receiver-type constraint
 	ValMatches []string // `val "substr"` (AND) — only a source when an arg literal matches (e.g. getenv("HTTP_*"))
 	ValAbsents []string // `nval "substr"` (AND) — not a source if any arg literal contains a substr
+	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 }
 
 type sinkSpec struct {
@@ -33,6 +38,7 @@ type sinkSpec struct {
 	ArgIndex   int      // which argument is the dangerous one (default 0)
 	ValMatches []string // `val "substr"` (AND) — every substr must be in some arg/option literal
 	ValAbsents []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
+	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 	Collection bool     // also flag a Seq/collection-literal arg (e.g. ldap options {filter})
 }
 
@@ -40,8 +46,10 @@ type controlSpec struct {
 	Concept    string
 	Pattern    string
 	ByMethod   bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
+	Exact      bool     // exact path match instead of segment-prefix path matching
 	ValMatches []string // `val "substr"` (AND — marks AND controls)
 	ValAbsents []string // `nval "substr"` (AND — marks AND controls)
+	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 }
 
 // activeSources, when non-nil, restricts which source concepts the input adapters
@@ -51,6 +59,24 @@ var activeSources map[string]bool
 // SetActiveSources sets the trust-boundary filter for source labelling (the
 // active application profile's entry-point families). Pass nil to disable.
 func SetActiveSources(s map[string]bool) { activeSources = s }
+
+// ActiveSourcesKey returns a deterministic fingerprint of the active source set (the profile's
+// trust boundary), for the incremental adapter-label cache: changing the profile changes which
+// source labels adapters emit, so cached labels from one profile must not be reused under
+// another. "*" means no filter (every source active).
+func ActiveSourcesKey() string {
+	if activeSources == nil {
+		return "*"
+	}
+	keys := make([]string, 0, len(activeSources))
+	for k, on := range activeSources {
+		if on {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
+}
 
 // valContains reports whether the NUL-joined str_args prop contains sub,
 // case-insensitively. Used by `val`/`nval` matching.
@@ -74,10 +100,202 @@ func valConds(tokens string, vals, nvals []string) bool {
 	return true
 }
 
+func detailWithPattern(detail map[string]string, pattern string) map[string]string {
+	if len(detail) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(detail)+1)
+	for k, v := range detail {
+		out[k] = v
+	}
+	if pattern != "" && out["pattern"] == "" {
+		out["pattern"] = pattern
+	}
+	return out
+}
+
+func exploitDetail(concept, pattern string) (map[string]string, string) {
+	detail := map[string]string{}
+	conf := ""
+	switch concept {
+	case "code.UnboundedCopy":
+		detail = map[string]string{
+			"exploit_category":   "memory",
+			"exploit_condition":  "attacker-controlled bytes reach an unbounded copy into a fixed-size destination",
+			"exploit_evidence":   "unsafe copy primitive " + pattern + " receives tainted input",
+			"exploit_assumption": "the destination capacity can be smaller than the copied bytes",
+			"exploit_confidence": "high",
+		}
+	case "code.UnboundedCopySmell":
+		detail = map[string]string{
+			"exploit_category":   "memory",
+			"exploit_condition":  "an unbounded copy can overflow its destination",
+			"exploit_evidence":   "unsafe copy primitive " + pattern + " is present",
+			"exploit_assumption": "an attacker can influence source length or destination capacity is insufficient",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.RawMemoryCopySize":
+		detail = map[string]string{
+			"exploit_category":   "memory",
+			"exploit_condition":  "attacker-controlled size reaches a raw memory copy",
+			"exploit_evidence":   "copy-size argument to " + pattern + " is tainted",
+			"exploit_assumption": "the size can exceed the destination object bounds",
+			"exploit_confidence": "medium",
+		}
+	case "code.SizeComputation":
+		detail = map[string]string{
+			"exploit_category":   "numeric",
+			"exploit_condition":  "attacker-controlled size feeds allocation or bounds-sensitive operation",
+			"exploit_evidence":   "size argument to " + pattern + " is tainted",
+			"exploit_assumption": "the value is not range-checked before memory use",
+			"exploit_confidence": "medium",
+		}
+	case "code.StackAllocationSmell":
+		detail = map[string]string{
+			"exploit_category":   "memory",
+			"exploit_condition":  "unbounded stack allocation can exhaust stack or corrupt nearby state",
+			"exploit_evidence":   "stack allocation primitive " + pattern + " is present",
+			"exploit_assumption": "the allocation size can be attacker-influenced or unexpectedly large",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.FileCheck":
+		detail = map[string]string{
+			"exploit_category":   "race",
+			"exploit_condition":  "filesystem state is checked before a later use",
+			"exploit_evidence":   "check primitive " + pattern + " observes path state",
+			"exploit_assumption": "an attacker can change the path target between check and use",
+			"exploit_confidence": "medium",
+		}
+	case "code.FileUse":
+		detail = map[string]string{
+			"exploit_category":   "race",
+			"exploit_condition":  "checked filesystem state is later used",
+			"exploit_evidence":   "use primitive " + pattern + " acts on the path",
+			"exploit_assumption": "the use is not protected by atomic open flags or symlink-safe handling",
+			"exploit_confidence": "medium",
+		}
+	case "code.LockAcquire":
+		detail = map[string]string{
+			"exploit_category":   "lifecycle",
+			"exploit_condition":  "a lock acquisition may not be released on every path",
+			"exploit_evidence":   "lock primitive " + pattern + " is acquired",
+			"exploit_assumption": "an unreleased lock can be triggered to deadlock or starve concurrent work",
+			"exploit_confidence": "medium",
+		}
+	case "code.LocklessSharedMutation":
+		detail = map[string]string{
+			"exploit_category":   "race",
+			"exploit_condition":  "shared state appears to be mutated without an observed lock or atomic guard",
+			"exploit_evidence":   "concurrency-capable mutation primitive " + pattern + " is present",
+			"exploit_assumption": "multiple attacker-triggerable executions can interleave on the same state",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.IndexAccess":
+		detail = map[string]string{
+			"exploit_category":   "memory",
+			"exploit_condition":  "attacker-controlled index reaches an array/subscript access",
+			"exploit_evidence":   "subscript index flows into " + pattern,
+			"exploit_assumption": "the index is not range-checked against the accessed object",
+			"exploit_confidence": "medium",
+		}
+	case "code.DivisionDenominator":
+		detail = map[string]string{
+			"exploit_category":   "numeric",
+			"exploit_condition":  "attacker-controlled denominator reaches division or modulo",
+			"exploit_evidence":   "denominator operand for " + pattern + " is tainted",
+			"exploit_assumption": "zero or unsafe divisor values are not excluded before the operation",
+			"exploit_confidence": "medium",
+		}
+	case "code.IntegerSizeArithmetic":
+		detail = map[string]string{
+			"exploit_category":   "numeric",
+			"exploit_condition":  "attacker-controlled value participates in size-sensitive arithmetic",
+			"exploit_evidence":   "arithmetic operation " + pattern + " receives tainted input",
+			"exploit_assumption": "the arithmetic result is later used for allocation, indexing, copy size, or bounds",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.PointerFree":
+		detail = map[string]string{
+			"exploit_category":   "memory",
+			"exploit_condition":  "a pointer is released and may be released or used again later",
+			"exploit_evidence":   "release primitive " + pattern + " is observed",
+			"exploit_assumption": "the same allocation or alias is involved and remains attacker-reachable",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.PointerUse":
+		detail = map[string]string{
+			"exploit_category":   "memory",
+			"exploit_condition":  "a pointer is dereferenced or otherwise used after a prior release",
+			"exploit_evidence":   "pointer-use primitive " + pattern + " is observed",
+			"exploit_assumption": "the pointer aliases the released allocation and no safe reinitialization occurs",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.NullableDeref":
+		detail = map[string]string{
+			"exploit_category":   "memory",
+			"exploit_condition":  "a pointer-like value is dereferenced without an observed null exclusion",
+			"exploit_evidence":   "dereference primitive " + pattern + " is present",
+			"exploit_assumption": "the dereferenced value may be null on an attacker-triggerable path",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.AuthenticationRequiredOp":
+		detail = map[string]string{
+			"exploit_category":   "auth",
+			"exploit_condition":  "security-sensitive operation is reachable without an observed authentication guard",
+			"exploit_evidence":   "sensitive operation " + pattern + " is present",
+			"exploit_assumption": "the enclosing endpoint or entry point can be reached by an unauthenticated actor",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.ObjectLookupByUserInput":
+		detail = map[string]string{
+			"exploit_category":   "access_control",
+			"exploit_condition":  "attacker-controlled object id reaches a direct object lookup",
+			"exploit_evidence":   "lookup primitive " + pattern + " receives tainted input",
+			"exploit_assumption": "the object is not constrained to the authenticated principal or tenant",
+			"exploit_confidence": "medium",
+		}
+	case "code.ArchiveEntryWrite":
+		detail = map[string]string{
+			"exploit_category":   "path",
+			"exploit_condition":  "attacker-controlled archive entry path reaches filesystem write/extraction",
+			"exploit_evidence":   "archive extraction/write primitive " + pattern + " receives tainted input",
+			"exploit_assumption": "the entry name is not normalized, confined, or symlink-safe before writing",
+			"exploit_confidence": "medium",
+		}
+	case "code.StaticIv":
+		detail = map[string]string{
+			"exploit_category":   "crypto",
+			"exploit_condition":  "cipher operation uses a static or predictable IV/nonce",
+			"exploit_evidence":   "cipher primitive " + pattern + " is called with static-looking IV material",
+			"exploit_assumption": "the mode requires nonce/IV uniqueness for confidentiality or integrity",
+			"exploit_confidence": "low",
+		}
+		conf = "low"
+	case "code.DynamicCodeLoad":
+		detail = map[string]string{
+			"exploit_category":   "code_loading",
+			"exploit_condition":  "attacker-controlled module or library name reaches a dynamic code loader",
+			"exploit_evidence":   "dynamic loader " + pattern + " receives tainted input",
+			"exploit_assumption": "the resolved module/library path or search path can be influenced by the attacker",
+			"exploit_confidence": "medium",
+		}
+	}
+	return detailWithPattern(detail, pattern), conf
+}
+
 type filterSpec struct {
 	Pattern  string
 	ByMethod bool // match the bare method name (x.replace) vs the dotted path (re.sub)
 	Global   bool // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
+	Packages []string
 }
 
 // assumeSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
@@ -91,6 +309,7 @@ type assumeSpec struct {
 	About      string // the sink concept it purports to cover
 	ValMatches []string
 	ValAbsents []string
+	Packages   []string
 }
 
 type adapterSpec struct {
@@ -109,7 +328,12 @@ type adapterSpec struct {
 // AdaptersFor loads the framework adapters for a technology from
 // vyql/adapters/<tech>.vyql and builds the input + sink + control adapters.
 func AdaptersFor(tech string) []adapters.Adapter {
-	spec := loadSpec(tech)
+	return adaptersFromSpec(loadSpec(tech))
+}
+
+// adaptersFromSpec turns a built adapterSpec into the concrete adapter set (one adapter
+// per mapping kind present). Shared by AdaptersFor and the dynamic package loader.
+func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 	var out []adapters.Adapter
 	if len(spec.Inputs) > 0 {
 		out = append(out, spec.inputAdapter())
@@ -143,14 +367,22 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 		Fidelity: "syntactic", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
+			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			allowed := make([]bool, len(spec.Assumes))
+			for i := range spec.Assumes {
+				allowed[i] = packageAllowed(spec.Assumes[i].Packages, pkgs)
+			}
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
-				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
+				if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
 					continue
 				}
 				method, path := n.Prop("method"), n.Prop("callee_path")
-				for _, as := range spec.Assumes {
+				for ai, as := range spec.Assumes {
+					if !allowed[ai] {
+						continue
+					}
 					if !(as.ByMethod && method == as.Pattern || !as.ByMethod && matchSinkPath(path, as.Pattern)) {
 						continue
 					}
@@ -179,6 +411,11 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
+			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			allowed := make([]bool, len(spec.Filters))
+			for i := range spec.Filters {
+				allowed[i] = packageAllowed(spec.Filters[i].Packages, pkgs)
+			}
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
@@ -187,7 +424,10 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 				}
 				method, path := n.Prop("method"), n.Prop("callee_path")
 				matched, global := false, false
-				for _, f := range spec.Filters {
+				for fi, f := range spec.Filters {
+					if !allowed[fi] {
+						continue
+					}
 					if f.ByMethod && method == f.Pattern || !f.ByMethod && matchSinkPath(path, f.Pattern) {
 						matched, global = true, f.Global
 						break
@@ -223,20 +463,43 @@ func CtorTypesFor(tech string) map[string]string {
 }
 
 func loadDecl(tech string) *parser.AdapterDecl {
-	decls, err := parser.Parse(string(datadir.MustRead("adapters/" + tech + ".vyql")))
+	src := string(datadir.MustRead("adapters/" + tech + ".vyql"))
+	if extra, err := datadir.Read("adapters/packages/" + tech + ".vyql"); err == nil {
+		src += "\n" + string(extra)
+	}
+	decls, err := parser.Parse(src)
 	if err != nil {
 		panic("frontend: invalid adapters/" + tech + ".vyql: " + err.Error())
 	}
+	var merged *parser.AdapterDecl
 	for _, d := range decls {
-		if a, ok := d.(*parser.AdapterDecl); ok {
-			return a
+		a, ok := d.(*parser.AdapterDecl)
+		if !ok || a.Name != tech {
+			continue
 		}
+		if merged == nil {
+			merged = &parser.AdapterDecl{Name: a.Name, Meta: a.Meta}
+		} else {
+			for k, v := range a.Meta {
+				merged.Meta[k] = v
+			}
+		}
+		merged.Mappings = append(merged.Mappings, a.Mappings...)
+	}
+	if merged != nil {
+		return merged
 	}
 	panic("frontend: no adapter declaration in adapters/" + tech + ".vyql")
 }
 
 func loadSpec(tech string) adapterSpec {
-	d := loadDecl(tech)
+	return specFromDecl(loadDecl(tech))
+}
+
+// specFromDecl builds an adapterSpec from an already-parsed adapter declaration.
+// Split out of loadSpec so the dynamic per-package adapter loader (packages.go) can
+// reuse the exact same mapping→spec lowering for the generated catalog.
+func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 	s := adapterSpec{Name: d.Name, Technology: d.Name}
 	if m, _ := d.Meta["match"].(string); m == "contains" {
 		s.containsMatch = true
@@ -254,9 +517,9 @@ func loadSpec(tech string) adapterSpec {
 		case "source":
 			// a value-constrained source (e.g. getenv("HTTP_*")) gets its own spec so the
 			// val/nval filter is not shared with other patterns mapping to the same concept.
-			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 {
+			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
-					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
@@ -267,9 +530,9 @@ func loadSpec(tech string) adapterSpec {
 			}
 			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
 		case "source_method":
-			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 {
+			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
-					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
@@ -279,33 +542,40 @@ func loadSpec(tech string) adapterSpec {
 				srcByConcept[mp.Concept] = i
 			}
 			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
+		case "source_receiver":
+			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
+				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Collection: mp.Collection})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Collection: mp.Collection})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method (e.g. `URL(u).openConnection()`,
 			// `u.toRegex()`); match the bare method name, label the call node itself.
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "control_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+		case "mark_method":
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "filter_method":
-			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global"})
+			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global", Packages: mp.Packages})
 		case "filter_path":
-			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global"})
+			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global", Packages: mp.Packages})
 		case "assume_guard_method", "assume_guard_path", "assume_sanitizer_method", "assume_sanitizer_path":
 			mode := "guard"
 			if strings.Contains(mp.Kind, "sanitizer") {
 				mode = "sanitizer"
 			}
 			s.Assumes = append(s.Assumes, assumeSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
-				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents})
+				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		}
 	}
 	return s
@@ -322,19 +592,37 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 		Name: spec.Name + ".input", Technology: spec.Technology, Specificity: 2,
 		Fidelity: fidelity, Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
-			nodes, _ := s.AllNodes()
+			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			inIdx := buildSpecIndex(len(spec.Inputs), func(i int) (methods, paths []string, loose bool) {
+				return spec.Inputs[i].Methods, spec.Inputs[i].Paths, spec.Inputs[i].Match == "contains"
+			})
+			// package gating is node-independent (pkgs is constant for this Apply), so
+			// resolve it once per spec instead of re-running the costly evidence match per node.
+			allowed := make([]bool, len(spec.Inputs))
+			for i := range spec.Inputs {
+				allowed[i] = packageAllowed(spec.Inputs[i].Packages, pkgs)
+			}
 			var out []adapters.Mapping
-			for _, n := range nodes {
+			rangeNodes(s, func(n usg.Node) bool {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				if path == "" && method == "" {
-					continue
+					return true
 				}
 				if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
-					continue // only label this language's nodes (cross-language adapters skip this)
+					return true // only label this language's nodes (cross-language adapters skip this)
 				}
-				for _, in := range spec.Inputs {
-					if (path != "" && matchPath(path, in.Paths, in.Match)) ||
-						(method != "" && containsStr(in.Methods, method)) {
+				for _, ci := range inIdx.candidates(method, path) {
+					in := spec.Inputs[ci]
+					if !allowed[ci] {
+						continue
+					}
+					matched := (path != "" && matchPath(path, in.Paths, in.Match)) ||
+						(method != "" && containsStr(in.Methods, method))
+					if in.Receiver {
+						matched = method != "" && containsStr(in.Methods, method) &&
+							constraintAllows(in.Constraint, n.Prop("recv_type"))
+					}
+					if matched {
 						// value-constrained source: only a source when an arg literal matches
 						// (e.g. getenv("HTTP_X_FORWARDED_FOR") yes, getenv("PATH") no).
 						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&
@@ -344,12 +632,17 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 						// trust-boundary gating: an active profile restricts which
 						// source families count as attacker-controlled.
 						if activeSources == nil || activeSources[in.Concept] {
-							out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept})
+							spec := 0
+							if len(in.Packages) > 0 {
+								spec = 3 // package-specific source supersedes native/general
+							}
+							out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept, Specificity: spec})
 						}
 						break
 					}
 				}
-			}
+				return true
+			})
 			return out
 		},
 	}
@@ -372,6 +665,19 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			ids, _ := s.NodesOfType("code.Call")
 			attrs, _ := s.NodesOfType("code.Attr")
 			ids = append(ids, attrs...)
+			binops, _ := s.NodesOfType("code.BinOp")
+			ids = append(ids, binops...)
+			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			sinkIdx := buildSpecIndex(len(spec.Sinks), func(i int) (methods, paths []string, loose bool) {
+				if spec.Sinks[i].ByMethod {
+					return []string{spec.Sinks[i].Pattern}, nil, false
+				}
+				return nil, []string{spec.Sinks[i].Pattern}, false
+			})
+			allowed := make([]bool, len(spec.Sinks))
+			for i := range spec.Sinks {
+				allowed[i] = packageAllowed(spec.Sinks[i].Packages, pkgs)
+			}
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
@@ -380,13 +686,18 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 				}
 				isAttr := n.Type == "code.Attr"
 				method, path, recvType := n.Prop("method"), n.Prop("callee_path"), n.Prop("recv_type")
+				cand := sinkIdx.candidates(method, path)
 				// Pick the MOST SPECIFIC matching sink (longest pattern) per concept, so
 				// e.g. "re.compile" wins over "compile" for CodeEval/RegexCompile-style
 				// overlaps, while one call can still carry genuinely distinct concepts
 				// such as FilePathAccess and UnsafeUpload.
 				bestByConcept := map[string]int{}
 				strArgs := n.Prop("str_args")
-				for i, sk := range spec.Sinks {
+				for _, i := range cand {
+					sk := spec.Sinks[i]
+					if !allowed[i] {
+						continue
+					}
 					if isAttr && sk.Concept != "code.ProtoPollute" {
 						continue
 					}
@@ -410,23 +721,33 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						bestByConcept[sk.Concept] = i
 					}
 				}
-				for i, sk := range spec.Sinks {
+				for _, i := range cand {
+					sk := spec.Sinks[i]
 					best, ok := bestByConcept[sk.Concept]
 					if !ok || best != i {
 						continue
 					}
+					// tiering: a package-gated sink is the most specific match (tier 3) and
+					// supersedes native path (resolved) and general method (syntactic) matches.
+					pkgSpec := 0
+					if len(sk.Packages) > 0 {
+						pkgSpec = 3
+					}
 					if isAttr {
 						if sk.ByMethod {
-							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic"})
+							detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						} else {
-							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "resolved"})
+							detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "resolved", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
 					}
 					// receiver-sink: the tainted data is the receiver; the call node
 					// carries that taint, so label the node itself rather than an arg.
 					if sk.Receiver {
-						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic"})
+						detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						continue
 					}
 					fidelity := "resolved"
@@ -454,7 +775,8 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && a.Prop("vkind") == "Seq" {
 								continue
 							}
-							out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity})
+							detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+							out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
 					}
@@ -465,7 +787,8 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && a.Prop("vkind") == "Seq" {
 						continue
 					}
-					out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity})
+					detail, conf := exploitDetail(sk.Concept, sk.Pattern)
+					out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
 				}
 			}
 			return out
@@ -481,6 +804,17 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
+			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			ctrlIdx := buildSpecIndex(len(spec.Controls), func(i int) (methods, paths []string, loose bool) {
+				if spec.Controls[i].ByMethod {
+					return []string{spec.Controls[i].Pattern}, nil, false
+				}
+				return nil, []string{spec.Controls[i].Pattern}, false
+			})
+			allowed := make([]bool, len(spec.Controls))
+			for i := range spec.Controls {
+				allowed[i] = packageAllowed(spec.Controls[i].Packages, pkgs)
+			}
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
@@ -489,12 +823,20 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 				}
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				strArgs := n.Prop("str_args")
-				for _, c := range spec.Controls {
+				for _, ci := range ctrlIdx.candidates(method, path) {
+					c := spec.Controls[ci]
+					if !allowed[ci] {
+						continue
+					}
 					// no break: a single call can be MULTIPLE controls (e.g. numeric coercion
 					// neutralizes HTML, SQL, AND trust-boundary), so attach every match.
 					hit := c.ByMethod && method == c.Pattern || !c.ByMethod && matchPath(path, []string{c.Pattern}, "prefix")
 					if hit && valConds(strArgs, c.ValMatches, c.ValAbsents) {
-						out = append(out, adapters.Mapping{NodeID: id, Concept: c.Concept})
+						spec := 0
+						if len(c.Packages) > 0 {
+							spec = 3 // package-specific control supersedes native/general
+						}
+						out = append(out, adapters.Mapping{NodeID: id, Concept: c.Concept, Specificity: spec})
 					}
 				}
 			}
@@ -529,6 +871,97 @@ func nodeTech(loc string) string {
 	return ""
 }
 
+// rangeNodes streams every node to fn via the store's RangeNodes fast path (no full []Node copy)
+// when available, else falls back to AllNodes. Adapter passes iterate every node once; the slice
+// copy was a multi-GB transient on large graphs.
+func rangeNodes(s usg.Store, fn func(usg.Node) bool) {
+	if rs, ok := s.(interface{ RangeNodes(func(usg.Node) bool) }); ok {
+		rs.RangeNodes(fn)
+		return
+	}
+	nodes, _ := s.AllNodes()
+	for _, n := range nodes {
+		if !fn(n) {
+			return
+		}
+	}
+}
+
+func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
+	out := map[string]bool{}
+	add := func(v string) {
+		v = sca.NormalizePackageName(v)
+		if v == "" {
+			return
+		}
+		out[v] = true
+		if root := sca.PackageRoot(v); root != "" {
+			out[root] = true
+		}
+		// expand import→distribution aliases (e.g. `import yaml` ⇒ pyyaml) so package-gated
+		// adapters keyed by the distribution name activate from imports, not just manifests.
+		for _, a := range sca.ImportAliases(v) {
+			out[a] = true
+		}
+	}
+	// only import/SBOM nodes carry package evidence — use the type index (O(result)) instead of
+	// scanning every node, since this runs once per adapter spec.
+	impIDs, _ := s.NodesOfType("code.Import")
+	for _, id := range impIDs {
+		n, ok, _ := s.GetNode(id)
+		if !ok {
+			continue
+		}
+		if !crossLang {
+			if t := nodeTech(n.Prop("loc")); t != "" && t != tech {
+				continue
+			}
+		}
+		add(n.Prop("module"))
+		add(n.Prop("symbol"))
+		add(n.Prop("package"))
+		add(n.Prop("root"))
+	}
+	sbomIDs, _ := s.NodesOfType("sbom.PackageVersion")
+	for _, id := range sbomIDs {
+		if n, ok, _ := s.GetNode(id); ok {
+			add(n.Prop("name"))
+		}
+	}
+	return out
+}
+
+func packageAllowed(want []string, have map[string]bool) bool {
+	if len(want) == 0 {
+		return true
+	}
+	for _, w := range want {
+		if packageInEvidence(w, have) {
+			return true
+		}
+	}
+	return false
+}
+
+func packageInEvidence(want string, have map[string]bool) bool {
+	want = sca.NormalizePackageName(want)
+	if want == "" {
+		return true
+	}
+	if have[want] {
+		return true
+	}
+	if root := sca.PackageRoot(want); root != "" && have[root] {
+		return true
+	}
+	for got := range have {
+		if sca.PackageMatches(got, want) {
+			return true
+		}
+	}
+	return false
+}
+
 // markAdapter labels a CALL node with a presence concept (for `match`-style
 // rules that flag a dangerous USE rather than a taint flow — e.g. weak crypto).
 func (spec adapterSpec) markAdapter() adapters.Adapter {
@@ -543,7 +976,18 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			// cross-language adapters (secretscan, …) label nodes in source files of
 			// every language, so the per-language tech filter doesn't apply.
 			crossLang := spec.crossLang
-			for _, nodeType := range []string{"code.Call", "code.Attr", "code.Seq"} {
+			pkgs := packageEvidence(s, spec.Technology, crossLang)
+			markIdx := buildSpecIndex(len(spec.Marks), func(i int) (methods, paths []string, loose bool) {
+				if spec.Marks[i].ByMethod {
+					return []string{spec.Marks[i].Pattern}, nil, false
+				}
+				return nil, []string{spec.Marks[i].Pattern}, false
+			})
+			allowed := make([]bool, len(spec.Marks))
+			for i := range spec.Marks {
+				allowed[i] = packageAllowed(spec.Marks[i].Packages, pkgs)
+			}
+			for _, nodeType := range []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary"} {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
 					n, _, _ := s.GetNode(id)
@@ -551,22 +995,131 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 						continue
 					}
 					path := n.Prop("callee_path")
+					method := n.Prop("method")
 					strArgs := n.Prop("str_args")
-					for _, m := range spec.Marks {
-						if !matchSinkPath(path, m.Pattern) {
+					seenConcept := map[string]bool{}
+					for _, mi := range markIdx.candidates(method, path) {
+						m := spec.Marks[mi]
+						if !allowed[mi] {
+							continue
+						}
+						if seenConcept[m.Concept] {
+							continue
+						}
+						hit := m.ByMethod && method == m.Pattern ||
+							!m.ByMethod && ((m.Exact && path == m.Pattern) || (!m.Exact && matchSinkPath(path, m.Pattern)))
+						if !hit {
 							continue
 						}
 						if !valConds(strArgs, m.ValMatches, m.ValAbsents) {
 							continue
 						}
-						out = append(out, adapters.Mapping{NodeID: id, Concept: m.Concept})
-						break
+						detail, conf := exploitDetail(m.Concept, m.Pattern)
+						spec := 0
+						if len(m.Packages) > 0 {
+							spec = 3 // package-specific mark supersedes native/general
+						}
+						out = append(out, adapters.Mapping{NodeID: id, Concept: m.Concept, Confidence: conf, Specificity: spec, Detail: detail})
+						seenConcept[m.Concept] = true
 					}
 				}
 			}
 			return out
 		},
 	}
+}
+
+// --- adapter spec indexing -------------------------------------------------
+//
+// Adapter matching is a search problem: for each graph node, find the specs whose
+// pattern matches its method/callee_path. Done naively that is O(nodes × specs) —
+// the dominant scan cost on large repos. Every matcher here (method exact, path
+// prefix/suffix/segment) shares one invariant: a matching spec's pattern FIRST
+// SEGMENT must appear as a dotted segment of the node path, OR the spec is a
+// by-method spec whose name equals the node method. So we index specs by those
+// keys once per Apply and, per node, consult only the candidate specs. Patterns
+// that need unanchored substring matching (`contains` mode) can't be indexed and
+// go into `loose`, always considered. Restricting the precise match loop to
+// candidates is exactly equivalent to the full scan: a non-candidate spec always
+// fails the precise check, so it could never have produced a mapping.
+
+// firstSeg returns the leading dotted/bracket segment of a pattern or path
+// ("requests.get" → "requests", "exec" → "exec").
+func firstSeg(p string) string {
+	if i := strings.IndexAny(p, ".["); i >= 0 {
+		return p[:i]
+	}
+	return p
+}
+
+// specIndex maps node method names and path segments to candidate spec indices.
+// visited/gen provide allocation-free dedup across the per-node candidate lookups
+// (a generation stamp per spec instead of a fresh map each call); buf is the reused
+// output. Not safe for concurrent use — adapters apply sequentially.
+type specIndex struct {
+	byMethod map[string][]int
+	bySeg    map[string][]int
+	loose    []int
+	visited  []int32
+	gen      int32
+	buf      []int
+}
+
+// buildSpecIndex indexes n specs. keysOf reports, for spec i, its by-method keys
+// (exact method names), its path patterns (indexed by first segment), and whether
+// it needs unanchored matching (loose → always a candidate).
+func buildSpecIndex(n int, keysOf func(i int) (methods, paths []string, loose bool)) *specIndex {
+	idx := &specIndex{byMethod: map[string][]int{}, bySeg: map[string][]int{}, visited: make([]int32, n)}
+	for i := 0; i < n; i++ {
+		methods, paths, loose := keysOf(i)
+		if loose {
+			idx.loose = append(idx.loose, i)
+			continue
+		}
+		for _, m := range methods {
+			idx.byMethod[m] = append(idx.byMethod[m], i)
+		}
+		for _, p := range paths {
+			idx.bySeg[firstSeg(p)] = append(idx.bySeg[firstSeg(p)], i)
+		}
+	}
+	return idx
+}
+
+// candidates returns the sorted spec indices that could match a node with the
+// given method/path (a superset filter; the caller still runs the precise check).
+// The returned slice is reused on the next call — consume it before calling again.
+func (idx *specIndex) candidates(method, path string) []int {
+	idx.gen++
+	g := idx.gen
+	out := idx.buf[:0]
+	add := func(is []int) {
+		for _, i := range is {
+			if idx.visited[i] != g {
+				idx.visited[i] = g
+				out = append(out, i)
+			}
+		}
+	}
+	if method != "" {
+		add(idx.byMethod[method])
+	}
+	// walk path segments without allocating (substring map lookups don't copy).
+	if path != "" && len(idx.bySeg) > 0 {
+		start := 0
+		for i := 0; i <= len(path); i++ {
+			if i == len(path) || path[i] == '.' || path[i] == '[' || path[i] == ']' {
+				if i > start {
+					add(idx.bySeg[path[start:i]])
+				}
+				start = i + 1
+			}
+		}
+	}
+	add(idx.loose)
+	sort.Ints(out)
+	idx.buf = out
+	return out
 }
 
 // matchSinkPath matches a sink pattern against a callee path with dotted-segment
@@ -584,7 +1137,13 @@ func matchSinkPath(path, p string) bool {
 // single type or a comma-separated list from `on [a, b]`).
 func constraintAllows(constraint, recvType string) bool {
 	for _, t := range strings.Split(constraint, ",") {
-		if t == recvType {
+		t = strings.TrimSpace(t)
+		recvType = strings.TrimSpace(recvType)
+		if t == recvType ||
+			strings.HasSuffix(t, "."+recvType) ||
+			strings.HasSuffix(recvType, "."+t) ||
+			strings.HasSuffix(t, "::"+recvType) ||
+			strings.HasSuffix(recvType, "::"+t) {
 			return true
 		}
 	}

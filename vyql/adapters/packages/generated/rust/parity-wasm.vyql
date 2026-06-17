@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "parity-wasm" {
+    sink method "read" -> code.Deserialization
+  }
+}

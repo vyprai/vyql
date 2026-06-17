@@ -1,0 +1,11 @@
+import code.{UrlFetch}
+import core.{UserControlledData}
+
+adapter ruby {
+  package "jekyll-avatar" {
+    source method "initialize" -> core.UserControlledData
+    sink method "path" -> code.UrlFetch
+    sink method "url_with_custom_host" -> code.UrlFetch
+    sink method "url" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,10 @@
+import core.{InputValidation}
+
+adapter python {
+  package "coreschema" {
+    control method "validate" -> core.InputValidation
+    control method "validate_format" -> core.InputValidation
+    control method "validate_email" -> core.InputValidation
+    control method "validate_uri" -> core.InputValidation
+  }
+}

@@ -1,0 +1,7 @@
+adapter rust {
+  package "cargo-platform" {
+    sink method "expr" -> code.Deserialization
+    sink method "cfg" -> code.Deserialization
+    sink method "from_str" -> code.Deserialization
+  }
+}

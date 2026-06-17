@@ -66,6 +66,18 @@ test "android: addJavascriptInterface exposes a native bridge"
   }
   ```
 
+test "android: removing a JavaScript interface is clean"
+  lang java
+  reject VYQL-MOB-002
+  code
+  ```
+  class A {
+    void onCreate() {
+      webView.removeJavascriptInterface("android");
+    }
+  }
+  ```
+
 test "android (kotlin): intent extra -> WebView.loadUrl is WebView injection"
   lang kotlin
   expect VYQL-MOB-001
@@ -75,6 +87,30 @@ test "android (kotlin): intent extra -> WebView.loadUrl is WebView injection"
     fun onCreate() {
       val u = intent.getStringExtra("url")
       webView.loadUrl(u)
+    }
+  }
+  ```
+
+test "android (kotlin): addJavascriptInterface exposes a native bridge"
+  lang kotlin
+  expect VYQL-MOB-002
+  code
+  ```
+  class A {
+    fun onCreate() {
+      webView.addJavascriptInterface(Bridge(), "android")
+    }
+  }
+  ```
+
+test "android (kotlin): removing a JavaScript interface is clean"
+  lang kotlin
+  reject VYQL-MOB-002
+  code
+  ```
+  class A {
+    fun onCreate() {
+      webView.removeJavascriptInterface("android")
     }
   }
   ```

@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkData, NetworkSend, Deserialization}
+
+adapter elixir {
+  package "grpc" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "send_request" -> code.NetworkSend
+    source method "recv" -> code.NetworkData
+    sink method "parse" -> code.Deserialization
+  }
+}

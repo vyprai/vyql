@@ -1,0 +1,11 @@
+import code.{Deserialization, HttpInput}
+
+adapter groovy {
+  package "org.springframework:spring-web" {
+    sink method "parseRanges" -> code.Deserialization
+    sink method "parseRange" -> code.Deserialization
+    sink method "parseMediaType" -> code.Deserialization
+    sink method "parseMediaTypes" -> code.Deserialization
+    sink method "tokenize" -> code.Deserialization
+  }
+}

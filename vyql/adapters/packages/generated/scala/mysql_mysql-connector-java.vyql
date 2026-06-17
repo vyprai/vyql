@@ -1,0 +1,5 @@
+adapter scala {
+  package "mysql:mysql-connector-java" {
+    sink method "query" -> code.SqlExecution
+  }
+}

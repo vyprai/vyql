@@ -1,0 +1,11 @@
+import code.{SqlExecution}
+import core.{SqlParameterization}
+
+adapter scala {
+  package "org.jooq:jooq" {
+    sink method "sql" -> code.SqlExecution
+    control method "bind" -> core.SqlParameterization
+    sink method "and" -> code.SqlExecution
+    sink method "xor" -> code.SqlExecution
+  }
+}

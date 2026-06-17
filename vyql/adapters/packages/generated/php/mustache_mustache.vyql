@@ -1,0 +1,6 @@
+import code.{TemplateRender}
+adapter php {
+  package "mustache/mustache" {
+    sink method "render" -> code.TemplateRender
+  }
+}

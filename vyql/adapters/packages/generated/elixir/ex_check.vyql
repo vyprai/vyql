@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter elixir {
+  package "ex_check" {
+    sink method "run" -> code.CommandExecution
+  }
+}

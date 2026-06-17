@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter php {
+  package "symfony/doctrine-messenger" {
+    sink method "executeQuery" -> code.SqlExecution
+  }
+}

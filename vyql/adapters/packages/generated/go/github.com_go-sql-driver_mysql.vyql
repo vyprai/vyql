@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/go-sql-driver/mysql" {
+    sink method "TestDSNServerPubKeyQueryEscape" -> code.SqlExecution
+    control method "TestPreparedManyCols" -> core.SqlParameterization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CommandExecution, SecretValue, UrlFetch}
+
+adapter python {
+  package "python-coveralls" {
+    sink method "post" -> code.UrlFetch
+  }
+}

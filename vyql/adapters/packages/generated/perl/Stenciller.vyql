@@ -1,0 +1,9 @@
+import code.{CodeEval, Deserialization}
+import core.{UserControlledData}
+adapter perl {
+  package "Stenciller" {
+    sink method "eval_to_hashref" -> code.CodeEval
+    sink method "parse" -> code.Deserialization
+    source method "transform" -> core.UserControlledData
+  }
+}

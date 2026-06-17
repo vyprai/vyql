@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter csharp {
+  package "bootbox" {
+    control method "sanitize" -> core.HtmlEscape
+  }
+}

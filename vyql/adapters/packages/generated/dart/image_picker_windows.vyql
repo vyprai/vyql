@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter dart {
+  package "image_picker_windows" {
+    source method "getMedia" -> core.UserControlledData
+    source method "PickedFile" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "conduit" {
+    sink method "parse" -> code.Deserialization
+  }
+}

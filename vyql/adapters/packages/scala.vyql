@@ -1,0 +1,81 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter scala {
+  package "playframework" {
+    source receiver "getQueryString" on "Request" -> HttpInput
+    source ".body" -> HttpInput
+    control "Security.Authenticated" -> AuthenticationCheck
+    control "Security.WithPermissions" -> AuthorizationCheck
+    control "CSRFCheck" -> CsrfProtection
+  }
+  package "akka-http" {
+    source ".param" -> HttpInput
+  }
+  package "scala-library" {
+    source "sys.env" -> SecretValue
+    sink path "Regex" -> RegexCompile
+  }
+  package "sttp" {
+    source method "body" -> ExternalApiResponse
+    sink method "send" -> UrlFetch
+  }
+  package "slick" {
+    sink method "sql" -> SqlExecution
+    control method "bind" -> SqlParameterization
+  }
+  package "hibernate-core" {
+    sink method "createNativeQuery" -> SqlExecution
+  }
+  package "java.sql" {
+    sink method "executeQuery" -> SqlExecution
+  }
+  package "mongodb-scala-driver" {
+    sink method "find" -> NosqlQuery
+  }
+  package "scala.sys.process" {
+    sink path "Process" -> CommandExecution
+  }
+  package "scala-compiler" {
+    sink path "ToolBox.eval" -> CodeEval
+  }
+  package "java.io" {
+    sink method "readObject" -> Deserialization
+  }
+  package "snakeyaml" {
+    sink path "Yaml.load" -> Deserialization
+    control "Yaml.safeLoad" -> SafeDeserialization
+  }
+  package "scala-io" {
+    sink path "Source.fromFile" -> FilePathAccess
+  }
+  package "commons-compress" {
+    sink method "extract" -> ArchiveEntryWrite
+  }
+  package "scala-xml" {
+    sink method "parse" -> XmlParse
+  }
+  package "javax.xml.xpath" {
+    sink method "evaluate" -> XpathQuery
+  }
+  package "spring-ldap" {
+    sink method "search" arg 1 -> LdapQuery
+    control "LdapEncoder.filterEncode" -> LdapEscape
+  }
+  package "twirl" {
+    sink method "render" -> TemplateRender
+    control "HtmlFormat.escape" -> HtmlEscape
+  }
+  package "commons-text" {
+    control "StringEscapeUtils.escapeHtml4" -> HtmlEscape
+  }
+  package "commons-io" {
+    control "FilenameUtils.normalize" -> PathCanonicalization
+  }
+  package "javax.xml.parsers" {
+    control "DocumentBuilderFactory.setFeature" -> XmlHardening
+  }
+  package "owasp-java-encoder" {
+    control "Encode.forXPath" -> XpathEscape
+  }
+}

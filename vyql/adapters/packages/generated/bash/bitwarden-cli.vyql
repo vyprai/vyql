@@ -1,0 +1,6 @@
+adapter bash {
+  package "bitwarden-cli" {
+    source path "bitwarden-cli.argv" -> code.CliArgument
+    source path "bitwarden-cli" -> code.SecretValue
+  }
+}

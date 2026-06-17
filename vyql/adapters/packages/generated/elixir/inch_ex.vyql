@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter elixir {
+  package "inch_ex" {
+    source method "parse" -> code.CliArgument
+  }
+}

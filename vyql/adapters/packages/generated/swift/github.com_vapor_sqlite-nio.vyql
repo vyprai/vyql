@@ -1,0 +1,8 @@
+import code.{SqlExecution, FilePathAccess}
+
+adapter swift {
+  package "github.com/vapor/sqlite-nio" {
+    sink method "query" -> code.SqlExecution
+    sink method "open" -> code.FilePathAccess
+  }
+}

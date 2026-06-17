@@ -1,0 +1,6 @@
+adapter groovy {
+  package "commons-digester:commons-digester" {
+    sink method "parse" -> code.Deserialization
+    source method "body" -> core.UserControlledData
+  }
+}

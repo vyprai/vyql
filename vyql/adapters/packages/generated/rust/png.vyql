@@ -1,0 +1,7 @@
+import code.{Deserialization, FileUse}
+adapter rust {
+  package "png" {
+    sink method "read" -> code.Deserialization
+    sink method "write" -> code.FileUse
+  }
+}

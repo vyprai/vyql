@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/jellevandenhooff/dkim" {
+    sink method "ParseAndVerify" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{FilePathAccess, UrlFetch, FileUse}
+
+adapter groovy {
+  package "org.apache.ivy:ivy" {
+    sink method "configure" -> code.FilePathAccess
+    sink method "resolve" -> code.FilePathAccess
+    sink method "retrieve" -> code.FileUse
+  }
+}

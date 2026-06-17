@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend, NetworkData, NetworkBind}
+
+adapter kotlin {
+  package "org.apache.mina:mina-core" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "write" -> code.NetworkSend
+    source method "messageReceived" -> code.NetworkData
+    sink method "bind" -> code.NetworkBind
+  }
+}

@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter javascript {
+  package "@types/yargs-parser" {
+    source method "Arguments._" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,9 @@
+import code.{CommandExecution, CliArgument}
+
+adapter php {
+  package "symfony/console" {
+    sink method "shell_exec" -> code.CommandExecution
+    source method "run" -> code.CliArgument
+    control method "parseColor" -> core.InputValidation
+  }
+}

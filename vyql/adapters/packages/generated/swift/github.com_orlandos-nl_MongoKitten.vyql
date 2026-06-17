@@ -1,0 +1,15 @@
+import code.{NetworkConnect, NosqlQuery, Deserialization}
+
+adapter swift {
+  package "github.com/orlandos-nl/MongoKitten" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "parse" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+    sink method "find" -> code.NosqlQuery
+    sink method "findOne" -> code.NosqlQuery
+    control method "authenticate" -> core.AuthenticationCheck
+    sink method "execute" -> code.NosqlQuery
+    sink method "executeOpQuery" -> code.NosqlQuery
+    sink method "executeOpMessage" -> code.NosqlQuery
+  }
+}

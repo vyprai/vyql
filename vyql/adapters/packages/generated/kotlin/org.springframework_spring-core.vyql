@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.springframework:spring-core" {
+    sink method "parse" -> code.Deserialization
+  }
+}

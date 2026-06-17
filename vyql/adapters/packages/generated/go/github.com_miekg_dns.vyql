@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/miekg/dns" {
+    sink method "UnpackRRWithHeader" -> code.Deserialization
+    sink method "ReadRR" -> code.Deserialization
+    sink method "NewZoneParser" -> code.Deserialization
+    sink method "svcbParseParam" -> code.Deserialization
+    sink method "stringToCm" -> code.Deserialization
+  }
+}

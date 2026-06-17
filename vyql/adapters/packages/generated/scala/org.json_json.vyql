@@ -1,0 +1,9 @@
+import code.{XmlParse}
+import core.{HtmlEscape}
+
+adapter scala {
+  package "org.json:json" {
+    control method "XML.escape" -> core.HtmlEscape
+    sink method "XML.parse" -> code.XmlParse
+  }
+}

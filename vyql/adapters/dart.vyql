@@ -10,6 +10,22 @@ adapter dart {
   source "request.params" -> code.HttpInput
   source "request.headers" -> code.HttpInput
   source ".requestedUri" -> code.HttpInput
+  source method "getAll" -> code.StoredDataRead
+  source method "getString" -> code.StoredDataRead
+  source method "getBool" -> code.StoredDataRead
+  source method "getInt" -> code.StoredDataRead
+  source method "getDouble" -> code.StoredDataRead
+  source method "getStringList" -> code.StoredDataRead
+
+  // persistent storage / preferences
+  sink method "setValue" -> code.StoredDataWrite
+  sink method "setString" -> code.StoredDataWrite
+  sink method "setBool" -> code.StoredDataWrite
+  sink method "setInt" -> code.StoredDataWrite
+  sink method "setDouble" -> code.StoredDataWrite
+  sink method "setStringList" -> code.StoredDataWrite
+  sink method "clear" -> code.StoredDataWrite
+  sink method "remove" -> code.StoredDataWrite
 
   // SQL — sqflite raw queries
   sink method "rawQuery" -> code.SqlExecution
@@ -27,17 +43,21 @@ adapter dart {
   sink path "http.delete" -> code.UrlFetch
 
   // command execution — dart:io Process (the shell command is arg0 with runInShell)
-  sink path "Process.run" -> code.CommandExecution
-  sink path "Process.runSync" -> code.CommandExecution
-  sink path "Process.start" -> code.CommandExecution
+  sink path "Process.run" arg all collection -> code.CommandExecution
+  sink path "Process.runSync" arg all collection -> code.CommandExecution
+  sink path "Process.start" arg all collection -> code.CommandExecution
 
   // path / file — dart:io (the path is the constructor arg0)
   sink path "File" -> code.FilePathAccess
   sink path "Directory" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
+  sink method "extractFile" -> code.ArchiveEntryWrite
+  sink path "extractArchiveToDisk" arg all -> code.ArchiveEntryWrite
 
   // weak hash (CWE-328) — package:crypto md5/sha1.
   mark "md5.convert" -> code.WeakHash
   mark "sha1.convert" -> code.WeakHash
+  mark "ParametersWithIV" val "0000000000000000" -> code.StaticIv
 
   // XSS (CWE-79) — shelf/HTML response writers (the rendered body is the arg)
   sink method "write" arg all -> code.HtmlRender
@@ -52,10 +72,36 @@ adapter dart {
   // trust boundary (CWE-501) — untrusted data into the session
   sink method "setAttribute" arg all -> code.TrustBoundary
   sink method "putValue" arg all -> code.TrustBoundary
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
+
+  // regex compile (ReDoS)
+  sink path "RegExp" -> code.RegexCompile
 
   // insecure cookie (CWE-614) — dart:io Cookie configured insecurely
   mark "setSecure" val "false" -> code.InsecureCookie
   mark "setHttpOnly" val "false" -> code.InsecureCookie
+  mark "http.get" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "http.post" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "http.put" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "http.head" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "http.read" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "http.delete" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "badCertificateCallback" val "true" -> code.CertValidationDisabled
+  mark "Socket.connect" -> code.ResourceHandle
+  mark "File.open" -> code.ResourceHandle
+  mark "File.openRead" -> code.ResourceHandle
+  mark "File.openWrite" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
 
   // weak cipher (CWE-327) — pointycastle BlockCipher with a broken algorithm
   mark "BlockCipher" val "DES" -> code.WeakCipher
@@ -63,7 +109,7 @@ adapter dart {
   mark "BlockCipher" val "Blowfish" -> code.WeakCipher
 
   // insecure randomness (CWE-330) — dart:math Random() (Random.secure() is safe)
-  mark "Random" -> code.WeakRandomValue
+  mark exact "Random" -> code.WeakRandomValue
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
@@ -72,4 +118,9 @@ adapter dart {
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization
   control "validateRole" -> core.InputValidation
+  control "requireAuth" -> core.AuthenticationCheck
+  control "ensureAuthenticated" -> core.AuthenticationCheck
+  control "isAuthenticated" -> core.AuthenticationCheck
+  control "checkOwnership" -> core.OwnershipCheck
+  control "requireOwner" -> core.OwnershipCheck
 }

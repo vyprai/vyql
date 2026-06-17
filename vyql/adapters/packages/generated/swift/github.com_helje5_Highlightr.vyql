@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/helje5/Highlightr" {
+    sink method "highlight" -> code.CodeEval
+    source method "language" -> core.UserControlledData
+  }
+}

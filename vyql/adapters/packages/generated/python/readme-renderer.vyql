@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter python {
+  package "readme-renderer" {
+    control method "readme_renderer.txt.render" -> core.HtmlEscape
+  }
+}

@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter objc {
+  package "LFLiveKit" {
+    sink method "start" -> code.NetworkConnect
+    sink method "sendFrame" -> code.NetworkSend
+  }
+}

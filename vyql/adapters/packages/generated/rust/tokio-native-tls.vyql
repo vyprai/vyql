@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter rust {
+  package "tokio-native-tls" {
+    source method "poll_read" -> code.NetworkData
+    sink method "poll_write" -> code.NetworkSend
+  }
+}

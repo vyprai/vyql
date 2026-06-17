@@ -1,0 +1,6 @@
+import code.{SecretValue}
+adapter php {
+  package "defuse/php-encryption" {
+    source method "getRawBytes" -> code.SecretValue
+  }
+}

@@ -1,0 +1,9 @@
+import code.{CodeEval}
+
+adapter ruby {
+  package "eco" {
+    sink method "compile" -> code.CodeEval
+    sink method "context_for" -> code.CodeEval
+    sink method "render" -> code.CodeEval
+  }
+}

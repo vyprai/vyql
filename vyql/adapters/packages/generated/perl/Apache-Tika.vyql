@@ -1,0 +1,17 @@
+import code.{NetworkConnect, NetworkSend}
+import core.{UserControlledData}
+
+adapter perl {
+  package "Apache-Tika" {
+    sink method "meta" -> code.NetworkConnect
+    sink method "meta" -> code.NetworkSend
+    sink method "rmeta" -> code.NetworkConnect
+    sink method "rmeta" -> code.NetworkSend
+    sink method "tika" -> code.NetworkConnect
+    sink method "tika" -> code.NetworkSend
+    sink method "detect_stream" -> code.NetworkConnect
+    sink method "detect_stream" -> code.NetworkSend
+    sink method "language_stream" -> code.NetworkConnect
+    sink method "language_stream" -> code.NetworkSend
+  }
+}

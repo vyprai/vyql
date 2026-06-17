@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter perl {
+  package "Data-Sah-Coerce-perl-To_str-From_str-to_cryptocurrency_code" {
+    source method "coerce" -> core.UserControlledData
+  }
+}

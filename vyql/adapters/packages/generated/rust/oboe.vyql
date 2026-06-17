@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter rust {
+  package "oboe" {
+    source method "read" -> core.UserControlledData
+    source method "write" -> core.UserControlledData
+  }
+}

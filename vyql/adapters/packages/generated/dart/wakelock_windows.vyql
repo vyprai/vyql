@@ -1,0 +1,8 @@
+import code.{PrivilegedOp}
+
+adapter dart {
+  package "wakelock_windows" {
+    mark method "WakelockWindows.enable" -> code.PrivilegedOp
+    mark method "WakelockWindows.disable" -> code.PrivilegedOp
+  }
+}

@@ -1,0 +1,11 @@
+adapter scala {
+  package "org.osgi:org.osgi.core" {
+    sink method "match" -> code.ExpressionEval
+    sink method "matchCase" -> code.ExpressionEval
+    sink method "getResource" -> code.FilePathAccess
+    sink method "getEntryPaths" -> code.FilePathAccess
+    sink method "getEntry" -> code.FilePathAccess
+    sink method "findEntries" -> code.FilePathAccess
+    sink method "getDataFile" -> code.FilePathAccess
+  }
+}

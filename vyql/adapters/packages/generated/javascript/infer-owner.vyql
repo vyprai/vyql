@@ -1,0 +1,12 @@
+adapter javascript {
+  package "infer-owner" {
+    source method "inferOwner" -> core.UserControlledData
+    sink method "inferOwner" -> code.FilePathAccess
+    source method "inferOwnerSync" -> core.UserControlledData
+    sink method "inferOwnerSync" -> code.FilePathAccess
+    source method "path" -> core.UserControlledData
+    sink method "path" -> code.FilePathAccess
+    source method "sync" -> core.UserControlledData
+    sink method "sync" -> code.FilePathAccess
+  }
+}

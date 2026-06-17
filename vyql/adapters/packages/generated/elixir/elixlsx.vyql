@@ -1,0 +1,7 @@
+import core.{XpathEscape}
+adapter elixir {
+  package "elixlsx" {
+    control method "minimal_xml_text_escape" -> core.XpathEscape
+    control method "xml_escape" -> core.XpathEscape
+  }
+}

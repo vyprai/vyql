@@ -1,0 +1,13 @@
+import code.{FilePathAccess, UrlFetch}
+
+adapter dart {
+  package "package_resolver" {
+    sink method "loadConfigMap" -> code.UrlFetch
+    sink method "loadConfig" -> code.UrlFetch
+    sink method "readFileAsString" -> code.FilePathAccess
+    sink method "urlFor" -> code.FilePathAccess
+    sink method "packagePath" -> code.FilePathAccess
+    sink method "resolvePackageUri" -> code.FilePathAccess
+    sink method "resolveUri" -> code.FilePathAccess
+  }
+}

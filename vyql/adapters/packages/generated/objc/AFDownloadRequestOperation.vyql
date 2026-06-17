@@ -1,0 +1,6 @@
+import code.{FilePathAccess, FileUse}
+adapter objc {
+  package "AFDownloadRequestOperation" {
+    sink method "deleteTempFileWithError:" -> FileUse
+  }
+}

@@ -1,0 +1,14 @@
+import code.{NetworkConnect, NetworkSend}
+import core.{UserControlledData}
+
+adapter rust {
+  package "async-io" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "accept" -> code.NetworkConnect
+    sink method "incoming" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+    source method "recv" -> core.UserControlledData
+    source method "recv_from" -> core.UserControlledData
+    source method "peek_from" -> core.UserControlledData
+  }
+}

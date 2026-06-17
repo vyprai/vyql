@@ -1,0 +1,6 @@
+adapter php {
+  package "guzzle/guzzle" {
+    sink method "exec" -> code.CommandExecution
+    sink method "request" -> code.UrlFetch
+  }
+}

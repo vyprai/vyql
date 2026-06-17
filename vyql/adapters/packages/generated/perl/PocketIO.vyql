@@ -1,0 +1,5 @@
+adapter perl {
+  package "PocketIO" {
+    source method "call" -> code.HttpInput
+  }
+}

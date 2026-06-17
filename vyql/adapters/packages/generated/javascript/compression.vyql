@@ -1,0 +1,5 @@
+adapter javascript {
+  package "compression" {
+    sink method "onHeaders" -> code.UrlFetch
+  }
+}

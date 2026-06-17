@@ -1,0 +1,9 @@
+import code.{SqlExecution, DatabaseRead}
+
+adapter go {
+  package "github.com/Masterminds/squirrel" {
+    sink method "ExecWith" -> code.SqlExecution
+    sink method "QueryWith" -> code.DatabaseRead
+    sink method "QueryRowWith" -> code.DatabaseRead
+  }
+}

@@ -1,0 +1,9 @@
+import code.{NetworkConnect}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "email_checker" {
+    sink method "EmailChecker.Tools.lookup" -> code.NetworkConnect
+    sink method "EmailChecker.Check.SMTP.smtp_reply" -> code.NetworkConnect
+  }
+}

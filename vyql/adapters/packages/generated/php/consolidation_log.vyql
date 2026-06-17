@@ -1,0 +1,6 @@
+adapter php {
+  package "consolidation/log" {
+    sink method "log" -> code.LogOutput
+    sink method "write" -> code.LogOutput
+  }
+}

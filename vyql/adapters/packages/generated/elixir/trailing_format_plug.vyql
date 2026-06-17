@@ -1,0 +1,5 @@
+adapter elixir {
+  package "trailing_format_plug" {
+    source method "call" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter java {
+  package "org.hibernate:hibernate-core" {
+    sink method "createQuery" -> code.SqlExecution
+  }
+}

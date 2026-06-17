@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "arbre" {
+    control method "html_escape" -> core.HtmlEscape
+  }
+}

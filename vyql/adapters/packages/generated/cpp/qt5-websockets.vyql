@@ -1,0 +1,11 @@
+import code.{NetworkConnect, NetworkSend, NetworkData}
+
+adapter cpp {
+  package "qt5-websockets" {
+    sink method "QWebSocket::sendTextMessage" -> code.NetworkSend
+    sink method "QWebSocket::sendBinaryMessage" -> code.NetworkSend
+    sink method "QWebSocket::open" -> code.NetworkConnect
+    source method "QWebSocket::textMessageReceived" -> code.NetworkData
+    source method "QWebSocket::binaryMessageReceived" -> code.NetworkData
+  }
+}

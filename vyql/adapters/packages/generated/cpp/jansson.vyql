@@ -1,0 +1,10 @@
+adapter cpp {
+  package "jansson" {
+    sink method "json_loads" -> code.Deserialization
+    sink method "json_loadfd" -> code.Deserialization
+    sink method "json_loadf" -> code.Deserialization
+    sink method "json_load_file" -> code.Deserialization
+    sink method "json_unpack" -> code.Deserialization
+    sink method "json_unpack_ex" -> code.Deserialization
+  }
+}

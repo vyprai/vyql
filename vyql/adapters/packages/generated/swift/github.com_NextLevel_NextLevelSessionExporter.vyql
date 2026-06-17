@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter swift {
+  package "github.com/NextLevel/NextLevelSessionExporter" {
+    sink method "export" -> code.FilePathAccess
+  }
+}

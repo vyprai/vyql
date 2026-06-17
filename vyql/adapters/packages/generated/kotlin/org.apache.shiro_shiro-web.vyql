@@ -1,0 +1,12 @@
+import code.{FilePathAccess, RedirectTarget, HttpInput}
+import core.{PathCanonicalization}
+
+adapter kotlin {
+  package "org.apache.shiro:shiro-web" {
+    source method "getPathWithinApplication" -> code.HttpInput
+    source method "getRequestUri" -> code.HttpInput
+    source method "decodeRequestString" -> code.HttpInput
+    control method "normalize" -> core.PathCanonicalization
+    mark method "issueRedirect" -> code.RedirectTarget
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "com.hazelcast:hazelcast-spring" {
+    sink method "parseInternal" -> code.Deserialization
+  }
+}

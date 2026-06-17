@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter java {
+  package "com.fasterxml.jackson.module:jackson-module-afterburner" {
+    sink method "loadAndResolve" -> code.CodeEval
+  }
+}

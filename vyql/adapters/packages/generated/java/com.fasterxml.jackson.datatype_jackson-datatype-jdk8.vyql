@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter java {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-jdk8" {
+    sink method "findReferenceDeserializer" -> code.Deserialization
+    sink method "deserialize" -> code.Deserialization
+  }
+}

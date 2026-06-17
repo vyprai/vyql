@@ -1,0 +1,10 @@
+import code.{CliArgument, StoredDataRead, NetworkData}
+import core.{InputValidation, UserControlledData}
+
+adapter dart {
+  package "intl_phone_field" {
+    control method "IntlPhoneField.validator" -> core.InputValidation
+    source method "PhoneNumber" -> core.UserControlledData
+    source method "PhoneNumber.getCountry" -> core.UserControlledData
+  }
+}

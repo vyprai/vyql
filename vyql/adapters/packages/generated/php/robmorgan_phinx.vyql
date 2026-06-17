@@ -1,0 +1,8 @@
+import code.{SqlExecution, FilePathAccess, CommandExecution, NetworkConnect}
+
+adapter php {
+  package "robmorgan/phinx" {
+    sink method "query" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+  }
+}

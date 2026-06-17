@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+
+adapter csharp {
+  package "microsoft.kinect" {
+    source method "ProcessUpEvent" -> core.UserControlledData
+    source method "ProcessMoveEvents" -> core.UserControlledData
+    source method "ProcessDownEvent" -> core.UserControlledData
+  }
+}

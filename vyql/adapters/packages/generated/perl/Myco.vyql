@@ -1,0 +1,8 @@
+import code.{DatabaseRead, SqlExecution}
+
+adapter perl {
+  package "Myco" {
+    sink method "load" -> code.DatabaseRead
+    sink method "unload" -> code.SqlExecution
+  }
+}

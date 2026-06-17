@@ -1,0 +1,6 @@
+import code.{FileUse}
+adapter php {
+  package "magento-hackathon/magento-composer-installer" {
+    sink method "MagentoHackathon\Composer\Magento\GitIgnore::write" -> code.FileUse
+  }
+}

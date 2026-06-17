@@ -1,0 +1,6 @@
+import code.{WeakRandomValue}
+adapter cpp {
+  package "boost-random" {
+    mark method "random_device" -> code.WeakRandomValue
+  }
+}

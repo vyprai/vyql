@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend}
+import core.{AuthenticationCheck}
+
+adapter python {
+  package "tweepy" {
+    sink method "API.request" -> code.NetworkConnect
+    sink method "API.request" -> code.NetworkSend
+    control method "API.request" -> core.AuthenticationCheck
+  }
+}

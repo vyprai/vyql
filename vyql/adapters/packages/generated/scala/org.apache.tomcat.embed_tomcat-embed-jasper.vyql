@@ -1,0 +1,18 @@
+import code.{ExpressionEval, CodeEval}
+import core.{HtmlEscape, UserControlledData}
+
+adapter scala {
+  package "org.apache.tomcat.embed:tomcat-embed-jasper" {
+    sink method "parse" -> code.ExpressionEval
+    control method "escape" -> core.HtmlEscape
+    sink method "compile" -> code.CodeEval
+    source method "setArgs" -> core.UserControlledData
+    source method "setUriroot" -> core.UserControlledData
+    source method "setWebXmlEncoding" -> core.UserControlledData
+    source method "setClassPath" -> core.UserControlledData
+    source method "setJavaEncoding" -> core.UserControlledData
+    source method "setCompilerSourceVM" -> core.UserControlledData
+    source method "setCompilerTargetVM" -> core.UserControlledData
+    source method "setCompiler" -> core.UserControlledData
+  }
+}

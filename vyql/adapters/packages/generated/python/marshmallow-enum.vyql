@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "marshmallow-enum" {
+    sink method "EnumField._deserialize" -> code.Deserialization
+  }
+}

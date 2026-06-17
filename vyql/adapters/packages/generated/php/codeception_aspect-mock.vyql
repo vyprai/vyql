@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter php {
+  package "codeception/aspect-mock" {
+    sink method "func" -> code.CodeEval
+    sink method "registerFunc" -> code.CodeEval
+  }
+}

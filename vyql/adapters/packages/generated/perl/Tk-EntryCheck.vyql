@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter perl {
+  package "Tk-EntryCheck" {
+    control method "_EntryCheckValidate" -> core.InputValidation
+  }
+}

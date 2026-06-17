@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "Cikl" {
+    sink method "Cikl::Codecs::JSON::decode_event" -> code.Deserialization
+  }
+}

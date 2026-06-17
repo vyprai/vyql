@@ -1,0 +1,15 @@
+import code.{NetworkData, NetworkSend}
+adapter kotlin {
+  package "org.apache.avro:avro-ipc" {
+    source method "readBuffers" -> code.NetworkData
+    sink method "writeBuffers" -> code.NetworkSend
+    sink method "request" -> code.NetworkSend
+    source method "readResponse" -> code.NetworkData
+    sink method "writeRequest" -> code.NetworkSend
+    source method "readError" -> code.NetworkData
+    sink method "writeError" -> code.NetworkSend
+    sink method "writeHandshake" -> code.NetworkSend
+    source method "readHandshake" -> code.NetworkData
+    source method "respond" -> code.NetworkData
+  }
+}

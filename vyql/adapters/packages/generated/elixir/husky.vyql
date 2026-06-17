@@ -1,0 +1,6 @@
+adapter elixir {
+  package "husky" {
+    sink method "execute_cmd" -> code.CommandExecution
+    sink method "parse_json" -> code.Deserialization
+  }
+}

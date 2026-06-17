@@ -1,0 +1,11 @@
+import code.{HttpInput, NetworkSend, ResponseHeaderWrite}
+
+adapter php {
+  package "laminas/laminas-httphandlerrunner" {
+    source method "Laminas\HttpHandlerRunner\RequestHandlerRunner::run" -> code.HttpInput
+    sink method "Laminas\HttpHandlerRunner\Emitter\SapiEmitter::emit" -> code.ResponseHeaderWrite
+    sink method "Laminas\HttpHandlerRunner\Emitter\SapiEmitter::emit" -> code.NetworkSend
+    sink method "Laminas\HttpHandlerRunner\Emitter\SapiStreamEmitter::emit" -> code.ResponseHeaderWrite
+    sink method "Laminas\HttpHandlerRunner\Emitter\SapiStreamEmitter::emit" -> code.NetworkSend
+  }
+}

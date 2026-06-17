@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter dart {
+  package "isolate" {
+    sink method "IsolateRunner.spawn" -> code.CommandExecution
+  }
+}

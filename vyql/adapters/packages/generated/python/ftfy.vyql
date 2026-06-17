@@ -1,0 +1,14 @@
+import core.{HtmlEscape, InputValidation}
+adapter python {
+  package "ftfy" {
+    control method "unescape_html" -> core.HtmlEscape
+    control method "fix_encoding" -> core.InputValidation
+    control method "fix_latin_ligatures" -> core.InputValidation
+    control method "fix_character_width" -> core.InputValidation
+    control method "fix_line_breaks" -> core.InputValidation
+    control method "fix_surrogates" -> core.InputValidation
+    control method "remove_control_chars" -> core.InputValidation
+    control method "remove_bom" -> core.InputValidation
+    control method "fix_c1_controls" -> core.InputValidation
+  }
+}

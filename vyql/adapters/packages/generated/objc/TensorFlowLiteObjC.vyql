@@ -1,0 +1,7 @@
+adapter objc {
+  package "TensorFlowLiteObjC" {
+    sink method "FindFunctionBody" -> code.NosqlQuery
+    sink method "ResetJitCompilerFlags" -> code.StoredDataWrite
+    sink method "Compile" -> code.DynamicCodeLoad
+  }
+}

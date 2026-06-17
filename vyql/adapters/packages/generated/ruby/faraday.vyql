@@ -1,0 +1,11 @@
+import code.{NetworkConnect, NetworkSend, UrlFetch, HttpInput}
+import core.{InputValidation, HtmlEscape}
+
+adapter ruby {
+  package "faraday" {
+    sink method "Faraday::Connection.new" -> code.NetworkConnect
+    sink method "run_request" -> code.NetworkSend
+    sink method "run_request" -> code.UrlFetch
+    control method "Faraday::Utils.escape" -> core.InputValidation
+  }
+}

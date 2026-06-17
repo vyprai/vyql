@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter rust {
+  package "utf-8" {
+    sink method "decode" -> code.Deserialization
+  }
+}

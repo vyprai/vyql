@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/mrackwitz/Version" {
+    sink method "parse" -> code.Deserialization
+  }
+}

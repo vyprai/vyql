@@ -1,0 +1,6 @@
+adapter scala {
+  package "io.cucumber:cucumber-spring" {
+    sink method "loadGlue" -> code.FilePathAccess
+    sink method "loadGlue" -> code.UrlFetch
+  }
+}

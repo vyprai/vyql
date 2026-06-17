@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter go {
+  package "go.opencensus.io" {
+    control method "Sanitize" -> core.InputValidation
+  }
+}

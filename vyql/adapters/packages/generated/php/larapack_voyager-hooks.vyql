@@ -1,0 +1,6 @@
+import code.{RedirectTarget}
+adapter php {
+  package "larapack/voyager-hooks" {
+    mark method "redirect" -> code.RedirectTarget
+  }
+}

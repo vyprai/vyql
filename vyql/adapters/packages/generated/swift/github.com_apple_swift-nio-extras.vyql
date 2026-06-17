@@ -1,0 +1,7 @@
+import core.{CertificateValidation}
+
+adapter swift {
+  package "github.com/apple/swift-nio-extras" {
+    control method "validate" -> core.CertificateValidation
+  }
+}

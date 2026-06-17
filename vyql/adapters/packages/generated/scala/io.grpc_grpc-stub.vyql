@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter scala {
+  package "io.grpc:grpc-stub" {
+    source method "BlockingClientCall.read" -> code.NetworkData
+    sink method "BlockingClientCall.write" -> code.NetworkSend
+  }
+}

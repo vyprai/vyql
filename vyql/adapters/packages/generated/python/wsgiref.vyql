@@ -1,0 +1,5 @@
+adapter python {
+  package "wsgiref" {
+    control method "test_validated_hello" -> core.InputValidation
+  }
+}

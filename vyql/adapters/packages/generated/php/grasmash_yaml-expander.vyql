@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "grasmash/yaml-expander" {
+    sink method "parse" -> code.Deserialization
+  }
+}

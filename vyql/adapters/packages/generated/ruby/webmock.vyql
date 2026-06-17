@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "webmock" {
+    sink method "WebMock::Util::Parsers::XML.parse" -> code.Deserialization
+  }
+}

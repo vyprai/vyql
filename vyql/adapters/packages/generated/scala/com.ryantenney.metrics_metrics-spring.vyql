@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter scala {
+  package "com.ryantenney.metrics:metrics-spring" {
+    control method "validate" -> core.InputValidation
+  }
+}

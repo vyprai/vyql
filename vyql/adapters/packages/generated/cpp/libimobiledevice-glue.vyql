@@ -1,0 +1,17 @@
+import code.{Deserialization, FilePathAccess, FileUse, NetworkData, NetworkSend, WeakHash}
+
+adapter cpp {
+  package "libimobiledevice-glue" {
+    source method "socket_receive" -> code.NetworkData
+    source method "socket_receive_timeout" -> code.NetworkData
+    sink method "socket_send" -> code.NetworkSend
+    sink method "opack_decode_to_plist" -> code.Deserialization
+    sink method "buffer_read_from_filename" -> code.FilePathAccess
+    sink method "buffer_read_from_filename" -> code.FileUse
+    sink method "buffer_write_to_filename" -> code.FileUse
+    mark method "sha1_init" -> code.WeakHash
+    mark method "sha1_final" -> code.WeakHash
+    mark method "sha1_update" -> code.WeakHash
+    mark method "sha1" -> code.WeakHash
+  }
+}

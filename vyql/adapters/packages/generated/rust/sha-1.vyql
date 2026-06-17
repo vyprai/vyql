@@ -1,0 +1,7 @@
+import code.{WeakHash}
+adapter rust {
+  package "sha-1" {
+    mark method "update_blocks" -> code.WeakHash
+    mark method "finalize_fixed_core" -> code.WeakHash
+  }
+}

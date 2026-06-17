@@ -1,0 +1,10 @@
+import code.{CodeEval}
+
+adapter php {
+  package "slim/php-view" {
+    sink method "render" -> code.CodeEval
+    sink method "fetch" -> code.CodeEval
+    sink method "fetchTemplate" -> code.CodeEval
+    sink method "protectedIncludeScope" -> code.CodeEval
+  }
+}

@@ -1,0 +1,5 @@
+adapter c {
+  package "rhash" {
+    mark method "load_updated_hash_file" -> code.WeakHash
+  }
+}

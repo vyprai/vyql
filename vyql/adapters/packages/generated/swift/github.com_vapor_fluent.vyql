@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/vapor/fluent" {
+    sink method "data" -> code.SqlExecution
+    source method "init" -> code.SecretValue
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter java {
+  package "com.google.api-client:google-api-client" {
+    sink method "GoogleJsonError.parse" -> code.Deserialization
+    sink method "GoogleClientSecrets.load" -> code.Deserialization
+  }
+}

@@ -1,0 +1,10 @@
+import code.{ExpressionEval}
+adapter cpp {
+  package "c89stringutils" {
+    sink method "snprintf" -> code.ExpressionEval
+    sink method "wtf_vsnprintf" -> code.ExpressionEval
+    sink method "vasprintf" -> code.ExpressionEval
+    sink method "asprintf" -> code.ExpressionEval
+    sink method "jasprintf" -> code.ExpressionEval
+  }
+}

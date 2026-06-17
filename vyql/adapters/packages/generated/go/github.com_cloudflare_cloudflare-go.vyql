@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter go {
+  package "github.com/cloudflare/cloudflare-go" {
+    control method "sanitiseBINDFileInput" -> core.InputValidation
+  }
+}

@@ -1,0 +1,11 @@
+import code.{RedirectTarget, StoredDataRead, StoredDataWrite}
+import core.{AuthenticationCheck}
+
+adapter python {
+  package "social-auth-app-django" {
+    control method "authenticate" -> core.AuthenticationCheck
+    source method "session" -> code.StoredDataRead
+    sink method "session" -> code.StoredDataWrite
+    mark method "redirect" -> code.RedirectTarget
+  }
+}

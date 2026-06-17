@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter swift {
+  package "github.com/iosdevzone/IDZSwiftCommonCrypto" {
+    mark method "MD5" -> code.WeakHash
+    mark method "SHA1" -> code.WeakHash
+  }
+}

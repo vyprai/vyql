@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "org.jboss.resteasy:resteasy-jaxrs" {
+    source path "org.jboss.resteasy.resteasy.jaxrs.cookie" -> code.HttpInput
+  }
+}

@@ -1,0 +1,13 @@
+import code.{SqlExecution, StoredDataRead}
+adapter ruby {
+  package "activerecord-deprecated_finders" {
+    sink method "find_in_batches" -> code.SqlExecution
+    sink method "calculate" -> code.SqlExecution
+    sink method "find" -> code.SqlExecution
+    sink method "first" -> code.SqlExecution
+    sink method "last" -> code.SqlExecution
+    sink method "update_all_with_deprecated_options" -> code.SqlExecution
+    source method "default_scope" -> code.StoredDataRead
+    source method "scope" -> code.StoredDataRead
+  }
+}

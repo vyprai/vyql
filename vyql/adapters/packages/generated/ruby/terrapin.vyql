@@ -1,0 +1,11 @@
+import code.{CommandExecution}
+import core.{ShellEscape}
+
+adapter ruby {
+  package "terrapin" {
+    sink method "run" -> code.CommandExecution
+    sink method "spawn" -> code.CommandExecution
+    control method "shell_quote" -> core.ShellEscape
+    control method "shell_quote_all_values" -> core.ShellEscape
+  }
+}

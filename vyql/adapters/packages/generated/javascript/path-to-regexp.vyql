@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter javascript {
+  package "path-to-regexp" {
+    mark method "parse" -> code.RegexCompile
+    mark method "pathToRegexp" -> code.RegexCompile
+    control method "escape" -> core.InputValidation
+  }
+}

@@ -1,0 +1,10 @@
+import code.{UrlFetch}
+import core.{InputValidation}
+
+adapter cpp {
+  package "curlpp" {
+    control method "escape" -> core.InputValidation
+    control method "unescape" -> core.InputValidation
+    sink method "perform" -> code.UrlFetch
+  }
+}

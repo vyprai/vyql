@@ -34,27 +34,17 @@ var psWrappers = map[string]bool{
 
 // ExtractPowerShell parses .ps1/.psm1 files into one NIR Program.
 func ExtractPowerShell(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(psl.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &psConv{src: src, file: rel, key: moduleKey(root, f, ".ps1")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.program(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(psl.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &psConv{src: src, file: rel, key: moduleKey(root, abs, ".ps1")}
+			return nir.Module{Key: c.key, File: rel, Body: c.program(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *psConv) loc(n *tree_sitter.Node) string {
@@ -115,7 +105,8 @@ func (c *psConv) stmtList(n *tree_sitter.Node) []nir.Stmt {
 func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	switch n.Kind() {
 	case "function_statement":
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: nil, Body: c.stmtList(n), Loc: c.loc(n)}}
+		params, paramTypes := c.functionParams(n)
+		return []nir.Stmt{nir.FuncDef{Name: c.functionName(n), Params: params, ParamTypes: paramTypes, Body: c.stmtList(n), Loc: c.loc(n)}}
 	case "pipeline", "statement":
 		inner := c.psUnwrap(n)
 		if inner != n {
@@ -298,6 +289,111 @@ func (c *psConv) paramNames(n *tree_sitter.Node) []string {
 	return out
 }
 
+func (c *psConv) functionParams(n *tree_sitter.Node) ([]string, map[string]string) {
+	if pb := c.findParamBlock(n); pb != nil {
+		return c.paramNames(pb), c.paramTypes(pb)
+	}
+	return nil, map[string]string{}
+}
+
+func (c *psConv) paramTypes(n *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if name := c.directVarName(m); name != "" {
+			typ := paramTypeFromField(c, m)
+			if typ == "" {
+				typ = psBracketType(c.text(m))
+			}
+			putParamType(out, name, typ)
+		}
+		for _, ch := range namedChildren(m) {
+			if ch.Kind() == "parameter" || ch.Kind() == "parameter_declaration" || ch.Kind() == "variable" {
+				name := ""
+				if v := field(ch, "name"); v != nil {
+					name = c.varName(v)
+				}
+				if name == "" {
+					for _, cc := range namedChildren(ch) {
+						if cc.Kind() == "variable" {
+							name = c.varName(cc)
+							break
+						}
+					}
+				}
+				if name == "" && ch.Kind() == "variable" {
+					name = c.varName(ch)
+				}
+				putParamType(out, name, paramTypeFromField(c, ch))
+				if name != "" {
+					continue
+				}
+			}
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *psConv) functionName(n *tree_sitter.Node) string {
+	if name := c.text(field(n, "name")); name != "" {
+		return name
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "command_name", "function_name", "identifier":
+			return c.text(ch)
+		case "script_block", "script_block_body", "statement_list":
+			continue
+		}
+	}
+	parts := strings.Fields(c.text(n))
+	if len(parts) >= 2 && strings.EqualFold(parts[0], "function") {
+		return strings.TrimSpace(parts[1])
+	}
+	return ""
+}
+
+func (c *psConv) findParamBlock(n *tree_sitter.Node) *tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "param_block" {
+			return ch
+		}
+		if got := c.findParamBlock(ch); got != nil {
+			return got
+		}
+	}
+	return nil
+}
+
+func (c *psConv) directVarName(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if n.Kind() == "variable" {
+		return c.varName(n)
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "variable" {
+			return c.varName(ch)
+		}
+	}
+	return ""
+}
+
+func psBracketType(s string) string {
+	start := strings.Index(s, "[")
+	end := strings.Index(s, "]")
+	if start < 0 || end <= start {
+		return ""
+	}
+	return s[start : end+1]
+}
+
 // command models a cmdlet/program call: command_name -> path, the
 // array_literal_expression elements -> args (skipping separators).
 func (c *psConv) command(n *tree_sitter.Node) nir.Expr {
@@ -371,7 +467,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: psLiteralValue(c.text(n))}
 	case "additive_expression":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
@@ -423,6 +519,16 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		return parts[0]
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func psLiteralValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 2 {
+		if q := raw[0]; (q == '"' || q == '\'') && raw[len(raw)-1] == q {
+			return raw[1 : len(raw)-1]
+		}
+	}
+	return raw
 }
 
 func (c *psConv) psInvokeArgs(n *tree_sitter.Node) []nir.Expr {

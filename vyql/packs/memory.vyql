@@ -1,0 +1,44 @@
+// Memory-safety weakness rules. These are exploitability-aware: taint rules mean
+// attacker-controlled data reaches a memory-sensitive operand; match rules are
+// assumption-gated smells with exploit conditions attached by adapters.
+module vypr.memory;
+
+rule TaintedUnboundedCopy {
+  meta { id: "VYQL-MEM-001", severity: high, cwe: [CWE_787, CWE_120] }
+  taint core.UserControlledData -> code.UnboundedCopy
+}
+
+rule PotentialUnboundedCopy {
+  meta { id: "VYQL-MEM-002", severity: medium, cwe: [CWE_787, CWE_120], confidence_floor: low }
+  match code.UnboundedCopySmell as c
+}
+
+rule TaintedRawMemoryCopySize {
+  meta { id: "VYQL-MEM-003", severity: high, cwe: [CWE_787] }
+  taint core.UserControlledData -> code.RawMemoryCopySize
+}
+
+rule StackAllocationSmell {
+  meta { id: "VYQL-MEM-004", severity: low, cwe: [CWE_400], confidence_floor: low }
+  match code.StackAllocationSmell as a
+}
+
+rule TaintedIndexAccess {
+  meta { id: "VYQL-MEM-005", severity: high, cwe: [CWE_125, CWE_787] }
+  taint core.UserControlledData -> code.IndexAccess
+}
+
+rule PotentialNullDeref {
+  meta { id: "VYQL-MEM-006", severity: low, cwe: [CWE_476], confidence_floor: low }
+  match code.NullableDeref as d
+}
+
+rule PotentialUseAfterFree {
+  meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
+  order code.PointerFree before code.PointerUse
+}
+
+rule PotentialDoubleFree {
+  meta { id: "VYQL-MEM-008", severity: high, cwe: [CWE_415], confidence_floor: low }
+  order code.PointerFree before code.PointerFree
+}

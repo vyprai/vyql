@@ -1,0 +1,11 @@
+import code.{ArchiveEntryWrite, FilePathAccess, NetworkConnect, NetworkData}
+
+adapter java {
+  package "org.eclipse.jgit:org.eclipse.jgit" {
+    sink method "open" -> code.FilePathAccess
+    sink method "cloneRepository" -> code.NetworkConnect
+    sink method "fetch" -> code.NetworkConnect
+    sink method "push" -> code.NetworkConnect
+    sink method "archive" -> code.ArchiveEntryWrite
+  }
+}

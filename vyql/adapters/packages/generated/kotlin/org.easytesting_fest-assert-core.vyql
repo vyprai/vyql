@@ -1,0 +1,9 @@
+import code.{FilePathAccess}
+adapter kotlin {
+  package "org.easytesting:fest-assert-core" {
+    sink method "contentOf" -> code.FilePathAccess
+    sink method "hasContent" -> code.FilePathAccess
+    sink method "canRead" -> code.FilePathAccess
+    sink method "canWrite" -> code.FilePathAccess
+  }
+}

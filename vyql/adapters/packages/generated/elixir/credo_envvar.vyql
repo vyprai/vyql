@@ -1,0 +1,5 @@
+adapter elixir {
+  package "credo_envvar" {
+    control method "run" -> core.InputValidation
+  }
+}

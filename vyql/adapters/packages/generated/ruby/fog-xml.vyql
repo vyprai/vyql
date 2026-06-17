@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "fog-xml" {
+    sink method "request" -> code.Deserialization
+  }
+}

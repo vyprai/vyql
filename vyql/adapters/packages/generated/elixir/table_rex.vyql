@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+adapter elixir {
+  package "table_rex" {
+    source method "quick_render" -> core.UserControlledData
+    source method "quick_render!" -> core.UserControlledData
+    source method "Table.render" -> core.UserControlledData
+    source method "Table.render!" -> core.UserControlledData
+  }
+}

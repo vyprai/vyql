@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter java {
+  package "javax.activation:activation" {
+    sink method "MimeType" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

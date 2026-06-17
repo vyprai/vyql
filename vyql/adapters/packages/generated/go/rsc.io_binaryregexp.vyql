@@ -1,0 +1,10 @@
+import code.{RegexCompile}
+
+adapter go {
+  package "rsc.io/binaryregexp" {
+    mark method "Compile" -> code.RegexCompile
+    mark method "CompilePOSIX" -> code.RegexCompile
+    mark method "MustCompile" -> code.RegexCompile
+    mark method "MustCompilePOSIX" -> code.RegexCompile
+  }
+}

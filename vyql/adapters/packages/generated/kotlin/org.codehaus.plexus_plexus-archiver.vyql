@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter kotlin {
+  package "org.codehaus.plexus:plexus-archiver" {
+    sink method "setDestFile" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,9 @@
+import code.{FileUpload, FileUse}
+adapter python {
+  package "boto3" {
+    mark method "upload_file" -> code.FileUpload
+    mark method "upload_fileobj" -> code.FileUpload
+    sink method "download_file" -> code.FileUse
+    sink method "download_fileobj" -> code.FileUse
+  }
+}

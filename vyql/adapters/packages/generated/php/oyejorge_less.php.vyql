@@ -1,0 +1,13 @@
+import code.{Deserialization, FilePathAccess}
+import core.{HtmlEscape}
+
+adapter php {
+  package "oyejorge/less.php" {
+    sink method "parse" -> code.Deserialization
+    sink method "compile" -> code.Deserialization
+    sink method "compileFile" -> code.FilePathAccess
+    sink method "file_put_contents" -> code.FilePathAccess
+    sink method "unlink" -> code.FilePathAccess
+    control method "escape" -> core.HtmlEscape
+  }
+}

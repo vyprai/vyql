@@ -1,0 +1,7 @@
+import code.{NetworkConnect, NetworkSend}
+adapter ruby {
+  package "aws-s3" {
+    sink method "request" -> code.NetworkConnect
+    sink method "request" -> code.NetworkSend
+  }
+}

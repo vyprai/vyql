@@ -1,0 +1,9 @@
+import code.{NetworkData, Deserialization}
+
+adapter objc {
+  package "SDWebImage" {
+    sink method "SDImageLoaderDecodeImageData" -> code.Deserialization
+    sink method "SDImageLoaderDecodeProgressiveImageData" -> code.Deserialization
+    source method "sd_setImageWithURL" -> code.NetworkData
+  }
+}

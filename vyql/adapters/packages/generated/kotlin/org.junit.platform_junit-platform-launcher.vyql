@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.junit.platform:junit-platform-launcher" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseFrom" -> code.Deserialization
+  }
+}

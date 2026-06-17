@@ -1,0 +1,11 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter go {
+  package "github.com/go-openapi/loads" {
+    sink method "JSONSpec" -> code.FilePathAccess
+    sink method "JSONSpec" -> code.Deserialization
+    sink method "Spec" -> code.FilePathAccess
+    sink method "Spec" -> code.Deserialization
+    sink method "Embedded" -> code.Deserialization
+  }
+}

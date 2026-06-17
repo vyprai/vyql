@@ -1,0 +1,16 @@
+adapter python {
+  package "tinycss2" {
+    sink method "parse_one_component_value" -> code.Deserialization
+    sink method "parse_one_declaration" -> code.Deserialization
+    sink method "parse_blocks_contents" -> code.Deserialization
+    sink method "parse_declaration_list" -> code.Deserialization
+    sink method "parse_one_rule" -> code.Deserialization
+    sink method "parse_rule_list" -> code.Deserialization
+    sink method "parse_stylesheet" -> code.Deserialization
+    sink method "parse_component_value_list" -> code.Deserialization
+    source method "decode_stylesheet_bytes" -> core.UserControlledData
+    sink method "parse_stylesheet_bytes" -> code.Deserialization
+    sink method "parse_color" -> code.Deserialization
+    sink method "parse_nth" -> code.Deserialization
+  }
+}

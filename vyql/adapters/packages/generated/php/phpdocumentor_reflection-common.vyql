@@ -1,0 +1,8 @@
+import code.{FileUse, WeakHash}
+
+adapter php {
+  package "phpdocumentor/reflection-common" {
+    sink method "getContents" -> code.FileUse
+    mark method "md5" -> code.WeakHash
+  }
+}

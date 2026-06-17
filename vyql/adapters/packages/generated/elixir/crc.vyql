@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter elixir {
+  package "crc" {
+    source method "calculate" -> core.UserControlledData
+  }
+}

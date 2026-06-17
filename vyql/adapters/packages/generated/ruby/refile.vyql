@@ -1,0 +1,13 @@
+import code.{Deserialization, FilePathAccess, NetworkData, UrlFetch, SecretValue, WeakHash}
+
+adapter ruby {
+  package "refile" {
+    source method "call" -> code.NetworkData
+    sink method "parse_json" -> code.Deserialization
+    sink method "download" -> code.UrlFetch
+    sink method "write" -> code.FilePathAccess
+    sink method "read" -> code.FilePathAccess
+    source method "token" -> code.SecretValue
+    mark method "hash" -> code.WeakHash
+  }
+}

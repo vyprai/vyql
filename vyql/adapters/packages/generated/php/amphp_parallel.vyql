@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "amphp/parallel" {
+    sink method "Amp\\Parallel\\Context\\ProcessContext::start" -> code.CommandExecution
+  }
+}

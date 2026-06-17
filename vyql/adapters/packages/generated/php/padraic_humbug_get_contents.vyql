@@ -1,0 +1,9 @@
+import code.{UrlFetch}
+
+adapter php {
+  package "padraic/humbug_get_contents" {
+    sink method "humbug_get_contents" -> code.UrlFetch
+    sink method "get_contents" -> code.UrlFetch
+    sink method "Humbug\FileGetContents.get" -> code.UrlFetch
+  }
+}

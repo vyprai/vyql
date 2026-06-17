@@ -1,0 +1,6 @@
+adapter objc {
+  package "RealmSwift" {
+    sink method "insertionsInSection" -> code.SqlExecution
+    mark path "realmswift.hash" -> code.WeakHash
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization, HttpInput, NetworkSend}
+adapter kotlin {
+  package "org.springframework.data:spring-data-rest-webmvc" {
+    sink method "read" -> code.Deserialization
+    source method "getBody" -> code.HttpInput
+    sink method "write" -> code.NetworkSend
+  }
+}

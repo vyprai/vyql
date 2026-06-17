@@ -1,0 +1,7 @@
+import core.{InputValidation}
+adapter javascript {
+  package "@hapi/joi" {
+    control method "validate" -> core.InputValidation
+    control method "validateAsync" -> core.InputValidation
+  }
+}

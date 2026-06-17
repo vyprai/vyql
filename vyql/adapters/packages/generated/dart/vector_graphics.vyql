@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter dart {
+  package "vector_graphics" {
+    sink method "NetworkBytesLoader" -> code.UrlFetch
+  }
+}

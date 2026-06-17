@@ -1,0 +1,12 @@
+import core.{AuthorizationCheck}
+
+adapter java {
+  package "org.springframework.security:spring-security-data" {
+    control method "setPermissionEvaluator" -> core.AuthorizationCheck
+    control method "setSecurityContextHolderStrategy" -> core.AuthorizationCheck
+    control method "setTrustResolver" -> core.AuthorizationCheck
+    control method "setRoleHierarchy" -> core.AuthorizationCheck
+    control method "registerHints" -> core.AuthorizationCheck
+    control method "setDefaultRolePrefix" -> core.AuthorizationCheck
+  }
+}

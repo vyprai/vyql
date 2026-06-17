@@ -1,0 +1,11 @@
+import code.{NetworkData}
+import core.{AuthorizationCheck}
+
+adapter dart {
+  package "location_web" {
+    source method "LocationWebPlugin.getLocation" -> code.NetworkData
+    source method "LocationWebPlugin.onLocationChanged" -> code.NetworkData
+    control method "LocationWebPlugin.requestPermission" -> core.AuthorizationCheck
+    control method "LocationWebPlugin.requestService" -> core.AuthorizationCheck
+  }
+}

@@ -1,0 +1,5 @@
+adapter perl {
+  package "Config-MySQL" {
+    sink method "find_extensions" -> code.SqlExecution
+  }
+}

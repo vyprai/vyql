@@ -1,0 +1,11 @@
+adapter kotlin {
+  package "io.springfox:springfox-bean-validators" {
+    control method "stringLengthRange" -> core.InputValidation
+    control method "allowableRange" -> core.InputValidation
+    control method "expanderMinMax" -> core.InputValidation
+    control method "expanderNotNull" -> core.InputValidation
+    control method "expanderNotBlank" -> core.InputValidation
+    control method "expanderPattern" -> core.InputValidation
+    control method "expanderSize" -> core.InputValidation
+  }
+}

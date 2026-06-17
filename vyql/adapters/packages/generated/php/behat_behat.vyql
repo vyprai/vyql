@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+
+adapter php {
+  package "behat/behat" {
+    sink method "Behat\Behat\Util\StrictRegex::replace" -> code.ExpressionEval
+  }
+}

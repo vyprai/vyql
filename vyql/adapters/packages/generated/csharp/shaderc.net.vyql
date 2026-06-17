@@ -1,0 +1,6 @@
+adapter csharp {
+  package "shaderc.net" {
+    sink method "Compile" -> code.CodeEval
+    source method "TryParseVersionProfile" -> core.UserControlledData
+  }
+}

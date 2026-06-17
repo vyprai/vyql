@@ -1,0 +1,7 @@
+adapter python {
+  package "pymongo" {
+    sink method "pymongo_buffer_update_position" -> code.SqlExecution
+    sink method "collection" -> code.NosqlQuery
+    sink method "PyErr_SetString" -> code.StoredDataWrite
+  }
+}

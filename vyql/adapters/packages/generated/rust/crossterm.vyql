@@ -1,0 +1,7 @@
+import code.{CommandExecution, StdinInput}
+
+adapter rust {
+  package "crossterm" {
+    source method "read" -> code.StdinInput
+  }
+}

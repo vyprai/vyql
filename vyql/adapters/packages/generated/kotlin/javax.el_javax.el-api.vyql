@@ -1,0 +1,6 @@
+import code.{ExpressionEval}
+adapter kotlin {
+  package "javax.el:javax.el-api" {
+    sink method "eval" -> code.ExpressionEval
+  }
+}

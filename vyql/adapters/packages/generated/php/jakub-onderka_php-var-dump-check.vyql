@@ -1,0 +1,9 @@
+import code.{CliArgument, FilePathAccess}
+
+adapter php {
+  package "jakub-onderka/php-var-dump-check" {
+    source method "JakubOnderka\PhpVarDumpCheck\Settings::parseArguments" -> code.CliArgument
+    sink method "JakubOnderka\PhpVarDumpCheck\Manager::checkFile" -> code.FilePathAccess
+    sink method "JakubOnderka\PhpVarDumpCheck\Manager::loadFile" -> code.FilePathAccess
+  }
+}

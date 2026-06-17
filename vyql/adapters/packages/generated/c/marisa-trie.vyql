@@ -1,0 +1,10 @@
+import code.{FilePathAccess}
+import core.{UserControlledData}
+
+adapter c {
+  package "marisa-trie" {
+    sink method "load" -> code.FilePathAccess
+    sink method "save" -> code.FilePathAccess
+    source method "push_back" -> core.UserControlledData
+  }
+}

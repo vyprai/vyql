@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/vapor/fluent-mongo-driver" {
+    sink method "find" -> code.NosqlQuery
+  }
+}

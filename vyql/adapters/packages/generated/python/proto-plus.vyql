@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "proto-plus" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

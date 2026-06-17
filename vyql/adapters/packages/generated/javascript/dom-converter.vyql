@@ -1,0 +1,5 @@
+adapter javascript {
+  package "dom-converter" {
+    sink method "sanitize" -> code.Deserialization
+  }
+}

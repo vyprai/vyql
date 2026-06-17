@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "boost-property-map-parallel" {
+    sink method "serialize" -> code.Deserialization
+    sink method "unsafe_serialize" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/google/go-containerregistry" {
+    sink method "ParseReference" -> code.Deserialization
+    sink method "MustParseReference" -> code.Deserialization
+    sink method "ParseConfigFile" -> code.Deserialization
+  }
+}

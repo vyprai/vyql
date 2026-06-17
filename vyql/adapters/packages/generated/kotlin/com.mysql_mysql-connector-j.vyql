@@ -1,0 +1,9 @@
+import code.{SqlExecution, NetworkConnect, SecretValue}
+
+adapter kotlin {
+  package "com.mysql:mysql-connector-j" {
+    sink method "query" -> code.SqlExecution
+    sink method "connect" -> code.NetworkConnect
+    source method "connect" -> code.SecretValue
+  }
+}

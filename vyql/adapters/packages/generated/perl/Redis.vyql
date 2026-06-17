@@ -1,0 +1,10 @@
+import code.{CommandExecution, NetworkConnect, NetworkData}
+adapter perl {
+  package "Redis" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "__send_command" -> code.NetworkConnect
+    source method "__read_response" -> code.NetworkData
+    sink method "exec" -> code.CommandExecution
+    sink method "system" -> code.CommandExecution
+  }
+}

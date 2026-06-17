@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "vector_graphics_compiler" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseCssRgb" -> code.Deserialization
+    sink method "parseCssHsl" -> code.Deserialization
+    sink method "parseRgbFunction" -> code.Deserialization
+    sink method "parseHslFunction" -> code.Deserialization
+  }
+}

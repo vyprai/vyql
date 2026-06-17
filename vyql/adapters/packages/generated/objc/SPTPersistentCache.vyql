@@ -1,0 +1,13 @@
+import code.{FilePathAccess, StoredDataRead, StoredDataWrite}
+adapter objc {
+  package "SPTPersistentCache" {
+    source method "read:buffer:bufferSize:" -> code.StoredDataRead
+    source method "loadDataForKey:" -> code.StoredDataRead
+    sink method "write:buffer:bufferSize:" -> code.StoredDataWrite
+    sink method "storeData:forKey:completion:" -> code.StoredDataWrite
+    sink method "removeDataForKey:" -> code.FilePathAccess
+    sink method "removeAllData" -> code.FilePathAccess
+    sink method "getFileSizeAtPath:" -> code.FilePathAccess
+    sink method "stat:statStruct:" -> code.FilePathAccess
+  }
+}

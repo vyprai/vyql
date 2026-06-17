@@ -1,0 +1,46 @@
+# Rust unsafe-memory parity where the frontend can expose honest review points.
+# Rust RAII resources are intentionally not modeled as leaks; this file covers
+# index and raw-pointer shapes that can participate in existing memory rules.
+
+test "rust memory: routed index controls vector access"
+  lang rust
+  expect VYQL-MEM-005
+  code
+  ```
+  #[get("/")]
+  fn handler(i: usize, data: Vec<u8>) {
+      let _x = data[i];
+  }
+  ```
+
+test "rust memory: constant vector index is clean"
+  lang rust
+  reject VYQL-MEM-005
+  code
+  ```
+  fn f(data: Vec<u8>) {
+      let _x = data[0];
+  }
+  ```
+
+test "rust memory: raw pointer dereference is nullable-deref review point"
+  lang rust
+  expect VYQL-MEM-006
+  code
+  ```
+  fn f(p: *const i32) {
+      unsafe {
+          let _x = *p;
+      }
+  }
+  ```
+
+test "rust memory: plain value read is not a dereference smell"
+  lang rust
+  reject VYQL-MEM-006
+  code
+  ```
+  fn f(x: i32) {
+      let _y = x;
+  }
+  ```

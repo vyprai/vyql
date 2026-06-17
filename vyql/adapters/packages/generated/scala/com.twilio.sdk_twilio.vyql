@@ -1,0 +1,6 @@
+import core.{AuthenticationCheck}
+adapter scala {
+  package "com.twilio.sdk:twilio" {
+    control method "RequestValidator.validate" -> core.AuthenticationCheck
+  }
+}

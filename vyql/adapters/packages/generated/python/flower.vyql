@@ -1,0 +1,8 @@
+import code.{HttpInput, NetworkBind, NetworkConnect, NetworkData, NetworkSend}
+adapter python {
+  package "flower" {
+    sink method "Flower.start" -> code.NetworkBind
+    sink method "Flower.start" -> code.NetworkConnect
+    sink method "Flower.start" -> code.NetworkSend
+  }
+}

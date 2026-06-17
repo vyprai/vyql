@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter go {
+  package "github.com/containerd/continuity" {
+    sink method "CopyDir" -> code.FilePathAccess
+    sink method "CopyFile" -> code.FilePathAccess
+  }
+}

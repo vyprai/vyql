@@ -1,0 +1,8 @@
+import core.{PathCanonicalization, HtmlEscape, InputValidation}
+adapter python {
+  package "w3lib" {
+    control method "canonicalize_url" -> core.PathCanonicalization
+    control method "replace_entities" -> core.HtmlEscape
+    control method "safe_url_string" -> core.InputValidation
+  }
+}

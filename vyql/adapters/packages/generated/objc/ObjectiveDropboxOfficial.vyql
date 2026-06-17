@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter objc {
+  package "ObjectiveDropboxOfficial" {
+    sink method "search:" -> code.FilePathAccess
+  }
+}

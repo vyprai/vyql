@@ -1,0 +1,7 @@
+adapter ruby {
+  package "rack-livereload" {
+    source method "message" -> code.NetworkData
+    sink method "Connector" -> code.NetworkConnect
+    sink method "decodeURIComponent" -> code.Deserialization
+  }
+}

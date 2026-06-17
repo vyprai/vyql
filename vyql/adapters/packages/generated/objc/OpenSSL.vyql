@@ -1,0 +1,9 @@
+import code.{SecretValue}
+import core.{CertificateValidation}
+
+adapter objc {
+  package "OpenSSL" {
+    source method "load_key" -> code.SecretValue
+    control method "setup_verify" -> core.CertificateValidation
+  }
+}

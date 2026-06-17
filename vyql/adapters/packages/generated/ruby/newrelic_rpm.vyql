@@ -1,0 +1,5 @@
+adapter ruby {
+  package "newrelic_rpm" {
+    source method "session" -> code.HttpInput
+  }
+}

@@ -1,0 +1,10 @@
+import code.{CommandExecution, Deserialization, NetworkData}
+
+adapter perl {
+  package "Java" {
+    sink method "send_command_and_get_response" -> code.CommandExecution
+    sink method "new_java_object" -> code.Deserialization
+    sink method "create_object" -> code.Deserialization
+    source method "new" -> code.NetworkData
+  }
+}

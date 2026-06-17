@@ -1,0 +1,6 @@
+import code.{RedirectTarget}
+adapter csharp {
+  package "microsoft.aspnet.web.optimization" {
+    mark method "ResolveBundleUrl" -> code.RedirectTarget
+  }
+}

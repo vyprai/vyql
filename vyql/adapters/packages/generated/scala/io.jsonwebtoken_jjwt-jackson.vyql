@@ -1,0 +1,5 @@
+adapter scala {
+  package "io.jsonwebtoken:jjwt-jackson" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

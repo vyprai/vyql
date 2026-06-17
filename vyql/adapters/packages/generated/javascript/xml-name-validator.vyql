@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter javascript {
+  package "xml-name-validator" {
+    control method "name" -> core.InputValidation
+    control method "qname" -> core.InputValidation
+  }
+}

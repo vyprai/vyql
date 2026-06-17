@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter javascript {
+  package "dir-glob" {
+    sink method "async" -> code.FilePathAccess
+    sink method "sync" -> code.FilePathAccess
+  }
+}

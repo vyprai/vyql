@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter dart {
+  package "flutter_email_sender" {
+    sink method "send" -> code.NetworkSend
+  }
+}

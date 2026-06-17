@@ -1,0 +1,6 @@
+adapter groovy {
+  package "javax.mail:javax.mail-api" {
+    sink method "MimeMessage.parse" -> code.Deserialization
+    source method "InternetAddress.parse" -> core.UserControlledData
+  }
+}

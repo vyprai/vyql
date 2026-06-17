@@ -1,0 +1,7 @@
+import code.{Deserialization, CodeEval}
+adapter groovy {
+  package "com.google.gwt:gwt-dev" {
+    sink method "GwtVersion.parse" -> code.Deserialization
+    sink method "Compiler.compile" -> code.CodeEval
+  }
+}

@@ -1,0 +1,13 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter objc {
+  package "GTMOAuth2" {
+    control method "authorizeRequest:" -> core.AuthenticationCheck
+    source method "persistenceResponseString" -> code.SecretValue
+    source method "setKeysForResponseString:" -> code.SecretValue
+    source method "setKeysForResponseDictionary:" -> code.SecretValue
+    source method "setKeysForPersistenceResponseString:" -> code.SecretValue
+    source method "setProperty:forKey:" -> code.SecretValue
+  }
+}

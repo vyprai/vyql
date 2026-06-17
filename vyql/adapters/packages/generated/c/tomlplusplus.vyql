@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter c {
+  package "tomlplusplus" {
+    sink method "parse" -> code.Deserialization
+  }
+}

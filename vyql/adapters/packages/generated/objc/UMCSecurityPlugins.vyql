@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter objc {
+  package "UMCSecurityPlugins" {
+    source method "getToken" -> code.SecretValue
+    source method "onUMIDInitFinished" -> code.SecretValue
+  }
+}

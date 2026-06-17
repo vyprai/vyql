@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter dart {
+  package "json_rpc_2" {
+    sink method "Server.listen" -> code.Deserialization
+    sink method "Client.sendRequest" -> code.Deserialization
+  }
+}

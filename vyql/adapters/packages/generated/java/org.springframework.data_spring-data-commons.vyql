@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter java {
+  package "org.springframework.data:spring-data-commons" {
+    sink method "read" -> code.Deserialization
+    sink method "readType" -> code.Deserialization
+  }
+}

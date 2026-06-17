@@ -1,0 +1,5 @@
+adapter powershell {
+  package "dotnet-ef" {
+    sink path "dotnet-ef.exe" -> code.CommandExecution
+  }
+}

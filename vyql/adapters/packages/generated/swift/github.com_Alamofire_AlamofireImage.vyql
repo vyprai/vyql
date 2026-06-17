@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter swift {
+  package "github.com/Alamofire/AlamofireImage" {
+    sink method "download" -> code.NetworkConnect
+    sink method "download" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+adapter javascript {
+  package "postcss-normalize-url" {
+    sink method "normalizeDataURL" -> code.UrlFetch
+    sink method "normalizeUrl" -> code.UrlFetch
+  }
+}

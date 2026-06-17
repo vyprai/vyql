@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter rust {
+  package "wasm-bindgen-macro" {
+    sink method "link_to" -> code.CodeEval
+  }
+}

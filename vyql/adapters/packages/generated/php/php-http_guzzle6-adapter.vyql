@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend}
+adapter php {
+  package "php-http/guzzle6-adapter" {
+    sink method "sendRequest" -> code.NetworkConnect
+    sink method "sendRequest" -> code.NetworkSend
+    sink method "sendAsyncRequest" -> code.NetworkConnect
+    sink method "sendAsyncRequest" -> code.NetworkSend
+  }
+}

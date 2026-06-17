@@ -1,0 +1,10 @@
+import code.{SecretValue, StoredDataRead}
+import core.{AuthenticationCheck}
+
+adapter dart {
+  package "supabase_flutter" {
+    source method "SupabaseAuth.recoverSession" -> code.StoredDataRead
+    source method "SupabaseAuth.onAuthStateChange" -> code.SecretValue
+    control method "Supabase.initialize" -> core.AuthenticationCheck
+  }
+}

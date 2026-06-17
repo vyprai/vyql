@@ -1,0 +1,12 @@
+import code.{HttpInput, NetworkSend}
+adapter scala {
+  package "org.apache.httpcomponents:fluent-hc" {
+    sink method "Get" -> code.NetworkSend
+    sink method "Post" -> code.NetworkSend
+    sink method "Put" -> code.NetworkSend
+    sink method "Delete" -> code.NetworkSend
+    sink method "execute" -> code.NetworkSend
+    sink method "addHeader" -> code.UrlFetch
+    sink method "setHeader" -> code.UrlFetch
+  }
+}

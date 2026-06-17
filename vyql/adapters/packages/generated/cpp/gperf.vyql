@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter cpp {
+  package "gperf" {
+    sink method "Input<KT>::read_input" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,18 @@
+import code.{ExpressionEval}
+
+adapter php {
+  package "composer/pcre" {
+    sink method "match" -> code.ExpressionEval
+    sink method "matchStrictGroups" -> code.ExpressionEval
+    sink method "matchWithOffsets" -> code.ExpressionEval
+    sink method "matchAll" -> code.ExpressionEval
+    sink method "matchAllStrictGroups" -> code.ExpressionEval
+    sink method "matchAllWithOffsets" -> code.ExpressionEval
+    sink method "replace" -> code.ExpressionEval
+    sink method "replaceCallback" -> code.ExpressionEval
+    sink method "replaceCallbackStrictGroups" -> code.ExpressionEval
+    sink method "replaceCallbackArray" -> code.ExpressionEval
+    sink method "split" -> code.ExpressionEval
+    sink method "splitWithOffsets" -> code.ExpressionEval
+  }
+}

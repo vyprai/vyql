@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter elixir {
+  package "xandra" {
+    sink method "execute" -> code.SqlExecution
+    sink method "prepare" -> code.SqlExecution
+  }
+}

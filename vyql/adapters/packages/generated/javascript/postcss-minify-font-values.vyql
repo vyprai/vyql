@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter javascript {
+  package "postcss-minify-font-values" {
+    sink method "transform" -> code.Deserialization
+    control method "escape" -> core.InputValidation
+  }
+}

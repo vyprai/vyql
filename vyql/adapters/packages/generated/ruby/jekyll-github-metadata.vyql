@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter ruby {
+  package "jekyll-github-metadata" {
+    control method "sanitize" -> core.InputValidation
+    control method "sanitize_resource" -> core.InputValidation
+  }
+}

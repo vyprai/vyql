@@ -1,0 +1,7 @@
+import code.{Deserialization, SecretValue}
+
+adapter python {
+  package "python-jose" {
+    sink method "jose.jwt.decode" -> code.Deserialization
+  }
+}

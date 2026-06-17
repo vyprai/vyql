@@ -1,0 +1,13 @@
+import code.{WeakHash, SecretValue}
+import core.{AuthenticationCheck}
+
+adapter ruby {
+  package "mixlib-authentication" {
+    mark method "Mixlib::Authentication::Digester.hash_file" -> code.WeakHash
+    mark method "Mixlib::Authentication::Digester.hash_string" -> code.WeakHash
+    control method "Mixlib::Authentication::SignatureVerification.authenticate_user_request" -> core.AuthenticationCheck
+    control method "Mixlib::Authentication::SignatureVerification.authenticate_request" -> core.AuthenticationCheck
+    source method "Mixlib::Authentication::SignedHeaderAuth.sign" -> code.SecretValue
+    source method "Mixlib::Authentication::SignedHeaderAuth.do_sign" -> code.SecretValue
+  }
+}

@@ -1,0 +1,6 @@
+import code.{StoredDataRead}
+adapter cpp {
+  package "libgeotiff" {
+    source method "GTIFKeyGet" -> code.StoredDataRead
+  }
+}

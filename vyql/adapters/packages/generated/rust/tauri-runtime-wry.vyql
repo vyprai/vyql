@@ -1,0 +1,7 @@
+import code.{NetworkConnect}
+
+adapter rust {
+  package "tauri-runtime-wry" {
+    sink method "parse_proxy_url" -> code.NetworkConnect
+  }
+}

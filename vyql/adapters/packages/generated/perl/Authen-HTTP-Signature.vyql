@@ -1,0 +1,10 @@
+import code.{HttpInput, SecretValue}
+import core.{AuthenticationCheck}
+
+adapter perl {
+  package "Authen-HTTP-Signature" {
+    source method "parse" -> code.HttpInput
+    source method "sign" -> code.SecretValue
+    control method "verify" -> core.AuthenticationCheck
+  }
+}

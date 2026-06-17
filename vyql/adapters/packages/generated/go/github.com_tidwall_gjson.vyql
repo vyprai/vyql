@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/tidwall/gjson" {
+    sink method "Parse" -> code.Deserialization
+    sink method "ParseBytes" -> code.Deserialization
+  }
+}

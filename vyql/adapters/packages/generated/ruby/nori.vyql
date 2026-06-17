@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter ruby {
+  package "nori" {
+    sink method "parse" -> code.Deserialization
+  }
+}

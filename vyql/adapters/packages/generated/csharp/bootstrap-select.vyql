@@ -1,0 +1,5 @@
+adapter csharp {
+  package "bootstrap-select" {
+    control method "sanitizeHtml" -> core.HtmlEscape
+  }
+}

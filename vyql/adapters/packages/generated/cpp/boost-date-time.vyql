@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter cpp {
+  package "boost-date-time" {
+    sink method "load_from_stream" -> code.Deserialization
+    sink method "load_from_file" -> code.Deserialization
+    sink method "parse_string" -> code.Deserialization
+  }
+}

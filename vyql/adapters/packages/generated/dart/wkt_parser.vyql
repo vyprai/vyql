@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter dart {
+  package "wkt_parser" {
+    sink method "parseWKT" -> code.Deserialization
+    sink method "parseString" -> code.Deserialization
+  }
+}

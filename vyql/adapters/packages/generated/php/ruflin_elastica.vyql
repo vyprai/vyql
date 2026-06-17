@@ -1,0 +1,16 @@
+import code.{Deserialization, NosqlQuery}
+import core.{InputValidation}
+
+adapter php {
+  package "ruflin/elastica" {
+    sink method "Elastica\JSON::parse" -> code.Deserialization
+    sink method "Elastica\Index::search" -> code.NosqlQuery
+    sink method "Elastica\Index::query" -> code.NosqlQuery
+    sink method "Elastica\Index::updateDocuments" -> code.NosqlQuery
+    sink method "Elastica\Index::updateByQuery" -> code.NosqlQuery
+    sink method "Elastica\Index::addDocument" -> code.NosqlQuery
+    sink method "Elastica\Index::deleteById" -> code.NosqlQuery
+    control method "Elastica\Util::escapeTerm" -> core.InputValidation
+    control method "Elastica\Util::replaceBooleanWordsAndEscapeTerm" -> core.InputValidation
+  }
+}

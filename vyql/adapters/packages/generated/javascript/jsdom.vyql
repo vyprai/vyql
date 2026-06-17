@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess, UrlFetch}
+adapter javascript {
+  package "jsdom" {
+    sink method "parseIntoDocument" -> code.Deserialization
+    sink method "fromURL" -> code.UrlFetch
+    sink method "fromFile" -> code.FilePathAccess
+  }
+}

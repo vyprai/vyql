@@ -1,0 +1,8 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter scala {
+  package "org.apache.hadoop:hadoop-yarn-common" {
+    source method "read" -> code.StoredDataRead
+    sink method "write" -> code.StoredDataWrite
+  }
+}

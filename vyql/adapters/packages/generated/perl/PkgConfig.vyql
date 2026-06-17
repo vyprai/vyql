@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter perl {
+  package "PkgConfig" {
+    sink method "parse_pcfile" -> code.Deserialization
+    sink method "parse_line" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{FilePathAccess}
+import core.{PathAccessCheck}
+
+adapter rust {
+  package "vcpkg" {
+    sink method "find_vcpkg_root" -> code.FilePathAccess
+    control method "validate_vcpkg_root" -> core.PathAccessCheck
+  }
+}

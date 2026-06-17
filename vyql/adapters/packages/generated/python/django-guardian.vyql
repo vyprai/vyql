@@ -1,0 +1,11 @@
+import core.{AuthorizationCheck}
+adapter python {
+  package "django-guardian" {
+    control method "get_user_perms" -> core.AuthorizationCheck
+    control method "get_group_perms" -> core.AuthorizationCheck
+    control method "has_add_permission" -> core.AuthorizationCheck
+    control method "has_view_permission" -> core.AuthorizationCheck
+    control method "has_change_permission" -> core.AuthorizationCheck
+    control method "has_delete_permission" -> core.AuthorizationCheck
+  }
+}

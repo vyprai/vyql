@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter javascript {
+  package "whatwg-fetch" {
+    sink method "fetch" -> code.NetworkConnect
+    sink method "fetch" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,5 @@
+adapter c {
+  package "qtshadertools" {
+    sink method "compileToSpirv" -> code.CodeEval
+  }
+}

@@ -1,0 +1,11 @@
+import code.{FilePathAccess, Deserialization}
+adapter python {
+  package "importlib-metadata" {
+    sink method "read_text" -> code.FilePathAccess
+    sink method "read_bytes" -> code.FilePathAccess
+    sink method "locate" -> code.FilePathAccess
+    sink method "locate_file" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+  }
+}

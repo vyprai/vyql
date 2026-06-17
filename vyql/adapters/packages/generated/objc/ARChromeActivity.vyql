@@ -1,0 +1,8 @@
+import code.{UrlFetch}
+
+adapter objc {
+  package "ARChromeActivity" {
+    sink method "performActivity" -> code.UrlFetch
+    control method "encodeByAddingPercentEscapes" -> core.InputValidation
+  }
+}

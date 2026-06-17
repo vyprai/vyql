@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter ruby {
+  package "semantic_range" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_range" -> code.Deserialization
+    sink method "parse_comparator" -> code.Deserialization
+  }
+}

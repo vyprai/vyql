@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter swift {
+  package "github.com/patrick-zippenfenig/SwiftEccodes" {
+    sink method "getMessages" -> code.Deserialization
+    sink method "iterateMessages" -> code.Deserialization
+    sink method "seekGrib" -> code.Deserialization
+    sink method "init" -> code.Deserialization
+  }
+}

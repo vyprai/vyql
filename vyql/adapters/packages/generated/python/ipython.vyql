@@ -1,0 +1,6 @@
+adapter python {
+  package "ipython" {
+    sink method "find_data_files" -> code.NosqlQuery
+    sink method "reset" -> code.StoredDataWrite
+  }
+}

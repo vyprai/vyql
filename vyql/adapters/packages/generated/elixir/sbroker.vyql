@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter elixir {
+  package "sbroker" {
+    sink method "system" -> code.CommandExecution
+  }
+}

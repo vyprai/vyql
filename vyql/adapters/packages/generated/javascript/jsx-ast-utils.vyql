@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "jsx-ast-utils" {
+    source method "getPropValue" -> core.UserControlledData
+  }
+}

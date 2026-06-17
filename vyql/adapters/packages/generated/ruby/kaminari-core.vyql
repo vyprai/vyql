@@ -1,0 +1,8 @@
+import code.{HtmlRender, RedirectTarget}
+
+adapter ruby {
+  package "kaminari-core" {
+    mark method "page_url_for" -> code.RedirectTarget
+    sink method "page_url_for" -> code.HtmlRender
+  }
+}

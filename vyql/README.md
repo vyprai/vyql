@@ -8,21 +8,28 @@ containing `ontology/concepts.vyql` (see `go/datadir`).
 
 ```
 vyql/
-  packs/        rule packs (rule …) — the default ruleset
-    injection.vyql  request_forgery.vyql  path.vyql  deserialization.vyql
-    secrets.vyql  cloud.vyql  identity.vyql  sca.vyql  business.vyql  runtime.vyql  smartcontract.vyql
-  adapters/     framework→concept adapters (adapter …) — one per technology
-    python.vyql  javascript.vyql  ruby.vyql  go.vyql  java.vyql  php.vyql  csharp.vyql
-    c.vyql  cpp.vyql  rust.vyql  bash.vyql  scala.vyql  lua.vyql  kotlin.vyql
-    powershell.vyql  swift.vyql  perl.vyql  solidity.vyql  objc.vyql
+  packs/        rule packs (rule ...) — 98 default rules across 22 packs
+    auth.vyql  business.vyql  cloud.vyql  crypto.vyql  deserialization.vyql
+    desktop.vyql  dos.vyql  identity.vyql  injection.vyql  lifecycle.vyql  memory.vyql
+    misconfig.vyql  mobile.vyql  numeric.vyql  path.vyql  concurrency.vyql
+    request_forgery.vyql  resource.vyql  runtime.vyql  sca.vyql  secrets.vyql
+    smartcontract.vyql
+  adapters/     framework->concept adapters (adapter ...) — 25 adapter files
+    bash.vyql  c.vyql  config.vyql  cpp.vyql  csharp.vyql  dart.vyql
+    elixir.vyql  go.vyql  groovy.vyql  java.vyql  javascript.vyql
+    kotlin.vyql  lua.vyql  objc.vyql  perl.vyql  php.vyql  pii.vyql
+    powershell.vyql  python.vyql  ruby.vyql  rust.vyql  scala.vyql
+    secretscan.vyql  solidity.vyql  swift.vyql
   ontology/     the curated analysis vocabulary
-    concepts.vyql       concept X : kind { … }  (sources/sinks/controls/assets/…)
-    threatkinds.vyql    threat X { cwe: […] }   (weakness classes)
+    concepts.vyql       151 concepts: concept X : kind { ... }
+    threatkinds.vyql    90 threat kinds: threat X { cwe: [...] }
     privileges.json     the privilege partial order (config, not a definition)
+  profiles/     application threat-model profiles used by `vyql scan -profile`
+  tests/        624 `.test.vyql` executable specs
   taxonomy/     MITRE reference catalogs (machine-generated, not authored)
-    cwe.json            every CWE (id → name/abstraction/parents/capec/desc)
-    capec.json          every CAPEC (id → name/abstraction/severity/cwes/desc)
-  risk.json     factor weights + P0–P4 priority bands (tunable config, docs/17)
+    cwe.json            every CWE (id -> name/abstraction/parents/capec/desc)
+    capec.json          every CAPEC (id -> name/abstraction/severity/cwes/desc)
+  risk.json     factor weights + P0-P4 priority bands (tunable config, docs/17)
 ```
 
 ### Definitions (VyQL) vs reference-data / config (JSON) vs engine (Go)
@@ -34,7 +41,7 @@ vyql/
   not hand-written). The risk weights/bands and privilege order are *tunable
   config*, not declarations. None are "definitions," so they remain data files.
 - **The engine is Go.** The graph store, stratified evaluator + solvers, the
-  type-checker, the language parsers (tree-sitter / go-ast — CGO, cannot be data),
+  type-checker, the language parsers (tree-sitter / go-ast; CGO cannot be data),
   and the output formatters. Mechanism that *defines how VyQL evaluates* (flow-verb
   endpoint type rules, the confidence scale, the SARIF level mapping) stays Go.
 
@@ -62,7 +69,7 @@ by Go, whose receiver names vary). Collection-literal args (e.g. Rails
   (`concept X : kind { … }`) and `ontology/threatkinds.vyql` (`threat X { … }`).
 - **Adapters** — edit `adapters/<tech>.vyql` (`adapter … { source/sink … }`) to
   grow framework/sink coverage.
-- After any edit, `go test ./...` validates that every concept, threat-kind, and
+- After any edit, `cd go && go test -count=1 ./...` validates that every concept, threat-kind, and
   CWE/CAPEC id resolves and that every rule type-checks.
 - **Taxonomy** catalogs are generated from the official MITRE CSVs with
   `poc/tools/gen_taxonomy.py`; don't hand-edit.

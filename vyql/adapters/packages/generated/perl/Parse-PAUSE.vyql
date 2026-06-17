@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter perl {
+  package "Parse-PAUSE" {
+    sink method "parse" -> code.Deserialization
+  }
+}

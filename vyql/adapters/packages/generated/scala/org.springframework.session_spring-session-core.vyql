@@ -1,0 +1,5 @@
+adapter scala {
+  package "org.springframework.session:spring-session-core" {
+    source method "getSessionId" -> code.HttpInput
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CertValidationDisabled}
+adapter objc {
+  package "AFNetworking" {
+    mark method "evaluateServerTrust:forDomain:" -> code.CertValidationDisabled
+  }
+}

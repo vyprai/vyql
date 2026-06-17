@@ -1,0 +1,11 @@
+import code.{NetworkSend, SecretValue}
+import core.{UserControlledData}
+
+adapter php {
+  package "laravel/nexmo-notification-channel" {
+    sink method "send" -> code.NetworkSend
+    source method "content" -> core.UserControlledData
+    source method "from" -> core.UserControlledData
+    source method "loadPrivateKey" -> code.SecretValue
+  }
+}

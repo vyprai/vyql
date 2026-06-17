@@ -1,0 +1,7 @@
+import code.{Cookie}
+adapter java {
+  package "org.springframework.session:spring-session-core" {
+    source method "readCookieValues" -> code.Cookie
+    source method "writeCookieValue" -> code.Cookie
+  }
+}

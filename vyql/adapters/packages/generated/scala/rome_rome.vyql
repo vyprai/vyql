@@ -1,0 +1,6 @@
+adapter scala {
+  package "rome:rome" {
+    sink method "parse" -> code.Deserialization
+    sink method "build" -> code.Deserialization
+  }
+}

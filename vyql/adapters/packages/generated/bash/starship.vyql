@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter bash {
+  package "starship" {
+    source method "starship_preexec_all" -> core.UserControlledData
+  }
+}

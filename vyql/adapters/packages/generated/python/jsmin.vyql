@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "jsmin" {
+    sink method "jsmin" -> code.Deserialization
+  }
+}

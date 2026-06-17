@@ -1,0 +1,6 @@
+import code.{FilePathAccess, CommandExecution}
+adapter rust {
+  package "shared_library" {
+    sink method "DynamicLibrary::open" -> code.FilePathAccess
+  }
+}

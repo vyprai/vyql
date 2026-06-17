@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter elixir {
+  package "ash_phoenix" {
+    source method "parse_opts" -> code.CliArgument
+  }
+}

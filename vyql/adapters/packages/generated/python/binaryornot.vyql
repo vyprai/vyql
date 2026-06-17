@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter python {
+  package "binaryornot" {
+    sink method "is_binary" -> code.FilePathAccess
+  }
+}

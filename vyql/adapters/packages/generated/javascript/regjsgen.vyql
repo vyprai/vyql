@@ -1,0 +1,7 @@
+import code.{RegexCompile}
+
+adapter javascript {
+  package "regjsgen" {
+    mark method "generate" -> code.RegexCompile
+  }
+}

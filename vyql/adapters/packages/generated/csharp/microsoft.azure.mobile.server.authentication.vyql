@@ -1,0 +1,9 @@
+import core.{AuthenticationCheck}
+
+adapter csharp {
+  package "microsoft.azure.mobile.server.authentication" {
+    control method "ValidateIdentity" -> core.AuthenticationCheck
+    control method "TryValidateLoginToken" -> core.AuthenticationCheck
+    control method "ValidateToken" -> core.AuthenticationCheck
+  }
+}

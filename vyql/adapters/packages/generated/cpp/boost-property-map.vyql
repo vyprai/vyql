@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "boost-property-map" {
+    sink method "read_value" -> code.Deserialization
+  }
+}

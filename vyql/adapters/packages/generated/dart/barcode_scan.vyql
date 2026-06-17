@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter dart {
+  package "barcode_scan" {
+    source method "BarcodeScanner.scan" -> core.UserControlledData
+  }
+}

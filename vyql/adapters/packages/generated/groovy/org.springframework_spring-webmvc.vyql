@@ -1,0 +1,17 @@
+import code.{HttpInput, Cookie, SecretValue}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "org.springframework:spring-webmvc" {
+    source method "path" -> code.HttpInput
+    source method "requestPath" -> code.HttpInput
+    source method "headers" -> code.HttpInput
+    source method "header" -> code.HttpInput
+    source method "cookies" -> code.Cookie
+    source method "remoteAddress" -> code.HttpInput
+    source method "params" -> code.HttpInput
+    source method "pathVariable" -> code.HttpInput
+    source method "pathVariables" -> code.HttpInput
+    source method "session" -> code.SecretValue
+  }
+}

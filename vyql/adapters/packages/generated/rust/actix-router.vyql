@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter rust {
+  package "actix-router" {
+    source method "query" -> core.UserControlledData
+    source method "path" -> core.UserControlledData
+  }
+}

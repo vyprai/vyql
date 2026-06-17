@@ -1,0 +1,8 @@
+import code.{SecretValue}
+adapter go {
+  package "github.com/ProtonMail/go-crypto" {
+    source method "ReadArmoredKeyRing" -> code.SecretValue
+    source method "ReadKeyRing" -> code.SecretValue
+    source method "ReadEntity" -> code.SecretValue
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter kotlin {
+  package "org.apache.spark:spark-core_2.11" {
+    sink method "testCommandAvailable" -> code.CommandExecution
+  }
+}

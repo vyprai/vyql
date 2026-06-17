@@ -1,0 +1,14 @@
+import code.{Deserialization, FilePathAccess, FileUse}
+import core.{InputValidation}
+
+adapter c {
+  package "parson" {
+    sink method "json_parse_file" -> code.Deserialization
+    sink method "json_parse_file_with_comments" -> code.Deserialization
+    sink method "json_parse_string" -> code.Deserialization
+    sink method "json_parse_string_with_comments" -> code.Deserialization
+    sink method "json_serialize_to_file" -> code.FilePathAccess
+    sink method "json_serialize_to_file_pretty" -> code.FilePathAccess
+    control method "json_validate" -> core.InputValidation
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter php {
+  package "lcobucci/jwt" {
+    sink method "Lcobucci\JWT\Parser::parse" -> code.Deserialization
+  }
+}

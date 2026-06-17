@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter kotlin {
+  package "org.springframework.integration:spring-integration-file" {
+    sink method "run" -> code.FilePathAccess
+    sink method "send" -> code.FilePathAccess
+  }
+}

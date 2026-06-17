@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "org.ow2.asm:asm" {
+    sink method "ClassReader.accept" -> code.Deserialization
+  }
+}

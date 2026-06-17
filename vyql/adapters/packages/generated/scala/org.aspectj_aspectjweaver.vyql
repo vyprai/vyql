@@ -1,0 +1,18 @@
+import code.{Deserialization, FilePathAccess}
+import core.{PathAccessCheck, PathCanonicalization}
+
+adapter scala {
+  package "org.aspectj:aspectjweaver" {
+    control method "canReadDir" -> core.PathAccessCheck
+    control method "canReadFile" -> core.PathAccessCheck
+    control method "canWriteDir" -> core.PathAccessCheck
+    control method "canWriteFile" -> core.PathAccessCheck
+    control method "throwIaxUnlessCanReadDir" -> core.PathAccessCheck
+    control method "throwIaxUnlessCanWriteFile" -> core.PathAccessCheck
+    control method "throwIaxUnlessCanWriteDir" -> core.PathAccessCheck
+    control method "normalizedPath" -> core.PathCanonicalization
+    control method "weakNormalize" -> core.PathCanonicalization
+    sink method "deleteContents" -> code.FilePathAccess
+    sink method "readResolve" -> code.Deserialization
+  }
+}

@@ -1,0 +1,12 @@
+import code.{Deserialization, CodeEval}
+import core.{InputValidation}
+
+adapter python {
+  package "jupyter-events" {
+    sink method "loads" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+    sink method "emit" -> code.CodeEval
+    control method "validate_schema" -> core.InputValidation
+    control method "validate_event" -> core.InputValidation
+  }
+}

@@ -1,0 +1,10 @@
+import core.{HtmlEscape, UserControlledData}
+import code.{Deserialization}
+
+adapter php {
+  package "drupal/core-utility" {
+    control method "Html::escape" -> core.HtmlEscape
+    sink method "Html::load" -> code.Deserialization
+    source method "UrlHelper::parse" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "fastcdr" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "read_wstring" -> code.Deserialization
+  }
+}

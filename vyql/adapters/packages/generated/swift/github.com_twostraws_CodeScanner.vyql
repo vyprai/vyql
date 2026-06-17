@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/twostraws/CodeScanner" {
+    source method "metadataOutput" -> core.UserControlledData
+    source method "imagePickerController" -> core.UserControlledData
+  }
+}

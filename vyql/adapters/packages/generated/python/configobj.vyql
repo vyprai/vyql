@@ -1,0 +1,7 @@
+import code.{FileUse}
+
+adapter python {
+  package "configobj" {
+    sink method "write" -> code.FileUse
+  }
+}

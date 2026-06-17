@@ -1,0 +1,5 @@
+adapter php {
+  package "twig/extra-bundle" {
+    sink method "getClasses" -> code.UrlFetch
+  }
+}

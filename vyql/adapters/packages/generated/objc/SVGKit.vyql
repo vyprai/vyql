@@ -1,0 +1,13 @@
+import code.{Deserialization}
+adapter objc {
+  package "SVGKit" {
+    sink method "imageWithContentsOfFile" -> code.Deserialization
+    sink method "imageWithContentsOfURL" -> code.Deserialization
+    sink method "imageParserWithContentsOfFileAsynchronously" -> code.Deserialization
+    sink method "imageWithContentsOfFileAsynchronously" -> code.Deserialization
+    sink method "imageParserWithDataAsynchronously" -> code.Deserialization
+    sink method "imageWithDataAsynchronously" -> code.Deserialization
+    sink method "newParserWithDefaultSVGKParserExtensions" -> code.Deserialization
+    sink method "initWithParsedSVG" -> code.Deserialization
+  }
+}

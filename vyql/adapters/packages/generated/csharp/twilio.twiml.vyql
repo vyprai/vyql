@@ -1,0 +1,10 @@
+import code.{RedirectTarget}
+import core.{AuthenticationCheck}
+
+adapter csharp {
+  package "twilio.twiml" {
+    mark method "TwilioResponse.Redirect" -> code.RedirectTarget
+    mark method "Redirect.ctor" -> code.RedirectTarget
+    control method "RequestValidator.IsValidRequest" -> core.AuthenticationCheck
+  }
+}

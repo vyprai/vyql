@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter csharp {
+  package "vssdk.shell.interop.8" {
+    sink method "Microsoft.VisualStudio.Shell.Interop.IDirList.Add" -> code.FilePathAccess
+  }
+}

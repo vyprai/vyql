@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter objc {
+  package "AEXML" {
+    sink method "parse" -> code.Deserialization
+  }
+}

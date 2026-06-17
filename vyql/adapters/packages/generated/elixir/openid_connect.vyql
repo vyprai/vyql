@@ -1,0 +1,16 @@
+import code.{NetworkConnect, RedirectTarget, SecretValue}
+
+adapter elixir {
+  package "openid_connect" {
+    mark method "authorization_uri" -> code.RedirectTarget
+    sink method "fetch_tokens" -> code.NetworkConnect
+    source method "fetch_tokens" -> code.SecretValue
+    source method "verify" -> code.SecretValue
+    source method "verify_signature" -> code.SecretValue
+    sink method "fetch_userinfo" -> code.NetworkConnect
+    source method "fetch_userinfo" -> code.SecretValue
+    mark method "build_uri" -> code.RedirectTarget
+    sink method "fetch_document" -> code.NetworkConnect
+    sink method "fetch_remote_resource" -> code.NetworkConnect
+  }
+}

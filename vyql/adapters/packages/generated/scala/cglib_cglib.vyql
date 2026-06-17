@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter scala {
+  package "cglib:cglib" {
+    sink method "parseType" -> code.Deserialization
+    sink method "parseSignature" -> code.Deserialization
+    sink method "parseConstructor" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "pango" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_with_alpha" -> code.Deserialization
+  }
+}

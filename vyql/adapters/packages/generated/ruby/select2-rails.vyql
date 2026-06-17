@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter ruby {
+  package "select2-rails" {
+    sink method "SourceFile.fetch" -> code.UrlFetch
+  }
+}

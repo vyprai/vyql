@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "serde_repr" {
+    sink method "derive_deserialize" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

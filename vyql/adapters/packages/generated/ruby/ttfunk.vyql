@@ -1,0 +1,5 @@
+adapter ruby {
+  package "ttfunk" {
+    sink method "read" -> code.Deserialization
+  }
+}

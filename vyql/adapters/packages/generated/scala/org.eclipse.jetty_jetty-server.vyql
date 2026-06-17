@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.eclipse.jetty:jetty-server" {
+    sink method "parse" -> code.Deserialization
+  }
+}

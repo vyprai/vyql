@@ -1,0 +1,6 @@
+import core.{SafeDeserialization}
+adapter groovy {
+  package "org.apache.camel:camel-jms" {
+    control method "checkDeserializedClass" -> core.SafeDeserialization
+  }
+}

@@ -1,0 +1,6 @@
+adapter rust {
+  package "digest" {
+    sink method "deserialize" -> code.Deserialization
+    mark path "digest.hash" -> code.WeakHash
+  }
+}

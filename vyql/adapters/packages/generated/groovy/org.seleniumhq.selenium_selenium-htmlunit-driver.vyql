@@ -1,0 +1,11 @@
+import code.{CodeEval, UrlFetch}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "org.seleniumhq.selenium:selenium-htmlunit-driver" {
+    sink method "get" -> code.UrlFetch
+    sink method "executeScript" -> code.CodeEval
+    sink method "executeAsyncScript" -> code.CodeEval
+    source method "sendKeys" -> core.UserControlledData
+  }
+}

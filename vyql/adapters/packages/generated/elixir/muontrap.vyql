@@ -1,0 +1,5 @@
+adapter elixir {
+  package "muontrap" {
+    sink method "cmd" -> code.CommandExecution
+  }
+}

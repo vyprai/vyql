@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter perl {
+  package "Data-Thunk" {
+    sink method "AUTOLOAD" -> code.CodeEval
+  }
+}

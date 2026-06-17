@@ -1,0 +1,13 @@
+import core.{AuthorizationCheck, CsrfProtection, HtmlEscape}
+adapter java {
+  package "org.springframework.security:spring-security-taglibs" {
+    control method "setHtmlEscape" -> core.HtmlEscape
+    control method "isHtmlEscape" -> core.HtmlEscape
+    control method "authorize" -> core.AuthorizationCheck
+    control method "authorizeUsingAccessExpression" -> core.AuthorizationCheck
+    control method "authorizeUsingUrlCheck" -> core.AuthorizationCheck
+    control method "handleToken" -> core.CsrfProtection
+    control method "doEndTag" -> core.CsrfProtection
+    control method "evalOrSkip" -> core.AuthorizationCheck
+  }
+}

@@ -1,0 +1,16 @@
+import code.{HttpInput, SecretValue, WeakCipher}
+import core.{CertificateValidation}
+
+adapter php {
+  package "symfony/http-client" {
+    source method "setQuery" -> code.HttpInput
+    source method "setHeader" -> code.HttpInput
+    source method "setHeaders" -> code.HttpInput
+    source method "setBody" -> code.HttpInput
+    source method "setAuthBasic" -> code.SecretValue
+    source method "setAuthBearer" -> code.SecretValue
+    control method "setCaFile" -> core.CertificateValidation
+    control method "setCaPath" -> core.CertificateValidation
+    mark method "setCiphers" -> code.WeakCipher
+  }
+}

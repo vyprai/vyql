@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter swift {
+  package "github.com/swift-server/swift-backtrace" {
+    sink method "print" -> code.CodeEval
+  }
+}

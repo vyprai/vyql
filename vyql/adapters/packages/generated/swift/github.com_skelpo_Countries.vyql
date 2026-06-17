@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/skelpo/Countries" {
+    source method "countryFromURL" -> core.UserControlledData
+  }
+}

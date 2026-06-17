@@ -1,0 +1,7 @@
+import code.{EnvVariable}
+
+adapter kotlin {
+  package "com.github.stefanbirkner:system-rules" {
+    source method "EnvironmentVariables.set" -> code.EnvVariable
+  }
+}

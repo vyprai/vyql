@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter csharp {
+  package "mustache.js" {
+    control method "escapeHtml" -> core.HtmlEscape
+  }
+}

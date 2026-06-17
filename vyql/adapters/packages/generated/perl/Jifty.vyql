@@ -1,0 +1,8 @@
+import code.{CommandExecution, Deserialization, SecretValue}
+adapter perl {
+  package "Jifty" {
+    sink path "Jifty::system" -> code.CommandExecution
+    sink method "decode_json" -> code.Deserialization
+    source method "from_token" -> code.SecretValue
+  }
+}

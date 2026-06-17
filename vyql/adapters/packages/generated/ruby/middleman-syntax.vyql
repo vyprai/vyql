@@ -1,0 +1,8 @@
+import code.{HtmlRender}
+adapter ruby {
+  package "middleman-syntax" {
+    sink method "block_code" -> code.HtmlRender
+    sink method "render" -> code.HtmlRender
+    sink method "compile" -> code.HtmlRender
+  }
+}

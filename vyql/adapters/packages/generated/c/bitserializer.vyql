@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter c {
+  package "bitserializer" {
+    sink method "LoadObject" -> code.Deserialization
+    sink method "LoadObjectFromFile" -> code.FilePathAccess
+  }
+}

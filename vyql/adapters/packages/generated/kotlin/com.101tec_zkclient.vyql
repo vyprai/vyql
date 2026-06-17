@@ -1,0 +1,13 @@
+import code.{StoredDataRead, StoredDataWrite}
+import core.{AuthorizationCheck}
+
+adapter kotlin {
+  package "com.101tec:zkclient" {
+    sink method "createPersistent" -> code.StoredDataWrite
+    sink method "writeData" -> code.StoredDataWrite
+    sink method "delete" -> code.StoredDataWrite
+    source method "readData" -> code.StoredDataRead
+    control method "setAcl" -> core.AuthorizationCheck
+    source method "getAcl" -> code.StoredDataRead
+  }
+}

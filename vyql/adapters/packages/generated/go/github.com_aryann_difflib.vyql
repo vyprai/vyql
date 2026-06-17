@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter go {
+  package "github.com/aryann/difflib" {
+    sink method "HTMLDiff" -> code.HtmlRender
+  }
+}

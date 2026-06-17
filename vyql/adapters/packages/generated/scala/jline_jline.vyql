@@ -1,0 +1,8 @@
+import code.{CommandExecution, Deserialization}
+
+adapter scala {
+  package "jline:jline" {
+    source method "parse" -> core.UserControlledData
+    sink method "read" -> code.Deserialization
+  }
+}

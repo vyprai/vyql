@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter swift {
+  package "github.com/SDWebImage/SDWebImageSwiftUI" {
+    source method "init" -> code.NetworkData
+    source method "load" -> code.NetworkData
+  }
+}

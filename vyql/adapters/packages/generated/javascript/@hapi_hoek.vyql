@@ -1,0 +1,9 @@
+import code.{ResponseHeaderWrite}
+import core.{HtmlEscape}
+
+adapter javascript {
+  package "@hapi/hoek" {
+    control method "escapeHtml" -> core.HtmlEscape
+    sink method "escapeHeaderAttribute" -> code.ResponseHeaderWrite
+  }
+}

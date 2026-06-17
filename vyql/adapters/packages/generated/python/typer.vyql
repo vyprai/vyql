@@ -1,0 +1,7 @@
+import code.{CliArgument}
+adapter python {
+  package "typer" {
+    source method "run" -> code.CliArgument
+    source method "parse_args" -> code.CliArgument
+  }
+}

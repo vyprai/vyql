@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter go {
+  package "github.com/hashicorp/go-safetemp" {
+    sink method "Dir" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,9 @@
+import code.{NetworkSend}
+import core.{UserControlledData}
+
+adapter rust {
+  package "ciborium-io" {
+    source method "read_exact" -> core.UserControlledData
+    sink method "write_all" -> code.NetworkSend
+  }
+}

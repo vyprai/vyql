@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "stack-utils" {
+    sink method "parseLine" -> code.Deserialization
+  }
+}

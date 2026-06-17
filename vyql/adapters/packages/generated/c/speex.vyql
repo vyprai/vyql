@@ -1,0 +1,6 @@
+import code.{WeakRandomValue}
+adapter c {
+  package "speex" {
+    mark method "speex_rand" -> code.WeakRandomValue
+  }
+}

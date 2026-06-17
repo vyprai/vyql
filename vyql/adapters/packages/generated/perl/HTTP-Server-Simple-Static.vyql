@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter perl {
+  package "HTTP-Server-Simple-Static" {
+    sink method "serve_static" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,6 @@
+adapter java {
+  package "org.jooq:jooq" {
+    sink method "queryTimeout" -> code.SqlExecution
+    control method "bind" -> core.SqlParameterization
+  }
+}

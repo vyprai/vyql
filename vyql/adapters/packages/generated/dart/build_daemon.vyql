@@ -1,0 +1,8 @@
+import code.{NetworkData}
+
+adapter dart {
+  package "build_daemon" {
+    source method "connect" -> code.NetworkData
+    source method "connectUnchecked" -> code.NetworkData
+  }
+}

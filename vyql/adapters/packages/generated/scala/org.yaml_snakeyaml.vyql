@@ -1,0 +1,10 @@
+adapter scala {
+  package "org.yaml:snakeyaml" {
+    sink method "load" -> code.Deserialization
+    sink method "loadAs" -> code.Deserialization
+    sink method "loadAll" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    sink method "compose" -> code.Deserialization
+    sink method "composeAll" -> code.Deserialization
+  }
+}

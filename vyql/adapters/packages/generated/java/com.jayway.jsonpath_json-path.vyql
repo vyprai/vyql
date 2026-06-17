@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter java {
+  package "com.jayway.jsonpath:json-path" {
+    sink method "read" -> code.Deserialization
+  }
+}

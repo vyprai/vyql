@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter python {
+  package "scikit-learn" {
+    sink path "sklearn.externals._arff.load" -> code.Deserialization
+    sink path "sklearn.externals._arff.loads" -> code.Deserialization
+  }
+}

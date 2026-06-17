@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter python {
+  package "referencing" {
+    sink method "get_or_retrieve" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "poyo" {
+    sink method "parse_string" -> code.Deserialization
+  }
+}

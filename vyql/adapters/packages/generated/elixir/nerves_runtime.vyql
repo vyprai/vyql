@@ -1,0 +1,5 @@
+adapter elixir {
+  package "nerves_runtime" {
+    sink method "cmd" -> code.CommandExecution
+  }
+}

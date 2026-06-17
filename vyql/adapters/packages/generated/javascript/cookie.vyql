@@ -1,0 +1,11 @@
+import code.{HttpInput, ResponseHeaderWrite}
+
+adapter javascript {
+  package "cookie" {
+    source method "parse" -> code.HttpInput
+    source method "parseCookie" -> code.HttpInput
+    sink method "stringifyCookie" -> code.ResponseHeaderWrite
+    sink method "stringifySetCookie" -> code.ResponseHeaderWrite
+    sink method "serialize" -> code.ResponseHeaderWrite
+  }
+}

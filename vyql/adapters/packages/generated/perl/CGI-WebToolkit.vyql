@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter perl {
+  package "CGI-WebToolkit" {
+    sink method "query" -> code.SqlExecution
+  }
+}

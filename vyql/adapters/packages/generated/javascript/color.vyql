@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter javascript {
+  package "color" {
+    source method "Color" -> core.UserControlledData
+  }
+}

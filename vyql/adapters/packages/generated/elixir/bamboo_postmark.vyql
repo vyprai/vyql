@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter elixir {
+  package "bamboo_postmark" {
+    sink method "deliver" -> code.NetworkSend
+  }
+}

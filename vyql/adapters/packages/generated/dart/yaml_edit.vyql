@@ -1,0 +1,11 @@
+import code.{Deserialization, StoredDataRead}
+
+adapter dart {
+  package "yaml_edit" {
+    source method "YamlEditor" -> code.StoredDataRead
+    sink method "YamlEditor.update" -> code.Deserialization
+    sink method "YamlEditor.insertIntoList" -> code.Deserialization
+    sink method "YamlEditor.prependToList" -> code.Deserialization
+    sink method "YamlEditor.appendToList" -> code.Deserialization
+  }
+}

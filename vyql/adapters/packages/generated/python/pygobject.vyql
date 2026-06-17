@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter python {
+  package "pygobject" {
+    sink method "connect" -> code.CodeEval
+  }
+}

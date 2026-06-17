@@ -1,0 +1,11 @@
+import code.{FileUse}
+import core.{AuthorizationCheck}
+
+adapter php {
+  package "zizaco/entrust" {
+    sink method "fwrite" -> code.FileUse
+    control method "routeNeedsRole" -> core.AuthorizationCheck
+    control method "routeNeedsPermission" -> core.AuthorizationCheck
+    control method "routeNeedsRoleOrPermission" -> core.AuthorizationCheck
+  }
+}

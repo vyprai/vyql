@@ -1,0 +1,11 @@
+import code.{Deserialization}
+adapter scala {
+  package "com.fasterxml.jackson.datatype:jackson-datatype-guava" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "deserializeWithType" -> code.Deserialization
+    sink method "deserializeRangeFromString" -> code.Deserialization
+    sink method "deserializeBoundType" -> code.Deserialization
+    sink method "deserializeEndpoint" -> code.Deserialization
+    sink method "deserializeStringified" -> code.Deserialization
+  }
+}

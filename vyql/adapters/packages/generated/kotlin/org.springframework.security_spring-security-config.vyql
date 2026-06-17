@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{AuthenticationCheck, InputValidation}
+
+adapter kotlin {
+  package "org.springframework.security:spring-security-config" {
+    sink method "parse" -> code.Deserialization
+    control method "validate" -> core.InputValidation
+  }
+}

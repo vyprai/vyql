@@ -1,0 +1,10 @@
+import code.{SecretValue, StoredDataWrite}
+
+adapter objc {
+  package "zipzap" {
+    source method "newStreamWithPassword" -> code.SecretValue
+    source method "newDataWithPassword" -> code.SecretValue
+    source method "newDataProviderWithPassword" -> code.SecretValue
+    sink method "writeData" -> code.StoredDataWrite
+  }
+}

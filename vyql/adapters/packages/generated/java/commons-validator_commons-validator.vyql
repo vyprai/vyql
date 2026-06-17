@@ -1,0 +1,6 @@
+adapter java {
+  package "commons-validator:commons-validator" {
+    control method "EmailValidator.isValid" -> core.InputValidation
+    control method "UrlValidator.isValid" -> core.InputValidation
+  }
+}

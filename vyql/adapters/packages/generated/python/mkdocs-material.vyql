@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "mkdocs-material" {
+    sink method "parse" -> code.Deserialization
+  }
+}

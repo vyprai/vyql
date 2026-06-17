@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "readosm" {
+    sink method "readosm_parse" -> code.Deserialization
+  }
+}

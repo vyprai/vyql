@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter dart {
+  package "html_unescape" {
+    control method "HtmlUnescape.convert" -> core.HtmlEscape
+  }
+}

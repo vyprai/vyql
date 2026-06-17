@@ -18,27 +18,17 @@ type gvConv struct {
 
 // ExtractGroovy parses Groovy files into one NIR Program (one module per file).
 func ExtractGroovy(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(groovy.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &gvConv{src: src, file: rel, key: moduleKey(root, f, ".groovy")}
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(groovy.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &gvConv{src: src, file: rel, key: moduleKey(root, abs, ".groovy")}
+			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *gvConv) loc(n *tree_sitter.Node) string {
@@ -66,6 +56,7 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "function_definition", "method_definition":
 		var name string
 		var params []string
+		paramTypes := map[string]string{}
 		for _, ch := range namedChildren(n) {
 			switch ch.Kind() {
 			case "identifier":
@@ -74,14 +65,15 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				}
 			case "parameter_list":
 				for _, p := range namedChildren(ch) {
-					if id := lastChildKind(p, "identifier"); id != nil {
-						params = append(params, c.text(id))
+					if name := c.paramName(p); name != "" {
+						params = append(params, name)
+						putParamType(paramTypes, name, paramTypeFromField(c, p))
 					}
 				}
 			}
 		}
 		body := c.block(lastChildKind(n, "closure"))
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "declaration":
 		kids := namedChildren(n)
 		if len(kids) >= 2 && kids[0].Kind() == "identifier" {
@@ -128,6 +120,16 @@ func (c *gvConv) block(n *tree_sitter.Node) []nir.Stmt {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
+}
+
+func (c *gvConv) paramName(n *tree_sitter.Node) string {
+	var name string
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "identifier" {
+			name = c.text(ch)
+		}
+	}
+	return name
 }
 
 // gvOp returns a binary/unary operator symbol (first non-named child token).

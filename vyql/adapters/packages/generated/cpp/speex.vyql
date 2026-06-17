@@ -1,0 +1,6 @@
+adapter cpp {
+  package "speex" {
+    sink method "read_wav_header" -> code.FilePathAccess
+    sink method "write_wav_header" -> code.FileUse
+  }
+}

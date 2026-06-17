@@ -5,6 +5,7 @@ adapter perl {
 
   // untrusted input
   source ".param" -> code.HttpInput
+  source "param" -> code.HttpInput
   source ".url_param" -> code.HttpInput
   source ".http" -> code.HttpInput
   source "ENV" -> code.EnvVariable
@@ -19,6 +20,7 @@ adapter perl {
 
   // code evaluation
   sink path "eval" -> code.CodeEval
+  sink path "require" arg all -> code.DynamicCodeLoad
 
   // SQL — DBI
   sink method "do" -> code.SqlExecution
@@ -34,12 +36,18 @@ adapter perl {
   sink path "opendir" arg all -> code.FilePathAccess
   sink path "unlink" arg all -> code.FilePathAccess
   sink path "sysopen" arg all -> code.FilePathAccess
+  sink path "Archive.Extract.extract" arg all -> code.ArchiveEntryWrite
+  sink method "extractMember" arg all -> code.ArchiveEntryWrite
 
   // SSRF — LWP::Simple / LWP::UserAgent / HTTP::Tiny (URL is the call argument)
   sink path "getstore" -> code.UrlFetch
   sink path "getprint" -> code.UrlFetch
   sink path "mirror" -> code.UrlFetch
   sink method "request" -> code.UrlFetch
+  mark "getstore" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "getprint" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "mirror" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "request" val "http://" nval "127.0" -> code.CleartextChannel
 
   // XSS (CWE-79) — print to the response filehandle / CGI writers
   sink path "print" arg all -> code.HtmlRender
@@ -56,6 +64,17 @@ adapter perl {
 
   // trust boundary (CWE-501) — untrusted data written into the session
   sink method "param" arg all -> code.TrustBoundary
+  sink method "find_by_id" -> code.ObjectLookupByUserInput
+  sink method "get_user" -> code.ObjectLookupByUserInput
+  sink method "get_account" -> code.ObjectLookupByUserInput
+  mark "change_password" -> code.AuthenticationRequiredOp
+  mark "update_password" -> code.AuthenticationRequiredOp
+  mark "reset_password" -> code.AuthenticationRequiredOp
+  mark "change_email" -> code.AuthenticationRequiredOp
+  mark "transfer_funds" -> code.AuthenticationRequiredOp
+  mark "delete_account" -> code.AuthenticationRequiredOp
+  mark "grant_role" -> code.AuthenticationRequiredOp
+  mark "make_admin" -> code.AuthenticationRequiredOp
 
   // insecure cookie (CWE-614) — cookie secure/httponly setter turned off
   mark "secure" val "false" -> code.InsecureCookie
@@ -72,10 +91,18 @@ adapter perl {
   mark "Crypt.CBC.new" val "DES" -> code.WeakCipher
   mark "Crypt.CBC.new" val "RC4" -> code.WeakCipher
   mark "Crypt.CBC.new" val "Blowfish" -> code.WeakCipher
+  mark "Crypt.CBC.new" val "0000000000000000" -> code.StaticIv
   mark "Crypt.DES" -> code.WeakCipher
 
   // insecure randomness (CWE-330) — perl builtin rand() (Crypt::URandom is safe)
   mark "rand" -> code.WeakRandomValue
+  mark "chmod" val "0777" -> code.InsecurePermission
+  mark "chmod" val "0666" -> code.InsecurePermission
+  mark "tmpnam" -> code.InsecureTempFile
+  mark "POSIX.tmpnam" -> code.InsecureTempFile
+  mark "open" -> code.ResourceHandle
+  mark "IO.Socket.INET.new" -> code.ResourceHandle
+  control "close" -> core.ResourceRelease
 
   // deserialization (CWE-502) — Storable
   sink path "Storable.thaw" -> code.Deserialization
@@ -97,4 +124,8 @@ adapter perl {
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization
   control "validateRole" -> core.InputValidation
+  control "require_auth" -> core.AuthenticationCheck
+  control "ensure_authenticated" -> core.AuthenticationCheck
+  control "check_ownership" -> core.OwnershipCheck
+  control "require_owner" -> core.OwnershipCheck
 }

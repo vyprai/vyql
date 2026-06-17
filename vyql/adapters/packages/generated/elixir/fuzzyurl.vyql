@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter elixir {
+  package "fuzzyurl" {
+    sink method "Fuzzyurl.from_string" -> code.Deserialization
+    sink method "Fuzzyurl.Strings.from_string" -> code.Deserialization
+  }
+}

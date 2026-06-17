@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter objc {
+  package "Swizzlean" {
+    sink method "swizzleInstanceMethod" -> code.CodeEval
+    sink method "swizzleClassMethod" -> code.CodeEval
+  }
+}

@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkBind}
+import core.{InputValidation}
+
+adapter c {
+  package "aws-c-io" {
+    sink method "aws_socket_connect" -> code.NetworkConnect
+    sink method "aws_socket_bind" -> code.NetworkBind
+    control method "aws_sanitize_pem" -> core.InputValidation
+  }
+}

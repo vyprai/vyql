@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter go {
+  package "github.com/containernetworking/cni" {
+    sink method "NetworkPluginConfFromBytes" -> code.Deserialization
+    sink method "NetworkConfFromBytes" -> code.Deserialization
+    sink method "ConfFromBytes" -> code.Deserialization
+    sink method "ConfListFromBytes" -> code.Deserialization
+    sink method "validateConfig" -> code.Deserialization
+  }
+}

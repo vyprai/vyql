@@ -1,0 +1,12 @@
+import code.{Deserialization, UrlFetch}
+
+adapter swift {
+  package "github.com/amzn/smoke-http" {
+    sink method "decode" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    sink method "executeRetriableWithoutOutput" -> code.UrlFetch
+    sink method "executeRetriableWithOutput" -> code.UrlFetch
+    sink method "executeWithoutOutput" -> code.UrlFetch
+    sink method "executeWithOutput" -> code.UrlFetch
+  }
+}

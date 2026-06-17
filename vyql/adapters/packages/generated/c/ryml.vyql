@@ -1,0 +1,5 @@
+adapter c {
+  package "ryml" {
+    sink path "ryml.parse" -> code.Deserialization
+  }
+}

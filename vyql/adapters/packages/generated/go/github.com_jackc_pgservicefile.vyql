@@ -1,0 +1,8 @@
+import code.{FilePathAccess, Deserialization}
+
+adapter go {
+  package "github.com/jackc/pgservicefile" {
+    sink method "ReadServicefile" -> code.FilePathAccess
+    sink method "ParseServicefile" -> code.Deserialization
+  }
+}

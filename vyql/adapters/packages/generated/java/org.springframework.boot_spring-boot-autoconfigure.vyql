@@ -1,0 +1,9 @@
+import code.{SecretValue}
+adapter java {
+  package "org.springframework.boot:spring-boot-autoconfigure" {
+    source method "getPassword" -> code.SecretValue
+    source method "determinePassword" -> code.SecretValue
+    source method "getKeyStorePassword" -> code.SecretValue
+    source method "getTrustStorePassword" -> code.SecretValue
+  }
+}

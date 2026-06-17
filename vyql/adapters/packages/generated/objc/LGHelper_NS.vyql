@@ -1,0 +1,9 @@
+import code.{WeakHash, WeakCipher}
+
+adapter objc {
+  package "LGHelper+NS" {
+    mark method "md5Hash" -> code.WeakHash
+    mark method "sha1Hash" -> code.WeakHash
+    mark method "xorCryptedWithKey" -> code.WeakCipher
+  }
+}

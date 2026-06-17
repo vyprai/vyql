@@ -1,0 +1,9 @@
+import code.{Deserialization, UrlFetch}
+
+adapter cpp {
+  package "marble" {
+    sink method "GeoUriParser.parse" -> code.Deserialization
+    sink method "OsmParser.read" -> code.Deserialization
+    sink method "HttpJob.execute" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,5 @@
+adapter objc {
+  package "STTwitter" {
+    source path "postTokenRequest" -> code.HttpInput
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "iconv" {
+    sink method "convert" -> code.Deserialization
+  }
+}

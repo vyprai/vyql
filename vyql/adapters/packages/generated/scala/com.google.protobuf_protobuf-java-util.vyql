@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter scala {
+  package "com.google.protobuf:protobuf-java-util" {
+    sink method "JsonFormat.Parser.merge" -> code.Deserialization
+  }
+}

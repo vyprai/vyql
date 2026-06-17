@@ -1,0 +1,14 @@
+import code.{FilePathAccess, FileUse, StoredDataRead, StoredDataWrite}
+
+adapter rust {
+  package "git2" {
+    sink method "open" -> code.FilePathAccess
+    sink method "open_ext" -> code.FilePathAccess
+    source method "read" -> code.StoredDataRead
+    sink method "write" -> code.StoredDataWrite
+    source method "read_tree" -> code.StoredDataRead
+    sink method "write_tree" -> code.StoredDataWrite
+    sink method "write_tree_to" -> code.StoredDataWrite
+    sink method "path" -> code.FilePathAccess
+  }
+}

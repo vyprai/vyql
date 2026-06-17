@@ -1,0 +1,8 @@
+import code.{Deserialization, NetworkSend}
+
+adapter ruby {
+  package "elasticsearch-transport" {
+    sink method "perform_request" -> code.NetworkSend
+    sink method "load" -> code.Deserialization
+  }
+}

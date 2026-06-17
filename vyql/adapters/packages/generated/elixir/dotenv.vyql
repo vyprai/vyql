@@ -1,0 +1,10 @@
+import core.{UserControlledData}
+
+adapter elixir {
+  package "dotenv" {
+    source method "load" -> core.UserControlledData
+    source method "load!" -> core.UserControlledData
+    source method "parse_contents" -> core.UserControlledData
+    source method "read_env_file" -> core.UserControlledData
+  }
+}

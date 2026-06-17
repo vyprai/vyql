@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter python {
+  package "pkginfo" {
+    sink method "parse" -> code.Deserialization
+    sink method "get_metadata" -> code.Deserialization
+  }
+}

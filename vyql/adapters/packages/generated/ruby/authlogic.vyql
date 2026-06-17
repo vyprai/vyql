@@ -1,0 +1,7 @@
+import code.{Deserialization, WeakHash}
+adapter ruby {
+  package "authlogic" {
+    sink method "Authlogic::CookieCredentials#parse" -> code.Deserialization
+    mark method "Authlogic::CryptoProviders::MD5.encrypt" -> code.WeakHash
+  }
+}

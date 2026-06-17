@@ -1,0 +1,11 @@
+import code.{FilePathAccess, UrlFetch, XmlParse}
+
+adapter java {
+  package "org.apache.maven.plugin-testing:maven-plugin-testing-harness" {
+    sink method "getTestFile" -> code.FilePathAccess
+    sink method "openPomUrl" -> code.UrlFetch
+    sink method "XmlPlexusConfiguration" -> code.XmlParse
+    sink method "extractPluginConfiguration" -> code.XmlParse
+    sink method "finalizeConfig" -> code.XmlParse
+  }
+}

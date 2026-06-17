@@ -1,0 +1,9 @@
+import code.{HttpInput, NetworkSend, Deserialization}
+adapter swift {
+  package "github.com/vapor/http" {
+    source method "parse" -> code.HttpInput
+    sink method "send" -> code.NetworkSend
+    sink method "onText" -> code.Deserialization
+    sink method "onBinary" -> code.Deserialization
+  }
+}

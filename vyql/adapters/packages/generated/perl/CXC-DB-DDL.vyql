@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter perl {
+  package "CXC-DB-DDL" {
+    sink method "sql" -> code.SqlExecution
+  }
+}

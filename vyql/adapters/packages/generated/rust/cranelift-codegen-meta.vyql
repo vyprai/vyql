@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter rust {
+  package "cranelift-codegen-meta" {
+    sink method "generate_rust" -> code.FilePathAccess
+    sink method "generate_isle" -> code.FilePathAccess
+  }
+}

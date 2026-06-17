@@ -1,0 +1,7 @@
+import code.{CliArgument}
+adapter javascript {
+  package "yargs" {
+    source method "parse" -> code.CliArgument
+    source method "parseArgs" -> code.CliArgument
+  }
+}

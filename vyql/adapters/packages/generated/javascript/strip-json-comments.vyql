@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter javascript {
+  package "strip-json-comments" {
+    control method "stripJsonComments" -> core.InputValidation
+  }
+}

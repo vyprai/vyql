@@ -1,0 +1,6 @@
+adapter go {
+  package "github.com/btcsuite/snappy-go" {
+    sink method "Decode" -> code.Deserialization
+    sink method "NewReader" -> code.Deserialization
+  }
+}

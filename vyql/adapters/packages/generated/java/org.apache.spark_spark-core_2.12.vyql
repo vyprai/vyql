@@ -1,0 +1,8 @@
+import code.{CommandExecution, Deserialization, FilePathAccess}
+adapter java {
+  package "org.apache.spark:spark-core_2.12" {
+    sink method "testCommandAvailable" -> code.CommandExecution
+    sink method "getAbsolutePathFromExecutable" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+  }
+}

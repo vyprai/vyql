@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "org.eclipse.jgit:org.eclipse.jgit" {
+    sink method "open" -> code.FilePathAccess
+  }
+}

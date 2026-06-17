@@ -1,0 +1,8 @@
+import code.{TemplateRender, FilePathAccess}
+adapter elixir {
+  package "phoenix_slime" {
+    sink method "PhoenixSlime.Engine.compile" -> code.TemplateRender
+    sink method "PhoenixSlime.Engine.read!" -> code.FilePathAccess
+    sink method "PhoenixSlime.LiveViewEngine.compile" -> code.TemplateRender
+  }
+}

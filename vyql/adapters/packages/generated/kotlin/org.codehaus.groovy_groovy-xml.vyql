@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter kotlin {
+  package "org.codehaus.groovy:groovy-xml" {
+    sink method "parse" -> code.Deserialization
+    control method "escapeXml" -> core.HtmlEscape
+    control method "escapeControlCharacters" -> core.HtmlEscape
+  }
+}

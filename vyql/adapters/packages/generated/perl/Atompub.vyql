@@ -1,0 +1,8 @@
+import core.{AuthenticationCheck, UserControlledData}
+
+adapter perl {
+  package "Atompub" {
+    control method "authenticate" -> core.AuthenticationCheck
+    source method "get_auth_info" -> core.UserControlledData
+  }
+}

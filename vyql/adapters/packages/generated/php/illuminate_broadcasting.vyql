@@ -1,0 +1,10 @@
+import core.{AuthenticationCheck, AuthorizationCheck}
+adapter php {
+  package "illuminate/broadcasting" {
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "authenticateUser" -> core.AuthenticationCheck
+    control method "resolveAuthenticatedUser" -> core.AuthenticationCheck
+    control method "verifyUserCanAccessChannel" -> core.AuthorizationCheck
+    control method "extractAuthParameters" -> core.AuthenticationCheck
+  }
+}

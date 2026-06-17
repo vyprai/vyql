@@ -1,0 +1,8 @@
+import code.{FilePathAccess, SecretValue}
+
+adapter php {
+  package "kartik-v/yii2-widget-activeform" {
+    sink method "fileInput" -> code.FilePathAccess
+    source method "passwordInput" -> code.SecretValue
+  }
+}

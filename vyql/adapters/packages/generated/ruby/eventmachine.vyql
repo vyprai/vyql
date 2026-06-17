@@ -1,0 +1,7 @@
+adapter ruby {
+  package "eventmachine" {
+    source method "Read" -> code.NetworkData
+    sink method "close" -> code.NetworkSend
+    sink method "connect" -> code.NetworkConnect
+  }
+}

@@ -1,0 +1,8 @@
+import code.{SecretValue, CommandExecution}
+
+adapter python {
+  package "pywin32-ctypes" {
+    source method "CredWrite" -> code.SecretValue
+    source method "CredRead" -> code.SecretValue
+  }
+}

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "cloak" {
+    sink method "decrypt" -> code.Deserialization
+    sink method "decrypt!" -> code.Deserialization
+  }
+}

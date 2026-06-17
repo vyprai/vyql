@@ -1,0 +1,9 @@
+import code.{CliArgument, SecretValue}
+
+adapter go {
+  package "github.com/mitchellh/cli" {
+    source method "Ask" -> core.UserControlledData
+    source method "AskSecret" -> code.SecretValue
+    source method "Run" -> code.CliArgument
+  }
+}

@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter python {
+  package "ipywidgets" {
+    control method "escape_script" -> core.HtmlEscape
+  }
+}

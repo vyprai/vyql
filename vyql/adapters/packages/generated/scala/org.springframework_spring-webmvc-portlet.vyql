@@ -1,0 +1,7 @@
+import code.{Deserialization, HttpInput}
+
+adapter scala {
+  package "org.springframework:spring-webmvc-portlet" {
+    sink method "parse" -> code.Deserialization
+  }
+}

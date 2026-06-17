@@ -1,0 +1,8 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+adapter c {
+  package "crow" {
+    sink method "load" -> code.Deserialization
+    control method "escape" -> core.HtmlEscape
+  }
+}

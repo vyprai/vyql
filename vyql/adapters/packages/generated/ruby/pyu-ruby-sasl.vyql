@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter ruby {
+  package "pyu-ruby-sasl" {
+    mark method "h" -> code.WeakHash
+    mark method "hh" -> code.WeakHash
+  }
+}

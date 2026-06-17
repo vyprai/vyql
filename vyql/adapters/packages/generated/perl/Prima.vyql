@@ -1,0 +1,8 @@
+import code.{FilePathAccess, Deserialization}
+adapter perl {
+  package "Prima" {
+    sink method "Prima::IniFile::read" -> code.FilePathAccess
+    sink method "Prima::IniFile::read" -> code.Deserialization
+    sink method "Prima::IniFile::write" -> code.FilePathAccess
+  }
+}

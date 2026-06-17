@@ -1,0 +1,9 @@
+import code.{Deserialization}
+adapter python {
+  package "safetensors" {
+    sink method "load" -> code.Deserialization
+    sink method "load_file" -> code.Deserialization
+    sink method "read_metadata" -> code.Deserialization
+    sink method "deserialize" -> code.Deserialization
+  }
+}

@@ -1,0 +1,9 @@
+import code.{LogOutput, FileUse}
+
+adapter swift {
+  package "github.com/xcode-actions/clt-logger" {
+    sink method "log" -> code.LogOutput
+    sink method "writeLog" -> code.LogOutput
+    sink method "init" -> code.FileUse
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/trilemma-dev/Required" {
+    sink method "parse" -> code.Deserialization
+  }
+}

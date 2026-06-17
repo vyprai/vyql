@@ -1,0 +1,7 @@
+import code.{Deserialization, ExpressionEval}
+adapter swift {
+  package "github.com/nicklockwood/Expression" {
+    sink method "parse" -> code.Deserialization
+    sink method "evaluate" -> code.ExpressionEval
+  }
+}

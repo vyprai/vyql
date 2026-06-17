@@ -1,0 +1,10 @@
+import code.{FilePathAccess, UrlFetch}
+
+adapter ruby {
+  package "bootstrap" {
+    sink method "save_file" -> code.FilePathAccess
+    sink method "write_cached_files" -> code.FilePathAccess
+    sink method "read_files" -> code.UrlFetch
+    sink method "get_json" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter ruby {
+  package "rack-timeout" {
+    source method "call" -> core.UserControlledData
+  }
+}

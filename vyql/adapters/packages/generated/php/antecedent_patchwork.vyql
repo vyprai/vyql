@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter php {
+  package "antecedent/patchwork" {
+    sink method "eval" -> code.CodeEval
+  }
+}

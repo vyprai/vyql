@@ -1,0 +1,13 @@
+import code.{CodeEval, RawMemoryCopySize, PointerFree, PointerUse}
+
+adapter scala {
+  package "net.java.dev.jna:jna" {
+    mark method "read" -> code.RawMemoryCopySize
+    mark method "write" -> code.RawMemoryCopySize
+    mark method "free" -> code.PointerFree
+    mark method "malloc" -> code.PointerUse
+    mark method "getByteBuffer" -> code.PointerUse
+    sink method "load" -> code.CodeEval
+    sink method "loadLibrary" -> code.CodeEval
+  }
+}

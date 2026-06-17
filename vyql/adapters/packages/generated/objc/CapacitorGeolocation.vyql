@@ -1,0 +1,10 @@
+import code.{NetworkData}
+import core.{AuthorizationCheck}
+
+adapter objc {
+  package "CapacitorGeolocation" {
+    source method "getCurrentPosition" -> code.NetworkData
+    source method "watchPosition" -> code.NetworkData
+    control method "requestPermissions" -> core.AuthorizationCheck
+  }
+}

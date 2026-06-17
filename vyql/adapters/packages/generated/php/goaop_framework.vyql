@@ -1,0 +1,12 @@
+import code.{CommandExecution, Deserialization, FilePathAccess}
+import core.{PathCanonicalization}
+
+adapter php {
+  package "goaop/framework" {
+    sink method "parse" -> code.Deserialization
+    sink method "mkdir" -> code.FilePathAccess
+    sink method "file_put_contents" -> code.FilePathAccess
+    sink method "chmod" -> code.FilePathAccess
+    control method "realpath" -> core.PathCanonicalization
+  }
+}

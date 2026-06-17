@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter dart {
+  package "back_button_interceptor" {
+    sink method "add" -> code.CodeEval
+  }
+}

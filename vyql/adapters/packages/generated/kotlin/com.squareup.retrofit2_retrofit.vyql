@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter kotlin {
+  package "com.squareup.retrofit2:retrofit" {
+    source method "RequestFactory.parseAnnotations" -> code.HttpInput
+  }
+}

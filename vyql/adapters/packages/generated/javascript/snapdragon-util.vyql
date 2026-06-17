@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "snapdragon-util" {
+    sink method "expect" -> code.Deserialization
+  }
+}

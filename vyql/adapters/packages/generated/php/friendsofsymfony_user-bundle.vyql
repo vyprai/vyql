@@ -1,0 +1,10 @@
+import code.{SecretValue}
+
+adapter php {
+  package "friendsofsymfony/user-bundle" {
+    source method "setPassword" -> code.SecretValue
+    source method "setPlainPassword" -> code.SecretValue
+    source method "getPassword" -> code.SecretValue
+    source method "getPlainPassword" -> code.SecretValue
+  }
+}

@@ -1,0 +1,5 @@
+adapter c {
+  package "tsl-ordered-map" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

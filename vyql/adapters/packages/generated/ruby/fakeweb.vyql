@@ -1,0 +1,10 @@
+import code.{NetworkConnect}
+import core.{UserControlledData}
+
+adapter ruby {
+  package "fakeweb" {
+    source method "register_uri" -> core.UserControlledData
+    sink method "register_passthrough_uri" -> code.NetworkConnect
+    sink method "request_with_fakeweb" -> code.NetworkConnect
+  }
+}

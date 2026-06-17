@@ -1,0 +1,6 @@
+import code.{SecretValue}
+adapter dart {
+  package "firebase_core" {
+    source method "Firebase.initializeApp" -> code.SecretValue
+  }
+}

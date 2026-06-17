@@ -1,0 +1,18 @@
+import code.{SecretValue}
+
+adapter objc {
+  package "SSKeychain" {
+    source method "passwordForService" -> code.SecretValue
+    source method "passwordDataForService" -> code.SecretValue
+    source method "passwordObject" -> code.SecretValue
+    source method "password" -> code.SecretValue
+    source method "fetchAll" -> code.SecretValue
+    source method "fetch" -> code.SecretValue
+    source method "setPassword" -> code.SecretValue
+    source method "setPasswordData" -> code.SecretValue
+    source method "setPasswordObject" -> code.SecretValue
+    source method "deletePasswordForService" -> code.SecretValue
+    source method "save" -> code.SecretValue
+    source method "deleteItem" -> code.SecretValue
+  }
+}

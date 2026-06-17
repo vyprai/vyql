@@ -1,0 +1,14 @@
+import core.{AuthorizationCheck}
+
+adapter php {
+  package "spatie/laravel-permission" {
+    control method "assignRole" -> core.AuthorizationCheck
+    control method "removeRole" -> core.AuthorizationCheck
+    control method "syncRoles" -> core.AuthorizationCheck
+    control method "hasRole" -> core.AuthorizationCheck
+    control method "givePermissionTo" -> core.AuthorizationCheck
+    control method "syncPermissions" -> core.AuthorizationCheck
+    control method "revokePermissionTo" -> core.AuthorizationCheck
+    control method "hasPermissionTo" -> core.AuthorizationCheck
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "com.github.pagehelper:pagehelper" {
+    sink method "parse" -> code.Deserialization
+  }
+}

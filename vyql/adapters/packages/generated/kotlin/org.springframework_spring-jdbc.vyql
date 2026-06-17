@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+adapter kotlin {
+  package "org.springframework:spring-jdbc" {
+    sink method "query" -> SqlExecution
+    sink method "update" -> SqlExecution
+    sink method "execute" -> SqlExecution
+  }
+}

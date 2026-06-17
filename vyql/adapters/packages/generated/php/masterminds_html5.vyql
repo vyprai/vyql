@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+adapter php {
+  package "masterminds/html5" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseFragment" -> code.Deserialization
+    control method "escape" -> core.HtmlEscape
+  }
+}

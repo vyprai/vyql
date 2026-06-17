@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter dart {
+  package "uuid" {
+    source method "Uuid.parse" -> core.UserControlledData
+    source method "Uuid.parseAsByteList" -> core.UserControlledData
+  }
+}

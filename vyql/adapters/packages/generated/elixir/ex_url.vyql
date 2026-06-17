@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "ex_url" {
+    sink method "parse" -> code.Deserialization
+    sink method "new" -> code.Deserialization
+    sink method "new!" -> code.Deserialization
+  }
+}

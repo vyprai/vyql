@@ -1,0 +1,19 @@
+adapter php {
+  package "guzzlehttp/psr7" {
+    source method "parse" -> core.UserControlledData
+    source method "getScheme" -> core.UserControlledData
+    source method "getUserInfo" -> core.UserControlledData
+    source method "getHost" -> core.UserControlledData
+    source method "getPort" -> core.UserControlledData
+    source method "getPath" -> core.UserControlledData
+    source method "getQuery" -> core.UserControlledData
+    source method "getFragment" -> core.UserControlledData
+    source method "withScheme" -> core.UserControlledData
+    source method "withUserInfo" -> core.UserControlledData
+    source method "withHost" -> core.UserControlledData
+    source method "withPort" -> core.UserControlledData
+    source method "withPath" -> core.UserControlledData
+    source method "withQuery" -> core.UserControlledData
+    source method "withFragment" -> core.UserControlledData
+  }
+}

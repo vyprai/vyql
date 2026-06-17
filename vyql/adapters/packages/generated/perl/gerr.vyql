@@ -1,0 +1,6 @@
+import code.{LogOutput}
+adapter perl {
+  package "gerr" {
+    sink method "error" -> code.LogOutput
+  }
+}

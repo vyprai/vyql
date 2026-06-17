@@ -1,0 +1,10 @@
+import code.{CodeEval}
+
+adapter elixir {
+  package "con_cache" {
+    sink method "ConCache.Lock.exec" -> CodeEval
+    sink method "ConCache.Lock.try_exec" -> CodeEval
+    sink method "ConCache.fetch_or_store" -> CodeEval
+    sink method "ConCache.dirty_fetch_or_store" -> CodeEval
+  }
+}

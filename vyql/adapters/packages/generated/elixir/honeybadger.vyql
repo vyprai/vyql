@@ -1,0 +1,10 @@
+import code.{NetworkSend, LogOutput}
+import core.{InputValidation}
+
+adapter elixir {
+  package "honeybadger" {
+    sink method "handle_errors" -> code.LogOutput
+    sink method "send_notice" -> code.NetworkSend
+    control method "sanitize" -> core.InputValidation
+  }
+}

@@ -1,0 +1,10 @@
+import code.{StoredDataRead}
+
+adapter dart {
+  package "device_info_plus_macos" {
+    source method "SystemUUID.getSystemUUID" -> code.StoredDataRead
+    source method "CwlSysctl.data" -> code.StoredDataRead
+    source method "CwlSysctl.keys" -> code.StoredDataRead
+    source method "CwlSysctl.string" -> code.StoredDataRead
+  }
+}

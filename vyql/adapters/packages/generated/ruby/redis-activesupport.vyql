@@ -1,0 +1,8 @@
+import code.{StoredDataWrite}
+
+adapter ruby {
+  package "redis-activesupport" {
+    sink method "write" -> code.StoredDataWrite
+    sink method "delete_matched" -> code.StoredDataWrite
+  }
+}

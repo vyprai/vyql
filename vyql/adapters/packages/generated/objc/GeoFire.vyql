@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter objc {
+  package "GeoFire" {
+    source method "observeEventType:withBlock:" -> core.UserControlledData
+    source method "observeEventType:withSnapshotBlock:" -> core.UserControlledData
+  }
+}

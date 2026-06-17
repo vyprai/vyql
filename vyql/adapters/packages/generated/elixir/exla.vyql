@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "exla" {
+    sink method "DeserializeExecutable" -> code.Deserialization
+  }
+}

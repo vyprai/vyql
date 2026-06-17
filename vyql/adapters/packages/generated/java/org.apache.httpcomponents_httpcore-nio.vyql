@@ -1,0 +1,11 @@
+import code.{HttpInput, NetworkSend}
+adapter java {
+  package "org.apache.httpcomponents:httpcore-nio" {
+    source method "requestReady" -> code.HttpInput
+    source method "responseReceived" -> code.HttpInput
+    source method "inputReady" -> code.HttpInput
+    source method "requestReceived" -> code.HttpInput
+    sink method "outputReady" -> code.NetworkSend
+    sink method "responseReady" -> code.NetworkSend
+  }
+}

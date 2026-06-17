@@ -1,0 +1,12 @@
+import code.{HttpInput, HtmlRender, ResponseHeaderWrite}
+adapter kotlin {
+  package "org.glassfish.jersey.core:jersey-server" {
+    source method "ContainerRequest.readEntity" -> code.HttpInput
+    source method "ContainerRequest.getEntityStream" -> code.HttpInput
+    source method "ContainerRequest.getUriInfo" -> code.HttpInput
+    source method "ContainerRequest.getRequestHeaders" -> code.HttpInput
+    sink method "ContainerResponse.write" -> code.HtmlRender
+    sink method "ContainerResponse.setEntity" -> code.HtmlRender
+    sink method "ContainerResponse.getResponseHeaders" -> code.ResponseHeaderWrite
+  }
+}

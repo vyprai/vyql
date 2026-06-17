@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter go {
+  package "github.com/vmihailenco/msgpack" {
+    sink method "Unmarshal" -> code.Deserialization
+    sink method "Decoder.Decode" -> code.Deserialization
+  }
+}

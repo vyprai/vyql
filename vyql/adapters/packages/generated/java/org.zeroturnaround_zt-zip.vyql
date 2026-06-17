@@ -1,0 +1,5 @@
+adapter java {
+  package "org.zeroturnaround:zt-zip" {
+    sink method "write" -> code.FilePathAccess
+  }
+}

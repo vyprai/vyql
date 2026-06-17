@@ -1,0 +1,13 @@
+import code.{CliArgument, SqlExecution, CodeEval}
+
+adapter php {
+  package "laravel/scout" {
+    source method "search" -> code.CliArgument
+    source method "query" -> code.CliArgument
+    source method "where" -> code.CliArgument
+    source method "whereIn" -> code.CliArgument
+    source method "whereNotIn" -> code.CliArgument
+    sink method "raw" -> code.SqlExecution
+    sink method "withRawResults" -> code.SqlExecution
+  }
+}

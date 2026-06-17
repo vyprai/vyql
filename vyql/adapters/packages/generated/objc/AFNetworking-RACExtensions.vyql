@@ -1,0 +1,14 @@
+import code.{UrlFetch}
+
+adapter objc {
+  package "AFNetworking-RACExtensions" {
+    sink method "rac_GET" -> code.UrlFetch
+    sink method "rac_HEAD" -> code.UrlFetch
+    sink method "rac_POST" -> code.UrlFetch
+    sink method "rac_PUT" -> code.UrlFetch
+    sink method "rac_PATCH" -> code.UrlFetch
+    sink method "rac_DELETE" -> code.UrlFetch
+    sink method "rac_enqueueHTTPRequestOperation" -> code.UrlFetch
+    sink method "rac_enqueueBatchOfHTTPRequestOperations" -> code.UrlFetch
+  }
+}

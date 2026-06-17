@@ -1,0 +1,8 @@
+import code.{FilePathAccess, StoredDataRead}
+
+adapter c {
+  package "lmdb" {
+    sink method "mdb_env_open" -> code.FilePathAccess
+    source method "mdb_dbi_open" -> code.StoredDataRead
+  }
+}

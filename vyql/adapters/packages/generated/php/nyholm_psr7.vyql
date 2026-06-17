@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter php {
+  package "nyholm/psr7" {
+    source method "Stream.read" -> code.NetworkData
+    sink method "Stream.write" -> code.NetworkSend
+  }
+}

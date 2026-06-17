@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/raspu/Highlightr" {
+    sink method "highlight" -> code.Deserialization
+  }
+}

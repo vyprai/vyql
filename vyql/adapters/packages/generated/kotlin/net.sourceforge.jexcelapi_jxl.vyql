@@ -1,0 +1,11 @@
+import code.{FilePathAccess, Deserialization, ArchiveEntryWrite}
+adapter kotlin {
+  package "net.sourceforge.jexcelapi:jxl" {
+    sink method "parse" -> code.Deserialization
+    sink method "getWorkbook" -> code.FilePathAccess
+    sink method "createWorkbook" -> code.FilePathAccess
+    sink method "getImageFile" -> code.FilePathAccess
+    sink method "getFile" -> code.FilePathAccess
+    sink method "write" -> code.ArchiveEntryWrite
+  }
+}

@@ -1,0 +1,13 @@
+// Concurrency / race rules. These are temporal or assumption-gated findings, not
+// pure taint flows.
+module vypr.concurrency;
+
+rule FileToctou {
+  meta { id: "VYQL-RACE-001", severity: medium, cwe: [CWE_367] }
+  order code.FileCheck before code.FileUse
+}
+
+rule LocklessSharedMutation {
+  meta { id: "VYQL-RACE-002", severity: low, cwe: [CWE_362], confidence_floor: low }
+  match code.LocklessSharedMutation as m
+}

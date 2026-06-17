@@ -1,0 +1,5 @@
+adapter cpp {
+  package "parallel-hashmap" {
+    mark path "parallel.hashmap.hash" -> code.WeakHash
+  }
+}

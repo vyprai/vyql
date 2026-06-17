@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter java {
+  package "org.webjars:webjars-locator" {
+    sink method "getSetupJavaScript" -> code.CodeEval
+  }
+}

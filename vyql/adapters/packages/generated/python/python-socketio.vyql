@@ -1,0 +1,11 @@
+import code.{HttpInput, NetworkConnect, NetworkSend, Deserialization}
+
+adapter python {
+  package "python-socketio" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "send" -> code.NetworkSend
+    source method "handle_request" -> code.HttpInput
+    sink method "emit" -> code.NetworkSend
+    sink method "decode" -> code.Deserialization
+  }
+}

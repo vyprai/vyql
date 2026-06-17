@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter perl {
+  package "Text-GooglewikiFormat" {
+    sink method "format" -> code.HtmlRender
+  }
+}

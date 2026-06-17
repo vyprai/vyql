@@ -1,0 +1,12 @@
+import code.{CliArgument, UrlFetch, NetworkConnect, NetworkSend, NetworkData, FilePathAccess}
+
+adapter python {
+  package "speedtest-cli" {
+    source method "parse_args" -> code.CliArgument
+    sink method "http_open" -> code.UrlFetch
+    sink method "https_open" -> code.UrlFetch
+    source method "download" -> code.NetworkData
+    sink method "upload" -> code.NetworkSend
+    sink method "shell" -> code.CommandExecution
+  }
+}

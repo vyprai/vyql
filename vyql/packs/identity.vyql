@@ -1,5 +1,5 @@
 // Identity & privilege — escalation paths and toxic combinations (docs/09).
-package vypr.identity;
+module vypr.identity;
 
 rule ExternalToAdmin {
   meta { id: "VYQL-IDN-001", severity: critical }

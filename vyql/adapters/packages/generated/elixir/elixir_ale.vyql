@@ -1,0 +1,16 @@
+import code.{CommandExecution, PrivilegedOp}
+
+adapter elixir {
+  package "elixir_ale" {
+    mark method "Elixir.ElixirALE.GPIO.write" -> code.PrivilegedOp
+    source method "Elixir.ElixirALE.GPIO.read" -> core.UserControlledData
+    mark method "Elixir.ElixirALE.I2C.write" -> code.PrivilegedOp
+    mark method "Elixir.ElixirALE.I2C.write_device" -> code.PrivilegedOp
+    mark method "Elixir.ElixirALE.I2C.write_read" -> code.PrivilegedOp
+    mark method "Elixir.ElixirALE.I2C.write_read_device" -> code.PrivilegedOp
+    source method "Elixir.ElixirALE.I2C.read" -> core.UserControlledData
+    source method "Elixir.ElixirALE.I2C.read_device" -> core.UserControlledData
+    source method "Elixir.ElixirALE.I2C.write_read" -> core.UserControlledData
+    source method "Elixir.ElixirALE.I2C.write_read_device" -> core.UserControlledData
+  }
+}

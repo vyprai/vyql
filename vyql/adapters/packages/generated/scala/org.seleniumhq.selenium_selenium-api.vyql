@@ -1,0 +1,6 @@
+adapter scala {
+  package "org.seleniumhq.selenium:selenium-api" {
+    source method "get" -> code.SecretValue
+    source method "Cookie" -> code.HttpInput
+  }
+}

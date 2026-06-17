@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter perl {
+  package "Options-Generator" {
+    source method "generate" -> core.UserControlledData
+  }
+}

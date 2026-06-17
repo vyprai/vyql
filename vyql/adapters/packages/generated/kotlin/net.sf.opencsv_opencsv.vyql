@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "net.sf.opencsv:opencsv" {
+    sink method "parseLine" -> code.Deserialization
+    sink method "readNext" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

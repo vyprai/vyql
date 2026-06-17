@@ -1,0 +1,5 @@
+adapter php {
+  package "infection/infection" {
+    sink method "parse" -> code.Deserialization
+  }
+}

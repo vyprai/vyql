@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter elixir {
+  package "bless" {
+    sink method "Mix.Tasks.Bless.run" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter dart {
+  package "record_web" {
+    sink method "start" -> code.FilePathAccess
+  }
+}

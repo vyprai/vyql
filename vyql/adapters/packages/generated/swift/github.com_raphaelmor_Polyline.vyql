@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter swift {
+  package "github.com/raphaelmor/Polyline" {
+    sink method "decodePolyline" -> code.Deserialization
+    sink method "decodeLevels" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "LookinServer" {
+    sink method "instanceWithObject:" -> code.Deserialization
+  }
+}

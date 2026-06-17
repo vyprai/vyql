@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "json-schema" {
+    sink method "validate_json" -> code.Deserialization
+    sink method "validate_uri" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

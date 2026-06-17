@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter cpp {
+  package "args" {
+    source method "Parse" -> core.UserControlledData
+    source method "ParseValue" -> core.UserControlledData
+  }
+}

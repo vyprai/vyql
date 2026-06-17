@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter php {
+  package "sentry/sentry-laravel" {
+    sink method "queryExecutedHandler" -> code.SqlExecution
+  }
+}

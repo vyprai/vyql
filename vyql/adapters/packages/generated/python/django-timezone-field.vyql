@@ -1,0 +1,6 @@
+adapter python {
+  package "django-timezone-field" {
+    sink method "from_db_value" -> code.Deserialization
+    sink method "to_python" -> code.Deserialization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter python {
+  package "pyjwt" {
+    sink method "decode" -> code.Deserialization
+    sink method "from_json" -> code.Deserialization
+  }
+}

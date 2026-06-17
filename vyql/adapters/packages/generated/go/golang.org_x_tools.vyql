@@ -1,0 +1,8 @@
+adapter go {
+  package "golang.org/x/tools" {
+    sink method "parseCode" -> code.Deserialization
+    sink method "parseHTML" -> code.Deserialization
+    sink method "parseLink" -> code.Deserialization
+    sink method "parseInlineLink" -> code.Deserialization
+  }
+}

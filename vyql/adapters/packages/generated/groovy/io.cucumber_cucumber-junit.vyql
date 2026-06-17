@@ -1,0 +1,5 @@
+adapter groovy {
+  package "io.cucumber:cucumber-junit" {
+    source method "JUnitOptionsParser.parse" -> core.UserControlledData
+  }
+}

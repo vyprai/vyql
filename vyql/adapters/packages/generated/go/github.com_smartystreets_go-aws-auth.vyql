@@ -1,0 +1,13 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter go {
+  package "github.com/smartystreets/go-aws-auth" {
+    source method "getIAMRoleCredentials" -> code.SecretValue
+    control method "Sign" -> core.AuthenticationCheck
+    control method "Sign2" -> core.AuthenticationCheck
+    control method "Sign3" -> core.AuthenticationCheck
+    control method "Sign4" -> core.AuthenticationCheck
+    control method "SignS3" -> core.AuthenticationCheck
+  }
+}

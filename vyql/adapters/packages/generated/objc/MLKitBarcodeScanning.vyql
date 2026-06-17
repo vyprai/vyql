@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{UserControlledData}
+
+adapter objc {
+  package "MLKitBarcodeScanning" {
+    sink method "processImage:completion:" -> code.Deserialization
+    sink method "resultsInImage:error:" -> code.Deserialization
+  }
+}

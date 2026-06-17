@@ -1,0 +1,10 @@
+import code.{SqlExecution}
+
+adapter java {
+  package "com.atomikos:transactions-jdbc" {
+    sink method "prepareStatement" -> code.SqlExecution
+    sink method "createStatement" -> code.SqlExecution
+    sink method "prepareCall" -> code.SqlExecution
+    sink method "setTestQuery" -> code.SqlExecution
+  }
+}

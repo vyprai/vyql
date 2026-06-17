@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter dart {
+  package "universal_html" {
+    sink method "DomParser.parseFromString" -> code.Deserialization
+    sink method "DomParserDriver.parseHtml" -> code.Deserialization
+    sink method "DomParserDriver.parseXml" -> code.Deserialization
+    sink method "DomParserDriver.parseDocumentFragmentFromHtml" -> code.Deserialization
+    sink method "DomParserDriver.parseDocumentFragmentFromSvg" -> code.Deserialization
+  }
+}

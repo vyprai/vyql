@@ -1,0 +1,12 @@
+import code.{CliArgument, CommandExecution, EnvVariable}
+import core.{UserControlledData}
+
+adapter python {
+  package "python-dotenv" {
+    source method "load_dotenv" -> code.EnvVariable
+    source method "set_key" -> code.EnvVariable
+    source method "parse_stream" -> core.UserControlledData
+    source method "cli" -> code.CliArgument
+    sink method "run_command" -> code.CommandExecution
+  }
+}

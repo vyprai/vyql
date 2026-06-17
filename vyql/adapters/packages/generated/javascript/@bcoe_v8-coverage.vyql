@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter javascript {
+  package "@bcoe/v8-coverage" {
+    sink method "parseFunctionRanges" -> code.Deserialization
+  }
+}

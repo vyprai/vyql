@@ -1,0 +1,8 @@
+import code.{RegexCompile}
+
+adapter rust {
+  package "proptest" {
+    mark method "string_regex" -> code.RegexCompile
+    mark method "string_regex_parsed" -> code.RegexCompile
+  }
+}

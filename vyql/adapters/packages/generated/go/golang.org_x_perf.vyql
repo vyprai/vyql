@@ -1,0 +1,5 @@
+adapter go {
+  package "golang.org/x/perf" {
+    sink method "OpenSQL" -> code.SqlExecution
+  }
+}

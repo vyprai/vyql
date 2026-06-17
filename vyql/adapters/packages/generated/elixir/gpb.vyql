@@ -1,0 +1,5 @@
+adapter elixir {
+  package "gpb" {
+    sink method "case_expr_to_parse_tree_for_clause" -> code.Deserialization
+  }
+}

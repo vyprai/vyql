@@ -1,0 +1,8 @@
+adapter perl {
+  package "Prancer-Plugin-Xslate" {
+    sink method "render" -> code.TemplateRender
+    sink method "mark_raw" -> code.TemplateRender
+    control method "html_escape" -> core.HtmlEscape
+    control method "uri_escape" -> core.InputValidation
+  }
+}

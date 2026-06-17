@@ -1,0 +1,10 @@
+import code.{ArchiveEntryWrite, FilePathAccess}
+
+adapter swift {
+  package "github.com/marmelroy/Zip" {
+    sink method "unzipFile" -> code.ArchiveEntryWrite
+    sink method "zipFiles" -> code.ArchiveEntryWrite
+    sink method "quickUnzipFile" -> code.ArchiveEntryWrite
+    sink method "quickZipFiles" -> code.ArchiveEntryWrite
+  }
+}

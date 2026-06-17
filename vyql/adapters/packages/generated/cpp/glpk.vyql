@@ -1,0 +1,17 @@
+import code.{FilePathAccess}
+adapter cpp {
+  package "glpk" {
+    sink method "glp_read_sol" -> code.FilePathAccess
+    sink method "glp_write_sol" -> code.FilePathAccess
+    sink method "glp_read_ipt" -> code.FilePathAccess
+    sink method "glp_write_ipt" -> code.FilePathAccess
+    sink method "glp_read_mip" -> code.FilePathAccess
+    sink method "glp_write_mip" -> code.FilePathAccess
+    sink method "glp_read_mps" -> code.FilePathAccess
+    sink method "glp_write_mps" -> code.FilePathAccess
+    sink method "glp_read_lp" -> code.FilePathAccess
+    sink method "glp_write_lp" -> code.FilePathAccess
+    sink method "glp_read_prob" -> code.FilePathAccess
+    sink method "glp_write_prob" -> code.FilePathAccess
+  }
+}

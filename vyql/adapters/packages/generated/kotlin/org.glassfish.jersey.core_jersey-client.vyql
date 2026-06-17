@@ -1,0 +1,6 @@
+import code.{NetworkConnect}
+adapter kotlin {
+  package "org.glassfish.jersey.core:jersey-client" {
+    sink method "connect" -> code.NetworkConnect
+  }
+}

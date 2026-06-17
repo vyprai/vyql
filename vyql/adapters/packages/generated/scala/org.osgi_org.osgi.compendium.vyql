@@ -1,0 +1,8 @@
+import code.{NetworkConnect, SecretValue}
+
+adapter scala {
+  package "org.osgi:org.osgi.compendium" {
+    source method "getCredentials" -> code.SecretValue
+    sink method "open" -> code.NetworkConnect
+  }
+}

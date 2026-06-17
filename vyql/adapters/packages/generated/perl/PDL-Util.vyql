@@ -1,0 +1,5 @@
+adapter perl {
+  package "PDL-Util" {
+    sink method "export2d" -> code.FileUse
+  }
+}

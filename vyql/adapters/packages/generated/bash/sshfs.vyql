@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter bash {
+  package "sshfs" {
+    sink method "Sshfs.install" -> code.CommandExecution
+  }
+}

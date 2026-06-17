@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+
+adapter elixir {
+  package "paginator" {
+    sink method "Paginator.Ecto.Query.maybe_where" -> code.SqlExecution
+    sink method "Paginator.Ecto.Query.build_where_expression" -> code.SqlExecution
+    sink method "Paginator.Ecto.Query.reverse_order_bys" -> code.SqlExecution
+  }
+}

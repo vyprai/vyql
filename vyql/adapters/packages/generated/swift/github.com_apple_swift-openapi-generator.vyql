@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/apple/swift-openapi-generator" {
+    sink method "extractTopLevelKeys" -> code.Deserialization
+    sink method "parseOpenAPIDocument" -> code.Deserialization
+  }
+}

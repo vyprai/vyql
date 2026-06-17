@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter python {
+  package "nbconvert" {
+    sink method "run_command" -> code.CommandExecution
+  }
+}

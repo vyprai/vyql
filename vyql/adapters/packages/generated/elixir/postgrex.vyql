@@ -1,0 +1,8 @@
+import code.{SqlExecution}
+
+adapter elixir {
+  package "postgrex" {
+    sink method "query" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,10 @@
+import code.{NetworkConnect, NetworkSend}
+adapter perl {
+  package "Memcached-RateLimit" {
+    sink method "new" -> code.NetworkConnect
+    sink method "new" -> code.NetworkSend
+    sink method "rate_limit" -> code.NetworkSend
+    sink method "set_read_timeout" -> code.NetworkSend
+    sink method "set_write_timeout" -> code.NetworkSend
+  }
+}

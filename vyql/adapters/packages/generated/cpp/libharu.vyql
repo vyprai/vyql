@@ -1,0 +1,14 @@
+import code.{CodeEval, FilePathAccess}
+
+adapter cpp {
+  package "libharu" {
+    sink method "HPDF_SaveToFile" -> code.FilePathAccess
+    sink method "HPDF_LoadPngImageFromFile" -> code.FilePathAccess
+    sink method "HPDF_LoadJpegImageFromFile" -> code.FilePathAccess
+    sink method "HPDF_LoadTTFontFromFile" -> code.FilePathAccess
+    sink method "HPDF_LoadType1FontFromFile" -> code.FilePathAccess
+    sink method "HPDF_LoadJSFromFile" -> code.FilePathAccess
+    sink method "HPDF_LoadJSFromFile" -> code.CodeEval
+    sink method "HPDF_LoadU3DFromFile" -> code.FilePathAccess
+  }
+}

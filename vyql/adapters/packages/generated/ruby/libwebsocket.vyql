@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter ruby {
+  package "libwebsocket" {
+    source method "parse" -> core.UserControlledData
+  }
+}

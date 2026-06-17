@@ -1,0 +1,9 @@
+import code.{HttpInput, NetworkSend}
+
+adapter perl {
+  package "POE-Filter-SimpleHTTP" {
+    source method "get_one" -> code.HttpInput
+    sink method "put" -> code.NetworkSend
+    sink method "build_message" -> code.NetworkSend
+  }
+}

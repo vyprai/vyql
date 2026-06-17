@@ -1,0 +1,9 @@
+import code.{CliArgument, FilePathAccess}
+adapter cpp {
+  package "butteraugli" {
+    sink method "ReadPNG" -> code.FilePathAccess
+    sink method "ReadJPEG" -> code.FilePathAccess
+    sink method "ReadImageOrDie" -> code.FilePathAccess
+    source method "Run" -> code.CliArgument
+  }
+}

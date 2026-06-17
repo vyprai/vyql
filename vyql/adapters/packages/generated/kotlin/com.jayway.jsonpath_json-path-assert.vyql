@@ -1,0 +1,14 @@
+import code.{Deserialization, ExpressionEval}
+adapter kotlin {
+  package "com.jayway.jsonpath:json-path-assert" {
+    sink method "parse" -> code.Deserialization
+    sink method "assertThat" -> code.ExpressionEval
+    sink method "assertEquals" -> code.ExpressionEval
+    sink method "assertNotDefined" -> code.ExpressionEval
+    sink method "assertNull" -> code.ExpressionEval
+    sink method "assertNotNull" -> code.ExpressionEval
+    sink method "withJsonPath" -> code.ExpressionEval
+    sink method "hasJsonPath" -> code.ExpressionEval
+    sink method "hasNoJsonPath" -> code.ExpressionEval
+  }
+}

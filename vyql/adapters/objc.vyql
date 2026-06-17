@@ -21,6 +21,7 @@ adapter objc {
   sink method "evaluateJavaScript" -> code.WebViewLoad
   sink method "loadHTMLString" -> code.WebViewLoad
   sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
+  mark "addScriptMessageHandler" -> code.WebViewJsInterface
 
   // command execution
   sink path "system" -> code.CommandExecution
@@ -37,6 +38,52 @@ adapter objc {
   sink method "contentsOfFile" -> code.FilePathAccess
   sink method "dataWithContentsOfFile" -> code.FilePathAccess
   sink method "stringWithContentsOfFile" -> code.FilePathAccess
+
+  // memory safety (ObjC is a C superset)
+  sink path "strcpy" arg 1 -> code.UnboundedCopy
+  sink path "strcat" arg 1 -> code.UnboundedCopy
+  sink path "sprintf" arg all -> code.UnboundedCopy
+  sink path "vsprintf" arg all -> code.UnboundedCopy
+  mark "strcpy" -> code.UnboundedCopySmell
+  mark "strcat" -> code.UnboundedCopySmell
+  mark "sprintf" -> code.UnboundedCopySmell
+  mark "vsprintf" -> code.UnboundedCopySmell
+  sink path "memcpy" arg 2 -> code.RawMemoryCopySize
+  sink path "memmove" arg 2 -> code.RawMemoryCopySize
+  sink path "strncpy" arg 2 -> code.RawMemoryCopySize
+  sink path "strncat" arg 2 -> code.RawMemoryCopySize
+  sink path "malloc" -> code.SizeComputation
+  sink path "calloc" arg all -> code.SizeComputation
+  sink path "realloc" arg 1 -> code.SizeComputation
+  mark "alloca" -> code.StackAllocationSmell
+  mark "__subscript" -> code.IndexAccess
+  mark "__deref" -> code.PointerUse
+  mark "__deref" -> code.NullableDeref
+  mark "free" -> code.PointerFree
+  sink path "__binop.div" arg 1 -> code.DivisionDenominator
+  sink path "__binop.mod" arg 1 -> code.DivisionDenominator
+  mark "__binop.add" -> code.IntegerSizeArithmetic
+  mark "__binop.sub" -> code.IntegerSizeArithmetic
+  mark "__binop.mul" -> code.IntegerSizeArithmetic
+  mark "__binop.shl" -> code.IntegerSizeArithmetic
+
+  // TOCTOU / race (CWE-367)
+  mark "access" -> code.FileCheck
+  mark "stat" -> code.FileCheck
+  mark "lstat" -> code.FileCheck
+  mark "fileExistsAtPath" -> code.FileCheck
+  mark "fopen" -> code.FileUse
+  mark "open" -> code.FileUse
+  mark "unlink" -> code.FileUse
+  mark "remove" -> code.FileUse
+  mark "rename" -> code.FileUse
+  mark "chmod" -> code.FileUse
+  mark "chown" -> code.FileUse
+
+  // lifecycle / concurrency
+  mark "pthread_mutex_lock" -> code.LockAcquire
+  control "pthread_mutex_unlock" -> core.LockRelease
+  mark "dispatch_async" -> code.LocklessSharedMutation
 
   // XSS (CWE-79) — writing untrusted HTML to an output stream (arg0 is the text)
   sink path "fputs" -> code.HtmlRender
@@ -73,7 +120,11 @@ adapter objc {
   mark "CCCrypt" val "DES" -> code.WeakCipher
   mark "CCCrypt" val "RC4" -> code.WeakCipher
   mark "CCCrypt" val "Blowfish" -> code.WeakCipher
+  mark "CCCrypt" val "0000000000000000" -> code.StaticIv
   mark "CCCryptorCreate" val "DES" -> code.WeakCipher
+  mark "CCCryptorCreate" val "0000000000000000" -> code.StaticIv
+  mark "NSURL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
 
   // insecure randomness (CWE-330) — arc4random/rand/random (presence); SecRandomCopyBytes safe
   mark "arc4random" -> code.WeakRandomValue

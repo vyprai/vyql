@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter perl {
+  package "Oryx" {
+    sink method "connect" -> code.SqlExecution
+  }
+}

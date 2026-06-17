@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+adapter kotlin {
+  package "com.aliyun:aliyun-java-sdk-dysmsapi" {
+    source method "setSignName" -> core.UserControlledData
+    source method "setPhoneNumbers" -> core.UserControlledData
+    source method "setTemplateCode" -> core.UserControlledData
+    source method "setTemplateParam" -> core.UserControlledData
+  }
+}

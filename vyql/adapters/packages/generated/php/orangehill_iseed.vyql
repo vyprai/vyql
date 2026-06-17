@@ -1,0 +1,5 @@
+adapter php {
+  package "orangehill/iseed" {
+    sink method "getData" -> code.SqlExecution
+  }
+}

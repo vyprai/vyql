@@ -1,0 +1,7 @@
+import code.{Deserialization, ArchiveEntryWrite}
+adapter elixir {
+  package "hex_core" {
+    sink method "hex_erl_tar.do_extract" -> code.Deserialization
+    sink method "hex_erl_tar.do_extract" -> code.ArchiveEntryWrite
+  }
+}

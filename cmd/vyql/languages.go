@@ -89,16 +89,18 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 		if err != nil {
 			return prog, nil, nil, stats, err
 		}
+		// Walk a directory ONCE and bucket files by language, instead of one full tree walk per
+		// language (24+ walks dominated extraction on a large tree).
+		var entries []treesitter.Entry
+		root := p
+		if info.IsDir() {
+			entries = treesitter.ListAllFiles(p)
+		} else {
+			root = filepath.Dir(p)
+			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
+		}
 		for _, lg := range languages {
-			var files []string
-			var root string
-			if info.IsDir() {
-				files, _ = treesitter.ListFiles(p, lg.exts)
-				root = p
-			} else if lg.exts[strings.ToLower(filepath.Ext(p))] || lg.exts[strings.ToLower(filepath.Base(p))] {
-				files = []string{p}
-				root = filepath.Dir(p)
-			}
+			files := treesitter.FilterEntries(entries, lg.exts)
 			if len(files) == 0 {
 				continue
 			}

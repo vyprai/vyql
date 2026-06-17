@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "xerces-c" {
+    sink method "parse" -> code.Deserialization
+  }
+}

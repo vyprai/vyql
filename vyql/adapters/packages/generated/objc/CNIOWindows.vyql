@@ -1,0 +1,8 @@
+import code.{NetworkSend, NetworkData}
+
+adapter objc {
+  package "CNIOWindows" {
+    sink method "CNIOWindows_sendmmsg" -> code.NetworkSend
+    source method "CNIOWindows_recvmmsg" -> code.NetworkData
+  }
+}

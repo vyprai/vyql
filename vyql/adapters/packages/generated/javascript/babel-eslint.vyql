@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "babel-eslint" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseForESLint" -> code.Deserialization
+    sink method "parseNoPatch" -> code.Deserialization
+  }
+}

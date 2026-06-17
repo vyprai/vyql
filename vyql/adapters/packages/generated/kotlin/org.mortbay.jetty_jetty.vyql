@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.mortbay.jetty:jetty" {
+    sink method "parse" -> code.Deserialization
+  }
+}

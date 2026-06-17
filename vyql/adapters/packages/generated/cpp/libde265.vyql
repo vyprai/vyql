@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter cpp {
+  package "libde265" {
+    sink method "de265_push_data" -> code.Deserialization
+  }
+}

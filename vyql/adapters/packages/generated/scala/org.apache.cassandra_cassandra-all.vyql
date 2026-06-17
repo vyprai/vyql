@@ -1,0 +1,13 @@
+import code.{Deserialization, SqlExecution, CommandExecution}
+import core.{AuthenticationCheck, HtmlEscape}
+
+adapter scala {
+  package "org.apache.cassandra:cassandra-all" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+    sink method "query" -> code.SqlExecution
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "authorize" -> core.AuthorizationCheck
+    control method "escape" -> core.HtmlEscape
+  }
+}

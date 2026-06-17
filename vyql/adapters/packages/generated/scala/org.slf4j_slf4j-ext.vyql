@@ -1,0 +1,6 @@
+import code.{LogOutput}
+adapter scala {
+  package "org.slf4j:slf4j-ext" {
+    sink method "LoggerWrapper.trace" -> code.LogOutput
+  }
+}

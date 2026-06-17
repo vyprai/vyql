@@ -1,0 +1,8 @@
+import code.{NetworkConnect, SecretValue}
+
+adapter elixir {
+  package "binance" {
+    sink method "signed_request_binance" -> code.NetworkConnect
+    sink method "unsigned_request_binance" -> code.NetworkConnect
+  }
+}

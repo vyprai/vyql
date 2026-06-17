@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/vapor/multipart-kit" {
+    sink method "parse" -> code.Deserialization
+    sink method "decode" -> code.Deserialization
+  }
+}

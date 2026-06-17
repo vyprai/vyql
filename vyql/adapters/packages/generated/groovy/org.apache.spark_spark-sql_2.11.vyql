@@ -1,0 +1,14 @@
+import code.{Deserialization, FilePathAccess, SqlExecution}
+
+adapter groovy {
+  package "org.apache.spark:spark-sql_2.11" {
+    sink method "jdbc" -> code.SqlExecution
+    sink method "json" -> code.Deserialization
+    sink method "csv" -> code.FilePathAccess
+    sink method "parquet" -> code.FilePathAccess
+    sink method "orc" -> code.FilePathAccess
+    sink method "text" -> code.FilePathAccess
+    sink method "load" -> code.FilePathAccess
+    sink method "save" -> code.FilePathAccess
+  }
+}

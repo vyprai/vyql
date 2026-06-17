@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "mail" {
+    sink method "parse" -> code.Deserialization
+  }
+}

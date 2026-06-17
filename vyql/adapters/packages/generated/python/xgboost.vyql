@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter python {
+  package "xgboost" {
+    sink method "load_model" -> code.FilePathAccess
+    sink method "save_model" -> code.FilePathAccess
+  }
+}

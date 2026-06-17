@@ -1,0 +1,8 @@
+import code.{FileUse, NetworkConnect}
+
+adapter c {
+  package "qtlocation" {
+    sink method "dumpGeoJSON" -> code.FileUse
+    sink method "writeDebug" -> code.NetworkConnect
+  }
+}

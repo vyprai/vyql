@@ -1,0 +1,6 @@
+adapter c {
+  package "hash-library" {
+    source method "hmac" -> code.SecretValue
+    mark method "getHash" -> code.WeakHash
+  }
+}

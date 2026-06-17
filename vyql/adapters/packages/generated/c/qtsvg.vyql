@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter c {
+  package "qtsvg" {
+    sink method "load" -> code.Deserialization
+  }
+}

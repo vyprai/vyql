@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "com.belerweb:pinyin4j" {
+    sink method "parse" -> code.Deserialization
+  }
+}

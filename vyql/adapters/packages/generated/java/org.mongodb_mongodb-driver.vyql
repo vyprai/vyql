@@ -1,0 +1,8 @@
+import code.{NosqlQuery, CodeEval}
+adapter java {
+  package "org.mongodb:mongodb-driver" {
+    sink method "command" -> code.NosqlQuery
+    sink method "doEval" -> code.CodeEval
+    sink method "eval" -> code.CodeEval
+  }
+}

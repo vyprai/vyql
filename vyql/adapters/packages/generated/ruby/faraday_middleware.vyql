@@ -1,0 +1,12 @@
+import core.{AuthenticationCheck}
+
+adapter ruby {
+  package "faraday_middleware" {
+    sink method "Mashify#parse" -> code.Deserialization
+    sink method "ParseJson#process_response" -> code.Deserialization
+    source method "OAuth2#initialize" -> code.SecretValue
+    control method "OAuth#oauth_header" -> core.AuthenticationCheck
+    control method "OAuth2#initialize" -> core.AuthenticationCheck
+    source method "OAuth#body_params" -> core.UserControlledData
+  }
+}

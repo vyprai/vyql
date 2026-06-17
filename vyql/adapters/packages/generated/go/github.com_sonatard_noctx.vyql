@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter go {
+  package "github.com/sonatard/noctx" {
+    sink method "Run" -> code.CodeEval
+    sink method "main" -> code.CodeEval
+  }
+}

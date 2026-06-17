@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter elixir {
+  package "dart_sass" {
+    sink method "run" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,15 @@
+import code.{FilePathAccess}
+import core.{InputValidation}
+
+adapter php {
+  package "spatie/temporary-directory" {
+    sink method "mkdir" -> code.FilePathAccess
+    sink method "path" -> code.FilePathAccess
+    sink method "file_exists" -> code.FilePathAccess
+    sink method "deleteDirectory" -> code.FilePathAccess
+    sink method "unlink" -> code.FilePathAccess
+    sink method "rmdir" -> code.FilePathAccess
+    control method "sanitizePath" -> core.InputValidation
+    control method "sanitizeName" -> core.InputValidation
+  }
+}

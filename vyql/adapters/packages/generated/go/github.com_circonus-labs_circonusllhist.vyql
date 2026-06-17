@@ -1,0 +1,7 @@
+adapter go {
+  package "github.com/circonus-labs/circonusllhist" {
+    sink method "Deserialize" -> code.Deserialization
+    sink method "DeserializeWithOptions" -> code.Deserialization
+    sink method "UnmarshalJSONWithOptions" -> code.Deserialization
+  }
+}

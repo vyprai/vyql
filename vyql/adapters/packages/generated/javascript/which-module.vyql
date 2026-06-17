@@ -1,0 +1,5 @@
+adapter javascript {
+  package "which-module" {
+    source method "module.exports" -> core.UserControlledData
+  }
+}

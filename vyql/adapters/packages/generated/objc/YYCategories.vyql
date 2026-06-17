@@ -1,0 +1,6 @@
+adapter objc {
+  package "YYCategories" {
+    sink method "CGRectGetArea" -> code.UrlFetch
+    sink method "jsonValueDecoded" -> code.Deserialization
+  }
+}

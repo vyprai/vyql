@@ -1,0 +1,6 @@
+import code.{SecretValue, FilePathAccess}
+adapter python {
+  package "google-api-core" {
+    source method "service_account.Credentials.from_service_account_file" -> code.SecretValue
+  }
+}

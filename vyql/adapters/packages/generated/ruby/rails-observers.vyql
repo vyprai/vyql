@@ -1,0 +1,8 @@
+import code.{FilePathAccess, CodeEval}
+
+adapter ruby {
+  package "rails-observers" {
+    sink method "action_path_for" -> code.FilePathAccess
+    sink method "method_missing" -> code.CodeEval
+  }
+}

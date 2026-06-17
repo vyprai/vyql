@@ -1,0 +1,9 @@
+import code.{CodeEval, Deserialization, SqlExecution}
+adapter perl {
+  package "Test-DBChanges" {
+    sink method "_db_do" -> code.SqlExecution
+    sink method "_db_fetch" -> code.SqlExecution
+    sink method "changeset_for_code" -> code.CodeEval
+    sink method "decode_recorded_data" -> code.Deserialization
+  }
+}

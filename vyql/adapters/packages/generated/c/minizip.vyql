@@ -1,0 +1,5 @@
+adapter c {
+  package "minizip" {
+    sink method "read" -> code.Deserialization
+  }
+}

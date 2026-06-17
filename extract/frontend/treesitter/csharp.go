@@ -22,28 +22,18 @@ var csHTTPAttrs = map[string]bool{
 
 // ExtractCSharp parses C# files into one NIR Program (one module per file).
 func ExtractCSharp(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tscs.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "this"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &csConv{src: src, file: rel, key: moduleKey(root, f, ".cs")}
-		root := tree.RootNode()
-		prog.Modules = append(prog.Modules, nir.Module{Key: c.key, File: rel, Imports: c.imports(root), Body: c.decls(root)})
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tscs.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &csConv{src: src, file: rel, key: moduleKey(root, abs, ".cs")}
+			r := tree.RootNode()
+			return nir.Module{Key: c.key, File: rel, Imports: c.imports(r), Body: c.decls(r)}, true
+		})
+	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
 func (c *csConv) loc(n *tree_sitter.Node) string {
@@ -99,6 +89,7 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration", "local_function_statement", "operator_declaration":
 		params := c.params(field(n, "parameters"))
+		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		// ASP.NET Core MVC: an action's parameters are model-bound from the request
 		// (route/query/body), so they are user input. Seed each as an HttpInput
@@ -111,7 +102,7 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "property_declaration":
 		// accessor bodies may hold logic
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
@@ -358,6 +349,21 @@ func (c *csConv) params(params *tree_sitter.Node) []string {
 	return out
 }
 
+func (c *csConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() == "parameter" {
+			if nm := field(ch, "name"); nm != nil {
+				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
+			}
+		}
+	}
+	return out
+}
+
 func (c *csConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 	if args == nil {
 		return nil
@@ -420,7 +426,13 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
 	case "object_creation_expression":
 		typ := c.text(field(n, "type"))
-		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
+		args := c.callArgs(field(n, "arguments"))
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "initializer_expression" {
+				args = append(args, c.expr(ch))
+			}
+		}
+		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: args, Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
@@ -443,7 +455,17 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "assignment_expression":
+		left := field(n, "left")
+		if left != nil {
+			return nir.Pair{Key: lastSeg(c.dotted(left)), Value: c.expr(field(n, "right")), Loc: L}
+		}
 		return c.expr(field(n, "right"))
+	case "initializer_expression":
+		var parts []nir.Expr
+		for _, ch := range namedChildren(n) {
+			parts = append(parts, c.expr(ch))
+		}
+		return nir.Seq{Parts: parts, Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {

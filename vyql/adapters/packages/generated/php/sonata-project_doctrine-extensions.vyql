@@ -1,0 +1,5 @@
+adapter php {
+  package "sonata-project/doctrine-extensions" {
+    sink method "loadClassMetadata" -> code.Deserialization
+  }
+}

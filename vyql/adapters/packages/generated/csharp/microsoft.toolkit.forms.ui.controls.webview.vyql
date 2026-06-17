@@ -1,0 +1,10 @@
+import code.{CodeEval, HtmlRender, UrlFetch}
+
+adapter csharp {
+  package "microsoft.toolkit.forms.ui.controls.webview" {
+    sink method "InvokeScript" -> code.CodeEval
+    sink method "InvokeScriptAsync" -> code.CodeEval
+    sink method "NavigateToString" -> code.HtmlRender
+    sink method "Navigate" -> code.UrlFetch
+  }
+}

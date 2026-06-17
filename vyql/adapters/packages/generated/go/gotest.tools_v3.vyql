@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter go {
+  package "gotest.tools/v3" {
+    sink method "Command" -> code.CommandExecution
+  }
+}

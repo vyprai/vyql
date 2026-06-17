@@ -91,6 +91,7 @@ that language's extension and routed through its frontend + adapters).
 | `languages.test.vyql` | per-language SQLi / command / code-injection / smart-contract idioms |
 | `interprocedural.test.vyql` | multi-file call-trace cases — framework controller → service → sink, with sanitization in the source / intermediate / sink file or from the framework, positive and negative |
 | `insecure_temp_file.test.vyql` | insecure temp file (PATH-003) |
+| `coverage_dynamic_loading.test.vyql` | RFI/dynamic loading matrix closure: tainted loader names/paths vs constant safe loader calls (INJ-023) |
 
 ## Cross-file (interprocedural) support
 

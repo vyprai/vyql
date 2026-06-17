@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter kotlin {
+  package "org.json:json" {
+    control method "XML.escape" -> core.HtmlEscape
+    sink method "XML.toJSONObject" -> code.Deserialization
+  }
+}

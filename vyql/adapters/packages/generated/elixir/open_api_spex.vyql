@@ -1,0 +1,12 @@
+adapter elixir {
+  package "open_api_spex" {
+    source method "body_params" -> code.HttpInput
+    sink method "cast" -> code.Deserialization
+    sink method "cast_value" -> code.Deserialization
+    sink method "cast_and_validate" -> code.Deserialization
+    sink method "validate" -> code.Deserialization
+    sink method "build_schema" -> code.Deserialization
+    sink method "schema_from_map" -> code.Deserialization
+    sink method "validate_compiled_schema" -> code.Deserialization
+  }
+}

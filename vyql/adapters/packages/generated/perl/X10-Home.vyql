@@ -1,0 +1,10 @@
+import code.{Deserialization, CodeEval}
+
+adapter perl {
+  package "X10-Home" {
+    sink method "new" -> code.Deserialization
+    sink method "new" -> code.CodeEval
+    sink method "init" -> code.Deserialization
+    sink method "init" -> code.CodeEval
+  }
+}

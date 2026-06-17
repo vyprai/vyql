@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+adapter javascript {
+  package "jest-serializer" {
+    sink method "deserialize" -> code.Deserialization
+    sink method "readFileSync" -> code.Deserialization
+    sink method "writeFileSync" -> code.FilePathAccess
+  }
+}

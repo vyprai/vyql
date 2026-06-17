@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+adapter groovy {
+  package "io.grpc:grpc-netty" {
+    sink method "writeHeaders" -> code.NetworkSend
+    sink method "writeFrame" -> code.NetworkSend
+  }
+}

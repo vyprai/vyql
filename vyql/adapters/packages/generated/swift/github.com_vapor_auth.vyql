@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/vapor/auth" {
+    source method "init" -> code.SecretValue
+    mark method "hash" -> code.WeakHash
+  }
+}

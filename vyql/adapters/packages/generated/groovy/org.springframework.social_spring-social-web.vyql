@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter groovy {
+  package "org.springframework.social:spring-social-web" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

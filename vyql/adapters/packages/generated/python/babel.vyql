@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{InputValidation}
+
+adapter python {
+  package "babel" {
+    sink method "babel.messages.pofile.parse" -> code.Deserialization
+    sink method "babel.messages.jslexer.tokenize" -> code.Deserialization
+    control method "babel.messages.pofile.escape" -> core.InputValidation
+  }
+}

@@ -1,0 +1,14 @@
+import code.{FilePathAccess, FileUse}
+
+adapter java {
+  package "org.webjars:webjars-locator-core" {
+    sink method "getFullPath" -> code.FilePathAccess
+    sink method "getFullPathExact" -> code.FilePathAccess
+    sink method "listAssets" -> code.FilePathAccess
+    sink method "extractAllWebJarsTo" -> code.FileUse
+    sink method "extractWebJarsTo" -> code.FileUse
+    sink method "extractWebJarTo" -> code.FileUse
+    sink method "extractAllNodeModulesTo" -> code.FileUse
+    sink method "extractAllBowerComponentsTo" -> code.FileUse
+  }
+}

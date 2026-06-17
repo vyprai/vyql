@@ -1,0 +1,7 @@
+import core.{HtmlEscape, InputValidation}
+adapter perl {
+  package "Tenjin" {
+    control method "escape_xml" -> core.HtmlEscape
+    control method "encode_url" -> core.InputValidation
+  }
+}

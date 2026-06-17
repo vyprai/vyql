@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter groovy {
+  package "org.thymeleaf:thymeleaf-spring5" {
+    sink method "render" -> code.HtmlRender
+  }
+}

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter go {
+  package "sigs.k8s.io/yaml" {
+    sink method "YAMLToJSON" -> code.Deserialization
+    sink method "YAMLToJSONStrict" -> code.Deserialization
+  }
+}

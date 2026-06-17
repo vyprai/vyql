@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "os-locale" {
+    source method "osLocale" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,8 @@
+import code.{NetworkConnect, SecretValue}
+import core.{UserControlledData}
+
+adapter python {
+  package "pandas-datareader" {
+    sink method "DataReader" -> code.NetworkConnect
+  }
+}

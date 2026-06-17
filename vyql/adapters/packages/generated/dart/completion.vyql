@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter dart {
+  package "completion" {
+    source method "getArgsCompletions" -> core.UserControlledData
+  }
+}

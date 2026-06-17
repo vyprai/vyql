@@ -1,0 +1,5 @@
+adapter javascript {
+  package "spdy-transport" {
+    sink method "Parser" -> code.Deserialization
+  }
+}

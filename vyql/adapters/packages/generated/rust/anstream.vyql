@@ -1,0 +1,10 @@
+import code.{NetworkSend}
+adapter rust {
+  package "anstream" {
+    sink method "write" -> code.NetworkSend
+    sink method "write_vectored" -> code.NetworkSend
+    sink method "write_all" -> code.NetworkSend
+    sink method "write_fmt" -> code.NetworkSend
+    sink method "write_str" -> code.NetworkSend
+  }
+}

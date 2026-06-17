@@ -19,10 +19,22 @@ adapter scala {
   sink method "execute" -> code.SqlExecution
   sink path "SQL" -> code.SqlExecution
   sink method "prepareStatement" -> code.SqlExecution
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // path / file
   sink path "Source.fromFile" -> code.FilePathAccess
   sink method "readAllBytes" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
 
   // SSRF — Play WS (ws.url), akka-http, sttp client
   sink path "ws.url" -> code.UrlFetch
@@ -44,6 +56,21 @@ adapter scala {
   mark "Cipher.getInstance" val "DES" -> code.WeakCipher
   mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
   mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
+  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
+  mark "GCMParameterSpec" val "000000000000" -> code.StaticIv
+  mark "csrf.disable" -> code.CsrfDisabled
+  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
+  mark "Algorithm.none" -> code.JwtUnverified
+  mark "setWritable" val "true" val "false" -> code.InsecurePermission
+  mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
+  mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
+  mark "Socket" -> code.ResourceHandle
+  mark "Files.newInputStream" -> code.ResourceHandle
+  mark "Files.newOutputStream" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
+  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
+  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval
@@ -54,6 +81,13 @@ adapter scala {
   // sanitizer — Apache Commons Text HTML escaping.
   control "escapeHtml4" -> core.HtmlEscape
   control "StringEscapeUtils.escapeHtml4" -> core.HtmlEscape
+  control method "requireAuth" -> core.AuthenticationCheck
+  control method "ensureAuthenticated" -> core.AuthenticationCheck
+  control method "isAuthenticated" -> core.AuthenticationCheck
+  control method "authenticate" -> core.AuthenticationCheck
+  control method "checkOwnership" -> core.OwnershipCheck
+  control method "requireOwner" -> core.OwnershipCheck
+  control method "isOwner" -> core.OwnershipCheck
 
   // character-filter: replaceAll (java interop) is global.
   filter method "replaceAll" global
@@ -70,7 +104,7 @@ adapter scala {
   sink method "search" arg 1 -> code.LdapQuery
   sink method "evaluate" arg 0 -> code.XpathQuery
   mark "java.util.Random" -> code.WeakRandomValue
-  mark "Random" -> code.WeakRandomValue
+  mark exact "Random" -> code.WeakRandomValue
   mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
   mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
   mark "Cipher.getInstance" val "DES" -> code.WeakCipher

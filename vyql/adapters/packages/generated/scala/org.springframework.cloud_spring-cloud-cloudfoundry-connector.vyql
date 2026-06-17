@@ -1,0 +1,10 @@
+import code.{SecretValue}
+
+adapter scala {
+  package "org.springframework.cloud:spring-cloud-cloudfoundry-connector" {
+    source method "getCredentials" -> code.SecretValue
+    source method "getUriFromCredentials" -> code.SecretValue
+    source method "getStringFromCredentials" -> code.SecretValue
+    source method "process" -> code.SecretValue
+  }
+}

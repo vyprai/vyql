@@ -1,0 +1,6 @@
+import code.{HttpInput}
+adapter python {
+  package "dj-static" {
+    source method "get_path_info" -> code.HttpInput
+  }
+}

@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.mongodb:bson" {
+    sink method "get" -> code.NosqlQuery
+    sink method "set" -> code.StoredDataWrite
+  }
+}

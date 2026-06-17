@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter rust {
+  package "colored" {
+    sink method "from_str" -> code.Deserialization
+    sink method "parse_hex" -> code.Deserialization
+    control method "escape_inner_reset_sequences" -> core.HtmlEscape
+  }
+}

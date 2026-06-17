@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter php {
+  package "mnapoli/front-yaml" {
+    sink method "Mni\FrontYAML\Parser::parse" -> code.Deserialization
+  }
+}

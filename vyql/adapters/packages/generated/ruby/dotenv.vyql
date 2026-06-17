@@ -1,0 +1,23 @@
+import code.{FileUse, SecretValue, Deserialization}
+import core.{UserControlledData}
+
+adapter ruby {
+  package "dotenv" {
+    sink method "load" -> code.FileUse
+    sink method "load!" -> code.FileUse
+    sink method "parse" -> code.FileUse
+    sink method "overwrite" -> code.FileUse
+    sink method "overwrite!" -> code.FileUse
+    source method "load" -> core.UserControlledData
+    source method "load!" -> core.UserControlledData
+    source method "parse" -> core.UserControlledData
+    source method "overwrite" -> core.UserControlledData
+    source method "overwrite!" -> core.UserControlledData
+    source method "load" -> code.SecretValue
+    source method "load!" -> code.SecretValue
+    source method "parse" -> code.SecretValue
+    source method "overwrite" -> code.SecretValue
+    source method "overwrite!" -> code.SecretValue
+    sink method "parse" -> code.Deserialization
+  }
+}

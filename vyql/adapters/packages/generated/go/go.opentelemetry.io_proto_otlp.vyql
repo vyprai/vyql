@@ -1,0 +1,10 @@
+adapter go {
+  package "go.opentelemetry.io/proto/otlp" {
+    sink method "request_LogsService_Export_0" -> code.Deserialization
+    sink method "local_request_LogsService_Export_0" -> code.Deserialization
+    sink method "request_TraceService_Export_0" -> code.Deserialization
+    sink method "local_request_TraceService_Export_0" -> code.Deserialization
+    sink method "request_MetricsService_Export_0" -> code.Deserialization
+    sink method "local_request_MetricsService_Export_0" -> code.Deserialization
+  }
+}

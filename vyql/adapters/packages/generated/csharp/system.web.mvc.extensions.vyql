@@ -1,0 +1,7 @@
+adapter csharp {
+  package "system.web.mvc.extensions" {
+    sink method "ToObject``1" -> code.Deserialization
+    sink method "ScriptInclude" -> code.HtmlRender
+    sink method "WriteFile" -> code.FilePathAccess
+  }
+}

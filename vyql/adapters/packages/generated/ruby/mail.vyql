@@ -1,0 +1,8 @@
+import code.{FilePathAccess, Deserialization}
+
+adapter ruby {
+  package "mail" {
+    sink method "read" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+  }
+}

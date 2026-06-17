@@ -1,0 +1,9 @@
+import core.{InputValidation}
+
+adapter java {
+  package "org.osgi:org.osgi.core" {
+    control method "match" -> core.InputValidation
+    control method "matchCase" -> core.InputValidation
+    control method "matches" -> core.InputValidation
+  }
+}

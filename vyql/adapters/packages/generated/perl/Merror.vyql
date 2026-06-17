@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter perl {
+  package "Merror" {
+    sink method "parseErrorFile" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter php {
+  package "twig/extensions" {
+    control method "twig_truncate_filter" -> core.InputValidation
+    control method "twig_wordwrap_filter" -> core.InputValidation
+  }
+}

@@ -1,0 +1,10 @@
+import code.{HttpInput, CodeEval, NetworkConnect}
+
+adapter scala {
+  package "org.jboss.arquillian.protocol:arquillian-protocol-servlet" {
+    source method "doPost" -> code.HttpInput
+    source method "doGet" -> code.HttpInput
+    sink method "invoke" -> code.CodeEval
+    sink method "execute" -> code.NetworkConnect
+  }
+}

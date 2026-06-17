@@ -1,0 +1,6 @@
+import code.{StdinInput}
+adapter rust {
+  package "redox_termios" {
+    source method "make_raw" -> code.StdinInput
+  }
+}

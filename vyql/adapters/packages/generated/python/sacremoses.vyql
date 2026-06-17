@@ -1,0 +1,7 @@
+import core.{HtmlEscape, InputValidation}
+adapter python {
+  package "sacremoses" {
+    control method "xml_escape" -> core.HtmlEscape
+    control method "xml_unescape" -> core.InputValidation
+  }
+}

@@ -1,0 +1,10 @@
+import code.{UrlFetch}
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "jekyll-gist" {
+    sink method "gist_script_tag" -> code.UrlFetch
+    sink method "fetch_raw_code" -> code.UrlFetch
+    control method "gist_noscript_tag" -> core.HtmlEscape
+  }
+}

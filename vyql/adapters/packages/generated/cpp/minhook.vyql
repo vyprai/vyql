@@ -1,0 +1,12 @@
+import code.{CodeEval}
+
+adapter cpp {
+  package "minhook" {
+    sink method "MH_CreateHook" -> code.CodeEval
+    sink method "MH_CreateHookApi" -> code.CodeEval
+    sink method "MH_CreateHookApiEx" -> code.CodeEval
+    sink method "MH_EnableHook" -> code.CodeEval
+    sink method "MH_QueueEnableHook" -> code.CodeEval
+    sink method "MH_ApplyQueued" -> code.CodeEval
+  }
+}

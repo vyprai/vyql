@@ -1,0 +1,8 @@
+import code.{Deserialization, HttpInput}
+
+adapter swift {
+  package "github.com/pointfreeco/swift-url-routing" {
+    sink method "parse" -> code.Deserialization
+    sink method "match" -> code.Deserialization
+  }
+}

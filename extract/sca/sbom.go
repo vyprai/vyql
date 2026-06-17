@@ -40,13 +40,24 @@ func ParseRequirements(content string) []Dep {
 		if line == "" || strings.HasPrefix(line, "-") {
 			continue
 		}
-		if i := strings.Index(line, "=="); i >= 0 {
-			out = append(out, Dep{strings.TrimSpace(line[:i]), strings.TrimSpace(line[i+2:])})
+		if name, ver, ok := splitRequirement(line); ok {
+			out = append(out, Dep{NormalizePackageName(name), normalizeVersion(ver)})
 		} else {
-			out = append(out, Dep{strings.TrimSpace(line), "*"})
+			out = append(out, Dep{NormalizePackageName(line), "*"})
 		}
 	}
 	return out
+}
+
+func splitRequirement(line string) (name, version string, ok bool) {
+	for _, op := range []string{"==", ">=", "<=", "~=", "!=", ">", "<", "="} {
+		if i := strings.Index(line, op); i >= 0 {
+			name = strings.TrimSpace(line[:i])
+			version = strings.TrimSpace(line[i+len(op):])
+			return name, version, true
+		}
+	}
+	return "", "", false
 }
 
 // ParsePackageJSON reads an npm package.json's dependencies + devDependencies into
@@ -62,7 +73,7 @@ func ParsePackageJSON(content string) []Dep {
 	var out []Dep
 	for _, m := range []map[string]string{pkg.Dependencies, pkg.DevDependencies} {
 		for name, ver := range m {
-			out = append(out, Dep{name, normalizeVersion(ver)})
+			out = append(out, Dep{NormalizePackageName(name), normalizeVersion(ver)})
 		}
 	}
 	return out
@@ -113,10 +124,17 @@ func BuildSBOM(g usg.Store, eco string, deps []Dep, manifest string) error {
 		manifest = eco + "-manifest"
 	}
 	for _, d := range deps {
-		nid := "pkg:" + eco + "/" + d.Name + "@" + d.Version
+		name := NormalizePackageName(d.Name)
+		version := normalizeVersion(d.Version)
+		if name == "" {
+			continue
+		}
+		root := PackageRoot(name)
+		nid := "pkg:" + eco + "/" + name + "@" + version
 		if err := g.AddNode(usg.Node{ID: nid, Type: "sbom.PackageVersion",
-			Props: map[string]string{"loc": manifest + ":" + d.Name, "name": d.Name,
-				"version": d.Version, "eco": eco}}); err != nil {
+			Props: map[string]string{"loc": manifest + ":" + name, "name": name,
+				"version": version, "eco": eco, "package": root, "root": root,
+				"purl": "pkg:" + eco + "/" + name + "@" + version}}); err != nil {
 			return err
 		}
 	}
@@ -131,27 +149,75 @@ func LinkReachability(g usg.Store) error {
 	if err != nil {
 		return err
 	}
-	used := map[string]bool{}
+	used := packageUsage(nodes)
+	pkgsByID := map[string]usg.Node{}
 	for _, n := range nodes {
-		path := n.Prop("callee_path")
-		if path == "" {
+		if n.Type != "sbom.PackageVersion" {
 			continue
 		}
-		root := path
-		if i := strings.IndexAny(root, ".["); i >= 0 {
-			root = root[:i]
+		pkgsByID[n.ID] = n
+		for _, imp := range used.imports {
+			if packageNodeMatches(n, imp) {
+				_ = g.AddEdge(usg.Edge{Type: "DEPENDS_ON", Src: imp.id, Dst: n.ID})
+				used.reachable[n.ID] = true
+			}
 		}
-		if root != "" {
-			used[root] = true
-		}
-	}
-	for _, n := range nodes {
-		if n.Type == "sbom.PackageVersion" && used[n.Prop("name")] {
-			if err := g.AddLabel(n.ID, usg.Label{Concept: "sbom.ReachableSymbol",
-				Provenance: usg.Provenance{Adapter: "sbom.linker"}}); err != nil {
-				return err
+		for callRoot := range used.callRoots {
+			if PackageMatches(callRoot, n.Prop("name")) || PackageMatches(callRoot, n.Prop("package")) {
+				used.reachable[n.ID] = true
 			}
 		}
 	}
+	for id := range used.reachable {
+		if _, ok := pkgsByID[id]; !ok {
+			continue
+		}
+		if err := g.AddLabel(id, usg.Label{Concept: "sbom.ReachableSymbol",
+			Provenance: usg.Provenance{Adapter: "sbom.linker"}}); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+type importUse struct {
+	id      string
+	module  string
+	pkgRoot string
+}
+
+type usageEvidence struct {
+	imports   []importUse
+	callRoots map[string]bool
+	reachable map[string]bool
+}
+
+func packageUsage(nodes []usg.Node) usageEvidence {
+	used := usageEvidence{callRoots: map[string]bool{}, reachable: map[string]bool{}}
+	for _, n := range nodes {
+		switch n.Type {
+		case "code.Import":
+			module := n.Prop("module")
+			root := n.Prop("package")
+			if root == "" {
+				root = n.Prop("root")
+			}
+			if root == "" {
+				root = PackageRoot(module)
+			}
+			used.imports = append(used.imports, importUse{id: n.ID, module: module, pkgRoot: root})
+		default:
+			if root := CallRoot(n.Prop("callee_path")); root != "" {
+				used.callRoots[root] = true
+			}
+		}
+	}
+	return used
+}
+
+func packageNodeMatches(n usg.Node, imp importUse) bool {
+	return PackageMatches(imp.module, n.Prop("name")) ||
+		PackageMatches(imp.pkgRoot, n.Prop("name")) ||
+		PackageMatches(imp.module, n.Prop("package")) ||
+		PackageMatches(imp.pkgRoot, n.Prop("package"))
 }

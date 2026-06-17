@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter cpp {
+  package "tomlplusplus" {
+    sink method "parse" -> code.Deserialization
+    sink method "parse_file" -> code.FilePathAccess
+  }
+}

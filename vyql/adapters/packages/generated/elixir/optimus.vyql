@@ -1,0 +1,8 @@
+import code.{CliArgument}
+
+adapter elixir {
+  package "optimus" {
+    source method "parse" -> code.CliArgument
+    source method "parse!" -> code.CliArgument
+  }
+}

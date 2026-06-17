@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter ruby {
+  package "fog-rackspace" {
+    sink method "request_without_retry" -> code.NetworkSend
+  }
+}

@@ -1,0 +1,7 @@
+import code.{CodeEval}
+adapter csharp {
+  package "fabulous.liveupdate" {
+    sink method "TryEvalDecls" -> code.CodeEval
+    sink method "EvalDecls" -> code.CodeEval
+  }
+}

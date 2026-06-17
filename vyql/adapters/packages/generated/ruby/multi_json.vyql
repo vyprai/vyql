@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "multi_json" {
+    sink method "parse" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+  }
+}

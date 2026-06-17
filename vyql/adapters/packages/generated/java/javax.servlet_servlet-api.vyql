@@ -1,0 +1,20 @@
+import code.{HttpInput, HtmlRender, RedirectTarget, FilePathAccess}
+adapter java {
+  package "javax.servlet:servlet-api" {
+    source method "getParameter" -> code.HttpInput
+    source method "getParameterValues" -> code.HttpInput
+    source method "getParameterMap" -> code.HttpInput
+    source method "getReader" -> code.HttpInput
+    source method "getInputStream" -> code.HttpInput
+    source method "getHeader" -> code.HttpInput
+    source method "getCookies" -> code.HttpInput
+
+    sink method "getWriter" -> code.HtmlRender
+    sink method "getOutputStream" -> code.HtmlRender
+
+    mark method "forward" -> code.RedirectTarget
+    mark method "include" -> code.RedirectTarget
+
+    sink method "getRealPath" -> code.FilePathAccess
+  }
+}

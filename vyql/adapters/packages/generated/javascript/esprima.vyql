@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter javascript {
+  package "esprima" {
+    sink method "parse" -> code.Deserialization
+  }
+}

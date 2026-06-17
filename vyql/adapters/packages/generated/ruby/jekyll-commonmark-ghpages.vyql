@@ -1,0 +1,10 @@
+import code.{HtmlRender}
+adapter ruby {
+  package "jekyll-commonmark-ghpages" {
+    sink method "header" -> code.HtmlRender
+    sink method "code_block" -> code.HtmlRender
+    sink method "convert" -> code.HtmlRender
+    sink method "render" -> code.HtmlRender
+    sink method "render_rouge" -> code.HtmlRender
+  }
+}

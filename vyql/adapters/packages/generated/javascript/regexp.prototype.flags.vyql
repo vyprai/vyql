@@ -1,0 +1,5 @@
+adapter javascript {
+  package "regexp.prototype.flags" {
+    mark method "module.exports" -> code.RegexCompile
+  }
+}

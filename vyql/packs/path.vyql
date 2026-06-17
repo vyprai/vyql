@@ -1,5 +1,5 @@
 // Path/file family — traversal and remote/local file inclusion.
-package vypr.path;
+module vypr.path;
 
 rule Traversal {
   meta { id: "VYQL-PATH-001", severity: high, cwe: [CWE_22] }
@@ -18,4 +18,11 @@ rule FileInclusion {
 rule InsecureTempFile {
   meta { id: "VYQL-PATH-003", severity: low, cwe: [CWE_377] }
   match code.InsecureTempFile as t
+}
+
+rule ArchiveExtractionTraversal {
+  meta { id: "VYQL-PATH-004", severity: high, cwe: [CWE_22, CWE_59] }
+  taint core.UserControlledData -> code.ArchiveEntryWrite
+  unless sanitized_by core.PathCanonicalization
+  unless guarded_by core.PathAccessCheck
 }

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter scala {
+  package "org.codehaus.jackson:jackson-jaxrs" {
+    sink method "readFrom" -> code.Deserialization
+  }
+}

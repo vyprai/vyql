@@ -1,0 +1,10 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter objc {
+  package "MWFeedParser" {
+    sink method "parse" -> code.Deserialization
+    control method "stringByEncodingXMLEntities" -> core.HtmlEscape
+    control method "gtm_stringByEscapingHTMLUsingTable" -> core.HtmlEscape
+  }
+}

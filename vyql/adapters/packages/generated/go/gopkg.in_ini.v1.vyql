@@ -1,0 +1,9 @@
+import code.{Deserialization}
+
+adapter go {
+  package "gopkg.in/ini.v1" {
+    sink method "LoadSources" -> code.Deserialization
+    sink method "Load" -> code.Deserialization
+    sink method "LooseLoad" -> code.Deserialization
+  }
+}

@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter perl {
+  package "lexicals" {
+    source method "lexicals" -> core.UserControlledData
+  }
+}

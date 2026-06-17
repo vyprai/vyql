@@ -1,0 +1,7 @@
+import code.{SecretValue}
+adapter rust {
+  package "zeroize" {
+    source method "zeroize" -> code.SecretValue
+    source method "try_zeroize" -> code.SecretValue
+  }
+}

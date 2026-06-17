@@ -1,0 +1,9 @@
+import code.{HttpInput}
+
+adapter groovy {
+  package "org.apache.tiles:tiles-servlet" {
+    source method "doGet" -> code.HttpInput
+    source method "doPost" -> code.HttpInput
+    source method "mutate" -> code.HttpInput
+  }
+}

@@ -1,0 +1,15 @@
+import code.{HttpInput, NetworkSend}
+adapter kotlin {
+  package "org.apache.cxf:cxf-rt-rs-client" {
+    source method "query" -> code.HttpInput
+    source method "header" -> code.HttpInput
+    sink method "invoke" -> code.NetworkSend
+    sink method "post" -> code.NetworkSend
+    sink method "put" -> code.NetworkSend
+    sink method "get" -> code.NetworkSend
+    sink method "head" -> code.NetworkSend
+    sink method "options" -> code.NetworkSend
+    sink method "delete" -> code.NetworkSend
+    sink method "form" -> code.NetworkSend
+  }
+}

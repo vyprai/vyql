@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+
+adapter swift {
+  package "github.com/apple/swift-format" {
+    sink method "generateFile" -> code.FilePathAccess
+  }
+}

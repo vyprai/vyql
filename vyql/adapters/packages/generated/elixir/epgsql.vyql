@@ -1,0 +1,6 @@
+adapter elixir {
+  package "epgsql" {
+    sink method "prepared_query" -> code.SqlExecution
+    control method "prepared_query" -> core.SqlParameterization
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "coerce" {
+    sink method "coerce" -> code.Deserialization
+  }
+}

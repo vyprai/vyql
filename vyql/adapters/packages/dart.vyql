@@ -1,0 +1,100 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile, StoredDataRead, StoredDataWrite}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter dart {
+  package "shelf" {
+    source receiver "queryParameters" on "Request" -> HttpInput
+    source ".readAsString" -> HttpInput
+  }
+  package "dart_frog" {
+    source receiver "params" on "RequestContext" -> HttpInput
+  }
+  package "dart:io" {
+    source "Platform.environment" -> SecretValue
+    sink path "Process.run" -> CommandExecution
+    sink path "File" -> FilePathAccess
+  }
+  package "http" {
+    source method "body" -> ExternalApiResponse
+    sink path "http.get" -> UrlFetch
+  }
+  package "sqflite" {
+    sink method "rawQuery" -> SqlExecution
+  }
+  package "postgres" {
+    sink method "execute" -> SqlExecution
+    control method "prepared" -> SqlParameterization
+  }
+  package "mysql1" {
+    sink method "query" -> SqlExecution
+  }
+  package "mongo_dart" {
+    sink method "find" -> NosqlQuery
+  }
+  package "dart:isolate" {
+    sink path "Isolate.spawnUri" -> CodeEval
+  }
+  package "dart:convert" {
+    sink path "jsonDecode" -> Deserialization
+    control "htmlEscape.convert" -> HtmlEscape
+    control "HtmlEscape.convert" -> HtmlEscape
+  }
+  package "yaml" {
+    sink path "YamlMap.wrap" -> Deserialization
+  }
+  package "archive" {
+    sink method "extract" -> ArchiveEntryWrite
+  }
+  package "dio" {
+    sink method "send" -> UrlFetch
+  }
+  package "xml" {
+    sink path "XmlDocument.parse" -> XmlParse
+    control "XmlDocument.parse" val "externalEntities=false" -> XmlHardening
+  }
+  package "xpath_selector" {
+    sink method "xpath" -> XpathQuery
+    control "escapeXPath" -> XpathEscape
+  }
+  package "ldap" {
+    sink method "search" arg 1 -> LdapQuery
+    control "encodeForLDAP" -> LdapEscape
+  }
+  package "mustache_template" {
+    sink method "render" -> TemplateRender
+  }
+  package "dart:core" {
+    sink path "RegExp" -> RegexCompile
+    control "Uri.parse" -> RedirectAllowlist
+  }
+  package "path" {
+    control "p.normalize" -> PathCanonicalization
+  }
+  package "shared_preferences" {
+    sink method "setString" -> StoredDataWrite
+    sink method "setBool" -> StoredDataWrite
+    sink method "setInt" -> StoredDataWrite
+    sink method "setDouble" -> StoredDataWrite
+    sink method "setStringList" -> StoredDataWrite
+    source method "getString" -> StoredDataRead
+    source method "getBool" -> StoredDataRead
+    source method "getInt" -> StoredDataRead
+    source method "getDouble" -> StoredDataRead
+    source method "getStringList" -> StoredDataRead
+  }
+  package "shared_preferences_web" {
+    sink method "setValue" -> StoredDataWrite
+    sink method "clear" -> StoredDataWrite
+    sink method "remove" -> StoredDataWrite
+    source method "getAll" -> StoredDataRead
+  }
+  package "shelf_auth" {
+    control method "authenticate" -> AuthenticationCheck
+  }
+  package "angel3_auth" {
+    control method "authorize" -> AuthorizationCheck
+  }
+  package "shelf_csrf" {
+    control "csrf" -> CsrfProtection
+  }
+}

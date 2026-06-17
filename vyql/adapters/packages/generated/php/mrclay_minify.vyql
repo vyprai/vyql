@@ -1,0 +1,8 @@
+import code.{CommandExecution}
+
+adapter php {
+  package "mrclay/minify" {
+    sink method "shell" -> code.CommandExecution
+    sink method "exec" -> code.CommandExecution
+  }
+}

@@ -1,0 +1,11 @@
+import code.{HttpInput, NetworkSend}
+
+adapter scala {
+  package "com.sun.jersey:jersey-servlet" {
+    source method "service" -> code.HttpInput
+    source method "createRequest" -> code.HttpInput
+    source method "filterFormParameters" -> code.HttpInput
+    sink method "write" -> code.NetworkSend
+    sink method "writeStatusAndHeaders" -> code.NetworkSend
+  }
+}

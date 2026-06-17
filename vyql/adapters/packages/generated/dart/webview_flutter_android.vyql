@@ -1,0 +1,11 @@
+import code.{CodeEval, Cookie, UrlFetch}
+
+adapter dart {
+  package "webview_flutter_android" {
+    sink method "loadUrl" -> code.UrlFetch
+    sink method "loadData" -> code.UrlFetch
+    sink method "postUrl" -> code.UrlFetch
+    source method "setCookie" -> code.Cookie
+    sink method "evaluateJavascript" -> code.CodeEval
+  }
+}

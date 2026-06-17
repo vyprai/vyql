@@ -1,0 +1,9 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter objc {
+  package "CapacitorStorage" {
+    source method "get" -> code.StoredDataRead
+    sink method "set" -> code.StoredDataWrite
+    sink method "remove" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,6 @@
+import code.{CommandExecution}
+adapter rust {
+  package "pkg-config" {
+    sink method "run" -> code.CommandExecution
+  }
+}

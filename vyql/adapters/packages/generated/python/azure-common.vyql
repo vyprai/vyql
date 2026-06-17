@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter python {
+  package "azure-common" {
+    source method "get_token" -> code.SecretValue
+    source method "get_azure_cli_credentials" -> code.SecretValue
+  }
+}

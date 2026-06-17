@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter java {
+  package "io.cucumber:cucumber-junit" {
+    sink method "parse" -> code.Deserialization
+  }
+}

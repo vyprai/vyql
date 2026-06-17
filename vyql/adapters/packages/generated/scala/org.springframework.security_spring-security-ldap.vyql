@@ -1,0 +1,7 @@
+import core.{AuthenticationCheck}
+
+adapter scala {
+  package "org.springframework.security:spring-security-ldap" {
+    control method "authenticate" -> core.AuthenticationCheck
+  }
+}

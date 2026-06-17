@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter elixir {
+  package "graphql" {
+    sink method "GraphQL.Lang.Parser.parse" -> code.Deserialization
+    sink method "GraphQL.Lang.Lexer.tokenize" -> code.Deserialization
+  }
+}

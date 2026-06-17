@@ -1,0 +1,6 @@
+import code.{NetworkBind}
+adapter dart {
+  package "multi_server_socket" {
+    sink method "loopback" -> code.NetworkBind
+  }
+}

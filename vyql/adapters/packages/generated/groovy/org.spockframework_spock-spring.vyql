@@ -1,0 +1,5 @@
+adapter groovy {
+  package "org.spockframework:spock-spring" {
+    sink method "parse" -> code.Deserialization
+  }
+}

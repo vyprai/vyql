@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter java {
+  package "com.opencsv:opencsv" {
+    sink method "parse" -> code.Deserialization
+  }
+}

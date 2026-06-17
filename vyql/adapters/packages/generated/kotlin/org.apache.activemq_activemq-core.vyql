@@ -1,0 +1,8 @@
+import code.{NetworkData}
+
+adapter kotlin {
+  package "org.apache.activemq:activemq-core" {
+    source method "read" -> code.NetworkData
+    source method "write" -> code.NetworkData
+  }
+}

@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "url-parse" {
+    source method "Url" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,11 @@
+import code.{Deserialization}
+
+adapter go {
+  package "gopkg.in/asn1-ber.v1" {
+    sink method "ReadPacket" -> code.Deserialization
+    sink method "DecodePacket" -> code.Deserialization
+    sink method "DecodePacketErr" -> code.Deserialization
+    sink method "ParseInt64" -> code.Deserialization
+    sink method "DecodeString" -> code.Deserialization
+  }
+}

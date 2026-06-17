@@ -1,0 +1,9 @@
+import code.{StoredDataRead, StoredDataWrite}
+adapter php {
+  package "cakephp/cakephp" {
+    sink method "write" -> code.StoredDataWrite
+    sink method "writeMany" -> code.StoredDataWrite
+    source method "read" -> code.StoredDataRead
+    source method "readMany" -> code.StoredDataRead
+  }
+}

@@ -1,0 +1,7 @@
+import code.{FilePathAccess, SqlExecution}
+adapter kotlin {
+  package "org.xerial:sqlite-jdbc" {
+    sink method "exec" -> code.SqlExecution
+    sink method "open" -> code.FilePathAccess
+  }
+}

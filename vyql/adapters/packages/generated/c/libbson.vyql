@@ -1,0 +1,5 @@
+adapter c {
+  package "libbson" {
+    sink method "code" -> code.Deserialization
+  }
+}

@@ -1,0 +1,26 @@
+import code.{Deserialization, FilePathAccess, FileUse, NetworkSend}
+
+adapter swift {
+  package "github.com/awslabs/smithy-swift" {
+    sink method "read" -> code.FilePathAccess
+    sink method "write" -> code.FileUse
+    sink method "readBoolean" -> code.Deserialization
+    sink method "readBlob" -> code.Deserialization
+    sink method "readByte" -> code.Deserialization
+    sink method "readShort" -> code.Deserialization
+    sink method "readInteger" -> code.Deserialization
+    sink method "readLong" -> code.Deserialization
+    sink method "readFloat" -> code.Deserialization
+    sink method "readDouble" -> code.Deserialization
+    sink method "readBigInteger" -> code.Deserialization
+    sink method "readBigDecimal" -> code.Deserialization
+    sink method "readString" -> code.Deserialization
+    sink method "readDocument" -> code.Deserialization
+    sink method "readTimestamp" -> code.Deserialization
+    sink method "readNull" -> code.Deserialization
+    sink method "readStruct" -> code.Deserialization
+    sink method "readList" -> code.Deserialization
+    sink method "readMap" -> code.Deserialization
+    sink method "send" -> code.NetworkSend
+  }
+}

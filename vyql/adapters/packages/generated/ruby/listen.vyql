@@ -1,0 +1,13 @@
+adapter ruby {
+  package "listen" {
+    sink method "add_dir" -> code.FilePathAccess
+    sink method "update_file" -> code.FilePathAccess
+    sink method "unset_path" -> code.FilePathAccess
+    sink method "file_data" -> code.FilePathAccess
+    sink method "dir_entries" -> code.FilePathAccess
+    sink method "scan" -> code.FilePathAccess
+    sink method "_async_changes" -> code.FilePathAccess
+    sink method "_change" -> code.FilePathAccess
+    sink method "_children" -> code.FilePathAccess
+  }
+}

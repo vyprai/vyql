@@ -1,0 +1,9 @@
+import code.{HttpInput, SqlExecution, Cookie}
+
+adapter perl {
+  package "NetSDS" {
+    sink method "fetch_call" -> code.SqlExecution
+    source method "url_param" -> code.HttpInput
+    source method "get_cookie" -> code.Cookie
+  }
+}

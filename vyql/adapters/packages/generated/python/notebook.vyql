@@ -1,0 +1,8 @@
+import code.{HttpInput}
+import core.{HtmlEscape}
+adapter python {
+  package "notebook" {
+    source method "get" -> code.HttpInput
+    control method "escape" -> core.HtmlEscape
+  }
+}

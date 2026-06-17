@@ -1,0 +1,8 @@
+adapter go {
+  package "github.com/pkg/diff" {
+    sink method "Text" -> code.FilePathAccess
+    source method "Text" -> core.UserControlledData
+    source method "Slices" -> core.UserControlledData
+    sink method "Unified" -> code.FileUse
+  }
+}

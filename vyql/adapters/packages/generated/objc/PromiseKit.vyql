@@ -1,0 +1,10 @@
+import code.{ExpressionEval}
+
+adapter objc {
+  package "PromiseKit" {
+    sink method "promiseWithResolverBlock" -> code.ExpressionEval
+    sink method "promiseWithAdapterBlock" -> code.ExpressionEval
+    sink method "promiseWithIntegerAdapterBlock" -> code.ExpressionEval
+    sink method "promiseWithBooleanAdapterBlock" -> code.ExpressionEval
+  }
+}

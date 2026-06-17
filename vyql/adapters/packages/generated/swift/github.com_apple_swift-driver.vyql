@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/apple/swift-driver" {
+    source method "parse" -> code.CliArgument
+  }
+}

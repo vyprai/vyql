@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter elixir {
+  package "cortex" {
+    sink method "reload_file" -> code.FilePathAccess
+    sink method "reload_or_recompile" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,6 @@
+import code.{HtmlRender}
+adapter ruby {
+  package "katex" {
+    sink method "render" -> code.HtmlRender
+  }
+}

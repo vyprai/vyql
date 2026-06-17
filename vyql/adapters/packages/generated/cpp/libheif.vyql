@@ -1,0 +1,5 @@
+adapter cpp {
+  package "libheif" {
+    sink method "parse" -> code.Deserialization
+  }
+}

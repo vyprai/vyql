@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter swift {
+  package "github.com/trilemma-dev/SecureXPC" {
+    sink method "send" -> code.NetworkSend
+    sink method "sendMessage" -> code.NetworkSend
+  }
+}

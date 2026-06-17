@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter objc {
+  package "FXForms" {
+    source method "valueForUndefinedKey:" -> core.UserControlledData
+    source method "setValue:forUndefinedKey:" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,6 @@
+import core.{HtmlEscape}
+adapter ruby {
+  package "haml" {
+    control method "Haml::Util.escape_html" -> core.HtmlEscape
+  }
+}

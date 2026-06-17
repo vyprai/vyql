@@ -1,0 +1,5 @@
+adapter scala {
+  package "org.springframework.security:spring-security-config" {
+    sink method "parse" -> code.Deserialization
+  }
+}

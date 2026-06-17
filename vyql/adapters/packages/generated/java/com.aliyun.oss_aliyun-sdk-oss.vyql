@@ -1,0 +1,11 @@
+import code.{CommandExecution, ExpressionEval, FilePathAccess, NetworkConnect, NetworkSend, SecretValue, StoredDataRead, StoredDataWrite, UrlFetch}
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter java {
+  package "com.aliyun.oss:aliyun-sdk-oss" {
+    sink method "putObject" -> code.StoredDataWrite
+    source method "getObject" -> code.StoredDataRead
+    sink method "selectObject" -> code.ExpressionEval
+    source method "switchCredentials" -> code.SecretValue
+  }
+}

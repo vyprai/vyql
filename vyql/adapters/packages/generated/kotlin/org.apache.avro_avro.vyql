@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+adapter kotlin {
+  package "org.apache.avro:avro" {
+    sink method "parse" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+  }
+}

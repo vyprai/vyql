@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter perl {
+  package "WWW-Scraper-ISBN-BarnesNoble_Driver" {
+    sink method "search" -> code.UrlFetch
+  }
+}

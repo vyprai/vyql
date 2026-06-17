@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "libflac" {
+    sink method "FLAC__metadata_chain_read" -> code.Deserialization
+    sink method "FLAC__metadata_chain_read_ogg" -> code.Deserialization
+  }
+}

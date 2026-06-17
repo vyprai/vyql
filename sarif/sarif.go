@@ -75,6 +75,13 @@ func findingToResult(f *findings.Finding) map[string]any {
 	for _, b := range f.Bindings {
 		prov = append(prov, map[string]any{"binding": b.Name, "concept": b.Concept, "loc": b.Loc, "provenance": b.LabelProvenance})
 	}
+	var exploit []any
+	for _, ec := range f.ExploitConditions {
+		exploit = append(exploit, map[string]any{
+			"category": ec.Category, "condition": ec.Condition, "evidence": ec.Evidence,
+			"assumption": ec.Assumption, "confidence": ec.Confidence,
+		})
+	}
 
 	result := map[string]any{
 		"ruleId":              f.RuleID,
@@ -82,11 +89,12 @@ func findingToResult(f *findings.Finding) map[string]any {
 		"message":             map[string]any{"text": msg},
 		"partialFingerprints": map[string]any{"vyqlFingerprint/v1": f.Fingerprint()},
 		"properties": map[string]any{
-			"vypr.confidence":       f.Confidence,
-			"vypr.witnessKind":      f.WitnessKind,
-			"vypr.negationEvidence": negEv,
-			"vypr.labelProvenance":  prov,
-			"vypr.context":          f.Context,
+			"vypr.confidence":        f.Confidence,
+			"vypr.witnessKind":       f.WitnessKind,
+			"vypr.negationEvidence":  negEv,
+			"vypr.labelProvenance":   prov,
+			"vypr.context":           f.Context,
+			"vypr.exploitConditions": exploit,
 		},
 	}
 	if sink != nil {

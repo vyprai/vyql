@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter groovy {
+  package "org.testng:testng" {
+    control method "setEscapeHtml" -> core.HtmlEscape
+  }
+}

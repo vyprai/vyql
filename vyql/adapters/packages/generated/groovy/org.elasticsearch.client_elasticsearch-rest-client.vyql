@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter groovy {
+  package "org.elasticsearch.client:elasticsearch-rest-client" {
+    source method "setEntity" -> code.NetworkData
+    source method "setJsonEntity" -> code.NetworkData
+  }
+}

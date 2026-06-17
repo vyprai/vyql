@@ -1,0 +1,12 @@
+import code.{CliArgument, FilePathAccess}
+import core.{UserControlledData}
+
+adapter ruby {
+  package "scss_lint" {
+    source method "SCSSLint::Options.parse" -> code.CliArgument
+    sink method "SCSSLint::Config.load" -> code.FilePathAccess
+    sink method "SCSSLint::Config.load_options_hash_from_file" -> code.FilePathAccess
+    sink method "SCSSLint::Config.load_file_contents" -> code.FilePathAccess
+    source method "SCSSLint::CLI.run" -> core.UserControlledData
+  }
+}

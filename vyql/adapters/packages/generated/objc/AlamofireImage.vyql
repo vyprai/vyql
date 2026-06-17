@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter objc {
+  package "AlamofireImage" {
+    sink method "download" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,7 @@
+import core.{AuthenticationCheck}
+
+adapter dart {
+  package "local_auth_ios" {
+    control method "authenticate" -> core.AuthenticationCheck
+  }
+}

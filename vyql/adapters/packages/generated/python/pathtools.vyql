@@ -1,0 +1,13 @@
+import code.{FilePathAccess}
+import core.{PathCanonicalization}
+
+adapter python {
+  package "pathtools" {
+    sink method "walk" -> code.FilePathAccess
+    sink method "listdir" -> code.FilePathAccess
+    sink method "list_directories" -> code.FilePathAccess
+    sink method "list_files" -> code.FilePathAccess
+    control method "absolute_path" -> core.PathCanonicalization
+    control method "real_absolute_path" -> core.PathCanonicalization
+  }
+}

@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter dart {
+  package "audioplayers_linux" {
+    sink method "AudioPlayer.SetSourceUrl" -> code.UrlFetch
+  }
+}

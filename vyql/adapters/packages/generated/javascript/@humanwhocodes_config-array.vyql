@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter javascript {
+  package "@humanwhocodes/config-array" {
+    control method "validate" -> core.InputValidation
+  }
+}

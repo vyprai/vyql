@@ -1,0 +1,6 @@
+adapter kotlin {
+  package "org.jsoup:jsoup" {
+    sink method "parse" -> code.Deserialization
+    control method "clean" -> core.HtmlEscape
+  }
+}

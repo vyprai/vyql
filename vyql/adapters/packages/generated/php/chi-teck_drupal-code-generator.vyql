@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+
+adapter php {
+  package "chi-teck/drupal-code-generator" {
+    sink method "replaceTokens" -> code.ExpressionEval
+  }
+}

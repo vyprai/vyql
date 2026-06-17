@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter c {
+  package "qttranslations" {
+    sink path "src/translations/add_tika_to_ts.py.parse_tika_mime_types" -> code.Deserialization
+    sink path "src/translations/add_tika_to_ts.py.create_ts_file_with_mime_types" -> code.Deserialization
+  }
+}

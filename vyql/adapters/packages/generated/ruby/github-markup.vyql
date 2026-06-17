@@ -1,0 +1,11 @@
+import code.{CommandExecution, HtmlRender}
+import core.{HtmlEscape}
+
+adapter ruby {
+  package "github-markup" {
+    sink method "Github::Markup.render" -> code.HtmlRender
+    sink method "Github::Markup.render_s" -> code.HtmlRender
+    sink method "Github::Markup::CommandImplementation.execute" -> code.CommandExecution
+    control method "Github::Markup::CommandImplementation.sanitize" -> core.HtmlEscape
+  }
+}

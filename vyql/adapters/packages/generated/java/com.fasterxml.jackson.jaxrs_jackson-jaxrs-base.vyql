@@ -1,0 +1,9 @@
+adapter java {
+  package "com.fasterxml.jackson.jaxrs:jackson-jaxrs-base" {
+    sink method "readFrom" -> code.Deserialization
+    sink method "writeTo" -> code.Deserialization
+    control method "configure" -> core.InputValidation
+    control method "enable" -> core.InputValidation
+    control method "disable" -> core.InputValidation
+  }
+}

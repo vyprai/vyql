@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter c {
+  package "robin-map" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

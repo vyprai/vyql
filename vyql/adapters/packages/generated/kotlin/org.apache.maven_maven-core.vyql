@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter kotlin {
+  package "org.apache.maven:maven-core" {
+    sink method "setConfiguration" -> code.Deserialization
+    sink method "getConfiguration" -> code.Deserialization
+  }
+}

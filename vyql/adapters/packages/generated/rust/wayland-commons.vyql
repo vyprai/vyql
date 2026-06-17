@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend, FilePathAccess}
+adapter rust {
+  package "wayland-commons" {
+    sink method "send_msg" -> code.NetworkSend
+    source method "rcv_msg" -> code.NetworkData
+    sink method "dup_fd_cloexec" -> code.FilePathAccess
+  }
+}

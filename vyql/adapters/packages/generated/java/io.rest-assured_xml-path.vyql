@@ -1,0 +1,5 @@
+adapter java {
+  package "io.rest-assured:xml-path" {
+    sink method "parseText" -> code.XmlParse
+  }
+}

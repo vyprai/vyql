@@ -1,0 +1,9 @@
+import code.{CommandExecution, StoredDataRead, StoredDataWrite}
+
+adapter swift {
+  package "github.com/vapor/redis" {
+    source method "get" -> code.StoredDataRead
+    sink method "set" -> code.StoredDataWrite
+    sink method "setex" -> code.StoredDataWrite
+  }
+}

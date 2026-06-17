@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter python {
+  package "google-api-python-client" {
+    sink method "deserialize" -> code.Deserialization
+  }
+}

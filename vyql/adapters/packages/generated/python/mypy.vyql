@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "mypy" {
+    sink method "parse" -> code.Deserialization
+  }
+}

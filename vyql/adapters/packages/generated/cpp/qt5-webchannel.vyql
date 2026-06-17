@@ -1,0 +1,10 @@
+import code.{Deserialization, NetworkSend, CodeEval}
+
+adapter cpp {
+  package "qt5-webchannel" {
+    sink method "sendMessage" -> code.NetworkSend
+    sink method "toVariant" -> code.Deserialization
+    sink method "registerObject" -> code.CodeEval
+    sink method "registerObjects" -> code.CodeEval
+  }
+}

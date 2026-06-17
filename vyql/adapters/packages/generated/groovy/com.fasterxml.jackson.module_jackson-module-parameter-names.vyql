@@ -1,0 +1,6 @@
+adapter groovy {
+  package "com.fasterxml.jackson.module:jackson-module-parameter-names" {
+    sink method "findImplicitPropertyName" -> code.Deserialization
+    sink method "findParameterName" -> code.Deserialization
+  }
+}

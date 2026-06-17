@@ -1,0 +1,27 @@
+import code.{WeakHash}
+
+adapter cpp {
+  package "tracy" {
+    mark method "XXH32" -> code.WeakHash
+    mark method "XXH32_freeState" -> code.WeakHash
+    mark method "XXH32_copyState" -> code.WeakHash
+    mark method "XXH32_reset" -> code.WeakHash
+    mark method "XXH32_digest" -> code.WeakHash
+    mark method "XXH32_canonicalFromHash" -> code.WeakHash
+    mark method "XXH32_hashFromCanonical" -> code.WeakHash
+    mark method "XXH64" -> code.WeakHash
+    mark method "XXH64_freeState" -> code.WeakHash
+    mark method "XXH64_copyState" -> code.WeakHash
+    mark method "XXH64_reset" -> code.WeakHash
+    mark method "XXH64_update" -> code.WeakHash
+    mark method "XXH64_digest" -> code.WeakHash
+    mark method "XXH64_canonicalFromHash" -> code.WeakHash
+    mark method "XXH64_hashFromCanonical" -> code.WeakHash
+    mark method "XXH3_64bits" -> code.WeakHash
+    mark method "XXH3_64bits_withSeed" -> code.WeakHash
+    mark method "XXH3_64bits_withSecret" -> code.WeakHash
+    mark method "XXH3_freeState" -> code.WeakHash
+    mark method "XXH3_copyState" -> code.WeakHash
+    mark method "XXH3_64bits_reset" -> code.WeakHash
+  }
+}

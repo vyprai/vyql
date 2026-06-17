@@ -60,6 +60,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		out = append(out, &findings.Finding{
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "match",
 			NegationEvidence: ne, Confidence: e.conf(node), Context: ctx,
+			ExploitConditions: e.exploitConditions(node, body.Concept),
 			Bindings: []findings.Binding{
 				{Name: body.Binding, NodeID: node, Concept: body.Concept, Loc: e.loc(node), LabelProvenance: e.prov(node, body.Concept)},
 			},

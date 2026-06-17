@@ -1,0 +1,13 @@
+import core.{UserControlledData}
+adapter swift {
+  package "github.com/OperatorFoundation/AdversaryLabClientSwift" {
+    source method "RawPacket.connection" -> core.UserControlledData
+    source method "RawPacket.ip_packet" -> core.UserControlledData
+    source method "RawPacket.tcp_packet" -> core.UserControlledData
+    source method "RawPacket.payload" -> core.UserControlledData
+    source method "RawPacket.timestamp" -> core.UserControlledData
+    source method "RawPacket.allow_block" -> core.UserControlledData
+    source method "RawPacket.in_out" -> core.UserControlledData
+    source method "RawPacket.handshake" -> core.UserControlledData
+  }
+}

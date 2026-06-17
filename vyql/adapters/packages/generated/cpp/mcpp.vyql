@@ -1,0 +1,9 @@
+import code.{ExpressionEval}
+
+adapter cpp {
+  package "mcpp" {
+    sink method "eval_if" -> code.ExpressionEval
+    sink method "eval_num" -> code.ExpressionEval
+    sink method "mb_eval" -> code.ExpressionEval
+  }
+}

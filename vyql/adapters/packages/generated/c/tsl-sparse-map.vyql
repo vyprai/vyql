@@ -1,0 +1,8 @@
+import code.{Deserialization, WeakHash}
+
+adapter c {
+  package "tsl-sparse-map" {
+    sink method "deserialize" -> code.Deserialization
+    mark method "hash_key" -> code.WeakHash
+  }
+}

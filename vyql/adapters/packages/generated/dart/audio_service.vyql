@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter dart {
+  package "audio_service" {
+    source method "search" -> core.UserControlledData
+  }
+}

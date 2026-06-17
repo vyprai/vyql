@@ -1,0 +1,11 @@
+import code.{NetworkData, NetworkSend, NetworkConnect}
+adapter rust {
+  package "tokio-udp" {
+    source method "recv" -> code.NetworkData
+    source method "recv_from" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "send_to" -> code.NetworkSend
+    sink method "bind" -> code.NetworkConnect
+    sink method "connect" -> code.NetworkConnect
+  }
+}

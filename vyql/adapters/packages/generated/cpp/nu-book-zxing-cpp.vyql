@@ -1,0 +1,10 @@
+import code.{Deserialization, FilePathAccess}
+import core.{InputValidation}
+
+adapter cpp {
+  package "nu-book-zxing-cpp" {
+    sink method "decode" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+    control method "ZXing_ReaderOptions_setTextMode" -> core.InputValidation
+  }
+}

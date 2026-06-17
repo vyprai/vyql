@@ -1,0 +1,14 @@
+import code.{FilePathAccess}
+
+adapter cpp {
+  package "acl" {
+    sink method "acl_set_file" -> code.FilePathAccess
+    sink method "acl_get_file" -> code.FilePathAccess
+    sink method "acl_delete_def_file" -> code.FilePathAccess
+    sink method "acl_extended_file" -> code.FilePathAccess
+    sink method "acl_extended_file_nofollow" -> code.FilePathAccess
+    sink method "perm_copy_file" -> code.FilePathAccess
+    sink method "perm_copy_fd" -> code.FilePathAccess
+    sink method "acl_delete_file" -> code.FilePathAccess
+  }
+}

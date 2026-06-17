@@ -1,0 +1,7 @@
+import core.{InputValidation}
+adapter go {
+  package "github.com/stefanberger/go-pkcs11uri" {
+    control method "escapeAll" -> core.InputValidation
+    control method "escape" -> core.InputValidation
+  }
+}

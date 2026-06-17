@@ -1,0 +1,6 @@
+adapter elixir {
+  package "paper_trail" {
+    sink method "insert" -> code.SqlExecution
+    sink method "serialize" -> code.Deserialization
+  }
+}

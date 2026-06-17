@@ -1,0 +1,8 @@
+import code.{Deserialization, NetworkData}
+
+adapter rust {
+  package "jpeg-decoder" {
+    source method "new" -> code.NetworkData
+    sink method "decode" -> code.Deserialization
+  }
+}

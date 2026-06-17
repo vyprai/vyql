@@ -1,0 +1,5 @@
+adapter c {
+  package "wolfssl" {
+    source method "CRYPT_RSA_PrivateKeyDecode" -> code.SecretValue
+  }
+}

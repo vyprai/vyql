@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+adapter scala {
+  package "org.twitter4j:twitter4j-core" {
+    control method "HTMLEntity.escape" -> core.HtmlEscape
+    control method "HTMLEntity.unescape" -> core.HtmlEscape
+  }
+}

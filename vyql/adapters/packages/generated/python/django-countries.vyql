@@ -1,0 +1,9 @@
+import core.{HtmlEscape, InputValidation}
+
+adapter python {
+  package "django-countries" {
+    control method "escape" -> core.HtmlEscape
+    control method "maybe_escape" -> core.HtmlEscape
+    control method "validate" -> core.InputValidation
+  }
+}

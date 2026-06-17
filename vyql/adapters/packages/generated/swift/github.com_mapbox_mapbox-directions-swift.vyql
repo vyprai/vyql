@@ -1,0 +1,10 @@
+import code.{UrlFetch}
+
+adapter swift {
+  package "github.com/mapbox/mapbox-directions-swift" {
+    sink method "calculateRoutes" -> code.UrlFetch
+    sink method "refreshRoute" -> code.UrlFetch
+    sink method "url" -> code.UrlFetch
+    sink method "urlRequest" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter swift {
+  package "github.com/apple/swift-async-algorithms" {
+    source method "send" -> core.UserControlledData
+  }
+}

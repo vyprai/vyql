@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter python {
+  package "dataclasses-json" {
+    sink method "from_json" -> code.Deserialization
+    sink method "from_dict" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+    sink method "loads" -> code.Deserialization
+  }
+}

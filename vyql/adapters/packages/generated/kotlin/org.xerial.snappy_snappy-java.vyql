@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.xerial.snappy:snappy-java" {
+    sink method "uncompress" -> code.Deserialization
+    sink method "unshuffle" -> code.Deserialization
+  }
+}

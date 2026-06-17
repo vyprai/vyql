@@ -1,0 +1,9 @@
+import code.{SecretValue}
+import core.{AuthenticationCheck}
+
+adapter elixir {
+  package "guardian_phoenix" {
+    source method "connect" -> code.SecretValue
+    control method "authenticate" -> core.AuthenticationCheck
+  }
+}

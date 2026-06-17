@@ -1,0 +1,8 @@
+import code.{FilePathAccess, FileUse}
+
+adapter perl {
+  package "Forest" {
+    sink method "Forest::Tree::Builder::SimpleTextFile.new" -> code.FilePathAccess
+    sink method "Forest::Tree::Reader::SimpleTextFile.read" -> code.FileUse
+  }
+}

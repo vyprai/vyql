@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/steipete/InterposeKit" {
+    sink method "apply" -> code.CodeEval
+  }
+}

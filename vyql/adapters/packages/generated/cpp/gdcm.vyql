@@ -1,0 +1,17 @@
+import code.{Deserialization, FilePathAccess, WeakHash}
+adapter cpp {
+  package "gdcm" {
+    sink method "MakeDirectory" -> code.FilePathAccess
+    sink method "FileExists" -> code.FilePathAccess
+    sink method "RemoveFile" -> code.FilePathAccess
+    sink method "FileSize" -> code.FilePathAccess
+    sink method "FileTime" -> code.FilePathAccess
+    sink method "SetPermissions" -> code.FilePathAccess
+    sink method "GetPermissions" -> code.FilePathAccess
+    mark method "Compute" -> code.WeakHash
+    mark method "ComputeFile" -> code.WeakHash
+    sink method "ParseDumpFile" -> code.Deserialization
+    sink method "ParseDump" -> code.Deserialization
+    sink method "Decode" -> code.Deserialization
+  }
+}

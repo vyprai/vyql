@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter groovy {
+  package "org.apache.logging.log4j:log4j-1.2-api" {
+    sink method "parse" -> code.Deserialization
+  }
+}

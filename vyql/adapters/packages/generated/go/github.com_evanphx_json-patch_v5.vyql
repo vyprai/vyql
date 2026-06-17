@@ -1,0 +1,5 @@
+adapter go {
+  package "github.com/evanphx/json-patch/v5" {
+    sink method "parseTag" -> code.Deserialization
+  }
+}

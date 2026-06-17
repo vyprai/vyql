@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter objc {
+  package "Hero" {
+    sink method "parse" -> code.Deserialization
+  }
+}

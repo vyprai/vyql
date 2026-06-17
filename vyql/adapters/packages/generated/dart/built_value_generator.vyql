@@ -1,0 +1,6 @@
+import core.{InputValidation}
+adapter dart {
+  package "built_value_generator" {
+    control method "escapeString" -> core.InputValidation
+  }
+}

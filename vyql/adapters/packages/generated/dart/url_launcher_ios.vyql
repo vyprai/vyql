@@ -1,0 +1,9 @@
+import code.{RedirectTarget, NetworkConnect}
+import core.{InputValidation}
+
+adapter dart {
+  package "url_launcher_ios" {
+    mark method "open" -> code.RedirectTarget
+    control method "canOpenURL" -> core.InputValidation
+  }
+}

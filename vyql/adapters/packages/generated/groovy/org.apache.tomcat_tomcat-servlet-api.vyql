@@ -1,0 +1,7 @@
+import code.{HttpInput}
+
+adapter groovy {
+  package "org.apache.tomcat:tomcat-servlet-api" {
+    source method "getHeader" -> code.HttpInput
+  }
+}

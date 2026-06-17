@@ -1,0 +1,11 @@
+import core.{AuthenticationCheck, AuthorizationCheck}
+
+adapter elixir {
+  package "pow_assent" {
+    control method "authorize_url" -> core.AuthorizationCheck
+    control method "callback_upsert" -> core.AuthenticationCheck
+    control method "authenticate" -> core.AuthenticationCheck
+    control method "create_user" -> core.AuthenticationCheck
+    control method "create_identity" -> core.AuthenticationCheck
+  }
+}

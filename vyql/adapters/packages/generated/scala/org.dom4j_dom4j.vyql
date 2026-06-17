@@ -1,0 +1,11 @@
+import code.{XmlParse}
+adapter scala {
+  package "org.dom4j:dom4j" {
+    sink method "selectNodes" -> code.XmlParse
+    sink method "selectObject" -> code.XmlParse
+    sink method "selectSingleNode" -> code.XmlParse
+    sink method "valueOf" -> code.XmlParse
+    sink method "numberValueOf" -> code.XmlParse
+    sink method "matches" -> code.XmlParse
+  }
+}

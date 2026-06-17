@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+adapter dart {
+  package "firebase_core_web" {
+    control method "createScriptURL" -> core.HtmlEscape
+    control method "createScript" -> core.HtmlEscape
+  }
+}

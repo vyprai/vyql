@@ -1,0 +1,8 @@
+import code.{FilePathAccess, EnvVariable}
+adapter elixir {
+  package "confex" {
+    source method "Confex.Adapters.SystemEnvironment.fetch_value" -> code.EnvVariable
+    sink method "Confex.Adapters.FileFromSystemEnvironment.fetch_value" -> code.FilePathAccess
+    sink method "Confex.Adapters.FileFromSystemEnvironment.read_value" -> code.FilePathAccess
+  }
+}

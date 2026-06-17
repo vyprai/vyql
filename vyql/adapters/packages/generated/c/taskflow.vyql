@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter c {
+  package "taskflow" {
+    sink method "run" -> code.CodeEval
+  }
+}

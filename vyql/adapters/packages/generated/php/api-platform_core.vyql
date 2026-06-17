@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+
+adapter php {
+  package "api-platform/core" {
+    sink method "executeQuery" -> code.ExpressionEval
+  }
+}

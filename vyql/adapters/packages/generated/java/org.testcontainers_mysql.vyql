@@ -1,0 +1,13 @@
+import code.{StoredDataRead, SecretValue}
+import core.{UserControlledData}
+
+adapter java {
+  package "org.testcontainers:mysql" {
+    source method "getJdbcUrl" -> code.StoredDataRead
+    source method "constructUrlForConnection" -> code.StoredDataRead
+    source method "withPassword" -> core.UserControlledData
+    source method "withUsername" -> core.UserControlledData
+    source method "withDatabaseName" -> core.UserControlledData
+    source method "addEnv" -> code.SecretValue
+  }
+}

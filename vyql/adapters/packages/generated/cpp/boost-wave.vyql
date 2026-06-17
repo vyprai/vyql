@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter cpp {
+  package "boost-wave" {
+    sink method "native_cmd" -> code.CommandExecution
+  }
+}

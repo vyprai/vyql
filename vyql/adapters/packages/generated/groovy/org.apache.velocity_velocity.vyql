@@ -1,0 +1,8 @@
+import code.{Deserialization, HtmlRender}
+
+adapter groovy {
+  package "org.apache.velocity:velocity" {
+    sink method "parse" -> code.Deserialization
+    sink method "merge" -> code.HtmlRender
+  }
+}

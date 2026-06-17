@@ -1,0 +1,7 @@
+import core.{AuthenticationCheck}
+
+adapter elixir {
+  package "ssl_verify_hostname" {
+    control method "verify_cert_hostname" -> core.AuthenticationCheck
+  }
+}

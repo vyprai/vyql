@@ -1,0 +1,143 @@
+# Authentication and object-ownership coverage.
+
+test "auth: sensitive operation without authentication guard is reported (javascript)"
+  lang javascript
+  expect VYQL-AUTH-001
+  code
+  ```
+  function handler(req) {
+    changePassword(req.body.password);
+  }
+  ```
+
+test "auth: sensitive operation with authentication guard is clean (javascript)"
+  lang javascript
+  reject VYQL-AUTH-001
+  code
+  ```
+  function handler(req) {
+    requireAuth(req);
+    changePassword(req.body.password);
+  }
+  ```
+
+test "auth: user-controlled object lookup is reported as IDOR (javascript)"
+  lang javascript
+  expect VYQL-AUTH-002
+  code
+  ```
+  function handler(req) {
+    return User.findById(req.params.id);
+  }
+  ```
+
+test "auth: ownership guard suppresses user-controlled object lookup (javascript)"
+  lang javascript
+  reject VYQL-AUTH-002
+  code
+  ```
+  function handler(req) {
+    checkOwnership(req.user, req.params.id);
+    return User.findById(req.params.id);
+  }
+  ```
+
+test "auth: sensitive operation without authentication guard is reported (python)"
+  lang python
+  expect VYQL-AUTH-001
+  code
+  ```
+  def handler(request):
+      change_password(request.form["password"])
+  ```
+
+test "auth: sensitive operation with authentication guard is clean (python)"
+  lang python
+  reject VYQL-AUTH-001
+  code
+  ```
+  def handler(request):
+      require_auth(request)
+      change_password(request.form["password"])
+  ```
+
+test "auth: user-controlled object lookup is reported as IDOR (python)"
+  lang python
+  expect VYQL-AUTH-002
+  code
+  ```
+  def handler(request):
+      return get_user(request.args["id"])
+  ```
+
+test "auth: ownership guard suppresses user-controlled object lookup (python)"
+  lang python
+  reject VYQL-AUTH-002
+  code
+  ```
+  def handler(request):
+      check_ownership(request.user, request.args["id"])
+      return get_user(request.args["id"])
+  ```
+
+test "auth: php sensitive operation and IDOR are reported"
+  lang php
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  <?php
+  function handler($repo) {
+      changePassword($_POST["password"]);
+      return $repo->find($_GET["id"]);
+  }
+  ?>
+  ```
+
+test "auth: ruby sensitive operation and IDOR are reported"
+  lang ruby
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  def handler
+    change_password(params[:password])
+    User.find(params[:id])
+  end
+  ```
+
+test "auth: kotlin sensitive operation and IDOR are reported"
+  lang kotlin
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  fun handler(req: Request, repo: Repo) {
+      changePassword(req.getParameter("password"))
+      repo.findById(req.getParameter("id"))
+  }
+  ```
+
+test "auth: scala sensitive operation and IDOR are reported"
+  lang scala
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  def handler(req: Request, repo: Repo) = {
+    changePassword(req.getParameter("password"))
+    repo.findById(req.getParameter("id"))
+  }
+  ```
+
+test "auth: elixir sensitive operation and IDOR are reported"
+  lang elixir
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  def handler(conn, params) do
+    change_password(params["password"])
+    get_user(params["id"])
+  end
+  ```

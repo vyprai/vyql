@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -254,6 +255,22 @@ func cmdExplain(args []string) error {
 			}
 			fmt.Printf("  %s %s: %s\n", mark, ne.Clause, ne.Detail)
 		}
+		for _, ec := range f.ExploitConditions {
+			fmt.Printf("  exploit: %s", ec.Condition)
+			if ec.Category != "" {
+				fmt.Printf(" [%s]", ec.Category)
+			}
+			if ec.Evidence != "" {
+				fmt.Printf(" — evidence: %s", ec.Evidence)
+			}
+			if ec.Assumption != "" {
+				fmt.Printf(" — assumes: %s", ec.Assumption)
+			}
+			if ec.Confidence != "" {
+				fmt.Printf(" — conf=%s", ec.Confidence)
+			}
+			fmt.Println()
+		}
 	}
 	return nil
 }
@@ -489,18 +506,91 @@ func adapterNames() []string {
 	return out
 }
 
+// ── vyql validate-adapter ──────────────────────────────────────────────────────────
+// Parse an adapter file through the real VyQL parser and emit a compact public summary.
+
+func cmdValidateAdapter(args []string) error {
+	fs := flag.NewFlagSet("validate-adapter", flag.ExitOnError)
+	file := fs.String("file", "", "adapter .vyql file to parse; reads stdin when empty")
+	_ = fs.Parse(args)
+	var data []byte
+	var err error
+	if *file != "" {
+		data, err = os.ReadFile(*file)
+	} else {
+		data, err = io.ReadAll(os.Stdin)
+	}
+	if err != nil {
+		return err
+	}
+	decls, err := parser.Parse(string(data))
+	if err != nil {
+		return fmt.Errorf("adapter parse: %w", err)
+	}
+	type mappingSummary struct {
+		Kind     string   `json:"kind"`
+		Pattern  string   `json:"pattern"`
+		Concept  string   `json:"concept,omitempty"`
+		Packages []string `json:"packages,omitempty"`
+	}
+	type adapterSummary struct {
+		Name          string           `json:"name"`
+		MappingCount  int              `json:"mapping_count"`
+		PackageBlocks []string         `json:"package_blocks,omitempty"`
+		Mappings      []mappingSummary `json:"mappings"`
+	}
+	summary := struct {
+		OK       bool             `json:"ok"`
+		Adapters []adapterSummary `json:"adapters"`
+	}{OK: true}
+	for _, d := range decls {
+		ad, ok := d.(*parser.AdapterDecl)
+		if !ok {
+			continue
+		}
+		item := adapterSummary{Name: ad.Name, MappingCount: len(ad.Mappings)}
+		packageSeen := map[string]bool{}
+		for _, m := range ad.Mappings {
+			item.Mappings = append(item.Mappings, mappingSummary{
+				Kind:     m.Kind,
+				Pattern:  m.Pattern,
+				Concept:  m.Concept,
+				Packages: m.Packages,
+			})
+			for _, pkg := range m.Packages {
+				if !packageSeen[pkg] {
+					packageSeen[pkg] = true
+					item.PackageBlocks = append(item.PackageBlocks, pkg)
+				}
+			}
+		}
+		sort.Strings(item.PackageBlocks)
+		summary.Adapters = append(summary.Adapters, item)
+	}
+	if len(summary.Adapters) == 0 {
+		return fmt.Errorf("adapter parse: no adapter declaration found")
+	}
+	out, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(out))
+	return nil
+}
+
 // ── vyql diff ───────────────────────────────────────────────────────────────────────
 // Diff two `scan -format json` outputs by fingerprint: which findings appeared / disappeared.
 // Use to PROVE a change is finding-preserving (e.g. an engine optimization) without eyeballing
 // scorecards.
 
 type jsonFinding struct {
-	RuleID   string `json:"rule"`
-	Severity string `json:"severity"`
-	FP       string `json:"fp"`
-	Source   string `json:"source"`
-	Sink     string `json:"sink"`
-	Noted    bool   `json:"assumption_noted"`
+	RuleID            string                      `json:"rule"`
+	Severity          string                      `json:"severity"`
+	FP                string                      `json:"fp"`
+	Source            string                      `json:"source"`
+	Sink              string                      `json:"sink"`
+	Noted             bool                        `json:"assumption_noted"`
+	ExploitConditions []findings.ExploitCondition `json:"exploit_conditions,omitempty"`
 }
 
 func findingsJSON(all []*findings.Finding) []jsonFinding {
@@ -523,6 +613,7 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 				jf.Noted = true
 			}
 		}
+		jf.ExploitConditions = f.ExploitConditions
 		out = append(out, jf)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].FP < out[j].FP })

@@ -1,0 +1,7 @@
+import code.{Deserialization}
+adapter objc {
+  package "JSONModel" {
+    sink method "initWithString:error:" -> code.Deserialization
+    sink method "initWithString:usingEncoding:error:" -> code.Deserialization
+  }
+}

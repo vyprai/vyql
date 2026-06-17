@@ -1,0 +1,8 @@
+import code.{Deserialization}
+adapter java {
+  package "com.google.zxing:core" {
+    sink method "decode" -> code.Deserialization
+    sink method "decodeWithState" -> code.Deserialization
+    sink method "parse" -> code.Deserialization
+  }
+}

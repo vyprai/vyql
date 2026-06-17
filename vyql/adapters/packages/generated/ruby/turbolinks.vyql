@@ -1,0 +1,7 @@
+import code.{RedirectTarget}
+
+adapter ruby {
+  package "turbolinks" {
+    mark method "redirect_to" -> code.RedirectTarget
+  }
+}

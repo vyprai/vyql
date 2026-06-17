@@ -1,0 +1,5 @@
+adapter javascript {
+  package "request-promise-core" {
+    sink method "HEAD" -> code.UrlFetch
+  }
+}

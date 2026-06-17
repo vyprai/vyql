@@ -1,0 +1,8 @@
+import code.{FilePathAccess}
+
+adapter java {
+  package "org.springframework.batch:spring-batch-infrastructure" {
+    sink method "setUpOutputFile" -> code.FilePathAccess
+    sink method "createNewFile" -> code.FilePathAccess
+  }
+}

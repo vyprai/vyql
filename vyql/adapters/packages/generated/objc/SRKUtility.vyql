@@ -1,0 +1,9 @@
+import code.{FilePathAccess, StoredDataWrite, StoredDataRead}
+
+adapter objc {
+  package "SRKUtility" {
+    sink method "playAudioFromFilePath" -> code.FilePathAccess
+    sink method "saveValueForKey" -> code.StoredDataWrite
+    source method "getValueForKey" -> code.StoredDataRead
+  }
+}

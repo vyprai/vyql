@@ -1,0 +1,14 @@
+import code.{FilePathAccess, NetworkConnect, NetworkData}
+
+adapter rust {
+  package "libgit2-sys" {
+    sink method "git_repository_open" -> code.FilePathAccess
+    sink method "git_repository_open_bare" -> code.FilePathAccess
+    sink method "git_repository_open_ext" -> code.FilePathAccess
+    sink method "git_repository_open_from_worktree" -> code.FilePathAccess
+    sink method "git_repository_path" -> code.FilePathAccess
+    sink method "git_ignore_path_is_ignored" -> code.FilePathAccess
+    sink method "git_remote_connect" -> code.NetworkConnect
+    source method "git_remote_download" -> code.NetworkData
+  }
+}

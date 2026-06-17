@@ -1,0 +1,8 @@
+import code.{Deserialization, SecretValue}
+
+adapter groovy {
+  package "org.apache.rocketmq:rocketmq-client" {
+    sink method "getYamlDataObject" -> code.Deserialization
+    source method "calSignature" -> code.SecretValue
+  }
+}

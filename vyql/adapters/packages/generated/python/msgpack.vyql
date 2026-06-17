@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "msgpack" {
+    sink method "unpack" -> code.Deserialization
+  }
+}

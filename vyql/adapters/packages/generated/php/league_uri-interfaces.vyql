@@ -1,0 +1,18 @@
+adapter php {
+  package "league/uri-interfaces" {
+    source method "parse" -> code.HttpInput
+    control method "encodePassword" -> core.InputValidation
+    control method "normalizePassword" -> core.InputValidation
+    control method "decodeAll" -> core.InputValidation
+    control method "decodeNecessary" -> core.InputValidation
+    control method "encodePath" -> core.InputValidation
+    control method "decodePath" -> core.InputValidation
+    control method "normalizePath" -> core.InputValidation
+    control method "decodeQuery" -> core.InputValidation
+    control method "normalizeQuery" -> core.InputValidation
+    control method "decodeFragment" -> core.InputValidation
+    control method "normalizeFragment" -> core.InputValidation
+    control method "normalizeHost" -> core.InputValidation
+    control method "encodeQueryOrFragment" -> core.InputValidation
+  }
+}

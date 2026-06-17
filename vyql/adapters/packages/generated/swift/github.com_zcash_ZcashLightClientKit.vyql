@@ -1,0 +1,9 @@
+import code.{SqlExecution, UrlFetch, NetworkConnect}
+adapter swift {
+  package "github.com/zcash/ZcashLightClientKit" {
+    sink method "debugDatabase" -> code.SqlExecution
+    sink method "httpRequest" -> code.UrlFetch
+    sink method "httpRequestOverTor" -> code.UrlFetch
+    sink method "connectToLightwalletd" -> code.NetworkConnect
+  }
+}

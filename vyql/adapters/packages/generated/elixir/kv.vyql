@@ -1,0 +1,8 @@
+import code.{StoredDataRead, StoredDataWrite}
+adapter elixir {
+  package "kv" {
+    source method "get" -> code.StoredDataRead
+    sink method "put" -> code.StoredDataWrite
+    sink method "delete" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,14 @@
+import code.{Deserialization}
+
+adapter csharp {
+  package "nebml" {
+    sink method "ReadNext" -> code.Deserialization
+    sink method "ReadInt" -> code.Deserialization
+    sink method "ReadUInt" -> code.Deserialization
+    sink method "ReadFloat" -> code.Deserialization
+    sink method "ReadDate" -> code.Deserialization
+    sink method "ReadAscii" -> code.Deserialization
+    sink method "ReadUtf" -> code.Deserialization
+    sink method "ReadBinary" -> code.Deserialization
+  }
+}

@@ -1,0 +1,8 @@
+adapter ruby {
+  package "ransack" {
+    source method "build" -> core.UserControlledData
+    control method "validate" -> core.InputValidation
+    control method "sanitized_scope_args" -> core.InputValidation
+    control method "escape_wildcards" -> core.InputValidation
+  }
+}

@@ -28,29 +28,18 @@ type pyConv struct {
 // ExtractPython parses Python files into one NIR Program (one module per file,
 // keyed by its source-root-relative dotted path so imports resolve).
 func ExtractPython(files []string, root string) (nir.Program, error) {
-	parser := tree_sitter.NewParser()
-	defer parser.Close()
-	_ = parser.SetLanguage(tree_sitter.NewLanguage(tspython.Language()))
-
-	var prog nir.Program
-	prog.SelfName = "self"
-	for _, f := range files {
-		src, err := readFile(f)
-		if err != nil {
-			continue // skip unreadable
-		}
-		tree := parser.Parse(src, nil)
-		if tree == nil {
-			continue
-		}
-		rel := relPath(root, f)
-		c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, f, ".py")}
-		root0 := tree.RootNode()
-		mod := nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}
-		prog.Modules = append(prog.Modules, mod)
-		tree.Close()
-	}
-	return prog, nil
+	mods := parseModules(files, root,
+		func() *tree_sitter.Parser {
+			p := tree_sitter.NewParser()
+			_ = p.SetLanguage(tree_sitter.NewLanguage(tspython.Language()))
+			return p
+		},
+		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
+			root0 := tree.RootNode()
+			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+		})
+	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
 
 func (c *pyConv) loc(n *tree_sitter.Node) string {
@@ -82,8 +71,11 @@ func namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
-	out := make([]*tree_sitter.Node, 0, n.NamedChildCount())
-	for i := uint(0); i < n.NamedChildCount(); i++ {
+	// cache the count: each *Count() is a cgo call, and re-evaluating it in the loop
+	// condition (once per child) was the bulk of the cgo traffic in this hot helper.
+	k := n.NamedChildCount()
+	out := make([]*tree_sitter.Node, 0, k)
+	for i := uint(0); i < k; i++ {
 		out = append(out, n.NamedChild(i))
 	}
 	return out
@@ -93,8 +85,9 @@ func children(n *tree_sitter.Node) []*tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
-	out := make([]*tree_sitter.Node, 0, n.ChildCount())
-	for i := uint(0); i < n.ChildCount(); i++ {
+	k := n.ChildCount()
+	out := make([]*tree_sitter.Node, 0, k)
+	for i := uint(0); i < k; i++ {
 		out = append(out, n.Child(i))
 	}
 	return out
@@ -268,13 +261,14 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "function_definition":
 		name := c.text(field(n, "name"))
 		params := c.params(field(n, "parameters"))
+		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
 		// the args after self/info/root/parent are the query's user-supplied inputs.
 		if strings.HasPrefix(name, "resolve_") {
 			body = append(c.seedResolverParams(params, L), body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, Body: body, Loc: L, EndLoc: c.endloc(n), IsValidator: c.hasValidatorComment(n)}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n), IsValidator: c.hasValidatorComment(n)}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -291,6 +285,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// (path/query/body), so seed each as http_input (like Java controllers).
 		if def.Kind() == "function_definition" && c.hasRouteDecorator(n) {
 			params := c.params(field(def, "parameters"))
+			paramTypes := c.paramTypes(field(def, "parameters"))
 			body := c.block(field(def, "body"))
 			var seed []nir.Stmt
 			for _, p := range params {
@@ -300,7 +295,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				seed = append(seed, nir.Assign{Targets: []string{p},
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
-			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, Body: append(seed, body...), Loc: L, EndLoc: c.endloc(def), IsRoute: true}}
+			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, ParamTypes: paramTypes, Body: append(seed, body...), Loc: L, EndLoc: c.endloc(def), IsRoute: true}}
 		}
 		return c.stmt(def)
 	case "class_definition":
@@ -593,6 +588,26 @@ func (c *pyConv) params(params *tree_sitter.Node) []string {
 			} else if kids := namedChildren(ch); len(kids) > 0 {
 				out = append(out, c.text(kids[0]))
 			}
+		}
+	}
+	return out
+}
+
+func (c *pyConv) paramTypes(params *tree_sitter.Node) map[string]string {
+	out := map[string]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		switch ch.Kind() {
+		case "typed_parameter", "typed_default_parameter":
+			name := ""
+			if nm := field(ch, "name"); nm != nil {
+				name = c.text(nm)
+			} else if kids := namedChildren(ch); len(kids) > 0 {
+				name = c.text(kids[0])
+			}
+			putParamType(out, name, paramTypeFromField(c, ch))
 		}
 	}
 	return out

@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter python {
+  package "yacs" {
+    sink method "yacs.config.CfgNode.load_cfg" -> code.Deserialization
+    sink method "yacs.config.CfgNode.merge_from_file" -> code.Deserialization
+  }
+}

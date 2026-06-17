@@ -1,0 +1,9 @@
+import code.{NetworkConnect, NetworkSend, WeakHash}
+
+adapter ruby {
+  package "fog-voxel" {
+    mark method "create_signature" -> code.WeakHash
+    sink method "request" -> code.NetworkConnect
+    sink method "request" -> code.NetworkSend
+  }
+}

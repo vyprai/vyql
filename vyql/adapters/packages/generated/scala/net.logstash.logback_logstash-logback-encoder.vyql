@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{HtmlEscape}
+
+adapter scala {
+  package "net.logstash.logback:logstash-logback-encoder" {
+    sink method "readFully" -> code.Deserialization
+    control method "escapeJson" -> core.HtmlEscape
+  }
+}

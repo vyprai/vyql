@@ -1,0 +1,16 @@
+import code.{TemplateRender}
+adapter go {
+  package "github.com/eknkc/amber" {
+    sink method "Compile" -> code.TemplateRender
+    sink method "CompileData" -> code.TemplateRender
+    sink method "MustCompile" -> code.TemplateRender
+    sink method "CompileFile" -> code.TemplateRender
+    sink method "MustCompileFile" -> code.TemplateRender
+    sink method "CompileDir" -> code.TemplateRender
+    sink method "MustCompileDir" -> code.TemplateRender
+    source method "StringParser" -> core.UserControlledData
+    source method "ByteParser" -> core.UserControlledData
+    source method "FileParser" -> core.UserControlledData
+    source method "VirtualFileParser" -> core.UserControlledData
+  }
+}

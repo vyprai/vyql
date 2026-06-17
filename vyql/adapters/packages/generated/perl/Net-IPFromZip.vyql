@@ -1,0 +1,8 @@
+import code.{FilePathAccess, Deserialization}
+
+adapter perl {
+  package "Net-IPFromZip" {
+    sink method "reverse" -> code.FilePathAccess
+    sink method "reverse" -> code.Deserialization
+  }
+}

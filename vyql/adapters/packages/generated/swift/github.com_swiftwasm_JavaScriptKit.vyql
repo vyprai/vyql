@@ -1,0 +1,8 @@
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/swiftwasm/JavaScriptKit" {
+    source method "JSSymbol.match" -> core.UserControlledData
+    source method "JSSymbol.search" -> core.UserControlledData
+  }
+}

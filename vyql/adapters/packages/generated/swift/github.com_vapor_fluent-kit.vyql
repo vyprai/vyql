@@ -1,0 +1,9 @@
+adapter swift {
+  package "github.com/vapor/fluent-kit" {
+    sink method "query" -> code.SqlExecution
+    control method "prepare" -> core.SqlParameterization
+    source path "database" -> code.HttpInput
+    sink path "set" -> code.ResponseHeaderWrite
+    mark method "update" -> code.WeakHash
+  }
+}

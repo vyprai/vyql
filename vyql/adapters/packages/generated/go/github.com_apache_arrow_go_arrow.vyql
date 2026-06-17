@@ -1,0 +1,8 @@
+import code.{WeakHash}
+
+adapter go {
+  package "github.com/apache/arrow/go/arrow" {
+    mark method "HashType" -> code.WeakHash
+    mark method "Hash" -> code.WeakHash
+  }
+}

@@ -1,0 +1,9 @@
+import code.{NetworkSend, SecretValue}
+adapter scala {
+  package "com.sendgrid:sendgrid-java" {
+    source method "SendGrid" -> code.SecretValue
+    source method "initializeSendGrid" -> code.SecretValue
+    source method "init" -> code.SecretValue
+    sink method "makeCall" -> code.NetworkSend
+  }
+}

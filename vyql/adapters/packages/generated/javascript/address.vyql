@@ -1,0 +1,6 @@
+import code.{CommandExecution, FilePathAccess}
+adapter javascript {
+  package "address" {
+    sink method "dns" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,70 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
+
+adapter perl {
+  package "CGI" {
+    source "param" -> HttpInput
+    control "CGI.escapeHTML" -> HtmlEscape
+  }
+  package "Mojolicious" {
+    source ".param" -> HttpInput
+    control "csrf_token" -> CsrfProtection
+  }
+  package "Dancer2" {
+    source ".param" -> HttpInput
+    control "authenticated" -> AuthenticationCheck
+  }
+  package "perl" {
+    source "$ENV" -> SecretValue
+    sink path "system" -> CommandExecution
+    sink path "exec" -> CommandExecution
+    sink path "eval" -> CodeEval
+    sink path "open" arg all -> FilePathAccess
+    sink path "qr" -> RegexCompile
+  }
+  package "LWP::UserAgent" {
+    source method "decoded_content" -> ExternalApiResponse
+    sink method "request" -> UrlFetch
+  }
+  package "DBI" {
+    sink method "execute" -> SqlExecution
+    sink method "prepare" -> SqlExecution
+    control method "quote" -> SqlParameterization
+  }
+  package "MongoDB" {
+    sink method "find" -> NosqlQuery
+  }
+  package "Storable" {
+    sink path "Storable.thaw" -> Deserialization
+  }
+  package "YAML" {
+    sink path "YAML.Load" -> Deserialization
+  }
+  package "Archive::Extract" {
+    sink path "Archive.Extract.extract" arg all -> ArchiveEntryWrite
+  }
+  package "XML::LibXML" {
+    sink method "parse_string" -> XmlParse
+    sink method "findnodes" -> XpathQuery
+    control "XML.LibXML.load_xml" val "no_network=true" -> XmlHardening
+  }
+  package "Net::LDAP" {
+    sink method "search" arg 1 -> LdapQuery
+    control "Net.LDAP.Filter.escape" -> LdapEscape
+  }
+  package "Template" {
+    sink method "process" -> TemplateRender
+  }
+  package "HTML::Entities" {
+    control "HTML.Entities.encode_entities" -> HtmlEscape
+  }
+  package "String::ShellQuote" {
+    control "String.ShellQuote.shell_quote" -> ShellEscape
+  }
+  package "Cwd" {
+    control "Cwd.realpath" -> PathCanonicalization
+  }
+  package "YAML::Safe" {
+    control "YAML.Safe.Load" -> SafeDeserialization
+  }
+}

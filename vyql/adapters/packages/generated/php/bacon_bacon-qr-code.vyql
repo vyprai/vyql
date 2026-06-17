@@ -1,0 +1,6 @@
+adapter php {
+  package "bacon/bacon-qr-code" {
+    sink method "writeFile" -> code.FilePathAccess
+    sink method "writeString" -> code.HtmlRender
+  }
+}

@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter javascript {
+  package "lodash.templatesettings" {
+    control method "escape" -> core.HtmlEscape
+  }
+}

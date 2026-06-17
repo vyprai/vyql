@@ -1,0 +1,10 @@
+import code.{SqlExecution, FilePathAccess}
+adapter dart {
+  package "sqflite_common_ffi" {
+    sink method "handleExecute" -> code.SqlExecution
+    sink method "handleInsert" -> code.SqlExecution
+    sink method "handleUpdate" -> code.SqlExecution
+    sink method "handleQuery" -> code.SqlExecution
+    sink method "handleOpenDatabase" -> code.FilePathAccess
+  }
+}

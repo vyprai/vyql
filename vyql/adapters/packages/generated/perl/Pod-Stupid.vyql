@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter perl {
+  package "Pod-Stupid" {
+    sink method "parse_string" -> code.Deserialization
+  }
+}

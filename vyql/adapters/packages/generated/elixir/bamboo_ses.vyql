@@ -1,0 +1,5 @@
+adapter elixir {
+  package "bamboo_ses" {
+    sink method "deliver" -> code.NetworkSend
+  }
+}

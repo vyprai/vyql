@@ -1,0 +1,5 @@
+adapter elixir {
+  package "ex_aws_sns" {
+    sink method "parse" -> code.Deserialization
+  }
+}

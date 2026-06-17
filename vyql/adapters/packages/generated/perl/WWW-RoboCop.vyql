@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter perl {
+  package "WWW-RoboCop" {
+    sink method "crawl" -> code.UrlFetch
+  }
+}

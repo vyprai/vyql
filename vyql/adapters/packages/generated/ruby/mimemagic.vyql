@@ -1,0 +1,12 @@
+import code.{FilePathAccess, Deserialization, FileUse}
+
+adapter ruby {
+  package "mimemagic" {
+    sink method "by_path" -> code.FilePathAccess
+    sink method "magic_match" -> code.FileUse
+    sink method "by_magic" -> code.FileUse
+    sink method "all_by_magic" -> code.FileUse
+    sink method "open_mime_database" -> code.FilePathAccess
+    sink method "parse_database" -> code.Deserialization
+  }
+}

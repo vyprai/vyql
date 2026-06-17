@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+adapter dart {
+  package "phone_number" {
+    source method "validate" -> core.UserControlledData
+    source method "parse" -> core.UserControlledData
+    source method "parseList" -> core.UserControlledData
+    source method "parseStringAndRegion" -> core.UserControlledData
+  }
+}

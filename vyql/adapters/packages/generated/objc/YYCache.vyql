@@ -1,0 +1,6 @@
+adapter objc {
+  package "YYCache" {
+    sink method "getItemForKey" -> code.NosqlQuery
+    sink method "setObject" -> code.StoredDataWrite
+  }
+}

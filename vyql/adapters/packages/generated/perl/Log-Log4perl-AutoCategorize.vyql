@@ -1,0 +1,11 @@
+import code.{LogOutput}
+
+adapter perl {
+  package "Log-Log4perl-AutoCategorize" {
+    sink method "AUTOLOAD" -> code.LogOutput
+    sink method "logitDumper" -> code.LogOutput
+    sink method "logitYAML" -> code.LogOutput
+    sink method "set_debug" -> code.LogOutput
+    sink method "myDump" -> code.LogOutput
+  }
+}

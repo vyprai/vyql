@@ -1,0 +1,5 @@
+adapter javascript {
+  package "@jridgewell/trace-mapping" {
+    sink method "TraceMap" -> code.Deserialization
+  }
+}

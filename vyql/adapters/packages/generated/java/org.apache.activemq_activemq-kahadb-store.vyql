@@ -1,0 +1,8 @@
+import code.{Deserialization, StoredDataWrite}
+adapter java {
+  package "org.apache.activemq:activemq-kahadb-store" {
+    sink method "read" -> code.Deserialization
+    sink method "write" -> code.StoredDataWrite
+    sink method "store" -> code.StoredDataWrite
+  }
+}

@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter cpp {
+  package "boost-mpi" {
+    sink method "send" -> code.NetworkSend
+    source method "recv" -> code.NetworkData
+  }
+}

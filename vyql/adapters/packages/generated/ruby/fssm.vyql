@@ -1,0 +1,12 @@
+import code.{FilePathAccess}
+adapter ruby {
+  package "fssm" {
+    sink method "create" -> code.FilePathAccess
+    sink method "update" -> code.FilePathAccess
+    sink method "delete" -> code.FilePathAccess
+    sink method "path" -> code.FilePathAccess
+    sink method "file" -> code.FilePathAccess
+    sink method "monitor" -> code.FilePathAccess
+    sink method "create_path" -> code.FilePathAccess
+  }
+}

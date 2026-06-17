@@ -1,0 +1,7 @@
+adapter scala {
+  package "com.sun.xml.bind:jaxb-impl" {
+    control method "escape" -> core.HtmlEscape
+    sink method "parse" -> code.Deserialization
+    sink method "unmarshal" -> code.Deserialization
+  }
+}

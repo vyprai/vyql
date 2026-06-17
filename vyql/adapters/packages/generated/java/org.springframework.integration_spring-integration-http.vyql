@@ -1,0 +1,10 @@
+import code.{HttpInput, UrlFetch, NetworkConnect}
+adapter java {
+  package "org.springframework.integration:spring-integration-http" {
+    source method "read" -> code.HttpInput
+    source method "inboundChannelAdapter" -> code.HttpInput
+    source method "inboundGateway" -> code.HttpInput
+    sink method "outboundChannelAdapter" -> code.UrlFetch
+    sink method "outboundGateway" -> code.UrlFetch
+  }
+}

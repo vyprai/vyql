@@ -1,0 +1,6 @@
+adapter scala {
+  package "org.jdom:jdom2" {
+    sink method "build" -> code.XmlParse
+    sink method "process" -> code.XmlParse
+  }
+}

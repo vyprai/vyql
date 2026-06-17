@@ -1,0 +1,9 @@
+import code.{CliArgument}
+import core.{ShellEscape}
+
+adapter go {
+  package "github.com/kballard/go-shellquote" {
+    control method "Join" -> core.ShellEscape
+    source method "Split" -> code.CliArgument
+  }
+}

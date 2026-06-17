@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+
+adapter python {
+  package "sentry-sdk" {
+    sink method "Client.send" -> code.NetworkSend
+    sink method "AsyncClient.send" -> code.NetworkSend
+  }
+}

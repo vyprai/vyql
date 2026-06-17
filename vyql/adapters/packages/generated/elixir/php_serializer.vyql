@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "php_serializer" {
+    sink method "unserialize" -> code.Deserialization
+  }
+}

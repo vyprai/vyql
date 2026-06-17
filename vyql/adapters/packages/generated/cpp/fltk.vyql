@@ -1,0 +1,9 @@
+import code.{CommandExecution, FilePathAccess}
+adapter cpp {
+  package "fltk" {
+    sink method "fl_system" -> code.CommandExecution
+    sink method "fl_execvp" -> code.CommandExecution
+    sink method "fl_fopen" -> code.FilePathAccess
+    sink method "fl_open" -> code.FilePathAccess
+  }
+}

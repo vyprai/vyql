@@ -1,0 +1,9 @@
+import code.{FilePathAccess, Deserialization, NetworkSend}
+adapter c {
+  package "log4cxx" {
+    sink method "open" -> code.FilePathAccess
+    sink method "parse" -> code.Deserialization
+    sink method "send" -> code.NetworkSend
+    sink method "write" -> code.FilePathAccess
+  }
+}

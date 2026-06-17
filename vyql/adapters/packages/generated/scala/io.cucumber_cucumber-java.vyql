@@ -1,0 +1,8 @@
+import code.{CodeEval}
+adapter scala {
+  package "io.cucumber:cucumber-java" {
+    sink method "Invoker.invoke" -> code.CodeEval
+    sink method "Invoker.doInvoke" -> code.CodeEval
+    sink method "Invoker.invokeStatic" -> code.CodeEval
+  }
+}

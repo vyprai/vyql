@@ -1,0 +1,7 @@
+import code.{FilePathAccess, HtmlRender}
+adapter swift {
+  package "github.com/miroslavkovac/Lingo" {
+    sink path "Lingo.FileDataSource.rootPath" -> code.FilePathAccess
+    sink method "localize" -> code.HtmlRender
+  }
+}

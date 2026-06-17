@@ -1,0 +1,8 @@
+import code.{FilePathAccess, SqlExecution}
+adapter php {
+  package "doctrine/data-fixtures" {
+    sink method "loadFromDirectory" -> code.FilePathAccess
+    sink method "loadFromFile" -> code.FilePathAccess
+    sink method "execute" -> code.SqlExecution
+  }
+}

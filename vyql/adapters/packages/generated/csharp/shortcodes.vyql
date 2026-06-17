@@ -1,0 +1,7 @@
+import code.{ExpressionEval}
+
+adapter csharp {
+  package "shortcodes" {
+    sink method "ShortcodesProcessor.EvaluateAsync" -> code.ExpressionEval
+  }
+}

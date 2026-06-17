@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter php {
+  package "phpstan/phpdoc-parser" {
+    sink method "PHPStan\PhpDocParser\Parser\TypeParser::parse" -> code.Deserialization
+    sink method "PHPStan\PhpDocParser\Lexer\Lexer::tokenize" -> code.Deserialization
+  }
+}

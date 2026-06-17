@@ -1,0 +1,8 @@
+import code.{StoredDataRead, StoredDataWrite}
+
+adapter dart {
+  package "device_preview" {
+    source method "load" -> code.StoredDataRead
+    sink method "save" -> code.StoredDataWrite
+  }
+}

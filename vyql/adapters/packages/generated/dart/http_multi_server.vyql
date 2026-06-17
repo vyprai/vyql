@@ -1,0 +1,11 @@
+import code.{NetworkBind}
+
+adapter dart {
+  package "http_multi_server" {
+    sink method "HttpMultiServer" -> code.NetworkBind
+    sink method "loopback" -> code.NetworkBind
+    sink method "loopbackSecure" -> code.NetworkBind
+    sink method "bind" -> code.NetworkBind
+    sink method "bindSecure" -> code.NetworkBind
+  }
+}

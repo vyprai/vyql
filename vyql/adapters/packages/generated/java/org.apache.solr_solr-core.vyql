@@ -1,0 +1,8 @@
+import code.{CommandExecution, UrlFetch}
+
+adapter java {
+  package "org.apache.solr:solr-core" {
+    sink method "runImpl" -> code.CommandExecution
+    sink method "callGet" -> code.UrlFetch
+  }
+}

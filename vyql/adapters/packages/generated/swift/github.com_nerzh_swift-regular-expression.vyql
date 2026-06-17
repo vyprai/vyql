@@ -1,0 +1,11 @@
+import code.{ExpressionEval}
+adapter swift {
+  package "github.com/nerzh/swift-regular-expression" {
+    sink method "regexp" -> code.ExpressionEval
+    sink method "replace" -> code.ExpressionEval
+    sink method "replaceFirst" -> code.ExpressionEval
+    sink method "replaceFirstSelf" -> code.ExpressionEval
+    sink method "replaceSelf" -> code.ExpressionEval
+    sink method "matchesWithRange" -> code.ExpressionEval
+  }
+}

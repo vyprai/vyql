@@ -1,0 +1,9 @@
+import code.{NetworkData, NetworkSend}
+
+adapter cpp {
+  package "tacopie" {
+    source method "async_read" -> code.NetworkData
+    sink method "async_write" -> code.NetworkSend
+    source method "on_read_available" -> code.NetworkData
+  }
+}

@@ -1,0 +1,8 @@
+import core.{AuthenticationCheck}
+adapter csharp {
+  package "microsoft.aspnet.membership.openauth.zh-hans" {
+    control method "Login" -> core.AuthenticationCheck
+    control method "VerifyAuthentication" -> core.AuthenticationCheck
+    control method "CreateUser" -> core.AuthenticationCheck
+  }
+}

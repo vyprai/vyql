@@ -1,0 +1,18 @@
+import code.{FilePathAccess, DatabaseRead, SqlExecution}
+
+adapter elixir {
+  package "amnesia" {
+    sink method "load" -> code.FilePathAccess
+    sink method "dump" -> code.FilePathAccess
+    sink method "read" -> code.DatabaseRead
+    sink method "read!" -> code.DatabaseRead
+    sink method "read_at" -> code.DatabaseRead
+    sink method "read_at!" -> code.DatabaseRead
+    sink method "write" -> code.SqlExecution
+    sink method "write!" -> code.SqlExecution
+    sink method "match" -> code.DatabaseRead
+    sink method "match!" -> code.DatabaseRead
+    sink method "select" -> code.DatabaseRead
+    sink method "delete" -> code.SqlExecution
+  }
+}

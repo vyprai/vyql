@@ -1,0 +1,14 @@
+import code.{NetworkConnect, NetworkData, NetworkSend}
+import core.{InputValidation, UserControlledData}
+
+adapter scala {
+  package "org.eclipse.paho:org.eclipse.paho.client.mqttv3" {
+    sink method "connect" -> code.NetworkConnect
+    source method "subscribe" -> code.NetworkData
+    sink method "publish" -> code.NetworkSend
+    source method "getPayload" -> core.UserControlledData
+    source method "setPayload" -> core.UserControlledData
+    control method "validate" -> core.InputValidation
+    control method "validateQos" -> core.InputValidation
+  }
+}

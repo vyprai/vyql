@@ -1,0 +1,9 @@
+import code.{FilePathAccess}
+import core.{UserControlledData}
+
+adapter c {
+  package "libmagic" {
+    sink method "file" -> code.FilePathAccess
+    source method "buffer" -> core.UserControlledData
+  }
+}

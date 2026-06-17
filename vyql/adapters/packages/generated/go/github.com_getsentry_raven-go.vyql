@@ -1,0 +1,8 @@
+import code.{HttpInput}
+adapter go {
+  package "github.com/getsentry/raven-go" {
+    source method "NewHttp" -> code.HttpInput
+    source method "RecoveryHandler" -> code.HttpInput
+    source method "Recoverer" -> code.HttpInput
+  }
+}

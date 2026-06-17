@@ -1,0 +1,7 @@
+import code.{CodeEval}
+
+adapter kotlin {
+  package "org.apache.hadoop:hadoop-yarn-common" {
+    sink method "exec" -> code.CodeEval
+  }
+}

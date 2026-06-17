@@ -1,0 +1,7 @@
+import code.{HttpInput, ResponseHeaderWrite}
+adapter java {
+  package "com.github.penggle:kaptcha" {
+    source method "doGet" -> code.HttpInput
+    sink method "doGet" -> code.ResponseHeaderWrite
+  }
+}

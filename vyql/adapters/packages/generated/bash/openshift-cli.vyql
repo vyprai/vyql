@@ -1,0 +1,5 @@
+adapter bash {
+  package "openshift-cli" {
+    source path "oc.argv" -> code.CliArgument
+  }
+}

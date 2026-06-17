@@ -1,0 +1,6 @@
+import code.{Deserialization, FilePathAccess}
+adapter csharp {
+  package "webp.touch" {
+    sink method "Decode" -> code.Deserialization
+  }
+}

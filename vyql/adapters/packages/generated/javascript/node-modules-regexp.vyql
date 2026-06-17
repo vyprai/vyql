@@ -1,0 +1,6 @@
+import code.{RegexCompile}
+adapter javascript {
+  package "node-modules-regexp" {
+    mark path "module.exports" -> code.RegexCompile
+  }
+}

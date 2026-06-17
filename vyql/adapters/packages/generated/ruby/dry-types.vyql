@@ -1,0 +1,11 @@
+import code.{Deserialization, DynamicCodeLoad}
+adapter ruby {
+  package "dry-types" {
+    sink method "visit_json_hash" -> code.Deserialization
+    sink method "visit_params_hash" -> code.Deserialization
+    sink method "visit_params_array" -> code.Deserialization
+    sink method "call_unsafe" -> code.Deserialization
+    sink method "parse_arguments" -> code.Deserialization
+    sink method "compile_fn" -> code.DynamicCodeLoad
+  }
+}

@@ -1,0 +1,7 @@
+adapter bash {
+  package "httpie" {
+    source path "httpie.argv" -> code.CliArgument
+    source path "httpie.request" -> code.HttpInput
+    sink path "httpie.response_header" -> code.ResponseHeaderWrite
+  }
+}

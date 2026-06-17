@@ -1,0 +1,10 @@
+import code.{FileUse, FilePathAccess}
+
+adapter java {
+  package "org.aspectj:aspectjweaver" {
+    sink method "FileUtil.write" -> code.FileUse
+    sink method "FileUtil.deleteContents" -> code.FilePathAccess
+    sink method "FileUtil.copy" -> code.FilePathAccess
+    sink method "FileUtil.createTempFile" -> code.FilePathAccess
+  }
+}

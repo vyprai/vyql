@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter powershell {
+  package "fable.parsimmon" {
+    sink method "Parsimmon" -> code.Deserialization
+  }
+}

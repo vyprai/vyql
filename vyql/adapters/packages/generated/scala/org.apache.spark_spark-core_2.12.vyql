@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter scala {
+  package "org.apache.spark:spark-core_2.12" {
+    sink method "testCommandAvailable" -> code.CommandExecution
+  }
+}

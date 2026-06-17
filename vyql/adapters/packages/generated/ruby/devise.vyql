@@ -1,0 +1,5 @@
+adapter ruby {
+  package "devise" {
+    mark path "devise.hash" -> code.WeakHash
+  }
+}

@@ -1,0 +1,5 @@
+adapter kotlin {
+  package "io.dropwizard.metrics:metrics-core" {
+    control method "sanitize" -> core.InputValidation
+  }
+}

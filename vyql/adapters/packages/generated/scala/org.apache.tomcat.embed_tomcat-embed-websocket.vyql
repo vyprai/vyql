@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+adapter scala {
+  package "org.apache.tomcat.embed:tomcat-embed-websocket" {
+    source method "getRequestURI" -> core.UserControlledData
+    source method "getRequestParameterMap" -> core.UserControlledData
+    source method "getQueryString" -> core.UserControlledData
+    source method "getPathParameters" -> core.UserControlledData
+  }
+}

@@ -1,0 +1,8 @@
+import code.{StoredDataRead}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "org.apache.curator:curator-recipes" {
+    source method "get" -> code.StoredDataRead
+  }
+}

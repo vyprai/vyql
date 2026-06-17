@@ -1,0 +1,6 @@
+import code.{CliArgument}
+adapter python {
+  package "pytest-astropy" {
+    source method "pytest_addoption" -> code.CliArgument
+  }
+}

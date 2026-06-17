@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter ruby {
+  package "fog-radosgw" {
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.InputValidation
+  }
+}

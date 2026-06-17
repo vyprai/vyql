@@ -1,0 +1,9 @@
+import core.{UserControlledData}
+
+adapter python {
+  package "ipaddress" {
+    source method "ip_network" -> core.UserControlledData
+    source method "ip_address" -> core.UserControlledData
+    source method "ip_interface" -> core.UserControlledData
+  }
+}

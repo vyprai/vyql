@@ -1,0 +1,6 @@
+import core.{PathCanonicalization}
+adapter python {
+  package "flake8-polyfill" {
+    control method "normalize_path" -> core.PathCanonicalization
+  }
+}

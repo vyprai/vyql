@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter javascript {
+  package "urix" {
+    source method "urix" -> core.UserControlledData
+  }
+}

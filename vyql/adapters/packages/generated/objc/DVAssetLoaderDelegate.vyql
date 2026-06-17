@@ -1,0 +1,8 @@
+import code.{NetworkData}
+
+adapter objc {
+  package "DVAssetLoaderDelegate" {
+    source method "initWithURL" -> code.NetworkData
+    source method "URLSession" -> code.NetworkData
+  }
+}

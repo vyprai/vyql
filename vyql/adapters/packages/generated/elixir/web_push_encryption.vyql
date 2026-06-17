@@ -1,0 +1,8 @@
+import code.{NetworkConnect, NetworkSend}
+
+adapter elixir {
+  package "web_push_encryption" {
+    sink method "send_web_push" -> code.NetworkConnect
+    sink method "send_web_push" -> code.NetworkSend
+  }
+}

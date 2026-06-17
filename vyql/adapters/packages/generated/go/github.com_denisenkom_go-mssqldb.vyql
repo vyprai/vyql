@@ -1,0 +1,6 @@
+import code.{SqlExecution}
+adapter go {
+  package "github.com/denisenkom/go-mssqldb" {
+    sink method "sendSqlBatch72" -> code.SqlExecution
+  }
+}

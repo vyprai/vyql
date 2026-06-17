@@ -1,0 +1,5 @@
+adapter perl {
+  package "cPanel-APIClient" {
+    sink method "get_cli_command" -> code.CommandExecution
+  }
+}

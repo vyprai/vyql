@@ -1,0 +1,9 @@
+import code.{HtmlRender}
+import core.{HtmlEscape}
+
+adapter csharp {
+  package "giraffe.viewengine" {
+    sink method "rawText" -> code.HtmlRender
+    control method "encodedText" -> core.HtmlEscape
+  }
+}

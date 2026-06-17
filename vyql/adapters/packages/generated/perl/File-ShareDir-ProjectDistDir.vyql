@@ -1,0 +1,7 @@
+import code.{FilePathAccess}
+adapter perl {
+  package "File-ShareDir-ProjectDistDir" {
+    sink method "build_dist_dir" -> code.FilePathAccess
+    sink method "build_dist_file" -> code.FilePathAccess
+  }
+}

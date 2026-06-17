@@ -1,0 +1,9 @@
+import code.{NetworkSend}
+
+adapter java {
+  package "org.elasticsearch.client:elasticsearch-rest-client" {
+    sink method "performRequest" -> code.NetworkSend
+    sink method "setEntity" -> code.NetworkSend
+    sink method "setJsonEntity" -> code.NetworkSend
+  }
+}

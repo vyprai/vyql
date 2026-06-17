@@ -1,0 +1,6 @@
+adapter go {
+  package "sigs.k8s.io/structured-merge-diff/v4" {
+    sink method "ReadJSONIter" -> code.Deserialization
+    sink method "NewParser" -> code.Deserialization
+  }
+}

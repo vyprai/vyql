@@ -1,0 +1,8 @@
+import code.{NetworkData, NetworkSend}
+
+adapter groovy {
+  package "io.netty:netty-buffer" {
+    source method "ByteBufInputStream.read" -> code.NetworkData
+    sink method "ByteBufOutputStream.write" -> code.NetworkSend
+  }
+}

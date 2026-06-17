@@ -1,0 +1,11 @@
+import code.{Deserialization, HttpInput}
+import core.{HtmlEscape}
+
+adapter elixir {
+  package "mochiweb" {
+    sink method "json_decode" -> code.Deserialization
+    control method "escape" -> core.HtmlEscape
+    control method "escape_attr" -> core.HtmlEscape
+    source method "new_request" -> code.HttpInput
+  }
+}

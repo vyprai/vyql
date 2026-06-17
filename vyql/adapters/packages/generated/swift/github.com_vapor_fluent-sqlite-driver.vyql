@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/vapor/fluent-sqlite-driver" {
+    sink method "file" -> code.FilePathAccess
+  }
+}

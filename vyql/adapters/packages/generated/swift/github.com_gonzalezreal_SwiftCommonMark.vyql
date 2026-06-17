@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+
+adapter swift {
+  package "github.com/gonzalezreal/SwiftCommonMark" {
+    sink method "renderHTML" -> code.HtmlRender
+  }
+}

@@ -1,0 +1,14 @@
+import code.{UrlFetch}
+
+adapter objc {
+  package "StreamingKit" {
+    sink method "play:" -> code.UrlFetch
+    sink method "playURL:" -> code.UrlFetch
+    sink method "queue:" -> code.UrlFetch
+    sink method "queueURL:" -> code.UrlFetch
+    sink method "dataSourceFromURL:" -> code.UrlFetch
+    sink method "initWithURL:" -> code.UrlFetch
+    sink method "initWithURLProvider:" -> code.UrlFetch
+    sink method "initWithAsyncURLProvider:" -> code.UrlFetch
+  }
+}

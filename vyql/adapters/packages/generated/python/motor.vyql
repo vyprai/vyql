@@ -1,0 +1,7 @@
+adapter python {
+  package "motor" {
+    sink method "find" -> code.SqlExecution
+    sink method "find" -> code.NosqlQuery
+    sink method "delete" -> code.StoredDataWrite
+  }
+}

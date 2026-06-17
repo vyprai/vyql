@@ -1,0 +1,9 @@
+import core.{AuthorizationCheck, UserControlledData}
+adapter kotlin {
+  package "org.thymeleaf.extras:thymeleaf-extras-springsecurity4" {
+    control method "AuthUtils.authorizeUsingAccessExpression" -> core.AuthorizationCheck
+    control method "AuthUtils.authorizeUsingUrlCheck" -> core.AuthorizationCheck
+    control method "AclAuthUtils.authorizeUsingAccessControlList" -> core.AuthorizationCheck
+    control method "Authorization.url" -> core.AuthorizationCheck
+  }
+}

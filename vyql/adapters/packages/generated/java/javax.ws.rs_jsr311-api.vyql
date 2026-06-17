@@ -1,0 +1,7 @@
+import code.{HttpInput}
+adapter java {
+  package "javax.ws.rs:jsr311-api" {
+    source method "javax.ws.rs.core.UriInfo.getQueryParameters" -> code.HttpInput
+    source method "javax.ws.rs.core.UriInfo.getPathParameters" -> code.HttpInput
+  }
+}

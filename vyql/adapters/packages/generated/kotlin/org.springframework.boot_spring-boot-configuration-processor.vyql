@@ -1,0 +1,11 @@
+import code.{Deserialization, StoredDataWrite}
+
+adapter kotlin {
+  package "org.springframework.boot:spring-boot-configuration-processor" {
+    sink method "JsonMarshaller.read" -> code.Deserialization
+    sink method "JsonMarshaller.write" -> code.StoredDataWrite
+    sink method "JSONTokener" -> code.Deserialization
+    sink method "JSONObject" -> code.StoredDataWrite
+    sink method "JSONArray" -> code.StoredDataWrite
+  }
+}

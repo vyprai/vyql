@@ -1,0 +1,6 @@
+adapter php {
+  package "cviebrock/eloquent-sluggable" {
+    control method "Cviebrock\EloquentSluggable\Services\SlugService::slug" -> core.InputValidation
+    control method "Cviebrock\EloquentSluggable\Services\SlugService::validateSlug" -> core.InputValidation
+  }
+}

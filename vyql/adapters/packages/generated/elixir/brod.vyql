@@ -1,0 +1,12 @@
+import code.{NetworkConnect, NetworkSend, NetworkData, Deserialization}
+adapter elixir {
+  package "brod" {
+    sink method "connect" -> code.NetworkConnect
+    sink method "link_connect_leader" -> code.NetworkConnect
+    sink method "sync_produce_request" -> code.NetworkSend
+    source method "fetch" -> code.NetworkData
+    source method "fetch_one_batch" -> code.NetworkData
+    source method "do_fetch" -> code.NetworkData
+    sink method "parse_fetch_rsp" -> code.Deserialization
+  }
+}

@@ -1,0 +1,5 @@
+adapter dart {
+  package "flutter_dotenv" {
+    sink method "parse" -> code.Deserialization
+  }
+}

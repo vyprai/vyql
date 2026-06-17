@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter rust {
+  package "brotli-sys" {
+    sink method "BrotliDecoderDecompress" -> code.Deserialization
+    sink method "BrotliDecoderDecompressStream" -> code.Deserialization
+  }
+}

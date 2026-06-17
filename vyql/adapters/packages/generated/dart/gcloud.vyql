@@ -1,0 +1,7 @@
+import code.{StoredDataRead}
+
+adapter dart {
+  package "gcloud" {
+    source method "read" -> code.StoredDataRead
+  }
+}

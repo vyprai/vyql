@@ -1,0 +1,7 @@
+import code.{CliArgument}
+
+adapter cpp {
+  package "argparse" {
+    source method "parse_args" -> code.CliArgument
+  }
+}

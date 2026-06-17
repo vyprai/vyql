@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter objc {
+  package "InAppSettingsKit" {
+    sink method "initWithFile:bundle:delegate:" -> code.FilePathAccess
+  }
+}

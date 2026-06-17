@@ -1,0 +1,8 @@
+adapter cpp {
+  package "poco" {
+    source method "stream" -> code.NetworkData
+    sink method "send" -> code.NetworkSend
+    sink method "file" -> code.FilePathAccess
+    sink method "stream" -> code.Deserialization
+  }
+}

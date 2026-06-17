@@ -1,0 +1,10 @@
+import code.{Deserialization, XmlParse}
+import core.{InputValidation}
+
+adapter javascript {
+  package "postcss-svgo" {
+    sink method "minifySVG" -> code.XmlParse
+    sink method "minify" -> code.Deserialization
+    control method "encode" -> core.InputValidation
+  }
+}

@@ -1,0 +1,7 @@
+import code.{HtmlRender}
+
+adapter python {
+  package "tabulate" {
+    sink method "tabulate" -> code.HtmlRender
+  }
+}

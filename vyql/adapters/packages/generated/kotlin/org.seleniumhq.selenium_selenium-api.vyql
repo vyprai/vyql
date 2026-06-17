@@ -1,0 +1,12 @@
+import code.{Cookie, ExpressionEval, SecretValue, UrlFetch, NetworkConnect}
+import core.{UserControlledData}
+
+adapter kotlin {
+  package "org.seleniumhq.selenium:selenium-api" {
+    sink method "xpath" -> code.ExpressionEval
+    source method "sendKeys" -> core.UserControlledData
+    source method "Cookie" -> code.Cookie
+    source method "setSocksPassword" -> code.SecretValue
+    sink method "setProxyAutoconfigUrl" -> code.UrlFetch
+  }
+}

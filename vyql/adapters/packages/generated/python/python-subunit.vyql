@@ -1,0 +1,13 @@
+import code.{CliArgument, StdinInput, NetworkSend, Deserialization}
+import core.{UserControlledData}
+
+adapter python {
+  package "python-subunit" {
+    source method "parse_arguments" -> code.CliArgument
+    source method "run_filter_script" -> core.UserControlledData
+    source method "read" -> code.StdinInput
+    sink method "write" -> code.NetworkSend
+    source method "read_exactly" -> code.StdinInput
+    sink method "JUnitXML2SubUnit" -> code.Deserialization
+  }
+}

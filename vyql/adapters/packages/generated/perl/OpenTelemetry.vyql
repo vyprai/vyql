@@ -1,0 +1,7 @@
+import code.{NetworkData}
+adapter perl {
+  package "OpenTelemetry" {
+    source method "extract" -> code.NetworkData
+    source method "inject" -> code.NetworkData
+  }
+}

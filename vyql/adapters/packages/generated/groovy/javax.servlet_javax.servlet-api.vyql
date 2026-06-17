@@ -1,0 +1,13 @@
+import code.{HttpInput, Cookie, SessionId, FileUse}
+import core.{UserControlledData}
+
+adapter groovy {
+  package "javax.servlet:javax.servlet-api" {
+    source method "getCookies" -> code.Cookie
+    source method "getHeader" -> code.HttpInput
+    source method "getQueryString" -> code.HttpInput
+    source method "getRequestURI" -> code.HttpInput
+    mark method "getSession" -> code.SessionId
+    source method "getSubmittedFileName" -> core.UserControlledData
+  }
+}

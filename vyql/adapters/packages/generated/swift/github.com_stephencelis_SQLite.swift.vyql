@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter swift {
+  package "github.com/stephencelis/SQLite.swift" {
+    sink method "execute" -> code.SqlExecution
+  }
+}

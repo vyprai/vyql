@@ -1,0 +1,10 @@
+import code.{Deserialization}
+
+adapter cpp {
+  package "qt5-xmlpatterns" {
+    sink method "setQuery" -> code.Deserialization
+    sink method "evaluateTo" -> code.Deserialization
+    sink method "load" -> code.Deserialization
+    sink method "validate" -> code.Deserialization
+  }
+}

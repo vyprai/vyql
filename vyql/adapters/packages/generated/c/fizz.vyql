@@ -1,0 +1,9 @@
+import code.{SecretValue}
+import core.{CertificateValidation}
+
+adapter c {
+  package "fizz" {
+    source method "getExportedKeyingMaterial" -> code.SecretValue
+    control method "FizzClient" -> core.CertificateValidation
+  }
+}

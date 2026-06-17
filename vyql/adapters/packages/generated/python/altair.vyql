@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+
+adapter python {
+  package "altair" {
+    source method "parse_shorthand" -> core.UserControlledData
+  }
+}

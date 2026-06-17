@@ -1,0 +1,7 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter swift {
+  package "github.com/dehesa/CodableCSV" {
+    sink method "decode" -> code.Deserialization
+  }
+}

@@ -1,0 +1,13 @@
+import core.{AuthorizationCheck, InputValidation}
+
+adapter groovy {
+  package "org.thymeleaf.extras:thymeleaf-extras-springsecurity6" {
+    control method "AuthUtils.authorizeUsingAccessExpression" -> core.AuthorizationCheck
+    control method "AuthUtils.authorizeUsingUrlCheck" -> core.AuthorizationCheck
+    control method "AuthUtils.isAuthenticated" -> core.AuthorizationCheck
+    control method "AuthUtils.isFullyAuthenticated" -> core.AuthorizationCheck
+    control method "AclAuthUtils.authorizeUsingAccessControlList" -> core.AuthorizationCheck
+    control method "AclAuthUtils.parsePermissionsString" -> core.InputValidation
+    control method "Authorization.url" -> core.AuthorizationCheck
+  }
+}

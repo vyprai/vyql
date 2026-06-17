@@ -1,0 +1,9 @@
+import code.{SqlExecution}
+adapter scala {
+  package "org.springframework:spring-jdbc" {
+    sink method "query" -> code.SqlExecution
+    sink method "update" -> code.SqlExecution
+    sink method "execute" -> code.SqlExecution
+    sink method "stream" -> code.SqlExecution
+  }
+}

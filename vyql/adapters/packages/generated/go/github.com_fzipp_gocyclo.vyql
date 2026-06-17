@@ -1,0 +1,7 @@
+import code.{FilePathAccess, Deserialization}
+adapter go {
+  package "github.com/fzipp/gocyclo" {
+    sink method "Analyze" -> code.FilePathAccess
+    sink method "Analyze" -> code.Deserialization
+  }
+}

@@ -1,0 +1,10 @@
+import code.{HttpInput, NetworkSend}
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/AliSoftware/OHHTTPStubs" {
+    source method "hasJsonBody" -> core.UserControlledData
+    sink method "stub" -> code.NetworkSend
+    sink method "fixture" -> code.NetworkSend
+  }
+}

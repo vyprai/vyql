@@ -1,0 +1,22 @@
+import code.{NetworkConnect, NetworkSend, NetworkData, FileUse, NetworkBind}
+
+adapter c {
+  package "thrift" {
+    sink method "socket_send" -> code.NetworkSend
+    source method "socket_recv" -> code.NetworkData
+    sink method "socket_connect" -> code.NetworkConnect
+    sink method "socket_bind" -> code.NetworkBind
+    sink method "socket_listen" -> code.NetworkBind
+    source method "socket_accept" -> code.NetworkData
+    sink method "tcp_send" -> code.NetworkSend
+    source method "tcp_receive" -> code.NetworkData
+    source method "tcp_raw_receive" -> code.NetworkData
+    sink method "tcp_connect" -> code.NetworkConnect
+    sink method "tcp_bind" -> code.NetworkBind
+    sink method "tcp_listen" -> code.NetworkBind
+    sink method "tcp_accept" -> code.NetworkConnect
+    sink method "open" -> code.FileUse
+    sink method "write" -> code.FileUse
+    sink method "read" -> code.FileUse
+  }
+}

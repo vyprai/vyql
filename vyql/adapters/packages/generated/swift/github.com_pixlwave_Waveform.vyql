@@ -1,0 +1,6 @@
+import core.{UserControlledData}
+adapter swift {
+  package "github.com/pixlwave/Waveform" {
+    source method "WaveformGenerator.init" -> core.UserControlledData
+  }
+}

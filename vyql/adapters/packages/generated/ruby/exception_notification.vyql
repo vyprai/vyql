@@ -1,0 +1,8 @@
+import code.{NetworkSend}
+adapter ruby {
+  package "exception_notification" {
+    sink method "notify_exception" -> code.NetworkSend
+    sink method "send_message" -> code.NetworkSend
+    sink method "send_notice" -> code.NetworkSend
+  }
+}

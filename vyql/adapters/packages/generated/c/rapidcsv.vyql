@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter c {
+  package "rapidcsv" {
+    sink method "ParseCsv" -> code.Deserialization
+    sink method "Load" -> code.FilePathAccess
+  }
+}

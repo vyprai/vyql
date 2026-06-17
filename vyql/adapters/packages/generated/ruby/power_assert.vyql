@@ -1,0 +1,6 @@
+import code.{CodeEval}
+adapter ruby {
+  package "power_assert" {
+    sink method "PowerAssert::Parser#initialize" -> code.CodeEval
+  }
+}

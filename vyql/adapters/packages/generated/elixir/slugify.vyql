@@ -1,0 +1,5 @@
+adapter elixir {
+  package "slugify" {
+    source method "slugify" -> core.UserControlledData
+  }
+}

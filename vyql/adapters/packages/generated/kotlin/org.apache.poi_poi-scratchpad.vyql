@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter kotlin {
+  package "org.apache.poi:poi-scratchpad" {
+    sink method "parse" -> code.Deserialization
+  }
+}

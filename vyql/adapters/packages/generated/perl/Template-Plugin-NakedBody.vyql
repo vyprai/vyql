@@ -1,0 +1,7 @@
+import core.{HtmlEscape}
+
+adapter perl {
+  package "Template-Plugin-NakedBody" {
+    control method "_filter" -> core.HtmlEscape
+  }
+}

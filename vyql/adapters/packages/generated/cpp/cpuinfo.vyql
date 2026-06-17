@@ -1,0 +1,5 @@
+adapter cpp {
+  package "cpuinfo" {
+    sink method "cpuinfo_linux_parse_cpulist" -> code.FilePathAccess
+  }
+}

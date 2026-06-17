@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess}
+
+adapter go {
+  package "github.com/chai2010/gettext-go" {
+    sink method "Load" -> code.Deserialization
+    sink method "LoadFile" -> code.FilePathAccess
+  }
+}

@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter dart {
+  package "http_server" {
+    sink method "HttpMultipartFormData.parse" -> code.Deserialization
+  }
+}

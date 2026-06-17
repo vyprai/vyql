@@ -1,0 +1,6 @@
+adapter dart {
+  package "crypto" {
+    source method "Hmac" -> code.SecretValue
+    mark method "Digest" -> code.WeakHash
+  }
+}

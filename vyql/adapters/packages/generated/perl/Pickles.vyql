@@ -1,0 +1,8 @@
+import code.{RedirectTarget}
+
+adapter perl {
+  package "Pickles" {
+    mark method "uri_for" -> code.RedirectTarget
+    mark method "redirect" -> code.RedirectTarget
+  }
+}

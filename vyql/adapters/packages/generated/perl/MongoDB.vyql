@@ -1,0 +1,9 @@
+import code.{NosqlQuery}
+adapter perl {
+  package "MongoDB" {
+    sink method "run_command" -> code.NosqlQuery
+    sink method "write_update" -> code.NosqlQuery
+    sink method "write_insert" -> code.NosqlQuery
+    sink method "write_query" -> code.NosqlQuery
+  }
+}

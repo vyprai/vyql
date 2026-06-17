@@ -1,0 +1,7 @@
+import core.{UserControlledData}
+adapter elixir {
+  package "money" {
+    source method "parse" -> core.UserControlledData
+    source method "parse!" -> core.UserControlledData
+  }
+}

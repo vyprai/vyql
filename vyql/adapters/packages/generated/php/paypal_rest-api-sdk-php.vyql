@@ -1,0 +1,5 @@
+adapter php {
+  package "paypal/rest-api-sdk-php" {
+    sink method "saveToFile" -> code.FilePathAccess
+  }
+}

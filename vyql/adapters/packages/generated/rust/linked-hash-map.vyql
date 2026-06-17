@@ -1,0 +1,7 @@
+adapter rust {
+  package "linked-hash-map" {
+    sink method "get" -> code.NosqlQuery
+    sink method "let" -> code.StoredDataWrite
+    mark method "with_hasher" -> code.WeakHash
+  }
+}

@@ -1,0 +1,8 @@
+adapter rust {
+  package "actix-web" {
+    source path "request" -> code.HttpInput
+    sink path "response" -> code.ResponseHeaderWrite
+    source method "cookie" -> code.HttpInput
+    sink method "new" -> code.Deserialization
+  }
+}

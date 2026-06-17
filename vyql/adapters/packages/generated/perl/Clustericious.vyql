@@ -1,0 +1,7 @@
+import core.{InputValidation}
+
+adapter perl {
+  package "Clustericious" {
+    control method "_sanitize_url" -> core.InputValidation
+  }
+}

@@ -1,0 +1,7 @@
+adapter go {
+  package "github.com/Masterminds/semver" {
+    sink method "NewVersion" -> code.Deserialization
+    sink method "MustParse" -> code.Deserialization
+    sink method "parseConstraint" -> code.Deserialization
+  }
+}

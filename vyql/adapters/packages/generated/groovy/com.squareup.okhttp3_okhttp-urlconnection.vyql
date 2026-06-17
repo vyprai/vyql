@@ -1,0 +1,6 @@
+import core.{AuthenticationCheck}
+adapter groovy {
+  package "com.squareup.okhttp3:okhttp-urlconnection" {
+    control method "JavaNetAuthenticator.authenticate" -> core.AuthenticationCheck
+  }
+}

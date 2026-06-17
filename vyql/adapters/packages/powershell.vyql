@@ -1,0 +1,49 @@
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, RegexCompile}
+import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck}
+
+adapter powershell {
+  package "Azure.Functions" {
+    source "$Request.Query" -> HttpInput
+    source "$Request.Body" -> HttpInput
+  }
+  package "Microsoft.PowerShell.Core" {
+    source "$env" -> SecretValue
+    control "ValidateSet" -> AuthorizationCheck
+  }
+  package "Microsoft.PowerShell.Utility" {
+    source method "Content" -> ExternalApiResponse
+    sink path "Invoke-Expression" -> CodeEval
+    sink path "Add-Type" -> CodeEval
+    sink path "Import-Clixml" -> Deserialization
+    sink path "Invoke-WebRequest" -> UrlFetch
+    sink path "Invoke-RestMethod" -> UrlFetch
+    sink path "Select-Xml" -> XmlParse
+    sink path "Select-Xml" arg 1 -> XpathQuery
+    sink path "Select-String" -> RegexCompile
+  }
+  package "SqlServer" {
+    sink path "Invoke-Sqlcmd" -> SqlExecution
+  }
+  package "Microsoft.PowerShell.Management" {
+    sink path "Start-Process" -> CommandExecution
+    sink path "Get-Content" -> FilePathAccess
+    control "Resolve-Path" -> PathCanonicalization
+    control "Test-Path" -> PathCanonicalization
+  }
+  package "Microsoft.PowerShell.Archive" {
+    sink path "Expand-Archive" -> ArchiveEntryWrite
+  }
+  package "System.DirectoryServices" {
+    sink path "DirectorySearcher" -> LdapQuery
+    control "Escape-LdapFilter" -> LdapEscape
+  }
+  package "System.Web" {
+    control "HtmlEncode" -> HtmlEscape
+  }
+  package "System.Data" {
+    control "SqlParameter" -> SqlParameterization
+  }
+  package "System.Security" {
+    control "SecurityElement.Escape" -> HtmlEscape
+  }
+}

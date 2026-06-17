@@ -1,0 +1,15 @@
+import core.{InputValidation}
+
+adapter go {
+  package "gopkg.in/go-playground/validator.v9" {
+    control method "isURLEncoded" -> core.InputValidation
+    control method "isURL" -> core.InputValidation
+    control method "isFile" -> core.InputValidation
+    control method "isBase64URL" -> core.InputValidation
+    control method "contains" -> core.InputValidation
+    control method "excludesRune" -> core.InputValidation
+    control method "containsRune" -> core.InputValidation
+    control method "startsWith" -> core.InputValidation
+    control method "parseOneOfParam2" -> core.InputValidation
+  }
+}

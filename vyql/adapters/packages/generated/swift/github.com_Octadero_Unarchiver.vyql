@@ -1,0 +1,5 @@
+adapter swift {
+  package "github.com/Octadero/Unarchiver" {
+    sink method "gunzipped" -> code.Deserialization
+  }
+}

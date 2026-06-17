@@ -1,0 +1,8 @@
+import code.{Deserialization, CodeEval}
+adapter groovy {
+  package "org.apache.xmlbeans:xmlbeans" {
+    sink method "parse" -> code.Deserialization
+    sink method "compilePath" -> code.CodeEval
+    sink method "compileQuery" -> code.CodeEval
+  }
+}

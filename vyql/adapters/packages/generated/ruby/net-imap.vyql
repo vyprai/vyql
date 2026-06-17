@@ -1,0 +1,10 @@
+import code.{Deserialization, NetworkConnect, SecretValue}
+
+adapter ruby {
+  package "net-imap" {
+    sink method "initialize" -> code.NetworkConnect
+    source method "authenticate" -> code.SecretValue
+    source method "login" -> code.SecretValue
+    sink method "parse" -> code.Deserialization
+  }
+}

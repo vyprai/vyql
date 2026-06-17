@@ -1,0 +1,7 @@
+adapter go {
+  package "github.com/PuerkitoBio/urlesc" {
+    control method "QueryEscape" -> core.InputValidation
+    control method "Escape" -> core.InputValidation
+    sink method "unescapeUserinfo" -> code.Deserialization
+  }
+}

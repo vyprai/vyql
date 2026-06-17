@@ -1,0 +1,10 @@
+import code.{HttpInput, NetworkConnect, NetworkSend, UrlFetch}
+
+adapter scala {
+  package "com.squareup.okhttp:okhttp" {
+    sink method "parse" -> code.UrlFetch
+    source method "query" -> code.HttpInput
+    sink method "newCall" -> code.NetworkConnect
+    sink method "execute" -> code.NetworkSend
+  }
+}

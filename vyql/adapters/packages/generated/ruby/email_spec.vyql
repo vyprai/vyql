@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+
+adapter ruby {
+  package "email_spec" {
+    sink method "request_uri" -> code.UrlFetch
+  }
+}

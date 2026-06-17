@@ -1,0 +1,20 @@
+import code.{SecretValue, StoredDataRead, StoredDataWrite}
+import core.{UserControlledData}
+
+adapter swift {
+  package "github.com/StanfordBDHG/CardinalKitStorage" {
+    source method "store" -> code.SecretValue
+    source method "updateCredentials" -> code.SecretValue
+    source method "retrieveCredentials" -> code.SecretValue
+    source method "retrieveAllCredentials" -> code.SecretValue
+    source method "retrieveAllGenericCredentials" -> code.SecretValue
+    source method "retrieveAllInternetCredentials" -> code.SecretValue
+    source method "createKey" -> code.SecretValue
+    source method "retrievePrivateKey" -> code.SecretValue
+    source method "retrievePublicKey" -> code.SecretValue
+
+    source method "init" -> core.UserControlledData
+    source method "load" -> code.StoredDataRead
+    sink method "modify" -> code.StoredDataWrite
+  }
+}

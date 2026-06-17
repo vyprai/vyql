@@ -1,0 +1,5 @@
+adapter java {
+  package "org.eclipse.jetty:jetty-server" {
+    sink method "FormFields.parse" -> code.Deserialization
+  }
+}

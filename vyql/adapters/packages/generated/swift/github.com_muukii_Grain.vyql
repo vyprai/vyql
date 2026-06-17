@@ -1,0 +1,6 @@
+adapter swift {
+  package "github.com/muukii/Grain" {
+    sink method "write" -> code.FilePathAccess
+    sink method "decode" -> code.Deserialization
+  }
+}

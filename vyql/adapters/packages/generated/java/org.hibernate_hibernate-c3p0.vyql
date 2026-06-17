@@ -1,0 +1,5 @@
+adapter java {
+  package "org.hibernate:hibernate-c3p0" {
+    sink method "getConnection" -> code.SqlExecution
+  }
+}

@@ -1,0 +1,10 @@
+import code.{SecretValue}
+
+adapter php {
+  package "lusitanian/oauth" {
+    source method "getConsumerId" -> code.SecretValue
+    source method "getConsumerSecret" -> code.SecretValue
+    source method "getAccessToken" -> code.SecretValue
+    source method "getRefreshToken" -> code.SecretValue
+  }
+}

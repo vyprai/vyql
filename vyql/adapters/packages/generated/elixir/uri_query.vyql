@@ -1,0 +1,6 @@
+import code.{UrlFetch}
+adapter elixir {
+  package "uri_query" {
+    sink method "params" -> code.UrlFetch
+  }
+}

@@ -1,0 +1,7 @@
+import code.{NetworkSend}
+
+adapter scala {
+  package "io.grpc:grpc-netty" {
+    sink method "write" -> code.NetworkSend
+  }
+}

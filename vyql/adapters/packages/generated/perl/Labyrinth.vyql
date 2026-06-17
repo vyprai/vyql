@@ -1,0 +1,8 @@
+import code.{DatabaseRead, HttpInput}
+
+adapter perl {
+  package "Labyrinth" {
+    sink method "DBConnect" -> code.DatabaseRead
+    source method "ParseParams" -> code.HttpInput
+  }
+}

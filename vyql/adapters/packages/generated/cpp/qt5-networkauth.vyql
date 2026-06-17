@@ -1,0 +1,8 @@
+import code.{SecretValue}
+
+adapter cpp {
+  package "qt5-networkauth" {
+    source method "token" -> code.SecretValue
+    source method "setToken" -> code.SecretValue
+  }
+}

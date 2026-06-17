@@ -1,0 +1,5 @@
+adapter elixir {
+  package "blake2" {
+    mark path "blake2.hash" -> code.WeakHash
+  }
+}

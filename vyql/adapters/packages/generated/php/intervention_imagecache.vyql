@@ -1,0 +1,9 @@
+import code.{FilePathAccess, Deserialization, FileUse}
+import core.{UserControlledData}
+
+adapter php {
+  package "intervention/imagecache" {
+    source method "make" -> core.UserControlledData
+    sink method "getImagePath" -> code.FilePathAccess
+  }
+}

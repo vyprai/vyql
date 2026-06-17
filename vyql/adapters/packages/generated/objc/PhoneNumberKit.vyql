@@ -1,0 +1,8 @@
+import code.{Deserialization}
+
+adapter objc {
+  package "PhoneNumberKit" {
+    sink method "parse" -> code.Deserialization
+    sink method "parseMultiple" -> code.Deserialization
+  }
+}

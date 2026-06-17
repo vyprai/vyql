@@ -1,0 +1,6 @@
+adapter python {
+  package "thinc" {
+    sink method "to_disk" -> code.FilePathAccess
+    sink method "from_disk" -> code.FilePathAccess
+  }
+}

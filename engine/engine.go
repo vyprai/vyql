@@ -66,7 +66,8 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 			}
 			out = append(out, &findings.Finding{
 				RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "order",
-				Confidence: e.conf(a),
+				Confidence:        e.conf(a),
+				ExploitConditions: append(e.exploitConditions(a, body.First.Concept), e.exploitConditions(b, body.Second.Concept)...),
 				Bindings: []findings.Binding{
 					{Name: "first", NodeID: a, Concept: body.First.Concept, Loc: e.loc(a), LabelProvenance: e.prov(a, body.First.Concept)},
 					{Name: "second", NodeID: b, Concept: body.Second.Concept, Loc: e.loc(b), LabelProvenance: e.prov(b, body.Second.Concept)},
@@ -453,11 +454,12 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				{Name: "source", NodeID: fl.SourceID, Concept: srcC, Loc: e.loc(fl.SourceID), LabelProvenance: e.prov(fl.SourceID, srcC)},
 				{Name: "sink", NodeID: fl.SinkID, Concept: snkC, Loc: e.loc(fl.SinkID), LabelProvenance: e.prov(fl.SinkID, snkC)},
 			},
-			Witness:          fl.Path,
-			WitnessKind:      "taint",
-			NegationEvidence: ne,
-			Confidence:       e.conf(fl.SourceID, fl.SinkID),
-			Context:          e.crossDomainContext(fl.SinkID),
+			Witness:           fl.Path,
+			WitnessKind:       "taint",
+			NegationEvidence:  ne,
+			Confidence:        e.conf(fl.SourceID, fl.SinkID),
+			Context:           e.crossDomainContext(fl.SinkID),
+			ExploitConditions: e.exploitConditions(fl.SinkID, snkC),
 		}
 		if idx, seen := bySink[fl.SinkID]; seen {
 			// same sink already reported for this rule — keep whichever source gives the
@@ -525,6 +527,46 @@ func (e *Engine) prov(nodeID, concept string) string {
 		}
 	}
 	return fallback
+}
+
+func (e *Engine) exploitConditions(nodeID, concept string) []findings.ExploitCondition {
+	var out []findings.ExploitCondition
+	seen := map[string]bool{}
+	for _, l := range e.labels(nodeID) {
+		if l.Concept != concept || l.Detail == nil {
+			continue
+		}
+		cond := firstNonEmpty(l.Detail["exploit_condition"], l.Detail["condition"])
+		if cond == "" {
+			continue
+		}
+		conf := firstNonEmpty(l.Detail["exploit_confidence"], l.Provenance.Confidence)
+		if conf == "" {
+			conf = "medium"
+		}
+		ec := findings.ExploitCondition{
+			Category:   firstNonEmpty(l.Detail["exploit_category"], l.Detail["category"]),
+			Condition:  cond,
+			Evidence:   firstNonEmpty(l.Detail["exploit_evidence"], l.Detail["evidence"]),
+			Assumption: firstNonEmpty(l.Detail["exploit_assumption"], l.Detail["assumption"]),
+			Confidence: conf,
+		}
+		key := ec.Category + "\x00" + ec.Condition + "\x00" + ec.Evidence + "\x00" + ec.Assumption
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, ec)
+		}
+	}
+	return out
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // fidelityCeil caps confidence by match fidelity (docs/07): a syntactic match

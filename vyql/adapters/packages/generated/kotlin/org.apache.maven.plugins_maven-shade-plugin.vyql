@@ -1,0 +1,8 @@
+import code.{FileUse}
+
+adapter kotlin {
+  package "org.apache.maven.plugins:maven-shade-plugin" {
+    sink method "execute" -> code.FileUse
+    sink method "shade" -> code.FileUse
+  }
+}

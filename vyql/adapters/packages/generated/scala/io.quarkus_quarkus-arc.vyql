@@ -1,0 +1,6 @@
+adapter scala {
+  package "io.quarkus:quarkus-arc" {
+    control method "validateConfigProperties" -> core.InputValidation
+    sink method "create" -> code.Deserialization
+  }
+}

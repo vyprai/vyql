@@ -1,0 +1,5 @@
+adapter python {
+  package "pyglet" {
+    sink method "open" -> code.FilePathAccess
+  }
+}

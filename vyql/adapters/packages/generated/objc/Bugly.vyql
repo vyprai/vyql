@@ -1,0 +1,8 @@
+adapter objc {
+  package "Bugly" {
+    source method "setUserIdentifier" -> core.UserControlledData
+    source method "setUserValue" -> core.UserControlledData
+    sink method "reportException" -> code.NetworkSend
+    sink method "reportError" -> code.NetworkSend
+  }
+}

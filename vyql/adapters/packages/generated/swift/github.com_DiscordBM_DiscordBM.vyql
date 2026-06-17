@@ -1,0 +1,8 @@
+import code.{NetworkSend, Deserialization}
+
+adapter swift {
+  package "github.com/DiscordBM/DiscordBM" {
+    sink method "send" -> code.NetworkSend
+    sink method "decode" -> code.Deserialization
+  }
+}

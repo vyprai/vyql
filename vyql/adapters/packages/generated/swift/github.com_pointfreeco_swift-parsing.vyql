@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter swift {
+  package "github.com/pointfreeco/swift-parsing" {
+    sink method "parse" -> code.Deserialization
+  }
+}

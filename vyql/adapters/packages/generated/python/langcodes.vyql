@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "langcodes" {
+    sink method "parse_tag" -> code.Deserialization
+  }
+}

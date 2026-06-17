@@ -1,0 +1,6 @@
+import code.{FilePathAccess}
+adapter perl {
+  package "Log-Mini" {
+    sink method "_open_log_file" -> code.FilePathAccess
+  }
+}

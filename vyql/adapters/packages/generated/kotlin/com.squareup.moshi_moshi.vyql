@@ -1,0 +1,8 @@
+import code.{Deserialization, FilePathAccess, NetworkConnect, NetworkData, SqlExecution}
+adapter kotlin {
+  package "com.squareup.moshi:moshi" {
+    sink method "fromJson" -> code.Deserialization
+    sink method "read" -> code.Deserialization
+    sink method "peek" -> code.Deserialization
+  }
+}

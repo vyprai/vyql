@@ -1,0 +1,10 @@
+import code.{FilePathAccess, NetworkData}
+import core.{UserControlledData}
+
+adapter elixir {
+  package "circuits_spi" {
+    sink method "open" -> code.FilePathAccess
+    source method "transfer" -> core.UserControlledData
+    source method "transfer" -> core.UserControlledData
+  }
+}

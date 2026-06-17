@@ -1,0 +1,7 @@
+import code.{CommandExecution}
+
+adapter cpp {
+  package "tap-windows6" {
+    sink method "MsiProcess" -> code.CommandExecution
+  }
+}

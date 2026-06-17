@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter elixir {
+  package "wobserver" {
+    sink method "Wobserver.Web.ClientSocket.parse_command" -> code.Deserialization
+  }
+}

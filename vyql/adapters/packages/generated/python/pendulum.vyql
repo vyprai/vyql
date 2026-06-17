@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter python {
+  package "pendulum" {
+    sink method "parse" -> code.Deserialization
+  }
+}

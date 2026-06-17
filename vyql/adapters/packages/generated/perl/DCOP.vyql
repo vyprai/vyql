@@ -1,0 +1,6 @@
+adapter perl {
+  package "DCOP" {
+    source method "new" -> code.CliArgument
+    sink method "run" -> code.CommandExecution
+  }
+}

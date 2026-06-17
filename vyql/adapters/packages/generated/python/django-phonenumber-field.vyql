@@ -1,0 +1,8 @@
+import core.{InputValidation}
+
+adapter python {
+  package "django-phonenumber-field" {
+    control method "validate_international_phonenumber" -> core.InputValidation
+    control method "validate_phonenumber" -> core.InputValidation
+  }
+}

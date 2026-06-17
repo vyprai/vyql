@@ -1,0 +1,5 @@
+adapter python {
+  package "aiohttp" {
+    sink method "parse_cookie_header" -> code.UrlFetch
+  }
+}

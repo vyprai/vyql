@@ -39,6 +39,7 @@ adapter java {
   type "StringWriter" -> StringWriter
   type "CharArrayWriter" -> CharArrayWriter
   type "ByteArrayOutputStream" -> ByteArrayOutputStream
+  type "CSVWriter" -> CSVWriter
 
   // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
@@ -114,12 +115,27 @@ adapter java {
   sink path "Files.delete" -> code.FilePathAccess
   sink path "Files.copy" -> code.FilePathAccess
   sink path "Paths.get" -> code.FilePathAccess
+  sink method "extractEntry" -> code.ArchiveEntryWrite
+  sink method "transferTo" -> code.UnsafeUpload
 
   // SSRF
   sink path "URL" -> code.UrlFetch
   sink method "openConnection" -> code.UrlFetch
   sink method "getForObject" -> code.UrlFetch
   sink method "getForEntity" -> code.UrlFetch
+  sink method "findById" -> code.ObjectLookupByUserInput
+  sink method "getReferenceById" -> code.ObjectLookupByUserInput
+  sink method "getUser" -> code.ObjectLookupByUserInput
+  sink method "getAccount" -> code.ObjectLookupByUserInput
+  sink method "getOrder" -> code.ObjectLookupByUserInput
+  mark "changePassword" -> code.AuthenticationRequiredOp
+  mark "updatePassword" -> code.AuthenticationRequiredOp
+  mark "resetPassword" -> code.AuthenticationRequiredOp
+  mark "changeEmail" -> code.AuthenticationRequiredOp
+  mark "transferFunds" -> code.AuthenticationRequiredOp
+  mark "deleteAccount" -> code.AuthenticationRequiredOp
+  mark "grantRole" -> code.AuthenticationRequiredOp
+  mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // Code eval / scripting
   sink method "eval" -> code.CodeEval
@@ -142,6 +158,16 @@ adapter java {
   control "hasPermission" -> core.AuthorizationCheck
   control "hasAuthority" -> core.AuthorizationCheck
   control "hasRole" -> core.AuthorizationCheck
+  control method "requireAuth" -> core.AuthenticationCheck
+  control method "ensureAuthenticated" -> core.AuthenticationCheck
+  control method "isAuthenticated" -> core.AuthenticationCheck
+  control method "authenticate" -> core.AuthenticationCheck
+  control method "checkOwnership" -> core.OwnershipCheck
+  control method "requireOwner" -> core.OwnershipCheck
+  control method "isOwner" -> core.OwnershipCheck
+  mark method "lock" -> code.LockAcquire
+  control method "unlock" -> core.LockRelease
+  control "validateRole" -> core.InputValidation
   // XXE hardening — a parser factory configured to disallow DOCTYPE / external entities,
   // dominating the parse (value-matched feature flag).
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
@@ -194,6 +220,19 @@ adapter java {
 
   // csrf disabled (CWE-352) — presence marker
   mark "csrf.disable" -> code.CsrfDisabled
+  mark "setHostnameVerifier" val "true" -> code.CertValidationDisabled
+  mark "setDefaultHostnameVerifier" val "true" -> code.CertValidationDisabled
+  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
+  mark "Algorithm.none" -> code.JwtUnverified
+  mark "setWritable" val "true" val "false" -> code.InsecurePermission
+  mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
+  mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
+  mark "Socket" -> code.ResourceHandle
+  mark "Files.newInputStream" -> code.ResourceHandle
+  mark "Files.newOutputStream" -> code.ResourceHandle
+  mark "Files.newBufferedReader" -> code.ResourceHandle
+  mark "Files.newBufferedWriter" -> code.ResourceHandle
+  control method "close" -> core.ResourceRelease
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval
@@ -223,6 +262,8 @@ adapter java {
   mark "Cipher.getInstance" val "RC2" -> code.WeakCipher
   mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
   mark "Cipher.getInstance" val "ECB" -> code.WeakCipher
+  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
+  mark "GCMParameterSpec" val "000000000000" -> code.StaticIv
   // NullCipher (CWE-327) — a "cipher" that performs no encryption at all.
   mark "NullCipher" -> code.WeakCipher
   // weak randomness (CWE-330) — java.util.Random / Math.random (presence). SecureRandom is
@@ -262,6 +303,7 @@ adapter java {
 
   // unsafe reflection (CWE-470) — tainted class/method name dynamically invoked
   sink path "Class.forName" -> code.ReflectionInvoke
+  sink path "Class.forName" -> code.DynamicCodeLoad
   sink method "newInstance" -> code.ReflectionInvoke
   sink method "getDeclaredMethod" -> code.ReflectionInvoke
   sink method "getMethod" -> code.ReflectionInvoke
@@ -269,6 +311,11 @@ adapter java {
   // HTTP response splitting / header injection (CWE-113) — the header VALUE is arg1
   sink method "setHeader" arg 1 -> code.ResponseHeaderWrite
   sink method "addHeader" arg 1 -> code.ResponseHeaderWrite
+  // CSV/formula injection (CWE-1236), unrestricted upload (CWE-434), and mass assignment (CWE-915).
+  sink method "writeNext" arg all collection -> code.CsvCell
+  sink method "writeAll" arg all collection -> code.CsvCell
+  sink path "BeanUtils.copyProperties" arg all -> code.MassAssign
+  sink method "bind" arg all -> code.MassAssign
 
   // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
   // are a LogOutput sink (user data → log injection) AND a LogWrite mark (secret → leak).

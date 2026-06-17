@@ -1,0 +1,6 @@
+import code.{Deserialization}
+adapter objc {
+  package "AppAuth" {
+    sink method "initWithIDTokenString:" -> code.Deserialization
+  }
+}

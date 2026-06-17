@@ -1,0 +1,7 @@
+import code.{UrlFetch}
+adapter groovy {
+  package "org.webjars:webjars-locator" {
+    sink method "getSetupJavaScript" -> code.UrlFetch
+    sink method "getSetupJson" -> code.UrlFetch
+  }
+}

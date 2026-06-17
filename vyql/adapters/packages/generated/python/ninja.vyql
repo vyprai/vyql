@@ -1,0 +1,9 @@
+import code.{Deserialization}
+import core.{ShellEscape}
+
+adapter python {
+  package "ninja" {
+    sink method "parse" -> code.Deserialization
+    control method "escape" -> core.ShellEscape
+  }
+}

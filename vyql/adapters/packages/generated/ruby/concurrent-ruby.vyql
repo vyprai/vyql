@@ -1,0 +1,7 @@
+import code.{Deserialization}
+
+adapter ruby {
+  package "concurrent-ruby" {
+    sink method "marshal_load" -> code.Deserialization
+  }
+}

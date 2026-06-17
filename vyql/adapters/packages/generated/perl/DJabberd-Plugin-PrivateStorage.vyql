@@ -1,0 +1,6 @@
+import code.{SecretValue}
+adapter perl {
+  package "DJabberd-Plugin-PrivateStorage" {
+    source method "set_config_password" -> code.SecretValue
+  }
+}

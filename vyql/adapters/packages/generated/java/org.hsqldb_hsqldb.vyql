@@ -1,0 +1,7 @@
+import code.{SqlExecution}
+
+adapter java {
+  package "org.hsqldb:hsqldb" {
+    sink method "execute" -> code.SqlExecution
+  }
+}

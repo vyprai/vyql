@@ -1,0 +1,11 @@
+import core.{HtmlEscape, InputValidation}
+
+adapter go {
+  package "github.com/russross/blackfriday/v2" {
+    control method "escapeHTML" -> core.HtmlEscape
+    control method "escapeAllHTML" -> core.HtmlEscape
+    control method "escapeEntities" -> core.HtmlEscape
+    control method "escLink" -> core.HtmlEscape
+    control method "SanitizedAnchorName" -> core.InputValidation
+  }
+}

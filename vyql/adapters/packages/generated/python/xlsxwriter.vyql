@@ -1,0 +1,7 @@
+import code.{ArchiveEntryWrite}
+
+adapter python {
+  package "xlsxwriter" {
+    sink method "write_url" -> code.ArchiveEntryWrite
+  }
+}

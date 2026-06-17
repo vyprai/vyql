@@ -1,0 +1,9 @@
+import code.{WeakHash}
+import core.{AuthenticationCheck}
+
+adapter ruby {
+  package "sorcery" {
+    control method "authenticate" -> core.AuthenticationCheck
+    mark method "encrypt" -> code.WeakHash
+  }
+}
