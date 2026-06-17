@@ -56,3 +56,29 @@ test "kotlin: request param -> readValue is unsafe deserialization"
     val obj = mapper.readValue(u, Foo::class.java)
   }
   ```
+
+test "kotlin: unhardened SAXParser inside use{} is structural XXE"
+  lang kotlin
+  expect VYQL-DESER-004
+  code
+  ```
+  fun read(path: Path): Baseline {
+    Files.newInputStream(path).use {
+      val reader = SAXParserFactory.newInstance().newSAXParser()
+      reader.parse(it, handler)
+    }
+  }
+  ```
+
+test "kotlin: hardened SAXParserFactory is clean (XXE)"
+  lang kotlin
+  reject VYQL-DESER-004
+  code
+  ```
+  fun read(path: Path) {
+    val f = SAXParserFactory.newInstance()
+    f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+    val reader = f.newSAXParser()
+    reader.parse(Files.newInputStream(path), handler)
+  }
+  ```

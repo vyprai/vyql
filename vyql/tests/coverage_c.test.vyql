@@ -53,6 +53,41 @@ test "c: realpath neutralizes path traversal"
   }
   ```
 
+test "c: field-derived array index without upper bound is memory attention"
+  lang c
+  expect VYQL-MEM-010
+  code
+  ```
+  struct N { int neighbor[3]; };
+  struct S { struct N *nodes; int n; };
+
+  void fix(struct S *s, int facet, int j, char *seen) {
+    if (s->nodes[facet].neighbor[j] != -1) {
+      if (seen[s->nodes[facet].neighbor[j]] != 1) {
+        seen[s->nodes[facet].neighbor[j]] = 1;
+      }
+    }
+  }
+  ```
+
+test "c: field-derived array index with upper bound is clean"
+  lang c
+  reject VYQL-MEM-010
+  code
+  ```
+  struct N { int neighbor[3]; };
+  struct S { struct N *nodes; int n; };
+
+  void fix(struct S *s, int facet, int j, char *seen) {
+    if (s->nodes[facet].neighbor[j] != -1 &&
+        s->nodes[facet].neighbor[j] < s->n) {
+      if (seen[s->nodes[facet].neighbor[j]] != 1) {
+        seen[s->nodes[facet].neighbor[j]] = 1;
+      }
+    }
+  }
+  ```
+
 test "cpp: env var -> regcomp is ReDoS"
   lang cpp
   expect VYQL-DOS-001

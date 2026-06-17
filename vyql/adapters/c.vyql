@@ -22,6 +22,11 @@ adapter c {
   sink path "execv" -> code.CommandExecution
   sink path "execvp" -> code.CommandExecution
   sink path "execve" -> code.CommandExecution
+  sink path "execvpe" -> code.CommandExecution
+  // GLib / GTK process spawning (the command line is arg0)
+  sink path "g_spawn_command_line_sync" -> code.CommandExecution
+  sink path "g_spawn_command_line_async" -> code.CommandExecution
+  sink path "g_app_info_create_from_commandline" -> code.CommandExecution
 
   // SQL (procedural — the query is arg1)
   sink path "mysql_query" arg 1 -> code.SqlExecution
@@ -82,6 +87,8 @@ adapter c {
   sink path "realloc" arg 1 -> code.SizeComputation
   mark "alloca" -> code.StackAllocationSmell
   mark "__subscript" -> code.IndexAccess
+  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
+  mark "security.cpp.failure_path_owned_buffer_free" -> code.FailurePathOwnedBufferFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree

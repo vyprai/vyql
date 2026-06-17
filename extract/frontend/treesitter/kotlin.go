@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tskotlin "github.com/tree-sitter-grammars/tree-sitter-kotlin/bindings/go"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 
@@ -76,7 +78,8 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
+			Exported: c.inController || c.hasHandlerAnn(n) || ktPublic(c, n)}}
 	case "property_declaration":
 		name := c.propName(n)
 		val := c.propValue(n)
@@ -109,7 +112,11 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	case "call_expression", "navigation_expression":
-		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+		// trailing-lambda bodies (`stream.use { reader.parse(it) }`, `x.let { … }`,
+		// `apply/also/run`) execute synchronously — lower their statements inline so
+		// code inside scope functions is actually analyzed (it was being dropped).
+		return append(out, c.trailingLambdaStmts(n)...)
 	case "jump_expression", "return_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
@@ -200,6 +207,42 @@ func (c *ktConv) opToken(n *tree_sitter.Node) string {
 	return "?"
 }
 
+// trailingLambdaStmts lowers the bodies of any lambda arguments of a call
+// (trailing `{ … }` or `(…, { … })`). Kotlin scope functions (use/let/apply/
+// also/run/with/forEach) run their lambda synchronously, so the statements
+// inside must be analyzed; they were previously dropped.
+func (c *ktConv) trailingLambdaStmts(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		for _, ch := range children(m) {
+			switch ch.Kind() {
+			case "annotated_lambda", "lambda_literal":
+				out = append(out, c.collectBlocks(ch)...)
+			case "value_arguments", "call_suffix":
+				walk(ch) // lambda passed as a regular arg: `foo({ … })`
+			}
+		}
+	}
+	walk(n)
+	return out
+}
+
+// ktPublic reports whether a Kotlin function is public API. Kotlin is public BY DEFAULT;
+// only an explicit private/internal/protected modifier hides it. Used to scope the
+// library param-source to the public surface.
+func ktPublic(c *ktConv, n *tree_sitter.Node) bool {
+	for _, ch := range children(n) {
+		if ch.Kind() == "modifiers" {
+			t := c.text(ch)
+			if strings.Contains(t, "private") || strings.Contains(t, "internal") || strings.Contains(t, "protected") {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (c *ktConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var walk func(m *tree_sitter.Node)
@@ -208,7 +251,8 @@ func (c *ktConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 			switch ch.Kind() {
 			case "statements":
 				out = append(out, c.decls(ch)...)
-			case "control_structure_body", "when_entry", "catch_block", "finally_block", "block":
+			case "control_structure_body", "when_entry", "catch_block", "finally_block", "block",
+				"annotated_lambda", "lambda_literal":
 				walk(ch)
 			default:
 				if ch.IsNamed() && isKtStmt(ch.Kind()) {

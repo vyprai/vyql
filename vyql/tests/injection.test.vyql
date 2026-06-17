@@ -272,6 +272,7 @@ test "js: _.merge with a constant source is clean"
 
 test "js: tainted dynamic object key is prototype pollution"
   lang javascript
+  profile library
   expect VYQL-INJ-013
   code
   ```
@@ -284,6 +285,7 @@ test "js: tainted dynamic object key is prototype pollution"
 
 test "js: taint enters function-expression assigned to a variable"
   lang javascript
+  profile library
   expect VYQL-INJ-013
   code
   ```
@@ -631,6 +633,7 @@ test "javascript: encoded error message sent as HTML is clean"
 
 test "javascript: generate-function builder receives tainted source"
   lang javascript
+  profile library
   expect VYQL-INJ-003
   code
   ```
@@ -814,6 +817,95 @@ test "javascript: unrelated eval support option is clean for pdfjs eval"
   ```
   function configure(options) {
     return { ...options, isEvalSupported: true };
+  }
+  ```
+
+test "php: unscanned PDF preview response is XSS-relevant"
+  lang php
+  expect VYQL-INJ-026
+  code
+  ```
+  <?php
+  function preview($asset) {
+      $stream = $asset->getStream();
+      return new StreamedResponse(function () use ($stream) {
+          fpassthru($stream);
+      }, 200, [
+          'Content-Type' => 'application/pdf',
+      ]);
+  }
+  ```
+
+test "php: PDF preview scan gate suppresses unscanned PDF response"
+  lang php
+  reject VYQL-INJ-026
+  code
+  ```
+  <?php
+  function preview($asset) {
+      $scanResponse = getResponseByScanStatus($asset);
+      if ($scanResponse) {
+          return $scanResponse;
+      }
+      $stream = $asset->getStream();
+      return new StreamedResponse(function () use ($stream) {
+          fpassthru($stream);
+      }, 200, [
+          'Content-Type' => 'application/pdf',
+      ]);
+  }
+  ```
+
+test "php: non-PDF streamed response is not PDF preview XSS"
+  lang php
+  reject VYQL-INJ-026
+  code
+  ```
+  <?php
+  function preview($thumb) {
+      $stream = $thumb->getStream();
+      return new StreamedResponse(function () use ($stream) {
+          fpassthru($stream);
+      }, 200, [
+          'Content-Type' => 'image/jpeg',
+      ]);
+  }
+  ```
+
+test "php: GET key variable-variable assignment is XSS-relevant"
+  lang php
+  expect VYQL-INJ-027
+  code
+  ```
+  <?php
+  foreach ($_GET as $k => $v) {
+      $$k = $v;
+  }
+  echo $title;
+  ```
+
+test "php: allowlisted GET key variable-variable assignment is clean"
+  lang php
+  reject VYQL-INJ-027
+  code
+  ```
+  <?php
+  foreach ($_GET as $k => $v) {
+      if (preg_match('/^(test|no)\w+$/', $k)) {
+          $$k = $v;
+      }
+  }
+  echo $title;
+  ```
+
+test "php: non-request variable-variable assignment is not request XSS"
+  lang php
+  reject VYQL-INJ-027
+  code
+  ```
+  <?php
+  foreach ($defaults as $k => $v) {
+      $$k = $v;
   }
   ```
 

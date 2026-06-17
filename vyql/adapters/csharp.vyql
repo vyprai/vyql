@@ -48,6 +48,10 @@ adapter csharp {
   // command execution
   sink path "Process.Start" -> code.CommandExecution
   sink path "ProcessStartInfo" -> code.CommandExecution
+  // the command line is usually assigned to the .Arguments property, not passed to the
+  // ProcessStartInfo ctor — model that property write as the injectable cmdi position.
+  sink path "Arguments" -> code.CommandExecution
+  sink path "StartInfo.Arguments" -> code.CommandExecution
 
   // deserialization
   sink method "Deserialize" -> code.Deserialization
@@ -96,9 +100,22 @@ adapter csharp {
   sink path "Response.Write" -> code.HtmlRender
   sink method "Raw" -> code.HtmlRender
   sink path "MarkupString" -> code.HtmlRender
+  // BTCPay ConfirmModel(title, description, action): the Description (arg 1) is rendered as
+  // RAW HTML in the Confirm view, so an untrusted value interpolated into it is reflected XSS.
+  sink path "ConfirmModel" arg 1 -> code.HtmlRender
+  // Open redirect: ASP.NET-style redirect APIs and ABP's single-argument RedirectSafelyAsync
+  // take a destination URL/path as arg0.
+  sink path "Response.Redirect" -> code.RedirectTarget
+  sink method "Redirect" -> code.RedirectTarget
+  sink method "RedirectPermanent" -> code.RedirectTarget
+  sink method "RedirectPreserveMethod" -> code.RedirectTarget
+  sink method "RedirectPermanentPreserveMethod" -> code.RedirectTarget
+  sink method "RedirectSafelyAsync" -> code.RedirectTarget
   // HTTP response splitting / header injection (CWE-113).
   sink path "Response.Headers.Add" arg 1 -> code.ResponseHeaderWrite
   sink path "Response.Headers.Append" arg 1 -> code.ResponseHeaderWrite
+  // HttpClient/RestSharp header write WITHOUT CRLF validation (CWE-113 response splitting).
+  sink method "TryAddWithoutValidation" arg 1 -> code.ResponseHeaderWrite
   // log injection (CWE-117) + secret-in-log (CWE-532).
   sink method "LogInformation" arg all -> code.LogOutput
   sink method "LogWarning" arg all -> code.LogOutput
@@ -210,4 +227,20 @@ adapter csharp {
 
   // character-filter: Regex.Replace(input, pattern, repl) is global.
   filter path "Regex.Replace" global
+
+  // ServiceStack (dependency-gated): the HTML-format response writer reflects the request
+  // URL into an HTML page and writes it to the output stream. ResolveAbsoluteUrl is the
+  // request-derived source; the stream WriteAsync of the built HTML body is the XSS sink.
+  // Scoped to the servicestack package so the otherwise-generic WriteAsync stays safe.
+  // RestSharp (dependency-gated): the HeaderParameter ctor accepts a header VALUE (arg 1) that
+  // becomes an HTTP request header unvalidated — a CRLF value is response splitting (CWE-113).
+  // This is the exact operation CVE-2024-45302 hardened (the ctor now rejects \r\n\t), so it is
+  // the header-injection sink (like `new SqlCommand(q)` is a SQL sink).
+  package "restsharp" {
+    sink path "HeaderParameter" arg 1 -> code.ResponseHeaderWrite
+  }
+  package "servicestack" {
+    source method "ResolveAbsoluteUrl" -> code.HttpInput
+    sink method "WriteAsync" -> code.HtmlRender
+  }
 }

@@ -423,12 +423,17 @@ module.exports = function killport(port) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var sources, sinks []string
+	// public-API params are now the library trust boundary (FuncDef.Exported ->
+	// code.ExternalEntryInput), gated to the library profile. Simulate it.
+	defer frontend.SetActiveSources(nil)
+	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
+	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.LibraryAdapters()...), nil); err != nil {
+		t.Fatal(err)
+	}
+	sources, _ := g.NodesWithConcept("code.ExternalEntryInput")
+	var sinks []string
 	nodes, _ := g.AllNodes()
 	for _, n := range nodes {
-		if n.Prop("callee_path") == "public_api_input" {
-			sources = append(sources, n.ID)
-		}
 		if n.Prop("callee_path") == "child_process.exec" || n.Prop("callee_path") == "cp.exec" {
 			if arg := n.Prop("arg0"); arg != "" {
 				sinks = append(sinks, arg)
@@ -436,7 +441,7 @@ module.exports = function killport(port) {
 		}
 	}
 	if len(sources) == 0 || len(sinks) == 0 {
-		t.Fatalf("expected public API source and exec arg sink, got %d sources / %d sinks", len(sources), len(sinks))
+		t.Fatalf("expected exported-param source and exec arg sink, got %d sources / %d sinks", len(sources), len(sinks))
 	}
 	if !reachable(g, sources, sinks) {
 		t.Fatalf("expected exported parameter source to flow into cp.exec argument")
@@ -462,10 +467,12 @@ func TestJavaScriptPrototypeOptionReadSink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapterapply.Apply(g, frontend.JsAdapters(), nil); err != nil {
+	defer frontend.SetActiveSources(nil)
+	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
+	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.LibraryAdapters()...), nil); err != nil {
 		t.Fatal(err)
 	}
-	srcs, _ := g.NodesWithConcept("core.UserControlledData")
+	srcs, _ := g.NodesWithConcept("code.ExternalEntryInput")
 	sinks, _ := g.NodesWithConcept("code.ProtoPollute")
 	if len(srcs) == 0 || len(sinks) == 0 {
 		t.Fatalf("expected public API source and ProtoPollute option-read sink, got %d sources / %d sinks", len(srcs), len(sinks))
@@ -496,10 +503,12 @@ func TestJavaScriptDestructuringKeepsTaint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapterapply.Apply(g, frontend.JsAdapters(), nil); err != nil {
+	defer frontend.SetActiveSources(nil)
+	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
+	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.LibraryAdapters()...), nil); err != nil {
 		t.Fatal(err)
 	}
-	srcs, _ := g.NodesWithConcept("core.UserControlledData")
+	srcs, _ := g.NodesWithConcept("code.ExternalEntryInput")
 	sinks, _ := g.NodesWithConcept("code.CommandExecution")
 	if !reachable(g, srcs, sinks) {
 		t.Fatalf("expected exported destructured values to flow into cmd.exe spawn args")

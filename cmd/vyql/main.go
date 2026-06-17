@@ -52,6 +52,9 @@ func main() {
 	// deep in loading — recover into a clean message rather than a stack trace.
 	defer func() {
 		if r := recover(); r != nil {
+			if os.Getenv("VYQL_PANIC") != "" {
+				panic(r)
+			}
 			fmt.Fprintln(os.Stderr, "vyql: "+fmt.Sprint(r))
 			if os.Getenv("VYQL_DEBUG") != "" {
 				fmt.Fprintln(os.Stderr, string(debug.Stack()))
@@ -65,6 +68,8 @@ func main() {
 	switch cmd {
 	case "scan":
 		err = cmdScan(args)
+	case "review":
+		err = cmdReview(args)
 	case "trace":
 		err = cmdTrace(args)
 	case "explain":
@@ -251,6 +256,12 @@ func scanPathsFull(paths []string, rulesSrc string) ([]*findings.Finding, usg.St
 		}
 		all = append(all, got...)
 	}
+	// Possibility mode (opt-in, for the AI/triage pass): surface every dangerous-concept
+	// site the confirmed rules did not flag, as low-confidence "possibility" findings. OFF
+	// by default so the protected benchmarks are unaffected.
+	if os.Getenv("VYQL_POSSIBILITY") != "" {
+		all = append(all, eng.PossibilityFindings(all)...)
+	}
 	tk.mark("evaluate")
 	return all, g, meta, stats, nil
 }
@@ -430,6 +441,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
 	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json|graph-json -profile -stats]")
+	fmt.Fprintln(os.Stderr, "  review     list non-finding review targets and supporting checks for AI/manual review   [-format text|json]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")

@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsrust "github.com/tree-sitter/tree-sitter-rust/bindings/go"
 
@@ -98,6 +100,8 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
+		body = append(body, c.rsUnsafeMutableAliasCasts(n)...)
+		body = append(body, c.rsIncompleteIPv4DenylistChecks(n)...)
 		if handler {
 			var seed []nir.Stmt
 			for _, p := range params {
@@ -106,7 +110,14 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+		exported := handler // `pub fn` is the public API; trait methods are public too
+		for _, ch := range children(n) {
+			if ch.Kind() == "visibility_modifier" {
+				exported = true
+				break
+			}
+		}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: exported}}
 	case "impl_item", "mod_item", "trait_item":
 		return c.decls(field(n, "body"))
 	case "struct_item", "enum_item", "use_declaration", "const_item", "static_item":
@@ -140,6 +151,126 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, handler bool) []nir.Stmt {
 	}
 	// a bare tail expression (block value) still matters for taint
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *rsConv) rsIncompleteIPv4DenylistChecks(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	type seenSet map[string]bool
+	byReceiver := map[string]seenSet{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "call_expression" {
+			path := c.dotted(field(n, "function"))
+			if recv, meth, ok := rustReceiverMethod(path); ok && rustIPv4DenylistMethod(meth) {
+				if byReceiver[recv] == nil {
+					byReceiver[recv] = seenSet{}
+				}
+				byReceiver[recv][meth] = true
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+
+	var out []nir.Stmt
+	for _, seen := range byReceiver {
+		if !rustLooksLikeIPv4Denylist(seen) {
+			continue
+		}
+		var missing []string
+		for _, meth := range []string{"is_unspecified", "is_broadcast"} {
+			if !seen[meth] {
+				missing = append(missing, meth)
+			}
+		}
+		if len(missing) == 0 {
+			continue
+		}
+		path := "security.ipv4.denylist.incomplete." + strings.Join(missing, ".")
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: c.loc(fn)},
+			Path:   path,
+			Method: lastSeg(path),
+			Loc:    c.loc(fn),
+		}})
+	}
+	return out
+}
+
+func rustReceiverMethod(path string) (string, string, bool) {
+	i := strings.LastIndex(path, ".")
+	if i <= 0 || i == len(path)-1 {
+		return "", "", false
+	}
+	return path[:i], path[i+1:], true
+}
+
+func rustIPv4DenylistMethod(meth string) bool {
+	switch meth {
+	case "is_private", "is_loopback", "is_link_local", "is_multicast", "is_documentation",
+		"is_unspecified", "is_broadcast":
+		return true
+	default:
+		return false
+	}
+}
+
+func rustLooksLikeIPv4Denylist(seen map[string]bool) bool {
+	core := 0
+	for _, meth := range []string{"is_private", "is_loopback", "is_link_local", "is_multicast", "is_documentation"} {
+		if seen[meth] {
+			core++
+		}
+	}
+	return core >= 3
+}
+
+func (c *rsConv) rsUnsafeMutableAliasCasts(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "reference_expression" && rustUnsafeMutableAliasText(c.text(n)) {
+			loc := c.loc(n)
+			if !seen[loc] {
+				seen[loc] = true
+				path := "security.rust.unsafe.mutable_alias"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Path:   path,
+					Method: lastSeg(path),
+					Loc:    loc,
+				}})
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+func rustUnsafeMutableAliasText(s string) bool {
+	return strings.Contains(s, "&mut") &&
+		strings.Contains(s, "*") &&
+		strings.Contains(s, "as *const") &&
+		strings.Contains(s, "as *mut")
 }
 
 func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {

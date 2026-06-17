@@ -18,3 +18,14 @@ rule UnsafeReflection {
   meta { id: "VYQL-DESER-003", severity: high, cwe: [CWE_470] }
   taint core.UserControlledData -> code.ReflectionInvoke
 }
+
+// Structural XXE: an XML parser that parses input without entity-hardening is
+// vulnerable regardless of whether the source can be proven attacker-controlled
+// (the parsed document is itself the untrusted input). Low confidence; suppressed
+// when the parser/factory is hardened (disallow-doctype-decl / external entities off).
+rule XxeUnhardened {
+  meta { id: "VYQL-DESER-004", severity: medium, cwe: [CWE_611], confidence_floor: low }
+  match code.XmlParserCreate as p
+  unless guarded_by core.XmlHardening
+  unless sanitized_by core.XmlHardening
+}

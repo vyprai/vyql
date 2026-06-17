@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tscs "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
 
@@ -9,10 +11,11 @@ import (
 
 // csConv walks a tree-sitter C# CST into NIR.
 type csConv struct {
-	src          []byte
-	file         string
-	key          string
-	inController bool // inside an MVC controller → action params are user input
+	src           []byte
+	file          string
+	key           string
+	inController  bool // inside an MVC controller → action params are user input
+	boundGetProps []string
 }
 
 var csHTTPAttrs = map[string]bool{
@@ -83,9 +86,14 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return c.decls(n) // flatten namespace / declaration-list bodies
 	case "class_declaration", "struct_declaration", "interface_declaration", "record_declaration", "enum_declaration":
 		prev := c.inController
+		prevBound := c.boundGetProps
 		c.inController = prev || c.isController(n)
-		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}
+		bodyNode := field(n, "body")
+		c.boundGetProps = c.razorGetBoundProperties(bodyNode)
+		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(bodyNode), Loc: L,
+			Bases: c.classBases(n), Members: c.classMembers(bodyNode)}
 		c.inController = prev
+		c.boundGetProps = prevBound
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration", "local_function_statement", "operator_declaration":
 		params := c.params(field(n, "parameters"))
@@ -102,7 +110,20 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+		// Razor Pages [BindProperty(SupportsGet = true)] properties are populated from the
+		// request query/route before handler methods run. Seed those member reads so page
+		// handlers like OnPostAsync can flow ReturnUrl into redirect sinks.
+		if n.Kind() == "method_declaration" && len(c.boundGetProps) > 0 {
+			var seed []nir.Stmt
+			for _, p := range c.boundGetProps {
+				seed = append(seed, nir.Assign{Targets: []string{p},
+					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+			}
+			body = append(seed, body...)
+		}
+		exported := c.inController || (n.Kind() == "method_declaration" && c.hasHTTPAttr(n)) ||
+			((n.Kind() == "method_declaration" || n.Kind() == "constructor_declaration") && csPublic(c, n))
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: exported}}
 	case "property_declaration":
 		// accessor bodies may hold logic
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
@@ -139,11 +160,28 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if len(kids) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
+		// `return this;` / `return base;` — `this`/`base` are UNNAMED keyword tokens, so they
+		// are not in namedChildren; capture them explicitly so `return this` carries the self ref.
+		for _, ch := range children(n) {
+			if k := ch.Kind(); k == "this" || k == "base" {
+				return []nir.Stmt{nir.Return{Value: nir.Name{ID: "this", Loc: L}}}
+			}
+		}
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1); Cond nil (C# did not evaluate the predicate) -> byte-identical.
 	case "if_statement":
 		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.csBranch(field(n, "consequence")), Else: c.csBranch(field(n, "alternative"))}}
-	case "while_statement", "for_statement", "for_each_statement", "foreach_statement", "do_statement":
+	case "for_each_statement", "foreach_statement":
+		// `foreach (var p in coll) { … }` — bind the loop variable to the collection so it
+		// inherits the collection's element taint (the var/collection were dropped before,
+		// so element taint never reached the body).
+		body := c.collectBlocks(n)
+		if lv, coll := field(n, "left"), field(n, "right"); lv != nil && coll != nil {
+			bind := nir.Assign{Targets: []string{c.text(lv)}, Value: nir.Format{Parts: []nir.Expr{c.expr(coll)}, Loc: L}}
+			body = append([]nir.Stmt{bind}, body...)
+		}
+		return []nir.Stmt{nir.Loop{Body: body}}
+	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_statement", "using_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
@@ -171,6 +209,17 @@ func (c *csConv) attrNames(n *tree_sitter.Node) []string {
 	return out
 }
 
+// csPublic reports whether a C# member is part of the public API: it carries a `public`
+// modifier (C# members default to private). Scopes the library param-source.
+func csPublic(c *csConv, n *tree_sitter.Node) bool {
+	for _, ch := range children(n) {
+		if ch.Kind() == "modifier" && c.text(ch) == "public" {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *csConv) hasHTTPAttr(n *tree_sitter.Node) bool {
 	for _, a := range c.attrNames(n) {
 		if csHTTPAttrs[a] {
@@ -178,6 +227,27 @@ func (c *csConv) hasHTTPAttr(n *tree_sitter.Node) bool {
 		}
 	}
 	return false
+}
+
+func (c *csConv) razorGetBoundProperties(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	var out []string
+	for _, m := range namedChildren(body) {
+		if m.Kind() != "property_declaration" {
+			continue
+		}
+		txt := c.text(m)
+		if !strings.Contains(txt, "BindProperty") || !strings.Contains(txt, "SupportsGet") ||
+			!strings.Contains(strings.ToLower(txt), "true") {
+			continue
+		}
+		if nm := field(m, "name"); nm != nil {
+			out = append(out, c.text(nm))
+		}
+	}
+	return out
 }
 
 // isController reports whether a class is an MVC controller (by base type,
@@ -225,6 +295,14 @@ func (c *csConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		right := c.expr(field(inner, "right"))
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+		}
+		// member/element property write `si.Arguments = x` / `obj.prop = x`: model as a
+		// PATH-sink call (Method="") so the assigned value flows into a write node a
+		// `sink path "Arguments"`-style sink can match (e.g. ProcessStartInfo.Arguments
+		// command injection). Mirrors the JS/Kotlin member-write modeling.
+		if left != nil && (left.Kind() == "member_access_expression" || left.Kind() == "element_access_expression") {
+			p := c.dotted(left)
+			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: c.loc(inner)}}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
@@ -327,11 +405,114 @@ func (c *csConv) block(block *tree_sitter.Node) []nir.Stmt {
 	if block == nil {
 		return nil
 	}
+	// Expression-bodied member: `T M(...) => expr;` — the arrow clause is the body
+	// field but holds a bare expression, so model it as an implicit return so the
+	// param→return dataflow forms (without this the value is dropped).
+	if block.Kind() == "arrow_expression_clause" {
+		kids := namedChildren(block)
+		if len(kids) > 0 {
+			return []nir.Stmt{nir.Return{Value: c.expr(kids[len(kids)-1])}}
+		}
+		return nil
+	}
 	var out []nir.Stmt
 	for _, st := range namedChildren(block) {
 		out = append(out, c.stmt(st)...)
 	}
 	return out
+}
+
+// classBases returns the base class / interface SHORT names of a class declaration (generics
+// stripped: `ParametersCollection<HeaderParameter>` -> `ParametersCollection`), for
+// inheritance-aware implicit-`this` member resolution.
+func (c *csConv) classBases(n *tree_sitter.Node) []string {
+	var bl *tree_sitter.Node
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "base_list" {
+			bl = ch
+			break
+		}
+	}
+	if bl == nil {
+		return nil
+	}
+	var out []string
+	for _, b := range namedChildren(bl) {
+		if nm := lastSeg(baseTypeName(c, b)); nm != "" {
+			out = append(out, nm)
+		}
+	}
+	return out
+}
+
+// baseTypeName extracts the type name from a base-list entry, stripping generic arguments.
+func baseTypeName(c *csConv, n *tree_sitter.Node) string {
+	switch n.Kind() {
+	case "generic_name":
+		if id := field(n, "name"); id != nil {
+			return c.text(id)
+		}
+		if k := namedChildren(n); len(k) > 0 {
+			return c.text(k[0])
+		}
+	}
+	return c.text(n)
+}
+
+// classMembers returns the data-member names (fields + properties) declared directly in a class
+// body, so a bare member reference in a method resolves to `this.<member>`.
+func (c *csConv) classMembers(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	var out []string
+	for _, m := range namedChildren(body) {
+		switch m.Kind() {
+		case "property_declaration", "event_declaration":
+			if nm := field(m, "name"); nm != nil {
+				out = append(out, c.text(nm))
+			}
+		case "field_declaration", "event_field_declaration":
+			for _, ch := range namedChildren(m) {
+				if ch.Kind() == "variable_declaration" {
+					for _, d := range namedChildren(ch) {
+						if d.Kind() == "variable_declarator" {
+							if nm := field(d, "name"); nm != nil {
+								out = append(out, c.text(nm))
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// lambdaParams extracts the parameter names of a C# lambda: an `implicit_parameter`/identifier
+// for `x => …`, or a `parameter_list` for `(x, y) => …` / `(int x) => …`.
+func (c *csConv) lambdaParams(p *tree_sitter.Node) []string {
+	if p == nil {
+		return nil
+	}
+	switch p.Kind() {
+	case "parameter_list":
+		var out []string
+		for _, ch := range namedChildren(p) {
+			switch ch.Kind() {
+			case "parameter":
+				if nm := field(ch, "name"); nm != nil {
+					out = append(out, c.text(nm))
+				}
+			case "implicit_parameter", "identifier":
+				out = append(out, c.text(ch))
+			}
+		}
+		return out
+	case "implicit_parameter", "identifier":
+		return []string{c.text(p)}
+	}
+	return nil
 }
 
 func (c *csConv) params(params *tree_sitter.Node) []string {
@@ -389,6 +570,10 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "this", "base":
 		return nir.Name{ID: c.text(n), Loc: L}
+	case "this_expression", "base_expression":
+		// `this` / `base` — model both as the self reference ("this") so member writes/reads and
+		// `return this` resolve to the same stable self node (base.X is this.X for our purposes).
+		return nir.Name{ID: "this", Loc: L}
 	case "null_literal", "predefined_type":
 		return nir.Const{Loc: L}
 	case "integer_literal", "real_literal", "character_literal":
@@ -401,8 +586,17 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "interpolation" {
-				if k := namedChildren(ch); len(k) > 0 {
-					parts = append(parts, c.expr(k[0]))
+				// the hole's named children are `interpolation_brace {`, the EXPRESSION, then
+				// `interpolation_brace }` (+ optional alignment/format clauses). Indexing [0]
+				// blindly picked up the `{` brace, dropping every interpolated value's taint —
+				// so lower each real expression child (interpolation is ubiquitous in C#).
+				for _, e := range namedChildren(ch) {
+					switch e.Kind() {
+					case "interpolation_brace", "interpolation_alignment_clause", "interpolation_format_clause":
+						// punctuation / formatting — not a value
+					default:
+						parts = append(parts, c.expr(e))
+					}
 				}
 			}
 		}
@@ -432,7 +626,22 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 				args = append(args, c.expr(ch))
 			}
 		}
-		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: args, Path: typ, Method: typ, Loc: L}
+		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: args, Path: typ, Method: typ, Loc: L, IsCtor: true}
+	case "lambda_expression", "anonymous_method_expression":
+		// C# lambdas / anonymous delegates were unlowered (fell through to a Seq), so callbacks
+		// and ALL LINQ (Select/Where/ForEach/GroupBy…) dropped their bodies — no taint reached
+		// the lambda param or a sink inside it. Lower as nir.Lambda so the param is routed from
+		// the receiver (elementCallbackMethods) and the body is analysed.
+		params := c.lambdaParams(field(n, "parameters"))
+		var body []nir.Stmt
+		if b := field(n, "body"); b != nil {
+			if b.Kind() == "block" {
+				body = c.block(b)
+			} else {
+				body = []nir.Stmt{nir.Return{Value: c.expr(b)}} // expression-bodied lambda
+			}
+		}
+		return nir.Lambda{Params: params, Body: body, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))

@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"regexp"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -29,9 +30,11 @@ var cPropagators = map[string]bool{
 	"memcpy": true, "memmove": true, "stpcpy": true,
 }
 
-// cReaders read external input into their dest (arg0) buffer.
-var cReaders = map[string]bool{
-	"fgets": true, "gets": true, "fread": true, "read": true, "recv": true, "recvfrom": true,
+// cReaders read external input into a destination BUFFER argument; the value is the
+// arg index of that buffer (recv/read take the buffer at arg1, not arg0).
+var cReaders = map[string]int{
+	"fgets": 0, "gets": 0, "fread": 0, "fscanf": 0,
+	"read": 1, "recv": 1, "recvfrom": 1, "pread": 1,
 }
 
 // ExtractC parses C files into one NIR Program (one module per file).
@@ -62,7 +65,9 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext)}
-			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+			body := c.decls(tree.RootNode())
+			body = append(body, c.ccFailurePathOwnedBufferFree(tree.RootNode())...)
+			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
@@ -76,6 +81,87 @@ func (c *ccConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+var (
+	ccNewAssignRe = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\b`)
+	ccDeleteRe    = regexp.MustCompile(`delete\s*(?:\[\]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*;`)
+)
+
+func (c *ccConv) ccFailurePathOwnedBufferFree(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "function_definition" {
+			text := c.text(n)
+			allocated := map[string]bool{}
+			for _, m := range ccNewAssignRe.FindAllStringSubmatch(text, -1) {
+				if len(m) == 2 && !ccFunctionDeclaresLocal(text, m[1]) {
+					allocated[m[1]] = true
+				}
+			}
+			for _, m := range ccDeleteRe.FindAllStringSubmatchIndex(text, -1) {
+				if len(m) < 4 {
+					continue
+				}
+				name := text[m[2]:m[3]]
+				if !allocated[name] {
+					continue
+				}
+				after := strings.ToLower(text[m[1]:minInt(len(text), m[1]+160)])
+				if !strings.Contains(after, "return(false)") && !strings.Contains(after, "return false") {
+					continue
+				}
+				loc := c.locAt(n, text, m[0])
+				if seen[loc] {
+					continue
+				}
+				seen[loc] = true
+				path := "security.cpp.failure_path_owned_buffer_free"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Path:   path,
+					Method: lastSeg(path),
+					Loc:    loc,
+				}})
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func ccFunctionDeclaresLocal(fnText, name string) bool {
+	for _, line := range strings.Split(fnText, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, name) || !strings.Contains(line, "=") {
+			continue
+		}
+		if strings.Contains(line, "* "+name) || strings.Contains(line, "*"+name) ||
+			strings.Contains(line, "& "+name) || strings.Contains(line, "&"+name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *ccConv) locAt(fn *tree_sitter.Node, fnText string, offset int) string {
+	line := int(fn.StartPosition().Row) + 1 + strings.Count(fnText[:offset], "\n")
+	return c.file + ":" + itoa(line)
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (c *ccConv) decls(n *tree_sitter.Node) []nir.Stmt {
@@ -167,7 +253,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			Name:       c.declName(decl),
 			Params:     params,
 			ParamTypes: paramTypes,
-			Body:       c.block(field(n, "body")),
+			Body:       append(c.block(field(n, "body")), c.ccUncheckedFieldIndexAccesses(n)...),
 			Loc:        L,
 		}}
 	case "struct_specifier", "union_specifier", "enum_specifier":
@@ -300,10 +386,10 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	case "call_expression":
 		name := lastSeg(c.dotted(field(inner, "function")))
 		args := namedChildren(field(inner, "arguments"))
-		// buffer writers: dest (arg0) is tainted from the source args / the read
+		// buffer writers: the destination buffer is tainted from the source args / the read.
 		if len(args) > 0 {
-			if dst := c.destName(args[0]); dst != "" {
-				if cPropagators[name] {
+			if cPropagators[name] {
+				if dst := c.destName(args[0]); dst != "" { // dest is arg0 for str/mem copy
 					var parts []nir.Expr
 					for _, a := range args[1:] {
 						parts = append(parts, c.expr(a))
@@ -313,7 +399,9 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 						nir.ExprStmt{Value: c.expr(inner)},
 					}
 				}
-				if cReaders[name] {
+			}
+			if idx, ok := cReaders[name]; ok && idx < len(args) {
+				if dst := c.destName(args[idx]); dst != "" { // read into the BUFFER arg (recv/read = arg1)
 					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
 				}
 			}
@@ -629,10 +717,6 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
-		if op == "+" {
-			// C++ string concat with + builds tainted strings; treat as Format.
-			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
-		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
@@ -663,6 +747,60 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *ccConv) ccUncheckedFieldIndexAccesses(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	bodyText := compactCExprText(c.text(body))
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "subscript_expression" {
+			idx := field(n, "index")
+			idxText := c.text(idx)
+			compactIdx := compactCExprText(idxText)
+			if ccFieldDerivedIndex(idxText) && compactIdx != "" && !ccHasUpperBoundGuard(bodyText, compactIdx) {
+				loc := c.loc(n)
+				if !seen[loc] {
+					seen[loc] = true
+					path := "security.index.field_derived.unchecked"
+					out = append(out, nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: path, Loc: loc},
+						Path:   path,
+						Method: lastSeg(path),
+						Loc:    loc,
+					}})
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+func ccFieldDerivedIndex(s string) bool {
+	return strings.Contains(s, "->") || strings.Contains(s, ".")
+}
+
+func ccHasUpperBoundGuard(bodyText, idx string) bool {
+	return strings.Contains(bodyText, idx+"<") ||
+		strings.Contains(bodyText, idx+"<=") ||
+		strings.Contains(bodyText, ">"+idx) ||
+		strings.Contains(bodyText, ">="+idx)
+}
+
+func compactCExprText(s string) string {
+	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
 }
 
 func (c *ccConv) unaryOp(n *tree_sitter.Node) string {

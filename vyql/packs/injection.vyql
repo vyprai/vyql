@@ -46,9 +46,25 @@ rule MarkdownNegotiationBypass {
   match code.MarkdownNegotiationBypass as sink
 }
 
+rule UnescapedSessionFlash {
+  meta { id: "VYQL-INJ-025", severity: medium, cwe: [CWE_79], confidence_floor: low }
+  match code.UnescapedSessionFlash as sink
+}
+
 rule PdfJsEvalSupported {
   meta { id: "VYQL-INJ-022", severity: high, cwe: [CWE_79] }
   taint code.PdfJsEvalSupported -> code.PdfJsDocumentLoad
+}
+
+rule UnscannedPdfPreview {
+  meta { id: "VYQL-INJ-026", severity: high, cwe: [CWE_79], confidence_floor: low }
+  match code.UnscannedPdfPreview as sink
+  unless guarded_by core.PdfScanCheck
+}
+
+rule UnrestrictedVariableVariableAssignment {
+  meta { id: "VYQL-INJ-027", severity: high, cwe: [CWE_79], confidence_floor: low }
+  match code.UnrestrictedVariableVariableAssignment as sink
 }
 
 // Stored / second-order XSS — data read back from the database (assumed attacker-
@@ -81,6 +97,11 @@ rule Nosql {
 rule Template {
   meta { id: "VYQL-INJ-008", severity: high, cwe: [CWE_1336] }
   taint core.UserControlledData -> code.TemplateRender
+}
+
+rule IncompleteTemplateValidation {
+  meta { id: "VYQL-INJ-024", severity: medium, cwe: [CWE_1336], confidence_floor: low }
+  match code.IncompleteTemplateValidation as sink
 }
 
 rule Log {

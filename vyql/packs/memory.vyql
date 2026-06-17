@@ -42,3 +42,18 @@ rule PotentialDoubleFree {
   meta { id: "VYQL-MEM-008", severity: high, cwe: [CWE_415], confidence_floor: low }
   order code.PointerFree before code.PointerFree
 }
+
+rule PotentialUnsafeMutableAlias {
+  meta { id: "VYQL-MEM-009", severity: medium, cwe: [CWE_787, CWE_416], confidence_floor: low }
+  match code.UnsafeMutableAlias as a
+}
+
+rule PotentialFieldDerivedIndexAccess {
+  meta { id: "VYQL-MEM-010", severity: medium, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: low }
+  match code.FieldDerivedIndexAccess as idx
+}
+
+rule FailurePathOwnedBufferFree {
+  meta { id: "VYQL-MEM-011", severity: high, cwe: [CWE_415], confidence_floor: low }
+  match code.FailurePathOwnedBufferFree as free
+}

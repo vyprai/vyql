@@ -22,4 +22,15 @@ adapter config {
   mark "k8s_host_path" -> code.HostNamespaceShare
   mark "tf_open_cidr" -> code.PublicNetworkExposure
   mark "tf_wildcard_iam" -> code.WildcardIamPolicy
+
+  // Jenkins Jelly views: template model fields such as it.name/it.description
+  // rendered into HTML-bearing attributes need escaping before display.
+  source "jelly.input" -> core.UserControlledData
+  sink   "jelly.render" -> code.HtmlRender
+  control "h.escape" -> core.HtmlEscape
+
+  // JSP/JSTL views: raw EL expressions in HTML/link/attribute contexts are
+  // rendered output; <c:out> is skipped by the frontend as an escaped render.
+  source "jsp.input" -> core.UserControlledData
+  sink   "jsp.render" -> code.HtmlRender
 }

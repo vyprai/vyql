@@ -120,6 +120,10 @@ func Detect(paths []string, profiles []Profile) Profile {
 					// incidental docs/demo frontend files inside the same repository.
 					score += 2
 				}
+			case "manifest":
+				if val == "library" && manifestLibrary(paths) {
+					score += 2 // a non-npm/python ecosystem library manifest (gem/crate/composer/pod)
+				}
 			case "ext":
 				if exts[strings.ToLower(val)] {
 					score++
@@ -158,6 +162,73 @@ func packageJSONDepKeys(data []byte) string {
 	return b.String()
 }
 
+// manifestLibrary reports whether the project is a library/SDK in a non-npm/python
+// ecosystem, by its PUBLISH manifest: a *.gemspec (Ruby gem), *.podspec (CocoaPods),
+// Cargo.toml with a [lib] target (Rust crate lib), or composer.json with "type":"library"
+// (PHP). These are unambiguous library signals (apps don't ship them), so they won't flip
+// applications — and the OWASP ports have none of them.
+func manifestLibrary(paths []string) bool {
+	for _, root := range roots(paths) {
+		found := false
+		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil || found {
+				return nil
+			}
+			if d.IsDir() {
+				if path != root && (d.Name() == "node_modules" || d.Name() == "vendor" || strings.HasPrefix(d.Name(), ".")) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			name := d.Name()
+			switch {
+			case strings.HasSuffix(name, ".gemspec"), strings.HasSuffix(name, ".podspec"), strings.HasSuffix(name, ".nuspec"):
+				found = true
+			case strings.HasSuffix(name, ".csproj"):
+				// a .NET project that declares NuGet PACKAGE metadata is a publishable
+				// library (apps don't); ignore Exe output projects.
+				if data, err := os.ReadFile(path); err == nil {
+					t := string(data)
+					if !strings.Contains(t, "<OutputType>Exe</OutputType>") && !strings.Contains(t, "<OutputType>WinExe</OutputType>") &&
+						(strings.Contains(t, "<PackageId>") || strings.Contains(t, "<PackageLicenseExpression>") ||
+							strings.Contains(t, "<PackageLicenseFile>") || strings.Contains(t, "<GeneratePackageOnBuild>")) {
+						found = true
+					}
+				}
+			case name == "pom.xml":
+				// A Maven artifact with hpi/maven-plugin packaging is unambiguously a
+				// plugin/library (never a deployable app), so its public-API params are the
+				// trust boundary. Plain-jar poms are NOT flipped — too many are apps and there
+				// is no Java OWASP gate to bound the precision cost.
+				if data, err := os.ReadFile(path); err == nil {
+					t := string(data)
+					if strings.Contains(t, "<packaging>hpi</packaging>") || strings.Contains(t, "<packaging>maven-plugin</packaging>") {
+						found = true
+					}
+				}
+			case name == "Cargo.toml":
+				if data, err := os.ReadFile(path); err == nil && strings.Contains(string(data), "[lib]") {
+					found = true
+				}
+			case name == "composer.json":
+				if data, err := os.ReadFile(path); err == nil {
+					var pkg struct {
+						Type string `json:"type"`
+					}
+					if json.Unmarshal(data, &pkg) == nil && pkg.Type == "library" {
+						found = true // explicit only — absent type is ambiguous (PHP apps omit it)
+					}
+				}
+			}
+			return nil
+		})
+		if found {
+			return true
+		}
+	}
+	return false
+}
+
 func depMatch(manifests, dep string) bool {
 	// Package-name boundary: `-` and `.` are within-name chars (so `dep:express` does NOT
 	// match `express-session`), but `/` and `@` stay segment boundaries so a short rule can
@@ -192,11 +263,18 @@ func npmLibrary(paths []string) bool {
 				Main    string          `json:"main"`
 				Module  string          `json:"module"`
 				Exports json.RawMessage `json:"exports"`
+				Files   json.RawMessage `json:"files"`
+				Types   string          `json:"types"`
+				Typings string          `json:"typings"`
+				Bin     json.RawMessage `json:"bin"`
 			}
 			if json.Unmarshal(data, &pkg) != nil || pkg.Private {
 				return nil
 			}
-			if pkg.Main != "" || pkg.Module != "" || len(pkg.Exports) > 0 {
+			// A non-private package that declares any publish surface is a library/SDK.
+			// `main` is often omitted (defaults to index.js); also accept files/types/bin.
+			if pkg.Main != "" || pkg.Module != "" || len(pkg.Exports) > 0 ||
+				len(pkg.Files) > 0 || pkg.Types != "" || pkg.Typings != "" || len(pkg.Bin) > 0 {
 				found = true
 			}
 			return nil

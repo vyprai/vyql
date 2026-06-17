@@ -1,10 +1,10 @@
 // Reusable library / SDK. There is no single entry point — any caller may pass attacker
 // data through a public API. Treat externally-derived data and any user-controlled value
-// as untrusted, and flag unsafe defaults. (Public-API-param tainting is conceptual; the
-// permissive source set approximates it.)
+// as untrusted, and flag unsafe defaults. Public-API-param tainting is REAL here:
+// ExternalEntryInput labels function parameters as a (low-confidence) source.
 profile library {
   title: "Library / SDK"
   detect: ["file:setup.py", "file:pyproject.toml", "npm:library",
-           "dep:rollup", "dep:tsup"]
-  entrypoints: [UserControlledData, DomInput, ExternalApiResponse, HttpInput, DatabaseRead, SecretValue]
+           "dep:rollup", "dep:tsup", "manifest:library"]
+  entrypoints: [UserControlledData, ExternalEntryInput, DomInput, ExternalApiResponse, HttpInput, DatabaseRead, SecretValue]
 }

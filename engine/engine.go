@@ -21,7 +21,7 @@ func New(onto *ontology.Ontology, store usg.Store) *Engine {
 	return &Engine{Onto: onto, Store: store}
 }
 
-var confOrder = map[string]int{"low": 1, "medium": 2, "high": 3}
+var confOrder = map[string]int{"possibility": 0, "low": 1, "medium": 2, "high": 3}
 
 // Evaluate runs a compiled rule, returning deduplicated findings filtered by the
 // rule's confidence floor.
@@ -31,6 +31,66 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 		return nil, err
 	}
 	return e.applyConfidenceFloor(cr, dedup(fs)), nil
+}
+
+// PossibilityFindings emits low-confidence "possibility" findings for the AI/triage pass:
+// one per dangerous-concept node (any sink in the ontology) that the confirmed rules did
+// NOT already report. The idea — "if VyQL can't prove exploitability, surface the site as a
+// possibility and let a later AI pass decide" — trades precision for recall. Each carries an
+// exploit condition describing what to verify, and confidence "possibility" (below "low"),
+// so it is OFF by default and never affects the protected benchmarks; the AI-pass pipeline
+// opts in. `confirmed` is the set of findings already produced by the normal rules.
+func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.Finding {
+	covered := map[string]bool{}
+	for _, f := range confirmed {
+		for _, b := range f.Bindings {
+			covered[b.NodeID] = true
+		}
+	}
+	// Low-signal / high-volume concepts excluded from the possibility pass: they ride on
+	// very broad labels (e.g. TrustBoundary on every collection .Add; LogOutput on every
+	// log call) that are fine for taint-GATED confirmed rules but would flood the AI pass
+	// as untainted possibilities. (Confirmed taint findings for these still fire normally.)
+	possibilityDeny := map[string]bool{
+		"code.TrustBoundary": true, "code.LogOutput": true, "code.LogWrite": true,
+	}
+	var out []*findings.Finding
+	seen := map[string]bool{}
+	for _, c := range e.Onto.AllConcepts() {
+		if c.Kind != "sink" || len(c.VulnerableTo) == 0 {
+			continue
+		}
+		qn := c.QualifiedName()
+		if possibilityDeny[qn] {
+			continue
+		}
+		nodes, _ := e.Store.NodesWithConcept(qn)
+		for _, id := range nodes {
+			if covered[id] || seen[id] {
+				continue
+			}
+			seen[id] = true
+			threat := c.VulnerableTo[0]
+			cwe := ""
+			if len(c.CWE) > 0 {
+				cwe = c.CWE[0]
+			}
+			out = append(out, &findings.Finding{
+				RuleID:      "VYQL-POSS-" + c.Name,
+				Severity:    "info",
+				Confidence:  "possibility",
+				WitnessKind: "possibility",
+				Bindings:    []findings.Binding{{Name: "sink", NodeID: id, Concept: qn, Loc: e.loc(id)}},
+				ExploitConditions: []findings.ExploitCondition{{
+					Category:   threat,
+					Condition:  "a " + c.Name + " sink (" + threat + ", " + cwe + ") with no proven sanitized untrusted-input flow — verify whether attacker-controlled data can reach it",
+					Assumption: "exploitable only if untrusted input reaches this site unsanitized",
+					Confidence: "possibility",
+				}},
+			})
+		}
+	}
+	return out
 }
 
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
@@ -447,6 +507,33 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
+		conf := e.conf(fl.SourceID, fl.SinkID)
+		exploit := e.exploitConditions(fl.SinkID, snkC)
+		if srcC == "code.ExternalEntryInput" {
+			// Library/SDK trust boundary: the source is a public-API parameter, not a proven
+			// untrusted input. The flow is real, but exploitability depends on whether a CALLER
+			// forwards attacker-controlled data here — which can't be decided from the library
+			// alone. Emit it as caller-conditional (capped confidence) so a later triage/AI phase
+			// assesses exploitability against actual usage, rather than asserting it.
+			n, _, _ := e.Store.GetNode(fl.SourceID)
+			param := ""
+			if n.ID != "" {
+				param = n.Prop("name")
+			}
+			cond := "a caller forwards attacker-controlled data into the public-API parameter"
+			if param != "" {
+				cond += " '" + param + "'"
+			}
+			exploit = append(exploit, findings.ExploitCondition{
+				Category:   "caller-controlled-input",
+				Condition:  cond,
+				Assumption: "the library is invoked with untrusted input at this entry point",
+				Confidence: "medium",
+			})
+			if confOrder[conf] > confOrder["medium"] {
+				conf = "medium" // caller-dependent: never assert high confidence from a param source
+			}
+		}
 		f := &findings.Finding{
 			RuleID:   e.ruleID(cr),
 			Severity: cr.Severity,
@@ -455,11 +542,12 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				{Name: "sink", NodeID: fl.SinkID, Concept: snkC, Loc: e.loc(fl.SinkID), LabelProvenance: e.prov(fl.SinkID, snkC)},
 			},
 			Witness:           fl.Path,
+			PathLocs:          e.pathLocs(fl.Path),
 			WitnessKind:       "taint",
 			NegationEvidence:  ne,
-			Confidence:        e.conf(fl.SourceID, fl.SinkID),
+			Confidence:        conf,
 			Context:           e.crossDomainContext(fl.SinkID),
-			ExploitConditions: e.exploitConditions(fl.SinkID, snkC),
+			ExploitConditions: exploit,
 		}
 		if idx, seen := bySink[fl.SinkID]; seen {
 			// same sink already reported for this rule — keep whichever source gives the
@@ -482,6 +570,29 @@ func (e *Engine) ruleID(cr *CompiledRule) string {
 		return id
 	}
 	return cr.Rule.QualifiedName()
+}
+
+// pathLocs resolves each witness node to its loc, keeping order and dropping
+// consecutive duplicates. Used to expose the files the taint path traverses
+// (a CVE patch frequently lands on a sanitizer/helper on the flow, not the
+// source or sink site), so downstream localization can match the patch file.
+func (e *Engine) pathLocs(path []string) []string {
+	if len(path) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(path))
+	prev := ""
+	for _, id := range path {
+		l := e.loc(id)
+		if l == "" || l == id {
+			continue
+		}
+		if l != prev {
+			out = append(out, l)
+			prev = l
+		}
+	}
+	return out
 }
 
 func (e *Engine) loc(nodeID string) string {

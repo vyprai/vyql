@@ -3,16 +3,22 @@ package treesitter
 import (
 	"path/filepath"
 	"strings"
+	"unsafe"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsjs "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
+	tstypescript "github.com/tree-sitter/tree-sitter-typescript/bindings/go"
 
 	"github.com/vyprai/vyql/extract/nir"
 )
 
-// jsConv walks a tree-sitter JavaScript/TypeScript CST into NIR. The JS grammar
-// covers JSX and most of TS surface; for TS we parse with the JS grammar (type
-// annotations are skipped as unknown nodes), which is enough for taint.
+// jsConv walks a tree-sitter JavaScript/TypeScript CST into NIR. The SAME walker handles
+// both — TS is a syntactic superset of JS, so the JS node kinds are identical; TS-only
+// nodes (type annotations, generics, `as`/`!`/`satisfies`, accessibility modifiers) are
+// either skipped as unknown or unwrapped to their inner expression. Crucially, .ts/.tsx
+// files are parsed with the TYPESCRIPT grammar (not the JS grammar), so a generic in a
+// type annotation — `: Promise<string | null>` — no longer mis-parses `<` as less-than
+// and drops the function body.
 type jsConv struct {
 	src      []byte
 	root     string
@@ -22,7 +28,7 @@ type jsConv struct {
 	// exportsAlias holds local identifiers aliased to the module's exports object via
 	// `module.exports = res`. The dominant Node-library idiom then augments it as
 	// `res.method = function(...)`; treating those methods as the public API lets their
-	// params be seeded as untrusted input (publicAPISeeds), just like `module.exports.x`.
+	// params be treated as public-API entry points (Exported), just like `module.exports.x`.
 	exportsAlias map[string]bool
 	// thisReceiver is the object `this` binds to inside this file's methods — set to the
 	// sole exports alias so `this.X` resolves to `res.X` (see dotted()). Empty when there
@@ -30,27 +36,47 @@ type jsConv struct {
 	thisReceiver string
 }
 
-// ExtractJavaScript parses JS/TS files into one NIR Program.
+func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
+	return func() *tree_sitter.Parser {
+		p := tree_sitter.NewParser()
+		_ = p.SetLanguage(tree_sitter.NewLanguage(lang))
+		return p
+	}
+}
+
+// ExtractJavaScript parses JS/TS files into one NIR Program. Files are routed to the
+// matching grammar by extension (.ts → typescript, .tsx → tsx, else javascript); all
+// share the jsConv walker.
 func ExtractJavaScript(files []string, root string) (nir.Program, error) {
-	mods := parseModules(files, root,
-		func() *tree_sitter.Parser {
-			p := tree_sitter.NewParser()
-			_ = p.SetLanguage(tree_sitter.NewLanguage(tsjs.Language()))
-			return p
-		},
-		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
-			root0 := tree.RootNode()
-			c.exported = c.exportedNames(root0)
-			// single-prototype library (`module.exports = res; res.x = function`): bind `this`
-			// to res so `this.end`/`this.set`/… resolve to the receiver-named sinks.
-			if len(c.exportsAlias) == 1 {
-				for a := range c.exportsAlias {
-					c.thisReceiver = a
-				}
+	var js, ts, tsx []string
+	for _, f := range files {
+		l := strings.ToLower(f)
+		switch {
+		case strings.HasSuffix(l, ".tsx"):
+			tsx = append(tsx, f)
+		case strings.HasSuffix(l, ".ts") || strings.HasSuffix(l, ".mts") || strings.HasSuffix(l, ".cts"):
+			ts = append(ts, f)
+		default:
+			js = append(js, f)
+		}
+	}
+	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+		c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
+		root0 := tree.RootNode()
+		c.exported = c.exportedNames(root0)
+		// single-prototype library (`module.exports = res; res.x = function`): bind `this`
+		// to res so `this.end`/`this.set`/… resolve to the receiver-named sinks.
+		if len(c.exportsAlias) == 1 {
+			for a := range c.exportsAlias {
+				c.thisReceiver = a
 			}
-			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
-		})
+		}
+		return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+	}
+	var mods []nir.Module
+	mods = append(mods, parseModules(js, root, jsParserFor(tsjs.Language()), build)...)
+	mods = append(mods, parseModules(ts, root, jsParserFor(tstypescript.LanguageTypescript()), build)...)
+	mods = append(mods, parseModules(tsx, root, jsParserFor(tstypescript.LanguageTSX()), build)...)
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
@@ -121,14 +147,6 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	return out
 }
 
-func publicAPISeeds(params []string, L string) []nir.Stmt {
-	var seed []nir.Stmt
-	for _, p := range params {
-		seed = append(seed, nir.Assign{Targets: []string{p},
-			Value: nir.Call{Callee: nir.Name{ID: "public_api_input", Loc: L}, Path: "public_api_input", Method: "public_api_input", Loc: L}})
-	}
-	return seed
-}
 
 func jsModuleKey(root, f string) string {
 	for _, ext := range []string{".jsx", ".tsx", ".ts", ".js"} {
@@ -249,10 +267,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		if c.exported[name] {
-			body = append(publicAPISeeds(params, L), body...)
-		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n)}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n), Exported: c.exported[name]}}
 	case "class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "field_definition", "public_field_definition":
@@ -300,10 +315,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 						params = c.paramsFromFunctionText(d)
 					}
 					body := c.funcBody(val)
-					if c.exported[fnName] {
-						body = append(publicAPISeeds(params, L), body...)
-					}
-					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L})
+					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: c.exported[fnName]})
 					continue
 				}
 				var v nir.Expr = nir.Const{Loc: L}
@@ -400,6 +412,19 @@ func (c *jsConv) isModuleExports(n *tree_sitter.Node) bool {
 
 // exportFuncName returns the exported function name for `exports.NAME` or
 // `module.exports.NAME` member targets ("" if it is neither).
+// memberRootIdent returns the root identifier of a member chain (the object at the base
+// of `A.b.c`), or "" — so `LdapAuth.prototype.authenticate` yields "LdapAuth". Used to
+// tie a prototype/static method back to an exported constructor/class.
+func (c *jsConv) memberRootIdent(m *tree_sitter.Node) string {
+	for m != nil && m.Kind() == "member_expression" {
+		m = field(m, "object")
+	}
+	if m != nil && m.Kind() == "identifier" {
+		return c.text(m)
+	}
+	return ""
+}
+
 func (c *jsConv) exportFuncName(left *tree_sitter.Node) string {
 	obj := field(left, "object")
 	name := c.text(field(left, "property"))
@@ -451,8 +476,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 			if len(params) == 0 {
 				params = c.paramsFromFunctionText(inner)
 			}
-			body := append(publicAPISeeds(params, L), c.funcBody(rhs)...)
-			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, Exported: true}}
 		}
 		if left != nil && left.Kind() == "member_expression" && isJsFuncNode(rhs) {
 			if name := c.exportFuncName(left); name != "" {
@@ -461,8 +485,23 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				if len(params) == 0 {
 					params = c.paramsFromFunctionText(inner)
 				}
-				body := append(publicAPISeeds(params, L), c.funcBody(rhs)...)
-				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(rhs)}}
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), Exported: true}}
+			}
+			// `Ctor.prototype.method = function` / `Ctor.method = function` on an EXPORTED
+			// constructor/class. Always emit a FuncDef so the method is REGISTERED (calls to
+			// it resolve → interprocedural taint flows through internal helpers). Mark it an
+			// entry point (Exported) only if it's public by convention: a `_name` method is
+			// internal and is reached by propagation from the public methods, not directly.
+			if root := c.memberRootIdent(left); root != "" && c.exported[root] {
+				name := c.text(field(left, "property"))
+				if name != "" {
+					params := c.funcParams(rhs)
+					paramTypes := c.funcParamTypes(rhs)
+					if len(params) == 0 {
+						params = c.paramsFromFunctionText(inner)
+					}
+					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), Exported: !strings.HasPrefix(name, "_")}}
+				}
 			}
 		}
 		if left != nil && c.isModuleExports(left) && rhs != nil && rhs.Kind() == "object" {
@@ -475,8 +514,13 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					if len(params) == 0 {
 						params = c.paramsFromFunctionText(pr)
 					}
-					body := append(publicAPISeeds(params, L), c.funcBody(v)...)
-					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(v)})
+					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, ParamTypes: paramTypes, Body: c.funcBody(v), Loc: L, EndLoc: c.endloc(v), Exported: true})
+				} else if pr.Kind() == "method_definition" {
+					// object-method SHORTHAND: `module.exports = { set(o, p, v) { … } }`.
+					// Common npm-library export shape; extract as an exported FuncDef so its
+					// params are public-API entry points and its body is analyzed.
+					out = append(out, nir.FuncDef{Name: c.text(field(pr, "name")), Params: c.funcParams(pr),
+						ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: L, EndLoc: c.endloc(pr), Exported: true})
 				}
 			}
 			if len(out) > 0 {
@@ -980,10 +1024,9 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "shorthand_property_identifier", "property_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
-	case "this":
-		// `this` as a value (the base of `this.method()`): emit a Name so the lowering can
-		// type it to the enclosing class and resolve `this.m()` to a sibling method. Without
-		// this it fell to the generic Seq default and the receiver was never a resolvable name.
+	case "this", "super":
+		// model `this`/`super` as a Name so `this.method()` resolves to the enclosing class's
+		// method (interprocedural taint through `this.helper(x)`), incl. inside arrow callbacks.
 		return nir.Name{ID: "this", Loc: L}
 	case "number":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding

@@ -32,6 +32,7 @@ type funcInfo struct {
 	funcID     string // id of this function's code.Function node; stamped as `func` on its nodes
 	validator  bool   // a `# vyql: validator` function: its result clears trust-boundary taint
 	abstract   bool   // an interface/abstract method (empty body) — dispatch to concrete impls
+	selfNode   string // stable `this` node for a method (alias target for the receiver); "" if none
 }
 
 type importEntry struct {
@@ -54,6 +55,15 @@ type lowerer struct {
 	classDefs    map[string]map[string]bool   // bare class name -> SET of modules that define it
 	classFields  map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables map[string]map[string]importEntry
+
+	// inheritance-aware implicit-`this` member resolution (populated by frontends that set
+	// ClassDef.Members/Bases — currently C#). directMembers: "modkey::Class" -> declared member
+	// set; classBaseNames: "modkey::Class" -> base SHORT names; membersOfShort: short class name
+	// -> union of declared members (for resolving inherited members by name across files).
+	directMembers  map[string]map[string]bool
+	classBaseNames map[string][]string
+	membersOfShort map[string]map[string]bool
+	allMembersMemo map[string]map[string]bool // memoized transitive member set per "modkey::Class"
 
 	curModule string // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS     string // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
@@ -119,6 +129,11 @@ var mutatorMethods = map[string]bool{
 	"addElement": true, "addFirst": true, "addLast": true, "push": true, "offer": true,
 	"offerFirst": true, "offerLast": true, "put": true, "putAll": true, "putIfAbsent": true,
 	"set": true, "enqueue": true,
+	// C#/.NET PascalCase collection mutators (case differs from the lowercase JS/Java/Python
+	// names above, so they were unrecognised → C# collections never inherited element taint).
+	"Add": true, "AddRange": true, "Insert": true, "InsertRange": true, "Append": true,
+	"Push": true, "Enqueue": true, "TryAdd": true, "AddFirst": true, "AddLast": true,
+	"AddParameter": true, "AddOrUpdateParameter": true, "Set": true,
 	// __setitem__ models a subscript store `container[k] = v` (frontends lower it to this
 	// synthetic call) so the container inherits the stored value's taint.
 	"__setitem__": true,
@@ -133,12 +148,30 @@ var keyedMutators = map[string]bool{"put": true, "putIfAbsent": true, "set": tru
 var elementCallbackMethods = map[string]bool{
 	"forEach": true, "map": true, "filter": true, "find": true, "findIndex": true,
 	"some": true, "every": true, "flatMap": true, "then": true, "catch": true, "finally": true,
+	// C#/.NET LINQ (and ForEach) invoke their lambda with each element of the receiver, so
+	// route the receiver's (element) taint into the lambda's first param.
+	"Select": true, "SelectMany": true, "Where": true, "ForEach": true, "GroupBy": true,
+	"OrderBy": true, "OrderByDescending": true, "ThenBy": true, "First": true, "FirstOrDefault": true,
+	"Single": true, "SingleOrDefault": true, "Last": true, "LastOrDefault": true, "Any": true,
+	"All": true, "Count": true, "TakeWhile": true, "SkipWhile": true, "Aggregate": true,
+	"DistinctBy": true, "MaxBy": true, "MinBy": true, "ToDictionary": true, "ToLookup": true,
+}
+
+// selfPassingMethods invoke their lambda WITH THE RECEIVER as the argument (C# fluent helpers
+// `obj.With/Also/Tap(x => …)`, Kotlin scope functions `apply/also/let/run`), so the lambda's
+// first parameter aliases the receiver.
+var selfPassingMethods = map[string]bool{
+	"With": true, "Also": true, "Apply": true, "Tap": true, "Let": true, "Pipe": true,
+	"also": true, "apply": true, "let": true, "run": true, "with": true,
 }
 
 // appendMutators add at the next sequence index: `list.add(val)` / `sb.append(val)`.
 var appendMutators = map[string]bool{
 	"add": true, "append": true, "push": true, "offer": true, "offerFirst": true,
 	"offerLast": true, "addFirst": true, "addLast": true, "addElement": true, "enqueue": true,
+	// C#/.NET PascalCase single-element appenders.
+	"Add": true, "Append": true, "Push": true, "Enqueue": true, "AddFirst": true,
+	"AddLast": true, "AddParameter": true, "AddOrUpdateParameter": true,
 }
 
 // containerInvalidate handles a container method that may shift/invalidate element slots.
@@ -651,6 +684,10 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		importTables:   map[string]map[string]importEntry{},
 		containers:     map[string]*containerInfo{},
 		lambdaParams:   map[string][]string{},
+		directMembers:  map[string]map[string]bool{},
+		classBaseNames: map[string][]string{},
+		membersOfShort: map[string]map[string]bool{},
+		allMembersMemo: map[string]map[string]bool{},
 	}
 }
 
@@ -848,10 +885,14 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		if typ := st.ParamTypes[p]; typ != "" {
 			props["decl_type"] = typ
 		}
+		if st.Exported {
+			// public-API parameter: a library entry point (see ParamSourceAdapter).
+			props["exported"] = "true"
+		}
 		params[p] = l.nodeWithID(sigID(ns, rel, "param", p), "Param", st.Loc, props)
 		order = append(order, p)
 	}
-	return &funcInfo{
+	fi := &funcInfo{
 		paramNames: order,
 		params:     params,
 		paramTypes: st.ParamTypes,
@@ -863,9 +904,78 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		// to the concrete implementations (whose bodies carry the taint).
 		abstract: len(st.Body) == 0,
 	}
+	// A method (no explicit self param[0]) gets a STABLE `this` node, so the receiver at every
+	// call site can be ALIASED to it (field mutations via this reach the receiver object —
+	// object-sensitivity for fluent/builder mutators). Languages with an explicit self param
+	// (Python/Go) keep param[0]; this is the C#-style implicit-this case.
+	if cls != "" && (len(order) == 0 || order[0] != l.selfName) {
+		fi.selfNode = l.nodeWithID(sigID(ns, rel, "self", ""), "Param", st.Loc, map[string]string{"name": "this", "func": st.Name})
+	}
+	return fi
 }
 
 // --- pass 1: registration ----------------------------------------------
+
+// aliasReceiverSelf makes a method's stable `this` node share the receiver's container info, so
+// a field mutation via `this` inside the method (this.X = …) reaches the RECEIVER object the
+// method was called on, and vice versa (object-sensitivity for fluent/builder mutators like
+// `req.AddParameter(p) => this.With(x => x.Parameters.Add(p))`). Merge-and-repoint, so it is
+// independent of whether the call site or the callee body is lowered first.
+func (l *lowerer) aliasReceiverSelf(recv, self string) {
+	if recv == "" || self == "" {
+		return
+	}
+	rc := l.cinfo(recv)
+	if sc := l.containers[self]; sc != nil && sc != rc {
+		for k, slot := range sc.elems {
+			if slot == "" {
+				continue
+			}
+			if rc.elems[k] == "" {
+				rc.elems[k] = slot
+			} else if rc.elems[k] != slot {
+				l.flow(slot, rc.elems[k])
+				l.flow(rc.elems[k], slot)
+			}
+		}
+		if sc.dirty {
+			rc.dirty = true
+		}
+	}
+	l.containers[self] = rc // future this.X / recv.X accesses share the same slots
+}
+
+// classMemberSet returns the transitive data-member names of "modkey::Class": its declared
+// members plus those inherited from base classes (resolved by short name across files, so an
+// inherited property like RequestHeaders' `Parameters` from ParametersCollection<T> is included).
+// Memoized; cycle-safe.
+func (l *lowerer) classMemberSet(modkey, class string) map[string]bool {
+	qual := modkey + "::" + class
+	if m, ok := l.allMembersMemo[qual]; ok {
+		return m
+	}
+	out := map[string]bool{}
+	l.allMembersMemo[qual] = out // mark in-progress (cycle guard)
+	for m := range l.directMembers[qual] {
+		out[m] = true
+	}
+	for _, base := range l.classBaseNames[qual] {
+		// resolve the base by short name: union the declared members of every class with that
+		// name, and recurse through that class's own bases where it is defined.
+		for m := range l.membersOfShort[base] {
+			out[m] = true
+		}
+		for bq := range l.directMembers {
+			if strings.HasSuffix(bq, "::"+base) {
+				bmod := strings.TrimSuffix(bq, "::"+base)
+				for m := range l.classMemberSet(bmod, base) {
+					out[m] = true
+				}
+			}
+		}
+	}
+	return out
+}
 
 func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 	for _, s := range stmts {
@@ -879,6 +989,24 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 			if l.p1 != nil {
 				l.p1.ClassQual = append(l.p1.ClassQual, modkey+"::"+st.Name)
 				l.p1.ClassDefs = append(l.p1.ClassDefs, st.Name)
+			}
+			// inheritance-aware implicit-this: record declared members (by qual + by short name)
+			// and base names, so a bare member ref in a method resolves to `this.<member>`.
+			if len(st.Members) > 0 {
+				qual := modkey + "::" + st.Name
+				if l.directMembers[qual] == nil {
+					l.directMembers[qual] = map[string]bool{}
+				}
+				if l.membersOfShort[st.Name] == nil {
+					l.membersOfShort[st.Name] = map[string]bool{}
+				}
+				for _, m := range st.Members {
+					l.directMembers[qual][m] = true
+					l.membersOfShort[st.Name][m] = true
+				}
+			}
+			if len(st.Bases) > 0 {
+				l.classBaseNames[modkey+"::"+st.Name] = st.Bases
 			}
 			// record field -> declared class type (for cross-file method resolution
 			// on field receivers, e.g. Spring `@Autowired UserService svc; svc.m()`).
@@ -910,6 +1038,10 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 					Name: info.name, Validator: info.validator, Abstract: info.abstract,
 				})
 			}
+			// recurse into the body to register NESTED LOCAL FUNCTIONS (C# local functions, JS
+			// inner function declarations) so a FORWARD reference — `coll.ForEach(x => Helper(x));
+			// … void Helper(...) {}` (RestSharp AddHeaders) — resolves regardless of declaration order.
+			l.register(modkey, st.Body, cls)
 		}
 	}
 }
@@ -960,6 +1092,18 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// `this` implicit — bind it regardless of whether it appears in the param list.
 		if l.curClass != "" && (len(st.Params) > 0 && st.Params[0] == l.selfName || l.selfName == "this") {
 			inner.typ[l.selfName] = [2]string{l.curModule, l.curClass}
+		}
+		// languages with no explicit self param (C#) still need a STABLE `this` node per method
+		// so `this.Field` writes/reads — and inheritance-aware implicit-`this` member refs —
+		// connect within the method and escape via `return this`. Synthesize one when the class
+		// has known members (i.e. the frontend opted into member resolution).
+		// implicit-this is C#-gated (only C# populates ClassDef.Members); C#'s self keyword is
+		// "this" (the merged multi-language Program loses per-language SelfName), so key on "this".
+		// Use the STABLE funcInfo.selfNode so call sites can alias the receiver to it.
+		if l.curClass != "" && inner.node["this"] == "" && info != nil && info.selfNode != "" &&
+			len(l.classMemberSet(l.curModule, l.curClass)) > 0 {
+			inner.node["this"] = info.selfNode
+			inner.typ["this"] = [2]string{l.curModule, l.curClass}
 		}
 		// seed enclosing-class field receivers so `field.method()` resolves
 		for fld, typ := range l.classFields[l.curModule+"::"+l.curClass] {
@@ -1025,6 +1169,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.Return:
 		rv := l.eval(st.Value, sc)
 		l.flow(rv, sc.node["__ret__"])
+		// escape direction of cross-method field taint: returning an object whose field was
+		// tainted (`h.X = src; return h`) flows each tainted slot into the ret node, so the
+		// caller's result (ret → result edge) carries it and a later `o.X` read connects.
+		// Edge-based → order-independent; only fires when slots exist.
+		if ci := l.containers[rv]; ci != nil {
+			for _, slot := range ci.elems {
+				if slot != "" {
+					l.flow(slot, sc.node["__ret__"])
+				}
+			}
+		}
 		// reflected XSS: a route handler returning a freshly-built string (an f-string or
 		// concatenation) writes it straight to the response body unescaped. Only string-build
 		// nodes qualify — returning a template render / Response object / redirect (all Calls)
@@ -1036,7 +1191,24 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 	case nir.ExprStmt:
-		l.eval(st.Value, sc)
+		callNode := l.eval(st.Value, sc)
+		// receiver-mutating ("builder"/accumulator) taint: a stdlib builder method
+		// (strings.Builder.WriteString, bytes.Buffer.Write…) or a C string-accumulator
+		// (g_string_append*, strcat/strncat) folds its args INTO the object you later read
+		// back. Model it as a taint-join on that variable (like `x += …`): the variable
+		// gains the call's taint. Without this, `b.WriteString(taint); b.String()` loses it.
+		// (stdlib accumulator semantics = language mechanism, not security knowledge.)
+		if call, ok := st.Value.(nir.Call); ok && callNode != "" {
+			if v := mutatedVar(call); v != "" {
+				n := l.node("Concat", call.Loc, nil)
+				if cur := sc.node[v]; cur != "" {
+					l.flow(cur, n) // preserve the builder's existing taint (`var b` may be unbound)
+				}
+				l.flow(callNode, n) // call node carries its args' taint
+				sc.node[v] = n
+				delete(sc.cnst, v)
+			}
+		}
 	case nir.Block:
 		l.block(st.Stmts, sc)
 	// Structured control flow (B1). Until the CFG lowering lands (B1.2), these flatten
@@ -1083,7 +1255,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		sc.node = before
 		l.mergeBindings(sc, before, []map[string]string{bodyB})
 	case nir.Switch:
-		l.eval(st.Subject, sc)
+		subject := l.eval(st.Subject, sc)
 		// constant subject → lower only the matching case (or default), like if/ternary
 		// pruning. `switch ("ABC".charAt(1)) { case 'A': x=src(); case 'B': x="safe"; }` runs
 		// only case 'B'. Requires the frontend to have captured case labels.
@@ -1103,6 +1275,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					l.block(st.Default, sc)
 				}
 				return
+			}
+		}
+		for _, labs := range st.Labels {
+			for _, lab := range labs {
+				l.flow(subject, l.eval(lab, sc))
 			}
 		}
 		b := l.nextBranch()
@@ -1137,6 +1314,16 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Name:
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
+		}
+		// inheritance-aware implicit-`this`: a bare identifier that is a (declared or inherited)
+		// member of the enclosing class — and is NOT a local/param (checked above) — refers to
+		// this.<member>. Resolve to the STABLE this-field SLOT so reads AND mutations connect and
+		// the taint escapes via `return this`. (Static-type refs like File/Console aren't members,
+		// so they stay untouched — sink matching is preserved.)
+		if l.curClass != "" {
+			if self := sc.node["this"]; self != "" && l.classMemberSet(l.curModule, l.curClass)[ex.ID] {
+				return l.elemNode(self, ex.ID, ex.Loc)
+			}
 		}
 		return l.node("Name", ex.Loc, map[string]string{"callee_path": ex.ID, "method": ex.ID})
 	case nir.Const:
@@ -1470,6 +1657,46 @@ func constSetFactory(path, method string) bool {
 // recognize structured-field sinks even when the field value is non-literal
 // (`{ hypertext: userInput }`). Frontends that don't emit nir.Pair simply
 // contribute bare values.
+// recvMutators are stdlib accumulator METHODS whose receiver gains the args' taint
+// (strings.Builder / bytes.Buffer in Go, StringBuilder/StringBuffer in Java/Kotlin/C#).
+var recvMutators = map[string]bool{
+	"WriteString": true, "WriteByte": true, "WriteRune": true, "Write": true,
+	"append": true, "push": true, // StringBuilder.append / list-ish builders
+}
+
+// argMutators are C/stdlib accumulator FUNCTIONS whose first argument (the destination)
+// gains the other args' taint (g_string_append*, strcat/strncat, …).
+var argMutators = map[string]bool{
+	"strcat": true, "strncat": true, "strlcat": true,
+	"g_string_append": true, "g_string_append_printf": true, "g_string_append_len": true,
+	"g_string_prepend": true, "g_string_insert": true,
+}
+
+// mutatedVar returns the variable a builder/accumulator call mutates (so taint can be
+// joined onto it): the receiver of a recvMutator method, or arg0 of an argMutator function.
+func mutatedVar(call nir.Call) string {
+	if recvMutators[call.Method] {
+		if at, ok := call.Callee.(nir.Attr); ok {
+			if nm, ok := at.Base.(nir.Name); ok {
+				return nm.ID
+			}
+		}
+	}
+	if argMutators[lastDot(call.Path)] && len(call.Args) > 0 {
+		if nm, ok := call.Args[0].(nir.Name); ok {
+			return nm.ID
+		}
+	}
+	return ""
+}
+
+func lastDot(p string) string {
+	if i := strings.LastIndex(p, "."); i >= 0 {
+		return p[i+1:]
+	}
+	return p
+}
+
 func collectValTokens(e nir.Expr, key string, out *[]string) {
 	switch ex := e.(type) {
 	case nir.Const:
@@ -1497,7 +1724,27 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		for _, a := range ex.Args {
 			collectValTokens(a, key, out)
 		}
+	case nir.Name:
+		// enum / named constant arg (QSslSocket::VerifyNone, SSL_VERIFY_NONE, DES,
+		// Algorithm.none). Value-matched marks/sinks key off these symbolic values, not
+		// just string literals, so capture the identifier for `val`/`nval` matching.
+		if ex.ID != "" {
+			*out = append(*out, ex.ID)
+			if key != "" {
+				*out = append(*out, key+"="+ex.ID)
+			}
+		}
 	case nir.Attr:
+		// a qualified constant like Foo::Bar / pkg.CONST — match on the dotted path and leaf.
+		if ex.Path != "" {
+			*out = append(*out, ex.Path)
+		}
+		if ex.Attr != "" {
+			*out = append(*out, ex.Attr)
+			if key != "" {
+				*out = append(*out, key+"="+ex.Attr)
+			}
+		}
 		collectValTokens(ex.Base, key, out)
 	case nir.Thru:
 		collectValTokens(ex.Inner, key, out)
@@ -1659,6 +1906,18 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			for _, a := range args {
 				l.flow(a, result)
 			}
+			// `base.field.add(v)` — the receiver is a member access, so the mutator taints a
+			// transient Attr read node, not the FIELD SLOT. Also route the added value(s) into
+			// elemNode(base, field) so a later `base.field` read (or an aliased receiver) sees
+			// the mutation, not just chained reads off this exact expression.
+			if outer, ok := call.Callee.(nir.Attr); ok {
+				if inner, ok := outer.Base.(nir.Attr); ok && inner.Attr != "" {
+					slot := l.elemNode(l.eval(inner.Base, sc), inner.Attr, call.Loc)
+					for _, a := range args {
+						l.flow(a, slot)
+					}
+				}
+			}
 		} else if ci := l.containers[recvNode]; ci != nil && !modeledContainerMethod(call.Method) {
 			l.containerInvalidate(call, recvNode, sc) // precise index-shift where unambiguous, else dirty
 		}
@@ -1682,6 +1941,17 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 				}
 			}
 		}
+		// self-passing scope functions (`recv.With/Also/Apply/Tap/Let(x => …)` — C# fluent
+		// helpers, Kotlin scope functions) invoke the lambda WITH THE RECEIVER, so the lambda's
+		// param IS the receiver: alias them so a field mutation via the param (`x.Field = …`)
+		// reaches the receiver object. The closure already captured the outer scope.
+		if selfPassingMethods[call.Method] && recvNode != "" {
+			for _, av := range argVals {
+				if ps := l.lambdaParams[av]; len(ps) > 0 {
+					l.aliasReceiverSelf(recvNode, ps[0])
+				}
+			}
+		}
 	}
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
 	// function's body (arg → param → … → ret → result), so a sanitizer applied INSIDE the
@@ -1693,11 +1963,28 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for _, target := range targets {
 		for i, a := range args {
 			if i < len(target.paramNames) {
-				l.flow(a, target.params[target.paramNames[i]])
+				pnode := target.params[target.paramNames[i]]
+				l.flow(a, pnode)
+				// cross-method object identity: C# objects are reference types, so a field
+				// mutation inside the callee (`p.field = …` / `p.list.Add(…)`) is visible to the
+				// CALLER's object. Share the container (field slots) between the arg and the param
+				// — bidirectional, so both the callee reading the arg's existing field taint AND
+				// the caller seeing the callee's mutations work. Only fires when the arg carries
+				// field/element slots (an object/collection), so scalars are unaffected.
+				if l.containers[argVals[i]] != nil {
+					l.aliasReceiverSelf(argVals[i], pnode)
+				}
 				mapped[i] = true
 			}
 		}
 		l.flow(target.ret, result)
+		// object-sensitivity: alias the receiver with the callee's stable `this` node so field
+		// mutations performed via `this` inside the method reach the receiver object (and reads
+		// of the receiver's fields are visible inside the method). Enables fluent/builder
+		// mutators (`req.AddParameter(p)` whose body does `this.Parameters.Add(p)`).
+		if recvNode != "" && target.selfNode != "" {
+			l.aliasReceiverSelf(recvNode, target.selfNode)
+		}
 		// a `# vyql: validator` function returns validated data: label the call result so
 		// `unless sanitized_by core.InputValidation` clears the trust-boundary threat.
 		if target.validator {
@@ -1708,6 +1995,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for i, a := range args {
 		if !mapped[i] {
 			l.flow(a, result)
+		}
+	}
+	// wrapper-object taint: `new T(taintedArg)` builds an object that CONTAINS its args, so the
+	// constructed object (result) carries each arg's taint — even when the ctor body is resolved
+	// (args mapped to params). Lets a tainted value wrapped in an object propagate through it
+	// (e.g. RestSharp `new HeaderParameter(name, value)`). FN-safe over-approximation.
+	if call.IsCtor {
+		for _, av := range argVals {
+			l.flow(av, result)
 		}
 	}
 	return result

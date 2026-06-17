@@ -21,6 +21,7 @@ adapter go {
   type "support.NewSession" -> session.Store
   type "csv.NewWriter" -> csv.Writer
 
+  source "http_input" -> code.HttpInput  // seeded on *http.Request params
   source "os.Args" -> code.CliArgument
   source "os.Getenv" -> code.EnvVariable
   source "flag.Arg" -> code.CliArgument
@@ -40,7 +41,18 @@ adapter go {
   source ".QueryArray" -> code.HttpInput
   source ".GetQuery" -> code.HttpInput
   source ".ShouldBind" -> code.HttpInput
+  source ".ShouldBindJSON" -> code.HttpInput
+  source ".ShouldBindQuery" -> code.HttpInput
+  source ".ShouldBindUri" -> code.HttpInput
+  source ".ShouldBindWith" -> code.HttpInput
+  source ".ShouldBindBodyWith" -> code.HttpInput
   source ".BindJSON" -> code.HttpInput
+  source ".BindQuery" -> code.HttpInput
+  source ".BindUri" -> code.HttpInput
+  source ".BindWith" -> code.HttpInput
+  // NOTE: bare `.Bind` and `.Body` were removed — too broad (matched tmpl.Bind / a
+  // client resp.Body), causing false positives. The specific gin/echo bind methods
+  // above are precise; the bind out-param taint handles `c.Bind(&x)`-style decode.
   source ".URLParam" -> code.HttpInput
   source "mux.Vars" -> code.HttpInput
   source ".Cookie" -> code.HttpInput
@@ -57,6 +69,11 @@ adapter go {
   sink method "PrepareContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink path "gorm.Raw" -> code.SqlExecution
   sink path "db.Raw" -> code.SqlExecution
+  // gorm's .Raw(sql) is frequently called on a non-db-named receiver (e.g. a helper
+  // return: `q := getDB(); q.Raw(sql)`), which the dotted-path forms above miss. The
+  // method form catches it regardless of receiver var; SqlExecution only yields a
+  // finding under taint, so receiver-agnostic matching is safe for recall.
+  sink method "Raw" -> code.SqlExecution
   sink path "sqlx.Query" -> code.SqlExecution
   sink path "sqlx.MustExec" -> code.SqlExecution
   sink path "bun.Raw" -> code.SqlExecution
@@ -70,6 +87,9 @@ adapter go {
   sink path "syscall.Exec" -> code.CommandExecution
   sink path "syscall.ForkExec" -> code.CommandExecution
   sink path "sh.Command" -> code.CommandExecution
+  // chaosblade-spec-go `channel.NewLocalChannel().Run(ctx, prog, args)` runs a shell
+  // command; the distinctive constructor segment keeps this from matching unrelated `.Run`.
+  sink path "channel.NewLocalChannel.Run" arg all -> code.CommandExecution
   sink path "http.Get" -> code.UrlFetch
   sink path "http.Post" -> code.UrlFetch
   sink path "http.Head" -> code.UrlFetch
@@ -198,6 +218,10 @@ adapter go {
   mark "os.Chmod" val "0666" -> code.InsecurePermission
   mark "os.MkdirAll" val "0777" -> code.InsecurePermission
   mark "os.WriteFile" val "0777" -> code.InsecurePermission
+  // Review-only: project-specific config serializers often need an explicit
+  // "redact/scrub secrets" option before returning configs through diagnostics/API.
+  mark "MarshalConfig" val "false" -> code.ConfigExposureReview
+  mark "instance.MarshalConfig" val "false" -> code.ConfigExposureReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission

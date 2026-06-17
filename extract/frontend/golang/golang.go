@@ -176,6 +176,11 @@ func Extract(files []string, root string) (nir.Program, error) {
 type conv struct {
 	fset *token.FileSet
 	file string
+	// hoisted holds synthetic FuncDefs lifted from func-literal expressions (inline
+	// HTTP handlers / goroutines / callbacks). They are flushed into the module body so
+	// their bodies are analyzed (and *http.Request params seeded), instead of dropped.
+	hoisted []nir.Stmt
+	anonSeq int
 }
 
 func (c *conv) loc(p token.Pos) string {
@@ -201,27 +206,157 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	for _, d := range decls {
 		switch fn := d.(type) {
 		case *ast.FuncDecl:
-			var params []string
-			paramTypes := map[string]string{}
-			if fn.Type.Params != nil {
-				for _, p := range fn.Type.Params.List {
-					typ := c.typeName(p.Type)
-					for _, n := range p.Names {
-						params = append(params, n.Name)
-						if typ != "" {
-							paramTypes[n.Name] = typ
-						}
-					}
-				}
-			}
-			var body []nir.Stmt
-			if fn.Body != nil {
-				body = c.stmts(fn.Body.List)
-			}
-			out = append(out, nir.FuncDef{Name: fn.Name.Name, Params: params, ParamTypes: paramTypes, Body: body, Loc: c.loc(fn.Pos())})
+			out = append(out, c.funcDef(fn.Name.Name, fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
 		}
 	}
+	// Flush func-literal bodies hoisted while lowering this decl set, so inline HTTP
+	// handlers / goroutines registered as closures are analyzed as functions.
+	out = append(out, c.hoisted...)
+	c.hoisted = nil
 	return out
+}
+
+// funcDef builds a FuncDef from a function type+body (shared by top-level FuncDecl and
+// hoisted func literals): extracts params/types, seeds each *http.Request param as an
+// http_input source (Java/C#-symmetric handler-param tainting), and lowers the body.
+func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, exported bool, loc string) nir.FuncDef {
+	var params []string
+	paramTypes := map[string]string{}
+	if typ != nil && typ.Params != nil {
+		for _, p := range typ.Params.List {
+			t := c.typeName(p.Type)
+			for _, n := range p.Names {
+				params = append(params, n.Name)
+				if t != "" {
+					paramTypes[n.Name] = t
+				}
+			}
+		}
+	}
+	var body []nir.Stmt
+	if bodyNode != nil {
+		body = c.stmts(bodyNode.List)
+	}
+	var seed []nir.Stmt
+	for _, p := range params {
+		if paramTypes[p] == "http.Request" {
+			seed = append(seed, nir.Assign{Targets: []string{p},
+				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: loc}, Path: "http_input", Method: "http_input", Loc: loc}})
+		}
+	}
+	if len(seed) > 0 {
+		body = append(seed, body...)
+	}
+	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc, Exported: exported}
+}
+
+// callOutParams returns the identifiers a call writes THROUGH as out-parameters:
+// every `&x` address-of arg (`json.Unmarshal(b,&v)`, `c.Bind(&form)`), plus — when the
+// callee name is a bind/parse verb — every plain-identifier arg (`parseForm(r, form)`).
+// These are the destination variables a request is decoded into.
+func (c *conv) callOutParams(call *ast.CallExpr) []string {
+	var outs []string
+	for _, a := range call.Args {
+		if u, ok := a.(*ast.UnaryExpr); ok && u.Op == token.AND {
+			if id, ok := u.X.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
+				outs = append(outs, id.Name)
+			}
+		}
+	}
+	if isBindName(calleeName(call.Fun)) {
+		for _, a := range call.Args {
+			if id, ok := a.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
+				outs = append(outs, id.Name)
+			}
+		}
+	}
+	return outs
+}
+
+// outParamJoinsFor emits `o = combine(o, …)` for each out-param o of a call. It is a
+// taint-JOIN, not a redefinition: a plain `o = …` would SHADOW any taint o already had, so
+// f(&taintedVar) would clear it (false negative). The join adds taint AND preserves o's.
+//
+// For a `&x` arg on an arbitrary call (`json.Unmarshal(b,&v)`) the joined taint is the call
+// itself — the dominant case being a bind/decode SOURCE whose result IS the request data. But
+// a custom decode HELPER (`parseForm(r, form)`, `decoder.Decode(f, r.Form)`) is NOT a labelled
+// source; its return is a clean error, while the request flows in through an INPUT arg. So for
+// a bind-name call we additionally join the receiver and the call's simple argument
+// expressions, so whichever of them carries the request taint reaches the decoded dest.
+func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc string) []nir.Stmt {
+	outs := c.callOutParams(call)
+	if len(outs) == 0 {
+		return nil
+	}
+	srcs := []nir.Expr{callExpr}
+	if isBindName(calleeName(call.Fun)) {
+		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+			if e := c.simpleTaintExpr(sel.X); e != nil { // the receiver may hold the request
+				srcs = append(srcs, e)
+			}
+		}
+		for _, a := range call.Args { // an input arg may hold the request (decode reads it)
+			if e := c.simpleTaintExpr(a); e != nil {
+				srcs = append(srcs, e)
+			}
+		}
+	}
+	var stmts []nir.Stmt
+	for _, o := range outs {
+		parts := append([]nir.Expr{nir.Name{ID: o, Loc: loc}}, srcs...)
+		stmts = append(stmts, nir.Assign{Targets: []string{o},
+			Value: nir.Format{Parts: parts, Loc: loc}})
+	}
+	return stmts
+}
+
+// simpleTaintExpr lowers an argument/receiver expression ONLY when it is side-effect-free
+// (an identifier, field access, address-of, or deref) so it can be safely re-evaluated inside
+// an out-param taint-join. Nested calls are skipped to avoid duplicating a side-effectful
+// node; their taint still reaches the dest through the call result already in the join.
+func (c *conv) simpleTaintExpr(e ast.Expr) nir.Expr {
+	switch x := e.(type) {
+	case *ast.Ident:
+		if x.Name == "_" || x.Name == "" || x.Name == "nil" {
+			return nil
+		}
+		return c.expr(x)
+	case *ast.SelectorExpr, *ast.StarExpr:
+		return c.expr(e)
+	case *ast.UnaryExpr:
+		if x.Op == token.AND {
+			return c.expr(e)
+		}
+	}
+	return nil
+}
+
+// calleeName returns the last identifier of a call's function expression
+// (`pkg.parseForm` → "parseForm", `parseForm` → "parseForm").
+func calleeName(fun ast.Expr) string {
+	switch f := fun.(type) {
+	case *ast.Ident:
+		return f.Name
+	case *ast.SelectorExpr:
+		return f.Sel.Name
+	}
+	return ""
+}
+
+// isBindName reports whether a function name reads external/request data into a
+// destination argument (a custom bind/parse/decode helper). Scoped to these verbs
+// so the no-`&` out-param treatment stays precise.
+func isBindName(name string) bool {
+	if name == "" {
+		return false
+	}
+	low := strings.ToLower(name)
+	for _, p := range []string{"parse", "decode", "unmarshal", "bind", "scan", "populate", "deserialize", "readinto", "readbody"} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *conv) typeName(e ast.Expr) string {
@@ -263,6 +398,17 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 				return nir.AugAssign{Target: id.Name, Value: c.expr(st.Rhs[0]), Loc: c.loc(st.Pos())}
 			}
 		}
+		// subscript write `m[k] = v` / `a[i] = v`: model as a container taint-join
+		// `m = combine(m, v)` so a later `m[k]` read carries v's taint (otherwise the
+		// write target is "_" and the taint is dropped). Conservative (whole-container).
+		if len(st.Lhs) == 1 && len(st.Rhs) == 1 {
+			if ix, ok := st.Lhs[0].(*ast.IndexExpr); ok {
+				if base, ok := ix.X.(*ast.Ident); ok && base.Name != "_" {
+					return nir.Assign{Targets: []string{base.Name},
+						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: base.Name, Loc: c.loc(base.Pos())}, c.expr(st.Rhs[0])}, Loc: c.loc(st.Pos())}}
+				}
+			}
+		}
 		var targets []string
 		for _, lhs := range st.Lhs {
 			if id, ok := lhs.(*ast.Ident); ok {
@@ -272,7 +418,18 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 			}
 		}
 		if len(st.Rhs) == 1 {
-			return nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0])}
+			assign := nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0])}
+			// `err := bind(&v)` / `err := parseForm(r, form)`: the result goes to err, but the
+			// call also writes through its out-param destinations — taint those too. The
+			// dominant idiom is `if err := decode(...); err != nil`, an AssignStmt (the ExprStmt
+			// path below only covers the discarded-result form).
+			if call, ok := st.Rhs[0].(*ast.CallExpr); ok {
+				if joins := c.outParamJoinsFor(call, c.expr(st.Rhs[0]), c.loc(st.Pos())); len(joins) > 0 {
+					stmts := append([]nir.Stmt{assign}, joins...)
+					return nir.Block{Stmts: stmts}
+				}
+			}
+			return assign
 		}
 		// parallel assignment: pair element-wise where possible
 		blk := nir.Block{}
@@ -288,6 +445,20 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		}
 		return nir.Return{}
 	case *ast.ExprStmt:
+		// out-parameter taint: a bare call passing the address of a local
+		// (`json.Unmarshal(b, &v)`, `c.ShouldBind(&form)`, `decoder.Decode(&x)`)
+		// writes through that pointer, so model it as a (re)definition of the
+		// variable from the call. This is what lets a bind/decode SOURCE taint
+		// the struct the request is decoded into — the dominant web-handler
+		// pattern — instead of the (discarded) error return.
+		if call, ok := st.X.(*ast.CallExpr); ok {
+			if stmts := c.outParamJoinsFor(call, c.expr(st.X), c.loc(st.Pos())); len(stmts) > 0 {
+				if len(stmts) == 1 {
+					return stmts[0]
+				}
+				return nir.Block{Stmts: stmts}
+			}
+		}
 		return nir.ExprStmt{Value: c.expr(st.X)}
 	case *ast.DeclStmt:
 		return c.declStmt(st)
@@ -378,8 +549,9 @@ func (c *conv) declStmt(st *ast.DeclStmt) nir.Stmt {
 
 func (c *conv) expr(e ast.Expr) nir.Expr {
 	if e == nil {
-		// nil expr: a tagless `switch { }`, an empty return, an optional clause, …
-		// Return an empty node rather than dereferencing nil in c.loc(e.Pos()).
+		// nil sub-expressions are legal in Go ASTs: a tag-less `switch { … }`,
+		// a slice expr with omitted bounds (a[:]), a bare `return`, etc. Model
+		// them as an empty constant so downstream lowering never deref-panics.
 		return nir.Const{}
 	}
 	switch ex := e.(type) {
@@ -404,6 +576,15 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 		return nir.Index{Base: c.expr(ex.X), Key: c.expr(ex.Index), Path: c.path(ex.X), Loc: c.loc(ex.Pos())}
 	case *ast.CallExpr:
 		return c.call(ex)
+	case *ast.FuncLit:
+		// An inline closure (HTTP handler registered via http.HandleFunc/router.GET, a
+		// goroutine, a callback). Its body would otherwise be dropped. Hoist it as a
+		// synthetic anonymous FuncDef so the body is analyzed and its params (incl. a
+		// seeded *http.Request) carry taint; the closure value itself flows nothing.
+		c.anonSeq++
+		fd := c.funcDef("func#"+strconv.Itoa(c.anonSeq), ex.Type, ex.Body, false, c.loc(ex.Pos()))
+		c.hoisted = append(c.hoisted, fd)
+		return nir.Const{Loc: c.loc(ex.Pos())}
 	case *ast.BinaryExpr:
 		if ex.Op == token.ADD { // string/operand concat propagates taint
 			return nir.Format{Parts: []nir.Expr{c.expr(ex.X), c.expr(ex.Y)}, Loc: c.loc(ex.Pos())}

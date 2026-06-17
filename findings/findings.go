@@ -44,6 +44,7 @@ type Finding struct {
 	Severity          string
 	Bindings          []Binding
 	Witness           []string // solver witness (node ids / hops, kind-specific)
+	PathLocs          []string // distinct file:line locs along the witness (taint path), in order
 	WitnessKind       string   // taint | reach | assume | match
 	NegationEvidence  []NegationEvidence
 	Confidence        string

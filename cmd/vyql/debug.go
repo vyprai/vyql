@@ -586,9 +586,12 @@ func cmdValidateAdapter(args []string) error {
 type jsonFinding struct {
 	RuleID            string                      `json:"rule"`
 	Severity          string                      `json:"severity"`
+	Confidence        string                      `json:"confidence,omitempty"`
+	WitnessKind       string                      `json:"witness_kind,omitempty"`
 	FP                string                      `json:"fp"`
 	Source            string                      `json:"source"`
 	Sink              string                      `json:"sink"`
+	Path              []string                    `json:"path,omitempty"`
 	Noted             bool                        `json:"assumption_noted"`
 	ExploitConditions []findings.ExploitCondition `json:"exploit_conditions,omitempty"`
 }
@@ -596,7 +599,7 @@ type jsonFinding struct {
 func findingsJSON(all []*findings.Finding) []jsonFinding {
 	out := make([]jsonFinding, 0, len(all))
 	for _, f := range all {
-		jf := jsonFinding{RuleID: f.RuleID, Severity: f.Severity, FP: f.Fingerprint()}
+		jf := jsonFinding{RuleID: f.RuleID, Severity: f.Severity, Confidence: f.Confidence, WitnessKind: f.WitnessKind, FP: f.Fingerprint()}
 		for _, b := range f.Bindings {
 			if b.Name == "source" {
 				jf.Source = b.Loc
@@ -613,6 +616,7 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 				jf.Noted = true
 			}
 		}
+		jf.Path = f.PathLocs
 		jf.ExploitConditions = f.ExploitConditions
 		out = append(out, jf)
 	}

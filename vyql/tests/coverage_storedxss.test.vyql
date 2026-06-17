@@ -34,3 +34,37 @@ test "stored-xss: AR read rendered via raw is flagged (ruby)"
     render html: raw(bio)
   end
   ```
+
+test "stored-xss: WordPress list table column return is rendered raw (php)"
+  lang php
+  expect VYQL-INJ-018
+  code
+  ```
+  <?php
+  class Logs_Table extends WP_List_Table {
+    public function column_default( $item, $column_name ) {
+      switch ( $column_name ) {
+        case 'ip':
+          return $item->hist_ip;
+      }
+      return '';
+    }
+  }
+  ```
+
+test "stored-xss: WordPress list table escaped column return is clean (php)"
+  lang php
+  reject VYQL-INJ-018
+  code
+  ```
+  <?php
+  class Logs_Table extends WP_List_Table {
+    public function column_default( $item, $column_name ) {
+      switch ( $column_name ) {
+        case 'ip':
+          return esc_html( $item->hist_ip );
+      }
+      return '';
+    }
+  }
+  ```

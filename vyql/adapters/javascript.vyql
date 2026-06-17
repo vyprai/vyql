@@ -4,8 +4,9 @@ adapter javascript {
   meta { fidelity: resolved }
 
   source "process.argv" -> code.CliArgument
-  // Public JS package APIs: callers can pass attacker-controlled values into exported funcs.
-  source "public_api_input" -> core.UserControlledData
+  // Public-API params are now handled by the cross-language library param-source
+  // (FuncDef.Exported -> code.ExternalEntryInput, library-profile-gated, caller-conditional;
+  // see adapters/library.vyql). The old ungated public_api_input seed was retired.
   // Library option bags are caller-controlled under the library profile. These option
   // fields have appeared in code-generation CVEs where the public API reaches an internal
   // compiler callback through a cache/helper the analyzer cannot inline.
@@ -78,6 +79,10 @@ adapter javascript {
   source method "getData" -> code.DomInput
   // Browser UI helper option bags can be populated from attacker-controlled markup/URLs.
   source "opt.title" -> code.DomInput
+  // Tooltip title metadata is copied from attacker-controlled DOM attributes in common
+  // Bootstrap-style helpers, then often measured/rendered through HTML sinks.
+  source method "originalTitle" -> code.DomInput
+  source method "tooltipTitle" -> code.DomInput
   // Parsed browser XML/HTML often comes from network responses; values extracted from it
   // are attacker-controlled unless independently verified.
   source method "parseFromString" -> core.UserControlledData
@@ -102,6 +107,9 @@ adapter javascript {
   sink path "connection.query" -> code.SqlExecution
   sink path "pool.query" -> code.SqlExecution
   sink path "db.query" -> code.SqlExecution
+  // ueberDB key-glob read: db.findKeys("pad:"+id+"*") — an unsanitized id in the key pattern
+  // reads keys outside the intended namespace (CWE-22-style traversal of the kv store).
+  sink method "findKeys" -> code.FilePathAccess
   sink path "client.query" -> code.SqlExecution
   sink path "mysql.query" -> code.SqlExecution
   sink path "pg.query" -> code.SqlExecution
@@ -179,6 +187,7 @@ adapter javascript {
   sink path "child_process.spawnSync" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "child_process.execFile" -> code.CommandExecution
   sink path "child_process.execFileSync" -> code.CommandExecution
+  // value in the ARGS ARRAY (arg1) is shell-interpreted = command injection. (arg0 is the
   sink path "child_process.fork" -> code.CommandExecution
   sink path "cp.exec" -> code.CommandExecution
   sink path "cp.execSync" -> code.CommandExecution
@@ -191,6 +200,17 @@ adapter javascript {
   sink path "spawnSync" -> code.CommandExecution
   sink path "spawnSync" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "execFile" -> code.CommandExecution
+  // execFile/spawn with a SHELL binary or shell:true runs the ARGS ARRAY (arg1)
+  // through a shell, so a tainted value there is command injection. (Plain execFile
+  // with a non-shell binary is safe — args are not shell-interpreted — so this is
+  // scoped to shell contexts via val.)
+  sink path "execFile" arg 1 collection val "powershell" -> code.CommandExecution
+  sink path "execFile" arg 1 collection val "cmd.exe" -> code.CommandExecution
+  sink path "execFile" arg 1 collection val "/bin/sh" -> code.CommandExecution
+  sink path "execFile" arg 1 collection val "/bin/bash" -> code.CommandExecution
+  sink path "execFile" arg 1 collection val "shell" val "true" -> code.CommandExecution
+  sink path "spawn" arg 1 collection val "powershell" -> code.CommandExecution
+  sink path "spawn" arg 1 collection val "shell" val "true" -> code.CommandExecution
   sink path "shelljs.exec" -> code.CommandExecution
   sink path "shell.exec" -> code.CommandExecution
   sink path "webpack-shell-plugin-next" -> code.CommandExecution
@@ -245,6 +265,9 @@ adapter javascript {
   sink path "http.request" -> code.UrlFetch
   sink path "https.request" -> code.UrlFetch
   sink path "request" -> code.UrlFetch
+  // headless-browser navigation (Puppeteer/Playwright `page.goto(url)`) fetches an
+  // attacker-controllable URL server-side -> SSRF (CVE-2026-5323, a11y-mcp).
+  sink method "goto" -> code.UrlFetch
   sink path "request.get" -> code.UrlFetch
   sink path "request.post" -> code.UrlFetch
   sink path "needle.get" -> code.UrlFetch

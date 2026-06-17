@@ -1,0 +1,54 @@
+test "jelly: unescaped parameter title is XSS"
+  lang config
+  expect VYQL-INJ-004
+  file choiceParameterCommon.jelly
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+    <f:entry title="${it.name}" description="${it.description}">
+      <div>${it.name}</div>
+    </f:entry>
+  </j:jelly>
+  ```
+
+test "jelly: escaped parameter title is clean"
+  lang config
+  reject VYQL-INJ-004
+  file choiceParameterCommon.jelly
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+    <f:entry title="${h.escape(it.name)}">
+      <div>static</div>
+    </f:entry>
+  </j:jelly>
+  ```
+
+test "jsp: raw JMS destination in link is XSS"
+  lang config
+  expect VYQL-INJ-004
+  file browse.jsp
+  code
+  ```
+  <html>
+  <body>
+    <a href="message.jsp?JMSDestination=${requestContext.queueBrowser.JMSDestination}">View Consumers</a>
+    <a href="deleteMessage.action?JMSDestination=${row.JMSDestination}&messageId=${row.JMSMessageID}">Delete</a>
+  </body>
+  </html>
+  ```
+
+test "jsp: c:out escaped JMS destination is clean"
+  lang config
+  reject VYQL-INJ-004
+  file browse.jsp
+  code
+  ```
+  <html>
+  <body>
+    <a href="message.jsp?JMSDestination=<c:out value="${requestContext.queueBrowser.JMSDestination}" />">View Consumers</a>
+  </body>
+  </html>
+  ```

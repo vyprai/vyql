@@ -106,6 +106,20 @@ test "python exhaustive: URL allowlist basename and safe archive path suppress f
       archive.extract(path)
   ```
 
+test "python exhaustive: realpath base plus separator guard suppresses path traversal"
+  lang python
+  reject VYQL-PATH-001
+  code
+  ```
+  def read(request):
+      import os
+      base = os.path.realpath("/srv/workspace")
+      path = os.path.realpath(os.path.normpath(os.path.join("/srv/workspace", request.args["name"])))
+      if not (path.startswith(base + os.sep) or path == base):
+          raise PermissionError("outside workspace")
+      return open(path).read()
+  ```
+
 test "python exhaustive: HTML template header log CSV mass assignment and NoSQL sinks receive taint"
   lang python
   expect VYQL-INJ-004
@@ -149,6 +163,42 @@ test "python exhaustive: escaping constants and numeric validation suppress web/
       User.update({"name": "safe"})
       collection.find({"active": True})
       return make_response(v)
+  ```
+
+test "python exhaustive: incomplete f-string format validation is flagged"
+  lang python
+  expect VYQL-INJ-024
+  code
+  ```
+  from string import Formatter
+
+  def get_template_variables(template, template_format):
+      if template_format == "f-string":
+          input_variables = {
+              v for _, v, _, _ in Formatter().parse(template) if v is not None
+          }
+          for var in input_variables:
+              if "." in var or "[" in var or "]" in var:
+                  raise ValueError("bad")
+      return sorted(input_variables)
+  ```
+
+test "python exhaustive: f-string format spec validation is clean"
+  lang python
+  reject VYQL-INJ-024
+  code
+  ```
+  from string import Formatter
+
+  def validate_f_string_template(template):
+      input_variables = set()
+      for _, var, format_spec, _ in Formatter().parse(template):
+          if "." in var or "[" in var or "]" in var:
+              raise ValueError("bad")
+          if format_spec and ("{" in format_spec or "}" in format_spec):
+              raise ValueError("nested fields")
+          input_variables.add(var)
+      return sorted(input_variables)
   ```
 
 test "python exhaustive: LDAP XPath regex trust-boundary auth IDOR and CSRF findings are reported"

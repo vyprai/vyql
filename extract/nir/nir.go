@@ -72,6 +72,9 @@ type Call struct {
 	Path   string
 	Method string
 	Loc    string
+	// IsCtor marks a constructor / `new T(args)` call: the constructed object contains its
+	// arguments, so the lowerer flows tainted args into the call result (wrapper-object taint).
+	IsCtor bool
 }
 
 // Format is a taint-propagating string build (f-string, %, +, .format).
@@ -203,6 +206,12 @@ type FuncDef struct {
 	// (docs/21 §5) — VyQL only emits the fact.
 	HTTPMethod string
 	HTTPPath   string
+	// Exported marks a function/method as part of the PUBLIC API surface (per the
+	// language's visibility rules: Go capitalization, `pub`, `public`, `export`, no
+	// leading underscore, …). The library/SDK archetype treats exported-function
+	// parameters as an external-entry taint source; internal helpers are reached by
+	// ordinary interprocedural propagation, so they must NOT be entry points.
+	Exported bool
 }
 
 // ClassDef is a class definition.
@@ -210,6 +219,12 @@ type ClassDef struct {
 	Name string
 	Body []Stmt
 	Loc  string
+	// Bases are the base class / interface short names (generics stripped) — used for
+	// inheritance-aware implicit-`this` member resolution.
+	Bases []string
+	// Members are the data-member names (fields + properties) declared on this class, so a
+	// bare member reference inside a method can be resolved to `this.<member>`.
+	Members []string
 }
 
 // Block is a flattened control-flow body, processed once in scope

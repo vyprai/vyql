@@ -324,6 +324,7 @@ type adapterSpec struct {
 	Marks         []controlSpec // presence markers (label the call node with a concept)
 	Filters       []filterSpec  // character-filtering replaces (core.CharFilter)
 	Assumes       []assumeSpec  // unsound neutralizers (core.Assumption)
+	ParamSources  []string      // `source param -> X`: concepts to label parameter nodes with
 }
 
 // AdaptersFor loads the framework adapters for a technology from
@@ -350,6 +351,9 @@ func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 	}
 	if len(spec.Filters) > 0 {
 		out = append(out, spec.filterAdapter())
+	}
+	if len(spec.ParamSources) > 0 {
+		out = append(out, spec.paramSourceAdapter())
 	}
 	if len(spec.Assumes) > 0 {
 		out = append(out, spec.assumeAdapter())
@@ -543,6 +547,8 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 				srcByConcept[mp.Concept] = i
 			}
 			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
+		case "source_param":
+			s.ParamSources = append(s.ParamSources, mp.Concept)
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
@@ -714,17 +720,21 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					}
 					// Most specific wins: longer pattern, then more value constraints
 					// (a `val`-matched sink like exec.Command arg2 val "-c" is more
-					// specific than the plain exec.Command arg0 form).
-					if curIdx, ok := bestByConcept[sk.Concept]; !ok {
-						bestByConcept[sk.Concept] = i
+					// specific than the plain exec.Command arg0 form). Keyed by (concept,
+					// ARG INDEX): the same concept can be injectable at MULTIPLE arg
+					// positions of one call (e.g. execFile(shell, [tainted args]) — arg0 the
+					// binary AND arg1 the args array), so those must not collapse together.
+					bkey := sk.Concept + "\x00" + strconv.Itoa(sk.ArgIndex)
+					if curIdx, ok := bestByConcept[bkey]; !ok {
+						bestByConcept[bkey] = i
 					} else if cur := spec.Sinks[curIdx]; len(sk.Pattern) > len(cur.Pattern) ||
 						(len(sk.Pattern) == len(cur.Pattern) && len(sk.ValMatches) > len(cur.ValMatches)) {
-						bestByConcept[sk.Concept] = i
+						bestByConcept[bkey] = i
 					}
 				}
 				for _, i := range cand {
 					sk := spec.Sinks[i]
-					best, ok := bestByConcept[sk.Concept]
+					best, ok := bestByConcept[sk.Concept+"\x00"+strconv.Itoa(sk.ArgIndex)]
 					if !ok || best != i {
 						continue
 					}
@@ -855,7 +865,7 @@ var extTech = map[string]string{
 	".rb": "ruby", ".java": "java", ".php": "php", ".phtml": "php", ".cs": "csharp",
 	".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
 	".rs": "rust", ".sh": "bash", ".bash": "bash", ".scala": "scala", ".sc": "scala", ".lua": "lua", ".kt": "kotlin", ".kts": "kotlin", ".ps1": "powershell", ".psm1": "powershell", ".swift": "swift", ".pl": "perl", ".pm": "perl", ".cgi": "perl", ".sol": "solidity", ".m": "objc",
-	".xml": "config", ".plist": "config",
+	".xml": "config", ".plist": "config", ".jelly": "config", ".jsp": "config", ".tag": "config",
 	".ex": "elixir", ".exs": "elixir",
 	".dart":   "dart",
 	".groovy": "groovy", ".gradle": "groovy",
@@ -1175,7 +1185,66 @@ func SecretscanAdapters() []adapters.Adapter { return AdaptersFor("secretscan") 
 
 // PiiAdapters is the cross-language PII taxonomy (adapters/pii.vyql). It labels nodes
 // in every language, so it is applied once per scan rather than per present frontend.
-func PiiAdapters() []adapters.Adapter        { return AdaptersFor("pii") }
+func PiiAdapters() []adapters.Adapter { return AdaptersFor("pii") }
+
+// paramSourceAdapter labels function/method parameter nodes with the spec's
+// `source param -> X` concept(s) — the library/SDK trust boundary (any caller may pass
+// attacker data through a public API). The KNOWLEDGE (which concept) is the .vyql line;
+// this is only the mechanism.
+//
+// Default-OFF, opt-in: unlike the pattern source adapter (where activeSources==nil means
+// "no profile → every source on"), a parameter source fires ONLY when a profile is set AND
+// explicitly lists the concept (i.e. the library profile). So application profiles, and the
+// no-profile default, never taint parameters. Low confidence (syntactic): a finding
+// surfaces only if a param actually reaches a sink.
+func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
+	concepts := spec.ParamSources
+	return adapters.Adapter{
+		Name: spec.Name + ".param-source", Technology: spec.Technology, Specificity: 0,
+		Fidelity: "syntactic", Origin: "human",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			if activeSources == nil {
+				return nil // no trust boundary set → parameters are not sources
+			}
+			active := make([]string, 0, len(concepts))
+			for _, c := range concepts {
+				if activeSources[c] {
+					active = append(active, c)
+				}
+			}
+			if len(active) == 0 {
+				return nil
+			}
+			ids, _ := s.NodesOfType("code.Param")
+			out := make([]adapters.Mapping, 0, len(active))
+			for _, id := range ids {
+				n, ok, _ := s.GetNode(id)
+				if !ok || n.Prop("exported") != "true" {
+					continue // only PUBLIC-API params are entry points; internal helpers are
+					// reached by ordinary interprocedural propagation (precision).
+				}
+				for _, c := range active {
+					out = append(out, adapters.Mapping{NodeID: id, Concept: c, Specificity: 0})
+				}
+			}
+			return out
+		},
+	}
+}
+
+// LibraryAdapters is the cross-language library/SDK trust boundary (adapters/library.vyql):
+// public-API parameters as external-entry sources. Applied once per scan; only active under
+// the library profile (the concept it labels is gated by the profile's trust boundary).
+func LibraryAdapters() []adapters.Adapter { return AdaptersFor("library") }
+
+// CryptoReviewAdapters labels cryptographic operations (adapters/cryptoreview.vyql) with
+// code.CryptoOperation. Inert for confirmed rules; the possibility tier surfaces them.
+func CryptoReviewAdapters() []adapters.Adapter { return AdaptersFor("cryptoreview") }
+
+// AuditReviewAdapters labels privileged/state-changing ops (code.SensitiveOperation) and
+// resource acquisitions (code.ResourceReview) for the possibility tier (adapters/auditreview.vyql).
+func AuditReviewAdapters() []adapters.Adapter { return AdaptersFor("auditreview") }
+
 func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }
 func DartAdapters() []adapters.Adapter       { return AdaptersFor("dart") }
 func GroovyAdapters() []adapters.Adapter     { return AdaptersFor("groovy") }

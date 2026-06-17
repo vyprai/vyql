@@ -44,3 +44,35 @@ test "rust memory: plain value read is not a dereference smell"
       let _y = x;
   }
   ```
+
+test "rust memory: unsafe mutable alias cast is review finding"
+  lang rust
+  expect VYQL-MEM-009
+  code
+  ```
+  fn f(buf: bytes::BytesMut) {
+      let _alias: &mut [u8] = unsafe { &mut *(buf.as_ref() as *const _ as *mut _) };
+  }
+  ```
+
+test "rust memory: raw pointer cast without mutable reference is clean"
+  lang rust
+  reject VYQL-MEM-009
+  code
+  ```
+  fn f(ptr: *const u8) {
+      let _p = ptr as *mut u8;
+  }
+  ```
+
+test "rust memory: mutable buffer pointer cast is not immutable alias"
+  lang rust
+  reject VYQL-MEM-009
+  code
+  ```
+  fn f(buffer: bytes::BytesMut) {
+      unsafe {
+          let _buf = &mut *(buffer.bytes_mut() as *mut [u8]);
+      }
+  }
+  ```

@@ -64,7 +64,16 @@ adapter cpp {
   mark "chmod" val "0666" -> code.InsecurePermission
   mark "open" val "0777" -> code.InsecurePermission
   mark "open" val "0666" -> code.InsecurePermission
+  // disabled TLS certificate verification (CWE-295) — Qt / OpenSSL / curl
+  mark "setPeerVerifyMode" val "VerifyNone" -> code.CertValidationDisabled
+  mark "setPeerVerifyMode" val "QSslSocket::VerifyNone" -> code.CertValidationDisabled
+  mark "SSL_CTX_set_verify" val "SSL_VERIFY_NONE" -> code.CertValidationDisabled
+  mark "SSL_set_verify" val "SSL_VERIFY_NONE" -> code.CertValidationDisabled
+  mark "curl_easy_setopt" val "CURLOPT_SSL_VERIFYPEER" val "0" -> code.CertValidationDisabled
+  mark "setsslverify" val "false" -> code.CertValidationDisabled
   mark "__subscript" -> code.IndexAccess
+  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
+  mark "security.cpp.failure_path_owned_buffer_free" -> code.FailurePathOwnedBufferFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree

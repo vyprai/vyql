@@ -67,11 +67,15 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "method", "singleton_method":
+		// Ruby methods are PUBLIC by default (the gem's API surface). A `private`/`protected`
+		// marker would hide subsequent methods — not tracked yet, so this slightly
+		// over-marks; the library param-source is caller-conditional, which absorbs that.
 		return []nir.Stmt{nir.FuncDef{
-			Name:   c.text(field(n, "name")),
-			Params: c.params(field(n, "parameters")),
-			Body:   c.body(field(n, "body")),
-			Loc:    L,
+			Name:     c.text(field(n, "name")),
+			Params:   c.params(field(n, "parameters")),
+			Body:     c.body(field(n, "body")),
+			Loc:      L,
+			Exported: true,
 		}}
 	case "class", "module":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
@@ -136,6 +140,12 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "identifier", "constant":
 		name := c.text(n)
 		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: name, Loc: L}, Path: name, Method: name, Loc: L}}}
+	case "call", "method_call", "command", "command_call":
+		// A call may carry a trailing block (`coll.each { |x| sink(x) }`, `lambda { |v| … }`).
+		// The block body was previously dropped, hiding sources/sinks inside it. Emit the call,
+		// then the block body inline (see callBlockStmts).
+		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+		return append(out, c.callBlockStmts(n)...)
 	}
 	// any other expression used as a statement
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
@@ -253,6 +263,15 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "string":
 		return c.string(n, L)
 	case "regex":
+		if rubyRegexMayBacktrack(c.text(n)) {
+			return nir.Call{
+				Callee: nir.Name{ID: "__regex.match", Loc: L},
+				Args:   []nir.Expr{nir.Const{Loc: L, Value: c.text(n)}},
+				Path:   "__regex.match",
+				Method: "match",
+				Loc:    L,
+			}
+		}
 		// carry `/pattern/` so a `filter` directive (gsub) can analyze its output alphabet.
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "call", "method_call", "command", "command_call":
@@ -328,6 +347,93 @@ func (c *rbConv) keyName(n *tree_sitter.Node) string {
 	return strings.TrimSuffix(strings.TrimPrefix(t, ":"), ":")
 }
 
+func rubyRegexMayBacktrack(raw string) bool {
+	pat := rubyRegexPattern(raw)
+	if pat == "" {
+		return false
+	}
+	if hasNestedBacktrackingQuantifier(pat) {
+		return true
+	}
+	alts := strings.Split(pat, "|")
+	if len(alts) < 2 {
+		return false
+	}
+	seen := map[byte]bool{}
+	for _, alt := range alts {
+		ch, ok := firstBacktrackingQuantifiedLiteral(alt)
+		if !ok {
+			continue
+		}
+		if seen[ch] {
+			return true
+		}
+		seen[ch] = true
+	}
+	return false
+}
+
+func rubyRegexPattern(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) < 2 || raw[0] != '/' {
+		return raw
+	}
+	for i := len(raw) - 1; i > 0; i-- {
+		if raw[i] != '/' || isEscaped(raw, i) {
+			continue
+		}
+		return raw[1:i]
+	}
+	return strings.Trim(raw, "/")
+}
+
+func hasNestedBacktrackingQuantifier(pat string) bool {
+	for i := 0; i < len(pat); i++ {
+		if pat[i] != ')' || i+1 >= len(pat) || !isRegexQuantifier(pat[i+1]) || isPossessiveQuantifier(pat, i+1) {
+			continue
+		}
+		for j := i - 1; j >= 0 && pat[j] != '('; j-- {
+			if isRegexQuantifier(pat[j]) && !isEscaped(pat, j) && !isPossessiveQuantifier(pat, j) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func firstBacktrackingQuantifiedLiteral(alt string) (byte, bool) {
+	for i := 0; i+1 < len(alt); i++ {
+		if isEscaped(alt, i) || !isRegexLiteralByte(alt[i]) || !isRegexQuantifier(alt[i+1]) {
+			continue
+		}
+		if isPossessiveQuantifier(alt, i+1) {
+			return 0, false
+		}
+		return alt[i], true
+	}
+	return 0, false
+}
+
+func isRegexLiteralByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
+
+func isRegexQuantifier(b byte) bool {
+	return b == '+' || b == '*'
+}
+
+func isPossessiveQuantifier(s string, i int) bool {
+	return i+1 < len(s) && s[i+1] == '+'
+}
+
+func isEscaped(s string, i int) bool {
+	esc := false
+	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
+		esc = !esc
+	}
+	return esc
+}
+
 func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {
 	var parts []nir.Expr
 	var walk func(m *tree_sitter.Node)
@@ -375,6 +481,67 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 		}
 	}
 	return nir.Call{Callee: callee, Args: args, Path: path, Method: m, Loc: L}
+}
+
+// callBlockStmts lowers a trailing block on a call (`recv.each { |x| … }`, `lambda { |v| … }`)
+// into inline statements: each block parameter is taint-joined from the receiver (the iterated
+// collection / object), then the block body is lowered. This surfaces sinks/sources inside the
+// block and connects taint from a tainted receiver into the block param.
+func (c *rbConv) callBlockStmts(n *tree_sitter.Node) []nir.Stmt {
+	var blk *tree_sitter.Node
+	if b := field(n, "block"); b != nil {
+		blk = b
+	} else {
+		for _, ch := range namedChildren(n) {
+			if k := ch.Kind(); k == "block" || k == "do_block" {
+				blk = ch
+				break
+			}
+		}
+	}
+	if blk == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	if recv := field(n, "receiver"); recv != nil {
+		rv := c.expr(recv)
+		for _, p := range c.blockParams(blk) {
+			out = append(out, nir.Assign{Targets: []string{p},
+				Value: nir.Format{Parts: []nir.Expr{rv}, Loc: c.loc(blk)}})
+		}
+	}
+	for _, ch := range namedChildren(blk) {
+		switch ch.Kind() {
+		case "block_parameters", "parameters":
+			// bound above
+		case "body_statement":
+			out = append(out, c.collectBodies(ch)...)
+		default:
+			out = append(out, c.stmt(ch)...)
+		}
+	}
+	return out
+}
+
+// blockParams returns the identifier names of a block's |params|.
+func (c *rbConv) blockParams(blk *tree_sitter.Node) []string {
+	var bp *tree_sitter.Node
+	for _, ch := range namedChildren(blk) {
+		if k := ch.Kind(); k == "block_parameters" || k == "parameters" {
+			bp = ch
+			break
+		}
+	}
+	if bp == nil {
+		return nil
+	}
+	var out []string
+	for _, ch := range namedChildren(bp) {
+		if ch.Kind() == "identifier" {
+			out = append(out, c.text(ch))
+		}
+	}
+	return out
 }
 
 func (c *rbConv) dotted(n *tree_sitter.Node) string {

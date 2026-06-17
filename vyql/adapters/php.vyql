@@ -5,12 +5,18 @@ adapter php {
 
   // superglobals (subscripted) -> HTTP input
   source "$argv" -> code.CliArgument
+  source "http_input" -> code.HttpInput   // synthetic seed (MediaWiki parser-hook user params)
   source "$_GET" -> code.HttpInput
   source "$_POST" -> code.HttpInput
   source "$_REQUEST" -> code.HttpInput
   source "$_COOKIE" -> code.HttpInput
   source "$_FILES" -> code.HttpInput
   source "$_SERVER" -> code.HttpInput
+  // framework request-object accessors (Utopia/Appwrite, Symfony-style): the request URI /
+  // query / path are attacker-controlled. Method form → receiver-agnostic.
+  source method "getURI" -> code.HttpInput
+  source method "getQuery" -> code.HttpInput
+  source method "getPathInfo" -> code.HttpInput
   // getenv() reading request-controlled CGI vars — untrusted (X-Forwarded-For SQLi/SSRF).
   // val-gated so benign getenv('PATH')/getenv('HOME') stay clean.
   source "getenv" val "HTTP_" -> code.HttpInput
@@ -18,6 +24,8 @@ adapter php {
   source "getenv" val "REQUEST_" -> code.HttpInput
   source "getenv" val "REMOTE_ADDR" -> code.HttpInput
   source "getenv" val "PATH_INFO" -> code.HttpInput
+  mark "security.php.server_port_validation.incomplete" -> code.IncompleteServerPortValidation
+  mark "security.php.session_flash.unescaped" -> code.UnescapedSessionFlash
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   sink path "mysqli_query" arg 1 -> code.SqlExecution
@@ -34,6 +42,11 @@ adapter php {
   sink method "get_var" -> code.SqlExecution
   sink method "get_row" -> code.SqlExecution
   sink method "get_col" -> code.SqlExecution
+  source "wp.list_table.row" -> code.DatabaseRead
+  source method "get_results" -> code.DatabaseRead
+  source method "get_var" -> code.DatabaseRead
+  source method "get_row" -> code.DatabaseRead
+  source method "get_col" -> code.DatabaseRead
   // Drupal
   sink path "db_query" -> code.SqlExecution
   // Laravel Eloquent / query-builder raw expressions
@@ -86,6 +99,15 @@ adapter php {
   sink path "echo" -> code.HtmlRender
   sink path "print" -> code.HtmlRender
   sink path "printf" -> code.HtmlRender
+  // MediaWiki Html builder: rawElement emits its content arg RAW (unescaped) and both
+  // element/rawElement pass the attributes array through WITHOUT validating attribute names,
+  // so a tainted attributes array is attribute-injection XSS (CVE-2025-59332; the upstream fix
+  // is Sanitizer::validateAttributes). element escapes the content arg, so only its attrs sink.
+  sink path "Html.rawElement" -> code.HtmlRender
+  sink path "Html.rawElement" arg 1 -> code.HtmlRender
+  sink path "Html.rawElement" arg 2 -> code.HtmlRender
+  sink path "Html.element" arg 1 -> code.HtmlRender
+  sink "wp.list_table.render" -> code.HtmlRender
 
   // server-side template injection (CWE-1336) — Twig compiles a STRING template
   sink method "createTemplate" -> code.TemplateRender
@@ -103,12 +125,20 @@ adapter php {
   control "isOwner" -> core.OwnershipCheck
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
+  control "esc_html" -> core.HtmlEscape
+  control "esc_attr" -> core.HtmlEscape
+  control "esc_url" -> core.HtmlEscape
+  control "wp_kses" -> core.HtmlEscape
+  control "wp_kses_post" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape
   control "escapeshellarg" -> core.ShellEscape
   control "escapeshellcmd" -> core.ShellEscape
   control "mysqli_real_escape_string" -> core.SqlParameterization
   control "pg_escape_string" -> core.SqlParameterization
-  control "realpath" -> core.PathCanonicalization
+  // realpath canonicalizes `../` but does NOT bound the path to a base dir, so it is not a
+  // sound traversal sanitizer on its own (only a following prefix/containment check is —
+  // core.PathAccessCheck). Leaving it out lets realpath-without-check traversal surface.
+  // control "realpath" -> core.PathCanonicalization
   control "basename" -> core.PathCanonicalization
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
@@ -124,6 +154,24 @@ adapter php {
   sink method "findById" -> code.ObjectLookupByUserInput
   sink method "getUser" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
+  // CSRF-sensitive state changes. PHP applications commonly route request handlers
+  // straight into model mutators/persistence methods, so request data reaching these
+  // operations should require a dominating CSRF check.
+  mark method "changePassword" -> code.StateChangingOp
+  mark method "updatePassword" -> code.StateChangingOp
+  mark method "resetPassword" -> code.StateChangingOp
+  mark method "changeEmail" -> code.StateChangingOp
+  mark method "transferFunds" -> code.StateChangingOp
+  mark method "deleteAccount" -> code.StateChangingOp
+  mark method "grantRole" -> code.StateChangingOp
+  mark method "makeAdmin" -> code.StateChangingOp
+  mark method "setValue" -> code.StateChangingOp
+  mark method "setValues" -> code.StateChangingOp
+  mark method "save" -> code.StateChangingOp
+  mark method "store" -> code.StateChangingOp
+  mark method "insert" -> code.StateChangingOp
+  mark method "update" -> code.StateChangingOp
+  mark method "delete" -> code.StateChangingOp
   mark "changePassword" -> code.AuthenticationRequiredOp
   mark "updatePassword" -> code.AuthenticationRequiredOp
   mark "resetPassword" -> code.AuthenticationRequiredOp
@@ -186,6 +234,12 @@ adapter php {
   mark "fopen" -> code.ResourceHandle
   mark "fsockopen" -> code.ResourceHandle
   control "fclose" -> core.ResourceRelease
+  // PDF previews can execute embedded script in-browser when streamed/rendered before
+  // content scanning. Match only explicit PDF responses and suppress once a scan gate runs.
+  mark "security.php.pdf_preview.unscanned" -> code.UnscannedPdfPreview
+  mark "security.php.variable_variable.unrestricted" -> code.UnrestrictedVariableVariableAssignment
+  control method "getScanStatus" -> core.PdfScanCheck
+  control "getResponseByScanStatus" -> core.PdfScanCheck
 
   // XPath injection (CWE-643) — SimpleXMLElement::xpath($expr) (distinctive method)
   sink method "xpath" -> code.XpathQuery

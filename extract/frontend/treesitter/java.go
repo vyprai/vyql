@@ -67,6 +67,22 @@ func (c *jvConv) hasHandlerAnn(n *tree_sitter.Node) bool {
 	return found
 }
 
+// javaPublic reports whether a method/constructor is part of the public API surface:
+// it carries a `public` modifier (package-private/private/protected are not the API a
+// library exposes to arbitrary callers). Used to scope the library param-source.
+func (c *jvConv) javaPublic(n *tree_sitter.Node) bool {
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "modifiers" {
+			t := c.text(ch)
+			if strings.Contains(t, "private") || strings.Contains(t, "protected") {
+				return false
+			}
+			return strings.Contains(t, "public")
+		}
+	}
+	return false
+}
+
 // ExtractJava parses Java files into one NIR Program (one module per file, keyed
 // by source-root-relative dotted path).
 func ExtractJava(files []string, root string) (nir.Program, error) {
@@ -178,8 +194,15 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
 			body = append(seed, body...)
+		} else if mn := c.text(field(n, "name")); mn == "isValid" && len(params) > 0 && hasParamType(paramTypes, "ConstraintValidatorContext") {
+			// JSR-380 `ConstraintValidator.isValid(value, ctx)`: `value` is the untrusted input
+			// being validated (by contract). Seeding it lets a tainted custom message reach the
+			// Bean-Validation EL sink (buildConstraintViolationWithTemplate) — CWE-917.
+			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
+				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}}}, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n)}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n),
+			Exported: c.inController || c.hasHandlerAnn(n) || c.javaPublic(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
 		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution
@@ -402,6 +425,17 @@ func (c *jvConv) paramTypes(params *tree_sitter.Node) map[string]string {
 		}
 	}
 	return out
+}
+
+// hasParamType reports whether any parameter's declared type has the given (generics-stripped)
+// short name — e.g. detecting the `ConstraintValidatorContext` arg of a JSR-380 validator.
+func hasParamType(paramTypes map[string]string, short string) bool {
+	for _, t := range paramTypes {
+		if t == short || strings.HasSuffix(t, "."+short) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {

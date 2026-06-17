@@ -19,6 +19,10 @@ adapter java {
   source ".getPathInfo" -> code.HttpInput
   source ".getRequestURI" -> code.HttpInput
   source ".getPart" -> code.HttpInput
+  // AOP-intercepted method arguments (org.aopalliance MethodInvocation.getArguments) carry the
+  // intercepted business call's runtime data — untrusted in an interceptor (e.g. @DS SpEL
+  // routing evaluates them, CVE-2026-7045). Surfaces only if they reach a sink.
+  source method "getArguments" -> code.HttpInput
   // Android intent / deep-link inputs (attacker-controlled IPC entry points)
   source ".getStringExtra" -> code.IntentInput
   source ".getStringArrayExtra" -> code.IntentInput
@@ -55,6 +59,9 @@ adapter java {
   sink method "loadDataWithBaseURL" arg 1 -> code.WebViewLoad
   sink method "postUrl" -> code.WebViewLoad
   sink method "evaluateJavascript" -> code.WebViewLoad
+  // open redirect (CWE-601) — HttpServletResponse.sendRedirect(location); Java had no
+  // redirect sink (go/ruby/js do), so request-derived redirect targets were never flagged.
+  sink method "sendRedirect" -> code.RedirectTarget
   // exposing a native bridge to WebView content (presence)
   mark "addJavascriptInterface" -> code.WebViewJsInterface
   sink method "executeLargeUpdate" -> code.SqlExecution
@@ -94,6 +101,12 @@ adapter java {
   // XXE
   sink method "parse" -> code.XmlParse
   sink method "newDocumentBuilder" -> code.XmlParse
+  // structural XXE — precise parser-factory construction, flagged unless hardened
+  mark method "newSAXParser" -> code.XmlParserCreate
+  mark method "newDocumentBuilder" -> code.XmlParserCreate
+  mark method "createXMLReader" -> code.XmlParserCreate
+  mark method "createXMLStreamReader" -> code.XmlParserCreate
+  mark method "createXMLEventReader" -> code.XmlParserCreate
 
   // Path / file. `new File(parent, child)` puts the tainted child path at arg 1, and
   // Paths.get(first, …more) / Files.write(path, …) likewise vary the path position — arg all.
@@ -158,6 +171,19 @@ adapter java {
   control "hasPermission" -> core.AuthorizationCheck
   control "hasAuthority" -> core.AuthorizationCheck
   control "hasRole" -> core.AuthorizationCheck
+  control "checkPermission" -> core.AuthorizationCheck
+  control method "hasPermission" -> core.AuthorizationCheck
+  control method "hasAuthority" -> core.AuthorizationCheck
+  control method "hasRole" -> core.AuthorizationCheck
+  control method "checkPermission" -> core.AuthorizationCheck
+  mark "Login.accurevLoginFromGlobalConfig" -> code.SensitiveOperation
+  // Accumulo-style permission gates: review-only context for authz CVEs where the bug is
+  // an ignored/unenforced boolean result rather than taint reaching a sink.
+  control method "canFlush" -> core.AuthorizationCheck
+  control method "canPerformSystemActions" -> core.AuthorizationCheck
+  control method "canAlterNamespace" -> core.AuthorizationCheck
+  control method "canAlterTable" -> core.AuthorizationCheck
+  control method "canObtainDelegationToken" -> core.AuthorizationCheck
   control method "requireAuth" -> core.AuthenticationCheck
   control method "ensureAuthenticated" -> core.AuthenticationCheck
   control method "isAuthenticated" -> core.AuthenticationCheck
@@ -173,6 +199,12 @@ adapter java {
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
+  // materialize hardening as a node mark for the structural XXE rule's guarded_by
+  mark "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
+  mark "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
+  mark "setExpandEntityReferences" val "false" -> core.XmlHardening
+  mark "setProperty" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
+  mark "setXIncludeAware" val "false" -> core.XmlHardening
   // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
   // position is the attribute key/value (arg 0).
   // trust-boundary (CWE-501): user input stored into the HTTP SESSION (a trusted store).
@@ -253,6 +285,14 @@ adapter java {
   sink path "MVEL.eval" -> code.ExpressionEval
   sink path "MVEL.evalToBoolean" -> code.ExpressionEval
   sink method "createExpression" -> code.ExpressionEval
+  // Spring SpEL evaluate-with-context idiom `parser.parseExpression(expr).getValue(ctx)`:
+  // the eval CONTEXT (arg0 of getValue) carries the runtime data the expression reads, so a
+  // tainted context (e.g. AOP method arguments) is SpEL injection — CWE-74 (CVE-2026-7045).
+  sink path "parseExpression.getValue" -> code.ExpressionEval
+  // Bean Validation custom messages: the template arg of buildConstraintViolationWithTemplate
+  // is interpolated as EL by the default message interpolator (Hibernate Validator), so a
+  // tainted template is EL injection / RCE (CWE-917, e.g. CVE-2021-21479, CVE-2019-10219).
+  sink method "buildConstraintViolationWithTemplate" -> code.ExpressionEval
 
   // weak crypto (CWE-327) — named-value on the algorithm-spec string argument.
   // Weak cipher: DES/DESede(3DES)/RC4(ARCFOUR)/RC2/Blowfish, or ECB mode (any cipher).
