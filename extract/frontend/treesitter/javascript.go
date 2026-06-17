@@ -449,6 +449,12 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 						params = c.paramsFromFunctionText(pr)
 					}
 					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, ParamTypes: paramTypes, Body: c.funcBody(v), Loc: L, Exported: true})
+				} else if pr.Kind() == "method_definition" {
+					// object-method SHORTHAND: `module.exports = { set(o, p, v) { … } }`.
+					// Common npm-library export shape; extract as an exported FuncDef so its
+					// params are public-API entry points and its body is analyzed.
+					out = append(out, nir.FuncDef{Name: c.text(field(pr, "name")), Params: c.funcParams(pr),
+						ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: L, Exported: true})
 				}
 			}
 			if len(out) > 0 {

@@ -163,11 +163,18 @@ func npmLibrary(paths []string) bool {
 				Main    string          `json:"main"`
 				Module  string          `json:"module"`
 				Exports json.RawMessage `json:"exports"`
+				Files   json.RawMessage `json:"files"`
+				Types   string          `json:"types"`
+				Typings string          `json:"typings"`
+				Bin     json.RawMessage `json:"bin"`
 			}
 			if json.Unmarshal(data, &pkg) != nil || pkg.Private {
 				return nil
 			}
-			if pkg.Main != "" || pkg.Module != "" || len(pkg.Exports) > 0 {
+			// A non-private package that declares any publish surface is a library/SDK.
+			// `main` is often omitted (defaults to index.js); also accept files/types/bin.
+			if pkg.Main != "" || pkg.Module != "" || len(pkg.Exports) > 0 ||
+				len(pkg.Files) > 0 || pkg.Types != "" || pkg.Typings != "" || len(pkg.Bin) > 0 {
 				found = true
 			}
 			return nil
