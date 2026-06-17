@@ -1486,9 +1486,12 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Ternary:
 		// `cond ? then : else` — prune the dead arm when the condition is a compile-time
 		// constant; otherwise both arms flow (over-approximation).
-		l.eval(ex.Cond, sc)
+		cond := l.eval(ex.Cond, sc)
 		if live, ok := l.constBool(ex.Cond, sc); ok {
 			if live {
+				if isMissingTernaryArm(ex.Then) {
+					return cond
+				}
 				return l.eval(ex.Then, sc)
 			}
 			return l.eval(ex.Else, sc)
@@ -1506,7 +1509,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 		}
 		n := l.node("Phi", ex.Loc, nil)
-		l.flow(l.eval(ex.Then, sc), n)
+		if isMissingTernaryArm(ex.Then) {
+			l.flow(cond, n)
+		} else {
+			l.flow(l.eval(ex.Then, sc), n)
+		}
 		l.flow(l.eval(ex.Else, sc), n)
 		return n
 	case nir.Pair:
@@ -1598,6 +1605,11 @@ func unaryMethod(op string) string {
 		return "op"
 	}
 	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "deref", "+", "pos", "-", "neg").Replace(op)
+}
+
+func isMissingTernaryArm(e nir.Expr) bool {
+	c, ok := e.(nir.Const)
+	return ok && c.Loc == "?:0" && c.Value == ""
 }
 
 // allowlistMembershipVar recognizes a constant-set membership test — `["a","b"].includes(x)`,

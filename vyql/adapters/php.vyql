@@ -17,6 +17,9 @@ adapter php {
   source method "getURI" -> code.HttpInput
   source method "getQuery" -> code.HttpInput
   source method "getPathInfo" -> code.HttpInput
+  // Aimeos media uploads must derive the storage path from the uploaded file,
+  // not from an existing item URL controlled through media metadata.
+  source "$item.getUrl" -> code.FileUpload
   // getenv() reading request-controlled CGI vars — untrusted (X-Forwarded-For SQLi/SSRF).
   // val-gated so benign getenv('PATH')/getenv('HOME') stay clean.
   source "getenv" val "HTTP_" -> code.HttpInput
@@ -208,6 +211,7 @@ adapter php {
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
   sink path "fputcsv" arg 1 collection -> code.CsvCell
   sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
+  sink path "$this.context.fs.write" -> code.UnsafeUpload
   sink method "extractTo" arg all -> code.ArchiveEntryWrite
   sink path "ZipArchive.extractTo" arg all -> code.ArchiveEntryWrite
 

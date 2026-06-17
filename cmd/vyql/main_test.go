@@ -361,6 +361,24 @@ class Standard {
   }
 }`
 
+const vulnerablePhpAimeosUploadPath = `<?php
+class Standard {
+  public function upload($item, $file) {
+    $mime = $this->mimetype($file);
+    $path = $item->getUrl() ?: $this->path($file->getClientFilename(), $mime, "catalog");
+    $this->context()->fs("fs-media")->write($path, $file->getStream()->getContents());
+  }
+}`
+
+const fixedPhpAimeosUploadPath = `<?php
+class Standard {
+  public function upload($item, $file) {
+    $mime = $this->mimetype($file);
+    $path = $this->path($file->getClientFilename(), $mime, "catalog");
+    $this->context()->fs("fs-media")->write($path, $file->getStream()->getContents());
+  }
+}`
+
 func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "vuln.php"), []byte(vulnerablePhpStoredHtmlWrite), 0o644); err != nil {
@@ -385,6 +403,33 @@ func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
 	}
 	if !strings.Contains(stored[0].Bindings[0].Loc, "vuln.php") {
 		t.Fatalf("stored HTML write finding should be in vuln.php, got %#v", stored[0].Bindings)
+	}
+}
+
+func TestScanPhpAimeosUploadPathReuse(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "vuln.php"), []byte(vulnerablePhpAimeosUploadPath), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "fixed.php"), []byte(fixedPhpAimeosUploadPath), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var uploads []*findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-INJ-015" {
+			uploads = append(uploads, f)
+		}
+	}
+	if len(uploads) != 1 {
+		t.Fatalf("expected one unrestricted-upload finding for reused item URL only, got %d: %#v", len(uploads), fs)
+	}
+	if !strings.Contains(uploads[0].Bindings[1].Loc, "vuln.php") {
+		t.Fatalf("expected upload sink in vulnerable file, got %#v", uploads[0].Bindings)
 	}
 }
 
