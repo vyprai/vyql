@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/parser"
 )
 
 // TestOWASPBenchmark scores VyQL against an OWASP Benchmark suite (Java or Python) and
@@ -30,6 +31,7 @@ func TestOWASPBenchmark(t *testing.T) {
 	}
 
 	rules, _ := loadRules("")
+	ruleCategory := benchmarkCategories(t, rules)
 	// python layout: testcode/ + helpers/. java layout: src/main/java (testcode + helpers).
 	candidates := [][]string{
 		{filepath.Join(dir, "testcode"), filepath.Join(dir, "helpers")},
@@ -151,23 +153,25 @@ func testNameOf(loc string) string {
 	return ""
 }
 
-// ruleCategory maps a VyQL rule id to its OWASP Benchmark category.
-var ruleCategory = map[string]string{
-	"VYQL-PATH-001":  "pathtraver",
-	"VYQL-INJ-001":   "sqli",
-	"VYQL-INJ-002":   "cmdi",
-	"VYQL-INJ-003":   "codeinj",
-	"VYQL-INJ-004":   "xss",
-	"VYQL-INJ-005":   "ldapi",
-	"VYQL-INJ-006":   "xpathi",
-	"VYQL-CRY-001":   "hash",   // weak hash/digest (MD5/SHA1)
-	"VYQL-CRY-002":   "crypto", // weak cipher (DES/RC4/ECB)
-	"VYQL-CRY-003":   "weakrand",
-	"VYQL-CFG-007":   "securecookie",
-	"VYQL-RF-002":    "redirect",
-	"VYQL-DESER-001": "deserialization",
-	"VYQL-DESER-002": "xxe",
-	"VYQL-CFG-014":   "trustbound",
+func benchmarkCategories(t *testing.T, rules string) map[string]string {
+	t.Helper()
+	decls, err := parser.Parse(rules)
+	if err != nil {
+		t.Fatalf("parse rules: %v", err)
+	}
+	out := map[string]string{}
+	for _, d := range decls {
+		r, ok := d.(*parser.Rule)
+		if !ok {
+			continue
+		}
+		id, _ := r.Meta["id"].(string)
+		cat, _ := r.Meta["benchmark"].(string)
+		if id != "" && cat != "" {
+			out[id] = cat
+		}
+	}
+	return out
 }
 
 func score(t *testing.T, expected map[string]expRow, detected map[string]map[string]bool) {

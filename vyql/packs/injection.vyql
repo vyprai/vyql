@@ -4,7 +4,7 @@
 module vypr.injection;
 
 rule Sql {
-  meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89] }
+  meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89], benchmark: sqli }
   taint core.UserControlledData -> code.SqlExecution
   unless sanitized_by core.SqlParameterization
 }
@@ -15,13 +15,13 @@ rule UnparameterizedSqlQueryParser {
 }
 
 rule Command {
-  meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78] }
+  meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78], benchmark: cmdi }
   taint core.UserControlledData -> code.CommandExecution
   unless sanitized_by core.ShellEscape
 }
 
 rule Code {
-  meta { id: "VYQL-INJ-003", severity: critical, cwe: [CWE_94] }
+  meta { id: "VYQL-INJ-003", severity: critical, cwe: [CWE_94], benchmark: codeinj }
   taint core.UserControlledData -> code.CodeEval
 }
 
@@ -36,7 +36,7 @@ rule PackageInstallCodeExecution {
 }
 
 rule Xss {
-  meta { id: "VYQL-INJ-004", severity: high, cwe: [CWE_79] }
+  meta { id: "VYQL-INJ-004", severity: high, cwe: [CWE_79], benchmark: xss }
   taint core.UserControlledData -> code.HtmlRender
   unless sanitized_by core.HtmlEscape
 }
@@ -89,13 +89,13 @@ rule StoredXss {
 }
 
 rule Ldap {
-  meta { id: "VYQL-INJ-005", severity: high, cwe: [CWE_90] }
+  meta { id: "VYQL-INJ-005", severity: high, cwe: [CWE_90], benchmark: ldapi }
   taint core.UserControlledData -> code.LdapQuery
   unless sanitized_by core.LdapEscape
 }
 
 rule Xpath {
-  meta { id: "VYQL-INJ-006", severity: high, cwe: [CWE_643] }
+  meta { id: "VYQL-INJ-006", severity: high, cwe: [CWE_643], benchmark: xpathi }
   taint core.UserControlledData -> code.XpathQuery
   unless sanitized_by core.XpathEscape
 }

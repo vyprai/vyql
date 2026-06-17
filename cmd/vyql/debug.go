@@ -12,6 +12,7 @@ import (
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
@@ -25,8 +26,8 @@ import (
 
 func cmdTrace(args []string) error {
 	fs := flag.NewFlagSet("trace", flag.ExitOnError)
-	from := fs.String("from", "", "only trace sources whose concept contains this substring (e.g. HttpInput)")
-	to := fs.String("to", "", "only count sinks whose concept contains this substring (e.g. SqlExecution)")
+	from := fs.String("from", "", "only trace sources whose concept contains this substring")
+	to := fs.String("to", "", "only count sinks whose concept contains this substring")
 	profileName := fs.String("profile", "auto", "threat-model profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
@@ -202,14 +203,8 @@ func isSink(g usg.Store, id string) bool {
 }
 
 func sinkConceptName(c string) bool {
-	for _, s := range []string{"Execution", "Eval", "Render", "PathAccess", "Query", "Redirect",
-		"UrlFetch", "Deserial", "TemplateRender", "TrustBoundary", "RegexCompile", "MassAssign",
-		"ProtoPollute", "ExpressionEval", "WeakHash", "WeakCipher", "WeakRandom", "InsecureCookie"} {
-		if strings.Contains(c, s) {
-			return true
-		}
-	}
-	return false
+	cc, err := ontology.Seed().Get(c)
+	return err == nil && cc.Kind == "sink"
 }
 
 // ── vyql explain ────────────────────────────────────────────────────────────────────
@@ -686,15 +681,15 @@ func readFindingsJSON(path string) ([]jsonFinding, error) {
 // then list them, count them, or show their edges. The general "grep the analysis graph" tool
 // the other commands specialize. Predicates AND together; all are substring matches.
 //
-//	vyql query -type code.Call -call db.Query <path>...        # nodes
-//	vyql query -concept HttpInput -edges <path>...             # + outgoing FLOWS
-//	vyql query -concept SqlExecution -count <path>...          # just the count
-//	vyql query -from HttpInput -to SqlExecution <path>...      # reachability (source→sink)
+//	vyql query -type code.Call -call some.path <path>...       # nodes
+//	vyql query -concept SomeConcept -edges <path>...           # + outgoing FLOWS
+//	vyql query -concept SomeConcept -count <path>...           # just the count
+//	vyql query -from SourceConcept -to SinkConcept <path>...   # reachability
 
 func cmdQuery(args []string) error {
 	fs := flag.NewFlagSet("query", flag.ExitOnError)
-	typ := fs.String("type", "", "match node type (substring, e.g. code.Call)")
-	concept := fs.String("concept", "", "match a concept label (substring, e.g. HttpInput)")
+	typ := fs.String("type", "", "match node type substring")
+	concept := fs.String("concept", "", "match concept label substring")
 	call := fs.String("call", "", "match callee_path/method (substring, e.g. db.Query)")
 	loc := fs.String("loc", "", "match location (substring, e.g. .go or a filename)")
 	from := fs.String("from", "", "reachability mode: source concept (with -to)")

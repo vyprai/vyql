@@ -15,20 +15,26 @@ import (
 // namespace; the qualified id is `<package>.<Name>` (e.g. code.HttpInput).
 // Cross-package references (Refines/VulnerableTo/…) are written qualified.
 type Concept struct {
-	Name         string   `json:"name"`              // short PascalCase
-	Package      string   `json:"package"`           // namespace (e.g. code, core, cloud)
-	Kind         string   `json:"kind"`              // source|sink|control|asset|privilege|principal|exposure|action|state
-	Taint        []string `json:"taint,omitempty"`   // for sources (taint kinds, qualified)
-	VulnerableTo []string `json:"vulnerable_to,omitempty"` // for sinks (threat kinds, qualified)
-	Neutralizes  []string `json:"neutralizes,omitempty"`   // for controls (threat kinds, qualified)
-	Applies      string   `json:"applies,omitempty"`       // control: path|endpoint|scope
-	Refines      string   `json:"refines,omitempty"`       // single-parent specialization (qualified)
-	EnabledBy    []string `json:"enabled_by,omitempty"`    // for sinks: taint kinds that arm it (qualified)
-	CWE          []string `json:"cwe,omitempty"`           // mapped weakness ids (CWE_89)
-	CAPEC        []string `json:"capec,omitempty"`         // mapped attack-pattern ids (CAPEC_66)
-	Attack       []string `json:"attack,omitempty"`        // MITRE ATT&CK technique ids
-	Aliases      []string `json:"aliases,omitempty"`
-	Deprecated   string   `json:"deprecated,omitempty"`
+	Name                    string   `json:"name"`                    // short PascalCase
+	Package                 string   `json:"package"`                 // namespace (e.g. code, core, cloud)
+	Kind                    string   `json:"kind"`                    // source|sink|control|asset|privilege|principal|exposure|action|state
+	Taint                   []string `json:"taint,omitempty"`         // for sources (taint kinds, qualified)
+	VulnerableTo            []string `json:"vulnerable_to,omitempty"` // for sinks (threat kinds, qualified)
+	Neutralizes             []string `json:"neutralizes,omitempty"`   // for controls (threat kinds, qualified)
+	Applies                 string   `json:"applies,omitempty"`       // control: path|endpoint|scope
+	Refines                 string   `json:"refines,omitempty"`       // single-parent specialization (qualified)
+	EnabledBy               []string `json:"enabled_by,omitempty"`    // for sinks: taint kinds that arm it (qualified)
+	CWE                     []string `json:"cwe,omitempty"`           // mapped weakness ids (CWE_89)
+	CAPEC                   []string `json:"capec,omitempty"`         // mapped attack-pattern ids (CAPEC_66)
+	Attack                  []string `json:"attack,omitempty"`        // MITRE ATT&CK technique ids
+	Aliases                 []string `json:"aliases,omitempty"`
+	Deprecated              string   `json:"deprecated,omitempty"`
+	Possibility             string   `json:"possibility,omitempty"`   // possibility pass policy: include|exclude
+	SourcePolicy            string   `json:"source_policy,omitempty"` // source exploit policy: direct|caller_conditional
+	SourceConditionCategory string   `json:"source_condition_category,omitempty"`
+	SourceCondition         string   `json:"source_condition,omitempty"`
+	SourceAssumption        string   `json:"source_assumption,omitempty"`
+	SourceConfidence        string   `json:"source_confidence,omitempty"`
 	// DangerousChars: for sinks, the characters that MUST be absent for taint to be
 	// neutralized — lets a character-filter (allowlist replace) be proven a sound
 	// sanitizer when its output alphabet excludes all of them.
@@ -156,10 +162,10 @@ func (o *Ontology) Descendants(name string) map[string]bool {
 
 // --- typing predicates ---------------------------------------------------
 
-func (o *Ontology) SinkThreats(sink string) []string  { return o.field(sink, "vulnerable_to") }
+func (o *Ontology) SinkThreats(sink string) []string     { return o.field(sink, "vulnerable_to") }
 func (o *Ontology) ControlNeutralizes(c string) []string { return o.field(c, "neutralizes") }
-func (o *Ontology) SourceTaints(s string) []string    { return o.field(s, "taint") }
-func (o *Ontology) SinkArmedBy(sink string) []string  { return o.field(sink, "enabled_by") }
+func (o *Ontology) SourceTaints(s string) []string       { return o.field(s, "taint") }
+func (o *Ontology) SinkArmedBy(sink string) []string     { return o.field(sink, "enabled_by") }
 
 func (o *Ontology) field(name, which string) []string {
 	c, err := o.Get(name)

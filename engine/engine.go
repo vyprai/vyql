@@ -47,13 +47,6 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 			covered[b.NodeID] = true
 		}
 	}
-	// Low-signal / high-volume concepts excluded from the possibility pass: they ride on
-	// very broad labels (e.g. TrustBoundary on every collection .Add; LogOutput on every
-	// log call) that are fine for taint-GATED confirmed rules but would flood the AI pass
-	// as untainted possibilities. (Confirmed taint findings for these still fire normally.)
-	possibilityDeny := map[string]bool{
-		"code.TrustBoundary": true, "code.LogOutput": true, "code.LogWrite": true,
-	}
 	var out []*findings.Finding
 	seen := map[string]bool{}
 	for _, c := range e.Onto.AllConcepts() {
@@ -61,7 +54,7 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 			continue
 		}
 		qn := c.QualifiedName()
-		if possibilityDeny[qn] {
+		if c.Possibility == "exclude" {
 			continue
 		}
 		nodes, _ := e.Store.NodesWithConcept(qn)
@@ -509,29 +502,22 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
 		conf := e.conf(fl.SourceID, fl.SinkID)
 		exploit := e.exploitConditions(fl.SinkID, snkC)
-		if srcC == "code.ExternalEntryInput" {
-			// Library/SDK trust boundary: the source is a public-API parameter, not a proven
-			// untrusted input. The flow is real, but exploitability depends on whether a CALLER
-			// forwards attacker-controlled data here — which can't be decided from the library
-			// alone. Emit it as caller-conditional (capped confidence) so a later triage/AI phase
-			// assesses exploitability against actual usage, rather than asserting it.
+		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourcePolicy == "caller_conditional" {
 			n, _, _ := e.Store.GetNode(fl.SourceID)
 			param := ""
 			if n.ID != "" {
 				param = n.Prop("name")
 			}
-			cond := "a caller forwards attacker-controlled data into the public-API parameter"
-			if param != "" {
-				cond += " '" + param + "'"
-			}
+			cond := strings.ReplaceAll(srcMeta.SourceCondition, "{param}", param)
 			exploit = append(exploit, findings.ExploitCondition{
-				Category:   "caller-controlled-input",
+				Category:   srcMeta.SourceConditionCategory,
 				Condition:  cond,
-				Assumption: "the library is invoked with untrusted input at this entry point",
-				Confidence: "medium",
+				Assumption: srcMeta.SourceAssumption,
+				Confidence: firstNonEmpty(srcMeta.SourceConfidence, "medium"),
 			})
-			if confOrder[conf] > confOrder["medium"] {
-				conf = "medium" // caller-dependent: never assert high confidence from a param source
+			ceil := firstNonEmpty(srcMeta.SourceConfidence, "medium")
+			if confOrder[conf] > confOrder[ceil] {
+				conf = ceil
 			}
 		}
 		f := &findings.Finding{
@@ -616,6 +602,16 @@ func (e *Engine) conceptIn(nodeID string, set map[string]bool) string {
 		}
 	}
 	return ""
+}
+
+func (e *Engine) sourceConcept(concept string) *ontology.Concept {
+	if concept == "" {
+		return nil
+	}
+	if c, err := e.Onto.Get(concept); err == nil {
+		return c
+	}
+	return nil
 }
 
 func (e *Engine) prov(nodeID, concept string) string {

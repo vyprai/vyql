@@ -2,13 +2,13 @@
 module vypr.deserialization;
 
 rule Unsafe {
-  meta { id: "VYQL-DESER-001", severity: critical, cwe: [CWE_502] }
+  meta { id: "VYQL-DESER-001", severity: critical, cwe: [CWE_502], benchmark: deserialization }
   taint core.UserControlledData -> code.Deserialization
   unless sanitized_by core.SafeDeserialization
 }
 
 rule Xxe {
-  meta { id: "VYQL-DESER-002", severity: high, cwe: [CWE_611] }
+  meta { id: "VYQL-DESER-002", severity: high, cwe: [CWE_611], benchmark: xxe }
   taint core.UserControlledData -> code.XmlParse
   unless sanitized_by core.XmlHardening
   unless guarded_by core.XmlHardening

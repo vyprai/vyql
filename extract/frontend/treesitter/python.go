@@ -278,6 +278,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if def == nil {
 			return nil
 		}
+		decorators := c.pyDecoratorTokens(n)
 		// FastAPI/Flask/Starlette route handlers: `@app.get(...)`, `@router.post(...)`,
 		// `@app.route(...)` — the function's parameters are bound from the request
 		// (path/query/body), so seed each as http_input (like Java controllers).
@@ -293,9 +294,16 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				seed = append(seed, nir.Assign{Targets: []string{p},
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
-			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, ParamTypes: paramTypes, Body: append(seed, body...), Loc: L, IsRoute: true, Exported: true}}
+			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, ParamTypes: paramTypes, Body: append(seed, body...), Loc: L, Decorators: decorators, Exported: true}}
 		}
-		return c.stmt(def)
+		out := c.stmt(def)
+		for i, st := range out {
+			if fn, ok := st.(nir.FuncDef); ok {
+				fn.Decorators = decorators
+				out[i] = fn
+			}
+		}
+		return out
 	case "class_definition":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
 	case "expression_statement":
@@ -596,6 +604,64 @@ func (c *pyConv) seedResolverParams(params []string, L string) []nir.Stmt {
 			Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 	}
 	return seed
+}
+
+func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "decorator" {
+			continue
+		}
+		path := c.pyDecoratorPath(ch)
+		add("decorator_path:" + path)
+		if i := strings.LastIndex(path, "."); i >= 0 {
+			add("decorator_method:" + path[i+1:])
+		} else {
+			add("decorator_method:" + path)
+		}
+	}
+	return out
+}
+
+func (c *pyConv) pyDecoratorPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Kind() {
+	case "decorator", "call":
+		if p := c.pyDecoratorPath(field(n, "function")); p != "" {
+			return p
+		}
+	case "attribute":
+		base := c.pyDecoratorPath(field(n, "object"))
+		if base == "" {
+			base = c.pyDecoratorPath(field(n, "value"))
+		}
+		attr := c.text(field(n, "attribute"))
+		if base == "" {
+			return attr
+		}
+		if attr == "" {
+			return base
+		}
+		return base + "." + attr
+	case "identifier":
+		return c.text(n)
+	}
+	for _, ch := range namedChildren(n) {
+		if p := c.pyDecoratorPath(ch); p != "" {
+			return p
+		}
+	}
+	return ""
 }
 
 // hasRouteDecorator reports whether a decorated_definition carries a route

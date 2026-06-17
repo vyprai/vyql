@@ -64,10 +64,10 @@ type lowerer struct {
 	membersOfShort map[string]map[string]bool
 	allMembersMemo map[string]map[string]bool // memoized transitive member set per "modkey::Class"
 
-	curModule string // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
-	curNS     string // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
-	curClass  string // "" = none
-	curRoute  bool   // lowering the body of a web request handler (FuncDef.IsRoute)
+	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
+	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
+	curClass      string   // "" = none
+	curDecorators []string // syntax annotations/decorators on the enclosing function
 
 	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
 	// module key (e.g. "app/utils.go/fn3/loop5"); every node is stamped with it plus a
@@ -664,11 +664,11 @@ func (l *lowerer) markPathContainment(call nir.Call, sc *scope) {
 	}
 }
 
-func (l *lowerer) routeReturn(id, loc string) {
-	if id == "" {
+func (l *lowerer) functionReturn(id, loc string, decorators []string) {
+	if id == "" || len(decorators) == 0 {
 		return
 	}
-	var valToks []string
+	valToks := append([]string{}, decorators...)
 	n, ok, _ := l.g.GetNode(id)
 	if ok {
 		if loc == "" {
@@ -690,7 +690,7 @@ func (l *lowerer) routeReturn(id, loc string) {
 	arg := l.node("Arg", loc, map[string]string{"vkind": "Return"})
 	l.flow(id, arg)
 	props := map[string]string{
-		"callee_path": "analysis.route.return",
+		"callee_path": "analysis.function.return",
 		"method":      "return",
 		"arg0":        arg,
 	}
@@ -1250,10 +1250,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// functions (cross-function flows fall back to presence semantics — conservative).
 		saveRegion := l.region
 		l.region = l.curNS + "/fn" + l.nextBranch()
-		saveRoute := l.curRoute
-		l.curRoute = st.IsRoute
+		saveDecorators := l.curDecorators
+		l.curDecorators = st.Decorators
 		l.block(st.Body, inner)
-		l.curRoute = saveRoute
+		l.curDecorators = saveDecorators
 		l.region = saveRegion
 	case nir.Assign:
 		val := l.eval(st.Value, sc)
@@ -1334,9 +1334,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 		}
-		if l.curRoute {
-			l.routeReturn(rv, "")
-		}
+		l.functionReturn(rv, "", l.curDecorators)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
 		if call, ok := st.Value.(nir.Call); ok {

@@ -4,13 +4,13 @@ module vypr.crypto;
 // Use of a broken/weak hash or cipher — a PRESENCE rule (`match`), not a taint
 // flow: it fires wherever a weak primitive is labeled (code.WeakHash).
 rule WeakCrypto {
-  meta { id: "VYQL-CRY-001", severity: medium, cwe: [CWE_327] }
+  meta { id: "VYQL-CRY-001", severity: medium, cwe: [CWE_327], benchmark: hash }
   match code.WeakHash as h
 }
 
 // Use of a broken/weak symmetric cipher (DES/RC4/Blowfish) — presence (CWE-327).
 rule WeakCipher {
-  meta { id: "VYQL-CRY-002", severity: medium, cwe: [CWE_327] }
+  meta { id: "VYQL-CRY-002", severity: medium, cwe: [CWE_327], benchmark: crypto }
   match code.WeakCipher as c
 }
 
@@ -20,7 +20,7 @@ rule WeakCipher {
 // security sink is what makes it a weakness (CWE-330). Secure RNG (secrets / os.urandom
 // / crypto.randomBytes / SecureRandom) is simply not a source, so it never fires.
 rule WeakRandomness {
-  meta { id: "VYQL-CRY-003", severity: medium, cwe: [CWE_330] }
+  meta { id: "VYQL-CRY-003", severity: medium, cwe: [CWE_330], benchmark: weakrand }
   match code.WeakRandomValue as r
 }
 

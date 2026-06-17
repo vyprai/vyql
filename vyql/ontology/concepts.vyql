@@ -26,6 +26,11 @@ concept CliArgument : source {
 concept ExternalEntryInput : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
+  source_policy: caller_conditional
+  source_condition_category: "caller-controlled-input"
+  source_condition: "a caller forwards attacker-controlled data into the public-API parameter {param}"
+  source_assumption: "the library is invoked with untrusted input at this entry point"
+  source_confidence: medium
 }
 concept CodeEval : sink {
   vulnerable_to: [injection.CodeInjection]
@@ -520,10 +525,12 @@ concept LogOutput : sink {
   vulnerable_to: [injection.LogInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_117]
+  possibility: exclude
 }
 concept LogWrite : sink {
   vulnerable_to: [secrets.SecretLeak]
   enabled_by: [taint.SecretValue]
+  possibility: exclude
 }
 // A hardcoded secret literal flagged by the secretscan frontend (presence — no flow).
 concept HardcodedSecret : sink {
@@ -559,6 +566,7 @@ concept TrustBoundary : sink {
   vulnerable_to: [validation.TrustBoundary]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_501]
+  possibility: exclude
 }
 concept MessageInput : source {
   taint: [taint.UntrustedData]

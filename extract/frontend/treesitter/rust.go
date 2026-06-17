@@ -386,7 +386,8 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 // rustStringValue returns a quoted string literal whose inner text reflects the
 // Rust literal payload. It covers normal, byte, raw, and byte-raw strings well
 // enough for adapter `val` matching; escape handling is intentionally simple
-// because security mappings match substrings such as "/tmp/" or static IV bytes.
+// because value-matched mappings need literal substrings such as path fragments
+// or byte constants.
 func rustStringValue(raw string) string {
 	s := raw
 	for len(s) > 0 {

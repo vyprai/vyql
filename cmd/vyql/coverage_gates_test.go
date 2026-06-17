@@ -226,14 +226,14 @@ func conceptsByKind(t *testing.T, kind string) map[string]bool {
 }
 
 // T2.1 — every SOURCE concept is wired in an adapter (something produces it) OR is in the
-// documented "reserved vocabulary" set (defined ahead of wiring; the input is currently
-// subsumed by a broader source like HttpInput, or belongs to an archetype not yet wired).
+// documented "reserved vocabulary" set (defined ahead of wiring; the input may currently
+// be subsumed by a broader source, or belong to an archetype not yet wired).
 // A NEW source concept must be wired or explicitly reserved here.
 func TestSourceConceptsWiredGate(t *testing.T) {
 	reserved := map[string]bool{
 		"UserControlledData": true, "SecretValue": true, // base taint roots
-		// reserved vocabulary — inputs presently subsumed by HttpInput, or archetype
-		// sources not yet wired (worker/library/second-order). Wire or remove when used.
+		// reserved vocabulary — inputs presently subsumed by broader sources, or
+		// archetype sources not yet wired. Wire or remove when used.
 		"Cookie": true, "HttpHeader": true, "HttpRequest": true,
 		"ConfigFileInput": true, "ExternalApiResponse": true,
 		"MessageInput": true,
@@ -313,8 +313,8 @@ func TestEveryLanguageHasATest(t *testing.T) {
 	t.Logf("frontends: %d in table, %d covered by a spec", len(languages), len(specLangs))
 }
 
-// T0.3 — every threat reference (vulnerable_to/neutralizes) resolves to a defined threat
-// in the correct package.
+// T0.3 — every ontology threat reference resolves to a defined threat in the
+// correct package.
 func TestThreatRefsResolveGate(t *testing.T) {
 	defined := map[string]bool{} // "pkg.Threat"
 	for _, c := range readDataFiles(t, "ontology", "threatkinds.vyql") {

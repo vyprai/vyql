@@ -99,9 +99,8 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
-		// ASP.NET Core MVC: an action's parameters are model-bound from the request
-		// (route/query/body), so they are user input. Seed each as an HttpInput
-		// source at the top of the body.
+		// Framework action parameters are externally bound entry data. Seed each at
+		// the top of the body.
 		if n.Kind() == "method_declaration" && (c.inController || c.hasHTTPAttr(n)) {
 			var seed []nir.Stmt
 			for _, p := range params {
@@ -296,10 +295,9 @@ func (c *csConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// member/element property write `si.Arguments = x` / `obj.prop = x`: model as a
-		// PATH-sink call (Method="") so the assigned value flows into a write node a
-		// `sink path "Arguments"`-style sink can match (e.g. ProcessStartInfo.Arguments
-		// command injection). Mirrors the JS/Kotlin member-write modeling.
+		// member/element property write `obj.prop = x`: model as a path call
+		// (Method="") so the assigned value flows into a write node that path
+		// mappings can match. Mirrors the JS/Kotlin member-write modeling.
 		if left != nil && (left.Kind() == "member_access_expression" || left.Kind() == "element_access_expression") {
 			p := c.dotted(left)
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: c.loc(inner)}}}

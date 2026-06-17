@@ -1,6 +1,7 @@
 package lowering
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/extract/nir"
@@ -76,4 +77,30 @@ func TestLowerStampsReceiverTypeFromParamTypes(t *testing.T) {
 		}
 	}
 	t.Fatalf("svc.clean call not found")
+}
+
+func TestLowerAnnotatedReturnCreatesSyntheticCall(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "handler", Decorators: []string{"decorator_method:get"}, Body: []nir.Stmt{
+				nir.Return{Value: nir.Name{ID: "body", Loc: "app.py:2"}},
+			}, Loc: "app.py:1"},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "analysis.function.return" &&
+			n.Prop("arg0") != "" &&
+			strings.Contains(n.Prop("str_args"), "decorator_method:get") {
+			return
+		}
+	}
+	t.Fatalf("annotated return synthetic call not found")
 }

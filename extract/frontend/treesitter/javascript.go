@@ -226,6 +226,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.funcParams(n)
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
+		decorators := c.jsDecoratorTokens(n)
 		// NestJS route handler (`@Get()/@Post() find(@Query() q, @Param() id)`): the
 		// method's parameters are request-bound (@Body/@Query/@Param/@Headers), so seed
 		// each as http_input. Detected by the HTTP-method decorator on the method.
@@ -237,7 +238,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: c.exported[name]}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Decorators: decorators, Exported: c.exported[name]}}
 	case "class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "lexical_declaration", "variable_declaration":
@@ -464,21 +465,20 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// member-property write (e.g. el.innerHTML = x, location.href = x): model as a
-		// PATH sink call so DOM-XSS / open-redirect `sink path "innerHTML"` etc. fire.
+		// member-property write (e.g. obj.prop = x): model as a path call so adapter
+		// mappings can reason about the assigned value.
 		// Method is empty so it can never collide with method-name sinks (query/exec/…).
 		if left != nil && left.Kind() == "member_expression" {
 			p := c.dotted(left)
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}
 		}
-		// subscript write (session['x'] = v): model as a write to the base's path so the
-		// same path sinks (trust-context, DOM) fire as for a dotted member write.
+		// subscript write (obj[key] = v): model as a write to the base's path so the
+		// same path mappings fire as for a dotted member write.
 		if left != nil && left.Kind() == "subscript_expression" {
 			base := field(left, "object")
 			key := field(left, "index")
 			return []nir.Stmt{
-				// Dynamic property names can mutate Object.prototype when the key is
-				// attacker-controlled ("__proto__", "constructor", etc.).
+				// Preserve dynamic property-name flow separately from value flow.
 				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{c.expr(key)}, Path: "__js_dynamic_property_write", Method: "", Loc: L}},
 				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right}, Path: c.dotted(base), Method: "", Loc: L}},
 			}
@@ -806,6 +806,61 @@ func (c *jsConv) seedIpcLambda(lam nir.Lambda, L string) nir.Lambda {
 	}
 	lam.Body = append(seed, lam.Body...)
 	return lam
+}
+
+func (c *jsConv) jsDecoratorTokens(n *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "decorator" {
+			continue
+		}
+		path := c.jsDecoratorPath(ch)
+		add("decorator_path:" + path)
+		if i := strings.LastIndex(path, "."); i >= 0 {
+			add("decorator_method:" + path[i+1:])
+		} else {
+			add("decorator_method:" + path)
+		}
+	}
+	return out
+}
+
+func (c *jsConv) jsDecoratorPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Kind() {
+	case "decorator", "call_expression":
+		if p := c.jsDecoratorPath(field(n, "function")); p != "" {
+			return p
+		}
+	case "member_expression":
+		base := c.jsDecoratorPath(field(n, "object"))
+		prop := c.text(field(n, "property"))
+		if base == "" {
+			return prop
+		}
+		if prop == "" {
+			return base
+		}
+		return base + "." + prop
+	case "identifier":
+		return c.text(n)
+	}
+	for _, ch := range namedChildren(n) {
+		if p := c.jsDecoratorPath(ch); p != "" {
+			return p
+		}
+	}
+	return ""
 }
 
 func (c *jsConv) jsHasRouteDecorator(n *tree_sitter.Node) bool {

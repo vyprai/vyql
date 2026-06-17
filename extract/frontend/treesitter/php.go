@@ -82,9 +82,8 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
 				Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.row", Loc: L}, Path: "wp.list_table.row", Method: "row", Loc: L}}}, body...)
 		}
-		// MediaWiki parser hook: a method taking a `Parser`/`PPFrame` carries user wiki markup
-		// in its OTHER params ($input, $args of `parse3DTag($input,$args,Parser $p,PPFrame $f)`),
-		// which flow into Html::element/rawElement output (stored XSS). Seed those as input.
+		// Framework parser hook: a method taking a Parser/PPFrame receives caller
+		// content in its other params. Seed those params as external input.
 		if phpHasFrameworkParam(ptypes) {
 			var seed []nir.Stmt
 			for _, p := range params {
@@ -141,9 +140,9 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "foreach_statement":
 		// `foreach ($coll as $k => $v) {…}` — bind the loop key/value vars to the collection
 		// (conservative whole-collection taint) so element taint flows into the body. Without
-		// this $v/$k were unbound and all per-element taint was lost (e.g. building an HTML
-		// attribute array `$par[$k]=$v` from user input). Binding $k too matters for
-		// attribute-NAME injection. tree-sitter-php: `body` is a field; the non-body children
+		// this $v/$k were unbound and all per-element flow was lost (e.g. building a
+		// keyed array `$par[$k]=$v` from input). Binding $k preserves dynamic keys too.
+		// tree-sitter-php: `body` is a field; the non-body children
 		// are [iterable, value-spec], where value-spec is variable_name | by_ref | list_literal
 		// | pair($k => $v).
 		body := c.collectBlocks(n)
@@ -191,16 +190,16 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
 		// member-property write ($obj->role = v) — model as a PATH-sink Call (Method empty so
-		// it never collides with method-name sinks) so trust-context / DOM path sinks fire.
+		// it never collides with method-name mappings) so path mappings can match writes.
 		if left != nil && left.Kind() == "member_access_expression" {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: c.loc(inner)}}}
 		}
 		// subscript write ($arr[$k] = v) — two effects: (1) a write to the base's path
-		// ($_SESSION['role'] → "_SESSION") so the trust-boundary path sink fires (CWE-501);
-		// (2) when the base is a plain variable, a taint-JOIN `$arr = combine($arr, v)` so a
-		// later read of $arr carries v's taint (an array built element-by-element from user
-		// input — e.g. `$par[$k]=$v; Html::element('canvas',$par)` — stays tainted). Without (2)
+		// ($_SESSION['role'] -> "_SESSION") so path mappings can match writes;
+		// (2) when the base is a plain variable, a flow join `$arr = combine($arr, v)` so a
+		// later read of $arr carries v's flow (an array built element-by-element stays linked).
+		// Without (2)
 		// the value taint was dropped at the discarded write.
 		if left != nil && left.Kind() == "subscript_expression" {
 			if kids := namedChildren(left); len(kids) > 0 {

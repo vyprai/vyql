@@ -22,10 +22,8 @@ var manifestParsers = []struct {
 }
 
 // applySCA discovers dependency manifests under the scanned paths, adds SBOM nodes to the
-// graph, then runs the reputation pipeline (vulnerable / malicious / typosquat /
-// unreviewed-version) per ecosystem and links reachability — so SCA rules (SCA-001..004)
-// evaluate against the SAME graph as the SAST rules. Manifest/IO errors are non-fatal:
-// SCA augments a scan, it never gates it.
+// graph, then runs the package reputation pipeline per ecosystem and links reachability.
+// Manifest/IO errors are non-fatal: package analysis augments a scan, it never gates it.
 func applySCA(g usg.Store, paths []string) {
 	ecos := map[string]bool{}
 	for _, p := range paths {

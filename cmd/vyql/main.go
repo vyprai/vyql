@@ -6,7 +6,7 @@
 // Usage:
 //
 //	vyql scan [flags] <path>...
-//	  -rules <file|dir>   load rule(s) from .vyql file(s) (default: built-in SQLi)
+//	  -rules <file|dir>   load rule(s) from .vyql file(s)
 //	  -format text|sarif  output format (default: text)
 //
 // Other languages and a tree-sitter frontend are the documented next step; this

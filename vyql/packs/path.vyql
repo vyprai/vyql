@@ -2,7 +2,7 @@
 module vypr.path;
 
 rule Traversal {
-  meta { id: "VYQL-PATH-001", severity: high, cwe: [CWE_22] }
+  meta { id: "VYQL-PATH-001", severity: high, cwe: [CWE_22], benchmark: pathtraver }
   taint core.UserControlledData -> code.FilePathAccess
   unless sanitized_by core.PathCanonicalization
   unless guarded_by core.PathAccessCheck

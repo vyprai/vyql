@@ -188,9 +188,8 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		} else if mn := c.text(field(n, "name")); mn == "isValid" && len(params) > 0 && hasParamType(paramTypes, "ConstraintValidatorContext") {
-			// JSR-380 `ConstraintValidator.isValid(value, ctx)`: `value` is the untrusted input
-			// being validated (by contract). Seeding it lets a tainted custom message reach the
-			// Bean-Validation EL sink (buildConstraintViolationWithTemplate) — CWE-917.
+			// JSR-380 ConstraintValidator.isValid(value, ctx): value is framework-supplied
+			// entry data. Seed it so custom-message flows remain visible to adapters.
 			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
 				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}}}, body...)
 		}

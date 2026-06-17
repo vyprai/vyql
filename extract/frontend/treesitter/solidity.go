@@ -12,8 +12,8 @@ import (
 
 // solConv walks a tree-sitter Solidity CST into NIR. Solidity wraps operands in
 // `expression` nodes (peeled by solUnwrap). A public/external function's
-// parameters are attacker-controllable (model-bound like a web handler), so they
-// are seeded as sources. For a low-level call (to.call/to.transfer) the RECEIVER
+// parameters are externally supplied by the entry model, so they are seeded as
+// sources. For a low-level call (to.call/to.transfer) the RECEIVER
 // address is the dangerous value, so it is modeled as arg0.
 type solConv struct {
 	src  []byte

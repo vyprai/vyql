@@ -183,11 +183,10 @@ type FuncDef struct {
 	ParamTypes map[string]string
 	Body       []Stmt
 	Loc        string
-	// IsRoute marks a web request handler (e.g. a Flask/FastAPI @app.route function).
-	// The lowering treats a returned freshly-built string (Concat/Format) as written to
-	// the HTTP response body — a reflected-XSS sink — since the framework does not escape
-	// raw string returns (only template renders).
-	IsRoute bool
+	// Decorators records syntax-level annotation/decorator tokens attached to this function.
+	// Lowering preserves them on generic function-return events; adapters decide what any
+	// specific decorator means for a domain.
+	Decorators []string
 	// IsValidator marks a function annotated `# vyql: validator` — a custom
 	// input-validator/authenticator the tool can't infer by name. Its return value is
 	// treated as validated (clears the trust-boundary threat), so storing it across a

@@ -26,12 +26,12 @@ import (
 //
 //	test "short description"
 //	  lang   java
-//	  expect VYQL-CRY-002      # repeatable — every listed rule MUST fire
-//	  reject VYQL-INJ-001      # repeatable — every listed rule must NOT fire
-//	  expect_evidence VYQL-PATH-001 assumption  # rule must carry negation evidence text
-//	  reject_evidence VYQL-INJ-004 char-filter  # rule evidence must not contain text
-//	  expect_review code.CryptoOperation # repeatable — review concept must appear
-//	  reject_review code.CryptoOperation # repeatable — review concept must not appear
+//	  expect RULE-ID      # repeatable — every listed rule MUST fire
+//	  reject RULE-ID      # repeatable — every listed rule must NOT fire
+//	  expect_evidence RULE-ID assumption  # rule must carry negation evidence text
+//	  reject_evidence RULE-ID char-filter # rule evidence must not contain text
+//	  expect_review some.Concept          # repeatable — review concept must appear
+//	  reject_review some.Concept          # repeatable — review concept must not appear
 //	  gitlink vendor/lib <sha>  # optional git submodule/gitlink fixture
 //	  code
 //	  ```

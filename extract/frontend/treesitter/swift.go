@@ -65,7 +65,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		paramTypes := c.paramTypes(n)
 		body := c.block(c.swBody(n))
-		// iOS attacker-controlled entry points seeded as URL-scheme input:
+		// Platform callback entry points seeded as external input:
 		//   application(_:open:) — deep-link URL param `open url:`
 		//   userContentController(_:didReceive:) — WKScriptMessage param (.body is web JS)
 		var seedParam string

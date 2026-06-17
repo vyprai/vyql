@@ -19,7 +19,7 @@ rule IncompleteServerPortValidation {
 }
 
 rule OpenRedirect {
-  meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601] }
+  meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601], benchmark: redirect }
   taint core.UserControlledData -> code.RedirectTarget
   unless sanitized_by core.RedirectAllowlist
   unless guarded_by core.RedirectAllowlist

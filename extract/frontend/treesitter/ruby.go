@@ -85,8 +85,8 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if left != nil && (left.Kind() == "identifier" || left.Kind() == "constant" || left.Kind() == "instance_variable") {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// subscript write (session['role'] = v) — model as a write to the base's path so a
-		// trust-context path sink fires (CWE-501). Method empty → no method-sink collision.
+		// subscript write (session['role'] = v) — model as a write to the base's path.
+		// Method empty -> no method-sink collision.
 		if left != nil && left.Kind() == "element_reference" {
 			base := field(left, "object")
 			if base == nil {
