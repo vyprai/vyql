@@ -545,6 +545,14 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 	case p.atWord("source"):
 		p.next()
 		kind := "source"
+		if p.atWord("param") { // public-API parameter source (library archetype): no pattern;
+			p.next()           // labels parameter nodes. A first-class source form like method/receiver.
+			sm := AdapterMapping{Kind: "source_param"}
+			p.parseAdapterGuards(&sm, true)
+			p.expect(tArrow, "->")
+			sm.Concept = p.parseConceptRef()
+			return []AdapterMapping{sm}
+		}
 		if p.atWord("method") { // receiver-agnostic source: match the call method name
 			p.next()
 			kind = "source_method"

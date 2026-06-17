@@ -323,6 +323,7 @@ type adapterSpec struct {
 	Marks         []controlSpec // presence markers (label the call node with a concept)
 	Filters       []filterSpec  // character-filtering replaces (core.CharFilter)
 	Assumes       []assumeSpec  // unsound neutralizers (core.Assumption)
+	ParamSources  []string      // `source param -> X`: concepts to label parameter nodes with
 }
 
 // AdaptersFor loads the framework adapters for a technology from
@@ -349,6 +350,9 @@ func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 	}
 	if len(spec.Filters) > 0 {
 		out = append(out, spec.filterAdapter())
+	}
+	if len(spec.ParamSources) > 0 {
+		out = append(out, spec.paramSourceAdapter())
 	}
 	if len(spec.Assumes) > 0 {
 		out = append(out, spec.assumeAdapter())
@@ -542,6 +546,8 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 				srcByConcept[mp.Concept] = i
 			}
 			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
+		case "source_param":
+			s.ParamSources = append(s.ParamSources, mp.Concept)
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
@@ -1175,6 +1181,52 @@ func SecretscanAdapters() []adapters.Adapter { return AdaptersFor("secretscan") 
 // PiiAdapters is the cross-language PII taxonomy (adapters/pii.vyql). It labels nodes
 // in every language, so it is applied once per scan rather than per present frontend.
 func PiiAdapters() []adapters.Adapter        { return AdaptersFor("pii") }
+
+// paramSourceAdapter labels function/method parameter nodes with the spec's
+// `source param -> X` concept(s) — the library/SDK trust boundary (any caller may pass
+// attacker data through a public API). The KNOWLEDGE (which concept) is the .vyql line;
+// this is only the mechanism.
+//
+// Default-OFF, opt-in: unlike the pattern source adapter (where activeSources==nil means
+// "no profile → every source on"), a parameter source fires ONLY when a profile is set AND
+// explicitly lists the concept (i.e. the library profile). So application profiles, and the
+// no-profile default, never taint parameters. Low confidence (syntactic): a finding
+// surfaces only if a param actually reaches a sink.
+func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
+	concepts := spec.ParamSources
+	return adapters.Adapter{
+		Name: spec.Name + ".param-source", Technology: spec.Technology, Specificity: 0,
+		Fidelity: "syntactic", Origin: "human",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			if activeSources == nil {
+				return nil // no trust boundary set → parameters are not sources
+			}
+			active := make([]string, 0, len(concepts))
+			for _, c := range concepts {
+				if activeSources[c] {
+					active = append(active, c)
+				}
+			}
+			if len(active) == 0 {
+				return nil
+			}
+			ids, _ := s.NodesOfType("code.Param")
+			out := make([]adapters.Mapping, 0, len(ids)*len(active))
+			for _, id := range ids {
+				for _, c := range active {
+					out = append(out, adapters.Mapping{NodeID: id, Concept: c, Specificity: 0})
+				}
+			}
+			return out
+		},
+	}
+}
+
+// LibraryAdapters is the cross-language library/SDK trust boundary (adapters/library.vyql):
+// public-API parameters as external-entry sources. Applied once per scan; only active under
+// the library profile (the concept it labels is gated by the profile's trust boundary).
+func LibraryAdapters() []adapters.Adapter    { return AdaptersFor("library") }
+
 func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }
 func DartAdapters() []adapters.Adapter       { return AdaptersFor("dart") }
 func GroovyAdapters() []adapters.Adapter     { return AdaptersFor("groovy") }

@@ -129,6 +129,7 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 	// whenever any source was parsed, so `user.ssn` is a PII source in every language.
 	if len(prog.Modules) > 0 {
 		ads = append(ads, frontend.PiiAdapters()...)
+		ads = append(ads, frontend.LibraryAdapters()...)
 	}
 	// bundled .properties config — resolved key→value so a `getProperty("hashAlg1")`
 	// read folds to its real value during lowering (CWE-327/328 via config indirection).

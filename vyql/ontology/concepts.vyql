@@ -20,6 +20,13 @@ concept CliArgument : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
 }
+// A public-API / exported-function parameter, treated as attacker-controlled under the
+// library/SDK archetype (any caller may pass untrusted data). Active only when the
+// library profile's trust boundary enables it — never under application profiles.
+concept ExternalEntryInput : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
 concept CodeEval : sink {
   vulnerable_to: [injection.CodeInjection]
   enabled_by: [taint.UntrustedData]
