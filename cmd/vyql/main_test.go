@@ -380,6 +380,34 @@ class Standard {
   }
 }`
 
+const vulnerablePythonOptionalLDAPTLS = `from ldap3 import Server, Tls
+import ssl
+
+def get_ldap_connection(conf):
+    tls_configuration = None
+    use_ssl = False
+    try:
+        cacert = conf.get("ldap", "cacert")
+        tls_configuration = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=cacert)
+        use_ssl = True
+    except Exception:
+        pass
+    return Server(conf.get("ldap", "uri"), use_ssl, tls_configuration)
+`
+
+const fixedPythonRequiredLDAPTLS = `from ldap3 import Server, Tls
+import ssl
+
+def get_ldap_connection(conf):
+    cacert = None
+    try:
+        cacert = conf.get("ldap", "cacert")
+    except Exception:
+        pass
+    tls_configuration = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=cacert)
+    return Server(conf.get("ldap", "uri"), use_ssl=True, tls=tls_configuration)
+`
+
 func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "vuln.php"), []byte(vulnerablePhpStoredHtmlWrite), 0o644); err != nil {
@@ -404,6 +432,33 @@ func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
 	}
 	if !strings.Contains(stored[0].Bindings[0].Loc, "vuln.php") {
 		t.Fatalf("stored HTML write finding should be in vuln.php, got %#v", stored[0].Bindings)
+	}
+}
+
+func TestScanPythonOptionalLDAPTLSValidation(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "vuln.py"), []byte(vulnerablePythonOptionalLDAPTLS), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "fixed.py"), []byte(fixedPythonRequiredLDAPTLS), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var cert []*findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-CFG-004" {
+			cert = append(cert, f)
+		}
+	}
+	if len(cert) != 1 {
+		t.Fatalf("expected one cert-validation-disabled finding for optional LDAP TLS only, got %d: %#v", len(cert), fs)
+	}
+	if !strings.Contains(cert[0].Bindings[0].Loc, "vuln.py") {
+		t.Fatalf("expected cert finding in vulnerable file, got %#v", cert[0].Bindings)
 	}
 }
 

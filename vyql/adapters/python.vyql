@@ -535,6 +535,7 @@ adapter python {
   // TLS cert validation disabled (CWE-295) — requests/httpx verify=False
   mark "requests" val "verify=False" -> code.CertValidationDisabled
   mark "httpx" val "verify=False" -> code.CertValidationDisabled
+  mark "security.ldap.tls.optional_validation" -> code.CertValidationDisabled
 
   // JWT signature not verified (CWE-347) — pyjwt alg none / verify off
   mark "jwt.decode" val "algorithms=none" -> code.JwtUnverified

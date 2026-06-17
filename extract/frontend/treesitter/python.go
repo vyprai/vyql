@@ -258,6 +258,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.block(field(n, "body"))
 		body = append(body, c.pyIncompleteFStringValidation(n)...)
 		body = append(body, c.pyStartTLSBufferReview(n)...)
+		body = append(body, c.pyOptionalLDAPTLSValidation(n)...)
 		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
 		// the args after self/info/root/parent are the query's user-supplied inputs.
 		if strings.HasPrefix(name, "resolve_") {
@@ -520,6 +521,27 @@ func (c *pyConv) pyStartTLSBufferReview(fn *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	path := "security.protocol.starttls.buffer_uncleared"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
+		Path:   path,
+		Method: lastSeg(path),
+		Loc:    c.loc(fn),
+	}}}
+}
+
+func (c *pyConv) pyOptionalLDAPTLSValidation(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := c.text(body)
+	if !strings.Contains(text, "use_ssl = False") ||
+		!strings.Contains(text, "Tls(") ||
+		!strings.Contains(text, "validate=ssl.CERT_REQUIRED") ||
+		!strings.Contains(text, "Server(") {
+		return nil
+	}
+	path := "security.ldap.tls.optional_validation"
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
 		Path:   path,
