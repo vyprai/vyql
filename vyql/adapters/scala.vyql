@@ -59,6 +59,7 @@ adapter scala {
   mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
   mark "GCMParameterSpec" val "000000000000" -> code.StaticIv
   mark "csrf.disable" -> code.CsrfDisabled
+  mark "security.csrf.empty_token_compare" -> code.IncompleteCsrfTokenValidation
   mark "NoopHostnameVerifier" -> code.CertValidationDisabled
   mark "Algorithm.none" -> code.JwtUnverified
   mark "setWritable" val "true" val "false" -> code.InsecurePermission

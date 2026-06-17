@@ -619,6 +619,10 @@ concept StateChangingOp : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_352]
 }
+concept IncompleteCsrfTokenValidation : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352]
+}
 concept StoredDataWrite : sink {
   vulnerable_to: [crypto.CleartextStorage]
   enabled_by: [taint.SecretValue]

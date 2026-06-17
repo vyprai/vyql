@@ -25,6 +25,11 @@ rule OpenRedirect {
   unless guarded_by core.RedirectAllowlist
 }
 
+rule IncompleteCsrfTokenValidation {
+  meta { id: "VYQL-RF-006", severity: medium, cwe: [CWE_352], confidence_floor: medium }
+  match code.IncompleteCsrfTokenValidation as guard
+}
+
 rule Csrf {
   meta { id: "VYQL-RF-003", severity: medium, cwe: [CWE_352] }
   taint core.UserControlledData -> code.StateChangingOp

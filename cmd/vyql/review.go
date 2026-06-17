@@ -120,6 +120,12 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		expected: []string{"core.CsrfProtection"},
 		review:   "review why CSRF protection is disabled or exempted here",
 	},
+	"code.IncompleteCsrfTokenValidation": {
+		category: "request",
+		kind:     "attention",
+		expected: []string{"core.CsrfProtection"},
+		review:   "review CSRF token validation for empty-token acceptance or missing freshness checks",
+	},
 	"code.InsecurePermission": {
 		category: "permission",
 		kind:     "target",

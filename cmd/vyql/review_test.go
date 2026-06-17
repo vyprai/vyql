@@ -140,6 +140,17 @@ const fixedStartTLSBufferReviewPython = `class SMTP:
             super().connection_made(transport)
 `
 
+const incompleteCsrfReviewScala = `trait CsrfDirectives {
+  def randomTokenCsrfProtection(): Unit = {
+    if (submitted == cookie) {
+      pass
+    } else {
+      reject
+    }
+  }
+}
+`
+
 const phpBulkUpdateReview = `<?php
 trait UpdateTrait {
   protected function updateItem($manager, $item, array $entry) {
@@ -399,6 +410,21 @@ func TestCollectReviewItemsStartTLSBufferAttention(t *testing.T) {
 	}
 	if hasReviewKind(collectReviewItems(g), "request", "attention", "code.ProtocolStateReview") {
 		t.Fatal("fixed STARTTLS buffer clear should suppress protocol-state review item")
+	}
+}
+
+func TestCollectReviewItemsIncompleteCsrfTokenValidation(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Csrf.scala"), []byte(incompleteCsrfReviewScala), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := collectReviewItems(g)
+	if !hasReviewKind(rows, "request", "attention", "code.IncompleteCsrfTokenValidation") {
+		t.Fatalf("expected incomplete CSRF token validation review attention item, got %#v", rows)
 	}
 }
 

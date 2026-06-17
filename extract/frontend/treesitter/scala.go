@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsscala "github.com/tree-sitter/tree-sitter-scala/bindings/go"
 
@@ -9,9 +11,10 @@ import (
 
 // scConvScala walks a tree-sitter Scala CST into NIR.
 type scConvScala struct {
-	src  []byte
-	file string
-	key  string
+	src         []byte
+	file        string
+	key         string
+	currentFunc string
 }
 
 // ExtractScala parses Scala files into one NIR Program (one module per file).
@@ -60,11 +63,16 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}}
 	case "function_definition":
 		params := c.params(field(n, "parameters"))
+		name := c.text(field(n, "name"))
+		prev := c.currentFunc
+		c.currentFunc = name
+		body := c.bodyStmts(field(n, "body"))
+		c.currentFunc = prev
 		return []nir.Stmt{nir.FuncDef{
-			Name:       c.text(field(n, "name")),
+			Name:       name,
 			Params:     params,
 			ParamTypes: c.paramTypes(field(n, "parameters")),
-			Body:       c.bodyStmts(field(n, "body")),
+			Body:       body,
 			Loc:        L,
 		}}
 	case "val_definition", "var_definition", "val_declaration", "var_declaration":
@@ -92,12 +100,20 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	// branch-structured (B1); Cond nil (Scala did not evaluate the predicate) -> byte-identical.
 	case "if_expression":
-		ifn := nir.If{Cond: c.expr(field(n, "condition"))}
+		condNode := field(n, "condition")
+		cond := c.expr(condNode)
+		ifn := nir.If{Cond: cond}
 		if cons := field(n, "consequence"); cons != nil {
 			ifn.Then = c.collectBlocks(cons)
 		}
 		if alt := field(n, "alternative"); alt != nil {
 			ifn.Else = c.collectBlocks(alt)
+		}
+		if c.isIncompleteCsrfTokenGuard(cond) && !scalaCsrfConditionHasNonEmptyCheck(c.text(condNode)) {
+			return []nir.Stmt{
+				nir.ExprStmt{Value: csrfEmptyTokenCompareCall(L)},
+				ifn,
+			}
 		}
 		return []nir.Stmt{ifn}
 	case "for_expression", "while_expression":
@@ -110,6 +126,138 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *scConvScala) isIncompleteCsrfTokenGuard(e nir.Expr) bool {
+	if !strings.Contains(strings.ToLower(c.currentFunc), "csrf") {
+		return false
+	}
+	return hasCsrfTokenEquality(e) && !hasCsrfNonEmptyCheck(e)
+}
+
+func scalaCsrfConditionHasNonEmptyCheck(s string) bool {
+	lower := strings.ToLower(strings.ReplaceAll(s, " ", ""))
+	return strings.Contains(lower, ".isempty") ||
+		strings.Contains(lower, ".nonempty") ||
+		strings.Contains(lower, "!=\"\"") ||
+		strings.Contains(lower, "!=null") ||
+		strings.Contains(lower, ".exists(")
+}
+
+func csrfEmptyTokenCompareCall(loc string) nir.Call {
+	return nir.Call{
+		Callee: nir.Name{ID: "security.csrf.empty_token_compare", Loc: loc},
+		Path:   "security.csrf.empty_token_compare",
+		Method: "empty_token_compare",
+		Loc:    loc,
+	}
+}
+
+func hasCsrfTokenEquality(e nir.Expr) bool {
+	switch v := e.(type) {
+	case nir.BinOp:
+		if v.Op == "==" && isCsrfTokenExpr(v.Left) && isCsrfTokenExpr(v.Right) {
+			return true
+		}
+		return hasCsrfTokenEquality(v.Left) || hasCsrfTokenEquality(v.Right)
+	case nir.Unary:
+		return hasCsrfTokenEquality(v.Operand)
+	case nir.Thru:
+		return hasCsrfTokenEquality(v.Inner)
+	case nir.Seq:
+		for _, p := range v.Parts {
+			if hasCsrfTokenEquality(p) {
+				return true
+			}
+		}
+	case nir.Ternary:
+		return hasCsrfTokenEquality(v.Cond) || hasCsrfTokenEquality(v.Then) || hasCsrfTokenEquality(v.Else)
+	}
+	return false
+}
+
+func hasCsrfNonEmptyCheck(e nir.Expr) bool {
+	switch v := e.(type) {
+	case nir.Unary:
+		if (v.Op == "!" || v.Op == "not") && isEmptyCheck(v.Operand) {
+			return true
+		}
+		return hasCsrfNonEmptyCheck(v.Operand)
+	case nir.BinOp:
+		if (v.Op == "!=" || v.Op == "==") && comparesWithEmptyLiteral(v.Left, v.Right) {
+			return true
+		}
+		return hasCsrfNonEmptyCheck(v.Left) || hasCsrfNonEmptyCheck(v.Right)
+	case nir.Call:
+		if strings.EqualFold(v.Method, "nonEmpty") && isCsrfTokenExpr(v.Callee) {
+			return true
+		}
+		for _, a := range v.Args {
+			if hasCsrfNonEmptyCheck(a) {
+				return true
+			}
+		}
+	case nir.Thru:
+		return hasCsrfNonEmptyCheck(v.Inner)
+	case nir.Seq:
+		for _, p := range v.Parts {
+			if hasCsrfNonEmptyCheck(p) {
+				return true
+			}
+		}
+	case nir.Ternary:
+		return hasCsrfNonEmptyCheck(v.Cond) || hasCsrfNonEmptyCheck(v.Then) || hasCsrfNonEmptyCheck(v.Else)
+	}
+	return false
+}
+
+func isEmptyCheck(e nir.Expr) bool {
+	switch v := e.(type) {
+	case nir.Call:
+		return strings.EqualFold(v.Method, "isEmpty") && isCsrfTokenExpr(v.Callee)
+	case nir.Attr:
+		return strings.EqualFold(v.Attr, "isEmpty") && isCsrfTokenExpr(v.Base)
+	case nir.Thru:
+		return isEmptyCheck(v.Inner)
+	}
+	return false
+}
+
+func comparesWithEmptyLiteral(a, b nir.Expr) bool {
+	return (isCsrfTokenExpr(a) && isEmptyLiteral(b)) || (isCsrfTokenExpr(b) && isEmptyLiteral(a))
+}
+
+func isEmptyLiteral(e nir.Expr) bool {
+	switch v := e.(type) {
+	case nir.Const:
+		s := strings.Trim(v.Value, `"'`)
+		return s == ""
+	case nir.Thru:
+		return isEmptyLiteral(v.Inner)
+	}
+	return false
+}
+
+func isCsrfTokenExpr(e nir.Expr) bool {
+	switch v := e.(type) {
+	case nir.Name:
+		return isCsrfTokenName(v.ID)
+	case nir.Attr:
+		return isCsrfTokenName(v.Attr) || isCsrfTokenExpr(v.Base)
+	case nir.Call:
+		return isCsrfTokenName(v.Method) || isCsrfTokenName(v.Path) || isCsrfTokenExpr(v.Callee)
+	case nir.Thru:
+		return isCsrfTokenExpr(v.Inner)
+	}
+	return false
+}
+
+func isCsrfTokenName(s string) bool {
+	lower := strings.ToLower(s)
+	return strings.Contains(lower, "csrf") ||
+		strings.Contains(lower, "token") ||
+		strings.Contains(lower, "cookie") ||
+		strings.Contains(lower, "submitted")
 }
 
 // scMatch lowers a `x match { case … }` to a subject+labelled nir.Switch so a constant
@@ -332,12 +480,17 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 	case "if_expression":
 		// if-as-expression `if (c) a else b` → Ternary so the engine merges both branch
 		// values into a Phi (a tainted branch then taints the result).
-		t := nir.Ternary{Cond: c.expr(field(n, "condition")), Loc: L}
+		condNode := field(n, "condition")
+		cond := c.expr(condNode)
+		t := nir.Ternary{Cond: cond, Loc: L}
 		t.Then = c.blockTail(field(n, "consequence"))
 		if alt := field(n, "alternative"); alt != nil {
 			t.Else = c.blockTail(alt)
 		} else {
 			t.Else = nir.Const{Loc: L}
+		}
+		if c.isIncompleteCsrfTokenGuard(cond) && !scalaCsrfConditionHasNonEmptyCheck(c.text(condNode)) {
+			return nir.Seq{Parts: []nir.Expr{csrfEmptyTokenCompareCall(L), t}, Loc: L}
 		}
 		return t
 	case "match_expression", "block":
