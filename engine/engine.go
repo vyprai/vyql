@@ -33,13 +33,9 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	return e.applyConfidenceFloor(cr, dedup(fs)), nil
 }
 
-// PossibilityFindings emits low-confidence "possibility" findings for the AI/triage pass:
-// one per ontology sink node that the confirmed rules did NOT already report. The idea —
-// "if VyQL can't prove the full rule, surface the site as a possibility and let a later AI
-// pass decide" — trades precision for recall. Each carries a review condition describing
-// what to verify, and confidence "possibility" (below "low"), so it is OFF by default and
-// never affects the protected benchmarks; the AI-pass pipeline opts in. `confirmed` is the
-// set of findings already produced by the normal rules.
+// PossibilityFindings emits opt-in, low-confidence review findings for labelled target
+// sites that confirmed rules did not already report. Concept-specific review text lives in
+// ontology data; the fallback here is deliberately generic.
 func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.Finding {
 	covered := map[string]bool{}
 	for _, f := range confirmed {
@@ -63,11 +59,7 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 				continue
 			}
 			seen[id] = true
-			threat := c.VulnerableTo[0]
-			cwe := ""
-			if len(c.CWE) > 0 {
-				cwe = c.CWE[0]
-			}
+			rc := possibilityReview(c)
 			out = append(out, &findings.Finding{
 				RuleID:      "VYQL-POSS-" + c.Name,
 				Severity:    "info",
@@ -75,15 +67,40 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 				WitnessKind: "possibility",
 				Bindings:    []findings.Binding{{Name: "sink", NodeID: id, Concept: qn, Loc: e.loc(id)}},
 				ReviewConditions: []findings.ReviewCondition{{
-					Category:   threat,
-					Condition:  "a " + c.Name + " sink (" + threat + ", " + cwe + ") with no proven sanitized untrusted-input flow — verify whether attacker-controlled data can reach it",
-					Assumption: "relevant only if untrusted input reaches this site unsanitized",
-					Confidence: "possibility",
+					Category:   rc.Category,
+					Condition:  rc.Condition,
+					Evidence:   rc.Evidence,
+					Assumption: rc.Assumption,
+					Confidence: rc.Confidence,
 				}},
 			})
 		}
 	}
 	return out
+}
+
+func possibilityReview(c ontology.Concept) findings.ReviewCondition {
+	qn := c.QualifiedName()
+	category := firstNonEmpty(c.ReviewCategory, firstString(c.VulnerableTo), qn)
+	condition := c.ReviewCondition
+	if condition == "" {
+		condition = "review " + qn + " because this labelled site was not covered by a confirmed rule finding"
+	}
+	evidence := c.ReviewEvidence
+	if evidence == "" {
+		evidence = "concept label " + qn + " is present"
+	}
+	assumption := c.ReviewAssumption
+	if assumption == "" {
+		assumption = "the data and control conditions represented by this concept hold for the reviewed site"
+	}
+	return findings.ReviewCondition{
+		Category:   category,
+		Condition:  condition,
+		Evidence:   evidence,
+		Assumption: assumption,
+		Confidence: firstNonEmpty(c.ReviewConfidence, "possibility"),
+	}
 }
 
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
@@ -396,7 +413,7 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 		seen[key] = true
 		detail := "an unsound sanitizer " + pat + " is on the path but is not provably complete for this sink (e.g. an escaper/encoder vyql cannot verify); false positive if it neutralizes correctly"
 		if mode == "guard" {
-			detail = "an unsound guard " + pat + " dominates the sink but does not provably exclude the attack (e.g. a prefix/normalize check a crafted input can bypass); false positive if it actually blocks the threat"
+			detail = "an unsound guard " + pat + " dominates the sink but is not provably complete for this target; false positive if it blocks the relevant condition"
 		}
 		out = append(out, findings.NegationEvidence{Clause: mode + " (assumption)", Satisfied: false, Detail: detail})
 	}
@@ -490,7 +507,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 	}
 
 	var out []*findings.Finding
-	// One finding per (rule, sink): a vulnerable sink reachable from N sources is ONE
+	// One finding per (rule, sink): a target sink reachable from N sources is ONE
 	// issue, not N. Reporting per source→sink path inflated real-world scans ~6× (e.g.
 	// a single `echo` reachable from 25 request reads). Keep the highest-confidence
 	// source as the representative witness; bySink maps sinkID → index in `out`.
@@ -710,6 +727,13 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
+func firstString(vals []string) string {
+	if len(vals) == 0 {
+		return ""
+	}
+	return vals[0]
+}
+
 // fidelityCeil caps confidence by match fidelity (docs/07): a syntactic match
 // (substring / bare method name, no receiver type) can be no better than medium;
 // resolved/semantic matches may be high.
@@ -773,8 +797,8 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 		}
 	}
 	// (2) B1: a guard-control-labelled node that DOMINATES the sink. This is what makes
-	// `guarded_by` work on REAL CODE — adapters label the check (e.g. validate_csrf_token,
-	// a @login_required decorator) with the control concept, and the structured CFG lets us
+	// `guarded_by` work on real code: adapters label the check with the control concept,
+	// and the structured CFG lets us
 	// connect it to exactly the sinks it covers (path-sensitive: a check in one branch does
 	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free
 	// graphs — those rely on the explicit edge above.

@@ -342,8 +342,8 @@ func (c *jsConv) isModuleExports(n *tree_sitter.Node) bool {
 // exportFuncName returns the exported function name for `exports.NAME` or
 // `module.exports.NAME` member targets ("" if it is neither).
 // memberRootIdent returns the root identifier of a member chain (the object at the base
-// of `A.b.c`), or "" — so `LdapAuth.prototype.authenticate` yields "LdapAuth". Used to
-// tie a prototype/static method back to an exported constructor/class.
+// of `A.b.c`), or "". Used to tie a prototype/static method back to an exported
+// constructor/class.
 func (c *jsConv) memberRootIdent(m *tree_sitter.Node) string {
 	for m != nil && m.Kind() == "member_expression" {
 		m = field(m, "object")
@@ -975,7 +975,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		// output alphabet of x.replace(/…/g, repl).
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "true", "false", "null", "undefined":
-		// carry the literal text so value-matching sees rejectUnauthorized=false etc.
+		// carry the literal text so value-matching can inspect boolean/null constants.
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "member_expression":
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "property")), Path: c.dotted(n), Loc: L}

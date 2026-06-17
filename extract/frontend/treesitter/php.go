@@ -613,8 +613,8 @@ func prependSeqKeyPath(e nir.Expr, key string) nir.Expr {
 	}
 }
 
-// keyName returns the bare name of an array key — a string literal with quotes
-// stripped (e.g. 'httponly'), or a constant/name as-is (e.g. CURLOPT_SSL_VERIFYPEER).
+// keyName returns the bare name of an array key: a string literal with quotes
+// stripped, or a constant/name as-is.
 func (c *phConv) keyName(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""

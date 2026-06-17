@@ -29,8 +29,13 @@ type Concept struct {
 	Attack                  []string `json:"attack,omitempty"`        // MITRE ATT&CK technique ids
 	Aliases                 []string `json:"aliases,omitempty"`
 	Deprecated              string   `json:"deprecated,omitempty"`
-	Possibility             string   `json:"possibility,omitempty"`   // possibility pass policy: include|exclude
-	SourcePolicy            string   `json:"source_policy,omitempty"` // source exploit policy: direct|caller_conditional
+	Possibility             string   `json:"possibility,omitempty"` // possibility pass policy: include|exclude
+	ReviewCategory          string   `json:"review_category,omitempty"`
+	ReviewCondition         string   `json:"review_condition,omitempty"`
+	ReviewEvidence          string   `json:"review_evidence,omitempty"`
+	ReviewAssumption        string   `json:"review_assumption,omitempty"`
+	ReviewConfidence        string   `json:"review_confidence,omitempty"`
+	SourcePolicy            string   `json:"source_policy,omitempty"` // source review policy: direct|caller_conditional
 	SourceConditionCategory string   `json:"source_condition_category,omitempty"`
 	SourceCondition         string   `json:"source_condition,omitempty"`
 	SourceAssumption        string   `json:"source_assumption,omitempty"`

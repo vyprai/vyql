@@ -1885,9 +1885,9 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 			collectValTokens(a, key, out)
 		}
 	case nir.Name:
-		// enum / named constant arg (QSslSocket::VerifyNone, SSL_VERIFY_NONE, DES,
-		// Algorithm.none). Value-matched marks/sinks key off these symbolic values, not
-		// just string literals, so capture the identifier for `val`/`nval` matching.
+		// enum / named constant arg. Value-matched marks/sinks key off these symbolic
+		// values, not just string literals, so capture the identifier for `val`/`nval`
+		// matching.
 		if ex.ID != "" {
 			*out = append(*out, ex.ID)
 			if key != "" {

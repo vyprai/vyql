@@ -45,6 +45,37 @@ func label(s usg.Store, id, concept string) {
 	s.AddLabel(id, usg.Label{Concept: concept})
 }
 
+func TestPossibilityFindingsUseConceptReviewData(t *testing.T) {
+	onto := ontology.New()
+	onto.Add(ontology.Concept{
+		Name:             "Target",
+		Package:          "custom",
+		Kind:             "sink",
+		VulnerableTo:     []string{"custom.Condition"},
+		ReviewCategory:   "custom-category",
+		ReviewCondition:  "custom condition text",
+		ReviewEvidence:   "custom evidence text",
+		ReviewAssumption: "custom assumption text",
+		ReviewConfidence: "medium",
+	})
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "target", Type: "code.Call", Props: map[string]string{"loc": "x:1"}})
+	store.AddLabel("target", usg.Label{Concept: "custom.Target"})
+
+	got := New(onto, store).PossibilityFindings(nil)
+	if len(got) != 1 {
+		t.Fatalf("possibility findings = %d, want 1", len(got))
+	}
+	rc := got[0].ReviewConditions[0]
+	if rc.Category != "custom-category" ||
+		rc.Condition != "custom condition text" ||
+		rc.Evidence != "custom evidence text" ||
+		rc.Assumption != "custom assumption text" ||
+		rc.Confidence != "medium" {
+		t.Fatalf("review condition was not data-driven: %+v", rc)
+	}
+}
+
 // Mirrors poc/cases/case_01 (universality) + case_03: a tainted source reaching
 // an unparameterized SQL sink is a finding.
 func TestTaintFindingAndSanitizer(t *testing.T) {

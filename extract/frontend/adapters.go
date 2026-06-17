@@ -42,7 +42,7 @@ type sinkSpec struct {
 	ValMatches []string // `val "substr"` (AND) — every substr must be in some arg/option literal
 	ValAbsents []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
 	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
-	Collection bool     // also flag a Seq/collection-literal arg (e.g. ldap options {filter})
+	Collection bool     // also flag a Seq/collection-literal arg
 }
 
 type controlSpec struct {
@@ -526,7 +526,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 							continue
 						}
 						// trust-boundary gating: an active profile restricts which
-						// source families count as attacker-controlled.
+						// source families are active for this profile.
 						if activeSources == nil || activeSources[in.Concept] {
 							spec := 0
 							if len(in.Packages) > 0 {
@@ -584,9 +584,8 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 				method, path, recvType := n.Prop("method"), n.Prop("callee_path"), n.Prop("recv_type")
 				cand := sinkIdx.candidates(method, path)
 				// Pick the MOST SPECIFIC matching sink (longest pattern) per concept, so
-				// e.g. "re.compile" wins over "compile" for CodeEval/RegexCompile-style
-				// overlaps, while one call can still carry genuinely distinct concepts
-				// such as FilePathAccess and UnsafeUpload.
+				// e.g. a qualified path wins over its short method for overlapping
+				// mappings, while one call can still carry genuinely distinct concepts.
 				bestByConcept := map[string]int{}
 				strArgs := n.Prop("str_args")
 				for _, i := range cand {
@@ -1109,8 +1108,8 @@ func AutoAdapters() []adapters.Adapter {
 }
 
 // paramSourceAdapter labels function/method parameter nodes with the spec's
-// `source param -> X` concept(s) — the library/SDK trust boundary (any caller may pass
-// attacker data through a public API). The KNOWLEDGE (which concept) is the .vyql line;
+// `source param -> X` concept(s) — the library/SDK trust boundary. The knowledge
+// (which concept) is the .vyql line;
 // this is only the mechanism.
 //
 // Default-OFF, opt-in: unlike the pattern source adapter (where activeSources==nil means
