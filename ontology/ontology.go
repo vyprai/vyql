@@ -42,10 +42,10 @@ type Concept struct {
 	ContextConfirmFlagProp  string   `json:"context_confirm_flag_prop,omitempty"`
 	ContextConfirmFlagValue string   `json:"context_confirm_flag_value,omitempty"`
 	ContextConfirmLabel     string   `json:"context_confirm_label,omitempty"`
-	// DangerousChars: for sinks, the characters that MUST be absent for taint to be
+	// ExcludedChars: for sinks, the characters that MUST be absent for taint to be
 	// neutralized — lets a character-filter (allowlist replace) be proven a sound
 	// sanitizer when its output alphabet excludes all of them.
-	DangerousChars string `json:"dangerous_chars,omitempty"`
+	ExcludedChars string `json:"excluded_chars,omitempty"`
 }
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.
@@ -210,7 +210,7 @@ func (o *Ontology) CheckSanitizerTyping(source, sink, control string) (string, e
 	}
 	if len(armed) > 0 && len(intersect(srcTaints, armed)) == 0 {
 		return "", fmt.Errorf("source '%s' carries taint %v but sink '%s' is only armed by %v — "+
-			"source cannot reach this sink dangerously.",
+			"source taint kind does not arm this sink.",
 			source, sortedKeys(srcTaints), sink, sortedKeys(armed))
 	}
 	c := sortedKeys(common)

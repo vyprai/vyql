@@ -620,14 +620,13 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 
 // scope holds variable -> node bindings and variable -> (module, class) types.
 type scope struct {
-	node          map[string]string
-	typ           map[string][2]string
-	cnst          map[string]string // variable -> its string-constant value (lightweight const-prop)
-	pathContained map[string]bool   // value node -> checked against a base path before return
+	node map[string]string
+	typ  map[string][2]string
+	cnst map[string]string // variable -> its string-constant value (lightweight const-prop)
 }
 
 func newScope() *scope {
-	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}, pathContained: map[string]bool{}}
+	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}}
 }
 
 func (s *scope) clone() *scope {
@@ -641,27 +640,7 @@ func (s *scope) clone() *scope {
 	for k, v := range s.cnst {
 		c.cnst[k] = v
 	}
-	for k, v := range s.pathContained {
-		c.pathContained[k] = v
-	}
 	return c
-}
-
-func (l *lowerer) markPathContainment(call nir.Call, sc *scope) {
-	if call.Method != "relative_to" || len(call.Args) == 0 {
-		return
-	}
-	attr, ok := call.Callee.(nir.Attr)
-	if !ok {
-		return
-	}
-	name, ok := attr.Base.(nir.Name)
-	if !ok {
-		return
-	}
-	if node := sc.node[name.ID]; node != "" {
-		sc.pathContained[node] = true
-	}
 }
 
 type analysisEventSpec struct {
@@ -1354,11 +1333,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		sc.node[st.Target] = n
 	case nir.Return:
 		rv := l.eval(st.Value, sc)
-		retVal := rv
-		if sc.pathContained[rv] {
-			retVal = l.syntheticCall("analysis.path.contained_value", "contained_value", rv, "")
-		}
-		l.flow(retVal, sc.node["__ret__"])
+		l.flow(rv, sc.node["__ret__"])
 		// escape direction of cross-method field taint: returning an object whose field was
 		// tainted (`h.X = src; return h`) flows each tainted slot into the ret node, so the
 		// caller's result (ret → result edge) carries it and a later `o.X` read connects.
@@ -1373,9 +1348,6 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.functionReturnAnalysisEvent(rv, "", l.curDecorators)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
-		if call, ok := st.Value.(nir.Call); ok {
-			l.markPathContainment(call, sc)
-		}
 		// receiver-mutating ("builder"/accumulator) taint: a stdlib builder method
 		// (strings.Builder.WriteString, bytes.Buffer.Write…) or a C string-accumulator
 		// (g_string_append*, strcat/strncat) folds its args INTO the object you later read
@@ -2068,6 +2040,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	var recvNode string
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		recvNode = l.eval(attr.Base, sc)
+		if recvNode != "" {
+			props["recv"] = recvNode
+		}
 		if t := l.recvType(recvNode); t != "" {
 			props["recv_type"] = t
 		}

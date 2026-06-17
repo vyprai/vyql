@@ -189,6 +189,7 @@ adapter python {
   sink method "execute" -> code.SqlExecution
   sink path "os.system" -> code.CommandExecution
   sink receiver "openConnection" -> code.UrlFetch
+  control receiver method "checked" -> core.InputValidation
   mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
   mark exact "Random" -> code.WeakRandomValue
 }
@@ -210,7 +211,7 @@ adapter python {
 	if th == nil || th.QualifiedName() != "injection.SqlInjection" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 8 {
+	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 9 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "code.HttpInput" {
@@ -228,12 +229,15 @@ adapter python {
 	if ad.Mappings[5].Kind != "sink_receiver" || ad.Mappings[5].Concept != "code.UrlFetch" {
 		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[5])
 	}
-	if ad.Mappings[6].Kind != "mark_method" || ad.Mappings[6].Pattern != "setAllowsAnyHTTPSCertificate" ||
-		ad.Mappings[6].Concept != "code.CertValidationDisabled" || len(ad.Mappings[6].ValMatches) != 1 {
-		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[6])
+	if ad.Mappings[6].Kind != "control_receiver_method" || ad.Mappings[6].Concept != "core.InputValidation" {
+		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[6])
 	}
-	if ad.Mappings[7].Kind != "mark" || !ad.Mappings[7].Exact || ad.Mappings[7].Pattern != "Random" {
-		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[7])
+	if ad.Mappings[7].Kind != "mark_method" || ad.Mappings[7].Pattern != "setAllowsAnyHTTPSCertificate" ||
+		ad.Mappings[7].Concept != "code.CertValidationDisabled" || len(ad.Mappings[7].ValMatches) != 1 {
+		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[7])
+	}
+	if ad.Mappings[8].Kind != "mark" || !ad.Mappings[8].Exact || ad.Mappings[8].Pattern != "Random" {
+		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[8])
 	}
 }
 

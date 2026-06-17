@@ -79,6 +79,38 @@ func TestLowerStampsReceiverTypeFromParamTypes(t *testing.T) {
 	t.Fatalf("svc.clean call not found")
 }
 
+func TestLowerCallRecordsReceiverNode(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "handler", Body: []nir.Stmt{
+				nir.Assign{Targets: []string{"value"}, Value: nir.Const{Loc: "app.py:1", Value: "\"x\""}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "value", Loc: "app.py:2"}, Attr: "checked", Path: "value.checked", Loc: "app.py:2"},
+					Path:   "value.checked", Method: "checked", Loc: "app.py:2",
+				}},
+			}, Loc: "app.py:1"},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") != "value.checked" {
+			continue
+		}
+		if n.Prop("recv") == "" {
+			t.Fatalf("receiver call missing recv prop: %+v", n.Props)
+		}
+		return
+	}
+	t.Fatalf("value.checked call not found")
+}
+
 func TestLowerFunctionReturnCreatesAnalysisEvent(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",

@@ -49,6 +49,7 @@ type controlSpec struct {
 	Concept    string
 	Pattern    string
 	ByMethod   bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
+	Receiver   bool     // label the call receiver node instead of the call result
 	Exact      bool     // exact path match instead of segment-prefix path matching
 	ValMatches []string // `val "substr"` (AND — marks AND controls)
 	ValAbsents []string // `nval "substr"` (AND — marks AND controls)
@@ -452,6 +453,9 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 		case "control_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+		case "control_receiver_method":
+			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "mark":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "mark_method":
@@ -728,11 +732,18 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 					// neutralizes HTML, SQL, AND trust-boundary), so attach every match.
 					hit := c.ByMethod && method == c.Pattern || !c.ByMethod && matchPath(path, []string{c.Pattern}, "prefix")
 					if hit && valConds(strArgs, c.ValMatches, c.ValAbsents) {
+						nodeID := id
+						if c.Receiver {
+							nodeID = n.Prop("recv")
+							if nodeID == "" {
+								continue
+							}
+						}
 						spec := 0
 						if len(c.Packages) > 0 {
 							spec = 3 // package-specific control supersedes native/general
 						}
-						out = append(out, adapters.Mapping{NodeID: id, Concept: c.Concept, Specificity: spec})
+						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Specificity: spec})
 					}
 				}
 			}

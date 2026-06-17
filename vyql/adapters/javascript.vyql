@@ -576,7 +576,7 @@ adapter javascript {
   mark "helmet" val "frameguard=false" -> code.MissingFrameProtection
 
   // character-filtering replace(/regex/g, repl): the engine analyzes the output
-  // alphabet (charfilter.go) -> sound sanitizer where it excludes the sink dangerous_chars.
+  // alphabet (charfilter.go) -> sound sanitizer where it excludes the sink excluded_chars.
   filter method "replace"
 
   // sqlite3 / better-sqlite3 — db.all/get/each/run/exec/prepare(sql, …). A non-SQL

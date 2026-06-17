@@ -76,11 +76,11 @@ func (*AdapterDecl) isDecl() {}
 
 // AdapterMapping is one `source`/`sink`/`type`/`control` line in an adapter.
 type AdapterMapping struct {
-	Kind       string   // "source" | "sink_method" | "sink_path" | "type" | "control"
+	Kind       string   // "source" | "sink_method" | "sink_path" | "type" | "control" variants
 	Pattern    string   // the callee path / method token (a string literal or dotted name)
 	Concept    string   // the concept it maps to (qualified); for "type", the type name
 	Constraint string   // optional `on <type>` receiver-type constraint for sinks
-	ArgIndex   int      // which argument is the dangerous one (default 0; `arg N`)
+	ArgIndex   int      // which argument position is targeted (default 0; `arg N`)
 	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
 	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
 	Packages   []string // inherited from `package "name" { ... }` — fire only when import/SBOM package evidence is present

@@ -588,7 +588,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		}
 		pat := p.parsePattern()
 		m := AdapterMapping{Kind: kind, Pattern: pat}
-		if p.atWord("arg") { // which argument is dangerous (default 0; `arg all` = every arg)
+		if p.atWord("arg") { // which argument position is targeted (default 0; `arg all` = every arg)
 			p.next()
 			if p.atWord("all") {
 				p.next()
@@ -619,7 +619,11 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		// optional val/nval gate value-based hardening (e.g. resolve_entities=False).
 		p.next()
 		kind := "control"
-		if p.atWord("method") { // receiver-agnostic: match the call method name (e.g. .close())
+		if p.atWord("receiver") {
+			p.next()
+			p.expectWord("method")
+			kind = "control_receiver_method"
+		} else if p.atWord("method") { // receiver-agnostic: match the call method name (e.g. .close())
 			p.next()
 			kind = "control_method"
 		}
@@ -655,7 +659,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		// `filter method "replace"` / `filter path "preg_replace"` marks a
 		// character-filtering replace(pattern, repl). The engine analyzes the
 		// pattern's output alphabet and labels the result core.CharFilter — a
-		// threat-aware sanitizer (sound for sinks whose dangerous chars it excludes).
+		// data-aware sanitizer (sound for sinks whose excluded chars it excludes).
 		p.next()
 		kind := "filter_path"
 		if p.atWord("method") {

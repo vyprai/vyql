@@ -206,6 +206,31 @@ func TestPackageGatedControlRequiresPackageEvidence(t *testing.T) {
 	}
 }
 
+func TestReceiverControlLabelsReceiverNode(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "recv", Type: "code.Name", Props: map[string]string{"loc": "app.py:1"}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc":    "app.py:1",
+		"method": "checked",
+		"recv":   "recv",
+	}})
+
+	spec := adapterSpec{
+		Name:       "python",
+		Technology: "python",
+		Controls: []controlSpec{{
+			Concept:  "core.InputValidation",
+			Pattern:  "checked",
+			ByMethod: true,
+			Receiver: true,
+		}},
+	}
+	got := spec.controlAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "recv" || got[0].Concept != "core.InputValidation" {
+		t.Fatalf("receiver control mapping wrong: %+v", got)
+	}
+}
+
 func TestGroupedPackageCatalogsCoverSupportedLanguages(t *testing.T) {
 	cases := []struct {
 		tech    string

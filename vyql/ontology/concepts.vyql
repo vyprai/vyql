@@ -58,7 +58,7 @@ concept CommandExecution : sink {
   vulnerable_to: [injection.CommandInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_78]
-  dangerous_chars: ";|&$<>()"
+  excluded_chars: ";|&$<>()"
 }
 
 concept FormatString : sink {
@@ -544,7 +544,7 @@ concept FilePathAccess : sink {
   vulnerable_to: [path.PathTraversal]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_22]
-  dangerous_chars: "/\\"
+  excluded_chars: "/\\"
 }
 concept FileUpload : source {
   taint: [taint.UntrustedData]
@@ -555,7 +555,7 @@ concept HtmlRender : sink {
   vulnerable_to: [injection.Xss]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_79]
-  dangerous_chars: "<>&\"'"
+  excluded_chars: "<>&\"'"
 }
 concept StoredHtmlWrite : sink {
   vulnerable_to: [injection.Xss]
@@ -723,7 +723,7 @@ concept SqlExecution : sink {
   vulnerable_to: [injection.SqlInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_89]
-  dangerous_chars: "'\"\\;"
+  excluded_chars: "'\"\\;"
 }
 concept UnparameterizedSqlQueryParser : sink {
   vulnerable_to: [injection.SqlInjection]
@@ -971,7 +971,7 @@ concept MiningPool : indicator { }
 
 
 // A character-filtering replace(); the engine records its proven output alphabet and
-// treats it as a sound sanitizer for any sink whose dangerous_chars it excludes.
+// treats it as a sound sanitizer for any sink whose excluded_chars it excludes.
 concept CharFilter : control {
 }
 
