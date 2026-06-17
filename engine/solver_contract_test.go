@@ -14,7 +14,7 @@ import (
 
 func fireOne(t *testing.T, rule string, build func(*usg.InMemStore)) findingView {
 	t.Helper()
-	onto := ontology.Seed()
+	onto := solverContractOntology()
 	decls, err := parser.Parse(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -42,6 +42,16 @@ func fireOne(t *testing.T, rule string, build func(*usg.InMemStore)) findingView
 	return fs[0]
 }
 
+func solverContractOntology() *ontology.Ontology {
+	onto := testOntology()
+	onto.Add(ontology.Concept{Name: "Edge", Package: "custom", Kind: "exposure"})
+	onto.Add(ontology.Concept{Name: "Asset", Package: "custom", Kind: "asset"})
+	onto.Add(ontology.Concept{Name: "Actor", Package: "custom", Kind: "principal"})
+	onto.Add(ontology.Concept{Name: "Capability", Package: "custom", Kind: "privilege"})
+	onto.Add(ontology.Concept{Name: "Marker", Package: "custom", Kind: "asset"})
+	return onto
+}
+
 type findingView struct {
 	id      string
 	kind    string
@@ -58,47 +68,47 @@ func TestSolverContractConformance(t *testing.T) {
 	}{
 		{
 			name:     "taint",
-			rule:     "package t;\nrule R { meta { id: \"X-TAINT\" }\n taint code.HttpInput -> code.SqlExecution }",
+			rule:     "package t;\nrule R { meta { id: \"X-TAINT\" }\n taint custom.Input -> custom.Target }",
 			wantKind: "taint", wantFlow: true,
 			build: func(s *usg.InMemStore) {
 				s.AddNode(usg.Node{ID: "in", Type: "code.X", Props: map[string]string{"loc": "a:1"}})
 				s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "a:2"}})
-				s.AddLabel("in", usg.Label{Concept: "code.HttpInput"})
-				s.AddLabel("q", usg.Label{Concept: "code.SqlExecution"})
+				s.AddLabel("in", usg.Label{Concept: "custom.Input"})
+				s.AddLabel("q", usg.Label{Concept: "custom.Target"})
 				s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
 			},
 		},
 		{
 			name:     "reach",
-			rule:     "package t;\nrule R { meta { id: \"X-REACH\" }\n reach cloud.Internet -> cloud.Database }",
+			rule:     "package t;\nrule R { meta { id: \"X-REACH\" }\n reach custom.Edge -> custom.Asset }",
 			wantKind: "reach", wantFlow: true,
 			build: func(s *usg.InMemStore) {
-				s.AddNode(usg.Node{ID: "internet", Type: "cloud.Internet"})
-				s.AddNode(usg.Node{ID: "db", Type: "cloud.Database", Props: map[string]string{"loc": "db"}})
-				s.AddLabel("internet", usg.Label{Concept: "cloud.Internet"})
-				s.AddLabel("db", usg.Label{Concept: "cloud.Database"})
-				s.AddEdge(usg.Edge{Type: "NET", Src: "internet", Dst: "db", Props: map[string]string{"rule": "sg-open"}})
+				s.AddNode(usg.Node{ID: "edge", Type: "custom.Edge"})
+				s.AddNode(usg.Node{ID: "asset", Type: "custom.Asset", Props: map[string]string{"loc": "asset"}})
+				s.AddLabel("edge", usg.Label{Concept: "custom.Edge"})
+				s.AddLabel("asset", usg.Label{Concept: "custom.Asset"})
+				s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "asset", Props: map[string]string{"rule": "edge-rule"}})
 			},
 		},
 		{
 			name:     "assume",
-			rule:     "package t;\nrule R { meta { id: \"X-ASSUME\" }\n assume identity.ExternalPrincipal -> identity.AdminPrivilege }",
+			rule:     "package t;\nrule R { meta { id: \"X-ASSUME\" }\n assume custom.Actor -> custom.Capability }",
 			wantKind: "assume", wantFlow: true,
 			build: func(s *usg.InMemStore) {
-				s.AddNode(usg.Node{ID: "ext", Type: "identity.User"})
-				s.AddNode(usg.Node{ID: "admin", Type: "identity.Role", Props: map[string]string{"priv_level": "ADMIN"}})
-				s.AddLabel("ext", usg.Label{Concept: "identity.ExternalPrincipal"})
-				s.AddLabel("admin", usg.Label{Concept: "identity.AdminPrivilege"})
-				s.AddEdge(usg.Edge{Type: "STEP", Src: "ext", Dst: "admin", Props: map[string]string{"ability": "sts:AssumeRole"}})
+				s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor"})
+				s.AddNode(usg.Node{ID: "capability", Type: "custom.Capability", Props: map[string]string{"level": "high"}})
+				s.AddLabel("actor", usg.Label{Concept: "custom.Actor"})
+				s.AddLabel("capability", usg.Label{Concept: "custom.Capability"})
+				s.AddEdge(usg.Edge{Type: "STEP", Src: "actor", Dst: "capability", Props: map[string]string{"ability": "delegated"}})
 			},
 		},
 		{
 			name:     "match",
-			rule:     "package t;\nrule R { meta { id: \"X-MATCH\" }\n match cloud.PublicStorage as s }",
+			rule:     "package t;\nrule R { meta { id: \"X-MATCH\" }\n match custom.Marker as s }",
 			wantKind: "match", wantFlow: false,
 			build: func(s *usg.InMemStore) {
-				s.AddNode(usg.Node{ID: "bucket", Type: "cloud.PublicStorage", Props: map[string]string{"loc": "b"}})
-				s.AddLabel("bucket", usg.Label{Concept: "cloud.PublicStorage"})
+				s.AddNode(usg.Node{ID: "matched", Type: "custom.Marker", Props: map[string]string{"loc": "m"}})
+				s.AddLabel("matched", usg.Label{Concept: "custom.Marker"})
 			},
 		},
 	}
