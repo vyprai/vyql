@@ -341,9 +341,8 @@ func calleeKey(n usg.Node) string {
 }
 
 func isSourceConcept(c string) bool {
-	return strings.Contains(c, "Input") || strings.Contains(c, "UserControlled") ||
-		strings.Contains(c, "Argument") || strings.Contains(c, "DatabaseRead") ||
-		strings.Contains(c, "EnvVariable") || strings.Contains(c, "Cookie")
+	cc, err := ontology.Seed().Get(c)
+	return err == nil && cc.Kind == "source"
 }
 
 // ── vyql resolve ────────────────────────────────────────────────────────────────────

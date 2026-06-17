@@ -265,9 +265,7 @@ func conceptsOf(g usg.Store, id string) string {
 func isSource(g usg.Store, id string) bool {
 	labels, _ := g.Labels(id)
 	for _, l := range labels {
-		if strings.Contains(l.Concept, "Input") || strings.Contains(l.Concept, "UserControlled") ||
-			strings.Contains(l.Concept, "Argument") || strings.Contains(l.Concept, "DatabaseRead") ||
-			strings.Contains(l.Concept, "SecretValue") {
+		if isSourceConcept(l.Concept) {
 			return true
 		}
 	}
