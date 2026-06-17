@@ -348,6 +348,16 @@ func (c *csConv) block(block *tree_sitter.Node) []nir.Stmt {
 	if block == nil {
 		return nil
 	}
+	// Expression-bodied member: `T M(...) => expr;` — the arrow clause is the body
+	// field but holds a bare expression, so model it as an implicit return so the
+	// param→return dataflow forms (without this the value is dropped).
+	if block.Kind() == "arrow_expression_clause" {
+		kids := namedChildren(block)
+		if len(kids) > 0 {
+			return []nir.Stmt{nir.Return{Value: c.expr(kids[len(kids)-1])}}
+		}
+		return nil
+	}
 	var out []nir.Stmt
 	for _, st := range namedChildren(block) {
 		out = append(out, c.stmt(st)...)
