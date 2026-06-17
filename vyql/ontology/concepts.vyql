@@ -530,6 +530,14 @@ concept XmlParse : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_611]
 }
+// Construction of an XML parser/factory (newSAXParser / newDocumentBuilder /
+// createXMLReader …). Distinct from XmlParse (the .parse call) so the structural
+// XXE rule can flag an unhardened parser precisely without matching bare `.parse`
+// (Date.parse, JSON.parse, …).
+concept XmlParserCreate : sink {
+  vulnerable_to: [deserialization.XxeUnhardened]
+  cwe: [CWE_611]
+}
 concept XpathQuery : sink {
   vulnerable_to: [injection.XpathInjection]
   enabled_by: [taint.UntrustedData]

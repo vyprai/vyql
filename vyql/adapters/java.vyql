@@ -94,6 +94,12 @@ adapter java {
   // XXE
   sink method "parse" -> code.XmlParse
   sink method "newDocumentBuilder" -> code.XmlParse
+  // structural XXE — precise parser-factory construction, flagged unless hardened
+  mark method "newSAXParser" -> code.XmlParserCreate
+  mark method "newDocumentBuilder" -> code.XmlParserCreate
+  mark method "createXMLReader" -> code.XmlParserCreate
+  mark method "createXMLStreamReader" -> code.XmlParserCreate
+  mark method "createXMLEventReader" -> code.XmlParserCreate
 
   // Path / file. `new File(parent, child)` puts the tainted child path at arg 1, and
   // Paths.get(first, …more) / Files.write(path, …) likewise vary the path position — arg all.
@@ -173,6 +179,12 @@ adapter java {
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
+  // materialize hardening as a node mark for the structural XXE rule's guarded_by
+  mark "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
+  mark "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
+  mark "setExpandEntityReferences" val "false" -> core.XmlHardening
+  mark "setProperty" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
+  mark "setXIncludeAware" val "false" -> core.XmlHardening
   // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
   // position is the attribute key/value (arg 0).
   // trust-boundary (CWE-501): user input stored into the HTTP SESSION (a trusted store).

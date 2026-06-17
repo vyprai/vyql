@@ -44,6 +44,7 @@ module deserialization;
 threat DeserializationAbuse { cwe: [CWE_502], desc: "Deserialization of untrusted data" }
 threat UnsafeReflection { cwe: [CWE_470], desc: "Untrusted data selecting classes/code via reflection" }
 threat Xxe { cwe: [CWE_611], desc: "Improper restriction of XML external entities" }
+threat XxeUnhardened { cwe: [CWE_611], desc: "XML parser created without entity hardening" }
 
 module dos;
 threat ReDoS { cwe: [CWE_1333], desc: "Untrusted data compiled as a regular expression (catastrophic backtracking)" }
