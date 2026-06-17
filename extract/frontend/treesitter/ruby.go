@@ -263,6 +263,15 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "string":
 		return c.string(n, L)
 	case "regex":
+		if rubyRegexMayBacktrack(c.text(n)) {
+			return nir.Call{
+				Callee: nir.Name{ID: "__regex.match", Loc: L},
+				Args:   []nir.Expr{nir.Const{Loc: L, Value: c.text(n)}},
+				Path:   "__regex.match",
+				Method: "match",
+				Loc:    L,
+			}
+		}
 		// carry `/pattern/` so a `filter` directive (gsub) can analyze its output alphabet.
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "call", "method_call", "command", "command_call":
@@ -336,6 +345,93 @@ func (c *rbConv) keyName(n *tree_sitter.Node) string {
 		}
 	}
 	return strings.TrimSuffix(strings.TrimPrefix(t, ":"), ":")
+}
+
+func rubyRegexMayBacktrack(raw string) bool {
+	pat := rubyRegexPattern(raw)
+	if pat == "" {
+		return false
+	}
+	if hasNestedBacktrackingQuantifier(pat) {
+		return true
+	}
+	alts := strings.Split(pat, "|")
+	if len(alts) < 2 {
+		return false
+	}
+	seen := map[byte]bool{}
+	for _, alt := range alts {
+		ch, ok := firstBacktrackingQuantifiedLiteral(alt)
+		if !ok {
+			continue
+		}
+		if seen[ch] {
+			return true
+		}
+		seen[ch] = true
+	}
+	return false
+}
+
+func rubyRegexPattern(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) < 2 || raw[0] != '/' {
+		return raw
+	}
+	for i := len(raw) - 1; i > 0; i-- {
+		if raw[i] != '/' || isEscaped(raw, i) {
+			continue
+		}
+		return raw[1:i]
+	}
+	return strings.Trim(raw, "/")
+}
+
+func hasNestedBacktrackingQuantifier(pat string) bool {
+	for i := 0; i < len(pat); i++ {
+		if pat[i] != ')' || i+1 >= len(pat) || !isRegexQuantifier(pat[i+1]) || isPossessiveQuantifier(pat, i+1) {
+			continue
+		}
+		for j := i - 1; j >= 0 && pat[j] != '('; j-- {
+			if isRegexQuantifier(pat[j]) && !isEscaped(pat, j) && !isPossessiveQuantifier(pat, j) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func firstBacktrackingQuantifiedLiteral(alt string) (byte, bool) {
+	for i := 0; i+1 < len(alt); i++ {
+		if isEscaped(alt, i) || !isRegexLiteralByte(alt[i]) || !isRegexQuantifier(alt[i+1]) {
+			continue
+		}
+		if isPossessiveQuantifier(alt, i+1) {
+			return 0, false
+		}
+		return alt[i], true
+	}
+	return 0, false
+}
+
+func isRegexLiteralByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
+
+func isRegexQuantifier(b byte) bool {
+	return b == '+' || b == '*'
+}
+
+func isPossessiveQuantifier(s string, i int) bool {
+	return i+1 < len(s) && s[i+1] == '+'
+}
+
+func isEscaped(s string, i int) bool {
+	esc := false
+	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
+		esc = !esc
+	}
+	return esc
 }
 
 func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {

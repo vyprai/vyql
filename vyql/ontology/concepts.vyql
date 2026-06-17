@@ -60,6 +60,12 @@ concept RegexCompile : sink {
   cwe: [CWE_1333]
 }
 
+concept RegexMatch : sink {
+  vulnerable_to: [dos.ReDoS]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_1333]
+}
+
 concept MassAssign : sink {
   vulnerable_to: [injection.MassAssignment]
   enabled_by: [taint.UntrustedData]

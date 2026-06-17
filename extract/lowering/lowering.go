@@ -28,8 +28,8 @@ type funcInfo struct {
 	module     string
 	cls        string
 	name       string
-	validator  bool // a `# vyql: validator` function: its result clears trust-boundary taint
-	abstract   bool // an interface/abstract method (empty body) — dispatch to concrete impls
+	validator  bool   // a `# vyql: validator` function: its result clears trust-boundary taint
+	abstract   bool   // an interface/abstract method (empty body) — dispatch to concrete impls
 	selfNode   string // stable `this` node for a method (alias target for the receiver); "" if none
 }
 
@@ -1202,7 +1202,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		sc.node = before
 		l.mergeBindings(sc, before, []map[string]string{bodyB})
 	case nir.Switch:
-		l.eval(st.Subject, sc)
+		subject := l.eval(st.Subject, sc)
 		// constant subject → lower only the matching case (or default), like if/ternary
 		// pruning. `switch ("ABC".charAt(1)) { case 'A': x=src(); case 'B': x="safe"; }` runs
 		// only case 'B'. Requires the frontend to have captured case labels.
@@ -1222,6 +1222,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					l.block(st.Default, sc)
 				}
 				return
+			}
+		}
+		for _, labs := range st.Labels {
+			for _, lab := range labs {
+				l.flow(subject, l.eval(lab, sc))
 			}
 		}
 		b := l.nextBranch()

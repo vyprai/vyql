@@ -202,6 +202,7 @@ adapter ruby {
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "Regexp.new" -> code.RegexCompile
   sink path "Regexp.compile" -> code.RegexCompile
+  mark "__regex.match" -> code.RegexMatch
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "update_attributes" -> code.MassAssign

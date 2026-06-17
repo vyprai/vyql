@@ -6,3 +6,10 @@ rule ReDoS {
   meta { id: "VYQL-DOS-001", severity: medium, cwe: [CWE_1333] }
   taint core.UserControlledData -> code.RegexCompile
 }
+
+// Untrusted data matched against a regex pattern with static catastrophic-backtracking
+// structure — ReDoS (CWE-1333).
+rule StaticRegexReDoS {
+  meta { id: "VYQL-DOS-002", severity: medium, cwe: [CWE_1333], confidence_floor: low }
+  taint core.UserControlledData -> code.RegexMatch
+}
