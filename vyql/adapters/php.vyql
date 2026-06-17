@@ -113,7 +113,10 @@ adapter php {
   control "escapeshellcmd" -> core.ShellEscape
   control "mysqli_real_escape_string" -> core.SqlParameterization
   control "pg_escape_string" -> core.SqlParameterization
-  control "realpath" -> core.PathCanonicalization
+  // realpath canonicalizes `../` but does NOT bound the path to a base dir, so it is not a
+  // sound traversal sanitizer on its own (only a following prefix/containment check is —
+  // core.PathAccessCheck). Leaving it out lets realpath-without-check traversal surface.
+  // control "realpath" -> core.PathCanonicalization
   control "basename" -> core.PathCanonicalization
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0

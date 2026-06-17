@@ -420,6 +420,19 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Seq{Parts: parts, Loc: L}
 	case "conditional_expression":
 		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
+	case "anonymous_function", "anonymous_function_creation_expression":
+		// `function ($req, $res) use ($x) { … }` — a closure (the dominant PHP route-handler
+		// shape, e.g. Utopia/Slim `->action(function (...) { … })`). Without this it fell to the
+		// Seq fallback below, which expr's the body instead of lowering its statements, so
+		// variable reads never connected to their writes and all in-handler taint was lost.
+		// Captured `use (...)` vars are free vars resolved from the enclosing scope by the
+		// lambda closure-capture in lowering, so they need not be params.
+		return nir.Lambda{Params: c.params(field(n, "parameters")), ParamTypes: c.paramTypes(field(n, "parameters")),
+			Body: c.block(field(n, "body")), Loc: L}
+	case "arrow_function":
+		// `fn ($x) => expr` — single-expression closure; model the body as a return.
+		return nir.Lambda{Params: c.params(field(n, "parameters")), ParamTypes: c.paramTypes(field(n, "parameters")),
+			Body: []nir.Stmt{nir.Return{Value: c.expr(field(n, "body"))}}, Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range namedChildren(n) {
@@ -447,7 +460,10 @@ func (c *phConv) dotted(n *tree_sitter.Node) string {
 	}
 	switch n.Kind() {
 	case "variable_name", "name", "qualified_name":
-		return c.text(n)
+		// PHP global-namespace qualifier: `\file_get_contents` / `Foo\Bar\baz` — strip the
+		// leading `\` and map namespace separators to the dotted form adapters match against,
+		// else a fully-qualified builtin call (`\realpath`, `@\file_get_contents`) misses its sink.
+		return strings.ReplaceAll(strings.TrimPrefix(c.text(n), `\`), `\`, ".")
 	case "member_access_expression":
 		return c.dotted(field(n, "object")) + "." + c.text(field(n, "name"))
 	case "member_call_expression":
