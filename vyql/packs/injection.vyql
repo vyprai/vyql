@@ -46,6 +46,11 @@ rule MarkdownNegotiationBypass {
   match code.MarkdownNegotiationBypass as sink
 }
 
+rule UnescapedSessionFlash {
+  meta { id: "VYQL-INJ-025", severity: medium, cwe: [CWE_79], confidence_floor: low }
+  match code.UnescapedSessionFlash as sink
+}
+
 rule PdfJsEvalSupported {
   meta { id: "VYQL-INJ-022", severity: high, cwe: [CWE_79] }
   taint code.PdfJsEvalSupported -> code.PdfJsDocumentLoad

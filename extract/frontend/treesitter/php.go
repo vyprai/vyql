@@ -32,6 +32,7 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 			c := &phConv{src: src, root: root, file: rel}
 			body := c.block(tree.RootNode())
 			body = append(body, c.phpIncompleteServerPortValidation(tree.RootNode())...)
+			body = append(body, c.phpUnescapedSessionFlash(tree.RootNode())...)
 			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -472,6 +473,64 @@ func (c *phConv) phpIncompleteServerPortValidation(root *tree_sitter.Node) []nir
 	}
 	walk(root)
 	return out
+}
+
+func (c *phConv) phpUnescapedSessionFlash(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "assignment_expression" {
+			left := c.text(field(n, "left"))
+			right := c.text(field(n, "right"))
+			if phpSessionFlashInfoWrite(left) &&
+				strings.Contains(right, "$") &&
+				!phpLooksHtmlEscaped(right) {
+				loc := c.loc(n)
+				if !seen[loc] {
+					seen[loc] = true
+					path := "security.php.session_flash.unescaped"
+					out = append(out, nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: path, Loc: loc},
+						Path:   path,
+						Method: lastSeg(path),
+						Loc:    loc,
+					}})
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func phpSessionFlashInfoWrite(left string) bool {
+	compact := strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, left)
+	return strings.Contains(compact, "$_SESSION['info']") ||
+		strings.Contains(compact, "$_SESSION[\"info\"]") ||
+		strings.Contains(compact, "$_SESSION['message']") ||
+		strings.Contains(compact, "$_SESSION[\"message\"]") ||
+		strings.Contains(compact, "$_SESSION['flash']") ||
+		strings.Contains(compact, "$_SESSION[\"flash\"]")
+}
+
+func phpLooksHtmlEscaped(s string) bool {
+	lower := strings.ToLower(s)
+	return strings.Contains(lower, "htmlspecialchars") ||
+		strings.Contains(lower, "htmlentities") ||
+		strings.Contains(lower, "esc_html") ||
+		strings.Contains(lower, "strip_tags")
 }
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —

@@ -422,6 +422,10 @@ concept MarkdownNegotiationBypass : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
 }
+concept UnescapedSessionFlash : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
 concept PdfJsEvalSupported : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_79]
