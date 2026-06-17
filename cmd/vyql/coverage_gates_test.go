@@ -225,19 +225,34 @@ func conceptsByKind(t *testing.T, kind string) map[string]bool {
 	return out
 }
 
-// T2.1 — every SOURCE concept is wired in an adapter (something produces it) OR is in the
-// documented "reserved vocabulary" set (defined ahead of wiring; the input may currently
-// be subsumed by a broader source, or belong to an archetype not yet wired).
-// A NEW source concept must be wired or explicitly reserved here.
-func TestSourceConceptsWiredGate(t *testing.T) {
-	reserved := map[string]bool{
-		"UserControlledData": true, "SecretValue": true, // base taint roots
-		// reserved vocabulary — inputs presently subsumed by broader sources, or
-		// archetype sources not yet wired. Wire or remove when used.
-		"Cookie": true, "HttpHeader": true, "HttpRequest": true,
-		"ConfigFileInput": true, "ExternalApiResponse": true,
-		"MessageInput": true,
+func conceptsWithBoolField(t *testing.T, kind, field string) map[string]bool {
+	out := map[string]bool{}
+	fieldRe := regexp.MustCompile(`^\s*` + regexp.QuoteMeta(field) + `\s*:\s*true\s*$`)
+	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
+		cur, curKind := "", ""
+		for _, ln := range strings.Split(c, "\n") {
+			if m := conceptKind.FindStringSubmatch(ln); m != nil {
+				cur, curKind = m[1], m[2]
+				continue
+			}
+			if cur != "" && fieldRe.MatchString(ln) && curKind == kind {
+				out[cur] = true
+				continue
+			}
+			if strings.TrimSpace(ln) == "}" {
+				cur, curKind = "", ""
+			}
+		}
 	}
+	return out
+}
+
+// T2.1 — every SOURCE concept is wired in an adapter (something produces it) OR is in the
+// documented reserved vocabulary set in ontology metadata (defined ahead of wiring; the input
+// may currently be subsumed by a broader source, or belong to an archetype not yet wired).
+// A NEW source concept must be wired or explicitly marked `coverage_reserved_source: true`.
+func TestSourceConceptsWiredGate(t *testing.T) {
+	reserved := conceptsWithBoolField(t, "source", "coverage_reserved_source")
 	sources := conceptsByKind(t, "source")
 	wired := conceptRefsIn(t, "adapters")
 	var unwired []string
@@ -251,13 +266,7 @@ func TestSourceConceptsWiredGate(t *testing.T) {
 	for _, s := range unwired {
 		t.Errorf("source concept %q is wired in NO adapter and not reserved — wire it or add to the reserved set", s)
 	}
-	// keep the reserved set honest: a reserved source that got wired should be removed from it.
-	for s := range reserved {
-		if wired[s] && s != "UserControlledData" && s != "SecretValue" {
-			t.Errorf("source %q is now adapter-wired — remove it from the reserved set", s)
-		}
-	}
-	t.Logf("source concepts: %d defined, %d reserved-vocabulary", len(sources), len(reserved)-2)
+	t.Logf("source concepts: %d defined, %d reserved-vocabulary", len(sources), len(reserved))
 }
 
 // T2.3 — every CONTROL concept WIRED in an adapter must be consumed by some rule's

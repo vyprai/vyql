@@ -507,6 +507,7 @@ concept Cookie : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_20]
   refines: core.UserControlledData
+  coverage_reserved_source: true
 }
 concept DatabaseRead : source {
   taint: [taint.UntrustedData]
@@ -531,9 +532,11 @@ concept StoredDataRead : source {
 concept ConfigFileInput : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
+  coverage_reserved_source: true
 }
 concept ExternalApiResponse : source {
   taint: [taint.UntrustedData]
+  coverage_reserved_source: true
 }
 concept FileInclude : sink {
   vulnerable_to: [path.FileInclusion]
@@ -593,6 +596,7 @@ concept UnrestrictedVariableVariableAssignment : sink {
 concept HttpHeader : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
+  coverage_reserved_source: true
 }
 concept HttpInput : source {
   taint: [taint.UntrustedData]
@@ -673,6 +677,7 @@ concept TrustBoundary : sink {
 }
 concept MessageInput : source {
   taint: [taint.UntrustedData]
+  coverage_reserved_source: true
 }
 concept NosqlQuery : sink {
   vulnerable_to: [injection.NosqlInjection]
@@ -718,6 +723,7 @@ concept ResponseHeaderWrite : sink {
 }
 concept SecretValue : source {
   taint: [taint.SecretValue]
+  coverage_reserved_source: true
 }
 concept SqlExecution : sink {
   vulnerable_to: [injection.SqlInjection]
@@ -916,6 +922,7 @@ concept StrongHashing : control {
 }
 concept UserControlledData : source {
   taint: [taint.UntrustedData]
+  coverage_reserved_source: true
 }
 concept XmlHardening : control {
   neutralizes: [deserialization.Xxe]
@@ -947,6 +954,7 @@ concept Connection : observation {
 }
 concept HttpRequest : source {
   taint: [taint.UntrustedData]
+  coverage_reserved_source: true
 }
 concept Process : observation { }
 concept ShellExecution : sink {
