@@ -273,17 +273,62 @@ func (c *conv) callOutParams(call *ast.CallExpr) []string {
 	return outs
 }
 
-// outParamJoins emits `o = combine(o, call)` for each out-param o. It is a taint-JOIN,
-// not a redefinition: a plain `o = call` would SHADOW any taint o already had, so
-// f(&taintedVar) would clear it (false negative). The join adds the call's taint AND
-// preserves o's.
-func outParamJoins(outs []string, callExpr nir.Expr, loc string) []nir.Stmt {
+// outParamJoinsFor emits `o = combine(o, …)` for each out-param o of a call. It is a
+// taint-JOIN, not a redefinition: a plain `o = …` would SHADOW any taint o already had, so
+// f(&taintedVar) would clear it (false negative). The join adds taint AND preserves o's.
+//
+// For a `&x` arg on an arbitrary call (`json.Unmarshal(b,&v)`) the joined taint is the call
+// itself — the dominant case being a bind/decode SOURCE whose result IS the request data. But
+// a custom decode HELPER (`parseForm(r, form)`, `decoder.Decode(f, r.Form)`) is NOT a labelled
+// source; its return is a clean error, while the request flows in through an INPUT arg. So for
+// a bind-name call we additionally join the receiver and the call's simple argument
+// expressions, so whichever of them carries the request taint reaches the decoded dest.
+func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc string) []nir.Stmt {
+	outs := c.callOutParams(call)
+	if len(outs) == 0 {
+		return nil
+	}
+	srcs := []nir.Expr{callExpr}
+	if isBindName(calleeName(call.Fun)) {
+		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+			if e := c.simpleTaintExpr(sel.X); e != nil { // the receiver may hold the request
+				srcs = append(srcs, e)
+			}
+		}
+		for _, a := range call.Args { // an input arg may hold the request (decode reads it)
+			if e := c.simpleTaintExpr(a); e != nil {
+				srcs = append(srcs, e)
+			}
+		}
+	}
 	var stmts []nir.Stmt
 	for _, o := range outs {
+		parts := append([]nir.Expr{nir.Name{ID: o, Loc: loc}}, srcs...)
 		stmts = append(stmts, nir.Assign{Targets: []string{o},
-			Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: o, Loc: loc}, callExpr}, Loc: loc}})
+			Value: nir.Format{Parts: parts, Loc: loc}})
 	}
 	return stmts
+}
+
+// simpleTaintExpr lowers an argument/receiver expression ONLY when it is side-effect-free
+// (an identifier, field access, address-of, or deref) so it can be safely re-evaluated inside
+// an out-param taint-join. Nested calls are skipped to avoid duplicating a side-effectful
+// node; their taint still reaches the dest through the call result already in the join.
+func (c *conv) simpleTaintExpr(e ast.Expr) nir.Expr {
+	switch x := e.(type) {
+	case *ast.Ident:
+		if x.Name == "_" || x.Name == "" || x.Name == "nil" {
+			return nil
+		}
+		return c.expr(x)
+	case *ast.SelectorExpr, *ast.StarExpr:
+		return c.expr(e)
+	case *ast.UnaryExpr:
+		if x.Op == token.AND {
+			return c.expr(e)
+		}
+	}
+	return nil
 }
 
 // calleeName returns the last identifier of a call's function expression
@@ -379,8 +424,8 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 			// dominant idiom is `if err := decode(...); err != nil`, an AssignStmt (the ExprStmt
 			// path below only covers the discarded-result form).
 			if call, ok := st.Rhs[0].(*ast.CallExpr); ok {
-				if outs := c.callOutParams(call); len(outs) > 0 {
-					stmts := append([]nir.Stmt{assign}, outParamJoins(outs, c.expr(st.Rhs[0]), c.loc(st.Pos()))...)
+				if joins := c.outParamJoinsFor(call, c.expr(st.Rhs[0]), c.loc(st.Pos())); len(joins) > 0 {
+					stmts := append([]nir.Stmt{assign}, joins...)
 					return nir.Block{Stmts: stmts}
 				}
 			}
@@ -407,13 +452,11 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		// the struct the request is decoded into — the dominant web-handler
 		// pattern — instead of the (discarded) error return.
 		if call, ok := st.X.(*ast.CallExpr); ok {
-			if outs := c.callOutParams(call); len(outs) > 0 {
-				callExpr := c.expr(st.X)
-				if stmts := outParamJoins(outs, callExpr, c.loc(st.Pos())); len(stmts) == 1 {
+			if stmts := c.outParamJoinsFor(call, c.expr(st.X), c.loc(st.Pos())); len(stmts) > 0 {
+				if len(stmts) == 1 {
 					return stmts[0]
-				} else {
-					return nir.Block{Stmts: stmts}
 				}
+				return nir.Block{Stmts: stmts}
 			}
 		}
 		return nir.ExprStmt{Value: c.expr(st.X)}

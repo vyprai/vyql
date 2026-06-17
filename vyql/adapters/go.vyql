@@ -87,6 +87,9 @@ adapter go {
   sink path "syscall.Exec" -> code.CommandExecution
   sink path "syscall.ForkExec" -> code.CommandExecution
   sink path "sh.Command" -> code.CommandExecution
+  // chaosblade-spec-go `channel.NewLocalChannel().Run(ctx, prog, args)` runs a shell
+  // command; the distinctive constructor segment keeps this from matching unrelated `.Run`.
+  sink path "channel.NewLocalChannel.Run" arg all -> code.CommandExecution
   sink path "http.Get" -> code.UrlFetch
   sink path "http.Post" -> code.UrlFetch
   sink path "http.Head" -> code.UrlFetch
