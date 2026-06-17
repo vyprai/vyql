@@ -822,14 +822,24 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 	// it is stable and module-namespaced: an incremental rebuild that re-lowers only one module
 	// reproduces the same id (no collision with cached modules, no build-order dependence).
 	fid := sigID(ns, rel, "func", "")
-	l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Loc: st.Loc, Region: l.region, Props: map[string]string{
+	// is_route covers BOTH route flavors: send-on-return routes (st.IsRoute — decorator
+	// frameworks) and call-registration routes carrying http_method (Express et al.). Only the
+	// former drives the reflected-string-return sink (l.curRoute, set in the FuncDef case).
+	props := map[string]string{
 		"name":         rel,
 		"end_loc":      st.EndLoc,
 		"module":       modkey,
 		"class":        cls,
-		"is_route":     boolProp(st.IsRoute),
+		"is_route":     boolProp(st.IsRoute || st.HTTPMethod != ""),
 		"is_validator": boolProp(st.IsValidator),
-	}})
+	}
+	if st.HTTPMethod != "" {
+		props["http_method"] = st.HTTPMethod
+	}
+	if st.HTTPPath != "" {
+		props["http_path"] = st.HTTPPath
+	}
+	l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Loc: st.Loc, Region: l.region, Props: props})
 	params := map[string]string{}
 	order := make([]string, 0, len(st.Params))
 	for _, p := range st.Params {
@@ -944,7 +954,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 			inner.node["__ret__"] = info.ret
 		}
-		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
+		// bind the receiver to the enclosing class so `self.m()` / `this.m()` resolve to a
+		// sibling method. Python/Ruby pass it as the first param (`self`); JS/TS/Java leave
+		// `this` implicit — bind it regardless of whether it appears in the param list.
+		if l.curClass != "" && (len(st.Params) > 0 && st.Params[0] == l.selfName || l.selfName == "this") {
 			inner.typ[l.selfName] = [2]string{l.curModule, l.curClass}
 		}
 		// seed enclosing-class field receivers so `field.method()` resolves

@@ -73,6 +73,9 @@ adapter javascript {
   source "queryParams" -> code.DomInput
   // jQuery data-* reads can carry server/user-controlled DOM content into client-side HTML.
   source method "data" -> code.DomInput
+  // clipboard / drag-and-drop payload (DataTransfer.getData / ClipboardEvent.clipboardData):
+  // the pasted/dropped content is attacker-influenced (a page can seed the clipboard).
+  source method "getData" -> code.DomInput
   // Browser UI helper option bags can be populated from attacker-controlled markup/URLs.
   source "opt.title" -> code.DomInput
   // Parsed browser XML/HTML often comes from network responses; values extracted from it
@@ -320,6 +323,12 @@ adapter javascript {
   sink path "outerHTML" -> code.HtmlRender
   sink path "document.write" -> code.HtmlRender
   sink path "insertAdjacentHTML" arg 1 -> code.HtmlRender
+  // DOM-based XSS via a link/script URL: writing untrusted data into a `.href`/`.src`
+  // property lets a `javascript:`/`data:` scheme execute (anchor href, iframe/script src).
+  // Member-writes lower to a path-sink call (see js frontend), so this fires only on the
+  // tainted WRITE, never a read (location.href stays a source).
+  sink path "href" -> code.HtmlRender
+  sink path "src" -> code.HtmlRender
   sink path "$.html" -> code.HtmlRender
   sink path "el.html" -> code.HtmlRender
   sink method "html" -> code.HtmlRender

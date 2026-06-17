@@ -182,16 +182,27 @@ type FuncDef struct {
 	// With Loc it gives the full line range VyPr reconciles against its
 	// structural_functions rows. Empty if the frontend doesn't yet emit it.
 	EndLoc string
-	// IsRoute marks a web request handler (e.g. a Flask/FastAPI @app.route function).
-	// The lowering treats a returned freshly-built string (Concat/Format) as written to
-	// the HTTP response body — a reflected-XSS sink — since the framework does not escape
-	// raw string returns (only template renders).
+	// IsRoute marks a web request handler whose framework SENDS a raw string return as the
+	// response body (Flask/FastAPI/Nest @route functions). The lowering treats a returned
+	// freshly-built string (Concat/Format) as written to the HTTP response body — a
+	// reflected-XSS sink — since the framework does not escape raw string returns (only
+	// template renders). Call-registration frameworks that do NOT auto-send returns (Express:
+	// the handler must call res.send) set HTTPMethod/HTTPPath WITHOUT IsRoute — they are route
+	// entrypoints for export, but returning a string there is not a sink.
 	IsRoute bool
 	// IsValidator marks a function annotated `# vyql: validator` — a custom
 	// input-validator/authenticator the tool can't infer by name. Its return value is
 	// treated as validated (clears the trust-boundary threat), so storing it across a
 	// trust boundary is legitimate.
 	IsValidator bool
+	// HTTPMethod and HTTPPath carry route metadata for a handler detected from a
+	// call-registration framework (Express `app.get("/x", h)`, etc.). HTTPMethod is the
+	// upper-cased verb ("GET", "POST", "ALL"); HTTPPath is the literal route path, or
+	// empty when the registration's path argument is not a string literal. Both empty for
+	// non-route functions. VyPr merges these into its canonical CodeEntrypoint
+	// (docs/21 §5) — VyQL only emits the fact.
+	HTTPMethod string
+	HTTPPath   string
 }
 
 // ClassDef is a class definition.

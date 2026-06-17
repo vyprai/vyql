@@ -255,6 +255,37 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n)}}
 	case "class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
+	case "field_definition", "public_field_definition":
+		// a class field whose value is an object literal of methods, e.g.
+		// `static events = { paste(event){ … } }` (trix input-handler maps, and the common
+		// "handler dictionary" pattern). Lower each method so its body is analyzed — otherwise
+		// the whole object, and any source→sink flow inside it, is dead code.
+		val := field(n, "value")
+		if val == nil {
+			for _, ch := range namedChildren(n) {
+				if ch.Kind() == "object" {
+					val = ch
+					break
+				}
+			}
+		}
+		if val != nil && val.Kind() == "object" {
+			var out []nir.Stmt
+			for _, pr := range namedChildren(val) {
+				switch pr.Kind() {
+				case "method_definition":
+					out = append(out, c.stmt(pr)...)
+				case "pair":
+					if v := field(pr, "value"); isJsFuncNode(v) {
+						out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")),
+							Params: c.funcParams(v), ParamTypes: c.funcParamTypes(v),
+							Body: c.funcBody(v), Loc: c.loc(pr), EndLoc: c.endloc(v)})
+					}
+				}
+			}
+			return out
+		}
+		return nil
 	case "lexical_declaration", "variable_declaration":
 		var out []nir.Stmt
 		for _, d := range namedChildren(n) {
@@ -397,6 +428,9 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 	case "call_expression":
+		if routes := c.expressRouteFuncs(inner, L); len(routes) > 0 {
+			return routes
+		}
 		if body := c.iife(inner, L); len(body) > 0 {
 			return body
 		}
@@ -946,6 +980,11 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "shorthand_property_identifier", "property_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
+	case "this":
+		// `this` as a value (the base of `this.method()`): emit a Name so the lowering can
+		// type it to the enclosing class and resolve `this.m()` to a sibling method. Without
+		// this it fell to the generic Seq default and the receiver was never a resolvable name.
+		return nir.Name{ID: "this", Loc: L}
 	case "number":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "regex":
@@ -1085,6 +1124,87 @@ func (c *jsConv) isExpressRouteRegistration(path string) bool {
 		return false
 	}
 	return jsExpressRouteMethods[path[i+1:]]
+}
+
+// expressRouteFuncs promotes an Express-style call-registration — app.get("/x", h),
+// router.post("/y", mw, h), app.use(fn) — into one route-flagged FuncDef per inline handler,
+// carrying the HTTP method and (literal) path. Returning a FuncDef instead of leaving the
+// callback an anonymous Lambda gives the handler a first-class code.Function node, so a sink in
+// its body resolves a func_id (scope:function, not module — docs/21 §4) and graph-json can
+// export http_method/http_path. Express does NOT auto-send raw string returns (the handler must
+// call res.send), so these are NOT marked IsRoute — that flag means send-on-return (reflected
+// XSS), which would be a false positive here; the route metadata alone drives the is_route
+// export (see lowering.makeFuncInfo). Returns nil when this is not a route registration or has
+// no inline handler to model (e.g. app.use(router), app.get(path, controllerRef)).
+func (c *jsConv) expressRouteFuncs(call *tree_sitter.Node, L string) []nir.Stmt {
+	fn := field(call, "function")
+	path := c.dotted(fn)
+	if !c.isExpressRouteRegistration(path) {
+		return nil
+	}
+	method := strings.ToUpper(path[strings.LastIndex(path, ".")+1:])
+	httpPath := ""
+	var handlers []*tree_sitter.Node
+	if args := field(call, "arguments"); args != nil {
+		for _, a := range namedChildren(args) {
+			switch {
+			case isJsFuncNode(a):
+				handlers = append(handlers, a)
+			case httpPath == "" && a.Kind() == "string":
+				httpPath = c.keyName(a) // strips the surrounding quotes
+			}
+		}
+	}
+	// Precision guard: the route-method names collide with everyday APIs — db.all/db.get
+	// (sqlite3), Promise.all, Map.get/delete, cache.get, headers.get. Promoting (and thereby
+	// DROPPING the original call) on a false match silently deletes a real sink. Only treat it
+	// as a route when there is an inline handler AND either a route-path argument (a string
+	// starting with "/" or the "*" wildcard — a SQL/key string never does) or it is `.use`
+	// middleware. Routes with a non-literal path (app.get(ROUTES.x, h)) are missed here but
+	// still get their input typed via the expr() path — only the entrypoint export is skipped.
+	if len(handlers) == 0 {
+		return nil
+	}
+	routeLike := strings.HasPrefix(httpPath, "/") || httpPath == "*"
+	if !routeLike && method != "USE" {
+		return nil
+	}
+	// line within the file disambiguates the synthetic name; ns is already per-file, so the
+	// id stays stable across incremental rebuilds (same file → same line).
+	line := L
+	if i := strings.LastIndex(L, ":"); i >= 0 {
+		line = L[i+1:]
+	}
+	var out []nir.Stmt
+	for idx, h := range handlers {
+		// reuse the existing param typing (req→express.Request, res→express.Response, …) so the
+		// handler's input source is seeded exactly as it was when these stayed inline Lambdas.
+		lam := c.typeExpressLambda(nir.Lambda{
+			Params:     c.funcParams(h),
+			ParamTypes: c.funcParamTypes(h),
+			Body:       c.funcBody(h),
+			Loc:        c.loc(h),
+		})
+		name := method
+		if httpPath != "" {
+			name += " " + httpPath
+		}
+		name += "@L" + line
+		if len(handlers) > 1 {
+			name += "#" + itoa(idx)
+		}
+		out = append(out, nir.FuncDef{
+			Name:       name,
+			Params:     lam.Params,
+			ParamTypes: lam.ParamTypes,
+			Body:       lam.Body,
+			Loc:        c.loc(h),
+			EndLoc:     c.endloc(h),
+			HTTPMethod: method,
+			HTTPPath:   httpPath,
+		})
+	}
+	return out
 }
 
 func (c *jsConv) typeExpressLambda(lam nir.Lambda) nir.Lambda {
