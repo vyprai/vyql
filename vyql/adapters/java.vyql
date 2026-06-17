@@ -19,6 +19,10 @@ adapter java {
   source ".getPathInfo" -> code.HttpInput
   source ".getRequestURI" -> code.HttpInput
   source ".getPart" -> code.HttpInput
+  // AOP-intercepted method arguments (org.aopalliance MethodInvocation.getArguments) carry the
+  // intercepted business call's runtime data — untrusted in an interceptor (e.g. @DS SpEL
+  // routing evaluates them, CVE-2026-7045). Surfaces only if they reach a sink.
+  source method "getArguments" -> code.HttpInput
   // Android intent / deep-link inputs (attacker-controlled IPC entry points)
   source ".getStringExtra" -> code.IntentInput
   source ".getStringArrayExtra" -> code.IntentInput
@@ -268,6 +272,10 @@ adapter java {
   sink path "MVEL.eval" -> code.ExpressionEval
   sink path "MVEL.evalToBoolean" -> code.ExpressionEval
   sink method "createExpression" -> code.ExpressionEval
+  // Spring SpEL evaluate-with-context idiom `parser.parseExpression(expr).getValue(ctx)`:
+  // the eval CONTEXT (arg0 of getValue) carries the runtime data the expression reads, so a
+  // tainted context (e.g. AOP method arguments) is SpEL injection — CWE-74 (CVE-2026-7045).
+  sink path "parseExpression.getValue" -> code.ExpressionEval
   // Bean Validation custom messages: the template arg of buildConstraintViolationWithTemplate
   // is interpolated as EL by the default message interpolator (Hibernate Validator), so a
   // tainted template is EL injection / RCE (CWE-917, e.g. CVE-2021-21479, CVE-2019-10219).
