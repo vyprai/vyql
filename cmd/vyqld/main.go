@@ -38,6 +38,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type config struct {
@@ -94,12 +96,23 @@ func main() {
 	mux.HandleFunc("GET /healthz", srv.handleHealth)
 	mux.HandleFunc("POST /scan", srv.handleScan)
 
+	// MCP over Streamable HTTP at /mcp. Stateless + JSON responses keep it simple
+	// for request/response tool calls; one server instance is reused (it holds no
+	// per-session state).
+	mcpSrv := srv.mcpServer()
+	mcpHandler := mcp.NewStreamableHTTPHandler(
+		func(*http.Request) *mcp.Server { return mcpSrv },
+		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true},
+	)
+	mux.Handle("/mcp", mcpHandler)
+	mux.Handle("/mcp/", mcpHandler)
+
 	httpSrv := &http.Server{
 		Addr:              cfg.addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 15 * time.Second,
 	}
-	log.Printf("vyqld: listening on %s (bin=%s home=%s max-concurrency=%d)",
+	log.Printf("vyqld: listening on %s (bin=%s home=%s max-concurrency=%d); REST POST /scan, MCP /mcp",
 		cfg.addr, cfg.bin, cfg.home, cfg.maxConcurrency)
 	if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("vyqld: server error: %v", err)
@@ -259,7 +272,7 @@ func (s *server) prepareWorkspace(ctx context.Context, w http.ResponseWriter, r 
 	}
 }
 
-// runScan shells out to the vyql CLI and returns its stdout.
+// runScan shells out to `vyql scan` and returns its stdout.
 func (s *server) runScan(ctx context.Context, dir, format, profile string, exclude []string) ([]byte, error) {
 	args := []string{"scan", "-format", format}
 	if profile != "" {
@@ -269,7 +282,12 @@ func (s *server) runScan(ctx context.Context, dir, format, profile string, exclu
 		args = append(args, "-exclude", strings.Join(exclude, ","))
 	}
 	args = append(args, dir)
+	return s.runVyql(ctx, args...)
+}
 
+// runVyql execs the vyql CLI with VYQL_HOME set and returns stdout, or an error
+// carrying a truncated stderr on a non-zero exit.
+func (s *server) runVyql(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, s.cfg.bin, args...)
 	cmd.Env = os.Environ()
 	if s.cfg.home != "" {

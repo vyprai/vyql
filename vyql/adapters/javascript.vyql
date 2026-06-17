@@ -252,6 +252,10 @@ adapter javascript {
   sink method "send" -> code.HtmlRender
   sink path "res.write" -> code.HtmlRender
   sink path "res.end" -> code.HtmlRender
+  // res.render(view, data): tainted values in the template data object reach the
+  // rendered HTML (reflected/stored XSS). arg 1 = the data object. Taint-gated, so
+  // it only fires when user input actually flows into the render — not on every view.
+  sink path "res.render" arg 1 -> code.HtmlRender
   sink path "dangerouslySetInnerHTML" -> code.HtmlRender
   sink path "innerHTML" -> code.HtmlRender
   sink path "outerHTML" -> code.HtmlRender
