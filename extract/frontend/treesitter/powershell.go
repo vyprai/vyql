@@ -430,17 +430,6 @@ func (c *psConv) command(n *tree_sitter.Node) nir.Expr {
 	return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: callArgs, Path: name, Method: name, Loc: L}
 }
 
-// psSourceVar recognizes environment-style entry variable names.
-func psSourceVar(name string) bool {
-	n := strings.TrimPrefix(strings.ToUpper(name), "ENV:")
-	for _, p := range []string{"QUERY_STRING", "HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_"} {
-		if n == p || strings.HasPrefix(n, p) {
-			return true
-		}
-	}
-	return false
-}
-
 func (c *psConv) varName(n *tree_sitter.Node) string {
 	return strings.TrimPrefix(c.text(n), "$")
 }
@@ -453,8 +442,8 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "variable":
-		if psSourceVar(c.varName(n)) {
-			return nir.Call{Callee: nir.Name{ID: "shell_input", Loc: L}, Path: "shell_input", Method: "shell_input", Loc: L}
+		if event, ok := sourceVarEvent("powershell", c.varName(n)); ok {
+			return nir.Call{Callee: nir.Name{ID: event, Loc: L}, Path: event, Method: event, Loc: L}
 		}
 		return nir.Name{ID: c.varName(n), Loc: L}
 	case "integer_literal", "decimal_integer_literal", "real_literal", "boolean":

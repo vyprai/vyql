@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/ontology"
+	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -87,6 +89,99 @@ func TestFrontendDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	if len(hits) > 0 {
 		t.Fatalf("frontend extractors must not hardcode ontology concepts; move roles/semantics into VyQL metadata: %s", strings.Join(hits, ", "))
 	}
+}
+
+func TestFrontendEntryVariableNamesComeFromData(t *testing.T) {
+	root := frontendPackageRoot(t)
+	forbidden := frontendSourceVarNeedles(t)
+	var hits []string
+	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(raw)
+		for _, needle := range forbidden {
+			if strings.Contains(text, needle) {
+				rel, _ := filepath.Rel(root, path)
+				hits = append(hits, rel+": "+needle)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) > 0 {
+		t.Fatalf("frontend entry variable names must be loaded from VyQL data, not hardcoded in Go: %s", strings.Join(hits, ", "))
+	}
+}
+
+func frontendSourceVarNeedles(t *testing.T) []string {
+	t.Helper()
+	files, err := filepath.Glob(filepath.Join(datadir.Root(), "adapters", "*.vyql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decls, err := parser.Parse(string(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range decls {
+			ad, ok := decl.(*parser.AdapterDecl)
+			if !ok {
+				continue
+			}
+			for _, key := range []string{"source_var_exact", "source_var_prefix", "source_var_strip_prefix"} {
+				for _, value := range metaValues(ad.Meta, key) {
+					if len(value) < 3 && !strings.Contains(value, "_") {
+						continue
+					}
+					seen["\""+value+"\""] = true
+				}
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for needle := range seen {
+		out = append(out, needle)
+	}
+	return out
+}
+
+func metaValues(meta map[string]any, key string) []string {
+	switch v := meta[key].(type) {
+	case []string:
+		return v
+	case string:
+		if v != "" {
+			return []string{v}
+		}
+	}
+	return nil
+}
+
+func frontendPackageRoot(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	return filepath.Dir(file)
 }
 
 func frontendOntologyConceptNeedles(t *testing.T) []string {

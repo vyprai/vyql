@@ -28,7 +28,7 @@ type inputSpec struct {
 	Match      string   // "prefix" (default) | "contains"
 	Receiver   bool     // match a receiver attribute/method with a recv_type constraint
 	Constraint string   // optional `on <type>` receiver-type constraint
-	ValMatches []string // `val "substr"` (AND) — only a source when an arg literal matches (e.g. getenv("HTTP_*"))
+	ValMatches []string // `val "substr"` (AND) — only a source when an arg literal matches
 	ValAbsents []string // `nval "substr"` (AND) — not a source if any arg literal contains a substr
 	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 }
@@ -440,7 +440,7 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 	for _, mp := range d.Mappings {
 		switch mp.Kind {
 		case "source":
-			// a value-constrained source (e.g. getenv("HTTP_*")) gets its own spec so the
+			// a value-constrained source gets its own spec so the
 			// val/nval filter is not shared with other patterns mapping to the same concept.
 			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
@@ -553,8 +553,8 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 							constraintAllows(in.Constraint, n.Prop("recv_type"))
 					}
 					if matched {
-						// value-constrained source: only a source when an arg literal matches
-						// (e.g. getenv("HTTP_X_FORWARDED_FOR") yes, getenv("PATH") no).
+						// value-constrained source: only a source when configured literal
+						// tokens are present or absent as declared by the adapter.
 						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&
 							!valConds(n.Prop("str_args"), in.ValMatches, in.ValAbsents) {
 							continue

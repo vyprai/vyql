@@ -2,7 +2,12 @@
 // A shell command is modeled as a call (program -> path); $1/$QUERY_STRING
 // expansions are seeded as shell_input sources by the frontend.
 adapter bash {
-  meta { fidelity: resolved }
+  meta {
+    fidelity: resolved
+    source_var_event: shell_input
+    source_var_exact: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "@", "*", "QUERY_STRING", "REQUEST_URI", "REQUEST_METHOD"]
+    source_var_prefix: ["HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_"]
+  }
 
   // untrusted input: positional params + CGI environment ($1, $QUERY_STRING, …)
   source "shell_input" -> code.HttpInput

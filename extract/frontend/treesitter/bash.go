@@ -10,26 +10,13 @@ import (
 )
 
 // shConv walks a tree-sitter Bash CST into NIR. A `command` becomes a Call
-// (program word = path/method, words/strings = args); a `$1`/`$QUERY_STRING`
-// expansion becomes a synthetic source call (shell_input); a string with
-// embedded expansions becomes a Format (taint-propagating).
+// (program word = path/method, words/strings = args); configured variable
+// expansions become synthetic event calls; a string with embedded expansions
+// becomes a Format.
 type shConv struct {
 	src  []byte
 	file string
 	key  string
-}
-
-// shSourceVars: positional/special params and CGI env vars are untrusted input.
-func shSourceVar(name string) bool {
-	if len(name) == 1 && (name[0] >= '1' && name[0] <= '9' || name == "@" || name == "*") {
-		return true
-	}
-	for _, p := range []string{"QUERY_STRING", "HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_", "REQUEST_URI", "REQUEST_METHOD"} {
-		if name == p || strings.HasPrefix(name, p) {
-			return true
-		}
-	}
-	return false
 }
 
 // ExtractBash parses shell scripts into one NIR Program (one module per file).
@@ -153,8 +140,8 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "simple_expansion", "expansion":
 		name := c.expansionVar(n)
-		if shSourceVar(name) { // $1 / $QUERY_STRING / … → untrusted input
-			return nir.Call{Callee: nir.Name{ID: "shell_input", Loc: L}, Path: "shell_input", Method: "shell_input", Loc: L}
+		if event, ok := sourceVarEvent("bash", name); ok {
+			return nir.Call{Callee: nir.Name{ID: event, Loc: L}, Path: event, Method: event, Loc: L}
 		}
 		return nir.Name{ID: name, Loc: L}
 	case "string", "concatenation":
