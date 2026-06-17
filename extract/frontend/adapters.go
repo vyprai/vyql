@@ -16,6 +16,7 @@ import (
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/sca"
+	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
@@ -121,6 +122,8 @@ func detailWithPattern(detail map[string]string, pattern string) map[string]stri
 var (
 	conceptDetailOnce sync.Once
 	conceptDetails    map[string]map[string]string
+	conceptRoleOnce   sync.Once
+	conceptRoles      map[string]map[string]bool
 )
 
 func reviewDetail(concept, pattern string) (map[string]string, string) {
@@ -178,6 +181,33 @@ func ontologyConceptDetails() map[string]map[string]string {
 	return conceptDetails
 }
 
+func ontologyRoleConcepts(role string) map[string]bool {
+	conceptRoleOnce.Do(func() {
+		conceptRoles = map[string]map[string]bool{}
+		for _, c := range ontology.Seed().AllConcepts() {
+			if c.AnalysisRole == "" {
+				continue
+			}
+			if conceptRoles[c.AnalysisRole] == nil {
+				conceptRoles[c.AnalysisRole] = map[string]bool{}
+			}
+			conceptRoles[c.AnalysisRole][c.QualifiedName()] = true
+		}
+	})
+	return conceptRoles[role]
+}
+
+func singleOntologyRoleConcept(role string) string {
+	var out string
+	for c := range ontologyRoleConcepts(role) {
+		if out != "" {
+			return ""
+		}
+		out = c
+	}
+	return out
+}
+
 type filterSpec struct {
 	Pattern  string
 	ByMethod bool // match the bare method name (x.replace) vs the dotted path (re.sub)
@@ -186,9 +216,8 @@ type filterSpec struct {
 }
 
 // assumeSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
-// *might* defuse a threat but cannot be proven to. Labelled core.Assumption; never kills a
-// flow — the engine attaches an assumption note instead. (The regex-CharFilter pattern,
-// generalized to arbitrary neutralizers via the `assume` directive.)
+// *might* defuse a threat but cannot be proven to. It never kills a flow; the engine
+// attaches an assumption note instead.
 type assumeSpec struct {
 	Pattern    string
 	ByMethod   bool
@@ -208,9 +237,9 @@ type adapterSpec struct {
 	Sinks         []sinkSpec
 	Controls      []controlSpec
 	Marks         []controlSpec // presence markers (label the call node with a concept)
-	Filters       []filterSpec  // character-filtering replaces (core.CharFilter)
-	Assumes       []assumeSpec  // unsound neutralizers (core.Assumption)
-	ParamSources  []string      // `source param -> X`: concepts to label parameter nodes with
+	Filters       []filterSpec
+	Assumes       []assumeSpec
+	ParamSources  []string // `source param -> X`: concepts to label parameter nodes with
 }
 
 // AdaptersFor loads the framework adapters for a technology from
@@ -248,15 +277,16 @@ func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 }
 
 // assumeAdapter labels unsound-neutralizer calls (guards/escapers that cannot be proven
-// sound) with core.Assumption, recording the mode (guard|sanitizer) and the sink concept it
-// purports to cover. The engine never suppresses a flow on this label; when such a node
-// guards/sanitizes a finding it attaches an assumption note — generalizing the regex
-// CharFilter mechanism to any neutralizer whose soundness vyql cannot establish.
+// sound) with the ontology role concept that the engine can surface as review context.
 func (spec adapterSpec) assumeAdapter() adapters.Adapter {
+	concept := singleOntologyRoleConcept(ontology.AnalysisRoleNeutralizerAssumption)
 	return adapters.Adapter{
 		Name: spec.Name + ".assumptions", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "syntactic", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
+			if concept == "" {
+				return nil
+			}
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			allowed := make([]bool, len(spec.Assumes))
@@ -280,7 +310,7 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 					if !valConds(n.Prop("str_args"), as.ValMatches, as.ValAbsents) {
 						continue
 					}
-					out = append(out, adapters.Mapping{NodeID: id, Concept: "core.Assumption",
+					out = append(out, adapters.Mapping{NodeID: id, Concept: concept,
 						Detail: map[string]string{"mode": as.Mode, "about": as.About, "pattern": as.Pattern}})
 					break
 				}
@@ -290,17 +320,21 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 	}
 }
 
-// filterAdapter labels character-filtering replace(pattern, repl) calls with
-// core.CharFilter, recording the proven OUTPUT alphabet (or that it is unbounded) in
-// the label Detail. The solver then treats it as a SOUND sanitizer for any sink whose
+// filterAdapter labels character-filtering replace(pattern, repl) calls with the
+// ontology role concept, recording the proven OUTPUT alphabet (or that it is unbounded)
+// in the label Detail. The solver then treats it as a SOUND sanitizer for any sink whose
 // excluded chars the alphabet excludes, and the engine surfaces an unproven filter
 // as an assumption note. The regex math is general (charfilter.go); WHICH methods
 // filter is data (the `filter` directive).
 func (spec adapterSpec) filterAdapter() adapters.Adapter {
+	concept := singleOntologyRoleConcept(ontology.AnalysisRoleCharFilter)
 	return adapters.Adapter{
 		Name: spec.Name + ".filters", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
+			if concept == "" {
+				return nil
+			}
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			allowed := make([]bool, len(spec.Filters))
@@ -334,7 +368,7 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 					detail["bounded"] = "true"
 					detail["alphabet"] = alphabet
 				}
-				out = append(out, adapters.Mapping{NodeID: id, Concept: "core.CharFilter", Detail: detail})
+				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Detail: detail})
 			}
 			return out
 		},
@@ -554,6 +588,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 //
 // Collection-literal arg0s (vkind == Seq, e.g. Rails where(id: x)) are skipped.
 func (spec adapterSpec) sinkAdapter() adapters.Adapter {
+	attributeSinks := ontologyRoleConcepts(ontology.AnalysisRoleAttributeSink)
 	return adapters.Adapter{
 		Name: spec.Name + ".sinks", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
@@ -593,7 +628,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if !allowed[i] {
 						continue
 					}
-					if isAttr && sk.Concept != "code.ProtoPollute" {
+					if isAttr && !attributeSinks[sk.Concept] {
 						continue
 					}
 					hit := sk.ByMethod && method == sk.Pattern ||
@@ -727,8 +762,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 					if !allowed[ci] {
 						continue
 					}
-					// no break: a single call can be MULTIPLE controls (e.g. numeric coercion
-					// neutralizes HTML, SQL, AND trust-boundary), so attach every match.
+					// no break: a single call can be MULTIPLE controls, so attach every match.
 					hit := c.ByMethod && method == c.Pattern || !c.ByMethod && matchPath(path, []string{c.Pattern}, "prefix")
 					if hit && valConds(strArgs, c.ValMatches, c.ValAbsents) {
 						nodeID := id

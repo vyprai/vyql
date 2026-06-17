@@ -1,6 +1,10 @@
 package engine
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
@@ -136,6 +140,55 @@ func TestPossibilityFindingsUseConceptReviewData(t *testing.T) {
 		rc.Confidence != "medium" {
 		t.Fatalf("review condition was not data-driven: %+v", rc)
 	}
+}
+
+func TestEngineDoesNotHardcodeOntologyConcepts(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(file)
+	concepts := ontologyConceptNeedles(t)
+	var hits []string
+	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range files {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(raw)
+		for _, needle := range concepts {
+			if strings.Contains(text, needle) {
+				hits = append(hits, filepath.Base(path)+": "+needle)
+			}
+		}
+	}
+	if len(hits) > 0 {
+		t.Fatalf("engine must not hardcode ontology concepts; move roles/semantics into ontology metadata: %s", strings.Join(hits, ", "))
+	}
+}
+
+func ontologyConceptNeedles(t *testing.T) []string {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, c := range ontology.Seed().AllConcepts() {
+		if c.AnalysisRole != "" {
+			continue
+		}
+		seen["\""+c.Name+"\""] = true
+		seen["\""+c.QualifiedName()+"\""] = true
+	}
+	out := make([]string, 0, len(seen))
+	for needle := range seen {
+		out = append(out, needle)
+	}
+	return out
 }
 
 func TestTaintFindingAndSanitizer(t *testing.T) {

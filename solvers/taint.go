@@ -43,12 +43,12 @@ func firstKey(m map[string]bool) string {
 // FindTaintFlows enumerates source->sink paths; a path yields a flow iff no
 // kill-control node lies on it (the control killed the fact). Records near-miss
 // controls seen on killed sibling paths.
-func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string) ([]TaintFlow, error) {
+func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) ([]TaintFlow, error) {
 	// int-indexed fast path: run the whole fixpoint on int32 node indices (no string ids/payload
 	// in the hot loop) when the store supports it — the basis for keeping only int adjacency +
 	// labels resident while ids/payload spill to disk. Produces identical findings.
 	if ig, ok := store.(usg.IntGraph); ok {
-		return findTaintFlowsInt(ig, sourceConcepts, sinkConcepts, taintKinds, killControls, excluded), nil
+		return findTaintFlowsInt(ig, sourceConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters), nil
 	}
 	// collect source nodes (nodes carrying any source concept)
 	sourceNodes := map[string]bool{}
@@ -114,10 +114,10 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 				killMemo[id], killConcept[id] = 1, l.Concept
 				return true, l.Concept
 			}
-			if l.Concept == "core.CharFilter" && excluded != "" &&
+			if charFilters[l.Concept] && excluded != "" &&
 				l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
-				killMemo[id], killConcept[id] = 1, "core.CharFilter"
-				return true, "core.CharFilter"
+				killMemo[id], killConcept[id] = 1, l.Concept
+				return true, l.Concept
 			}
 		}
 		killMemo[id] = 2
@@ -220,7 +220,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 // int32 (no string maps in the hot loop), and adjacency/labels/concept-sets come from the
 // IntGraph. String ids are produced only when emitting findings (NodeID), so the inner loop
 // touches no ids or payload — exactly what an out-of-core (ids/payload-on-disk) store needs.
-func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string) []TaintFlow {
+func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) []TaintFlow {
 	n := g.NodeCount()
 	kind := firstKey(taintKinds)
 
@@ -256,11 +256,11 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 				killConcept[i] = l.Concept
 				return true, l.Concept
 			}
-			if l.Concept == "core.CharFilter" && excluded != "" &&
+			if charFilters[l.Concept] && excluded != "" &&
 				l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
 				killMemo[i] = 1
-				killConcept[i] = "core.CharFilter"
-				return true, "core.CharFilter"
+				killConcept[i] = l.Concept
+				return true, l.Concept
 			}
 		}
 		killMemo[i] = 2

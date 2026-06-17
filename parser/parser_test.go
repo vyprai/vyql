@@ -1,6 +1,12 @@
 package parser
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+)
 
 // Mirrors the Python parser smoke test: every docs/05 rule form parses.
 // VyQL conventions: `module <ns>;` declares the namespace, rule
@@ -55,6 +61,78 @@ rule InvalidRefundTransition {
   unless t.from == Paid
 }
 `
+
+func TestParserDoesNotHardcodeOntologyConcepts(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(file)
+	concepts := parserOntologyConceptNeedles(t)
+	var hits []string
+	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range files {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(raw)
+		for _, needle := range concepts {
+			if strings.Contains(text, needle) {
+				hits = append(hits, filepath.Base(path)+": "+needle)
+			}
+		}
+	}
+	if len(hits) > 0 {
+		t.Fatalf("parser must not hardcode ontology concepts; keep concept selection in VyQL data: %s", strings.Join(hits, ", "))
+	}
+}
+
+func parserOntologyConceptNeedles(t *testing.T) []string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	files, err := filepath.Glob(filepath.Join(root, "vyql", "ontology", "*.vyql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decls, err := Parse(string(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range decls {
+			cd, ok := decl.(*ConceptDecl)
+			if !ok {
+				continue
+			}
+			if role, _ := cd.Fields["analysis_role"].(string); role != "" {
+				continue
+			}
+			seen["\""+cd.Name+"\""] = true
+			seen["\""+cd.QualifiedName()+"\""] = true
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for needle := range seen {
+		out = append(out, needle)
+	}
+	return out
+}
 
 func TestParseAllForms(t *testing.T) {
 	decls, err := Parse(program)

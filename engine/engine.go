@@ -13,12 +13,13 @@ import (
 
 // Engine evaluates compiled rules against a USG store.
 type Engine struct {
-	Onto  *ontology.Ontology
-	Store usg.Store
+	Onto         *ontology.Ontology
+	Store        usg.Store
+	analysisRole map[string]map[string]bool
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
-	return &Engine{Onto: onto, Store: store}
+	return &Engine{Onto: onto, Store: store, analysisRole: map[string]map[string]bool{}}
 }
 
 var confOrder = map[string]int{"possibility": 0, "low": 1, "medium": 2, "high": 3}
@@ -365,6 +366,7 @@ func (e *Engine) assumeMinLevel(concept string) string {
 // live taint path — meaning vyql could NOT prove it excludes this sink's required
 // character set (a sound allowlist filter would have killed the flow already).
 func (e *Engine) charFilterAssumption(path []string, excluded string) string {
+	charFilters := e.conceptsWithAnalysisRole(ontology.AnalysisRoleCharFilter)
 	onPath := make(map[string]bool, len(path))
 	for _, id := range path {
 		onPath[id] = true
@@ -372,7 +374,7 @@ func (e *Engine) charFilterAssumption(path []string, excluded string) string {
 	for _, id := range path {
 		labels, _ := e.Store.Labels(id)
 		for _, l := range labels {
-			if l.Concept != "core.CharFilter" {
+			if !charFilters[l.Concept] {
 				continue
 			}
 			// A replace FILTERS its subject but emits its REPLACEMENT verbatim (arg1, in both
@@ -394,7 +396,7 @@ func (e *Engine) charFilterAssumption(path []string, excluded string) string {
 	return ""
 }
 
-// neutralizerAssumptions surfaces UNSOUND neutralizers (core.Assumption) that bear on a finding:
+// neutralizerAssumptions surfaces UNSOUND neutralizers that bear on a finding:
 // a guard that DOMINATES the sink, or a sanitizer ON the taint path, whose declared `about`
 // concept matches this sink's threat. Each yields an assumption note — the flow is NEVER
 // suppressed (vyql cannot prove the neutralizer sound), but is flagged as a false positive
@@ -404,6 +406,7 @@ func (e *Engine) charFilterAssumption(path []string, excluded string) string {
 // (the `assume` adapter directive); this engine logic is threat-agnostic.
 func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcepts map[string]bool) []findings.NegationEvidence {
 	var out []findings.NegationEvidence
+	assumptions := e.conceptsWithAnalysisRole(ontology.AnalysisRoleNeutralizerAssumption)
 	seen := map[string]bool{}
 	add := func(mode, pat string) {
 		key := mode + "|" + pat
@@ -417,15 +420,15 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 		}
 		out = append(out, findings.NegationEvidence{Clause: mode + " (assumption)", Satisfied: false, Detail: detail})
 	}
-	// sanitizer-style: a core.Assumption label lying ON the taint path.
+	// sanitizer-style: an assumption-role label lying ON the taint path.
 	for _, id := range path {
 		for _, l := range e.labels(id) {
-			if l.Concept == "core.Assumption" && l.Detail["mode"] == "sanitizer" && sinkConcepts[l.Detail["about"]] {
+			if assumptions[l.Concept] && l.Detail["mode"] == "sanitizer" && sinkConcepts[l.Detail["about"]] {
 				add("sanitizer", l.Detail["pattern"])
 			}
 		}
 	}
-	// guard-style: a core.Assumption guard that DOMINATES the sink. A guard inspecting THIS
+	// guard-style: an assumption-role guard that DOMINATES the sink. A guard inspecting THIS
 	// tainted value is, by construction, a direct FLOWS out-neighbour of a node on the path
 	// (the tainted operand flows into it), so we scan those neighbours LOCALLY rather than the
 	// whole store — O(path · out-degree), not O(store · findings). Found nothing globally is
@@ -441,7 +444,7 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 				}
 				guarded[gid] = true
 				for _, l := range e.labels(gid) {
-					if l.Concept != "core.Assumption" || l.Detail["mode"] != "guard" {
+					if !assumptions[l.Concept] || l.Detail["mode"] != "guard" {
 						continue
 					}
 					// about=="*" is a structural guard (a `<const> in tainted` blocklist) that
@@ -487,7 +490,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 	}
 
-	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, excluded)
+	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, excluded, e.conceptsWithAnalysisRole(ontology.AnalysisRoleCharFilter))
 	if err != nil {
 		return nil, err
 	}
@@ -644,6 +647,18 @@ func (e *Engine) loc(nodeID string) string {
 func (e *Engine) labels(nodeID string) []usg.Label {
 	ls, _ := e.Store.Labels(nodeID)
 	return ls
+}
+
+func (e *Engine) conceptsWithAnalysisRole(role string) map[string]bool {
+	if e == nil || e.Onto == nil || role == "" {
+		return nil
+	}
+	if concepts, ok := e.analysisRole[role]; ok {
+		return concepts
+	}
+	concepts := e.Onto.ConceptsWithAnalysisRole(role)
+	e.analysisRole[role] = concepts
+	return concepts
 }
 
 func (e *Engine) conceptIn(nodeID string, set map[string]bool) string {

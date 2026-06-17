@@ -657,9 +657,8 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		return []AdapterMapping{mk}
 	case p.atWord("filter"):
 		// `filter method "replace"` / `filter path "preg_replace"` marks a
-		// character-filtering replace(pattern, repl). The engine analyzes the
-		// pattern's output alphabet and labels the result core.CharFilter — a
-		// data-aware sanitizer (sound for sinks whose excluded chars it excludes).
+		// character-filtering replace(pattern, repl). The adapter layer labels it
+		// with the ontology concept tagged for the character-filter analysis role.
 		p.next()
 		kind := "filter_path"
 		if p.atWord("method") {
@@ -669,7 +668,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 			p.next()
 		}
 		pat := p.parsePattern()
-		fm := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.CharFilter"}
+		fm := AdapterMapping{Kind: kind, Pattern: pat}
 		if p.atWord("global") { // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
 			p.next()
 			fm.Constraint = "global"
@@ -680,9 +679,9 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		// `assume guard method "check" -> code.Target` /
 		// `assume sanitizer path "normalize" -> code.Target` declares an UNSOUND
 		// neutralizer: a guard or transformer that *might* defuse the condition but cannot be
-		// proven to. The engine never suppresses on it — instead it labels the node
-		// core.Assumption and, when that node guards/sanitizes a finding, attaches an
-		// assumption note (the regex-CharFilter pattern, generalized to any neutralizer).
+		// proven to. The engine never suppresses on it — instead the adapter layer
+		// labels the node with the ontology concept tagged for the assumption role,
+		// and the engine attaches an assumption note when it bears on a finding.
 		p.next()
 		mode := "guard"
 		if p.atWord("sanitizer") {
@@ -699,7 +698,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 			p.next()
 		}
 		pat := p.parsePattern()
-		am := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.Assumption"}
+		am := AdapterMapping{Kind: kind, Pattern: pat}
 		p.parseAdapterGuards(&am, true)
 		p.expect(tArrow, "->")
 		am.About = p.parseConceptRef()

@@ -1,8 +1,13 @@
 package solvers
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -12,6 +17,55 @@ func set(xs ...string) map[string]bool {
 		m[x] = true
 	}
 	return m
+}
+
+func TestSolversDoNotHardcodeOntologyConcepts(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(file)
+	concepts := solverOntologyConceptNeedles(t)
+	var hits []string
+	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range files {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(raw)
+		for _, needle := range concepts {
+			if strings.Contains(text, needle) {
+				hits = append(hits, filepath.Base(path)+": "+needle)
+			}
+		}
+	}
+	if len(hits) > 0 {
+		t.Fatalf("solvers must not hardcode ontology concepts; pass semantic role sets in from the caller: %s", strings.Join(hits, ", "))
+	}
+}
+
+func solverOntologyConceptNeedles(t *testing.T) []string {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, c := range ontology.Seed().AllConcepts() {
+		if c.AnalysisRole != "" {
+			continue
+		}
+		seen["\""+c.Name+"\""] = true
+		seen["\""+c.QualifiedName()+"\""] = true
+	}
+	out := make([]string, 0, len(seen))
+	for needle := range seen {
+		out = append(out, needle)
+	}
+	return out
 }
 
 // Mirrors poc/cases/case_21 (a): the stub and the three real solvers all conform
@@ -33,7 +87,7 @@ func TestSolverContractConformance(t *testing.T) {
 	gt.AddLabel("a", usg.Label{Concept: "code.HttpInput"})
 	gt.AddLabel("b", usg.Label{Concept: "code.SqlExecution"})
 	gt.AddEdge(usg.Edge{Type: "FLOWS", Src: "a", Dst: "b"})
-	tflows, err := FindTaintFlows(gt, set("code.HttpInput"), set("code.SqlExecution"), set("code.UntrustedData"), set(), "")
+	tflows, err := FindTaintFlows(gt, set("code.HttpInput"), set("code.SqlExecution"), set("code.UntrustedData"), set(), "", set())
 	if err != nil {
 		t.Fatal(err)
 	}

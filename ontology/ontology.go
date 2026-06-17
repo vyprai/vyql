@@ -41,6 +41,7 @@ type Concept struct {
 	SourceAssumption        string   `json:"source_assumption,omitempty"`
 	SourceConfidence        string   `json:"source_confidence,omitempty"`
 	AssumeMinLevel          string   `json:"assume_min_level,omitempty"`
+	AnalysisRole            string   `json:"analysis_role,omitempty"`
 	ContextReachSource      string   `json:"context_reach_source,omitempty"`
 	ContextReachLabel       string   `json:"context_reach_label,omitempty"`
 	ContextConfirmDstProp   string   `json:"context_confirm_dst_prop,omitempty"`
@@ -52,6 +53,12 @@ type Concept struct {
 	// sanitizer when its output alphabet excludes all of them.
 	ExcludedChars string `json:"excluded_chars,omitempty"`
 }
+
+const (
+	AnalysisRoleAttributeSink         = "attribute_sink"
+	AnalysisRoleCharFilter            = "char_filter"
+	AnalysisRoleNeutralizerAssumption = "neutralizer_assumption"
+)
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.
 func (c Concept) QualifiedName() string {
@@ -91,6 +98,35 @@ func (o *Ontology) AllConcepts() []Concept {
 		out = append(out, *c)
 	}
 	sortConcepts(out)
+	return out
+}
+
+// ConceptsWithAnalysisRole returns the concepts tagged for an internal engine
+// role. The role names are generic mechanics; the concrete concept identities
+// live in ontology data.
+func (o *Ontology) ConceptsWithAnalysisRole(role string) map[string]bool {
+	out := map[string]bool{}
+	if role == "" {
+		return out
+	}
+	for _, c := range o.concepts {
+		if c.AnalysisRole == role {
+			out[c.QualifiedName()] = true
+		}
+	}
+	return out
+}
+
+// SingleConceptWithAnalysisRole returns the sole concept tagged for role.
+func (o *Ontology) SingleConceptWithAnalysisRole(role string) string {
+	concepts := o.ConceptsWithAnalysisRole(role)
+	var out string
+	for c := range concepts {
+		if out != "" {
+			return ""
+		}
+		out = c
+	}
 	return out
 }
 
