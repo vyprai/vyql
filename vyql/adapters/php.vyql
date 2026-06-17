@@ -24,6 +24,7 @@ adapter php {
   source "getenv" val "REQUEST_" -> code.HttpInput
   source "getenv" val "REMOTE_ADDR" -> code.HttpInput
   source "getenv" val "PATH_INFO" -> code.HttpInput
+  mark "security.php.server_port_validation.incomplete" -> code.IncompleteServerPortValidation
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   sink path "mysqli_query" arg 1 -> code.SqlExecution

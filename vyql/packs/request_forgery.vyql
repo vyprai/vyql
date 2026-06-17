@@ -13,6 +13,11 @@ rule IncompleteIpDenylist {
   match code.IncompleteIpDenylist as guard
 }
 
+rule IncompleteServerPortValidation {
+  meta { id: "VYQL-RF-005", severity: medium, cwe: [CWE_918], confidence_floor: low }
+  match code.IncompleteServerPortValidation as guard
+}
+
 rule OpenRedirect {
   meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601] }
   taint core.UserControlledData -> code.RedirectTarget

@@ -334,6 +334,12 @@ concept IncompleteIpDenylist : sink {
   vulnerable_to: [request_forgery.Ssrf]
   cwe: [CWE_918]
 }
+// Server/port validation that attempts to block privileged or out-of-range
+// outbound connections but can be bypassed by PHP string-to-number coercion.
+concept IncompleteServerPortValidation : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  cwe: [CWE_918]
+}
 // A resource-acquiring / potentially-unbounded operation (open file/socket/connection,
 // spawn thread, allocate, read-all). POSSIBILITY-tier review concept for the resource/DoS
 // bucket: "verify this resource is bounded and released". Inert for confirmed rules.

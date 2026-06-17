@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"strings"
+	"unicode"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsphp "github.com/tree-sitter/tree-sitter-php/bindings/go"
@@ -29,7 +30,9 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &phConv{src: src, root: root, file: rel}
-			return nir.Module{Key: "", File: rel, Body: c.block(tree.RootNode())}, true
+			body := c.block(tree.RootNode())
+			body = append(body, c.phpIncompleteServerPortValidation(tree.RootNode())...)
+			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
@@ -419,6 +422,56 @@ func phpHasFrameworkParam(ptypes map[string]string) bool {
 
 func phpIsWPListTableColumn(name string) bool {
 	return name == "column_default" || strings.HasPrefix(name, "column_")
+}
+
+func (c *phConv) phpIncompleteServerPortValidation(root *tree_sitter.Node) []nir.Stmt {
+	full := c.text(root)
+	compact := strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, full)
+	if !strings.Contains(compact, "connect(") ||
+		!strings.Contains(compact, "is_numeric($port)") ||
+		!(strings.Contains(compact, "explode(\":\",SERVER") || strings.Contains(compact, "explode(':',SERVER")) ||
+		!(strings.Contains(compact, "$port<1024") || strings.Contains(compact, "1024>$port")) {
+		return nil
+	}
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		callText := strings.Map(func(r rune) rune {
+			if unicode.IsSpace(r) {
+				return -1
+			}
+			return r
+		}, c.text(n))
+		if n.Kind() == "function_call_expression" &&
+			c.dotted(field(n, "function")) == "is_numeric" &&
+			strings.Contains(callText, "is_numeric($port)") {
+			loc := c.loc(n)
+			if !seen[loc] {
+				seen[loc] = true
+				path := "security.php.server_port_validation.incomplete"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Path:   path,
+					Method: lastSeg(path),
+					Loc:    loc,
+				}})
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
 }
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —
