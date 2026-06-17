@@ -149,27 +149,43 @@ func (c *pyConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
-// hasValidatorComment reports whether a function carries a `# vyql: validator` marker
-// comment in its body — opting it in as a trust-boundary input-validator/authenticator the
-// tool can't infer by name. Matched loosely (any comment containing "vyql" and "validat").
-func (c *pyConv) hasValidatorComment(fn *tree_sitter.Node) bool {
-	// the marker comment attaches as a direct child of the function_definition (between the
-	// signature and the body suite) or as a leading statement inside the body block.
-	scan := func(n *tree_sitter.Node) bool {
+// vyqlResultEntries extracts `# vyql: ...` function markers without interpreting them.
+func (c *pyConv) vyqlResultEntries(fn *tree_sitter.Node) []nir.ResultEntry {
+	var out []nir.ResultEntry
+	scan := func(n *tree_sitter.Node) {
 		if n == nil {
-			return false
+			return
 		}
 		for _, ch := range children(n) {
 			if ch.Kind() == "comment" {
-				s := strings.ToLower(c.text(ch))
-				if strings.Contains(s, "vyql") && strings.Contains(s, "validat") {
-					return true
+				for _, tok := range vyqlMarkerTokens(c.text(ch)) {
+					out = append(out, nir.ResultEntry{Tokens: []string{tok}})
 				}
 			}
 		}
-		return false
 	}
-	return scan(fn) || scan(field(fn, "body"))
+	scan(fn)
+	scan(field(fn, "body"))
+	return out
+}
+
+func vyqlMarkerTokens(comment string) []string {
+	lower := strings.ToLower(comment)
+	i := strings.Index(lower, "vyql:")
+	if i < 0 {
+		return nil
+	}
+	text := lower[i+len("vyql:"):]
+	fields := strings.FieldsFunc(text, func(r rune) bool {
+		return !(r == '_' || r == '-' || r == '.' || r == ':' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
+	})
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if f != "" {
+			out = append(out, "marker:"+f)
+		}
+	}
+	return out
 }
 
 // firstIdent returns the first identifier at or under n (e.g. the target name inside a
@@ -265,7 +281,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		// public API = no leading underscore, OR a dunder (__init__/__call__ are entry points).
 		exported := !strings.HasPrefix(name, "_") || (strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__"))
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ParamEntries: entries, IsValidator: c.hasValidatorComment(n), Exported: exported}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ParamEntries: entries, ResultEntries: c.vyqlResultEntries(n), Exported: exported}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {

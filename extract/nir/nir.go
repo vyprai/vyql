@@ -191,11 +191,10 @@ type FuncDef struct {
 	// external caller or framework. Lowering emits generic parameter-entry events from this
 	// data; adapters decide which events are source concepts.
 	ParamEntries []ParamEntry
-	// IsValidator marks a function annotated `# vyql: validator` — a custom
-	// input-validator/authenticator the tool can't infer by name. Its return value is
-	// treated as validated (clears the trust-boundary threat), so storing it across a
-	// trust boundary is legitimate.
-	IsValidator bool
+	// ResultEntries records syntax-level evidence attached to values returned by this
+	// function. Lowering emits generic result events; adapters decide which events are
+	// controls, sinks, or other domain concepts.
+	ResultEntries []ResultEntry
 	// Exported marks a function/method as part of the PUBLIC API surface (per the
 	// language's visibility rules: Go capitalization, `pub`, `public`, `export`, no
 	// leading underscore, …). The library/SDK archetype treats exported-function
@@ -206,6 +205,10 @@ type FuncDef struct {
 
 type ParamEntry struct {
 	Param  string
+	Tokens []string
+}
+
+type ResultEntry struct {
 	Tokens []string
 }
 

@@ -1,5 +1,5 @@
 // Package lowering is the shared, language-AGNOSTIC tier (docs/20): it lowers
-// NIR into a Universal Security Graph, owning the function/class registries,
+// NIR into the shared graph, owning the function/class registries,
 // per-file import tables, the type map (self, constructors, class/static
 // receivers), call resolution (import -> type -> guarded unique-name fallback),
 // and dataflow construction (scopes, assignments, FLOWS edges).
@@ -21,16 +21,16 @@ import (
 )
 
 type funcInfo struct {
-	paramNames []string
-	params     map[string]string // name -> param node id
-	paramTypes map[string]string // name -> declared/inferred receiver type
-	ret        string            // return node id
-	module     string
-	cls        string
-	name       string
-	validator  bool   // a `# vyql: validator` function: its result clears trust-boundary taint
-	abstract   bool   // an interface/abstract method (empty body) — dispatch to concrete impls
-	selfNode   string // stable `this` node for a method (alias target for the receiver); "" if none
+	paramNames    []string
+	params        map[string]string // name -> param node id
+	paramTypes    map[string]string // name -> declared/inferred receiver type
+	ret           string            // return node id
+	module        string
+	cls           string
+	name          string
+	resultEntries []nir.ResultEntry
+	abstract      bool   // an interface/abstract method (empty body) — dispatch to concrete impls
+	selfNode      string // stable `this` node for a method (alias target for the receiver); "" if none
 }
 
 type importEntry struct {
@@ -1053,7 +1053,7 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		paramTypes: st.ParamTypes,
 		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
 		module:     modkey, cls: cls, name: st.Name,
-		validator: st.IsValidator,
+		resultEntries: st.ResultEntries,
 		// an empty body marks an interface/abstract method: a call typed to it must dispatch
 		// to the concrete implementations (whose bodies carry the taint).
 		abstract: len(st.Body) == 0,
@@ -1189,7 +1189,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				l.p1.Funcs = append(l.p1.Funcs, fiGob{
 					Qual: qual, Short: st.Name, ParamNames: info.paramNames, Params: info.params,
 					ParamTypes: info.paramTypes, Ret: info.ret, Module: info.module, Cls: info.cls,
-					Name: info.name, Validator: info.validator, Abstract: info.abstract,
+					Name: info.name, ResultEntries: info.resultEntries, Abstract: info.abstract,
 				})
 			}
 			// recurse into the body to register NESTED LOCAL FUNCTIONS (C# local functions, JS
@@ -1367,8 +1367,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// (strings.Builder.WriteString, bytes.Buffer.Write…) or a C string-accumulator
 		// (g_string_append*, strcat/strncat) folds its args INTO the object you later read
 		// back. Model it as a taint-join on that variable (like `x += …`): the variable
-		// gains the call's taint. Without this, `b.WriteString(taint); b.String()` loses it.
-		// (stdlib accumulator semantics = language mechanism, not security knowledge.)
+		// gains the call's taint. Without this, `b.WriteString(x); b.String()` loses it.
+		// This is stdlib accumulator semantics.
 		if call, ok := st.Value.(nir.Call); ok && callNode != "" {
 			if v := mutatedVar(call); v != "" {
 				n := l.node("Concat", call.Loc, nil)
@@ -1584,8 +1584,8 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			return l.eval(ex.Else, sc)
 		}
 		// Allowlist-membership guard: `LIT_SET.includes(x) ? x : default`. The true arm
-		// returns a value provably drawn from a CONSTANT set (the attacker cannot escape the
-		// fixed allowlist), so x's taint does NOT survive into the result — a SOUND kill, not
+		// returns a value provably drawn from a CONSTANT set (the selected value cannot escape
+		// that fixed set), so x's taint does NOT survive into the result — a SOUND kill, not
 		// an assumption. FN-safe: fires only when the tested value and the then-arm are the
 		// same variable and the receiver is a literal of constants.
 		if v, ok := allowlistMembershipVar(ex.Cond); ok {
@@ -1702,7 +1702,7 @@ func isMissingTernaryArm(e nir.Expr) bool {
 // allowlistMembershipVar recognizes a constant-set membership test — `["a","b"].includes(x)`,
 // `.contains(x)`, `.has(x)` — over a LITERAL set of constants, returning the tested variable.
 // Such a guard, when it gates the same variable in a ternary, bounds the value to the fixed
-// allowlist (sound). The receiver must be a literal Seq of Consts so the attacker cannot
+// allowlist (sound). The receiver must be a literal Seq of Consts so the checked value cannot
 // influence the set.
 func allowlistMembershipVar(cond nir.Expr) (string, bool) {
 	switch c := cond.(type) {
@@ -1763,7 +1763,7 @@ func unsoundContainmentGuard(cond nir.Expr) (string, string, bool) {
 // constSeqVar confirms set is a fixed literal set of constants and returns varID,true. A set
 // is either a collection literal (`[a,b]`, JS/Python) or a JVM constant-set factory call
 // (`Arrays.asList(a,b)`, `List.of(a,b)`, `Set.of(a,b)`) — in every case with all-constant
-// elements, so the attacker cannot influence the membership domain.
+// elements, so the checked value cannot influence the membership domain.
 func constSeqVar(set nir.Expr, varID string) (string, bool) {
 	switch s := set.(type) {
 	case nir.Seq:
@@ -2145,8 +2145,10 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		if recvNode != "" && target.selfNode != "" {
 			l.aliasReceiverSelf(recvNode, target.selfNode)
 		}
-		if target.validator {
-			result = l.syntheticCall("analysis.validator.result", "result", result, call.Loc)
+		for _, entry := range target.resultEntries {
+			if len(entry.Tokens) > 0 {
+				result = l.syntheticCall("analysis.function.result", "result", result, call.Loc, entry.Tokens...)
+			}
 		}
 	}
 	for i, a := range args {

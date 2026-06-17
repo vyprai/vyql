@@ -151,3 +151,38 @@ func TestLowerParamEntryCreatesSourceEventFlow(t *testing.T) {
 	}
 	t.Fatalf("parameter entry event does not flow to parameter")
 }
+
+func TestLowerResultEntryCreatesControlEventFlow(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "marked", Params: []string{"value"}, ResultEntries: []nir.ResultEntry{{
+				Tokens: []string{"marker:review"},
+			}}, Body: []nir.Stmt{
+				nir.Return{Value: nir.Name{ID: "value", Loc: "app.py:2"}},
+			}, Loc: "app.py:1"},
+			nir.FuncDef{Name: "handler", Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "marked", Loc: "app.py:5"},
+					Args:   []nir.Expr{nir.Const{Loc: "app.py:5", Value: "\"x\""}},
+					Path:   "marked", Method: "marked", Loc: "app.py:5",
+				}},
+			}, Loc: "app.py:4"},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "analysis.function.result" &&
+			strings.Contains(n.Prop("str_args"), "marker:review") &&
+			n.Prop("arg0") != "" {
+			return
+		}
+	}
+	t.Fatalf("result entry event not found")
+}
