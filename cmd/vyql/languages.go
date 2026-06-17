@@ -131,6 +131,7 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 		ads = append(ads, frontend.PiiAdapters()...)
 		ads = append(ads, frontend.LibraryAdapters()...)
 		ads = append(ads, frontend.CryptoReviewAdapters()...) // inert unless possibility mode
+		ads = append(ads, frontend.AuditReviewAdapters()...)  // inert unless possibility mode
 	}
 	// bundled .properties config — resolved key→value so a `getProperty("hashAlg1")`
 	// read folds to its real value during lowering (CWE-327/328 via config indirection).

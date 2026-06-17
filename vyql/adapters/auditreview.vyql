@@ -1,0 +1,49 @@
+// Cross-language audit-review labeling for the POSSIBILITY tier (VYQL_POSSIBILITY=1).
+//
+// Marks privileged/state-changing operations (code.SensitiveOperation) and resource
+// acquisitions (code.ResourceReview). No CONFIRMED rule consumes these concepts, so they
+// are inert in normal scans (zero effect on default output / benchmarks). The possibility
+// tier surfaces each for the AI/triage pass:
+//   - SensitiveOperation → "verify this operation enforces access control" (authz CVEs)
+//   - ResourceReview     → "verify this resource is bounded and released" (resource/DoS)
+// Kept high-signal (destructive/privileged ops, acquisition calls) rather than every CRUD
+// call, to keep the AI pass's review set tractable. cross_language: these recur by name.
+adapter auditreview {
+  meta { fidelity: syntactic, cross_language: true }
+
+  // --- privileged / destructive operations (authz review) ---
+  mark method "delete" -> code.SensitiveOperation
+  mark method "destroy" -> code.SensitiveOperation
+  mark method "remove" -> code.SensitiveOperation
+  mark method "drop" -> code.SensitiveOperation
+  mark method "truncate" -> code.SensitiveOperation
+  mark method "deleteById" -> code.SensitiveOperation
+  mark method "deleteUser" -> code.SensitiveOperation
+  mark method "grant" -> code.SensitiveOperation
+  mark method "revoke" -> code.SensitiveOperation
+  mark method "setRole" -> code.SensitiveOperation
+  mark method "addRole" -> code.SensitiveOperation
+  mark method "setPermission" -> code.SensitiveOperation
+  mark method "setPermissions" -> code.SensitiveOperation
+  mark method "makeAdmin" -> code.SensitiveOperation
+  mark method "setAdmin" -> code.SensitiveOperation
+  mark method "elevate" -> code.SensitiveOperation
+  mark method "impersonate" -> code.SensitiveOperation
+  mark method "assumeRole" -> code.SensitiveOperation
+  mark method "promote" -> code.SensitiveOperation
+
+  // --- resource acquisition / unbounded reads (resource-DoS review) ---
+  mark method "ReadAll" -> code.ResourceReview
+  mark method "readAll" -> code.ResourceReview
+  mark method "read_to_end" -> code.ResourceReview
+  mark method "read_to_string" -> code.ResourceReview
+  mark method "Accept" -> code.ResourceReview
+  mark "net.Dial" -> code.ResourceReview
+  mark "net.Listen" -> code.ResourceReview
+  mark "exec.Command" -> code.ResourceReview
+  mark method "spawn" -> code.ResourceReview
+  mark method "fork" -> code.ResourceReview
+  mark "fopen" -> code.ResourceReview
+  mark "opendir" -> code.ResourceReview
+  mark "socket" -> code.ResourceReview
+}

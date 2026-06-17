@@ -1236,6 +1236,10 @@ func LibraryAdapters() []adapters.Adapter    { return AdaptersFor("library") }
 // code.CryptoOperation. Inert for confirmed rules; the possibility tier surfaces them.
 func CryptoReviewAdapters() []adapters.Adapter { return AdaptersFor("cryptoreview") }
 
+// AuditReviewAdapters labels privileged/state-changing ops (code.SensitiveOperation) and
+// resource acquisitions (code.ResourceReview) for the possibility tier (adapters/auditreview.vyql).
+func AuditReviewAdapters() []adapters.Adapter { return AdaptersFor("auditreview") }
+
 func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }
 func DartAdapters() []adapters.Adapter       { return AdaptersFor("dart") }
 func GroovyAdapters() []adapters.Adapter     { return AdaptersFor("groovy") }

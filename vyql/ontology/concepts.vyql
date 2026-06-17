@@ -305,6 +305,22 @@ concept ObjectLookupByUserInput : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_639]
 }
+// A privileged / state-changing operation (delete/grant/setRole/admin, DB writes) whose
+// access-control can't be verified statically. POSSIBILITY-tier review concept (broader than
+// the curated AuthenticationRequiredOp the confirmed AUTH rules use): surfaces "verify this
+// operation is authorized" for the AI pass — the missing/wrong-check bug class behind authz
+// CVEs. No confirmed rule consumes it, so default output is unaffected.
+concept SensitiveOperation : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+}
+// A resource-acquiring / potentially-unbounded operation (open file/socket/connection,
+// spawn thread, allocate, read-all). POSSIBILITY-tier review concept for the resource/DoS
+// bucket: "verify this resource is bounded and released". Inert for confirmed rules.
+concept ResourceReview : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+}
 concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   enabled_by: [taint.UntrustedData]
