@@ -152,6 +152,24 @@ adapter php {
   sink method "findById" -> code.ObjectLookupByUserInput
   sink method "getUser" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
+  // CSRF-sensitive state changes. PHP applications commonly route request handlers
+  // straight into model mutators/persistence methods, so request data reaching these
+  // operations should require a dominating CSRF check.
+  mark method "changePassword" -> code.StateChangingOp
+  mark method "updatePassword" -> code.StateChangingOp
+  mark method "resetPassword" -> code.StateChangingOp
+  mark method "changeEmail" -> code.StateChangingOp
+  mark method "transferFunds" -> code.StateChangingOp
+  mark method "deleteAccount" -> code.StateChangingOp
+  mark method "grantRole" -> code.StateChangingOp
+  mark method "makeAdmin" -> code.StateChangingOp
+  mark method "setValue" -> code.StateChangingOp
+  mark method "setValues" -> code.StateChangingOp
+  mark method "save" -> code.StateChangingOp
+  mark method "store" -> code.StateChangingOp
+  mark method "insert" -> code.StateChangingOp
+  mark method "update" -> code.StateChangingOp
+  mark method "delete" -> code.StateChangingOp
   mark "changePassword" -> code.AuthenticationRequiredOp
   mark "updatePassword" -> code.AuthenticationRequiredOp
   mark "resetPassword" -> code.AuthenticationRequiredOp

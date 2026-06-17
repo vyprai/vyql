@@ -22,6 +22,28 @@ test "python: a constant state change is clean (no user input)"
       account.change_password("system-generated")
   ```
 
+test "php: post data -> model mutator is a CSRF-exposed state change"
+  lang php
+  expect VYQL-RF-003
+  code
+  ```
+  <?php
+  $role->setValue("rol_edit_user", $_POST["rol_edit_user"]);
+  $role->save();
+  ?>
+  ```
+
+test "php: constant model update is clean for CSRF"
+  lang php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+  $role->setValue("rol_description", "system");
+  $role->save();
+  ?>
+  ```
+
 test "graph: user input reaching a state-changing op without CSRF protection (RF-003)"
   expect VYQL-RF-003
   graph
