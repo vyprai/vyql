@@ -30,6 +30,7 @@ type funcInfo struct {
 	name       string
 	validator  bool // a `# vyql: validator` function: its result clears trust-boundary taint
 	abstract   bool // an interface/abstract method (empty body) — dispatch to concrete impls
+	selfNode   string // stable `this` node for a method (alias target for the receiver); "" if none
 }
 
 type importEntry struct {
@@ -151,6 +152,14 @@ var elementCallbackMethods = map[string]bool{
 	"Single": true, "SingleOrDefault": true, "Last": true, "LastOrDefault": true, "Any": true,
 	"All": true, "Count": true, "TakeWhile": true, "SkipWhile": true, "Aggregate": true,
 	"DistinctBy": true, "MaxBy": true, "MinBy": true, "ToDictionary": true, "ToLookup": true,
+}
+
+// selfPassingMethods invoke their lambda WITH THE RECEIVER as the argument (C# fluent helpers
+// `obj.With/Also/Tap(x => …)`, Kotlin scope functions `apply/also/let/run`), so the lambda's
+// first parameter aliases the receiver.
+var selfPassingMethods = map[string]bool{
+	"With": true, "Also": true, "Apply": true, "Tap": true, "Let": true, "Pipe": true,
+	"also": true, "apply": true, "let": true, "run": true, "with": true,
 }
 
 // appendMutators add at the next sequence index: `list.add(val)` / `sb.append(val)`.
@@ -839,7 +848,7 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		params[p] = l.nodeWithID(sigID(ns, rel, "param", p), "Param", st.Loc, props)
 		order = append(order, p)
 	}
-	return &funcInfo{
+	fi := &funcInfo{
 		paramNames: order,
 		params:     params,
 		paramTypes: st.ParamTypes,
@@ -850,9 +859,46 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		// to the concrete implementations (whose bodies carry the taint).
 		abstract: len(st.Body) == 0,
 	}
+	// A method (no explicit self param[0]) gets a STABLE `this` node, so the receiver at every
+	// call site can be ALIASED to it (field mutations via this reach the receiver object —
+	// object-sensitivity for fluent/builder mutators). Languages with an explicit self param
+	// (Python/Go) keep param[0]; this is the C#-style implicit-this case.
+	if cls != "" && (len(order) == 0 || order[0] != l.selfName) {
+		fi.selfNode = l.nodeWithID(sigID(ns, rel, "self", ""), "Param", st.Loc, map[string]string{"name": "this", "func": st.Name})
+	}
+	return fi
 }
 
 // --- pass 1: registration ----------------------------------------------
+
+// aliasReceiverSelf makes a method's stable `this` node share the receiver's container info, so
+// a field mutation via `this` inside the method (this.X = …) reaches the RECEIVER object the
+// method was called on, and vice versa (object-sensitivity for fluent/builder mutators like
+// `req.AddParameter(p) => this.With(x => x.Parameters.Add(p))`). Merge-and-repoint, so it is
+// independent of whether the call site or the callee body is lowered first.
+func (l *lowerer) aliasReceiverSelf(recv, self string) {
+	if recv == "" || self == "" {
+		return
+	}
+	rc := l.cinfo(recv)
+	if sc := l.containers[self]; sc != nil && sc != rc {
+		for k, slot := range sc.elems {
+			if slot == "" {
+				continue
+			}
+			if rc.elems[k] == "" {
+				rc.elems[k] = slot
+			} else if rc.elems[k] != slot {
+				l.flow(slot, rc.elems[k])
+				l.flow(rc.elems[k], slot)
+			}
+		}
+		if sc.dirty {
+			rc.dirty = true
+		}
+	}
+	l.containers[self] = rc // future this.X / recv.X accesses share the same slots
+}
 
 // classMemberSet returns the transitive data-member names of "modkey::Class": its declared
 // members plus those inherited from base classes (resolved by short name across files, so an
@@ -1005,9 +1051,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// has known members (i.e. the frontend opted into member resolution).
 		// implicit-this is C#-gated (only C# populates ClassDef.Members); C#'s self keyword is
 		// "this" (the merged multi-language Program loses per-language SelfName), so key on "this".
-		if l.curClass != "" && inner.node["this"] == "" && len(l.classMemberSet(l.curModule, l.curClass)) > 0 {
-			thisNode := l.node("Param", st.Loc, map[string]string{"name": "this"})
-			inner.node["this"] = thisNode
+		// Use the STABLE funcInfo.selfNode so call sites can alias the receiver to it.
+		if l.curClass != "" && inner.node["this"] == "" && info != nil && info.selfNode != "" &&
+			len(l.classMemberSet(l.curModule, l.curClass)) > 0 {
+			inner.node["this"] = info.selfNode
 			inner.typ["this"] = [2]string{l.curModule, l.curClass}
 		}
 		// seed enclosing-class field receivers so `field.method()` resolves
@@ -1762,6 +1809,18 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		// list.add(param); ProcessBuilder(list)). Element-sensitive per constant key.
 		if mutatorMethods[call.Method] {
 			l.containerWrite(call, args, recvNode, sc)
+			// `base.field.add(v)` — the receiver is a member access, so the mutator taints a
+			// transient Attr read node, not the FIELD SLOT. Also route the added value(s) into
+			// elemNode(base, field) so a later `base.field` read (or an aliased receiver) sees
+			// the mutation, not just chained reads off this exact expression.
+			if outer, ok := call.Callee.(nir.Attr); ok {
+				if inner, ok := outer.Base.(nir.Attr); ok && inner.Attr != "" {
+					slot := l.elemNode(l.eval(inner.Base, sc), inner.Attr, call.Loc)
+					for _, a := range args {
+						l.flow(a, slot)
+					}
+				}
+			}
 		} else if ci := l.containers[recvNode]; ci != nil && !modeledContainerMethod(call.Method) {
 			l.containerInvalidate(call, recvNode, sc) // precise index-shift where unambiguous, else dirty
 		}
@@ -1782,6 +1841,17 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			for _, av := range argVals {
 				if ps := l.lambdaParams[av]; len(ps) > 0 {
 					l.flow(recvNode, ps[0])
+				}
+			}
+		}
+		// self-passing scope functions (`recv.With/Also/Apply/Tap/Let(x => …)` — C# fluent
+		// helpers, Kotlin scope functions) invoke the lambda WITH THE RECEIVER, so the lambda's
+		// param IS the receiver: alias them so a field mutation via the param (`x.Field = …`)
+		// reaches the receiver object. The closure already captured the outer scope.
+		if selfPassingMethods[call.Method] && recvNode != "" {
+			for _, av := range argVals {
+				if ps := l.lambdaParams[av]; len(ps) > 0 {
+					l.aliasReceiverSelf(recvNode, ps[0])
 				}
 			}
 		}
@@ -1814,6 +1884,13 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 		l.flow(target.ret, result)
+		// object-sensitivity: alias the receiver with the callee's stable `this` node so field
+		// mutations performed via `this` inside the method reach the receiver object (and reads
+		// of the receiver's fields are visible inside the method). Enables fluent/builder
+		// mutators (`req.AddParameter(p)` whose body does `this.Parameters.Add(p)`).
+		if recvNode != "" && target.selfNode != "" {
+			l.aliasReceiverSelf(recvNode, target.selfNode)
+		}
 		// a `# vyql: validator` function returns validated data: label the call result so
 		// `unless sanitized_by core.InputValidation` clears the trust-boundary threat.
 		if target.validator {
