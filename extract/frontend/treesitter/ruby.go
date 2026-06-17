@@ -140,6 +140,12 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "identifier", "constant":
 		name := c.text(n)
 		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: name, Loc: L}, Path: name, Method: name, Loc: L}}}
+	case "call", "method_call", "command", "command_call":
+		// A call may carry a trailing block (`coll.each { |x| sink(x) }`, `lambda { |v| … }`).
+		// The block body was previously dropped, hiding sources/sinks inside it. Emit the call,
+		// then the block body inline (see callBlockStmts).
+		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+		return append(out, c.callBlockStmts(n)...)
 	}
 	// any other expression used as a statement
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
@@ -379,6 +385,67 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 		}
 	}
 	return nir.Call{Callee: callee, Args: args, Path: path, Method: m, Loc: L}
+}
+
+// callBlockStmts lowers a trailing block on a call (`recv.each { |x| … }`, `lambda { |v| … }`)
+// into inline statements: each block parameter is taint-joined from the receiver (the iterated
+// collection / object), then the block body is lowered. This surfaces sinks/sources inside the
+// block and connects taint from a tainted receiver into the block param.
+func (c *rbConv) callBlockStmts(n *tree_sitter.Node) []nir.Stmt {
+	var blk *tree_sitter.Node
+	if b := field(n, "block"); b != nil {
+		blk = b
+	} else {
+		for _, ch := range namedChildren(n) {
+			if k := ch.Kind(); k == "block" || k == "do_block" {
+				blk = ch
+				break
+			}
+		}
+	}
+	if blk == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	if recv := field(n, "receiver"); recv != nil {
+		rv := c.expr(recv)
+		for _, p := range c.blockParams(blk) {
+			out = append(out, nir.Assign{Targets: []string{p},
+				Value: nir.Format{Parts: []nir.Expr{rv}, Loc: c.loc(blk)}})
+		}
+	}
+	for _, ch := range namedChildren(blk) {
+		switch ch.Kind() {
+		case "block_parameters", "parameters":
+			// bound above
+		case "body_statement":
+			out = append(out, c.collectBodies(ch)...)
+		default:
+			out = append(out, c.stmt(ch)...)
+		}
+	}
+	return out
+}
+
+// blockParams returns the identifier names of a block's |params|.
+func (c *rbConv) blockParams(blk *tree_sitter.Node) []string {
+	var bp *tree_sitter.Node
+	for _, ch := range namedChildren(blk) {
+		if k := ch.Kind(); k == "block_parameters" || k == "parameters" {
+			bp = ch
+			break
+		}
+	}
+	if bp == nil {
+		return nil
+	}
+	var out []string
+	for _, ch := range namedChildren(bp) {
+		if ch.Kind() == "identifier" {
+			out = append(out, c.text(ch))
+		}
+	}
+	return out
 }
 
 func (c *rbConv) dotted(n *tree_sitter.Node) string {

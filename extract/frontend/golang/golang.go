@@ -176,6 +176,11 @@ func Extract(files []string, root string) (nir.Program, error) {
 type conv struct {
 	fset *token.FileSet
 	file string
+	// hoisted holds synthetic FuncDefs lifted from func-literal expressions (inline
+	// HTTP handlers / goroutines / callbacks). They are flushed into the module body so
+	// their bodies are analyzed (and *http.Request params seeded), instead of dropped.
+	hoisted []nir.Stmt
+	anonSeq int
 }
 
 func (c *conv) loc(p token.Pos) string {
@@ -201,42 +206,48 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	for _, d := range decls {
 		switch fn := d.(type) {
 		case *ast.FuncDecl:
-			var params []string
-			paramTypes := map[string]string{}
-			if fn.Type.Params != nil {
-				for _, p := range fn.Type.Params.List {
-					typ := c.typeName(p.Type)
-					for _, n := range p.Names {
-						params = append(params, n.Name)
-						if typ != "" {
-							paramTypes[n.Name] = typ
-						}
-					}
-				}
-			}
-			var body []nir.Stmt
-			if fn.Body != nil {
-				body = c.stmts(fn.Body.List)
-			}
-			// A function taking an *http.Request receives attacker-controlled request data
-			// (route/query/body/headers). Seed each such param as an http_input source at the
-			// top of the body — symmetric with the Java/C# handler-param seeding — so request
-			// data carried via the raw request object (custom helpers, not just recognized
-			// accessor methods) is tainted.
-			var seed []nir.Stmt
-			for _, p := range params {
-				if paramTypes[p] == "http.Request" {
-					seed = append(seed, nir.Assign{Targets: []string{p},
-						Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: c.loc(fn.Pos())}, Path: "http_input", Method: "http_input", Loc: c.loc(fn.Pos())}})
-				}
-			}
-			if len(seed) > 0 {
-				body = append(seed, body...)
-			}
-			out = append(out, nir.FuncDef{Name: fn.Name.Name, Params: params, ParamTypes: paramTypes, Body: body, Loc: c.loc(fn.Pos()), Exported: fn.Name.IsExported()})
+			out = append(out, c.funcDef(fn.Name.Name, fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
 		}
 	}
+	// Flush func-literal bodies hoisted while lowering this decl set, so inline HTTP
+	// handlers / goroutines registered as closures are analyzed as functions.
+	out = append(out, c.hoisted...)
+	c.hoisted = nil
 	return out
+}
+
+// funcDef builds a FuncDef from a function type+body (shared by top-level FuncDecl and
+// hoisted func literals): extracts params/types, seeds each *http.Request param as an
+// http_input source (Java/C#-symmetric handler-param tainting), and lowers the body.
+func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, exported bool, loc string) nir.FuncDef {
+	var params []string
+	paramTypes := map[string]string{}
+	if typ != nil && typ.Params != nil {
+		for _, p := range typ.Params.List {
+			t := c.typeName(p.Type)
+			for _, n := range p.Names {
+				params = append(params, n.Name)
+				if t != "" {
+					paramTypes[n.Name] = t
+				}
+			}
+		}
+	}
+	var body []nir.Stmt
+	if bodyNode != nil {
+		body = c.stmts(bodyNode.List)
+	}
+	var seed []nir.Stmt
+	for _, p := range params {
+		if paramTypes[p] == "http.Request" {
+			seed = append(seed, nir.Assign{Targets: []string{p},
+				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: loc}, Path: "http_input", Method: "http_input", Loc: loc}})
+		}
+	}
+	if len(seed) > 0 {
+		body = append(seed, body...)
+	}
+	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc, Exported: exported}
 }
 
 // callOutParams returns the identifiers a call writes THROUGH as out-parameters:
@@ -522,6 +533,15 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 		return nir.Index{Base: c.expr(ex.X), Key: c.expr(ex.Index), Path: c.path(ex.X), Loc: c.loc(ex.Pos())}
 	case *ast.CallExpr:
 		return c.call(ex)
+	case *ast.FuncLit:
+		// An inline closure (HTTP handler registered via http.HandleFunc/router.GET, a
+		// goroutine, a callback). Its body would otherwise be dropped. Hoist it as a
+		// synthetic anonymous FuncDef so the body is analyzed and its params (incl. a
+		// seeded *http.Request) carry taint; the closure value itself flows nothing.
+		c.anonSeq++
+		fd := c.funcDef("func#"+strconv.Itoa(c.anonSeq), ex.Type, ex.Body, false, c.loc(ex.Pos()))
+		c.hoisted = append(c.hoisted, fd)
+		return nir.Const{Loc: c.loc(ex.Pos())}
 	case *ast.BinaryExpr:
 		if ex.Op == token.ADD { // string/operand concat propagates taint
 			return nir.Format{Parts: []nir.Expr{c.expr(ex.X), c.expr(ex.Y)}, Loc: c.loc(ex.Pos())}
