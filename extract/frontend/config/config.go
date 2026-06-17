@@ -1,8 +1,6 @@
-// Package config is a non-tree-sitter frontend for mobile app configuration
-// files — AndroidManifest.xml and iOS Info.plist — that surfaces insecure
-// settings as markable NIR Call nodes. Each dangerous setting becomes a bare
-// call whose path is a stable token (e.g. "android_exported"), which the config
-// adapter labels with a presence concept (ExportedComponent/CleartextConfig/...).
+// Package config is a non-tree-sitter frontend for declarative project files.
+// It performs lightweight file parsing and emits data-defined event calls that
+// adapters can label with concepts.
 package config
 
 import (
@@ -12,8 +10,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
+	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/nir"
+	"github.com/vyprai/vyql/parser"
 )
 
 // Extract parses AndroidManifest.xml / *.plist files into one NIR Program. Other
@@ -259,14 +260,100 @@ func jellySource(expr, loc string) nir.Expr {
 	}
 }
 
-// androidComponents are the manifest elements whose android:exported="true" is a
-// security-relevant attack surface (CWE-926).
-var androidComponents = map[string]bool{
-	"activity": true, "activity-alias": true, "service": true,
-	"receiver": true, "provider": true,
+type boolAttrRule struct {
+	Element string
+	Attr    string
+	Event   string
+}
+
+type scopedLineRule struct {
+	Scope string
+	Match string
+	Event string
+}
+
+type directiveValueRule struct {
+	Scope     string
+	Directive string
+	Value     string
+	Mode      string
+	Event     string
+}
+
+type configProfile struct {
+	XMLTrueAttrs      []boolAttrRule
+	PlistTrueKey      map[string]string
+	LineContains      []scopedLineRule
+	LineExactCompact  []scopedLineRule
+	LinePrefixCompact []scopedLineRule
+	DirectiveValues   []directiveValueRule
+	QuotedStarFields  []scopedLineRule
+}
+
+var (
+	configProfileOnce sync.Once
+	configProfileData configProfile
+)
+
+func loadProfile() configProfile {
+	configProfileOnce.Do(func() {
+		raw := string(datadir.MustRead("adapters/config.vyql"))
+		decls, err := parser.Parse(raw)
+		if err != nil {
+			panic("config: parse adapters/config.vyql: " + err.Error())
+		}
+		var meta map[string]any
+		for _, d := range decls {
+			if ad, ok := d.(*parser.AdapterDecl); ok && ad.Name == "config" {
+				meta = ad.Meta
+				break
+			}
+		}
+		if meta == nil {
+			panic("config: missing adapter metadata")
+		}
+		configProfileData = configProfile{PlistTrueKey: map[string]string{}}
+		for _, entry := range metaList(meta, "config_xml_true_attrs") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+				panic("config: malformed config_xml_true_attrs entry " + entry)
+			}
+			configProfileData.XMLTrueAttrs = append(configProfileData.XMLTrueAttrs, boolAttrRule{
+				Element: parts[0],
+				Attr:    parts[1],
+				Event:   parts[2],
+			})
+		}
+		for _, entry := range metaList(meta, "config_plist_true_keys") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				panic("config: malformed config_plist_true_keys entry " + entry)
+			}
+			configProfileData.PlistTrueKey[parts[0]] = parts[1]
+		}
+		configProfileData.LineContains = parseScopedLineRules(meta, "config_line_contains_events")
+		configProfileData.LineExactCompact = parseScopedLineRules(meta, "config_line_exact_compact_events")
+		configProfileData.LinePrefixCompact = parseScopedLineRules(meta, "config_line_prefix_compact_events")
+		configProfileData.QuotedStarFields = parseScopedLineRules(meta, "config_quoted_star_field_events")
+		for _, entry := range metaList(meta, "config_directive_value_events") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 5 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" || parts[4] == "" {
+				panic("config: malformed config_directive_value_events entry " + entry)
+			}
+			configProfileData.DirectiveValues = append(configProfileData.DirectiveValues, directiveValueRule{
+				Scope:     parts[0],
+				Directive: parts[1],
+				Value:     parts[2],
+				Mode:      parts[3],
+				Event:     parts[4],
+			})
+		}
+	})
+	return configProfileData
 }
 
 func scanAndroidManifest(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	dec := xml.NewDecoder(bytes.NewReader(src))
 	line := 1
@@ -291,29 +378,17 @@ func scanAndroidManifest(src []byte, file string) []nir.Stmt {
 			}
 			return ""
 		}
-		if androidComponents[se.Name.Local] && isTrue(attr("exported")) {
-			emit("android_exported")
-		}
-		if se.Name.Local == "application" {
-			if isTrue(attr("usesCleartextTraffic")) {
-				emit("android_cleartext")
-			}
-			if isTrue(attr("debuggable")) {
-				emit("android_debuggable")
+		for _, rule := range cfg.XMLTrueAttrs {
+			if se.Name.Local == rule.Element && isTrue(attr(rule.Attr)) {
+				emit(rule.Event)
 			}
 		}
 	}
 	return out
 }
 
-// plistFlagKeys map an Info.plist boolean key (set to <true/>) to its finding token.
-var plistFlagKeys = map[string]string{
-	"NSAllowsArbitraryLoads":             "ats_arbitrary_loads",
-	"NSAllowsArbitraryLoadsInWebContent": "ats_arbitrary_loads",
-	"NSAllowsArbitraryLoadsForMedia":     "ats_arbitrary_loads",
-}
-
 func scanPlist(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	dec := xml.NewDecoder(bytes.NewReader(src))
 	line := 1
@@ -332,7 +407,7 @@ func scanPlist(src []byte, file string) []nir.Stmt {
 				inKey = true
 				lastKey = ""
 			case "true":
-				if token, ok := plistFlagKeys[lastKey]; ok {
+				if token, ok := cfg.PlistTrueKey[lastKey]; ok {
 					out = append(out, nir.ExprStmt{Value: call(token, file, line)})
 				}
 				lastKey = "" // value consumed
@@ -352,78 +427,44 @@ func scanPlist(src []byte, file string) []nir.Stmt {
 	return out
 }
 
-// scanDockerfile flags running as root (USER root, or no USER directive at all is NOT
-// flagged — too noisy) and privileged build args. Line-based, comment-aware.
 func scanDockerfile(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		low := strings.ToLower(line)
-		switch {
-		case strings.HasPrefix(low, "user "):
-			user := strings.TrimSpace(line[5:])
-			if user == "root" || user == "0" || strings.HasPrefix(user, "root:") || strings.HasPrefix(user, "0:") {
-				out = append(out, nir.ExprStmt{Value: call("container_user_root", file, i+1)})
-			}
-		case strings.Contains(low, "--privileged"):
-			out = append(out, nir.ExprStmt{Value: call("docker_privileged", file, i+1)})
-		}
+		out = append(out, directiveValueEvents(cfg, "dockerfile", line, file, i+1)...)
+		out = append(out, scopedContainsEvents(cfg, "dockerfile", line, file, i+1)...)
 	}
 	return out
 }
 
-// k8sFlags map a `key: true`-style security-relevant K8s field to its finding token.
-var k8sFlags = []struct{ needle, token string }{
-	{"privileged: true", "k8s_privileged"},
-	{"allowprivilegeescalation: true", "k8s_privileged"},
-	{"hostnetwork: true", "k8s_host_namespace"},
-	{"hostpid: true", "k8s_host_namespace"},
-	{"hostipc: true", "k8s_host_namespace"},
-}
-
-// scanK8sYaml flags privileged containers / host-namespace sharing / host-path mounts in
-// a Kubernetes manifest. Line-based (whitespace-insensitive) — no YAML parse needed.
 func scanK8sYaml(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		low := strings.ToLower(strings.ReplaceAll(line, " ", ""))
-		for _, f := range k8sFlags {
-			if low == strings.ReplaceAll(f.needle, " ", "") {
-				out = append(out, nir.ExprStmt{Value: call(f.token, file, i+1)})
-			}
-		}
-		if strings.HasPrefix(low, "hostpath:") || low == "hostpath:" {
-			out = append(out, nir.ExprStmt{Value: call("k8s_host_path", file, i+1)})
-		}
+		out = append(out, scopedCompactEvents(cfg.LineExactCompact, "yaml", line, false, file, i+1)...)
+		out = append(out, scopedCompactEvents(cfg.LinePrefixCompact, "yaml", line, true, file, i+1)...)
 	}
 	return out
 }
 
-// scanTerraform flags an open security-group CIDR (0.0.0.0/0) and wildcard IAM
-// action/resource. Line-based over HCL/JSON — robust to formatting.
 func scanTerraform(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
 			continue
 		}
-		low := strings.ToLower(line)
-		if strings.Contains(low, "0.0.0.0/0") {
-			out = append(out, nir.ExprStmt{Value: call("tf_open_cidr", file, i+1)})
-		}
-		// wildcard IAM: HCL `actions = ["*"]` / `resources = ["*"]` or JSON `"Action": "*"`.
-		if (strings.Contains(low, "action") || strings.Contains(low, "resource")) &&
-			(strings.Contains(line, `"*"`) || strings.Contains(line, `'*'`)) {
-			out = append(out, nir.ExprStmt{Value: call("tf_wildcard_iam", file, i+1)})
-		}
+		out = append(out, scopedContainsEvents(cfg, "terraform", line, file, i+1)...)
+		out = append(out, quotedStarFieldEvents(cfg, "terraform", line, file, i+1)...)
 	}
 	return out
 }
@@ -434,6 +475,95 @@ func call(token, file string, line int) nir.Call {
 }
 
 func isTrue(v string) bool { return strings.EqualFold(strings.TrimSpace(v), "true") }
+
+func parseScopedLineRules(meta map[string]any, key string) []scopedLineRule {
+	var out []scopedLineRule
+	for _, entry := range metaList(meta, key) {
+		parts := strings.Split(entry, "|")
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+			panic("config: malformed " + key + " entry " + entry)
+		}
+		out = append(out, scopedLineRule{Scope: parts[0], Match: parts[1], Event: parts[2]})
+	}
+	return out
+}
+
+func scopedContainsEvents(cfg configProfile, scope, line, file string, lineNo int) []nir.Stmt {
+	var out []nir.Stmt
+	low := strings.ToLower(line)
+	for _, rule := range cfg.LineContains {
+		if rule.Scope == scope && strings.Contains(low, strings.ToLower(rule.Match)) {
+			out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+		}
+	}
+	return out
+}
+
+func scopedCompactEvents(rules []scopedLineRule, scope, line string, prefix bool, file string, lineNo int) []nir.Stmt {
+	var out []nir.Stmt
+	compact := strings.ToLower(strings.ReplaceAll(line, " ", ""))
+	for _, rule := range rules {
+		if rule.Scope != scope {
+			continue
+		}
+		match := strings.ToLower(strings.ReplaceAll(rule.Match, " ", ""))
+		if (!prefix && compact == match) || (prefix && strings.HasPrefix(compact, match)) {
+			out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+		}
+	}
+	return out
+}
+
+func directiveValueEvents(cfg configProfile, scope, line, file string, lineNo int) []nir.Stmt {
+	var out []nir.Stmt
+	low := strings.ToLower(line)
+	for _, rule := range cfg.DirectiveValues {
+		prefix := strings.ToLower(rule.Directive) + " "
+		if rule.Scope != scope || !strings.HasPrefix(low, prefix) {
+			continue
+		}
+		value := strings.TrimSpace(line[len(rule.Directive):])
+		switch rule.Mode {
+		case "exact":
+			if value == rule.Value {
+				out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+			}
+		case "prefix":
+			if strings.HasPrefix(value, rule.Value) {
+				out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+			}
+		default:
+			panic("config: unsupported directive value match mode " + rule.Mode)
+		}
+	}
+	return out
+}
+
+func quotedStarFieldEvents(cfg configProfile, scope, line, file string, lineNo int) []nir.Stmt {
+	var out []nir.Stmt
+	low := strings.ToLower(line)
+	if !strings.Contains(line, `"*"`) && !strings.Contains(line, `'*'`) {
+		return nil
+	}
+	for _, rule := range cfg.QuotedStarFields {
+		if rule.Scope == scope && strings.Contains(low, strings.ToLower(rule.Match)) {
+			out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+		}
+	}
+	return out
+}
+
+func metaList(meta map[string]any, key string) []string {
+	switch v := meta[key].(type) {
+	case []string:
+		return v
+	case string:
+		if v != "" {
+			return []string{v}
+		}
+	}
+	return nil
+}
 
 func firstLineContaining(text, needle string) int {
 	for i, line := range strings.Split(text, "\n") {

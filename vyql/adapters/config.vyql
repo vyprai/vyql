@@ -1,27 +1,67 @@
-// config "framework" adapter — mobile app configuration files. The config
-// frontend (AndroidManifest.xml / Info.plist) emits a bare call per insecure
-// setting; these marks label each with its presence concept.
+// config "framework" adapter. The Go frontend parses declarative files and
+// emits the data-defined events below; this adapter gives those events their
+// security meaning.
 adapter config {
-  meta { fidelity: resolved }
+  meta {
+    fidelity: resolved,
+    config_xml_true_attrs: [
+      "activity|exported|analysis.config.android.exported_component",
+      "activity-alias|exported|analysis.config.android.exported_component",
+      "service|exported|analysis.config.android.exported_component",
+      "receiver|exported|analysis.config.android.exported_component",
+      "provider|exported|analysis.config.android.exported_component",
+      "application|usesCleartextTraffic|analysis.config.android.cleartext_enabled",
+      "application|debuggable|analysis.config.android.debuggable_enabled"
+    ],
+    config_plist_true_keys: [
+      "NSAllowsArbitraryLoads|analysis.config.plist.ats_arbitrary_loads",
+      "NSAllowsArbitraryLoadsInWebContent|analysis.config.plist.ats_arbitrary_loads",
+      "NSAllowsArbitraryLoadsForMedia|analysis.config.plist.ats_arbitrary_loads"
+    ],
+    config_directive_value_events: [
+      "dockerfile|USER|root|exact|analysis.config.container.root_user",
+      "dockerfile|USER|0|exact|analysis.config.container.root_user",
+      "dockerfile|USER|root:|prefix|analysis.config.container.root_user",
+      "dockerfile|USER|0:|prefix|analysis.config.container.root_user"
+    ],
+    config_line_contains_events: [
+      "dockerfile|--privileged|analysis.config.container.privileged_mode",
+      "terraform|0.0.0.0/0|analysis.config.terraform.open_cidr"
+    ],
+    config_line_exact_compact_events: [
+      "yaml|privileged: true|analysis.config.k8s.privileged_container",
+      "yaml|allowprivilegeescalation: true|analysis.config.k8s.privileged_container",
+      "yaml|hostnetwork: true|analysis.config.k8s.host_namespace",
+      "yaml|hostpid: true|analysis.config.k8s.host_namespace",
+      "yaml|hostipc: true|analysis.config.k8s.host_namespace"
+    ],
+    config_line_prefix_compact_events: [
+      "yaml|hostpath:|analysis.config.k8s.host_path"
+    ],
+    config_quoted_star_field_events: [
+      "terraform|action|analysis.config.terraform.wildcard_iam",
+      "terraform|resource|analysis.config.terraform.wildcard_iam"
+    ]
+  }
 
   // Android: android:exported="true" on an activity/service/receiver/provider
-  mark "android_exported" -> code.ExportedComponent
+  mark "analysis.config.android.exported_component" -> code.ExportedComponent
   // Android: <application android:usesCleartextTraffic="true">
-  mark "android_cleartext" -> code.CleartextConfig
+  mark "analysis.config.android.cleartext_enabled" -> code.CleartextConfig
   // Android: <application android:debuggable="true">
-  mark "android_debuggable" -> code.DebuggableApp
+  mark "analysis.config.android.debuggable_enabled" -> code.DebuggableApp
   // iOS Info.plist: ATS NSAllowsArbitraryLoads(/InWebContent/ForMedia) = <true/>
-  mark "ats_arbitrary_loads" -> code.CleartextConfig
+  mark "analysis.config.plist.ats_arbitrary_loads" -> code.CleartextConfig
 
   // IaC / container misconfig (CWE-250/653/284) — tokens from the Dockerfile / K8s YAML
   // / Terraform scanners.
-  mark "k8s_privileged" -> code.PrivilegedContainer
-  mark "container_user_root" -> code.PrivilegedContainer
-  mark "docker_privileged" -> code.PrivilegedContainer
-  mark "k8s_host_namespace" -> code.HostNamespaceShare
-  mark "k8s_host_path" -> code.HostNamespaceShare
-  mark "tf_open_cidr" -> code.PublicNetworkExposure
-  mark "tf_wildcard_iam" -> code.WildcardIamPolicy
+  mark "analysis.config.k8s.privileged_container" -> code.PrivilegedContainer
+  mark "analysis.config.container.root_user" -> code.PrivilegedContainer
+  mark "analysis.config.container.privileged_mode" -> code.PrivilegedContainer
+  mark "analysis.config.k8s.host_namespace" -> code.HostNamespaceShare
+  mark "analysis.config.k8s.host_path" -> code.HostNamespaceShare
+  mark "analysis.config.terraform.open_cidr" -> code.PublicNetworkExposure
+  mark "analysis.config.terraform.wildcard_iam" -> code.WildcardIamPolicy
 
   // Jenkins Jelly views: template model fields such as it.name/it.description
   // rendered into HTML-bearing attributes need escaping before display.
