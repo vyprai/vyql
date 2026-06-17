@@ -60,6 +60,13 @@ func addFlowConcepts(onto *ontology.Ontology) *ontology.Ontology {
 		EnabledBy:    []string{"custom.Taint"},
 	})
 	onto.Add(ontology.Concept{
+		Name:         "OtherTarget",
+		Package:      "custom",
+		Kind:         "sink",
+		VulnerableTo: []string{"custom.OtherCondition"},
+		EnabledBy:    []string{"custom.Taint"},
+	})
+	onto.Add(ontology.Concept{
 		Name:        "Transform",
 		Package:     "custom",
 		Kind:        "control",
@@ -70,6 +77,12 @@ func addFlowConcepts(onto *ontology.Ontology) *ontology.Ontology {
 		Package:     "custom",
 		Kind:        "control",
 		Neutralizes: []string{"custom.Condition"},
+	})
+	onto.Add(ontology.Concept{
+		Name:        "OtherTargetTransform",
+		Package:     "custom",
+		Kind:        "control",
+		Neutralizes: []string{"custom.OtherCondition"},
 	})
 	onto.Add(ontology.Concept{
 		Name:        "OtherTransform",

@@ -49,6 +49,7 @@ func solverContractOntology() *ontology.Ontology {
 	onto.Add(ontology.Concept{Name: "Actor", Package: "custom", Kind: "principal"})
 	onto.Add(ontology.Concept{Name: "Capability", Package: "custom", Kind: "privilege"})
 	onto.Add(ontology.Concept{Name: "Marker", Package: "custom", Kind: "asset"})
+	onto.Add(ontology.Concept{Name: "WorkItem", Package: "custom", Kind: "principal"})
 	return onto
 }
 
