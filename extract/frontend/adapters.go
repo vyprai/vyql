@@ -6,9 +6,12 @@
 package frontend
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
@@ -114,181 +117,64 @@ func detailWithPattern(detail map[string]string, pattern string) map[string]stri
 	return out
 }
 
+var (
+	conceptDetailOnce sync.Once
+	conceptDetails    map[string]map[string]string
+)
+
 func exploitDetail(concept, pattern string) (map[string]string, string) {
-	detail := map[string]string{}
+	template := ontologyConceptDetails()[concept]
+	if len(template) == 0 {
+		return nil, ""
+	}
+	detail := make(map[string]string, len(template))
+	for k, v := range template {
+		detail[k] = strings.ReplaceAll(v, "{pattern}", pattern)
+	}
 	conf := ""
-	switch concept {
-	case "code.UnboundedCopy":
-		detail = map[string]string{
-			"exploit_category":   "memory",
-			"exploit_condition":  "attacker-controlled bytes reach an unbounded copy into a fixed-size destination",
-			"exploit_evidence":   "unsafe copy primitive " + pattern + " receives tainted input",
-			"exploit_assumption": "the destination capacity can be smaller than the copied bytes",
-			"exploit_confidence": "high",
-		}
-	case "code.UnboundedCopySmell":
-		detail = map[string]string{
-			"exploit_category":   "memory",
-			"exploit_condition":  "an unbounded copy can overflow its destination",
-			"exploit_evidence":   "unsafe copy primitive " + pattern + " is present",
-			"exploit_assumption": "an attacker can influence source length or destination capacity is insufficient",
-			"exploit_confidence": "low",
-		}
+	if detail["exploit_confidence"] == "low" {
 		conf = "low"
-	case "code.RawMemoryCopySize":
-		detail = map[string]string{
-			"exploit_category":   "memory",
-			"exploit_condition":  "attacker-controlled size reaches a raw memory copy",
-			"exploit_evidence":   "copy-size argument to " + pattern + " is tainted",
-			"exploit_assumption": "the size can exceed the destination object bounds",
-			"exploit_confidence": "medium",
-		}
-	case "code.SizeComputation":
-		detail = map[string]string{
-			"exploit_category":   "numeric",
-			"exploit_condition":  "attacker-controlled size feeds allocation or bounds-sensitive operation",
-			"exploit_evidence":   "size argument to " + pattern + " is tainted",
-			"exploit_assumption": "the value is not range-checked before memory use",
-			"exploit_confidence": "medium",
-		}
-	case "code.StackAllocationSmell":
-		detail = map[string]string{
-			"exploit_category":   "memory",
-			"exploit_condition":  "unbounded stack allocation can exhaust stack or corrupt nearby state",
-			"exploit_evidence":   "stack allocation primitive " + pattern + " is present",
-			"exploit_assumption": "the allocation size can be attacker-influenced or unexpectedly large",
-			"exploit_confidence": "low",
-		}
-		conf = "low"
-	case "code.FileCheck":
-		detail = map[string]string{
-			"exploit_category":   "race",
-			"exploit_condition":  "filesystem state is checked before a later use",
-			"exploit_evidence":   "check primitive " + pattern + " observes path state",
-			"exploit_assumption": "an attacker can change the path target between check and use",
-			"exploit_confidence": "medium",
-		}
-	case "code.FileUse":
-		detail = map[string]string{
-			"exploit_category":   "race",
-			"exploit_condition":  "checked filesystem state is later used",
-			"exploit_evidence":   "use primitive " + pattern + " acts on the path",
-			"exploit_assumption": "the use is not protected by atomic open flags or symlink-safe handling",
-			"exploit_confidence": "medium",
-		}
-	case "code.LockAcquire":
-		detail = map[string]string{
-			"exploit_category":   "lifecycle",
-			"exploit_condition":  "a lock acquisition may not be released on every path",
-			"exploit_evidence":   "lock primitive " + pattern + " is acquired",
-			"exploit_assumption": "an unreleased lock can be triggered to deadlock or starve concurrent work",
-			"exploit_confidence": "medium",
-		}
-	case "code.LocklessSharedMutation":
-		detail = map[string]string{
-			"exploit_category":   "race",
-			"exploit_condition":  "shared state appears to be mutated without an observed lock or atomic guard",
-			"exploit_evidence":   "concurrency-capable mutation primitive " + pattern + " is present",
-			"exploit_assumption": "multiple attacker-triggerable executions can interleave on the same state",
-			"exploit_confidence": "low",
-		}
-		conf = "low"
-	case "code.IndexAccess":
-		detail = map[string]string{
-			"exploit_category":   "memory",
-			"exploit_condition":  "attacker-controlled index reaches an array/subscript access",
-			"exploit_evidence":   "subscript index flows into " + pattern,
-			"exploit_assumption": "the index is not range-checked against the accessed object",
-			"exploit_confidence": "medium",
-		}
-	case "code.DivisionDenominator":
-		detail = map[string]string{
-			"exploit_category":   "numeric",
-			"exploit_condition":  "attacker-controlled denominator reaches division or modulo",
-			"exploit_evidence":   "denominator operand for " + pattern + " is tainted",
-			"exploit_assumption": "zero or unsafe divisor values are not excluded before the operation",
-			"exploit_confidence": "medium",
-		}
-	case "code.IntegerSizeArithmetic":
-		detail = map[string]string{
-			"exploit_category":   "numeric",
-			"exploit_condition":  "attacker-controlled value participates in size-sensitive arithmetic",
-			"exploit_evidence":   "arithmetic operation " + pattern + " receives tainted input",
-			"exploit_assumption": "the arithmetic result is later used for allocation, indexing, copy size, or bounds",
-			"exploit_confidence": "low",
-		}
-		conf = "low"
-	case "code.PointerFree":
-		detail = map[string]string{
-			"exploit_category":   "memory",
-			"exploit_condition":  "a pointer is released and may be released or used again later",
-			"exploit_evidence":   "release primitive " + pattern + " is observed",
-			"exploit_assumption": "the same allocation or alias is involved and remains attacker-reachable",
-			"exploit_confidence": "low",
-		}
-		conf = "low"
-	case "code.PointerUse":
-		detail = map[string]string{
-			"exploit_category":   "memory",
-			"exploit_condition":  "a pointer is dereferenced or otherwise used after a prior release",
-			"exploit_evidence":   "pointer-use primitive " + pattern + " is observed",
-			"exploit_assumption": "the pointer aliases the released allocation and no safe reinitialization occurs",
-			"exploit_confidence": "low",
-		}
-		conf = "low"
-	case "code.NullableDeref":
-		detail = map[string]string{
-			"exploit_category":   "memory",
-			"exploit_condition":  "a pointer-like value is dereferenced without an observed null exclusion",
-			"exploit_evidence":   "dereference primitive " + pattern + " is present",
-			"exploit_assumption": "the dereferenced value may be null on an attacker-triggerable path",
-			"exploit_confidence": "low",
-		}
-		conf = "low"
-	case "code.AuthenticationRequiredOp":
-		detail = map[string]string{
-			"exploit_category":   "auth",
-			"exploit_condition":  "security-sensitive operation is reachable without an observed authentication guard",
-			"exploit_evidence":   "sensitive operation " + pattern + " is present",
-			"exploit_assumption": "the enclosing endpoint or entry point can be reached by an unauthenticated actor",
-			"exploit_confidence": "low",
-		}
-		conf = "low"
-	case "code.ObjectLookupByUserInput":
-		detail = map[string]string{
-			"exploit_category":   "access_control",
-			"exploit_condition":  "attacker-controlled object id reaches a direct object lookup",
-			"exploit_evidence":   "lookup primitive " + pattern + " receives tainted input",
-			"exploit_assumption": "the object is not constrained to the authenticated principal or tenant",
-			"exploit_confidence": "medium",
-		}
-	case "code.ArchiveEntryWrite":
-		detail = map[string]string{
-			"exploit_category":   "path",
-			"exploit_condition":  "attacker-controlled archive entry path reaches filesystem write/extraction",
-			"exploit_evidence":   "archive extraction/write primitive " + pattern + " receives tainted input",
-			"exploit_assumption": "the entry name is not normalized, confined, or symlink-safe before writing",
-			"exploit_confidence": "medium",
-		}
-	case "code.StaticIv":
-		detail = map[string]string{
-			"exploit_category":   "crypto",
-			"exploit_condition":  "cipher operation uses a static or predictable IV/nonce",
-			"exploit_evidence":   "cipher primitive " + pattern + " is called with static-looking IV material",
-			"exploit_assumption": "the mode requires nonce/IV uniqueness for confidentiality or integrity",
-			"exploit_confidence": "low",
-		}
-		conf = "low"
-	case "code.DynamicCodeLoad":
-		detail = map[string]string{
-			"exploit_category":   "code_loading",
-			"exploit_condition":  "attacker-controlled module or library name reaches a dynamic code loader",
-			"exploit_evidence":   "dynamic loader " + pattern + " receives tainted input",
-			"exploit_assumption": "the resolved module/library path or search path can be influenced by the attacker",
-			"exploit_confidence": "medium",
-		}
 	}
 	return detailWithPattern(detail, pattern), conf
+}
+
+func ontologyConceptDetails() map[string]map[string]string {
+	conceptDetailOnce.Do(func() {
+		conceptDetails = map[string]map[string]string{}
+		files, err := filepath.Glob(filepath.Join(datadir.Root(), "ontology", "*.vyql"))
+		if err != nil {
+			panic("frontend: glob ontology/*.vyql: " + err.Error())
+		}
+		for _, file := range files {
+			raw, err := os.ReadFile(file)
+			if err != nil {
+				panic("frontend: read " + file + ": " + err.Error())
+			}
+			decls, err := parser.Parse(string(raw))
+			if err != nil {
+				panic("frontend: parse " + file + ": " + err.Error())
+			}
+			for _, d := range decls {
+				cd, ok := d.(*parser.ConceptDecl)
+				if !ok {
+					continue
+				}
+				detail := map[string]string{}
+				for k, v := range cd.Fields {
+					if !strings.HasPrefix(k, "exploit_") {
+						continue
+					}
+					if s, ok := v.(string); ok && s != "" {
+						detail[k] = s
+					}
+				}
+				if len(detail) > 0 {
+					conceptDetails[cd.QualifiedName()] = detail
+				}
+			}
+		}
+	})
+	return conceptDetails
 }
 
 type filterSpec struct {

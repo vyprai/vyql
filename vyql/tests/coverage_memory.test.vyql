@@ -4,6 +4,7 @@ test "memory: argv reaches strcpy source and unbounded-copy smell is reported (c
   lang c
   expect VYQL-MEM-001
   expect VYQL-MEM-002
+  expect_evidence VYQL-MEM-001 unsafe copy primitive strcpy receives tainted input
   code
   ```
   void f(int argc, char **argv) {

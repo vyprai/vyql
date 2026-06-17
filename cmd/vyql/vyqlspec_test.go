@@ -230,6 +230,11 @@ func TestVyqlSpecs(t *testing.T) {
 							for _, ne := range fnd.NegationEvidence {
 								evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
 							}
+							for _, ec := range fnd.ExploitConditions {
+								evidence[fnd.RuleID] = append(evidence[fnd.RuleID], strings.Join([]string{
+									ec.Category, ec.Condition, ec.Evidence, ec.Assumption, ec.Confidence,
+								}, " "))
+							}
 						}
 					}
 					for _, row := range collectReviewItems(store) {
@@ -278,6 +283,11 @@ func TestVyqlSpecs(t *testing.T) {
 						fired[fnd.RuleID] = true
 						for _, ne := range fnd.NegationEvidence {
 							evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
+						}
+						for _, ec := range fnd.ExploitConditions {
+							evidence[fnd.RuleID] = append(evidence[fnd.RuleID], strings.Join([]string{
+								ec.Category, ec.Condition, ec.Evidence, ec.Assumption, ec.Confidence,
+							}, " "))
 						}
 					}
 					if len(s.expectReview) > 0 || len(s.rejectReview) > 0 {
