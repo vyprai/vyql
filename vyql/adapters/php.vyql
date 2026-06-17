@@ -116,6 +116,7 @@ adapter php {
   // authorization checks (guards BIZ-001) — Laravel Gate predicates (path-sensitive via B1).
   control "Gate.allows" -> core.AuthorizationCheck
   control "Gate.authorize" -> core.AuthorizationCheck
+  control method "access" -> core.AuthorizationCheck
   control "requireAuth" -> core.AuthenticationCheck
   control "ensureAuthenticated" -> core.AuthenticationCheck
   control "isAuthenticated" -> core.AuthenticationCheck
@@ -149,6 +150,9 @@ adapter php {
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "fill" -> code.MassAssign
   sink method "forceFill" -> code.MassAssign
+  // Review-only: model bulk hydration/update helpers as sensitive because they may bind
+  // security-critical account fields depending on the object type and allowed field list.
+  mark method "fromArray" -> code.SensitiveOperation
   sink method "find" -> code.ObjectLookupByUserInput
   sink method "findOrFail" -> code.ObjectLookupByUserInput
   sink method "findById" -> code.ObjectLookupByUserInput

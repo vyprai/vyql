@@ -115,6 +115,24 @@ func handle(c Config) {
 func MarshalConfig(c *Config, redact bool) []byte { return nil }
 `
 
+const phpBulkUpdateReview = `<?php
+trait UpdateTrait {
+  protected function updateItem($manager, $item, array $entry) {
+    $item = $item->fromArray($entry, true);
+    return $item;
+  }
+}
+class CustomerStandard {
+  protected function updateItem($manager, $item, array $entry) {
+    $view = $this->context()->view();
+    $item = $item->fromArray($entry);
+    if ($view->access(['super', 'admin'])) {
+      $item->setGroups($entry['groups'] ?? []);
+    }
+    return $item;
+  }
+}`
+
 func TestCollectReviewItemsAuthCategory(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "Admin.java"), []byte(authReviewJava), 0o644); err != nil {
@@ -262,6 +280,25 @@ func TestCollectReviewItemsConfigExposureAttention(t *testing.T) {
 	rows := collectReviewItems(g)
 	if !hasReviewKind(rows, "secret", "attention", "code.ConfigExposureReview") {
 		t.Fatalf("expected secret exposure review attention item, got %#v", rows)
+	}
+}
+
+func TestCollectReviewItemsPhpBulkUpdateAuth(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Customer.php"), []byte(phpBulkUpdateReview), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if !hasReviewCall(rows, "$item.fromArray", "code.SensitiveOperation") {
+		t.Fatalf("expected fromArray sensitive-operation review item, got %#v", rows)
+	}
+	if !hasReviewCall(rows, "$view.access", "core.AuthorizationCheck") {
+		t.Fatalf("expected access authorization check review item, got %#v", rows)
 	}
 }
 
