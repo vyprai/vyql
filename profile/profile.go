@@ -133,8 +133,37 @@ func Detect(paths []string, profiles []Profile) Profile {
 	return best
 }
 
+// packageJSONDepKeys returns the dependency NAMES declared in a package.json (all dep
+// sections), space-joined, so archetype `dep:X` rules match a real dependency rather than
+// the package's own name/repository/homepage. Falls back to the raw bytes (minus the name
+// field) if the JSON can't be parsed.
+func packageJSONDepKeys(data []byte) string {
+	var pkg struct {
+		Dependencies         map[string]string `json:"dependencies"`
+		DevDependencies      map[string]string `json:"devDependencies"`
+		PeerDependencies     map[string]string `json:"peerDependencies"`
+		OptionalDependencies map[string]string `json:"optionalDependencies"`
+	}
+	if json.Unmarshal(data, &pkg) != nil {
+		return string(jsonNameField.ReplaceAll(data, []byte(`"name":""`)))
+	}
+	var b strings.Builder
+	for _, m := range []map[string]string{pkg.Dependencies, pkg.DevDependencies,
+		pkg.PeerDependencies, pkg.OptionalDependencies} {
+		for name := range m {
+			b.WriteString(name)
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
+}
+
 func depMatch(manifests, dep string) bool {
-	pat := `(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(dep) + `($|[^A-Za-z0-9_])`
+	// Package-name boundary: `-` and `.` are within-name chars (so `dep:express` does NOT
+	// match `express-session`), but `/` and `@` stay segment boundaries so a short rule can
+	// match a trailing path segment (`dep:cobra` → `github.com/spf13/cobra`).
+	const nameChar = `A-Za-z0-9_.-`
+	pat := `(^|[^` + nameChar + `])` + regexp.QuoteMeta(dep) + `($|[^` + nameChar + `])`
 	return regexp.MustCompile(pat).FindStringIndex(manifests) != nil
 }
 
@@ -181,6 +210,12 @@ func npmLibrary(paths []string) bool {
 
 // readManifests concatenates the text of common dependency manifests under the
 // scanned roots, so "dep:x" fingerprints can substring-match a declared dep.
+var (
+	jsonNameField = regexp.MustCompile(`"name"\s*:\s*"[^"]*"`)         // package.json / composer.json
+	tomlNameField = regexp.MustCompile(`(?m)^\s*name\s*=\s*"[^"]*"`)   // Cargo.toml / pyproject.toml
+	goModModule   = regexp.MustCompile(`(?m)^module\s+\S+`)            // go.mod self-path
+)
+
 func readManifests(paths []string) string {
 	names := []string{"package.json", "requirements.txt", "pyproject.toml", "go.mod",
 		"Gemfile", "Gemfile.lock", "pom.xml", "build.gradle", "Cargo.toml", "composer.json"}
@@ -188,7 +223,25 @@ func readManifests(paths []string) string {
 	for _, root := range roots(paths) {
 		for _, n := range names {
 			if data, err := os.ReadFile(filepath.Join(root, n)); err == nil {
-				b.Write(data)
+				// For package.json, match `dep:X` against the actual DEPENDENCY KEYS only —
+				// never the whole file. Otherwise a library's own identity (express's
+				// `"name":"express"`, `"repository":"expressjs/express"`, homepage URL) matches
+				// a `dep:express` archetype rule and misclassifies the library as an app that
+				// depends on itself. For other manifests, strip the self-name/module path
+				// (best-effort) to avoid the same self-match.
+				if n == "package.json" {
+					b.WriteString(packageJSONDepKeys(data))
+				} else {
+					switch n {
+					case "composer.json":
+						data = jsonNameField.ReplaceAll(data, []byte(`"name":""`))
+					case "Cargo.toml", "pyproject.toml":
+						data = tomlNameField.ReplaceAll(data, []byte(`name=""`))
+					case "go.mod":
+						data = goModModule.ReplaceAll(data, []byte("module _"))
+					}
+					b.Write(data)
+				}
 				b.WriteByte('\n')
 			}
 		}
