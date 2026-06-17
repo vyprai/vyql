@@ -187,6 +187,12 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
 			}
 			body = append(seed, body...)
+		} else if mn := c.text(field(n, "name")); mn == "isValid" && len(params) > 0 && hasParamType(paramTypes, "ConstraintValidatorContext") {
+			// JSR-380 `ConstraintValidator.isValid(value, ctx)`: `value` is the untrusted input
+			// being validated (by contract). Seeding it lets a tainted custom message reach the
+			// Bean-Validation EL sink (buildConstraintViolationWithTemplate) — CWE-917.
+			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
+				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}}}, body...)
 		}
 		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
 			Exported: c.inController || c.hasHandlerAnn(n) || c.javaPublic(n)}}
@@ -412,6 +418,17 @@ func (c *jvConv) paramTypes(params *tree_sitter.Node) map[string]string {
 		}
 	}
 	return out
+}
+
+// hasParamType reports whether any parameter's declared type has the given (generics-stripped)
+// short name — e.g. detecting the `ConstraintValidatorContext` arg of a JSR-380 validator.
+func hasParamType(paramTypes map[string]string, short string) bool {
+	for _, t := range paramTypes {
+		if t == short || strings.HasSuffix(t, "."+short) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
