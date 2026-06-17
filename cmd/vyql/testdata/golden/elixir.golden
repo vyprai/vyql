@@ -1,2 +1,3 @@
 call System.cmd
-call http_input
+call analysis.parameter.entry
+call analysis.parameter.entry

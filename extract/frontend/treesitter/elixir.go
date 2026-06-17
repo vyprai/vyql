@@ -106,8 +106,7 @@ func (c *exConv) callStmt(n *tree_sitter.Node) []nir.Stmt {
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 }
 
-// funcDef builds a FuncDef from `def name(params) do … end`. A Phoenix/Plug action
-// `def action(conn, params)` has its non-conn params seeded as http_input.
+// funcDef builds a FuncDef from `def name(params) do … end`.
 func (c *exConv) funcDef(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	args := lastChildKind(n, "arguments")
@@ -147,19 +146,26 @@ func (c *exConv) funcDef(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 	}
-	// Phoenix controller action / Plug: first param `conn` → the rest are request data.
-	if len(params) > 1 && (params[0] == "conn" || params[0] == "_conn") {
-		var seed []nir.Stmt
-		for _, p := range params[1:] {
-			if p == "" || p == "_" {
-				continue
-			}
-			seed = append(seed, nir.Assign{Targets: []string{p},
-				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-		}
-		body = append(seed, body...)
+	return []nir.Stmt{nir.FuncDef{Name: fname, Params: params, Body: body, Loc: L, ParamEntries: c.exParamEntries(fname, params)}}
+}
+
+func (c *exConv) exParamEntries(name string, params []string) []nir.ParamEntry {
+	if len(params) <= 1 || (params[0] != "conn" && params[0] != "_conn") {
+		return nil
 	}
-	return []nir.Stmt{nir.FuncDef{Name: fname, Params: params, Body: body, Loc: L}}
+	out := make([]nir.ParamEntry, 0, len(params))
+	for i, p := range params {
+		if p == "" {
+			continue
+		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: []string{
+			"function_name:" + name,
+			"first_param:" + params[0],
+			"param_name:" + p,
+			"param_index:" + itoa(i),
+		}})
+	}
+	return out
 }
 
 func (c *exConv) patName(n *tree_sitter.Node) string {
