@@ -80,6 +80,12 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		expected: []string{"core.AuthorizationCheck"},
 		review:   "verify this privileged or destructive operation enforces authorization",
 	},
+	"code.AccessPolicyReview": {
+		category: "auth",
+		kind:     "attention",
+		expected: []string{"core.AuthorizationCheck"},
+		review:   "review role or group policy configuration for overly broad access",
+	},
 	"code.IncompleteIpDenylist": {
 		category: "request",
 		kind:     "attention",

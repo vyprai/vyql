@@ -85,8 +85,9 @@ type Format struct {
 
 // Seq is a tuple / list / array.
 type Seq struct {
-	Parts []Expr
-	Loc   string
+	Parts   []Expr
+	Loc     string
+	KeyPath []string
 }
 
 // Pair is a named key/value entry: a keyword argument (`verify=False`), a

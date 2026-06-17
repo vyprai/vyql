@@ -26,6 +26,13 @@ adapter php {
   source "getenv" val "PATH_INFO" -> code.HttpInput
   mark "security.php.server_port_validation.incomplete" -> code.IncompleteServerPortValidation
   mark "security.php.session_flash.unescaped" -> code.UnescapedSessionFlash
+  // Review-only access-policy config: nested PHP arrays such as
+  // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]
+  // carry key-path tokens, so broad role grants on sensitive resource groups can
+  // be surfaced without forcing a confirmed authz finding.
+  mark exact "__object_literal" val "locale/site/groups" val "admin" -> code.AccessPolicyReview
+  mark exact "__object_literal" val "locale/language/groups" val "admin" -> code.AccessPolicyReview
+  mark exact "__object_literal" val "locale/currency/groups" val "admin" -> code.AccessPolicyReview
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   sink path "mysqli_query" arg 1 -> code.SqlExecution

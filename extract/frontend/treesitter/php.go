@@ -749,7 +749,8 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 				k := namedChildren(ch)
 				switch {
 				case len(k) >= 2: // key => value (named-value matching)
-					parts = append(parts, nir.Pair{Key: c.keyName(k[0]), Value: c.expr(k[len(k)-1]), Loc: L})
+					key := c.keyName(k[0])
+					parts = append(parts, nir.Pair{Key: key, Value: prependSeqKeyPath(c.expr(k[len(k)-1]), key), Loc: L})
 				case len(k) == 1:
 					parts = append(parts, c.expr(k[0]))
 				}
@@ -777,6 +778,28 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func prependSeqKeyPath(e nir.Expr, key string) nir.Expr {
+	if key == "" {
+		return e
+	}
+	switch ex := e.(type) {
+	case nir.Seq:
+		ex.KeyPath = append([]string{key}, ex.KeyPath...)
+		for i := range ex.Parts {
+			ex.Parts[i] = prependSeqKeyPath(ex.Parts[i], key)
+		}
+		return ex
+	case nir.Pair:
+		ex.Value = prependSeqKeyPath(ex.Value, key)
+		return ex
+	case nir.Thru:
+		ex.Inner = prependSeqKeyPath(ex.Inner, key)
+		return ex
+	default:
+		return e
+	}
 }
 
 // keyName returns the bare name of an array key — a string literal with quotes

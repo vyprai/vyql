@@ -1395,6 +1395,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		props := map[string]string{"callee_path": "__object_literal"}
 		var valToks []string
 		collectValTokens(ex, "", &valToks)
+		collectKeyPathTokens(ex.KeyPath, &valToks)
 		if len(valToks) > 0 {
 			props["str_args"] = strings.Join(valToks, "\x00")
 		}
@@ -1690,6 +1691,19 @@ func lastDot(p string) string {
 		return p[i+1:]
 	}
 	return p
+}
+
+func collectKeyPathTokens(path []string, out *[]string) {
+	if len(path) == 0 {
+		return
+	}
+	for _, p := range path {
+		if p != "" {
+			*out = append(*out, p)
+		}
+	}
+	*out = append(*out, strings.Join(path, "/"))
+	*out = append(*out, strings.Join(path, "."))
 }
 
 func collectValTokens(e nir.Expr, key string, out *[]string) {

@@ -332,6 +332,12 @@ concept SensitiveOperation : sink {
   vulnerable_to: [access_control.MissingAuthorization]
   cwe: [CWE_862]
 }
+// Review-only: static role/group policy configuration that may grant access to a broader
+// principal than intended. Used to feed the AI/manual review pass for authz config CVEs.
+concept AccessPolicyReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_863]
+}
 // A network address denylist that recognizes special/private address classes but omits
 // ranges needed to keep SSRF fetches away from local or nonsensical endpoints.
 concept IncompleteIpDenylist : sink {

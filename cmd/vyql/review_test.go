@@ -133,6 +133,37 @@ class CustomerStandard {
   }
 }`
 
+const phpAccessPolicyReview = `<?php
+return [
+  'locale' => [
+    'groups' => ['admin', 'super'],
+    'site' => [
+      'groups' => ['admin', 'super'],
+    ],
+    'language' => [
+      'groups' => ['admin', 'super'],
+    ],
+    'currency' => [
+      'groups' => ['admin', 'super'],
+    ],
+    'text' => [
+      'groups' => ['admin', 'super'],
+    ],
+  ],
+  'catalog' => [
+    'site' => [
+      'groups' => ['admin', 'super'],
+    ],
+  ],
+  'fixed' => [
+    'locale' => [
+      'site' => [
+        'groups' => ['super'],
+      ],
+    ],
+  ],
+];`
+
 func TestCollectReviewItemsAuthCategory(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "Admin.java"), []byte(authReviewJava), 0o644); err != nil {
@@ -302,6 +333,25 @@ func TestCollectReviewItemsPhpBulkUpdateAuth(t *testing.T) {
 	}
 }
 
+func TestCollectReviewItemsPhpAccessPolicyConfig(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "resource.php"), []byte(phpAccessPolicyReview), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if got := countReviewConcept(rows, "code.AccessPolicyReview"); got != 3 {
+		t.Fatalf("expected three locale subresource access-policy review items, got %d: %#v", got, rows)
+	}
+	if !hasReviewKind(rows, "auth", "attention", "code.AccessPolicyReview") {
+		t.Fatalf("expected auth attention item for access policy config, got %#v", rows)
+	}
+}
+
 func hasReviewCall(rows []reviewItem, call, concept string) bool {
 	for _, r := range rows {
 		if r.Call == call && r.Concept == concept {
@@ -318,6 +368,16 @@ func hasReviewKind(rows []reviewItem, category, kind, concept string) bool {
 		}
 	}
 	return false
+}
+
+func countReviewConcept(rows []reviewItem, concept string) int {
+	n := 0
+	for _, r := range rows {
+		if r.Concept == concept {
+			n++
+		}
+	}
+	return n
 }
 
 func hasReviewConcept(rows []reviewItem, concept string) bool {
