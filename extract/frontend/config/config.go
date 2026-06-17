@@ -10,6 +10,7 @@ import (
 	"encoding/xml"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/vyprai/vyql/extract/nir"
@@ -38,6 +39,8 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanK8sYaml(src, rel)
 		case "terraform":
 			body = scanTerraform(src, rel)
+		case "jelly":
+			body = scanJelly(src, rel)
 		}
 		if len(body) == 0 {
 			continue
@@ -65,6 +68,9 @@ func kind(path string, src []byte) string {
 	if ext == ".tf" {
 		return "terraform"
 	}
+	if ext == ".jelly" {
+		return "jelly"
+	}
 	if ext == ".yaml" || ext == ".yml" {
 		// only Kubernetes-shaped manifests yield nodes; other YAML is inert.
 		if bytes.Contains(src, []byte("apiVersion")) && bytes.Contains(src, []byte("kind")) {
@@ -89,6 +95,93 @@ func kind(path string, src []byte) string {
 				return ""
 			}
 		}
+	}
+}
+
+var jellyInputRE = regexp.MustCompile(`\bit\.(name|description|value|defaultValue)\b`)
+
+func scanJelly(src []byte, file string) []nir.Stmt {
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || !strings.Contains(line, "${") || jellyControlLine(line) {
+			continue
+		}
+		for _, expr := range jellyExpressions(line) {
+			if expr == "" || !jellyInputRE.MatchString(expr) {
+				continue
+			}
+			loc := file + ":" + itoa(i+1)
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "jelly.render", Loc: loc},
+				Args:   []nir.Expr{jellyExpr(expr, loc)},
+				Path:   "jelly.render",
+				Method: "render",
+				Loc:    loc,
+			}})
+		}
+	}
+	return out
+}
+
+func jellyControlLine(line string) bool {
+	return strings.Contains(line, "<j:set") ||
+		strings.Contains(line, "<j:when") ||
+		strings.Contains(line, "<j:if") ||
+		strings.Contains(line, " test=")
+}
+
+func jellyExpressions(line string) []string {
+	var out []string
+	for {
+		start := strings.Index(line, "${")
+		if start < 0 {
+			return out
+		}
+		rest := line[start+2:]
+		end := strings.IndexByte(rest, '}')
+		if end < 0 {
+			return out
+		}
+		out = append(out, strings.TrimSpace(rest[:end]))
+		line = rest[end+1:]
+	}
+}
+
+func jellyExpr(expr, loc string) nir.Expr {
+	if inner, ok := jellyEscapeArg(expr); ok {
+		return nir.Call{
+			Callee: nir.Attr{Base: nir.Name{ID: "h", Loc: loc}, Attr: "escape", Path: "h.escape", Loc: loc},
+			Args:   []nir.Expr{jellySource(inner, loc)},
+			Path:   "h.escape",
+			Method: "escape",
+			Loc:    loc,
+		}
+	}
+	return jellySource(expr, loc)
+}
+
+func jellyEscapeArg(expr string) (string, bool) {
+	const prefix = "h.escape("
+	start := strings.Index(expr, prefix)
+	if start < 0 {
+		return "", false
+	}
+	inner := expr[start+len(prefix):]
+	if end := strings.LastIndexByte(inner, ')'); end >= 0 {
+		inner = inner[:end]
+	}
+	inner = strings.TrimSpace(inner)
+	return inner, inner != ""
+}
+
+func jellySource(expr, loc string) nir.Expr {
+	return nir.Call{
+		Callee: nir.Name{ID: "jelly.input", Loc: loc},
+		Args:   []nir.Expr{nir.Const{Value: expr, Loc: loc}},
+		Path:   "jelly.input",
+		Method: "input",
+		Loc:    loc,
 	}
 }
 
@@ -150,8 +243,8 @@ func scanPlist(src []byte, file string) []nir.Stmt {
 	var out []nir.Stmt
 	dec := xml.NewDecoder(bytes.NewReader(src))
 	line := 1
-	lastKey := ""   // text of the most recent <key>
-	inKey := false  // currently reading a <key>'s CharData
+	lastKey := ""  // text of the most recent <key>
+	inKey := false // currently reading a <key>'s CharData
 	for {
 		tok, err := dec.Token()
 		if err != nil {

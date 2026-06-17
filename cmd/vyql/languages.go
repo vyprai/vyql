@@ -64,7 +64,7 @@ var languages = []language{
 	// Terraform) — a non-tree-sitter frontend; non-matching files yield no nodes so
 	// other repos are unaffected. "dockerfile" matches by basename (no extension).
 	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
-		".tf": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
+		".tf": true, ".jelly": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
 	// hardcoded-secret scanner — runs over source + config/env files (alongside the real
 	// frontend), emitting HardcodedSecret nodes from provider tokens / secret literals.
 	{"secretscan", secretscanExts, secretscan.Extract, frontend.SecretscanAdapters},

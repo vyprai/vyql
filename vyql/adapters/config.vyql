@@ -22,4 +22,10 @@ adapter config {
   mark "k8s_host_path" -> code.HostNamespaceShare
   mark "tf_open_cidr" -> code.PublicNetworkExposure
   mark "tf_wildcard_iam" -> code.WildcardIamPolicy
+
+  // Jenkins Jelly views: template model fields such as it.name/it.description
+  // rendered into HTML-bearing attributes need escaping before display.
+  source "jelly.input" -> core.UserControlledData
+  sink   "jelly.render" -> code.HtmlRender
+  control "h.escape" -> core.HtmlEscape
 }

@@ -864,7 +864,7 @@ var extTech = map[string]string{
 	".rb": "ruby", ".java": "java", ".php": "php", ".phtml": "php", ".cs": "csharp",
 	".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
 	".rs": "rust", ".sh": "bash", ".bash": "bash", ".scala": "scala", ".sc": "scala", ".lua": "lua", ".kt": "kotlin", ".kts": "kotlin", ".ps1": "powershell", ".psm1": "powershell", ".swift": "swift", ".pl": "perl", ".pm": "perl", ".cgi": "perl", ".sol": "solidity", ".m": "objc",
-	".xml": "config", ".plist": "config",
+	".xml": "config", ".plist": "config", ".jelly": "config",
 	".ex": "elixir", ".exs": "elixir",
 	".dart":   "dart",
 	".groovy": "groovy", ".gradle": "groovy",
@@ -1184,7 +1184,7 @@ func SecretscanAdapters() []adapters.Adapter { return AdaptersFor("secretscan") 
 
 // PiiAdapters is the cross-language PII taxonomy (adapters/pii.vyql). It labels nodes
 // in every language, so it is applied once per scan rather than per present frontend.
-func PiiAdapters() []adapters.Adapter        { return AdaptersFor("pii") }
+func PiiAdapters() []adapters.Adapter { return AdaptersFor("pii") }
 
 // paramSourceAdapter labels function/method parameter nodes with the spec's
 // `source param -> X` concept(s) — the library/SDK trust boundary (any caller may pass
@@ -1234,7 +1234,7 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 // LibraryAdapters is the cross-language library/SDK trust boundary (adapters/library.vyql):
 // public-API parameters as external-entry sources. Applied once per scan; only active under
 // the library profile (the concept it labels is gated by the profile's trust boundary).
-func LibraryAdapters() []adapters.Adapter    { return AdaptersFor("library") }
+func LibraryAdapters() []adapters.Adapter { return AdaptersFor("library") }
 
 // CryptoReviewAdapters labels cryptographic operations (adapters/cryptoreview.vyql) with
 // code.CryptoOperation. Inert for confirmed rules; the possibility tier surfaces them.
