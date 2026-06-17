@@ -976,6 +976,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.Return:
 		rv := l.eval(st.Value, sc)
 		l.flow(rv, sc.node["__ret__"])
+		// escape direction of cross-method field taint: returning an object whose field was
+		// tainted (`h.X = src; return h`) flows each tainted slot into the ret node, so the
+		// caller's result (ret → result edge) carries it and a later `o.X` read connects.
+		// Edge-based → order-independent; only fires when slots exist.
+		if ci := l.containers[rv]; ci != nil {
+			for _, slot := range ci.elems {
+				if slot != "" {
+					l.flow(slot, sc.node["__ret__"])
+				}
+			}
+		}
 		// reflected XSS: a route handler returning a freshly-built string (an f-string or
 		// concatenation) writes it straight to the response body unescaped. Only string-build
 		// nodes qualify — returning a template render / Response object / redirect (all Calls)
