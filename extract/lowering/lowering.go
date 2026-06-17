@@ -1868,17 +1868,14 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			if i < len(target.paramNames) {
 				pnode := target.params[target.paramNames[i]]
 				l.flow(a, pnode)
-				// cross-method field/element taint: when the argument object carries tainted
-				// field/element slots (`o.field = src; callee(o)`), flow each slot into the
-				// param node so a field read inside the callee (which flows the whole param in,
-				// l.eval nir.Attr) sees it. Edge-based → lowering-order-independent; only fires
-				// when slots exist, so field-sensitivity within a scope is preserved.
-				if ci := l.containers[argVals[i]]; ci != nil {
-					for _, slot := range ci.elems {
-						if slot != "" {
-							l.flow(slot, pnode)
-						}
-					}
+				// cross-method object identity: C# objects are reference types, so a field
+				// mutation inside the callee (`p.field = …` / `p.list.Add(…)`) is visible to the
+				// CALLER's object. Share the container (field slots) between the arg and the param
+				// — bidirectional, so both the callee reading the arg's existing field taint AND
+				// the caller seeing the callee's mutations work. Only fires when the arg carries
+				// field/element slots (an object/collection), so scalars are unaffected.
+				if l.containers[argVals[i]] != nil {
+					l.aliasReceiverSelf(argVals[i], pnode)
 				}
 				mapped[i] = true
 			}
