@@ -56,6 +56,12 @@ rule PdfJsEvalSupported {
   taint code.PdfJsEvalSupported -> code.PdfJsDocumentLoad
 }
 
+rule UnscannedPdfPreview {
+  meta { id: "VYQL-INJ-026", severity: high, cwe: [CWE_79], confidence_floor: low }
+  match code.UnscannedPdfPreview as sink
+  unless guarded_by core.PdfScanCheck
+}
+
 // Stored / second-order XSS — data read back from the database (assumed attacker-
 // influenced) rendered WITHOUT escaping (Markup/mark_safe/html_safe/raw). Auto-escaped
 // renders (render_template / Jinja default) are not sinks, so they don't fire. Medium

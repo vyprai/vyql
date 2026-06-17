@@ -820,6 +820,58 @@ test "javascript: unrelated eval support option is clean for pdfjs eval"
   }
   ```
 
+test "php: unscanned PDF preview response is XSS-relevant"
+  lang php
+  expect VYQL-INJ-026
+  code
+  ```
+  <?php
+  function preview($asset) {
+      $stream = $asset->getStream();
+      return new StreamedResponse(function () use ($stream) {
+          fpassthru($stream);
+      }, 200, [
+          'Content-Type' => 'application/pdf',
+      ]);
+  }
+  ```
+
+test "php: PDF preview scan gate suppresses unscanned PDF response"
+  lang php
+  reject VYQL-INJ-026
+  code
+  ```
+  <?php
+  function preview($asset) {
+      $scanResponse = getResponseByScanStatus($asset);
+      if ($scanResponse) {
+          return $scanResponse;
+      }
+      $stream = $asset->getStream();
+      return new StreamedResponse(function () use ($stream) {
+          fpassthru($stream);
+      }, 200, [
+          'Content-Type' => 'application/pdf',
+      ]);
+  }
+  ```
+
+test "php: non-PDF streamed response is not PDF preview XSS"
+  lang php
+  reject VYQL-INJ-026
+  code
+  ```
+  <?php
+  function preview($thumb) {
+      $stream = $thumb->getStream();
+      return new StreamedResponse(function () use ($stream) {
+          fpassthru($stream);
+      }, 200, [
+          'Content-Type' => 'image/jpeg',
+      ]);
+  }
+  ```
+
 test "javascript: environment value in webpack shell plugin script is command injection"
   lang javascript
   expect VYQL-INJ-002

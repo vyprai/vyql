@@ -33,6 +33,7 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 			body := c.block(tree.RootNode())
 			body = append(body, c.phpIncompleteServerPortValidation(tree.RootNode())...)
 			body = append(body, c.phpUnescapedSessionFlash(tree.RootNode())...)
+			body = append(body, c.phpUnscannedPdfPreview(tree.RootNode())...)
 			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -531,6 +532,57 @@ func phpLooksHtmlEscaped(s string) bool {
 		strings.Contains(lower, "htmlentities") ||
 		strings.Contains(lower, "esc_html") ||
 		strings.Contains(lower, "strip_tags")
+}
+
+func (c *phConv) phpUnscannedPdfPreview(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node, string)
+	walk = func(n *tree_sitter.Node, scope string) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "function_definition" || n.Kind() == "method_declaration" {
+			scope = c.text(n)
+		}
+		if n.Kind() == "object_creation_expression" {
+			text := c.text(n)
+			if strings.Contains(text, "StreamedResponse") &&
+				strings.Contains(strings.ToLower(text), "application/pdf") &&
+				!phpPdfScanGateBefore(scope, text) {
+				loc := c.loc(n)
+				if !seen[loc] {
+					seen[loc] = true
+					path := "security.php.pdf_preview.unscanned"
+					out = append(out, nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: path, Loc: loc},
+						Path:   path,
+						Method: lastSeg(path),
+						Loc:    loc,
+					}})
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch, scope)
+		}
+	}
+	walk(root, "")
+	return out
+}
+
+func phpPdfScanGateBefore(scope, objectText string) bool {
+	if scope == "" {
+		return false
+	}
+	idx := strings.Index(scope, objectText)
+	if idx < 0 {
+		idx = len(scope)
+	}
+	prefix := strings.ToLower(scope[:idx])
+	return strings.Contains(prefix, "getresponsebyscanstatus") ||
+		strings.Contains(prefix, "getscanstatus") ||
+		strings.Contains(prefix, "scan_pdf")
 }
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —

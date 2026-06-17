@@ -234,6 +234,11 @@ adapter php {
   mark "fopen" -> code.ResourceHandle
   mark "fsockopen" -> code.ResourceHandle
   control "fclose" -> core.ResourceRelease
+  // PDF previews can execute embedded script in-browser when streamed/rendered before
+  // content scanning. Match only explicit PDF responses and suppress once a scan gate runs.
+  mark "security.php.pdf_preview.unscanned" -> code.UnscannedPdfPreview
+  control method "getScanStatus" -> core.PdfScanCheck
+  control "getResponseByScanStatus" -> core.PdfScanCheck
 
   // XPath injection (CWE-643) — SimpleXMLElement::xpath($expr) (distinctive method)
   sink method "xpath" -> code.XpathQuery

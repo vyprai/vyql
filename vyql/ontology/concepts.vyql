@@ -435,6 +435,10 @@ concept PdfJsDocumentLoad : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_79]
 }
+concept UnscannedPdfPreview : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
 concept HttpHeader : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
@@ -666,6 +670,11 @@ concept EncryptionInTransit : control {
 concept HtmlEscape : control {
   neutralizes: [injection.Xss]
   applies: path
+}
+concept PdfScanCheck : control {
+  neutralizes: [injection.Xss]
+  cwe: [CWE_79]
+  applies: endpoint
 }
 concept LdapEscape : control {
   neutralizes: [injection.LdapInjection]
