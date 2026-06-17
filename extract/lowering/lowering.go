@@ -947,6 +947,10 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 					Name: info.name, Validator: info.validator, Abstract: info.abstract,
 				})
 			}
+			// recurse into the body to register NESTED LOCAL FUNCTIONS (C# local functions, JS
+			// inner function declarations) so a FORWARD reference — `coll.ForEach(x => Helper(x));
+			// … void Helper(...) {}` (RestSharp AddHeaders) — resolves regardless of declaration order.
+			l.register(modkey, st.Body, cls)
 		}
 	}
 }

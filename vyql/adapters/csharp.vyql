@@ -106,6 +106,8 @@ adapter csharp {
   // HTTP response splitting / header injection (CWE-113).
   sink path "Response.Headers.Add" arg 1 -> code.ResponseHeaderWrite
   sink path "Response.Headers.Append" arg 1 -> code.ResponseHeaderWrite
+  // HttpClient/RestSharp header write WITHOUT CRLF validation (CWE-113 response splitting).
+  sink method "TryAddWithoutValidation" arg 1 -> code.ResponseHeaderWrite
   // log injection (CWE-117) + secret-in-log (CWE-532).
   sink method "LogInformation" arg all -> code.LogOutput
   sink method "LogWarning" arg all -> code.LogOutput
