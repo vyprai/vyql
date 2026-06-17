@@ -68,6 +68,11 @@ adapter go {
   sink method "PrepareContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink path "gorm.Raw" -> code.SqlExecution
   sink path "db.Raw" -> code.SqlExecution
+  // gorm's .Raw(sql) is frequently called on a non-db-named receiver (e.g. a helper
+  // return: `q := getDB(); q.Raw(sql)`), which the dotted-path forms above miss. The
+  // method form catches it regardless of receiver var; SqlExecution only yields a
+  // finding under taint, so receiver-agnostic matching is safe for recall.
+  sink method "Raw" -> code.SqlExecution
   sink path "sqlx.Query" -> code.SqlExecution
   sink path "sqlx.MustExec" -> code.SqlExecution
   sink path "bun.Raw" -> code.SqlExecution
