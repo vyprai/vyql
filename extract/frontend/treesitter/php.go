@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsphp "github.com/tree-sitter/tree-sitter-php/bindings/go"
 
@@ -55,12 +57,23 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	switch n.Kind() {
 	case "function_definition", "method_declaration":
 		params := c.params(field(n, "parameters"))
+		// top-level functions are public; methods are public unless private/protected.
+		exported := true
+		if n.Kind() == "method_declaration" {
+			for _, ch := range children(n) {
+				if ch.Kind() == "visibility_modifier" {
+					t := c.text(ch)
+					exported = !strings.Contains(t, "private") && !strings.Contains(t, "protected")
+				}
+			}
+		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:       c.text(field(n, "name")),
 			Params:     params,
 			ParamTypes: c.paramTypes(field(n, "parameters")),
 			Body:       c.block(field(n, "body")),
 			Loc:        L,
+			Exported:   exported,
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}

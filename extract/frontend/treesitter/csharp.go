@@ -102,7 +102,9 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+		exported := c.inController || (n.Kind() == "method_declaration" && c.hasHTTPAttr(n)) ||
+			((n.Kind() == "method_declaration" || n.Kind() == "constructor_declaration") && csPublic(c, n))
+		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: exported}}
 	case "property_declaration":
 		// accessor bodies may hold logic
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
@@ -169,6 +171,17 @@ func (c *csConv) attrNames(n *tree_sitter.Node) []string {
 		}
 	}
 	return out
+}
+
+// csPublic reports whether a C# member is part of the public API: it carries a `public`
+// modifier (C# members default to private). Scopes the library param-source.
+func csPublic(c *csConv, n *tree_sitter.Node) bool {
+	for _, ch := range children(n) {
+		if ch.Kind() == "modifier" && c.text(ch) == "public" {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *csConv) hasHTTPAttr(n *tree_sitter.Node) bool {

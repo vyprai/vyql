@@ -67,11 +67,15 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "method", "singleton_method":
+		// Ruby methods are PUBLIC by default (the gem's API surface). A `private`/`protected`
+		// marker would hide subsequent methods — not tracked yet, so this slightly
+		// over-marks; the library param-source is caller-conditional, which absorbs that.
 		return []nir.Stmt{nir.FuncDef{
-			Name:   c.text(field(n, "name")),
-			Params: c.params(field(n, "parameters")),
-			Body:   c.body(field(n, "body")),
-			Loc:    L,
+			Name:     c.text(field(n, "name")),
+			Params:   c.params(field(n, "parameters")),
+			Body:     c.body(field(n, "body")),
+			Loc:      L,
+			Exported: true,
 		}}
 	case "class", "module":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}

@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tskotlin "github.com/tree-sitter-grammars/tree-sitter-kotlin/bindings/go"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 
@@ -76,7 +78,8 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			body = append(seed, body...)
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.declName(n), Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
+			Exported: c.inController || c.hasHandlerAnn(n) || ktPublic(c, n)}}
 	case "property_declaration":
 		name := c.propName(n)
 		val := c.propValue(n)
@@ -223,6 +226,21 @@ func (c *ktConv) trailingLambdaStmts(n *tree_sitter.Node) []nir.Stmt {
 	}
 	walk(n)
 	return out
+}
+
+// ktPublic reports whether a Kotlin function is public API. Kotlin is public BY DEFAULT;
+// only an explicit private/internal/protected modifier hides it. Used to scope the
+// library param-source to the public surface.
+func ktPublic(c *ktConv, n *tree_sitter.Node) bool {
+	for _, ch := range children(n) {
+		if ch.Kind() == "modifiers" {
+			t := c.text(ch)
+			if strings.Contains(t, "private") || strings.Contains(t, "internal") || strings.Contains(t, "protected") {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (c *ktConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {

@@ -326,6 +326,19 @@ func (c *jsConv) isModuleExports(n *tree_sitter.Node) bool {
 
 // exportFuncName returns the exported function name for `exports.NAME` or
 // `module.exports.NAME` member targets ("" if it is neither).
+// memberRootIdent returns the root identifier of a member chain (the object at the base
+// of `A.b.c`), or "" — so `LdapAuth.prototype.authenticate` yields "LdapAuth". Used to
+// tie a prototype/static method back to an exported constructor/class.
+func (c *jsConv) memberRootIdent(m *tree_sitter.Node) string {
+	for m != nil && m.Kind() == "member_expression" {
+		m = field(m, "object")
+	}
+	if m != nil && m.Kind() == "identifier" {
+		return c.text(m)
+	}
+	return ""
+}
+
 func (c *jsConv) exportFuncName(left *tree_sitter.Node) string {
 	obj := field(left, "object")
 	name := c.text(field(left, "property"))
@@ -381,6 +394,22 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					params = c.paramsFromFunctionText(inner)
 				}
 				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, Exported: true}}
+			}
+			// `Ctor.prototype.method = function` / `Ctor.method = function` on an EXPORTED
+			// constructor/class. Always emit a FuncDef so the method is REGISTERED (calls to
+			// it resolve → interprocedural taint flows through internal helpers). Mark it an
+			// entry point (Exported) only if it's public by convention: a `_name` method is
+			// internal and is reached by propagation from the public methods, not directly.
+			if root := c.memberRootIdent(left); root != "" && c.exported[root] {
+				name := c.text(field(left, "property"))
+				if name != "" {
+					params := c.funcParams(rhs)
+					paramTypes := c.funcParamTypes(rhs)
+					if len(params) == 0 {
+						params = c.paramsFromFunctionText(inner)
+					}
+					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, Exported: !strings.HasPrefix(name, "_")}}
+				}
 			}
 		}
 		if left != nil && c.isModuleExports(left) && rhs != nil && rhs.Kind() == "object" {
