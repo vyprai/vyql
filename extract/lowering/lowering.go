@@ -13,6 +13,7 @@
 package lowering
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -1261,6 +1262,37 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			paramNodes = append(paramNodes, pn)
 		}
 		l.block(ex.Body, inner)
+		// closure write-back (recall-safe over-approximation): a callback that assigns to a
+		// captured OUTER variable — express's `res.format({ text(){ body = … } })` thunks, an
+		// event handler, any synchronously-invoked callback — must propagate that taint to the
+		// enclosing scope. We assume the callback runs; for one that doesn't, this only
+		// over-taints (recall-safe). Params shadow, so they never write back.
+		isParam := make(map[string]bool, len(ex.Params))
+		for _, p := range ex.Params {
+			isParam[p] = true
+		}
+		// iterate captured names in SORTED order: the merge mints Phi nodes (consuming the
+		// node counter), so a map-iteration order would make node ids — and thus the whole
+		// graph — nondeterministic run-to-run.
+		writeBack := make([]string, 0, len(sc.node))
+		for name := range sc.node {
+			if !isParam[name] {
+				if innerNode, ok := inner.node[name]; ok && innerNode != sc.node[name] {
+					writeBack = append(writeBack, name)
+				}
+			}
+		}
+		sort.Strings(writeBack)
+		for _, name := range writeBack {
+			// UNION, not overwrite: sibling callbacks are mutually exclusive
+			// (`res.format({ text(){body=…}, html(){body=…}, default(){body=''} })` picks one
+			// by content-type), so the variable could hold ANY branch's value — keep them all
+			// so a later default('') can't clobber a tainted text/html write.
+			join := l.node("Phi", ex.Loc, nil)
+			l.flow(sc.node[name], join)
+			l.flow(inner.node[name], join)
+			sc.node[name] = join
+		}
 		fn := l.node("Func", ex.Loc, nil)
 		l.lambdaParams[fn] = paramNodes // for higher-order callback dispatch
 		return fn
@@ -1619,6 +1651,14 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		// list.add(param); ProcessBuilder(list)). Element-sensitive per constant key.
 		if mutatorMethods[call.Method] {
 			l.containerWrite(call, args, recvNode, sc)
+			// a fluent mutator returns its (now-mutated) receiver, so the added value is
+			// reachable through the call RESULT for a chained read:
+			// `res.set('Location', url).get('Location')` (express redirect), or
+			// `sb.append(taint).toString()`. Recall-safe over-approximation — the result of a
+			// discarded mutator call is unused, so this only matters when it is chained/assigned.
+			for _, a := range args {
+				l.flow(a, result)
+			}
 		} else if ci := l.containers[recvNode]; ci != nil && !modeledContainerMethod(call.Method) {
 			l.containerInvalidate(call, recvNode, sc) // precise index-shift where unambiguous, else dirty
 		}
