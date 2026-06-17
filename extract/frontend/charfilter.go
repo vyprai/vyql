@@ -3,11 +3,10 @@ package frontend
 import "strings"
 
 // charfilter.go — GENERAL output-alphabet analysis for character-filtering replaces.
-// The engine reasons about a `replace(pattern, repl)`; which methods ARE filters and
-// which characters are dangerous per threat live in vyql data (the `filter` adapter
-// directive and the `dangerous_chars` concept attribute). This file is the language-
-// agnostic math: given a pattern + replacement, what can the OUTPUT contain, and is
-// that set provably bounded?
+// The engine reasons about a `replace(pattern, repl)`; which methods ARE filters
+// and which character sets matter live in VyQL data. This file is the language-
+// agnostic math: given a pattern + replacement, what can the OUTPUT contain, and
+// is that set provably bounded?
 //
 // Only the SOUND case is bounded: a GLOBAL replace whose entire pattern is a single
 // negated character class `[^…]`. Then output ⊆ (kept class chars) ∪ (replacement
@@ -45,18 +44,17 @@ func outputAlphabet(pattern, repl string, forceGlobal bool) (alphabet string, bo
 	return b.String(), true
 }
 
-// alphabetExcludes reports whether every rune of `dangerous` is absent from `alphabet`
-// — i.e. a bounded output over `alphabet` can never contain a dangerous character.
-func alphabetExcludes(alphabet, dangerous string) bool {
-	for _, d := range dangerous {
-		if strings.ContainsRune(alphabet, d) {
+// alphabetExcludes reports whether every rune of excluded is absent from alphabet.
+func alphabetExcludes(alphabet, excluded string) bool {
+	for _, r := range excluded {
+		if strings.ContainsRune(alphabet, r) {
 			return false
 		}
 	}
 	return true
 }
 
-// normalizeLit strips a string-literal prefix (Python r''/b''/u''/f'') and surrounding
+// normalizeLit strips a string-literal prefix (Python r”/b”/u”/f”) and surrounding
 // quotes from a pattern token, so a pattern captured as a string (re.sub) reads the same
 // as a regex literal. A `/…/` regex literal (no prefix, not quoted) passes through.
 func normalizeLit(p string) string {

@@ -563,8 +563,8 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 	switch ex := e.(type) {
 	case *ast.Ident:
 		if ex.Name == "true" || ex.Name == "false" {
-			// boolean keyword → a literal value, so value-matching sees
-			// InsecureSkipVerify=true etc. (Go booleans are predeclared idents).
+			// Boolean keywords are literal values, so adapter value-matching can
+			// inspect struct fields and call arguments consistently.
 			return nir.Const{Loc: c.loc(ex.Pos()), Value: ex.Name}
 		}
 		return nir.Name{ID: ex.Name, Loc: c.loc(ex.Pos())}
@@ -606,10 +606,10 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 				parts = append(parts, c.expr(el))
 			}
 		}
-		// A NAMED struct literal (T{…} / pkg.T{…}) is modeled as a constructor call
-		// so its field values are reachable by value-matching marks — e.g.
-		// tls.Config{InsecureSkipVerify: true}. Slice/map/array literals (whose type
-		// is *ast.ArrayType/MapType, not a name) stay as Seq.
+		// A NAMED struct literal (T{...} / pkg.T{...}) is modeled as a constructor
+		// call so its field values are reachable by adapter value-matching. Slice,
+		// map, and array literals (whose type is *ast.ArrayType/MapType, not a
+		// name) stay as Seq.
 		if p := c.path(ex.Type); p != "" {
 			method := p
 			if i := strings.LastIndex(p, "."); i >= 0 {

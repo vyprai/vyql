@@ -2008,7 +2008,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// node), flowing from the argument value. This gives sinks the correct
 	// location (the call, not where the value was defined) and lets an adapter
 	// label an arg position as a sink even when the value is itself a source —
-	// e.g. yaml.load(request_input).
+	// e.g. call(input_value).
 	var args []string
 	var argVals []string // the eval'd value node per arg (a Func node for a callback)
 	var valToks []string // literal value tokens for value-matching sinks (`val`/`nval`)
@@ -2016,9 +2016,8 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		av := l.eval(a, sc)
 		argVals = append(argVals, av)
 		// Record the argument's NIR kind on the slot, so sink adapters can
-		// distinguish a raw-SQL string position (Format/Const/Name/…) from a
-		// collection literal (Seq — e.g. Rails `where(id: params[:id])`, which is
-		// a safe hash condition, not a raw query).
+		// distinguish a string-building position (Format/Const/Name/...) from a
+		// collection literal (Seq).
 		an := l.node("Arg", call.Loc, map[string]string{"vkind": nirKind(a)})
 		l.flow(av, an)
 		args = append(args, an)

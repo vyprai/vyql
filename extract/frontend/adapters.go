@@ -38,7 +38,7 @@ type sinkSpec struct {
 	ByMethod   bool     // match the bare method name vs the dotted callee path
 	Receiver   bool     // tainted data is the RECEIVER, not an arg — label the call node
 	Constraint string   // optional `on <type>` receiver-type constraint
-	ArgIndex   int      // which argument is the dangerous one (default 0)
+	ArgIndex   int      // which argument position is targeted (default 0)
 	ValMatches []string // `val "substr"` (AND) — every substr must be in some arg/option literal
 	ValAbsents []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
 	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
@@ -292,9 +292,9 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 // filterAdapter labels character-filtering replace(pattern, repl) calls with
 // core.CharFilter, recording the proven OUTPUT alphabet (or that it is unbounded) in
 // the label Detail. The solver then treats it as a SOUND sanitizer for any sink whose
-// dangerous chars the alphabet excludes, and the engine surfaces an unproven filter as
-// an assumption note. The regex math is general (charfilter.go); WHICH methods filter
-// is data (the `filter` directive).
+// excluded chars the alphabet excludes, and the engine surfaces an unproven filter
+// as an assumption note. The regex math is general (charfilter.go); WHICH methods
+// filter is data (the `filter` directive).
 func (spec adapterSpec) filterAdapter() adapters.Adapter {
 	return adapters.Adapter{
 		Name: spec.Name + ".filters", Technology: spec.Technology, Specificity: 2,
@@ -858,16 +858,14 @@ func packageInEvidence(want string, have map[string]bool) bool {
 	return false
 }
 
-// markAdapter labels a CALL node with a presence concept (for `match`-style
-// rules that flag a dangerous USE rather than a taint flow — e.g. weak crypto).
+// markAdapter labels a node with a presence concept for `match`-style rules.
 func (spec adapterSpec) markAdapter() adapters.Adapter {
 	return adapters.Adapter{
 		Name: spec.Name + ".marks", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
-			// Marks flag a dangerous USE. Most are calls (weak-crypto getInstance,
-			// md5_hex…), but some are bare member accesses with no call — e.g.
-			// Solidity `tx.origin` used for authorization — so scan Attr nodes too.
+			// Most presence events are calls, but some are bare member accesses with
+			// no call, so scan Attr nodes too.
 			var out []adapters.Mapping
 			// cross-language adapters label nodes in source files of
 			// every language, so the per-language tech filter doesn't apply.
