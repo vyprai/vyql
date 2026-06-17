@@ -1682,7 +1682,20 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for _, target := range targets {
 		for i, a := range args {
 			if i < len(target.paramNames) {
-				l.flow(a, target.params[target.paramNames[i]])
+				pnode := target.params[target.paramNames[i]]
+				l.flow(a, pnode)
+				// cross-method field/element taint: when the argument object carries tainted
+				// field/element slots (`o.field = src; callee(o)`), flow each slot into the
+				// param node so a field read inside the callee (which flows the whole param in,
+				// l.eval nir.Attr) sees it. Edge-based → lowering-order-independent; only fires
+				// when slots exist, so field-sensitivity within a scope is preserved.
+				if ci := l.containers[argVals[i]]; ci != nil {
+					for _, slot := range ci.elems {
+						if slot != "" {
+							l.flow(slot, pnode)
+						}
+					}
+				}
 				mapped[i] = true
 			}
 		}
