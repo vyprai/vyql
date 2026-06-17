@@ -1,8 +1,6 @@
 package treesitter
 
 import (
-	"strings"
-
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tscs "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
 
@@ -11,16 +9,16 @@ import (
 
 // csConv walks a tree-sitter C# CST into NIR.
 type csConv struct {
-	src           []byte
-	file          string
-	key           string
-	inController  bool // inside an MVC controller → action params are user input
-	boundGetProps []string
+	src               []byte
+	file              string
+	key               string
+	classParamTokens  []string
+	propertyEntryInfo []csPropertyEntry
 }
 
-var csHTTPAttrs = map[string]bool{
-	"HttpGet": true, "HttpPost": true, "HttpPut": true, "HttpDelete": true,
-	"HttpPatch": true, "HttpHead": true, "Route": true, "ApiController": true,
+type csPropertyEntry struct {
+	Name   string
+	Tokens []string
 }
 
 // ExtractCSharp parses C# files into one NIR Program (one module per file).
@@ -85,44 +83,35 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "namespace_declaration", "file_scoped_namespace_declaration", "declaration_list":
 		return c.decls(n) // flatten namespace / declaration-list bodies
 	case "class_declaration", "struct_declaration", "interface_declaration", "record_declaration", "enum_declaration":
-		prev := c.inController
-		prevBound := c.boundGetProps
-		c.inController = prev || c.isController(n)
 		bodyNode := field(n, "body")
-		c.boundGetProps = c.razorGetBoundProperties(bodyNode)
+		bases := c.classBases(n)
+		prevTokens := c.classParamTokens
+		prevProps := c.propertyEntryInfo
+		c.classParamTokens = append(append([]string{}, prevTokens...), c.csClassTokens(n, bases)...)
+		c.propertyEntryInfo = c.csPropertyEntries(bodyNode)
 		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(bodyNode), Loc: L,
-			Bases: c.classBases(n), Members: c.classMembers(bodyNode)}
-		c.inController = prev
-		c.boundGetProps = prevBound
+			Bases: bases, Members: c.classMembers(bodyNode)}
+		c.classParamTokens = prevTokens
+		c.propertyEntryInfo = prevProps
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration", "local_function_statement", "operator_declaration":
+		name := c.text(field(n, "name"))
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
-		// Framework action parameters are externally bound entry data. Seed each at
-		// the top of the body.
-		if n.Kind() == "method_declaration" && (c.inController || c.hasHTTPAttr(n)) {
+		methodTokens := append([]string{}, c.classParamTokens...)
+		methodTokens = append(methodTokens, c.csAttributeTokens(n, "method_attribute:")...)
+		if n.Kind() == "method_declaration" && len(c.propertyEntryInfo) > 0 {
 			var seed []nir.Stmt
-			for _, p := range params {
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+			for _, p := range c.propertyEntryInfo {
+				seed = append(seed, nir.Assign{Targets: []string{p.Name},
+					Value: c.csAnalysisCall("analysis.property.entry", L, p.Tokens)})
 			}
 			body = append(seed, body...)
 		}
-		// Razor Pages [BindProperty(SupportsGet = true)] properties are populated from the
-		// request query/route before handler methods run. Seed those member reads so page
-		// handlers like OnPostAsync can flow ReturnUrl into redirect sinks.
-		if n.Kind() == "method_declaration" && len(c.boundGetProps) > 0 {
-			var seed []nir.Stmt
-			for _, p := range c.boundGetProps {
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-			}
-			body = append(seed, body...)
-		}
-		exported := c.inController || (n.Kind() == "method_declaration" && c.hasHTTPAttr(n)) ||
-			((n.Kind() == "method_declaration" || n.Kind() == "constructor_declaration") && csPublic(c, n))
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: exported}}
+		exported := (n.Kind() == "method_declaration" || n.Kind() == "constructor_declaration") && csPublic(c, n)
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
+			ParamEntries: c.csParamEntries(name, params, paramTypes, methodTokens), Exported: exported}}
 	case "property_declaration":
 		// accessor bodies may hold logic
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
@@ -208,6 +197,14 @@ func (c *csConv) attrNames(n *tree_sitter.Node) []string {
 	return out
 }
 
+func (c *csConv) csAttributeTokens(n *tree_sitter.Node, prefix string) []string {
+	var out []string
+	for _, a := range c.attrNames(n) {
+		out = append(out, prefix+a)
+	}
+	return out
+}
+
 // csPublic reports whether a C# member is part of the public API: it carries a `public`
 // modifier (C# members default to private). Scopes the library param-source.
 func csPublic(c *csConv, n *tree_sitter.Node) bool {
@@ -219,57 +216,74 @@ func csPublic(c *csConv, n *tree_sitter.Node) bool {
 	return false
 }
 
-func (c *csConv) hasHTTPAttr(n *tree_sitter.Node) bool {
-	for _, a := range c.attrNames(n) {
-		if csHTTPAttrs[a] {
-			return true
+func (c *csConv) csClassTokens(n *tree_sitter.Node, bases []string) []string {
+	name := c.text(field(n, "name"))
+	var out []string
+	if name != "" {
+		out = append(out, "class_name:"+name)
+	}
+	for _, b := range bases {
+		if b != "" {
+			out = append(out, "class_base:"+b)
 		}
 	}
-	return false
+	out = append(out, c.csAttributeTokens(n, "class_attribute:")...)
+	return out
 }
 
-func (c *csConv) razorGetBoundProperties(body *tree_sitter.Node) []string {
+func (c *csConv) csPropertyEntries(body *tree_sitter.Node) []csPropertyEntry {
+	var out []csPropertyEntry
 	if body == nil {
-		return nil
+		return out
 	}
-	var out []string
 	for _, m := range namedChildren(body) {
 		if m.Kind() != "property_declaration" {
 			continue
 		}
-		txt := c.text(m)
-		if !strings.Contains(txt, "BindProperty") || !strings.Contains(txt, "SupportsGet") ||
-			!strings.Contains(strings.ToLower(txt), "true") {
+		nm := field(m, "name")
+		if nm == nil {
 			continue
 		}
-		if nm := field(m, "name"); nm != nil {
-			out = append(out, c.text(nm))
+		tokens := []string{"property_name:" + c.text(nm)}
+		tokens = append(tokens, c.csAttributeTokens(m, "property_attribute:")...)
+		for _, al := range namedChildren(m) {
+			if al.Kind() == "attribute_list" {
+				tokens = append(tokens, "property_attribute_text:"+c.text(al))
+			}
 		}
+		out = append(out, csPropertyEntry{Name: c.text(nm), Tokens: tokens})
 	}
 	return out
 }
 
-// isController reports whether a class is an MVC controller (by base type,
-// [ApiController]/[Route] attribute, or the *Controller naming convention).
-func (c *csConv) isController(n *tree_sitter.Node) bool {
-	name := c.text(field(n, "name"))
-	if len(name) >= 10 && name[len(name)-10:] == "Controller" {
-		return true
+func (c *csConv) csParamEntries(name string, params []string, paramTypes map[string]string, base []string) []nir.ParamEntry {
+	if len(base) == 0 {
+		return nil
 	}
-	if c.hasHTTPAttr(n) {
-		return true
-	}
-	for _, ch := range namedChildren(n) {
-		if ch.Kind() == "base_list" {
-			for _, b := range namedChildren(ch) {
-				t := lastSeg(c.text(b))
-				if t == "Controller" || t == "ControllerBase" || t == "ApiController" {
-					return true
-				}
+	out := make([]nir.ParamEntry, 0, len(params))
+	for i, p := range params {
+		if p == "" || p == "_" {
+			continue
+		}
+		tokens := append([]string{}, base...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		if typ := paramTypes[p]; typ != "" {
+			tokens = append(tokens, "param_type:"+typ)
+			if short := lastSeg(typ); short != "" && short != typ {
+				tokens = append(tokens, "param_type:"+short)
 			}
 		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
 	}
-	return false
+	return out
+}
+
+func (c *csConv) csAnalysisCall(path, loc string, tokens []string) nir.Expr {
+	args := make([]nir.Expr, 0, len(tokens))
+	for _, tok := range tokens {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return nir.Call{Callee: nir.Name{ID: path, Loc: loc}, Args: args, Path: path, Method: "entry", Loc: loc}
 }
 
 func (c *csConv) declaratorValue(d *tree_sitter.Node) *tree_sitter.Node {

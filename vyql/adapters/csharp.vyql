@@ -3,11 +3,24 @@
 adapter csharp {
   meta { match: contains, fidelity: resolved }
 
-  // MVC controller action parameters (model-bound from the request) — the
-  // frontend seeds each as http_input() at the method top.
+  // MVC controller action parameters and Razor bound properties.
   source "Environment.GetCommandLineArgs" -> code.CliArgument
   source "Console.ReadLine" -> code.StdinInput
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpGet" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpPost" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpPut" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpDelete" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpPatch" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpHead" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:Route" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_attribute:ApiController" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_attribute:Route" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_name:" val "Controller" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:Controller" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:ControllerBase" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:ApiController" -> code.HttpInput
+  source path "analysis.property.entry" val "property_attribute:BindProperty" val "SupportsGet" val "true" -> code.HttpInput
+  source path "analysis.property.entry" val "property_attribute:BindPropertyAttribute" val "SupportsGet" val "true" -> code.HttpInput
 
   // ASP.NET request inputs (receiver name varies → substring match)
   source ".QueryString" -> code.HttpInput
