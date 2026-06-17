@@ -39,7 +39,7 @@ import (
 //	  gitlink vendor/lib <sha>  # optional git submodule/gitlink fixture
 //	  code
 //	  ```
-//	  class C { void f() { Cipher.getInstance("DES/CBC/PKCS5Padding"); } }
+//	  class C { void f() { marker(); } }
 //	  ```
 
 type specFile struct {
@@ -304,8 +304,8 @@ func TestVyqlSpecs(t *testing.T) {
 					if len(s.gitlinks) > 0 {
 						initGitlinks(t, dir, s.gitlinks)
 					}
-					// optional `profile` directive: set the trust boundary (e.g. library) so
-					// profile-gated sources like ExternalEntryInput are active for this spec.
+					// optional `profile` directive: set the trust boundary so profile-gated
+					// sources are active for this spec.
 					if s.profile != "" {
 						applyProfile([]string{dir}, s.profile)
 						defer frontend.SetActiveSources(nil)
