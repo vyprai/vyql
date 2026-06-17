@@ -701,6 +701,22 @@ func (l *lowerer) functionReturn(id, loc string, decorators []string) {
 	l.flow(arg, call)
 }
 
+func (l *lowerer) parameterEntry(paramNode, loc string, tokens []string) {
+	if paramNode == "" || len(tokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{
+		"callee_path": "analysis.parameter.entry",
+		"method":      "entry",
+		"str_args":    strings.Join(tokens, "\x00"),
+	}
+	call := l.node("Call", loc, props)
+	l.flow(call, paramNode)
+}
+
 func (l *lowerer) syntheticCall(path, method, id, loc string, valToks ...string) string {
 	if id == "" {
 		return ""
@@ -1224,6 +1240,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 			inner.node["__ret__"] = info.ret
+		}
+		if info != nil {
+			for _, pe := range st.ParamEntries {
+				if paramNode := info.params[pe.Param]; paramNode != "" {
+					l.parameterEntry(paramNode, st.Loc, pe.Tokens)
+				}
+			}
 		}
 		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
 			inner.typ[l.selfName] = [2]string{l.curModule, l.curClass}

@@ -187,6 +187,10 @@ type FuncDef struct {
 	// Lowering preserves them on generic function-return events; adapters decide what any
 	// specific decorator means for a domain.
 	Decorators []string
+	// ParamEntries records syntax-level evidence that a parameter is populated by an
+	// external caller or framework. Lowering emits generic parameter-entry events from this
+	// data; adapters decide which events are source concepts.
+	ParamEntries []ParamEntry
 	// IsValidator marks a function annotated `# vyql: validator` — a custom
 	// input-validator/authenticator the tool can't infer by name. Its return value is
 	// treated as validated (clears the trust-boundary threat), so storing it across a
@@ -198,6 +202,11 @@ type FuncDef struct {
 	// parameters as an external-entry taint source; internal helpers are reached by
 	// ordinary interprocedural propagation, so they must NOT be entry points.
 	Exported bool
+}
+
+type ParamEntry struct {
+	Param  string
+	Tokens []string
 }
 
 // ClassDef is a class definition.

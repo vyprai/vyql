@@ -12,7 +12,14 @@ adapter javascript {
   // compiler callback through a cache/helper the analyzer cannot inline.
   source "options.timezone" -> core.UserControlledData
   source "config.timezone" -> core.UserControlledData
-  // NestJS route-handler params (@Body/@Query/@Param/@Headers), seeded by the frontend.
+  source path "analysis.parameter.entry" val "decorator_method:Get" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Post" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Put" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Delete" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Patch" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Options" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Head" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:All" -> code.HttpInput
   source "http_input" -> code.HttpInput
   source "req.body" -> code.HttpInput
   source "req.query" -> code.HttpInput

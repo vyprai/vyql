@@ -259,14 +259,13 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		body = append(body, c.pyFunctionContext(n)...)
-		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
-		// the args after self/info/root/parent are the query's user-supplied inputs.
+		var entries []nir.ParamEntry
 		if strings.HasPrefix(name, "resolve_") {
-			body = append(c.seedResolverParams(params, L), body...)
+			entries = append(entries, c.pyParamEntries(name, params, nil)...)
 		}
 		// public API = no leading underscore, OR a dunder (__init__/__call__ are entry points).
 		exported := !strings.HasPrefix(name, "_") || (strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__"))
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, IsValidator: c.hasValidatorComment(n), Exported: exported}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ParamEntries: entries, IsValidator: c.hasValidatorComment(n), Exported: exported}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -279,27 +278,11 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return nil
 		}
 		decorators := c.pyDecoratorTokens(n)
-		// FastAPI/Flask/Starlette route handlers: `@app.get(...)`, `@router.post(...)`,
-		// `@app.route(...)` — the function's parameters are bound from the request
-		// (path/query/body), so seed each as http_input (like Java controllers).
-		if def.Kind() == "function_definition" && c.hasRouteDecorator(n) {
-			params := c.params(field(def, "parameters"))
-			paramTypes := c.paramTypes(field(def, "parameters"))
-			body := c.block(field(def, "body"))
-			var seed []nir.Stmt
-			for _, p := range params {
-				if p == "self" || p == "cls" {
-					continue
-				}
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-			}
-			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, ParamTypes: paramTypes, Body: append(seed, body...), Loc: L, Decorators: decorators, Exported: true}}
-		}
 		out := c.stmt(def)
 		for i, st := range out {
 			if fn, ok := st.(nir.FuncDef); ok {
 				fn.Decorators = decorators
+				fn.ParamEntries = append(fn.ParamEntries, c.pyParamEntries(fn.Name, fn.Params, decorators)...)
 				out[i] = fn
 			}
 		}
@@ -584,28 +567,6 @@ func (c *pyConv) block(block *tree_sitter.Node) []nir.Stmt {
 	return c.blockChildren(block)
 }
 
-// pyRouteMethods are the decorator attributes that mark a request handler whose
-// parameters are bound from the request (FastAPI/Flask/Starlette/APIRouter).
-var pyRouteMethods = map[string]bool{
-	"get": true, "post": true, "put": true, "delete": true, "patch": true,
-	"head": true, "options": true, "route": true, "websocket": true, "api_route": true,
-}
-
-// seedResolverParams seeds a GraphQL resolver's query-argument params (those
-// after the conventional self/info/root/parent positions) as http_input.
-func (c *pyConv) seedResolverParams(params []string, L string) []nir.Stmt {
-	skip := map[string]bool{"self": true, "cls": true, "info": true, "root": true, "parent": true, "_": true}
-	var seed []nir.Stmt
-	for _, p := range params {
-		if skip[p] {
-			continue
-		}
-		seed = append(seed, nir.Assign{Targets: []string{p},
-			Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-	}
-	return seed
-}
-
 func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -627,6 +588,16 @@ func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
 		} else {
 			add("decorator_method:" + path)
 		}
+	}
+	return out
+}
+
+func (c *pyConv) pyParamEntries(name string, params []string, base []string) []nir.ParamEntry {
+	var out []nir.ParamEntry
+	for i, p := range params {
+		tokens := append([]string{}, base...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
 	}
 	return out
 }
@@ -662,42 +633,6 @@ func (c *pyConv) pyDecoratorPath(n *tree_sitter.Node) string {
 		}
 	}
 	return ""
-}
-
-// hasRouteDecorator reports whether a decorated_definition carries a route
-// decorator like `@app.get("/x")` / `@router.post(...)` / `@app.route(...)`.
-func (c *pyConv) hasRouteDecorator(n *tree_sitter.Node) bool {
-	for _, ch := range namedChildren(n) {
-		if ch.Kind() != "decorator" {
-			continue
-		}
-		// the decorator's expression: a call (`app.get(...)`) or bare attribute.
-		var name string
-		var walk func(m *tree_sitter.Node)
-		walk = func(m *tree_sitter.Node) {
-			if m == nil || name != "" {
-				return
-			}
-			if m.Kind() == "attribute" {
-				if a := field(m, "attribute"); a != nil {
-					name = c.text(a)
-				}
-				return
-			}
-			if m.Kind() == "call" {
-				walk(field(m, "function"))
-				return
-			}
-			for _, k := range namedChildren(m) {
-				walk(k)
-			}
-		}
-		walk(ch)
-		if pyRouteMethods[name] {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *pyConv) params(params *tree_sitter.Node) []string {

@@ -227,18 +227,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
 		decorators := c.jsDecoratorTokens(n)
-		// NestJS route handler (`@Get()/@Post() find(@Query() q, @Param() id)`): the
-		// method's parameters are request-bound (@Body/@Query/@Param/@Headers), so seed
-		// each as http_input. Detected by the HTTP-method decorator on the method.
-		if n.Kind() == "method_definition" && c.jsHasRouteDecorator(n) {
-			var seed []nir.Stmt
-			for _, p := range params {
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-			}
-			body = append(seed, body...)
-		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Decorators: decorators, Exported: c.exported[name]}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: c.exported[name]}}
 	case "class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "lexical_declaration", "variable_declaration":
@@ -774,15 +763,6 @@ func isJSIdent(s string) bool {
 	return true
 }
 
-// jsRouteDecorators are NestJS HTTP-method decorators that mark a request handler.
-var jsRouteDecorators = map[string]bool{
-	"Get": true, "Post": true, "Put": true, "Delete": true, "Patch": true,
-	"Options": true, "Head": true, "All": true,
-}
-
-// jsHasRouteDecorator reports whether a method_definition carries a NestJS route
-// decorator (`@Get()`, `@Post(':id')`, …) — a `decorator` child whose callee name
-// (identifier of the call, or a bare identifier) is an HTTP-method decorator.
 // isIpcHandler reports whether a call path registers an Electron IPC handler
 // (`ipcMain.on/handle/once`, `ipcRenderer.on/once`) whose callback receives
 // renderer-controlled data.
@@ -833,6 +813,19 @@ func (c *jsConv) jsDecoratorTokens(n *tree_sitter.Node) []string {
 	return out
 }
 
+func (c *jsConv) jsParamEntries(name string, params []string, base []string) []nir.ParamEntry {
+	if len(base) == 0 {
+		return nil
+	}
+	var out []nir.ParamEntry
+	for i, p := range params {
+		tokens := append([]string{}, base...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return out
+}
+
 func (c *jsConv) jsDecoratorPath(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
@@ -861,40 +854,6 @@ func (c *jsConv) jsDecoratorPath(n *tree_sitter.Node) string {
 		}
 	}
 	return ""
-}
-
-func (c *jsConv) jsHasRouteDecorator(n *tree_sitter.Node) bool {
-	for _, ch := range namedChildren(n) {
-		if ch.Kind() != "decorator" {
-			continue
-		}
-		var name string
-		var walk func(m *tree_sitter.Node)
-		walk = func(m *tree_sitter.Node) {
-			if m == nil || name != "" {
-				return
-			}
-			switch m.Kind() {
-			case "identifier":
-				name = c.text(m)
-			case "call_expression":
-				walk(field(m, "function"))
-			case "member_expression":
-				if p := field(m, "property"); p != nil {
-					name = c.text(p)
-				}
-			default:
-				for _, k := range namedChildren(m) {
-					walk(k)
-				}
-			}
-		}
-		walk(ch)
-		if jsRouteDecorators[name] {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *jsConv) params(params *tree_sitter.Node) []string {

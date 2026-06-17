@@ -3,9 +3,17 @@
 adapter python {
   meta { fidelity: resolved }
 
-  // FastAPI/Starlette route-handler params, seeded by the frontend (the decorator
-  // marks the handler; each parameter is request-bound path/query/body input).
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:get" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:post" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:put" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:delete" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:patch" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:head" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:options" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:route" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:websocket" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:api_route" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_name:resolve_" nval "param_name:self" nval "param_name:cls" nval "param_name:info" nval "param_name:root" nval "param_name:parent" nval "param_name:_" -> code.HttpInput
 
   source "request.form" -> code.HttpInput
   source "request.query_string" -> code.HttpInput

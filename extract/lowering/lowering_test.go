@@ -104,3 +104,50 @@ func TestLowerAnnotatedReturnCreatesSyntheticCall(t *testing.T) {
 	}
 	t.Fatalf("annotated return synthetic call not found")
 }
+
+func TestLowerParamEntryCreatesSourceEventFlow(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "handler", Params: []string{"value"}, ParamEntries: []nir.ParamEntry{{
+				Param:  "value",
+				Tokens: []string{"decorator_method:get", "param_name:value"},
+			}}, Body: []nir.Stmt{
+				nir.Return{Value: nir.Name{ID: "value", Loc: "app.py:2"}},
+			}, Loc: "app.py:1"},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	var eventID, paramID string
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "analysis.parameter.entry" &&
+			strings.Contains(n.Prop("str_args"), "decorator_method:get") {
+			eventID = id
+			break
+		}
+	}
+	ids, _ = g.NodesOfType("code.Param")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("name") == "value" {
+			paramID = id
+			break
+		}
+	}
+	if eventID == "" || paramID == "" {
+		t.Fatalf("missing event=%q param=%q", eventID, paramID)
+	}
+	outs, _ := g.OutEdges(eventID, "FLOWS")
+	for _, edge := range outs {
+		if edge.Dst == paramID {
+			return
+		}
+	}
+	t.Fatalf("parameter entry event does not flow to parameter")
+}
