@@ -13,8 +13,8 @@ import (
 // psConv walks a tree-sitter PowerShell CST into NIR. PowerShell wraps every
 // expression in a deep precedence cascade (logical→bitwise→…→unary); psUnwrap
 // peels those single-child wrappers to the meaningful node. A `command` is a Call
-// (cmdlet name → path, elements → args); $env:CGI vars and param() parameters are
-// sources; expandable strings ("ping $x") propagate taint.
+// (cmdlet name -> path, elements -> args); expandable strings ("ping $x")
+// propagate taint.
 type psConv struct {
 	src  []byte
 	file string
@@ -72,12 +72,21 @@ func (c *psConv) psUnwrap(n *tree_sitter.Node) *tree_sitter.Node {
 
 func (c *psConv) program(root *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	// top-level param() block → seed parameters as user input
+	// Top-level param() block entries are emitted as neutral parameter-entry events.
 	for _, ch := range namedChildren(root) {
 		if ch.Kind() == "param_block" {
 			for _, p := range c.paramNames(ch) {
 				out = append(out, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input"}, Path: "http_input", Method: "http_input", Loc: c.loc(ch)}})
+					Value: nir.Call{
+						Callee: nir.Name{ID: "analysis.parameter.entry", Loc: c.loc(ch)},
+						Args: []nir.Expr{
+							nir.Const{Loc: c.loc(ch), Value: "entry_kind:script_param"},
+							nir.Const{Loc: c.loc(ch), Value: "param_name:" + p},
+						},
+						Path:   "analysis.parameter.entry",
+						Method: "entry",
+						Loc:    c.loc(ch),
+					}})
 			}
 		}
 	}
@@ -412,9 +421,8 @@ func (c *psConv) command(n *tree_sitter.Node) nir.Expr {
 			args = append(args, c.expr(ch))
 		}
 	}
-	// A shell command's danger can be in ANY argument position (e.g.
-	// Start-Process "cmd" $userArg), so collapse all args into one taint-carrying
-	// Format that the sink (arg0) inspects.
+	// Command adapters inspect arg0; collapse all command elements into one
+	// taint-carrying Format so no argument position is dropped.
 	var callArgs []nir.Expr
 	if len(args) > 0 {
 		callArgs = []nir.Expr{nir.Format{Parts: args, Loc: L}}
@@ -422,7 +430,7 @@ func (c *psConv) command(n *tree_sitter.Node) nir.Expr {
 	return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: callArgs, Path: name, Method: name, Loc: L}
 }
 
-// shSourcePSVar: $env:QUERY_STRING / $env:HTTP_* etc. are untrusted input.
+// psSourceVar recognizes environment-style entry variable names.
 func psSourceVar(name string) bool {
 	n := strings.TrimPrefix(strings.ToUpper(name), "ENV:")
 	for _, p := range []string{"QUERY_STRING", "HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_"} {

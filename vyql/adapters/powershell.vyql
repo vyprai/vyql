@@ -1,11 +1,11 @@
 // powershell framework adapter (docs/07) — framework→concept content.
-// A cmdlet/command is modeled as a call; $env:CGI vars + param() are sources.
+// A cmdlet/command is modeled as a call.
 adapter powershell {
   meta { fidelity: resolved }
 
   // untrusted input
   source "shell_input" -> code.HttpInput
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:script_param" -> code.HttpInput
 
   // code evaluation
   sink path "Invoke-Expression" -> code.CodeEval
