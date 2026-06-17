@@ -664,13 +664,23 @@ func (l *lowerer) markPathContainment(call nir.Call, sc *scope) {
 	}
 }
 
-func (l *lowerer) contextualReturnEvent(id, loc string, contextTokens []string) {
+type analysisEventSpec struct {
+	path   string
+	method string
+}
+
+var (
+	analysisFunctionReturn = analysisEventSpec{path: "analysis.function.return", method: "return"}
+	analysisFunctionResult = analysisEventSpec{path: "analysis.function.result", method: "result"}
+	analysisParameterEntry = analysisEventSpec{path: "analysis.parameter.entry", method: "entry"}
+)
+
+func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []string) {
 	if id == "" || len(contextTokens) == 0 {
 		return
 	}
-	// This is intentionally domain-neutral: lowering only records that a value was
-	// returned from a function carrying frontend-provided context tokens. Adapters
-	// decide whether that event is a source, sink, control, review signal, or inert.
+	// Lowering records only structural return evidence. Adapter data decides whether
+	// the event has any domain meaning.
 	valToks := append([]string{}, contextTokens...)
 	n, ok, _ := l.g.GetNode(id)
 	if ok {
@@ -693,8 +703,8 @@ func (l *lowerer) contextualReturnEvent(id, loc string, contextTokens []string) 
 	arg := l.node("Arg", loc, map[string]string{"vkind": "Return"})
 	l.flow(id, arg)
 	props := map[string]string{
-		"callee_path": "analysis.function.return",
-		"method":      "return",
+		"callee_path": analysisFunctionReturn.path,
+		"method":      analysisFunctionReturn.method,
 		"arg0":        arg,
 	}
 	if len(valToks) > 0 {
@@ -712,8 +722,8 @@ func (l *lowerer) parameterEntry(paramNode, loc string, tokens []string) {
 		loc = "?:0"
 	}
 	props := map[string]string{
-		"callee_path": "analysis.parameter.entry",
-		"method":      "entry",
+		"callee_path": analysisParameterEntry.path,
+		"method":      analysisParameterEntry.method,
 		"str_args":    strings.Join(tokens, "\x00"),
 	}
 	call := l.node("Call", loc, props)
@@ -1360,7 +1370,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 		}
-		l.contextualReturnEvent(rv, "", l.curDecorators)
+		l.functionReturnAnalysisEvent(rv, "", l.curDecorators)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
 		if call, ok := st.Value.(nir.Call); ok {
@@ -2157,7 +2167,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 		for _, entry := range target.resultEntries {
 			if len(entry.Tokens) > 0 {
-				result = l.syntheticCall("analysis.function.result", "result", result, call.Loc, entry.Tokens...)
+				result = l.syntheticCall(analysisFunctionResult.path, analysisFunctionResult.method, result, call.Loc, entry.Tokens...)
 			}
 		}
 	}

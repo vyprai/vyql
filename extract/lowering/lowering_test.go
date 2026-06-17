@@ -79,7 +79,7 @@ func TestLowerStampsReceiverTypeFromParamTypes(t *testing.T) {
 	t.Fatalf("svc.clean call not found")
 }
 
-func TestLowerContextualReturnCreatesAnalysisEvent(t *testing.T) {
+func TestLowerFunctionReturnCreatesAnalysisEvent(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",
 		File: "app.py",
@@ -102,7 +102,7 @@ func TestLowerContextualReturnCreatesAnalysisEvent(t *testing.T) {
 			return
 		}
 	}
-	t.Fatalf("contextual return analysis event not found")
+	t.Fatalf("function return analysis event not found")
 }
 
 func TestLowerParamEntryCreatesSourceEventFlow(t *testing.T) {
