@@ -33,4 +33,9 @@ adapter config {
   // rendered output; <c:out> is skipped by the frontend as an escaped render.
   source "jsp.input" -> core.UserControlledData
   sink   "jsp.render" -> code.HtmlRender
+
+  // Ajv/doT codegen templates: numeric schema keywords must be type-checked
+  // before the template emits validator code. Missing checks can let crafted
+  // schemas steer generated code/prototype behavior.
+  mark "dot_schema_codegen_unvalidated" -> code.SchemaCodegenValidationBypass
 }

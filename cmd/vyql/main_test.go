@@ -433,6 +433,32 @@ def respond_error(context):
     """ % cgi.escape(stack)
 `
 
+const vulnerableAjvLimitItemsTemplate = `{{# def.definitions }}
+{{# def.errors }}
+{{# def.setupKeyword }}
+{{# def.$data }}
+
+{{ var $op = $keyword == 'maxItems' ? '>' : '<'; }}
+if ({{# def.$dataNotType:'number' }} {{=$data}}.length {{=$op}} {{=$schemaValue}}) {
+  {{ var $errorKeyword = $keyword; }}
+  {{# def.error:'_limitItems' }}
+}
+`
+
+const fixedAjvLimitItemsTemplate = `{{# def.definitions }}
+{{# def.errors }}
+{{# def.setupKeyword }}
+{{# def.$data }}
+
+{{# def.numberKeyword }}
+
+{{ var $op = $keyword == 'maxItems' ? '>' : '<'; }}
+if ({{# def.$dataNotType:'number' }} {{=$data}}.length {{=$op}} {{=$schemaValue}}) {
+  {{ var $errorKeyword = $keyword; }}
+  {{# def.error:'_limitItems' }}
+}
+`
+
 func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "vuln.php"), []byte(vulnerablePhpStoredHtmlWrite), 0o644); err != nil {
@@ -457,6 +483,41 @@ func TestScanPhpStoredHtmlWriteRequiresPurifier(t *testing.T) {
 	}
 	if !strings.Contains(stored[0].Bindings[0].Loc, "vuln.php") {
 		t.Fatalf("stored HTML write finding should be in vuln.php, got %#v", stored[0].Bindings)
+	}
+}
+
+func TestScanAjvSchemaCodegenValidationBypass(t *testing.T) {
+	dir := t.TempDir()
+	vulnDir := filepath.Join(dir, "vuln")
+	fixedDir := filepath.Join(dir, "fixed")
+	if err := os.MkdirAll(vulnDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(fixedDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vulnDir, "_limitItems.jst"), []byte(vulnerableAjvLimitItemsTemplate), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fixedDir, "_limitItems.jst"), []byte(fixedAjvLimitItemsTemplate), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	var codegen []*findings.Finding
+	for _, f := range fs {
+		if f.RuleID == "VYQL-INJ-029" {
+			codegen = append(codegen, f)
+		}
+	}
+	if len(codegen) != 1 {
+		t.Fatalf("expected one schema-codegen validation finding only in vulnerable template, got %d: %#v", len(codegen), fs)
+	}
+	if !strings.Contains(codegen[0].Bindings[0].Loc, filepath.Join("vuln", "_limitItems.jst")) {
+		t.Fatalf("expected codegen finding in vulnerable template, got %#v", codegen[0].Bindings)
 	}
 }
 

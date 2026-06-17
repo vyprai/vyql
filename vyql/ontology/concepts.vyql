@@ -77,6 +77,10 @@ concept ProtoPollute : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_1321]
 }
+concept SchemaCodegenValidationBypass : sink {
+  vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
+  cwe: [CWE_1321, CWE_915]
+}
 
 concept WeakHash : sink {
   vulnerable_to: [crypto.WeakHash]

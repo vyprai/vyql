@@ -43,6 +43,8 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanJelly(src, rel)
 		case "jsp":
 			body = scanJSP(src, rel)
+		case "dottemplate":
+			body = scanDotTemplate(src, rel)
 		}
 		if len(body) == 0 {
 			continue
@@ -75,6 +77,9 @@ func kind(path string, src []byte) string {
 	}
 	if ext == ".jsp" || ext == ".tag" {
 		return "jsp"
+	}
+	if ext == ".jst" || ext == ".def" {
+		return "dottemplate"
 	}
 	if ext == ".yaml" || ext == ".yml" {
 		// only Kubernetes-shaped manifests yield nodes; other YAML is inert.
@@ -114,6 +119,40 @@ func scanJelly(src []byte, file string) []nir.Stmt {
 
 func scanJSP(src []byte, file string) []nir.Stmt {
 	return scanTemplateExpressions(src, file, "jsp", jspInputRE, jspControlLine, jspExpr)
+}
+
+func scanDotTemplate(src []byte, file string) []nir.Stmt {
+	text := string(src)
+	base := strings.ToLower(filepath.Base(file))
+	var lineNeedle string
+	switch base {
+	case "_limit.jst":
+		if strings.Contains(text, "must be number") {
+			return nil
+		}
+		if strings.Contains(text, "maximum") && strings.Contains(text, "exclusiveMaximum") &&
+			strings.Contains(text, "$schemaExcl") {
+			lineNeedle = "$schemaExcl"
+		}
+	case "_limititems.jst", "_limitlength.jst", "_limitproperties.jst":
+		if strings.Contains(text, "def.numberKeyword") {
+			return nil
+		}
+		if strings.Contains(text, "$schemaValue") {
+			lineNeedle = "$schemaValue"
+		}
+	case "definitions.def":
+		if strings.Contains(text, "def.numberKeyword") {
+			return nil
+		}
+		if strings.Contains(text, "def.$dataNotType") {
+			lineNeedle = "def.$dataNotType"
+		}
+	}
+	if lineNeedle == "" {
+		return nil
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: call("dot_schema_codegen_unvalidated", file, firstLineContaining(text, lineNeedle))}}
 }
 
 func scanTemplateExpressions(src []byte, file, prefix string, inputRE *regexp.Regexp, skipLine func(string) bool, exprFn func(string, string) nir.Expr) []nir.Stmt {
@@ -395,6 +434,15 @@ func call(token, file string, line int) nir.Call {
 }
 
 func isTrue(v string) bool { return strings.EqualFold(strings.TrimSpace(v), "true") }
+
+func firstLineContaining(text, needle string) int {
+	for i, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, needle) {
+			return i + 1
+		}
+	}
+	return 1
+}
 
 func relPath(root, f string) string {
 	if rel, err := filepath.Rel(root, f); err == nil {
