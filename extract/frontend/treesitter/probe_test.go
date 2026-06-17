@@ -427,7 +427,7 @@ module.exports = function killport(port) {
 	// code.ExternalEntryInput), gated to the library profile. Simulate it.
 	defer frontend.SetActiveSources(nil)
 	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
-	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.LibraryAdapters()...), nil); err != nil {
+	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.AdaptersFor("library")...), nil); err != nil {
 		t.Fatal(err)
 	}
 	sources, _ := g.NodesWithConcept("code.ExternalEntryInput")
@@ -469,7 +469,7 @@ func TestJavaScriptPrototypeOptionReadSink(t *testing.T) {
 	}
 	defer frontend.SetActiveSources(nil)
 	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
-	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.LibraryAdapters()...), nil); err != nil {
+	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.AdaptersFor("library")...), nil); err != nil {
 		t.Fatal(err)
 	}
 	srcs, _ := g.NodesWithConcept("code.ExternalEntryInput")
@@ -505,7 +505,7 @@ func TestJavaScriptDestructuringKeepsTaint(t *testing.T) {
 	}
 	defer frontend.SetActiveSources(nil)
 	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
-	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.LibraryAdapters()...), nil); err != nil {
+	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.AdaptersFor("library")...), nil); err != nil {
 		t.Fatal(err)
 	}
 	srcs, _ := g.NodesWithConcept("code.ExternalEntryInput")

@@ -9,7 +9,7 @@
 // Kept high-signal (destructive/privileged ops, acquisition calls) rather than every CRUD
 // call, to keep the AI pass's review set tractable. cross_language: these recur by name.
 adapter auditreview {
-  meta { fidelity: syntactic, cross_language: true }
+  meta { fidelity: syntactic, cross_language: true, auto_apply: graph }
 
   // --- privileged / destructive operations (authz review) ---
   // NOTE: bare delete/remove/destroy/drop omitted — too generic (match every collection

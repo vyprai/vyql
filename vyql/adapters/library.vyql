@@ -11,7 +11,7 @@
 // under application profiles, and with no profile, parameters are never sources, so apps
 // are unaffected. cross_language: parameters exist in every frontend.
 adapter library {
-  meta { fidelity: syntactic, cross_language: true }
+  meta { fidelity: syntactic, cross_language: true, auto_apply: graph }
 
   source param -> code.ExternalEntryInput
 }

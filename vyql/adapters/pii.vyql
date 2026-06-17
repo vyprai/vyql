@@ -6,7 +6,7 @@
 // a log/output sink (rule VYQL-PII-001). Keep the taxonomy NARROW — high-signal
 // identifiers only; broad terms (name/email/phone/address) cause false positives.
 adapter pii {
-  meta { fidelity: resolved, cross_language: true }
+  meta { fidelity: resolved, cross_language: true, auto_apply: graph }
 
   // national / government identifiers
   source method "ssn" -> code.PiiValue

@@ -8,7 +8,7 @@
 // key/IV handling) that static taint cannot prove. cross_language: crypto APIs recur by
 // name across ecosystems.
 adapter cryptoreview {
-  meta { fidelity: syntactic, cross_language: true }
+  meta { fidelity: syntactic, cross_language: true, auto_apply: graph }
 
   // Node.js / JS-TS crypto
   mark "crypto.createCipheriv" -> code.CryptoOperation

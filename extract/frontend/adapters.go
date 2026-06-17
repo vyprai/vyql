@@ -1068,9 +1068,36 @@ func matchPath(path string, patterns []string, mode string) bool {
 func ConfigAdapters() []adapters.Adapter     { return AdaptersFor("config") }
 func SecretscanAdapters() []adapters.Adapter { return AdaptersFor("secretscan") }
 
-// PiiAdapters is the cross-language PII taxonomy (adapters/pii.vyql). It labels nodes
-// in every language, so it is applied once per scan rather than per present frontend.
-func PiiAdapters() []adapters.Adapter { return AdaptersFor("pii") }
+// AutoAdapters returns adapter declarations that opt into whole-graph application through
+// `meta { auto_apply: graph }`.
+func AutoAdapters() []adapters.Adapter {
+	files, err := filepath.Glob(filepath.Join(datadir.Root(), "adapters", "*.vyql"))
+	if err != nil {
+		panic("frontend: glob adapters/*.vyql: " + err.Error())
+	}
+	sort.Strings(files)
+	var out []adapters.Adapter
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			panic("frontend: read " + file + ": " + err.Error())
+		}
+		decls, err := parser.Parse(string(raw))
+		if err != nil {
+			panic("frontend: parse " + file + ": " + err.Error())
+		}
+		for _, d := range decls {
+			ad, ok := d.(*parser.AdapterDecl)
+			if !ok {
+				continue
+			}
+			if mode, _ := ad.Meta["auto_apply"].(string); mode == "graph" {
+				out = append(out, adaptersFromSpec(specFromDecl(ad))...)
+			}
+		}
+	}
+	return out
+}
 
 // paramSourceAdapter labels function/method parameter nodes with the spec's
 // `source param -> X` concept(s) — the library/SDK trust boundary (any caller may pass
@@ -1116,19 +1143,6 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 		},
 	}
 }
-
-// LibraryAdapters is the cross-language library/SDK trust boundary (adapters/library.vyql):
-// public-API parameters as external-entry sources. Applied once per scan; only active under
-// the library profile (the concept it labels is gated by the profile's trust boundary).
-func LibraryAdapters() []adapters.Adapter { return AdaptersFor("library") }
-
-// CryptoReviewAdapters labels cryptographic operations (adapters/cryptoreview.vyql) with
-// code.CryptoOperation. Inert for confirmed rules; the possibility tier surfaces them.
-func CryptoReviewAdapters() []adapters.Adapter { return AdaptersFor("cryptoreview") }
-
-// AuditReviewAdapters labels privileged/state-changing ops (code.SensitiveOperation) and
-// resource acquisitions (code.ResourceReview) for the possibility tier (adapters/auditreview.vyql).
-func AuditReviewAdapters() []adapters.Adapter { return AdaptersFor("auditreview") }
 
 func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }
 func DartAdapters() []adapters.Adapter       { return AdaptersFor("dart") }
