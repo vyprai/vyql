@@ -34,8 +34,8 @@ import (
 //	  expect_review some.Concept          # repeatable — review concept must appear
 //	  reject_review some.Concept          # repeatable — review concept must not appear
 //	  adapter python                     # optional graph adapter to apply before label checks
-//	  expect_label node-id code.HttpInput # graph adapter label assertion
-//	  reject_label node-id code.HttpInput # graph adapter negative label assertion
+//	  expect_label node-id custom.Source # graph adapter label assertion
+//	  reject_label node-id custom.Source # graph adapter negative label assertion
 //	  gitlink vendor/lib <sha>  # optional git submodule/gitlink fixture
 //	  code
 //	  ```
