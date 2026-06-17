@@ -48,6 +48,10 @@ adapter csharp {
   // command execution
   sink path "Process.Start" -> code.CommandExecution
   sink path "ProcessStartInfo" -> code.CommandExecution
+  // the command line is usually assigned to the .Arguments property, not passed to the
+  // ProcessStartInfo ctor — model that property write as the injectable cmdi position.
+  sink path "Arguments" -> code.CommandExecution
+  sink path "StartInfo.Arguments" -> code.CommandExecution
 
   // deserialization
   sink method "Deserialize" -> code.Deserialization

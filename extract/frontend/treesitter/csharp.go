@@ -239,6 +239,14 @@ func (c *csConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
+		// member/element property write `si.Arguments = x` / `obj.prop = x`: model as a
+		// PATH-sink call (Method="") so the assigned value flows into a write node a
+		// `sink path "Arguments"`-style sink can match (e.g. ProcessStartInfo.Arguments
+		// command injection). Mirrors the JS/Kotlin member-write modeling.
+		if left != nil && (left.Kind() == "member_access_expression" || left.Kind() == "element_access_expression") {
+			p := c.dotted(left)
+			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: c.loc(inner)}}}
+		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
