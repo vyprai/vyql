@@ -170,6 +170,17 @@ func manifestLibrary(paths []string) bool {
 						found = true
 					}
 				}
+			case name == "pom.xml":
+				// A Maven artifact with hpi/maven-plugin packaging is unambiguously a
+				// plugin/library (never a deployable app), so its public-API params are the
+				// trust boundary. Plain-jar poms are NOT flipped — too many are apps and there
+				// is no Java OWASP gate to bound the precision cost.
+				if data, err := os.ReadFile(path); err == nil {
+					t := string(data)
+					if strings.Contains(t, "<packaging>hpi</packaging>") || strings.Contains(t, "<packaging>maven-plugin</packaging>") {
+						found = true
+					}
+				}
 			case name == "Cargo.toml":
 				if data, err := os.ReadFile(path); err == nil && strings.Contains(string(data), "[lib]") {
 					found = true

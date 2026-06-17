@@ -100,6 +100,9 @@ adapter javascript {
   sink path "connection.query" -> code.SqlExecution
   sink path "pool.query" -> code.SqlExecution
   sink path "db.query" -> code.SqlExecution
+  // ueberDB key-glob read: db.findKeys("pad:"+id+"*") — an unsanitized id in the key pattern
+  // reads keys outside the intended namespace (CWE-22-style traversal of the kv store).
+  sink method "findKeys" -> code.FilePathAccess
   sink path "client.query" -> code.SqlExecution
   sink path "mysql.query" -> code.SqlExecution
   sink path "pg.query" -> code.SqlExecution

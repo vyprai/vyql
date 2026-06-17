@@ -11,6 +11,11 @@ adapter php {
   source "$_COOKIE" -> code.HttpInput
   source "$_FILES" -> code.HttpInput
   source "$_SERVER" -> code.HttpInput
+  // framework request-object accessors (Utopia/Appwrite, Symfony-style): the request URI /
+  // query / path are attacker-controlled. Method form → receiver-agnostic.
+  source method "getURI" -> code.HttpInput
+  source method "getQuery" -> code.HttpInput
+  source method "getPathInfo" -> code.HttpInput
   // getenv() reading request-controlled CGI vars — untrusted (X-Forwarded-For SQLi/SSRF).
   // val-gated so benign getenv('PATH')/getenv('HOME') stay clean.
   source "getenv" val "HTTP_" -> code.HttpInput

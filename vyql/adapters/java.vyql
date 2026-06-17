@@ -55,6 +55,9 @@ adapter java {
   sink method "loadDataWithBaseURL" arg 1 -> code.WebViewLoad
   sink method "postUrl" -> code.WebViewLoad
   sink method "evaluateJavascript" -> code.WebViewLoad
+  // open redirect (CWE-601) — HttpServletResponse.sendRedirect(location); Java had no
+  // redirect sink (go/ruby/js do), so request-derived redirect targets were never flagged.
+  sink method "sendRedirect" -> code.RedirectTarget
   // exposing a native bridge to WebView content (presence)
   mark "addJavascriptInterface" -> code.WebViewJsInterface
   sink method "executeLargeUpdate" -> code.SqlExecution
