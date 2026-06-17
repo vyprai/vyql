@@ -573,17 +573,23 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 	case p.atWord("sink"):
 		p.next()
 		kind := "sink_path"
+		exact := false
 		if p.atWord("method") {
 			p.next()
 			kind = "sink_method"
 		} else if p.atWord("receiver") {
 			p.next()
 			kind = "sink_receiver"
+		} else if p.atWord("exact") {
+			// exact path match (no dotted-segment-prefix continuation) — matches the
+			// bare call `axios(cfg)` but not member access `axios.Cancel`.
+			p.next()
+			exact = true
 		} else if p.atWord("path") {
 			p.next()
 		}
 		pat := p.parsePattern()
-		m := AdapterMapping{Kind: kind, Pattern: pat}
+		m := AdapterMapping{Kind: kind, Pattern: pat, Exact: exact}
 		if p.atWord("arg") { // which argument is dangerous (default 0; `arg all` = every arg)
 			p.next()
 			if p.atWord("all") {

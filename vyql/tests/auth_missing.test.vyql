@@ -52,3 +52,31 @@ test "go: command exec with no HTTP input in scope is not missing-auth"
     exec.Command("echo", name).Run()
   }
   ```
+
+# --- A2 positive: command exec in an Express handler with no auth ---
+test "js: command exec in an HTTP handler with no auth check is missing-auth"
+  lang javascript
+  expect VYQL-AUTH-003
+  code
+  ```
+  const { exec } = require('child_process');
+  function handler(req, res) {
+    exec('ls ' + req.query.d);
+  }
+  module.exports = handler;
+  ```
+
+# --- A2 negative: a jwt.verify gate (broadened auth vocab) suppresses the finding ---
+test "js: command exec guarded by jwt.verify is not missing-auth"
+  lang javascript
+  reject VYQL-AUTH-003
+  code
+  ```
+  const { exec } = require('child_process');
+  const jwt = require('jsonwebtoken');
+  function handler(req, res) {
+    if (!jwt.verify(req.headers.token)) { res.sendStatus(401); return; }
+    exec('ls ' + req.query.d);
+  }
+  module.exports = handler;
+  ```

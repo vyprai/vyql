@@ -130,6 +130,25 @@ adapter javascript {
   control "ensureAuthenticated" -> core.AuthenticationCheck
   control "isAuthenticated" -> core.AuthenticationCheck
   control "authenticate" -> core.AuthenticationCheck
+  // Broader Node/Express auth-middleware vocabulary. These are how real apps express
+  // an authentication gate; without them an AuthenticationCheck rarely suppresses
+  // AUTH-001/AUTH-003, leaving false positives on middleware-protected handlers. Only
+  // ADDS suppressions (never new findings). Passport (passport.authenticate), JWT
+  // verification (jwt.verify / verifyToken / verifyJWT), and connect-ensure-login
+  // (ensureLoggedIn) plus common login-guard names.
+  control "passport.authenticate" -> core.AuthenticationCheck
+  control "ensureLoggedIn" -> core.AuthenticationCheck
+  control "isLoggedIn" -> core.AuthenticationCheck
+  control "requireLogin" -> core.AuthenticationCheck
+  control "loginRequired" -> core.AuthenticationCheck
+  control "requireUser" -> core.AuthenticationCheck
+  control "requireSession" -> core.AuthenticationCheck
+  control "checkAuth" -> core.AuthenticationCheck
+  control "verifyToken" -> core.AuthenticationCheck
+  control "verifyJwt" -> core.AuthenticationCheck
+  control "verifyJWT" -> core.AuthenticationCheck
+  control "jwt.verify" -> core.AuthenticationCheck
+  control "authenticateToken" -> core.AuthenticationCheck
   // authorization checks (guards BIZ-001) — path-sensitive via B1.
   control "checkPermission" -> core.AuthorizationCheck
   control "hasPermission" -> core.AuthorizationCheck
@@ -215,7 +234,10 @@ adapter javascript {
   sink path "axios.put" -> code.UrlFetch
   sink path "axios.delete" -> code.UrlFetch
   sink path "axios.request" -> code.UrlFetch
-  sink path "axios" -> code.UrlFetch
+  // `exact`: match the bare call `axios(cfg)` for SSRF, but NOT member access like
+  // `axios.Cancel = ...` / `axios.default = axios` (those are property assignments, not
+  // network calls — segment-prefix matching mislabelled them as UrlFetch sinks).
+  sink exact "axios" -> code.UrlFetch
   sink path "fetch" -> code.UrlFetch
   sink path "node-fetch" -> code.UrlFetch
   sink path "http.get" -> code.UrlFetch

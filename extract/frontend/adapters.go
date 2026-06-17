@@ -40,6 +40,7 @@ type sinkSpec struct {
 	ValAbsents []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
 	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 	Collection bool     // also flag a Seq/collection-literal arg (e.g. ldap options {filter})
+	Exact      bool     // exact path match (no dotted-segment-prefix continuation): `sink exact "axios"`
 }
 
 type controlSpec struct {
@@ -549,7 +550,7 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 		case "sink_method":
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method (e.g. `URL(u).openConnection()`,
 			// `u.toRegex()`); match the bare method name, label the call node itself.
@@ -702,7 +703,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						continue
 					}
 					hit := sk.ByMethod && method == sk.Pattern ||
-						!sk.ByMethod && matchSinkPath(path, sk.Pattern)
+						!sk.ByMethod && ((sk.Exact && path == sk.Pattern) || (!sk.Exact && matchSinkPath(path, sk.Pattern)))
 					// value-matched sink: every `val` must be present and every `nval`
 					// absent among the literal arg/option tokens (case-insensitive).
 					if hit && !valConds(strArgs, sk.ValMatches, sk.ValAbsents) {
