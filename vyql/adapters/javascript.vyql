@@ -71,6 +71,10 @@ adapter javascript {
   source "localStorage.getItem" -> code.DomInput
   source "sessionStorage.getItem" -> code.DomInput
   source "document.cookie" -> code.DomInput
+  // Browser fetch/Response payloads are external data. SPAs often store parsed JSON
+  // in a client model and later render model fields into the DOM.
+  source "response.json" -> code.DomInput
+  source "res.json" -> code.DomInput
   source "queryParams" -> code.DomInput
   // jQuery data-* reads can carry server/user-controlled DOM content into client-side HTML.
   source method "data" -> code.DomInput

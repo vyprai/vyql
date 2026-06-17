@@ -125,7 +125,6 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	return out
 }
 
-
 func jsModuleKey(root, f string) string {
 	for _, ext := range []string{".jsx", ".tsx", ".ts", ".js"} {
 		if strings.HasSuffix(strings.ToLower(f), ext) {
@@ -263,10 +262,10 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					v = c.expr(val)
 				}
 				if name != nil && name.Kind() == "identifier" {
-					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v})
+					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Decl: true})
 				} else if targets := c.bindingNames(name); len(targets) > 0 {
 					for _, target := range targets {
-						out = append(out, nir.Assign{Targets: []string{target}, Value: v})
+						out = append(out, nir.Assign{Targets: []string{target}, Value: v, Decl: true})
 					}
 				} else {
 					out = append(out, nir.ExprStmt{Value: v})

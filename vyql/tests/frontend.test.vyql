@@ -43,6 +43,54 @@ test "DOM-XSS: localStorage value -> insertAdjacentHTML"
   el.insertAdjacentHTML('beforeend', localStorage.getItem('msg'));
   ```
 
+test "DOM-XSS: parsed API model field -> innerHTML"
+  lang javascript
+  expect VYQL-INJ-004
+  file state.js
+  ```
+  let workspace;
+  export async function initializeWorkspace(id) {
+    const response = await fetch('/api/workspaces/' + id);
+    const data = await response.json();
+    workspace = data.results;
+  }
+  export function getCurrentWorkspace() {
+    return workspace;
+  }
+  ```
+  file editor.js
+  ```
+  import { getCurrentWorkspace } from './state.js';
+  function renderTopic(i) {
+    const span = document.createElement('span');
+    span.innerHTML = getCurrentWorkspace().topics[i].topicName;
+  }
+  ```
+
+test "clean: parsed API model field -> textContent"
+  lang javascript
+  reject VYQL-INJ-004
+  file state.js
+  ```
+  let workspace;
+  export async function initializeWorkspace(id) {
+    const response = await fetch('/api/workspaces/' + id);
+    const data = await response.json();
+    workspace = data.results;
+  }
+  export function getCurrentWorkspace() {
+    return workspace;
+  }
+  ```
+  file editor.js
+  ```
+  import { getCurrentWorkspace } from './state.js';
+  function renderTopic(i) {
+    const span = document.createElement('span');
+    span.textContent = getCurrentWorkspace().topics[i].topicName;
+  }
+  ```
+
 test "open redirect: location.hash -> location.href"
   lang javascript
   expect VYQL-RF-002

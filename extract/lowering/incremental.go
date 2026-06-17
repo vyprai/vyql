@@ -120,7 +120,8 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 			// (creator-attributed); the nodes/edges still land in base via the recordingStore.
 			rec := &recordingStore{Store: base, d: &moduleDelta{}}
 			l.g = rec
-			l.block(l.bodyOf(m).Body, newScope())
+			body := l.bodyOf(m)
+			l.block(body.Body, l.moduleScope(body))
 			l.g = base
 			fresh[ns] = true
 			sync.MarkFresh(ns)
@@ -138,7 +139,8 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		// cache miss → lower the body fresh (decoding the stub on demand if needed).
 		rec := &recordingStore{Store: base, d: &moduleDelta{}}
 		l.g = rec
-		l.block(l.bodyOf(m).Body, newScope())
+		body := l.bodyOf(m)
+		l.block(body.Body, l.moduleScope(body))
 		l.g = base
 		writes[keys[i]] = encodeDelta(rec.d)
 		fresh[ns] = true

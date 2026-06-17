@@ -47,12 +47,13 @@ type lowerer struct {
 	g              usg.Store
 	modCtr         map[string]int // per-module node-id counter (stable, module-local ids)
 
-	funcQual     map[string]*funcInfo         // "modkey::qual" -> info
-	funcShort    map[string][]*funcInfo       // short name -> infos
-	classQual    map[string]bool              // "modkey::Class"
-	classDefs    map[string]map[string]bool   // bare class name -> SET of modules that define it
-	classFields  map[string]map[string]string // "modkey::Class" -> field -> declared class type
-	importTables map[string]map[string]importEntry
+	funcQual      map[string]*funcInfo         // "modkey::qual" -> info
+	funcShort     map[string][]*funcInfo       // short name -> infos
+	classQual     map[string]bool              // "modkey::Class"
+	classDefs     map[string]map[string]bool   // bare class name -> SET of modules that define it
+	classFields   map[string]map[string]string // "modkey::Class" -> field -> declared class type
+	importTables  map[string]map[string]importEntry
+	moduleGlobals map[string]map[string]string // JS/TS module-level binding name -> stable slot node
 
 	// inheritance-aware implicit-`this` member resolution (populated by frontends that set
 	// ClassDef.Members/Bases — currently C#). directMembers: "modkey::Class" -> declared member
@@ -679,6 +680,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		classDefs:      map[string]map[string]bool{},
 		classFields:    map[string]map[string]string{},
 		importTables:   map[string]map[string]importEntry{},
+		moduleGlobals:  map[string]map[string]string{},
 		containers:     map[string]*containerInfo{},
 		lambdaParams:   map[string][]string{},
 		directMembers:  map[string]map[string]bool{},
@@ -770,9 +772,66 @@ func (l *lowerer) run() error {
 	}
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
-		l.block(m.Body, newScope())
+		l.block(m.Body, l.moduleScope(m))
 	}
 	return nil
+}
+
+func (l *lowerer) moduleScope(m nir.Module) *scope {
+	sc := newScope()
+	if !isJSLikeModule(m.File) {
+		return sc
+	}
+	globals := l.moduleGlobals[ModuleNS(m)]
+	if globals == nil {
+		globals = map[string]string{}
+		l.moduleGlobals[ModuleNS(m)] = globals
+	}
+	for _, name := range topLevelAssignedNames(m.Body) {
+		slot := globals[name]
+		if slot == "" {
+			slot = l.nodeWithID(sigID(l.curNS, "__module", "var", name), "Name", m.File,
+				map[string]string{"callee_path": name, "method": name, "module_global": "true"})
+			globals[name] = slot
+		}
+		sc.node[name] = slot
+	}
+	return sc
+}
+
+func isJSLikeModule(file string) bool {
+	for _, ext := range []string{".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"} {
+		if strings.HasSuffix(file, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+func topLevelAssignedNames(stmts []nir.Stmt) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range stmts {
+		a, ok := s.(nir.Assign)
+		if !ok {
+			continue
+		}
+		for _, t := range a.Targets {
+			if t == "" || strings.ContainsAny(t, ".[") || seen[t] {
+				continue
+			}
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func (l *lowerer) moduleGlobalSlot(name string) string {
+	if globals := l.moduleGlobals[l.curNS]; globals != nil {
+		return globals[name]
+	}
+	return ""
 }
 
 func (l *lowerer) importNode(m nir.Module, imp nir.Import) {
@@ -1098,6 +1157,20 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		for _, t := range st.Targets {
+			localDecl := st.Decl && l.region != ""
+			if slot := l.moduleGlobalSlot(t); slot != "" && !localDecl {
+				l.flow(val, slot)
+				sc.node[t] = slot
+				if hasTyp {
+					sc.typ[t] = typ
+				}
+				if cv != "" {
+					sc.cnst[t] = cv // x = "literal"
+				} else {
+					delete(sc.cnst, t) // reassigned to a non-constant → value unknown
+				}
+				continue
+			}
 			sc.node[t] = val
 			if hasTyp {
 				sc.typ[t] = typ
@@ -1112,6 +1185,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		n := l.node("Concat", st.Loc, nil)
 		l.flow(l.eval(st.Value, sc), n)
 		l.flow(sc.node[st.Target], n)
+		if slot := l.moduleGlobalSlot(st.Target); slot != "" {
+			l.flow(n, slot)
+			sc.node[st.Target] = slot
+			delete(sc.cnst, st.Target)
+			return
+		}
 		sc.node[st.Target] = n
 	case nir.Return:
 		rv := l.eval(st.Value, sc)

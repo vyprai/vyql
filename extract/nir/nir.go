@@ -159,6 +159,7 @@ type Assign struct {
 	Targets []string
 	Value   Expr
 	Type    string
+	Decl    bool // true when this assignment came from a declaration (let/const/var, etc.)
 }
 
 // AugAssign is x += y.
