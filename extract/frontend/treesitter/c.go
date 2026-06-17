@@ -169,7 +169,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			Name:       c.declName(decl),
 			Params:     params,
 			ParamTypes: paramTypes,
-			Body:       c.block(field(n, "body")),
+			Body:       append(c.block(field(n, "body")), c.ccUncheckedFieldIndexAccesses(n)...),
 			Loc:        L,
 		}}
 	case "struct_specifier", "union_specifier", "enum_specifier":
@@ -663,6 +663,60 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *ccConv) ccUncheckedFieldIndexAccesses(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	bodyText := compactCExprText(c.text(body))
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "subscript_expression" {
+			idx := field(n, "index")
+			idxText := c.text(idx)
+			compactIdx := compactCExprText(idxText)
+			if ccFieldDerivedIndex(idxText) && compactIdx != "" && !ccHasUpperBoundGuard(bodyText, compactIdx) {
+				loc := c.loc(n)
+				if !seen[loc] {
+					seen[loc] = true
+					path := "security.index.field_derived.unchecked"
+					out = append(out, nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: path, Loc: loc},
+						Path:   path,
+						Method: lastSeg(path),
+						Loc:    loc,
+					}})
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+func ccFieldDerivedIndex(s string) bool {
+	return strings.Contains(s, "->") || strings.Contains(s, ".")
+}
+
+func ccHasUpperBoundGuard(bodyText, idx string) bool {
+	return strings.Contains(bodyText, idx+"<") ||
+		strings.Contains(bodyText, idx+"<=") ||
+		strings.Contains(bodyText, ">"+idx) ||
+		strings.Contains(bodyText, ">="+idx)
+}
+
+func compactCExprText(s string) string {
+	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
 }
 
 func (c *ccConv) unaryOp(n *tree_sitter.Node) string {

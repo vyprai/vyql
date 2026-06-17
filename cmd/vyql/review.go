@@ -161,6 +161,11 @@ var reviewConcepts = map[string]reviewConceptInfo{
 		kind:     "attention",
 		review:   "review index/subscript access and the dominating bounds checks",
 	},
+	"code.FieldDerivedIndexAccess": {
+		category: "memory",
+		kind:     "attention",
+		review:   "review field-derived array index access and the dominating upper-bound checks",
+	},
 	"code.IntegerSizeArithmetic": {
 		category: "memory",
 		kind:     "attention",

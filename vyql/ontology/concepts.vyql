@@ -284,6 +284,10 @@ concept IndexAccess : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_125, CWE_787]
 }
+concept FieldDerivedIndexAccess : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_129, CWE_125, CWE_787]
+}
 concept DivisionDenominator : sink {
   vulnerable_to: [numeric.DivideByZero]
   enabled_by: [taint.UntrustedData]

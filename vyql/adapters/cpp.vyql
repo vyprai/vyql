@@ -72,6 +72,7 @@ adapter cpp {
   mark "curl_easy_setopt" val "CURLOPT_SSL_VERIFYPEER" val "0" -> code.CertValidationDisabled
   mark "setsslverify" val "false" -> code.CertValidationDisabled
   mark "__subscript" -> code.IndexAccess
+  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree

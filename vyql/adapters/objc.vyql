@@ -57,6 +57,7 @@ adapter objc {
   sink path "realloc" arg 1 -> code.SizeComputation
   mark "alloca" -> code.StackAllocationSmell
   mark "__subscript" -> code.IndexAccess
+  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree
