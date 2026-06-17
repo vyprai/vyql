@@ -32,6 +32,10 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 		AssumeMinLevel:          str(d.Fields, "assume_min_level"),
 		ContextReachSource:      str(d.Fields, "context_reach_source"),
 		ContextReachLabel:       str(d.Fields, "context_reach_label"),
+		ContextConfirmDstProp:   str(d.Fields, "context_confirm_dst_prop"),
+		ContextConfirmFlagProp:  str(d.Fields, "context_confirm_flag_prop"),
+		ContextConfirmFlagValue: str(d.Fields, "context_confirm_flag_value"),
+		ContextConfirmLabel:     str(d.Fields, "context_confirm_label"),
 		DangerousChars:          str(d.Fields, "dangerous_chars"),
 	}
 	return c

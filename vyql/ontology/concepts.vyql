@@ -939,7 +939,12 @@ concept WorkloadIdentity : principal { }
 
 module runtime;
 
-concept Connection : observation { }
+concept Connection : observation {
+  context_confirm_dst_prop: dst
+  context_confirm_flag_prop: external
+  context_confirm_flag_value: true
+  context_confirm_label: "confirmed by runtime traffic (last 24h)"
+}
 concept HttpRequest : source {
   taint: [taint.UntrustedData]
 }

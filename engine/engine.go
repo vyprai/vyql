@@ -240,11 +240,8 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 						via = h[len(h)-1].Rule
 					}
 					line := svc + " is " + src.Label + " (via " + via + ")"
-					// static↔runtime confirmation (docs/11 Part B): a statically
-					// predicted exposure observed in runtime telemetry is confirmed,
-					// which the risk layer escalates (docs/17 exposure→confirmed).
-					if e.observedExternalConnection(svc) {
-						line += " — confirmed by runtime traffic (last 24h)"
+					for _, label := range e.contextConfirmations(svc) {
+						line += " — " + label
 					}
 					ctx = append(ctx, line)
 				}
@@ -281,19 +278,31 @@ func (e *Engine) contextReachSources() []contextReachSource {
 	return out
 }
 
-// observedExternalConnection reports whether the pre-aggregated runtime snapshot
-// holds a runtime.Connection observed reaching svc from outside (docs/11: an
-// OBSERVED external connection). Modeled over the aggregate graph, not a live
-// stream — the streaming evaluator that maintains these deltas is deferred.
-func (e *Engine) observedExternalConnection(svc string) bool {
-	ids, _ := e.Store.NodesWithConcept("runtime.Connection")
-	for _, id := range ids {
-		n, _, _ := e.Store.GetNode(id)
-		if n.Prop("dst") == svc && n.Prop("external") == "true" {
-			return true
+func (e *Engine) contextConfirmations(target string) []string {
+	var out []string
+	for _, c := range e.Onto.AllConcepts() {
+		if c.ContextConfirmDstProp == "" {
+			continue
+		}
+		flagProp := c.ContextConfirmFlagProp
+		flagValue := c.ContextConfirmFlagValue
+		label := c.ContextConfirmLabel
+		if label == "" {
+			label = "confirmed by " + c.Name
+		}
+		ids, _ := e.Store.NodesWithConcept(c.QualifiedName())
+		for _, id := range ids {
+			n, _, _ := e.Store.GetNode(id)
+			if n.Prop(c.ContextConfirmDstProp) != target {
+				continue
+			}
+			if flagProp != "" && n.Prop(flagProp) != flagValue {
+				continue
+			}
+			out = append(out, label)
 		}
 	}
-	return false
+	return out
 }
 
 func sortedSet(m map[string]bool) []string {

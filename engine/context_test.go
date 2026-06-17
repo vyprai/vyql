@@ -95,6 +95,12 @@ concept PublicEdge : exposure {
   context_reach_source: true
   context_reach_label: "public-edge-reachable"
 }
+concept PublicEdgeObservation : observation {
+  context_confirm_dst_prop: target
+  context_confirm_flag_prop: observed
+  context_confirm_flag_value: yes
+  context_confirm_label: "confirmed by public edge observation"
+}
 module code;
 concept Input : source { taint: [taint.UntrustedData] }
 concept Sink : sink { vulnerable_to: [injection.SqlInjection] }
@@ -126,6 +132,8 @@ rule Flow {
 	s.AddLabel("sink", usg.Label{Concept: "code.Sink"})
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "sink"})
 	s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "svc", Props: map[string]string{"rule": "edge-rule", "proto": "tcp", "port": "443"}})
+	s.AddNode(usg.Node{ID: "obs", Type: "custom.Observation", Props: map[string]string{"target": "svc", "observed": "yes"}})
+	s.AddLabel("obs", usg.Label{Concept: "custom.PublicEdgeObservation"})
 
 	fs, err := New(onto, s).Evaluate(compiled[0])
 	if err != nil {
@@ -136,5 +144,8 @@ rule Flow {
 	}
 	if len(fs[0].Context) == 0 || !strings.Contains(fs[0].Context[0], "public-edge-reachable") {
 		t.Fatalf("context should use ontology reach-source label, got %v", fs[0].Context)
+	}
+	if !strings.Contains(fs[0].Context[0], "confirmed by public edge observation") {
+		t.Fatalf("context should use ontology confirmation label, got %v", fs[0].Context)
 	}
 }

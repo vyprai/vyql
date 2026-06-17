@@ -38,6 +38,10 @@ type Concept struct {
 	AssumeMinLevel          string   `json:"assume_min_level,omitempty"`
 	ContextReachSource      string   `json:"context_reach_source,omitempty"`
 	ContextReachLabel       string   `json:"context_reach_label,omitempty"`
+	ContextConfirmDstProp   string   `json:"context_confirm_dst_prop,omitempty"`
+	ContextConfirmFlagProp  string   `json:"context_confirm_flag_prop,omitempty"`
+	ContextConfirmFlagValue string   `json:"context_confirm_flag_value,omitempty"`
+	ContextConfirmLabel     string   `json:"context_confirm_label,omitempty"`
 	// DangerousChars: for sinks, the characters that MUST be absent for taint to be
 	// neutralized — lets a character-filter (allowlist replace) be proven a sound
 	// sanitizer when its output alphabet excludes all of them.
