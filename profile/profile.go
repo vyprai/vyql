@@ -157,8 +157,19 @@ func manifestLibrary(paths []string) bool {
 			}
 			name := d.Name()
 			switch {
-			case strings.HasSuffix(name, ".gemspec"), strings.HasSuffix(name, ".podspec"):
+			case strings.HasSuffix(name, ".gemspec"), strings.HasSuffix(name, ".podspec"), strings.HasSuffix(name, ".nuspec"):
 				found = true
+			case strings.HasSuffix(name, ".csproj"):
+				// a .NET project that declares NuGet PACKAGE metadata is a publishable
+				// library (apps don't); ignore Exe output projects.
+				if data, err := os.ReadFile(path); err == nil {
+					t := string(data)
+					if !strings.Contains(t, "<OutputType>Exe</OutputType>") && !strings.Contains(t, "<OutputType>WinExe</OutputType>") &&
+						(strings.Contains(t, "<PackageId>") || strings.Contains(t, "<PackageLicenseExpression>") ||
+							strings.Contains(t, "<PackageLicenseFile>") || strings.Contains(t, "<GeneratePackageOnBuild>")) {
+						found = true
+					}
+				}
 			case name == "Cargo.toml":
 				if data, err := os.ReadFile(path); err == nil && strings.Contains(string(data), "[lib]") {
 					found = true
