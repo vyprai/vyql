@@ -632,7 +632,7 @@ concept LogWrite : sink {
   enabled_by: [taint.SecretValue]
   possibility: exclude
 }
-// A hardcoded secret literal flagged by the secretscan frontend (presence — no flow).
+// A hardcoded secret literal flagged by the text-pattern frontend (presence — no flow).
 concept HardcodedSecret : sink {
   vulnerable_to: [secrets.HardcodedCredentials]
   cwe: [CWE_798]

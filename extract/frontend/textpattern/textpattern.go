@@ -1,7 +1,7 @@
-// Package secretscan runs a data-defined text-pattern profile over files that do not need
+// Package textpattern runs a data-defined text-pattern profile over files that do not need
 // a language parser. The scanner mechanics are generic; the adapter metadata declares the
 // patterns, file extensions, emitted event path, and the concept label for that event.
-package secretscan
+package textpattern
 
 import (
 	"bytes"
@@ -189,20 +189,20 @@ func charClasses(s string) int {
 
 func loadProfile() textPatternProfile {
 	profileOnce.Do(func() {
-		raw := string(datadir.MustRead("adapters/secretscan.vyql"))
+		raw := string(datadir.MustRead("adapters/textpattern.vyql"))
 		decls, err := parser.Parse(raw)
 		if err != nil {
-			panic("secretscan: parse adapters/secretscan.vyql: " + err.Error())
+			panic("textpattern: parse adapters/textpattern.vyql: " + err.Error())
 		}
 		var meta map[string]any
 		for _, d := range decls {
-			if ad, ok := d.(*parser.AdapterDecl); ok && ad.Name == "secretscan" {
+			if ad, ok := d.(*parser.AdapterDecl); ok && ad.Name == "textpattern" {
 				meta = ad.Meta
 				break
 			}
 		}
 		if meta == nil {
-			panic("secretscan: missing adapter metadata")
+			panic("textpattern: missing adapter metadata")
 		}
 		profile = textPatternProfile{
 			Event:              metaString(meta, "text_pattern_event"),
@@ -214,7 +214,7 @@ func loadProfile() textPatternProfile {
 			MinValueClasses:    metaInt(meta, "text_pattern_min_value_classes"),
 		}
 		if profile.Event == "" || profile.CacheKey == "" {
-			panic("secretscan: text_pattern_event and text_pattern_cache_key are required")
+			panic("textpattern: text_pattern_event and text_pattern_cache_key are required")
 		}
 		if profile.MinValueClasses == 0 {
 			profile.MinValueClasses = 1

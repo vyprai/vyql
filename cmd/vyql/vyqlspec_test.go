@@ -81,9 +81,8 @@ var primaryExt = map[string]string{
 	"elixir": ".ex",
 	"dart":   ".dart",
 	"groovy": ".groovy",
-	// secretscan runs over any text file; `.env` keys on no real frontend, so a
-	// `lang secretscan` spec exercises the secret scanner in isolation.
-	"secretscan": ".env",
+	// textpattern runs over any text file; `.env` keys on no real source frontend.
+	"textpattern": ".env",
 }
 
 func parseSpecFile(t *testing.T, path string) []vyqlSpec {

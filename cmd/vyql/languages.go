@@ -9,7 +9,7 @@ import (
 	"github.com/vyprai/vyql/extract/frontend"
 	cfgfront "github.com/vyprai/vyql/extract/frontend/config"
 	"github.com/vyprai/vyql/extract/frontend/golang"
-	"github.com/vyprai/vyql/extract/frontend/secretscan"
+	"github.com/vyprai/vyql/extract/frontend/textpattern"
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/nir"
 )
@@ -53,7 +53,7 @@ var languages = []language{
 	// other repos are unaffected. "dockerfile" matches by basename (no extension).
 	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
 		".tf": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
-	{"secretscan", secretscan.Extensions(), secretscan.Extract, frontend.SecretscanAdapters},
+	{"textpattern", textpattern.Extensions(), textpattern.Extract, frontend.TextPatternAdapters},
 }
 
 // scanStats reports per-language file counts for the run summary.

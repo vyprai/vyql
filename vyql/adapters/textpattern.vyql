@@ -1,12 +1,12 @@
-// secretscan text-pattern profile. The Go frontend executes the generic matching
+// Text-pattern profile. The Go frontend executes the generic matching
 // mechanics declared in this metadata and emits the configured event call; this
 // adapter gives that event its security meaning.
-adapter secretscan {
+adapter textpattern {
   meta {
     fidelity: resolved,
     cross_language: true,
-    text_pattern_event: "analysis.text_pattern.secretscan",
-    text_pattern_cache_key: "textpattern:secretscan",
+    text_pattern_event: "analysis.text_pattern.credential_literal",
+    text_pattern_cache_key: "textpattern:credential_literal",
     text_pattern_extensions: [".go", ".py", ".js", ".jsx", ".ts", ".tsx", ".rb", ".java", ".php", ".cs", ".c", ".cpp", ".rs", ".sh", ".bash", ".scala", ".kt", ".kts", ".swift", ".pl", ".ex", ".exs", ".dart", ".groovy", ".env", ".yaml", ".yml", ".properties", ".json", ".toml", ".ini", ".cfg", ".conf", ".tf"],
     text_pattern_direct: ["AKIA[0-9A-Z]{16}", "ASIA[0-9A-Z]{16}", "sk_live_[0-9A-Za-z]{20,}", "rk_live_[0-9A-Za-z]{20,}", "ghp_[0-9A-Za-z]{36,}", "gho_[0-9A-Za-z]{36,}", "github_pat_[0-9A-Za-z_]{40,}", "AIza[0-9A-Za-z_\\-]{35}", "xox[baprs]-[0-9A-Za-z-]{10,}", "-----BEGIN [A-Z ]*PRIVATE KEY-----", "eyJ[A-Za-z0-9_\\-]{10,}\\.[A-Za-z0-9_\\-]{10,}\\.[A-Za-z0-9_\\-]{10,}", "glpat-[0-9A-Za-z_\\-]{20,}", "SG\\.[0-9A-Za-z_\\-]{22}\\.[0-9A-Za-z_\\-]{43}"],
     text_pattern_assignment_names: ["password", "passwd", "pwd", "secret", "api[_-]?key", "apikey", "access[_-]?token", "auth[_-]?token", "client[_-]?secret", "private[_-]?key"],
@@ -16,5 +16,5 @@ adapter secretscan {
     text_pattern_excluded_substrings: ["env", "process."],
     text_pattern_min_value_classes: "2"
   }
-  mark "analysis.text_pattern.secretscan" -> code.HardcodedSecret
+  mark "analysis.text_pattern.credential_literal" -> code.HardcodedSecret
 }

@@ -869,7 +869,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			// md5_hex…), but some are bare member accesses with no call — e.g.
 			// Solidity `tx.origin` used for authorization — so scan Attr nodes too.
 			var out []adapters.Mapping
-			// cross-language adapters (secretscan, …) label nodes in source files of
+			// cross-language adapters label nodes in source files of
 			// every language, so the per-language tech filter doesn't apply.
 			crossLang := spec.crossLang
 			pkgs := packageEvidence(s, spec.Technology, crossLang)
@@ -1065,8 +1065,8 @@ func matchPath(path string, patterns []string, mode string) bool {
 }
 
 // Per-language adapter sets (loaded from vyql/adapters/*.vyql).
-func ConfigAdapters() []adapters.Adapter     { return AdaptersFor("config") }
-func SecretscanAdapters() []adapters.Adapter { return AdaptersFor("secretscan") }
+func ConfigAdapters() []adapters.Adapter      { return AdaptersFor("config") }
+func TextPatternAdapters() []adapters.Adapter { return AdaptersFor("textpattern") }
 
 // AutoAdapters returns adapter declarations that opt into whole-graph application through
 // `meta { auto_apply: graph }`.
