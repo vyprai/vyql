@@ -245,6 +245,15 @@ type Is struct {
 	Concept string
 }
 
+// Colocated is `<ref> colocated <Concept>` — the ref's enclosing function also
+// contains a node carrying Concept (same `func` scope). Used to gate a sink on its
+// surrounding context, e.g. a privileged operation that sits inside an HTTP request
+// handler (`op colocated code.HttpInput`), without requiring a dataflow path.
+type Colocated struct {
+	Ref     Ref
+	Concept string
+}
+
 type Cmp struct {
 	Ref   Ref
 	Op    string // "==" | "!="
@@ -265,6 +274,7 @@ func (SolverCall) isExpr()     {}
 func (HoldsAssetKind) isExpr() {}
 func (Has) isExpr()            {}
 func (Is) isExpr()             {}
+func (Colocated) isExpr()      {}
 func (Cmp) isExpr()            {}
 func (NotIn) isExpr()          {}
 

@@ -19,17 +19,23 @@ type shConv struct {
 	key  string
 }
 
-// shSourceVars: positional/special params and CGI env vars are untrusted input.
-func shSourceVar(name string) bool {
+// shSourceKind classifies a shell variable as an untrusted-input source. Both kinds
+// refine core.UserControlledData (so injection/SSRF rules fire on either), but they are
+// kept distinct so HTTP-specific rules — e.g. the missing-auth check, which keys on a
+// request handler — are not misled by a CLI installer's positional args:
+//   "http" — CGI request env ($QUERY_STRING, $HTTP_*, …) → code.HttpInput
+//   "cli"  — positional/special params ($1..$9, $@, $*)   → code.CliArgument
+//   ""     — not a source
+func shSourceKind(name string) string {
 	if len(name) == 1 && (name[0] >= '1' && name[0] <= '9' || name == "@" || name == "*") {
-		return true
+		return "cli"
 	}
 	for _, p := range []string{"QUERY_STRING", "HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_", "REQUEST_URI", "REQUEST_METHOD"} {
 		if name == p || strings.HasPrefix(name, p) {
-			return true
+			return "http"
 		}
 	}
-	return false
+	return ""
 }
 
 // ExtractBash parses shell scripts into one NIR Program (one module per file).
@@ -153,8 +159,11 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "simple_expansion", "expansion":
 		name := c.expansionVar(n)
-		if shSourceVar(name) { // $1 / $QUERY_STRING / … → untrusted input
+		switch shSourceKind(name) {
+		case "http": // $QUERY_STRING / $HTTP_* / … → HTTP request input
 			return nir.Call{Callee: nir.Name{ID: "shell_input", Loc: L}, Path: "shell_input", Method: "shell_input", Loc: L}
+		case "cli": // $1..$9 / $@ / $* → CLI positional argument
+			return nir.Call{Callee: nir.Name{ID: "cli_input", Loc: L}, Path: "cli_input", Method: "cli_input", Loc: L}
 		}
 		return nir.Name{ID: name, Loc: L}
 	case "string", "concatenation":

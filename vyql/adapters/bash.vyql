@@ -4,8 +4,13 @@
 adapter bash {
   meta { fidelity: resolved }
 
-  // untrusted input: positional params + CGI environment ($1, $QUERY_STRING, …)
+  // untrusted input. CGI request env ($QUERY_STRING, $HTTP_*) is HTTP request input;
+  // positional/special params ($1..$9, $@, $*) are CLI arguments. Both refine
+  // core.UserControlledData (so injection/SSRF rules fire on either), but the split
+  // keeps HTTP-handler-specific rules (missing-auth) from treating CLI installers as
+  // request handlers.
   source "shell_input" -> code.HttpInput
+  source "cli_input" -> code.CliArgument
 
   // code evaluation
   sink path "eval" arg 0 -> code.CodeEval

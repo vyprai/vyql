@@ -401,6 +401,12 @@ func (p *parser) parseAtom() Expr {
 		p.next()
 		return Has{Ref: ref, Concept: p.parseConceptRef()}
 	}
+	// `colocated <Concept>` — the ref's enclosing function also contains a node
+	// carrying Concept (same `func` scope). Context gate without a dataflow path.
+	if p.atWord("colocated") {
+		p.next()
+		return Colocated{Ref: ref, Concept: p.parseConceptRef()}
+	}
 	// `labeled <Concept>` — the node the ref resolves to carries the concept
 	// (docs/11: `c.dst labeled threat.MiningPool`). Same semantics as `has`.
 	if p.atWord("labeled") {

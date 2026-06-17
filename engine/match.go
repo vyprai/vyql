@@ -142,6 +142,9 @@ func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []stri
 	case parser.Has:
 		id := e.resolveRef(a.Ref, env)
 		return id != "" && e.nodeHasConcept(id, a.Concept), nil
+	case parser.Colocated:
+		id := e.resolveRef(a.Ref, env)
+		return id != "" && e.colocated(id, a.Concept), nil
 	case parser.Is:
 		return e.resolveScalar(a.Ref, env) == a.Concept, nil
 	case parser.NotIn:
@@ -266,6 +269,33 @@ func (e *Engine) resolveScalar(ref parser.Ref, env map[string]string) string {
 func (e *Engine) nodeHasConcept(nodeID, concept string) bool {
 	for _, l := range e.labels(nodeID) {
 		if l.Concept == concept {
+			return true
+		}
+	}
+	return false
+}
+
+// colocated reports whether nodeID's enclosing function (its `func` scope) also
+// contains a node carrying `concept`. This is a context gate, not a dataflow path:
+// it answers "is this operation inside the same function as a node labelled X" —
+// e.g. a privileged sink sitting in an HTTP request handler (`op colocated
+// code.HttpInput`). Nodes without a `func` property never co-locate (avoids
+// matching module-scope nodes against each other).
+func (e *Engine) colocated(nodeID, concept string) bool {
+	n, ok, _ := e.Store.GetNode(nodeID)
+	if !ok {
+		return false
+	}
+	fn := n.Prop("func")
+	if fn == "" {
+		return false
+	}
+	peers, _ := e.Store.NodesWithConcept(concept)
+	for _, pid := range peers {
+		if pid == nodeID {
+			continue
+		}
+		if pn, ok, _ := e.Store.GetNode(pid); ok && pn.Prop("func") == fn {
 			return true
 		}
 	}
