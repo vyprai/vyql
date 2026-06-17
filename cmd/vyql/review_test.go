@@ -58,6 +58,40 @@ const accurevReviewJava = `class DescriptorImpl {
   }
 }`
 
+const activeDirectoryStatusReviewJava = `class ActiveDirectoryStatus {
+  ProgressiveRendering startDomainHealthChecks(String domain) {
+    ActiveDirectorySecurityRealm realm = Jenkins.getActiveInstance().getSecurityRealm();
+    realm.getDescriptor().obtainLDAPServer(domain);
+    return new ProgressiveRendering();
+  }
+
+  long computeLoginExecutionTime() throws Exception {
+    String username = Jenkins.getAuthentication().getName();
+    Jenkins.getActiveInstance().getSecurityRealm().loadUserByUsername(username);
+    return 1L;
+  }
+
+  Object getTarget() {
+    Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+    return this;
+  }
+}
+class Jenkins {
+  static Jenkins get() { return new Jenkins(); }
+  static Jenkins getActiveInstance() { return new Jenkins(); }
+  static Authentication getAuthentication() { return new Authentication(); }
+  static String ADMINISTER;
+  ActiveDirectorySecurityRealm getSecurityRealm() { return new ActiveDirectorySecurityRealm(); }
+  void checkPermission(String p) {}
+}
+class Authentication { String getName() { return "u"; } }
+class ActiveDirectorySecurityRealm {
+  Descriptor getDescriptor() { return new Descriptor(); }
+  void loadUserByUsername(String u) {}
+}
+class Descriptor { void obtainLDAPServer(String domain) {} }
+class ProgressiveRendering {}`
+
 const authReviewC = `int run_post_create(char *path);
 int perform_http_xact(char *messagebuf_data) {
   return run_post_create(messagebuf_data);
@@ -141,6 +175,28 @@ func TestCollectReviewItemsAccurevCredentialTest(t *testing.T) {
 	}
 	if !hasReviewCall(rows, "Login.accurevLoginFromGlobalConfig", "code.SensitiveOperation") {
 		t.Fatalf("expected AccuRev global-config login review target, got %#v", rows)
+	}
+}
+
+func TestCollectReviewItemsActiveDirectoryStatus(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "ActiveDirectoryStatus.java"), []byte(activeDirectoryStatusReviewJava), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	applyProfile([]string{dir}, "auto")
+	g, _, err := buildGraph([]string{dir})
+	if err != nil {
+		t.Fatalf("buildGraph: %v", err)
+	}
+	rows := collectReviewItems(g)
+	if !hasReviewCall(rows, "realm.getDescriptor.obtainLDAPServer", "code.SensitiveOperation") {
+		t.Fatalf("expected LDAP server health lookup review target, got %#v", rows)
+	}
+	if !hasReviewCall(rows, "Jenkins.getActiveInstance.getSecurityRealm.loadUserByUsername", "code.SensitiveOperation") {
+		t.Fatalf("expected user lookup auth review target, got %#v", rows)
+	}
+	if !hasReviewCall(rows, "Jenkins.get.checkPermission", "core.AuthorizationCheck") {
+		t.Fatalf("expected Jenkins checkPermission authorization check, got %#v", rows)
 	}
 }
 
