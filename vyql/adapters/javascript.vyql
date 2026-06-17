@@ -228,6 +228,9 @@ adapter javascript {
   sink path "http.request" -> code.UrlFetch
   sink path "https.request" -> code.UrlFetch
   sink path "request" -> code.UrlFetch
+  // headless-browser navigation (Puppeteer/Playwright `page.goto(url)`) fetches an
+  // attacker-controllable URL server-side -> SSRF (CVE-2026-5323, a11y-mcp).
+  sink method "goto" -> code.UrlFetch
   sink path "request.get" -> code.UrlFetch
   sink path "request.post" -> code.UrlFetch
   sink path "needle.get" -> code.UrlFetch

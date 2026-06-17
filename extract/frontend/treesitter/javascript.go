@@ -958,6 +958,10 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	switch n.Kind() {
 	case "identifier", "shorthand_property_identifier", "property_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
+	case "this", "super":
+		// model `this`/`super` as a Name so `this.method()` resolves to the enclosing class's
+		// method (interprocedural taint through `this.helper(x)`), incl. inside arrow callbacks.
+		return nir.Name{ID: "this", Loc: L}
 	case "number":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "regex":
