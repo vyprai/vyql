@@ -63,6 +63,8 @@ func main() {
 	switch cmd {
 	case "scan":
 		err = cmdScan(args)
+	case "review":
+		err = cmdReview(args)
 	case "trace":
 		err = cmdTrace(args)
 	case "explain":
@@ -394,6 +396,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
 	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats]")
+	fmt.Fprintln(os.Stderr, "  review     list non-finding review targets and supporting checks for AI/manual review   [-format text|json]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")

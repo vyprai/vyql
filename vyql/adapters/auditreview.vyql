@@ -31,6 +31,7 @@ adapter auditreview {
   mark method "impersonate" -> code.SensitiveOperation
   mark method "assumeRole" -> code.SensitiveOperation
   mark method "promote" -> code.SensitiveOperation
+  mark method "run_post_create" -> code.SensitiveOperation
 
   // --- resource acquisition / unbounded reads (resource-DoS review) ---
   mark method "ReadAll" -> code.ResourceReview

@@ -171,6 +171,13 @@ adapter java {
   control "hasPermission" -> core.AuthorizationCheck
   control "hasAuthority" -> core.AuthorizationCheck
   control "hasRole" -> core.AuthorizationCheck
+  // Accumulo-style permission gates: review-only context for authz CVEs where the bug is
+  // an ignored/unenforced boolean result rather than taint reaching a sink.
+  control method "canFlush" -> core.AuthorizationCheck
+  control method "canPerformSystemActions" -> core.AuthorizationCheck
+  control method "canAlterNamespace" -> core.AuthorizationCheck
+  control method "canAlterTable" -> core.AuthorizationCheck
+  control method "canObtainDelegationToken" -> core.AuthorizationCheck
   control method "requireAuth" -> core.AuthenticationCheck
   control method "ensureAuthenticated" -> core.AuthenticationCheck
   control method "isAuthenticated" -> core.AuthenticationCheck
