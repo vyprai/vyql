@@ -435,6 +435,10 @@ adapter python {
   // Boundary check for realpath/common workspace guards: `resolved.startswith(base + os.sep)`
   // requires a path separator after the base, unlike plain prefix checks.
   control method "startswith" val "os.sep" -> core.PathAccessCheck
+  // pathlib containment guard: `candidate.resolve().relative_to(root)` raises
+  // ValueError when the candidate escapes root, and is the patched idiom for
+  // Windows-safe prompt file containment in CVE-2026-10044.
+  control method "relative_to" -> core.PathAccessCheck
 
   // UNSOUND neutralizers (`assume`) — never suppress; emit an assumption note. The dominant
   // Python OWASP idiom is the `if '<bad>' in tainted:` substring blocklist, recognized

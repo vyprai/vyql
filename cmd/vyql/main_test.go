@@ -189,6 +189,27 @@ def allow():
     return open(f'/data/{safe}', 'rb')
 `
 
+const pyPathlibRelativeToGuard = `from pathlib import Path
+from fastapi import APIRouter, HTTPException
+
+router = APIRouter()
+ROOT = Path("prompts").resolve()
+
+def safe_prompt_path(filename: str) -> Path:
+    try:
+        resolved = (ROOT / filename).resolve()
+        resolved.relative_to(ROOT)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid filename")
+    return resolved
+
+@router.get("/{filename}")
+def get_prompt(filename: str):
+    path = safe_prompt_path(filename)
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+`
+
 func TestScanPythonInOperatorIdioms(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "files.py"), []byte(pyBlocklistGuard), 0o644); err != nil {
@@ -218,6 +239,23 @@ func TestScanPythonInOperatorIdioms(t *testing.T) {
 	}
 	if !noted {
 		t.Fatalf("blocklist `if '../' in bar` must carry a guard assumption note, got NE=%+v", pathFs[0].NegationEvidence)
+	}
+}
+
+func TestScanPythonPathlibRelativeToGuard(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "prompts.py"), []byte(pyPathlibRelativeToGuard), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := loadRules("")
+	fs, _, err := scanPaths([]string{dir}, rules)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	for _, f := range fs {
+		if f.RuleID == "VYQL-PATH-001" {
+			t.Fatalf("pathlib resolve+relative_to containment should suppress path traversal finding: %+v", f)
+		}
 	}
 }
 
