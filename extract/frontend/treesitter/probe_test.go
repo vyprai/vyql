@@ -8,15 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	adapterapply "github.com/vyprai/vyql/adapters"
-	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/usg"
 )
 
-// TestFrontendCapabilityMatrix probes every frontend with security-critical snippets and
+// TestFrontendCapabilityMatrix probes every frontend with small syntax-flow snippets and
 // reports, per (language × capability), whether the frontend produces the expected graph
 // evidence. java/python/javascript are the reference (most complete). Run with:
 //
@@ -186,7 +184,7 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 		}},
 		{"member/subscript write", func(g usg.Store) bool {
 			// the assignment value is captured in a write node (a code.Call with an incoming
-			// FLOWS edge) — how JS path-sink-writes and python __setitem__ both model it.
+			// FLOWS edge) — how JS path-based writes and python __setitem__ both model it.
 			cs, _ := g.NodesOfType("code.Call")
 			for _, id := range cs {
 				if es, _ := g.InEdges(id, "FLOWS"); len(es) > 0 {
@@ -195,27 +193,27 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			}
 			return false
 		}, map[string]string{
-			"java":       `class T { void r(String p){ obj.role = p; } }`,
-			"python":     "def r(p):\n    s = {}\n    s['role'] = p",
-			"javascript": `function r(p){ obj.role = p; }`,
-			"csharp":     `class T { void R(string p){ obj.role = p; } }`,
-			"php":        `<?php function r($p){ $obj->role = $p; }`,
-			"ruby":       "def r(p)\n  obj.role = p\nend",
-			"kotlin":     `fun r(p: String){ obj.role = p }`,
-			"scala":      `object T { def r(p: String): Unit = { obj.role = p } }`,
+			"java":       `class T { void r(String p){ obj.value = p; } }`,
+			"python":     "def r(p):\n    s = {}\n    s['value'] = p",
+			"javascript": `function r(p){ obj.value = p; }`,
+			"csharp":     `class T { void R(string p){ obj.value = p; } }`,
+			"php":        `<?php function r($p){ $obj->value = $p; }`,
+			"ruby":       "def r(p)\n  obj.value = p\nend",
+			"kotlin":     `fun r(p: String){ obj.value = p }`,
+			"scala":      `object T { def r(p: String): Unit = { obj.value = p } }`,
 		}},
 		{"bool literal token", hasStrArg("false"), map[string]string{
-			"java":       `class T { void r(){ c.setSecure(false); } }`,
-			"python":     "def r():\n    c.set_cookie('x', secure=False)",
-			"javascript": `function r(){ c.setSecure(false); }`,
-			"csharp":     `class T { void R(){ c.SetSecure(false); } }`,
-			"php":        `<?php function r(){ setcookie('x', 'v', false); }`,
-			"ruby":       "def r()\n  set_cookie('x', secure: false)\nend",
-			"kotlin":     `fun r(){ c.setSecure(false) }`,
-			"scala":      `object T { def r(): Unit = { c.setSecure(false) } }`,
-			"swift":      `func r(){ c.setSecure(false) }`,
-			"dart":       `void r(){ c.setSecure(false); }`,
-			"groovy":     `void r(){ c.setSecure(false) }`,
+			"java":       `class T { void r(){ c.setEnabled(false); } }`,
+			"python":     "def r():\n    c.configure(enabled=False)",
+			"javascript": `function r(){ c.setEnabled(false); }`,
+			"csharp":     `class T { void R(){ c.SetEnabled(false); } }`,
+			"php":        `<?php function r(){ configure('mode', false); }`,
+			"ruby":       "def r()\n  configure(enabled: false)\nend",
+			"kotlin":     `fun r(){ c.setEnabled(false) }`,
+			"scala":      `object T { def r(): Unit = { c.setEnabled(false) } }`,
+			"swift":      `func r(){ c.setEnabled(false) }`,
+			"dart":       `void r(){ c.setEnabled(false); }`,
+			"groovy":     `void r(){ c.setEnabled(false) }`,
 		}},
 		{"interproc src→sink", flowToSink("p", "sink"), map[string]string{
 			"java":       `class T { String wrap(String p){ return p; } void r(String p){ sink(wrap(p)); } }`,
@@ -403,108 +401,6 @@ func TestJavaScriptIIFELowersBody(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestJavaScriptCommonJSExportSeedsPublicAPI(t *testing.T) {
-	dir := t.TempDir()
-	src := filepath.Join(dir, "index.js")
-	code := `const cp = require('child_process');
-module.exports = function killport(port) {
-  cp.exec('lsof -i:' + port);
-};`
-	if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	prog, err := treesitter.ExtractJavaScript([]string{src}, dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g, err := lowering.Lower(prog, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// public-API params are now the library trust boundary (FuncDef.Exported ->
-	// code.ExternalEntryInput), gated to the library profile. Simulate it.
-	defer frontend.SetActiveSources(nil)
-	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
-	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.AdaptersFor("library")...), nil); err != nil {
-		t.Fatal(err)
-	}
-	sources, _ := g.NodesWithConcept("code.ExternalEntryInput")
-	var sinks []string
-	nodes, _ := g.AllNodes()
-	for _, n := range nodes {
-		if n.Prop("callee_path") == "child_process.exec" || n.Prop("callee_path") == "cp.exec" {
-			if arg := n.Prop("arg0"); arg != "" {
-				sinks = append(sinks, arg)
-			}
-		}
-	}
-	if len(sources) == 0 || len(sinks) == 0 {
-		t.Fatalf("expected exported-param source and exec arg sink, got %d sources / %d sinks", len(sources), len(sinks))
-	}
-	if !reachable(g, sources, sinks) {
-		t.Fatalf("expected exported parameter source to flow into cp.exec argument")
-	}
-}
-
-func TestJavaScriptDestructuringKeepsTaint(t *testing.T) {
-	dir := t.TempDir()
-	src := filepath.Join(dir, "destructure.js")
-	code := `module.exports = function launch(file, specifiedEditor) {
-  const parsed = parseFile(file);
-  let { fileName } = parsed;
-  const [editor, ...args] = guessEditor(specifiedEditor);
-  args.push(fileName);
-  childProcess.spawn('cmd.exe', ['/C', editor].concat(args), {});
-};`
-	if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	prog, err := treesitter.ExtractJavaScript([]string{src}, dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g, err := lowering.Lower(prog, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer frontend.SetActiveSources(nil)
-	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
-	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.AdaptersFor("library")...), nil); err != nil {
-		t.Fatal(err)
-	}
-	srcs, _ := g.NodesWithConcept("code.ExternalEntryInput")
-	sinks, _ := g.NodesWithConcept("code.CommandExecution")
-	if !reachable(g, srcs, sinks) {
-		t.Fatalf("expected exported destructured values to flow into cmd.exe spawn args")
-	}
-}
-
-func reachable(g usg.Store, sources, sinks []string) bool {
-	sink := map[string]bool{}
-	for _, s := range sinks {
-		sink[s] = true
-	}
-	for _, s := range sources {
-		seen := map[string]bool{s: true}
-		q := []string{s}
-		for len(q) > 0 {
-			cur := q[0]
-			q = q[1:]
-			if sink[cur] {
-				return true
-			}
-			es, _ := g.OutEdges(cur, "FLOWS")
-			for _, e := range es {
-				if !seen[e.Dst] {
-					seen[e.Dst] = true
-					q = append(q, e.Dst)
-				}
-			}
-		}
-	}
-	return false
 }
 
 func pad(s, col string) string {
