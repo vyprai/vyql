@@ -217,4 +217,13 @@ adapter csharp {
 
   // character-filter: Regex.Replace(input, pattern, repl) is global.
   filter path "Regex.Replace" global
+
+  // ServiceStack (dependency-gated): the HTML-format response writer reflects the request
+  // URL into an HTML page and writes it to the output stream. ResolveAbsoluteUrl is the
+  // request-derived source; the stream WriteAsync of the built HTML body is the XSS sink.
+  // Scoped to the servicestack package so the otherwise-generic WriteAsync stays safe.
+  package "servicestack" {
+    source method "ResolveAbsoluteUrl" -> code.HttpInput
+    sink method "WriteAsync" -> code.HtmlRender
+  }
 }
