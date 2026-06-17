@@ -11,60 +11,11 @@ import (
 
 // jvConv walks a tree-sitter Java CST into NIR.
 type jvConv struct {
-	src          []byte
-	root         string
-	file         string
-	key          string
-	inController bool // inside a @RestController/@Controller class
-}
-
-// jvHandlerAnns mark a Spring/JAX-RS/Micronaut class/method as a request handler,
-// so its method parameters (e.g. @RequestParam/@PathVariable/@QueryParam values)
-// are seeded as http_input.
-var jvHandlerAnns = map[string]bool{
-	// Spring MVC / WebFlux
-	"RestController": true, "Controller": true, "RequestMapping": true,
-	"GetMapping": true, "PostMapping": true, "PutMapping": true,
-	"DeleteMapping": true, "PatchMapping": true,
-	// JAX-RS (Jersey/RESTEasy) + Quarkus (which reuses JAX-RS): @Path on the
-	// resource class, @GET/@POST/... on the methods.
-	"Path": true, "GET": true, "POST": true, "PUT": true,
-	"DELETE": true, "HEAD": true, "OPTIONS": true,
-	// Micronaut
-	"Get": true, "Post": true, "Put": true, "Delete": true,
-}
-
-// hasHandlerAnn reports whether a class/method declaration carries a Spring
-// handler annotation. Annotations live under the `modifiers` child; the name is
-// an identifier/scoped_identifier child of the (marker_)annotation node.
-func (c *jvConv) hasHandlerAnn(n *tree_sitter.Node) bool {
-	found := false
-	var walk func(m *tree_sitter.Node)
-	walk = func(m *tree_sitter.Node) {
-		if m == nil || found {
-			return
-		}
-		if m.Kind() == "marker_annotation" || m.Kind() == "annotation" {
-			for _, k := range namedChildren(m) {
-				if k.Kind() == "identifier" || k.Kind() == "scoped_identifier" {
-					if jvHandlerAnns[lastSeg(c.text(k))] {
-						found = true
-					}
-					break
-				}
-			}
-			return
-		}
-		for _, ch := range namedChildren(m) {
-			walk(ch)
-		}
-	}
-	for _, ch := range namedChildren(n) {
-		if ch.Kind() == "modifiers" {
-			walk(ch)
-		}
-	}
-	return found
+	src              []byte
+	root             string
+	file             string
+	key              string
+	classParamTokens []string
 }
 
 // javaPublic reports whether a method/constructor is part of the public API surface:
@@ -170,31 +121,20 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "class_declaration", "interface_declaration", "enum_declaration", "record_declaration":
-		prev := c.inController
-		c.inController = prev || c.hasHandlerAnn(n)
+		prev := c.classParamTokens
+		c.classParamTokens = append(append([]string{}, prev...), c.jvAnnotationTokens(n, "class_annotation:")...)
 		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}
-		c.inController = prev
+		c.classParamTokens = prev
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration":
+		name := c.text(field(n, "name"))
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
-		// Spring handler params (e.g. @RequestParam/@PathVariable) are request input.
-		if c.inController || c.hasHandlerAnn(n) {
-			var seed []nir.Stmt
-			for _, p := range params {
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-			}
-			body = append(seed, body...)
-		} else if mn := c.text(field(n, "name")); mn == "isValid" && len(params) > 0 && hasParamType(paramTypes, "ConstraintValidatorContext") {
-			// JSR-380 ConstraintValidator.isValid(value, ctx): value is framework-supplied
-			// entry data. Seed it so custom-message flows remain visible to adapters.
-			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
-				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}}}, body...)
-		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
-			Exported: c.inController || c.hasHandlerAnn(n) || c.javaPublic(n)}}
+		tokens := append([]string{}, c.classParamTokens...)
+		tokens = append(tokens, c.jvAnnotationTokens(n, "annotation:")...)
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
+			ParamEntries: c.jvParamEntries(name, params, paramTypes, tokens), Exported: c.javaPublic(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
 		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution
@@ -419,15 +359,75 @@ func (c *jvConv) paramTypes(params *tree_sitter.Node) map[string]string {
 	return out
 }
 
-// hasParamType reports whether any parameter's declared type has the given (generics-stripped)
-// short name — e.g. detecting the `ConstraintValidatorContext` arg of a JSR-380 validator.
-func hasParamType(paramTypes map[string]string, short string) bool {
-	for _, t := range paramTypes {
-		if t == short || strings.HasSuffix(t, "."+short) {
-			return true
+// jvAnnotationTokens extracts syntax-level annotation names without interpreting
+// framework/domain meaning. Adapters decide what each token means.
+func (c *jvConv) jvAnnotationTokens(n *tree_sitter.Node, prefix string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(name string) {
+		if name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		out = append(out, prefix+name)
+	}
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil {
+			return
+		}
+		if m.Kind() == "marker_annotation" || m.Kind() == "annotation" {
+			for _, k := range namedChildren(m) {
+				if k.Kind() == "identifier" || k.Kind() == "scoped_identifier" {
+					full := c.text(k)
+					add(full)
+					if short := lastSeg(full); short != "" && short != full {
+						add(short)
+					}
+					break
+				}
+			}
+			return
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
 		}
 	}
-	return false
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "modifiers" {
+			walk(ch)
+		}
+	}
+	return out
+}
+
+func (c *jvConv) jvParamEntries(name string, params []string, paramTypes map[string]string, base []string) []nir.ParamEntry {
+	funcTokens := append([]string{}, base...)
+	for _, typ := range paramTypes {
+		if typ == "" {
+			continue
+		}
+		funcTokens = append(funcTokens, "has_param_type:"+typ)
+		if short := lastSeg(typ); short != "" && short != typ {
+			funcTokens = append(funcTokens, "has_param_type:"+short)
+		}
+	}
+	out := make([]nir.ParamEntry, 0, len(params))
+	for i, p := range params {
+		if p == "" || p == "_" {
+			continue
+		}
+		tokens := append([]string{}, funcTokens...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		if typ := paramTypes[p]; typ != "" {
+			tokens = append(tokens, "param_type:"+typ)
+			if short := lastSeg(typ); short != "" && short != typ {
+				tokens = append(tokens, "param_type:"+short)
+			}
+		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return out
 }
 
 func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {

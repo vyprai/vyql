@@ -3,9 +3,29 @@
 adapter java {
   meta { match: contains, fidelity: resolved }
 
-  // Spring handler params (seeded http_input by the frontend) + servlet inputs
+  // Handler/framework-supplied params + servlet inputs
   source "System.console.readLine" -> code.StdinInput
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:GetMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PostMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PutMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:DeleteMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PatchMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:RequestMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:GET" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:POST" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PUT" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:DELETE" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:HEAD" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:OPTIONS" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:Get" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:Post" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:Put" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:Delete" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:RestController" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:Controller" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:RequestMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:Path" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_name:isValid" val "has_param_type:ConstraintValidatorContext" val "param_index:0" -> code.HttpInput
   // Servlet / Spring request inputs (receiver name varies → substring match)
   source ".getParameter" -> code.HttpInput
   source ".getParameterValues" -> code.HttpInput
