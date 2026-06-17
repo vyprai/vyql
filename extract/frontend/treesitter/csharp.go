@@ -365,6 +365,32 @@ func (c *csConv) block(block *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
+// lambdaParams extracts the parameter names of a C# lambda: an `implicit_parameter`/identifier
+// for `x => …`, or a `parameter_list` for `(x, y) => …` / `(int x) => …`.
+func (c *csConv) lambdaParams(p *tree_sitter.Node) []string {
+	if p == nil {
+		return nil
+	}
+	switch p.Kind() {
+	case "parameter_list":
+		var out []string
+		for _, ch := range namedChildren(p) {
+			switch ch.Kind() {
+			case "parameter":
+				if nm := field(ch, "name"); nm != nil {
+					out = append(out, c.text(nm))
+				}
+			case "implicit_parameter", "identifier":
+				out = append(out, c.text(ch))
+			}
+		}
+		return out
+	case "implicit_parameter", "identifier":
+		return []string{c.text(p)}
+	}
+	return nil
+}
+
 func (c *csConv) params(params *tree_sitter.Node) []string {
 	if params == nil {
 		return nil
@@ -473,6 +499,21 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: args, Path: typ, Method: typ, Loc: L}
+	case "lambda_expression", "anonymous_method_expression":
+		// C# lambdas / anonymous delegates were unlowered (fell through to a Seq), so callbacks
+		// and ALL LINQ (Select/Where/ForEach/GroupBy…) dropped their bodies — no taint reached
+		// the lambda param or a sink inside it. Lower as nir.Lambda so the param is routed from
+		// the receiver (elementCallbackMethods) and the body is analysed.
+		params := c.lambdaParams(field(n, "parameters"))
+		var body []nir.Stmt
+		if b := field(n, "body"); b != nil {
+			if b.Kind() == "block" {
+				body = c.block(b)
+			} else {
+				body = []nir.Stmt{nir.Return{Value: c.expr(b)}} // expression-bodied lambda
+			}
+		}
+		return nir.Lambda{Params: params, Body: body, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))

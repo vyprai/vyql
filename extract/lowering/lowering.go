@@ -130,6 +130,13 @@ var keyedMutators = map[string]bool{"put": true, "putIfAbsent": true, "set": tru
 var elementCallbackMethods = map[string]bool{
 	"forEach": true, "map": true, "filter": true, "find": true, "findIndex": true,
 	"some": true, "every": true, "flatMap": true, "then": true, "catch": true, "finally": true,
+	// C#/.NET LINQ (and ForEach) invoke their lambda with each element of the receiver, so
+	// route the receiver's (element) taint into the lambda's first param.
+	"Select": true, "SelectMany": true, "Where": true, "ForEach": true, "GroupBy": true,
+	"OrderBy": true, "OrderByDescending": true, "ThenBy": true, "First": true, "FirstOrDefault": true,
+	"Single": true, "SingleOrDefault": true, "Last": true, "LastOrDefault": true, "Any": true,
+	"All": true, "Count": true, "TakeWhile": true, "SkipWhile": true, "Aggregate": true,
+	"DistinctBy": true, "MaxBy": true, "MinBy": true, "ToDictionary": true, "ToLookup": true,
 }
 
 // appendMutators add at the next sequence index: `list.add(val)` / `sb.append(val)`.
