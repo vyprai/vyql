@@ -448,40 +448,6 @@ module.exports = function killport(port) {
 	}
 }
 
-func TestJavaScriptPrototypeOptionReadSink(t *testing.T) {
-	dir := t.TempDir()
-	src := filepath.Join(dir, "template.js")
-	code := `exports.compile = function compile(template, optsParam) {
-  var opts = optsParam || {};
-  var options = {};
-  options.outputFunctionName = opts.outputFunctionName;
-};`
-	if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	prog, err := treesitter.ExtractJavaScript([]string{src}, dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g, err := lowering.Lower(prog, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer frontend.SetActiveSources(nil)
-	frontend.SetActiveSources(map[string]bool{"core.UserControlledData": true, "code.ExternalEntryInput": true})
-	if _, _, err := adapterapply.Apply(g, append(frontend.JsAdapters(), frontend.AdaptersFor("library")...), nil); err != nil {
-		t.Fatal(err)
-	}
-	srcs, _ := g.NodesWithConcept("code.ExternalEntryInput")
-	sinks, _ := g.NodesWithConcept("code.ProtoPollute")
-	if len(srcs) == 0 || len(sinks) == 0 {
-		t.Fatalf("expected public API source and ProtoPollute option-read sink, got %d sources / %d sinks", len(srcs), len(sinks))
-	}
-	if !reachable(g, srcs, sinks) {
-		t.Fatalf("expected public API option object to flow into polluted option read")
-	}
-}
-
 func TestJavaScriptDestructuringKeepsTaint(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "destructure.js")

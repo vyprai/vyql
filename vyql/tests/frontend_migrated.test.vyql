@@ -1,0 +1,12 @@
+test "javascript library option object reaches prototype option sink"
+  lang javascript
+  profile library
+  expect VYQL-INJ-013
+  code
+  ```
+  exports.compile = function compile(template, optsParam) {
+    var opts = optsParam || {};
+    var options = {};
+    options.outputFunctionName = opts.outputFunctionName;
+  };
+  ```
