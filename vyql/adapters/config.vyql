@@ -41,6 +41,26 @@ adapter config {
     config_quoted_star_field_events: [
       "terraform|action|analysis.config.terraform.wildcard_iam",
       "terraform|resource|analysis.config.terraform.wildcard_iam"
+    ],
+    config_template_expr_start: "${",
+    config_template_expr_end: "}",
+    config_template_scopes: ["jelly", "jsp"],
+    config_template_input_pattern_jelly: "\\bit\\.(name|description|value|defaultValue)\\b",
+    config_template_skip_contains_jelly: ["<j:set", "<j:when", "<j:if", " test="],
+    config_template_input_event_jelly: "analysis.template.jelly.input",
+    config_template_render_event_jelly: "analysis.template.jelly.render",
+    config_template_escape_prefix_jelly: "h.escape(",
+    config_template_escape_event_jelly: "analysis.template.jelly.escape",
+    config_template_input_pattern_jsp: "\\b(requestContext|request|param|row|queues|value|text|name|defaultValue|JMSDestination)\\b",
+    config_template_skip_contains_jsp: ["<%@", "<c:out", "<c:forEach", "<c:if", " items=", " test="],
+    config_template_input_event_jsp: "analysis.template.jsp.input",
+    config_template_render_event_jsp: "analysis.template.jsp.render",
+    config_dot_template_rules: [
+      "_limit.jst|must be number|maximum;exclusiveMaximum;$schemaExcl|$schemaExcl|analysis.template.dot.schema_codegen_unvalidated",
+      "_limititems.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
+      "_limitlength.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
+      "_limitproperties.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
+      "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated"
     ]
   }
 
@@ -65,17 +85,17 @@ adapter config {
 
   // Jenkins Jelly views: template model fields such as it.name/it.description
   // rendered into HTML-bearing attributes need escaping before display.
-  source "jelly.input" -> core.UserControlledData
-  sink   "jelly.render" -> code.HtmlRender
-  control "h.escape" -> core.HtmlEscape
+  source "analysis.template.jelly.input" -> core.UserControlledData
+  sink   "analysis.template.jelly.render" -> code.HtmlRender
+  control "analysis.template.jelly.escape" -> core.HtmlEscape
 
   // JSP/JSTL views: raw EL expressions in HTML/link/attribute contexts are
   // rendered output; <c:out> is skipped by the frontend as an escaped render.
-  source "jsp.input" -> core.UserControlledData
-  sink   "jsp.render" -> code.HtmlRender
+  source "analysis.template.jsp.input" -> core.UserControlledData
+  sink   "analysis.template.jsp.render" -> code.HtmlRender
 
   // Ajv/doT codegen templates: numeric schema keywords must be type-checked
   // before the template emits validator code. Missing checks can let crafted
   // schemas steer generated code/prototype behavior.
-  mark "dot_schema_codegen_unvalidated" -> code.SchemaCodegenValidationBypass
+  mark "analysis.template.dot.schema_codegen_unvalidated" -> code.SchemaCodegenValidationBypass
 }

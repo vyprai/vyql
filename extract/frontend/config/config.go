@@ -110,68 +110,55 @@ func kind(path string, src []byte) string {
 }
 
 var (
-	jellyInputRE = regexp.MustCompile(`\bit\.(name|description|value|defaultValue)\b`)
-	jspInputRE   = regexp.MustCompile(`\b(requestContext|request|param|row|queues|value|text|name|defaultValue|JMSDestination)\b`)
+	defaultExprStart = "${"
+	defaultExprEnd   = "}"
 )
 
 func scanJelly(src []byte, file string) []nir.Stmt {
-	return scanTemplateExpressions(src, file, "jelly", jellyInputRE, jellyControlLine, jellyExpr)
+	return scanTemplateExpressions(src, file, "jelly")
 }
 
 func scanJSP(src []byte, file string) []nir.Stmt {
-	return scanTemplateExpressions(src, file, "jsp", jspInputRE, jspControlLine, jspExpr)
+	return scanTemplateExpressions(src, file, "jsp")
 }
 
 func scanDotTemplate(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	text := string(src)
 	base := strings.ToLower(filepath.Base(file))
-	var lineNeedle string
-	switch base {
-	case "_limit.jst":
-		if strings.Contains(text, "must be number") {
-			return nil
+	for _, rule := range cfg.DotRules {
+		if strings.ToLower(rule.File) != base {
+			continue
 		}
-		if strings.Contains(text, "maximum") && strings.Contains(text, "exclusiveMaximum") &&
-			strings.Contains(text, "$schemaExcl") {
-			lineNeedle = "$schemaExcl"
+		if containsAny(text, rule.SkipContains) || !containsAll(text, rule.RequiredContains) {
+			continue
 		}
-	case "_limititems.jst", "_limitlength.jst", "_limitproperties.jst":
-		if strings.Contains(text, "def.numberKeyword") {
-			return nil
-		}
-		if strings.Contains(text, "$schemaValue") {
-			lineNeedle = "$schemaValue"
-		}
-	case "definitions.def":
-		if strings.Contains(text, "def.numberKeyword") {
-			return nil
-		}
-		if strings.Contains(text, "def.$dataNotType") {
-			lineNeedle = "def.$dataNotType"
-		}
+		return []nir.Stmt{nir.ExprStmt{Value: call(rule.Event, file, firstLineContaining(text, rule.LineNeedle))}}
 	}
-	if lineNeedle == "" {
-		return nil
-	}
-	return []nir.Stmt{nir.ExprStmt{Value: call("dot_schema_codegen_unvalidated", file, firstLineContaining(text, lineNeedle))}}
+	return nil
 }
 
-func scanTemplateExpressions(src []byte, file, prefix string, inputRE *regexp.Regexp, skipLine func(string) bool, exprFn func(string, string) nir.Expr) []nir.Stmt {
+func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
+	cfg := loadProfile()
+	profile, ok := cfg.Templates[scope]
+	if !ok {
+		return nil
+	}
 	var out []nir.Stmt
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
-		if line == "" || !strings.Contains(line, "${") || skipLine(line) {
+		if line == "" || !strings.Contains(line, profile.ExprStart) || containsAny(line, profile.SkipContains) {
 			continue
 		}
-		for _, expr := range jellyExpressions(line) {
-			if expr == "" || !inputRE.MatchString(expr) {
+		for _, expr := range templateExpressions(line, profile.ExprStart, profile.ExprEnd) {
+			if expr == "" || !profile.InputPattern.MatchString(expr) {
 				continue
 			}
 			loc := file + ":" + itoa(i+1)
 			out = append(out, nir.ExprStmt{Value: nir.Call{
-				Callee: nir.Name{ID: prefix + ".render", Loc: loc},
-				Args:   []nir.Expr{exprFn(expr, loc)},
-				Path:   prefix + ".render",
+				Callee: nir.Name{ID: profile.RenderEvent, Loc: loc},
+				Args:   []nir.Expr{templateExpr(profile, expr, loc)},
+				Path:   profile.RenderEvent,
 				Method: "render",
 				Loc:    loc,
 			}})
@@ -180,31 +167,15 @@ func scanTemplateExpressions(src []byte, file, prefix string, inputRE *regexp.Re
 	return out
 }
 
-func jellyControlLine(line string) bool {
-	return strings.Contains(line, "<j:set") ||
-		strings.Contains(line, "<j:when") ||
-		strings.Contains(line, "<j:if") ||
-		strings.Contains(line, " test=")
-}
-
-func jspControlLine(line string) bool {
-	return strings.Contains(line, "<%@") ||
-		strings.Contains(line, "<c:out") ||
-		strings.Contains(line, "<c:forEach") ||
-		strings.Contains(line, "<c:if") ||
-		strings.Contains(line, " items=") ||
-		strings.Contains(line, " test=")
-}
-
-func jellyExpressions(line string) []string {
+func templateExpressions(line, startDelim, endDelim string) []string {
 	var out []string
 	for {
-		start := strings.Index(line, "${")
+		start := strings.Index(line, startDelim)
 		if start < 0 {
 			return out
 		}
-		rest := line[start+2:]
-		end := strings.IndexByte(rest, '}')
+		rest := line[start+len(startDelim):]
+		end := strings.Index(rest, endDelim)
 		if end < 0 {
 			return out
 		}
@@ -213,31 +184,23 @@ func jellyExpressions(line string) []string {
 	}
 }
 
-func jellyExpr(expr, loc string) nir.Expr {
-	if inner, ok := jellyEscapeArg(expr); ok {
+func templateExpr(profile templateProfile, expr, loc string) nir.Expr {
+	if inner, ok := templateWrapperArg(expr, profile.EscapePrefix); ok {
 		return nir.Call{
-			Callee: nir.Attr{Base: nir.Name{ID: "h", Loc: loc}, Attr: "escape", Path: "h.escape", Loc: loc},
-			Args:   []nir.Expr{jellySource(inner, loc)},
-			Path:   "h.escape",
-			Method: "escape",
+			Callee: nir.Name{ID: profile.EscapeEvent, Loc: loc},
+			Args:   []nir.Expr{templateInput(profile, inner, loc)},
+			Path:   profile.EscapeEvent,
+			Method: lastSeg(profile.EscapeEvent),
 			Loc:    loc,
 		}
 	}
-	return jellySource(expr, loc)
+	return templateInput(profile, expr, loc)
 }
 
-func jspExpr(expr, loc string) nir.Expr {
-	return nir.Call{
-		Callee: nir.Name{ID: "jsp.input", Loc: loc},
-		Args:   []nir.Expr{nir.Const{Value: expr, Loc: loc}},
-		Path:   "jsp.input",
-		Method: "input",
-		Loc:    loc,
+func templateWrapperArg(expr, prefix string) (string, bool) {
+	if prefix == "" {
+		return "", false
 	}
-}
-
-func jellyEscapeArg(expr string) (string, bool) {
-	const prefix = "h.escape("
 	start := strings.Index(expr, prefix)
 	if start < 0 {
 		return "", false
@@ -250,11 +213,11 @@ func jellyEscapeArg(expr string) (string, bool) {
 	return inner, inner != ""
 }
 
-func jellySource(expr, loc string) nir.Expr {
+func templateInput(profile templateProfile, expr, loc string) nir.Expr {
 	return nir.Call{
-		Callee: nir.Name{ID: "jelly.input", Loc: loc},
+		Callee: nir.Name{ID: profile.InputEvent, Loc: loc},
 		Args:   []nir.Expr{nir.Const{Value: expr, Loc: loc}},
-		Path:   "jelly.input",
+		Path:   profile.InputEvent,
 		Method: "input",
 		Loc:    loc,
 	}
@@ -280,6 +243,25 @@ type directiveValueRule struct {
 	Event     string
 }
 
+type templateProfile struct {
+	ExprStart    string
+	ExprEnd      string
+	InputPattern *regexp.Regexp
+	SkipContains []string
+	InputEvent   string
+	RenderEvent  string
+	EscapePrefix string
+	EscapeEvent  string
+}
+
+type dotTemplateRule struct {
+	File             string
+	SkipContains     []string
+	RequiredContains []string
+	LineNeedle       string
+	Event            string
+}
+
 type configProfile struct {
 	XMLTrueAttrs      []boolAttrRule
 	PlistTrueKey      map[string]string
@@ -288,6 +270,8 @@ type configProfile struct {
 	LinePrefixCompact []scopedLineRule
 	DirectiveValues   []directiveValueRule
 	QuotedStarFields  []scopedLineRule
+	Templates         map[string]templateProfile
+	DotRules          []dotTemplateRule
 }
 
 var (
@@ -312,7 +296,10 @@ func loadProfile() configProfile {
 		if meta == nil {
 			panic("config: missing adapter metadata")
 		}
-		configProfileData = configProfile{PlistTrueKey: map[string]string{}}
+		configProfileData = configProfile{
+			PlistTrueKey: map[string]string{},
+			Templates:    map[string]templateProfile{},
+		}
 		for _, entry := range metaList(meta, "config_xml_true_attrs") {
 			parts := strings.Split(entry, "|")
 			if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
@@ -346,6 +333,39 @@ func loadProfile() configProfile {
 				Value:     parts[2],
 				Mode:      parts[3],
 				Event:     parts[4],
+			})
+		}
+		exprStart := firstNonEmpty(metaString(meta, "config_template_expr_start"), defaultExprStart)
+		exprEnd := firstNonEmpty(metaString(meta, "config_template_expr_end"), defaultExprEnd)
+		for _, scope := range metaList(meta, "config_template_scopes") {
+			pattern := metaString(meta, "config_template_input_pattern_"+scope)
+			inputEvent := metaString(meta, "config_template_input_event_"+scope)
+			renderEvent := metaString(meta, "config_template_render_event_"+scope)
+			if scope == "" || pattern == "" || inputEvent == "" || renderEvent == "" {
+				panic("config: malformed config template profile " + scope)
+			}
+			configProfileData.Templates[scope] = templateProfile{
+				ExprStart:    exprStart,
+				ExprEnd:      exprEnd,
+				InputPattern: regexp.MustCompile(pattern),
+				SkipContains: metaList(meta, "config_template_skip_contains_"+scope),
+				InputEvent:   inputEvent,
+				RenderEvent:  renderEvent,
+				EscapePrefix: metaString(meta, "config_template_escape_prefix_"+scope),
+				EscapeEvent:  metaString(meta, "config_template_escape_event_"+scope),
+			}
+		}
+		for _, entry := range metaList(meta, "config_dot_template_rules") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 5 || parts[0] == "" || parts[2] == "" || parts[3] == "" || parts[4] == "" {
+				panic("config: malformed config_dot_template_rules entry " + entry)
+			}
+			configProfileData.DotRules = append(configProfileData.DotRules, dotTemplateRule{
+				File:             parts[0],
+				SkipContains:     splitList(parts[1]),
+				RequiredContains: splitList(parts[2]),
+				LineNeedle:       parts[3],
+				Event:            parts[4],
 			})
 		}
 	})
@@ -476,6 +496,24 @@ func call(token, file string, line int) nir.Call {
 
 func isTrue(v string) bool { return strings.EqualFold(strings.TrimSpace(v), "true") }
 
+func containsAny(text string, needles []string) bool {
+	for _, needle := range needles {
+		if needle != "" && strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAll(text string, needles []string) bool {
+	for _, needle := range needles {
+		if needle != "" && !strings.Contains(text, needle) {
+			return false
+		}
+	}
+	return true
+}
+
 func parseScopedLineRules(meta map[string]any, key string) []scopedLineRule {
 	var out []scopedLineRule
 	for _, entry := range metaList(meta, key) {
@@ -563,6 +601,42 @@ func metaList(meta map[string]any, key string) []string {
 		}
 	}
 	return nil
+}
+
+func metaString(meta map[string]any, key string) string {
+	if s, ok := meta[key].(string); ok {
+		return s
+	}
+	return ""
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func splitList(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, part := range strings.Split(s, ";") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func lastSeg(path string) string {
+	if i := strings.LastIndex(path, "."); i >= 0 {
+		return path[i+1:]
+	}
+	return path
 }
 
 func firstLineContaining(text, needle string) int {
