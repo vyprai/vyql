@@ -432,8 +432,17 @@ func (c *csConv) expr(n *tree_sitter.Node) nir.Expr {
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "interpolation" {
-				if k := namedChildren(ch); len(k) > 0 {
-					parts = append(parts, c.expr(k[0]))
+				// the hole's named children are `interpolation_brace {`, the EXPRESSION, then
+				// `interpolation_brace }` (+ optional alignment/format clauses). Indexing [0]
+				// blindly picked up the `{` brace, dropping every interpolated value's taint —
+				// so lower each real expression child (interpolation is ubiquitous in C#).
+				for _, e := range namedChildren(ch) {
+					switch e.Kind() {
+					case "interpolation_brace", "interpolation_alignment_clause", "interpolation_format_clause":
+						// punctuation / formatting — not a value
+					default:
+						parts = append(parts, c.expr(e))
+					}
 				}
 			}
 		}
