@@ -82,25 +82,14 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
 				Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.row", Loc: L}, Path: "wp.list_table.row", Method: "row", Loc: L}}}, body...)
 		}
-		// Framework parser hook: a method taking a Parser/PPFrame receives caller
-		// content in its other params. Seed those params as external input.
-		if phpHasFrameworkParam(ptypes) {
-			var seed []nir.Stmt
-			for _, p := range params {
-				if t := ptypes[p]; !phpFrameworkType(t) {
-					seed = append(seed, nir.Assign{Targets: []string{p},
-						Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-				}
-			}
-			body = append(seed, body...)
-		}
 		return []nir.Stmt{nir.FuncDef{
-			Name:       name,
-			Params:     params,
-			ParamTypes: ptypes,
-			Body:       body,
-			Loc:        L,
-			Exported:   exported,
+			Name:         name,
+			Params:       params,
+			ParamTypes:   ptypes,
+			ParamEntries: c.phpParamEntries(name, params, ptypes),
+			Body:         body,
+			Loc:          L,
+			Exported:     exported,
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
@@ -441,27 +430,35 @@ func (c *phConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 	return out
 }
 
-// phpFrameworkType reports whether a PHP param type is a MediaWiki framework object (NOT user
-// data) — used to identify a parser hook and exclude these params from input seeding.
-func phpFrameworkType(t string) bool {
-	switch t {
-	case "Parser", "PPFrame", "OutputPage", "Skin", "Title", "MimeAnalyzer":
-		return true
-	}
-	return false
-}
-
-func phpHasFrameworkParam(ptypes map[string]string) bool {
-	for _, t := range ptypes {
-		if t == "Parser" || t == "PPFrame" {
-			return true
-		}
-	}
-	return false
-}
-
 func phpIsWPListTableColumn(name string) bool {
 	return name == "column_default" || strings.HasPrefix(name, "column_")
+}
+
+func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string]string) []nir.ParamEntry {
+	if len(params) == 0 {
+		return nil
+	}
+	var functionTypes []string
+	seen := map[string]bool{}
+	for _, p := range params {
+		if t := ptypes[p]; t != "" && !seen[t] {
+			seen[t] = true
+			functionTypes = append(functionTypes, "function_param_type:"+t)
+		}
+	}
+	if len(functionTypes) == 0 {
+		return nil
+	}
+	var out []nir.ParamEntry
+	for i, p := range params {
+		tokens := append([]string{}, functionTypes...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		if t := ptypes[p]; t != "" {
+			tokens = append(tokens, "param_type:"+t)
+		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return out
 }
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —

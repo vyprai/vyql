@@ -5,7 +5,8 @@ adapter php {
 
   // superglobals (subscripted) -> HTTP input
   source "$argv" -> code.CliArgument
-  source "http_input" -> code.HttpInput   // synthetic seed (MediaWiki parser-hook user params)
+  source path "analysis.parameter.entry" val "function_param_type:Parser" nval "param_type:Parser" nval "param_type:PPFrame" nval "param_type:OutputPage" nval "param_type:Skin" nval "param_type:Title" nval "param_type:MimeAnalyzer" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_param_type:PPFrame" nval "param_type:Parser" nval "param_type:PPFrame" nval "param_type:OutputPage" nval "param_type:Skin" nval "param_type:Title" nval "param_type:MimeAnalyzer" -> code.HttpInput
   source "$_GET" -> code.HttpInput
   source "$_POST" -> code.HttpInput
   source "$_REQUEST" -> code.HttpInput
