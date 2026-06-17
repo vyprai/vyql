@@ -719,17 +719,21 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					}
 					// Most specific wins: longer pattern, then more value constraints
 					// (a `val`-matched sink like exec.Command arg2 val "-c" is more
-					// specific than the plain exec.Command arg0 form).
-					if curIdx, ok := bestByConcept[sk.Concept]; !ok {
-						bestByConcept[sk.Concept] = i
+					// specific than the plain exec.Command arg0 form). Keyed by (concept,
+					// ARG INDEX): the same concept can be injectable at MULTIPLE arg
+					// positions of one call (e.g. execFile(shell, [tainted args]) — arg0 the
+					// binary AND arg1 the args array), so those must not collapse together.
+					bkey := sk.Concept + "\x00" + strconv.Itoa(sk.ArgIndex)
+					if curIdx, ok := bestByConcept[bkey]; !ok {
+						bestByConcept[bkey] = i
 					} else if cur := spec.Sinks[curIdx]; len(sk.Pattern) > len(cur.Pattern) ||
 						(len(sk.Pattern) == len(cur.Pattern) && len(sk.ValMatches) > len(cur.ValMatches)) {
-						bestByConcept[sk.Concept] = i
+						bestByConcept[bkey] = i
 					}
 				}
 				for _, i := range cand {
 					sk := spec.Sinks[i]
-					best, ok := bestByConcept[sk.Concept]
+					best, ok := bestByConcept[sk.Concept+"\x00"+strconv.Itoa(sk.ArgIndex)]
 					if !ok || best != i {
 						continue
 					}

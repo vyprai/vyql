@@ -158,6 +158,7 @@ adapter javascript {
   sink path "child_process.spawnSync" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "child_process.execFile" -> code.CommandExecution
   sink path "child_process.execFileSync" -> code.CommandExecution
+  // value in the ARGS ARRAY (arg1) is shell-interpreted = command injection. (arg0 is the
   sink path "child_process.fork" -> code.CommandExecution
   sink path "cp.exec" -> code.CommandExecution
   sink path "cp.execSync" -> code.CommandExecution
@@ -170,6 +171,17 @@ adapter javascript {
   sink path "spawnSync" -> code.CommandExecution
   sink path "spawnSync" arg 1 collection val "cmd.exe" -> code.CommandExecution
   sink path "execFile" -> code.CommandExecution
+  // execFile/spawn with a SHELL binary or shell:true runs the ARGS ARRAY (arg1)
+  // through a shell, so a tainted value there is command injection. (Plain execFile
+  // with a non-shell binary is safe — args are not shell-interpreted — so this is
+  // scoped to shell contexts via val.)
+  sink path "execFile" arg 1 collection val "powershell" -> code.CommandExecution
+  sink path "execFile" arg 1 collection val "cmd.exe" -> code.CommandExecution
+  sink path "execFile" arg 1 collection val "/bin/sh" -> code.CommandExecution
+  sink path "execFile" arg 1 collection val "/bin/bash" -> code.CommandExecution
+  sink path "execFile" arg 1 collection val "shell" val "true" -> code.CommandExecution
+  sink path "spawn" arg 1 collection val "powershell" -> code.CommandExecution
+  sink path "spawn" arg 1 collection val "shell" val "true" -> code.CommandExecution
   sink path "shelljs.exec" -> code.CommandExecution
   sink path "shell.exec" -> code.CommandExecution
   sink path "webpack-shell-plugin-next" -> code.CommandExecution
