@@ -269,6 +269,7 @@ adapter python {
   sink receiver "openConnection" -> code.UrlFetch
   flow path "copy_into" arg 0 from args 1
   flow path "read_into" arg 0 from result
+  flow prefix "parse" arg 1 from args 0
   control receiver method "checked" -> core.InputValidation
   mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
   mark exact "Random" -> code.WeakRandomValue
@@ -291,7 +292,7 @@ adapter python {
 	if th == nil || th.QualifiedName() != "injection.SqlInjection" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 11 {
+	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 12 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "code.HttpInput" {
@@ -315,15 +316,18 @@ adapter python {
 	if ad.Mappings[7].Kind != "flow_path" || ad.Mappings[7].FlowDestArg != 0 || !ad.Mappings[7].FlowSourceResult {
 		t.Fatalf("flow result mapping wrong: %+v", ad.Mappings[7])
 	}
-	if ad.Mappings[8].Kind != "control_receiver_method" || ad.Mappings[8].Concept != "core.InputValidation" {
-		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[8])
+	if ad.Mappings[8].Kind != "flow_prefix" || ad.Mappings[8].Pattern != "parse" || ad.Mappings[8].FlowDestArg != 1 || ad.Mappings[8].FlowSourceArg != 0 {
+		t.Fatalf("flow prefix mapping wrong: %+v", ad.Mappings[8])
 	}
-	if ad.Mappings[9].Kind != "mark_method" || ad.Mappings[9].Pattern != "setAllowsAnyHTTPSCertificate" ||
-		ad.Mappings[9].Concept != "code.CertValidationDisabled" || len(ad.Mappings[9].ValMatches) != 1 {
-		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[9])
+	if ad.Mappings[9].Kind != "control_receiver_method" || ad.Mappings[9].Concept != "core.InputValidation" {
+		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[9])
 	}
-	if ad.Mappings[10].Kind != "mark" || !ad.Mappings[10].Exact || ad.Mappings[10].Pattern != "Random" {
-		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[10])
+	if ad.Mappings[10].Kind != "mark_method" || ad.Mappings[10].Pattern != "setAllowsAnyHTTPSCertificate" ||
+		ad.Mappings[10].Concept != "code.CertValidationDisabled" || len(ad.Mappings[10].ValMatches) != 1 {
+		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[10])
+	}
+	if ad.Mappings[11].Kind != "mark" || !ad.Mappings[11].Exact || ad.Mappings[11].Pattern != "Random" {
+		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[11])
 	}
 }
 

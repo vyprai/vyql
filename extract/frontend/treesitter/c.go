@@ -10,6 +10,7 @@ import (
 
 	objc "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/objc"
 
+	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/nir"
 )
 
@@ -653,7 +654,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		fn := field(n, "function")
 		path := c.dotted(fn)
 		method := lastSeg(path)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: method, Loc: L, Effects: callEffectsFor(c.tech, path, method)}
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: method, Loc: L, Effects: frontend.CallEffectsFor(c.tech, path, method)}
 	case "message_expression": // ObjC [receiver method:arg ...]
 		recv := field(n, "receiver")
 		methN := field(n, "method")
@@ -667,7 +668,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 			args = append(args, c.expr(ch))
 		}
-		return nir.Call{Callee: nir.Attr{Base: c.expr(recv), Attr: method, Path: path, Loc: L}, Args: args, Path: path, Method: method, Loc: L, Effects: callEffectsFor(c.tech, path, method)}
+		return nir.Call{Callee: nir.Attr{Base: c.expr(recv), Attr: method, Path: path, Loc: L}, Args: args, Path: path, Method: method, Loc: L, Effects: frontend.CallEffectsFor(c.tech, path, method)}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))

@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/nir"
 )
 
@@ -256,22 +257,14 @@ func (c *conv) goParamEntries(name string, params []string, paramTypes map[strin
 	return out
 }
 
-// callOutParams returns the identifiers a call writes THROUGH as out-parameters:
-// every `&x` address-of arg (`json.Unmarshal(b,&v)`, `c.Bind(&form)`), plus — when the
-// callee name is a bind/parse verb — every plain-identifier arg (`parseForm(r, form)`).
-// These are the destination variables a request is decoded into.
+// callOutParams returns the identifiers a call writes through as address-of
+// out-parameters. This is Go language mechanics; adapter-declared call effects
+// cover library-specific plain-argument destinations.
 func (c *conv) callOutParams(call *ast.CallExpr) []string {
 	var outs []string
 	for _, a := range call.Args {
 		if u, ok := a.(*ast.UnaryExpr); ok && u.Op == token.AND {
 			if id, ok := u.X.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
-				outs = append(outs, id.Name)
-			}
-		}
-	}
-	if isBindName(calleeName(call.Fun)) {
-		for _, a := range call.Args {
-			if id, ok := a.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
 				outs = append(outs, id.Name)
 			}
 		}
@@ -283,30 +276,14 @@ func (c *conv) callOutParams(call *ast.CallExpr) []string {
 // taint-JOIN, not a redefinition: a plain `o = …` would SHADOW any taint o already had, so
 // f(&taintedVar) would clear it (false negative). The join adds taint AND preserves o's.
 //
-// For a `&x` arg on an arbitrary call (`json.Unmarshal(b,&v)`) the joined taint is the call
-// itself — the dominant case being a bind/decode SOURCE whose result IS the request data. But
-// a custom decode HELPER (`parseForm(r, form)`, `decoder.Decode(f, r.Form)`) is NOT a labelled
-// source; its return is a clean error, while the request flows in through an INPUT arg. So for
-// a bind-name call we additionally join the receiver and the call's simple argument
-// expressions, so whichever of them carries the request taint reaches the decoded dest.
+// The joined taint is the call itself. Adapter-declared call effects handle APIs
+// whose input argument, not result, flows into a destination argument.
 func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc string) []nir.Stmt {
 	outs := c.callOutParams(call)
 	if len(outs) == 0 {
 		return nil
 	}
 	srcs := []nir.Expr{callExpr}
-	if isBindName(calleeName(call.Fun)) {
-		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
-			if e := c.simpleTaintExpr(sel.X); e != nil { // the receiver may hold the request
-				srcs = append(srcs, e)
-			}
-		}
-		for _, a := range call.Args { // an input arg may hold the request (decode reads it)
-			if e := c.simpleTaintExpr(a); e != nil {
-				srcs = append(srcs, e)
-			}
-		}
-	}
 	var stmts []nir.Stmt
 	for _, o := range outs {
 		parts := append([]nir.Expr{nir.Name{ID: o, Loc: loc}}, srcs...)
@@ -314,55 +291,6 @@ func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc strin
 			Value: nir.Format{Parts: parts, Loc: loc}})
 	}
 	return stmts
-}
-
-// simpleTaintExpr lowers an argument/receiver expression ONLY when it is side-effect-free
-// (an identifier, field access, address-of, or deref) so it can be safely re-evaluated inside
-// an out-param taint-join. Nested calls are skipped to avoid duplicating a side-effectful
-// node; their taint still reaches the dest through the call result already in the join.
-func (c *conv) simpleTaintExpr(e ast.Expr) nir.Expr {
-	switch x := e.(type) {
-	case *ast.Ident:
-		if x.Name == "_" || x.Name == "" || x.Name == "nil" {
-			return nil
-		}
-		return c.expr(x)
-	case *ast.SelectorExpr, *ast.StarExpr:
-		return c.expr(e)
-	case *ast.UnaryExpr:
-		if x.Op == token.AND {
-			return c.expr(e)
-		}
-	}
-	return nil
-}
-
-// calleeName returns the last identifier of a call's function expression
-// (`pkg.parseForm` → "parseForm", `parseForm` → "parseForm").
-func calleeName(fun ast.Expr) string {
-	switch f := fun.(type) {
-	case *ast.Ident:
-		return f.Name
-	case *ast.SelectorExpr:
-		return f.Sel.Name
-	}
-	return ""
-}
-
-// isBindName reports whether a function name reads external/request data into a
-// destination argument (a custom bind/parse/decode helper). Scoped to these verbs
-// so the no-`&` out-param treatment stays precise.
-func isBindName(name string) bool {
-	if name == "" {
-		return false
-	}
-	low := strings.ToLower(name)
-	for _, p := range []string{"parse", "decode", "unmarshal", "bind", "scan", "populate", "deserialize", "readinto", "readbody"} {
-		if strings.HasPrefix(low, p) {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *conv) typeName(e ast.Expr) string {
@@ -425,10 +353,9 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		}
 		if len(st.Rhs) == 1 {
 			assign := nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0])}
-			// `err := bind(&v)` / `err := parseForm(r, form)`: the result goes to err, but the
-			// call also writes through its out-param destinations — taint those too. The
-			// dominant idiom is `if err := decode(...); err != nil`, an AssignStmt (the ExprStmt
-			// path below only covers the discarded-result form).
+			// The result goes to err, but the call can also write through
+			// address-of out-parameter destinations; taint those too. The
+			// AssignStmt path covers `if err := f(&x); err != nil`.
 			if call, ok := st.Rhs[0].(*ast.CallExpr); ok {
 				if joins := c.outParamJoinsFor(call, c.expr(st.Rhs[0]), c.loc(st.Pos())); len(joins) > 0 {
 					stmts := append([]nir.Stmt{assign}, joins...)
@@ -451,12 +378,8 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		}
 		return nir.Return{}
 	case *ast.ExprStmt:
-		// out-parameter taint: a bare call passing the address of a local
-		// (`json.Unmarshal(b, &v)`, `c.ShouldBind(&form)`, `decoder.Decode(&x)`)
-		// writes through that pointer, so model it as a (re)definition of the
-		// variable from the call. This is what lets a bind/decode SOURCE taint
-		// the struct the request is decoded into — the dominant web-handler
-		// pattern — instead of the (discarded) error return.
+		// Out-parameter taint: a bare call passing the address of a local writes
+		// through that pointer, so model it as a join from the call result.
 		if call, ok := st.X.(*ast.CallExpr); ok {
 			if stmts := c.outParamJoinsFor(call, c.expr(st.X), c.loc(st.Pos())); len(stmts) > 0 {
 				if len(stmts) == 1 {
@@ -632,7 +555,7 @@ func (c *conv) call(ex *ast.CallExpr) nir.Call {
 	if i := strings.LastIndex(p, "."); i >= 0 {
 		method = p[i+1:]
 	}
-	return nir.Call{Callee: c.expr(ex.Fun), Args: args, Path: p, Method: method, Loc: c.loc(ex.Pos())}
+	return nir.Call{Callee: c.expr(ex.Fun), Args: args, Path: p, Method: method, Loc: c.loc(ex.Pos()), Effects: frontend.CallEffectsFor("go", p, method)}
 }
 
 // path builds a dotted callee path for adapter matching, e.g. r.URL.Query().Get

@@ -619,6 +619,9 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		if p.atWord("method") {
 			p.next()
 			kind = "flow_method"
+		} else if p.atWord("prefix") {
+			p.next()
+			kind = "flow_prefix"
 		} else if p.atWord("path") {
 			p.next()
 		}

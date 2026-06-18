@@ -48,6 +48,20 @@ test "go exhaustive: constants and filepath.Base suppress command path upload ar
   }
   ```
 
+test "go exhaustive: custom parse helper flows request data into destination"
+  lang go
+  expect VYQL-INJ-001
+  code
+  ```
+  package main
+  func h(r *http.Request, db *sql.DB) {
+    v := r.URL.Query().Get("v")
+    var form string
+    parseForm(v, form)
+    db.Query(form)
+  }
+  ```
+
 test "go exhaustive: HTML header log CSV LDAP XPath regex trust auth and IDOR findings are reported"
   lang go
   expect VYQL-INJ-004
