@@ -1,6 +1,10 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
@@ -27,4 +31,61 @@ func TestDebugConceptClassificationUsesPassedOntology(t *testing.T) {
 	if !isSink(onto, store, "out") {
 		t.Fatal("sink node should be classified from the passed ontology")
 	}
+}
+
+func TestCmdRuntimeDoesNotHardcodeSecurityKnowledge(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Dir(file)
+	needles := cmdForbiddenKnowledgeNeedles(t)
+	var hits []string
+	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(raw)
+		for _, needle := range needles {
+			if strings.Contains(text, needle) {
+				rel, _ := filepath.Rel(root, path)
+				hits = append(hits, rel+": "+needle)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) > 0 {
+		t.Fatalf("cmd runtime must not hardcode ontology/security knowledge; load it from VyQL data: %s", strings.Join(hits, ", "))
+	}
+}
+
+func cmdForbiddenKnowledgeNeedles(t *testing.T) []string {
+	t.Helper()
+	seen := map[string]bool{
+		"\"advisory:": true,
+		"\"CVE":       true,
+		"\"GHSA":      true,
+		"\"OSV":       true,
+	}
+	for _, c := range ontology.Seed().AllConcepts() {
+		if c.AnalysisRole != "" {
+			continue
+		}
+		seen["\""+c.Name+"\""] = true
+		seen["\""+c.QualifiedName()+"\""] = true
+	}
+	out := make([]string, 0, len(seen))
+	for needle := range seen {
+		out = append(out, needle)
+	}
+	return out
 }
