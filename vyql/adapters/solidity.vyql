@@ -22,6 +22,6 @@ adapter solidity {
 
   // tx.origin authorization anti-pattern (CWE-477) — presence of tx.origin
   mark "tx.origin" -> code.TxOriginAuth
-  // storage write marker emitted by the frontend for member/mapping assignments (B2 reentrancy).
-  mark "state_write" -> code.StateWrite
+  // Storage writes are derived from composite assignments by the Solidity adapter.
+  mark "analysis.assignment.write" -> code.StateWrite
 }

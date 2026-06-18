@@ -123,8 +123,8 @@ func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	return nil, nil
 }
 
-// evalOrder evaluates `order A before B` (B2 temporal): a finding for each (A,B) where an
-// A-operation can reach a B-operation on a CFG path (reentrancy, TOCTOU, …).
+// evalOrder evaluates `order A before B`: a finding for each (A,B) where an
+// A-operation can reach a B-operation on a CFG path.
 func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.OrderStmt)
 	firsts, _ := e.Store.NodesWithConcept(body.First.Concept)

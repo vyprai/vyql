@@ -137,10 +137,17 @@ func (c *solConv) exprStmt(n *tree_sitter.Node) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// a member / index target (balances[x] = …, self.owner = …) is a STORAGE write —
-		// emit a markable state_write node (B2 reentrancy: external_call before state_write).
+		// A member/index assignment writes through a composite target. Emit a generic
+		// structural event; adapter data decides what that means for this language.
 		L := c.loc(n)
-		sw := nir.Call{Callee: nir.Name{ID: "state_write", Loc: L}, Path: "state_write", Method: "state_write", Loc: L}
+		path := "analysis.assignment.write"
+		sw := nir.Call{
+			Callee: nir.Name{ID: path, Loc: L},
+			Args: []nir.Expr{
+				nir.Const{Loc: L, Value: "target_kind=" + left.Kind()},
+			},
+			Path: path, Method: "write", Loc: L,
+		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}, nir.ExprStmt{Value: sw}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
