@@ -36,7 +36,7 @@ func TestOWASPBenchmark(t *testing.T) {
 	candidates := [][]string{
 		{filepath.Join(dir, "testcode"), filepath.Join(dir, "helpers")},
 		// src/main (not just .../java) so bundled .properties under resources are read,
-		// letting config-indirection reads like getProperty("hashAlg1") const-fold.
+		// letting config-indirection reads like getProperty("mode") const-fold.
 		{filepath.Join(dir, "src", "main")},
 	}
 	var roots []string

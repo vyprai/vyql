@@ -335,7 +335,7 @@ func (c *plConv) dotted(n *tree_sitter.Node) string {
 		return c.plVarName(n)
 	case "function", "bareword", "method":
 		// normalize package separator `::` to `.` so dotted paths are boundary-
-		// matchable like every other language (Digest::MD5::md5_hex -> Digest.MD5.md5_hex).
+		// matchable like every other language (Pkg::Thing::call -> Pkg.Thing.call).
 		return strings.ReplaceAll(c.text(n), "::", ".")
 	case "method_call_expression":
 		return c.dotted(field(n, "invocant")) + "." + strings.ReplaceAll(c.text(field(n, "method")), "::", ".")

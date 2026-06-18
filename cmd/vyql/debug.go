@@ -272,8 +272,8 @@ func cmdExplain(args []string) error {
 
 // ── vyql match ──────────────────────────────────────────────────────────────────────
 // Show every node an adapter labelled — what matched which concept, and via which adapter.
-// Groups by concept role (source/sink/control/other) so a missing sink (e.g. md5.Sum before a
-// mark exists) shows up as absent.
+// Groups by concept role (source/sink/control/other) so a missing concept label shows up
+// as absent.
 
 func cmdMatch(args []string) error {
 	fs := flag.NewFlagSet("match", flag.ExitOnError)

@@ -357,14 +357,14 @@ func (l *lowerer) constStrVal(e nir.Expr, sc *scope) (string, bool) {
 				return string(base[idx]), true
 			}
 		}
-		// array-literal index: ['sha1'][0]  → the i-th element if constant.
+		// array-literal index: ['kind'][0]  → the i-th element if constant.
 		if seq, ok := l.seqOf(v.Base); ok {
 			if idx, ok := l.constInt(v.Key, sc); ok && idx >= 0 && int(idx) < len(seq) {
 				return l.constStrVal(seq[idx], sc)
 			}
 		}
 	case nir.Attr:
-		// object-literal property: { name: 'md5' }.name  → the matching pair's value.
+		// object-literal property: { name: 'mode' }.name  → the matching pair's value.
 		if seq, ok := l.seqOf(v.Base); ok {
 			for _, p := range seq {
 				if pr, ok := p.(nir.Pair); ok && pr.Key == v.Attr {
@@ -783,7 +783,7 @@ func Lower(prog nir.Program, resolveImports bool) (usg.Store, error) {
 }
 
 // LowerTyped is Lower with a constructor→type table (callee path of a
-// constructor → the type it returns, e.g. "sql.Open" → "sql.DB"). A receiver
+// constructor → the type it returns, e.g. "pkg.Open" → "pkg.Handle"). A receiver
 // assigned from a known constructor lets the lowering stamp `recv_type` on its
 // method calls, which type-constrained sink adapters use for precision.
 func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]string) (usg.Store, error) {
@@ -1285,7 +1285,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		cv := constStr(st.Value)
-		if cv == "" { // config read folded to its real value (e.g. getProperty("hashAlg1") -> "MD5")
+		if cv == "" { // config read folded to its real value (e.g. getProperty("mode") -> "fast")
 			if pv, ok := l.propConst(st.Value); ok {
 				cv = pv
 			}
@@ -1987,7 +1987,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 				case "sym":
 					calleePath = imp.module + "." + imp.symbol
 				case "mod":
-					// a default-export module called directly: f = require('escape-html'); f(x)
+					// a default-export module called directly: f = require('pkg-name'); f(x)
 					// resolves to the module's own path so module-named sinks/controls match.
 					calleePath = imp.module
 				}
@@ -2083,8 +2083,8 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 	}
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
-	// function's body (arg → param → … → ret → result), so a sanitizer applied INSIDE the
-	// callee is honoured — `bar = my_wrapper(p)` where my_wrapper escapes p is clean. Only an
+	// function's body (arg → param → … → ret → result), so an in-body transform is
+	// honoured — `bar = my_wrapper(p)` where my_wrapper transforms p is clean. Only an
 	// arg NOT mapped to any resolved param keeps the conservative direct `arg → result` edge
 	// (unknown/library callee, or a vararg beyond the param list), preserving recall there.
 	targets := l.resolveTargets(call.Callee, sc)

@@ -375,8 +375,8 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 	}
 }
 
-// CtorTypesFor returns the constructor→type table declared in the adapter (the
-// `type "sql.Open" -> sql.DB` mappings), used by the lowering to stamp recv_type.
+// CtorTypesFor returns the constructor→type table declared in the adapter (for example,
+// `type "pkg.Open" -> pkg.Handle`), used by the lowering to stamp recv_type.
 func CtorTypesFor(tech string) map[string]string {
 	out := map[string]string{}
 	for _, mp := range loadDecl(tech).Mappings {
@@ -642,11 +642,10 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						continue
 					}
 					// Most specific wins: longer pattern, then more value constraints
-					// (a `val`-matched sink like exec.Command arg2 val "-c" is more
-					// specific than the plain exec.Command arg0 form). Keyed by (concept,
+					// (a `val`-matched sink is more specific than the plain form).
+					// Keyed by (concept,
 					// ARG INDEX): the same concept can be injectable at MULTIPLE arg
-					// positions of one call (e.g. execFile(shell, [tainted args]) — arg0 the
-					// binary AND arg1 the args array), so those must not collapse together.
+					// positions of one call, so those must not collapse together.
 					bkey := sk.Concept + "\x00" + strconv.Itoa(sk.ArgIndex)
 					if curIdx, ok := bestByConcept[bkey]; !ok {
 						bestByConcept[bkey] = i
@@ -787,7 +786,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 
 // extTech maps a source file extension to its adapter technology, so an adapter
 // only labels nodes from its own language (avoids cross-language FPs in polyglot
-// repos — e.g. the JS `exec` sink matching a Bash `exec` command).
+// repos — e.g. one language's adapter matching another language's same-named call).
 var extTech = map[string]string{
 	".go": "go", ".py": "python",
 	".js": "javascript", ".jsx": "javascript", ".ts": "javascript", ".tsx": "javascript",
@@ -982,7 +981,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 // fails the precise check, so it could never have produced a mapping.
 
 // firstSeg returns the leading dotted/bracket segment of a pattern or path
-// ("requests.get" → "requests", "exec" → "exec").
+// ("client.get" → "client", "run" → "run").
 func firstSeg(p string) string {
 	if i := strings.IndexAny(p, ".["); i >= 0 {
 		return p[:i]

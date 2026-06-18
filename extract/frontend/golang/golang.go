@@ -636,7 +636,7 @@ func (c *conv) call(ex *ast.CallExpr) nir.Call {
 }
 
 // path builds a dotted callee path for adapter matching, e.g. r.URL.Query().Get
-// -> "r.URL.Query.Get", db.Exec -> "db.Exec".
+// -> "r.URL.Query.Get", svc.Run -> "svc.Run".
 func (c *conv) path(e ast.Expr) string {
 	switch ex := e.(type) {
 	case *ast.Ident:
