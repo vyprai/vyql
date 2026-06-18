@@ -1266,7 +1266,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		saveRegion := l.region
 		l.region = l.curNS + "/fn" + l.nextBranch()
 		saveDecorators := l.curDecorators
-		l.curDecorators = st.Decorators
+		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
 		l.block(st.Body, inner)
 		l.curDecorators = saveDecorators
 		l.region = saveRegion

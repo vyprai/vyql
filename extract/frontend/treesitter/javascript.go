@@ -456,7 +456,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		}
 		// member-property write (e.g. obj.prop = x): model as a path call so adapter
 		// mappings can reason about the assigned value.
-		// Method is empty so it can never collide with method-name sinks (query/exec/…).
+		// Method is empty so it can never collide with method-name mappings.
 		if left != nil && left.Kind() == "member_expression" {
 			p := c.dotted(left)
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}

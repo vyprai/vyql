@@ -194,6 +194,10 @@ type FuncDef struct {
 	ParamTypes map[string]string
 	Body       []Stmt
 	Loc        string
+	// ContextTokens records syntax-level evidence attached to the enclosing function
+	// itself (for example its name or language-native annotations). Lowering preserves
+	// these on generic function-return events; adapters decide what any token means.
+	ContextTokens []string
 	// Decorators records syntax-level annotation/decorator tokens attached to this function.
 	// Lowering preserves them on generic function-return events; adapters decide what any
 	// specific decorator means for a domain.

@@ -2,3 +2,5 @@ call $source.value
 call $worker.run
 call analysis.function.context
 call analysis.module.context
+call analysis.parameter.entry
+call analysis.parameter.entry

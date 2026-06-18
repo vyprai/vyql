@@ -78,18 +78,15 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.block(field(n, "body"))
 		body = append(body, c.phpFunctionContext(n)...)
 		c.funcName = prevFunc
-		if n.Kind() == "method_declaration" && phpIsWPListTableColumn(name) && len(params) > 0 {
-			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
-				Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.row", Loc: L}, Path: "wp.list_table.row", Method: "row", Loc: L}}}, body...)
-		}
 		return []nir.Stmt{nir.FuncDef{
-			Name:         name,
-			Params:       params,
-			ParamTypes:   ptypes,
-			ParamEntries: c.phpParamEntries(name, params, ptypes),
-			Body:         body,
-			Loc:          L,
-			Exported:     exported,
+			Name:          name,
+			Params:        params,
+			ParamTypes:    ptypes,
+			ContextTokens: c.phpFunctionTokens(name),
+			ParamEntries:  c.phpParamEntries(name, params, ptypes),
+			Body:          body,
+			Loc:           L,
+			Exported:      exported,
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
@@ -114,11 +111,6 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		kids := namedChildren(n)
 		if len(kids) > 0 {
 			value := c.expr(kids[0])
-			if phpIsWPListTableColumn(c.funcName) {
-				render := nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.render", Loc: L},
-					Args: []nir.Expr{value}, Path: "wp.list_table.render", Method: "render", Loc: L}}
-				return []nir.Stmt{render, nir.Return{Value: value}}
-			}
 			return []nir.Stmt{nir.Return{Value: value}}
 		}
 		return []nir.Stmt{nir.Return{}}
@@ -430,8 +422,11 @@ func (c *phConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 	return out
 }
 
-func phpIsWPListTableColumn(name string) bool {
-	return name == "column_default" || strings.HasPrefix(name, "column_")
+func (c *phConv) phpFunctionTokens(name string) []string {
+	if name == "" {
+		return nil
+	}
+	return []string{"function_name:" + name}
 }
 
 func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string]string) []nir.ParamEntry {
@@ -445,9 +440,6 @@ func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string
 			seen[t] = true
 			functionTypes = append(functionTypes, "function_param_type:"+t)
 		}
-	}
-	if len(functionTypes) == 0 {
-		return nil
 	}
 	var out []nir.ParamEntry
 	for i, p := range params {

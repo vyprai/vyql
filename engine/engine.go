@@ -614,8 +614,8 @@ func (e *Engine) ruleID(cr *CompiledRule) string {
 
 // pathLocs resolves each witness node to its loc, keeping order and dropping
 // consecutive duplicates. Used to expose the files the taint path traverses
-// (a CVE patch frequently lands on a sanitizer/helper on the flow, not the
-// source or sink site), so downstream localization can match the patch file.
+// (a patch frequently lands on a helper on the flow, not the source or sink site),
+// so downstream localization can match the changed file.
 func (e *Engine) pathLocs(path []string) []string {
 	if len(path) == 0 {
 		return nil
