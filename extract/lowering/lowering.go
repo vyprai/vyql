@@ -1348,14 +1348,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.functionReturnAnalysisEvent(rv, "", l.curDecorators)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
-		// receiver-mutating ("builder"/accumulator) taint: a stdlib builder method
-		// (strings.Builder.WriteString, bytes.Buffer.Write…) or a C string-accumulator
-		// (g_string_append*, strcat/strncat) folds its args INTO the object you later read
-		// back. Model it as a taint-join on that variable (like `x += …`): the variable
-		// gains the call's taint. Without this, `b.WriteString(x); b.String()` loses it.
-		// This is stdlib accumulator semantics.
+		// Receiver-mutating builder/accumulator methods fold their args into the
+		// object you later read back. Model it as a taint-join on that variable.
 		if call, ok := st.Value.(nir.Call); ok && callNode != "" {
-			if v := mutatedVar(call); v != "" {
+			if v := mutatedReceiverVar(call); v != "" {
 				n := l.node("Concat", call.Loc, nil)
 				if cur := sc.node[v]; cur != "" {
 					l.flow(cur, n) // preserve the builder's existing taint (`var b` may be unbound)
@@ -1811,17 +1807,8 @@ var recvMutators = map[string]bool{
 	"append": true, "push": true, // StringBuilder.append / list-ish builders
 }
 
-// argMutators are C/stdlib accumulator FUNCTIONS whose first argument (the destination)
-// gains the other args' taint (g_string_append*, strcat/strncat, …).
-var argMutators = map[string]bool{
-	"strcat": true, "strncat": true, "strlcat": true,
-	"g_string_append": true, "g_string_append_printf": true, "g_string_append_len": true,
-	"g_string_prepend": true, "g_string_insert": true,
-}
-
-// mutatedVar returns the variable a builder/accumulator call mutates (so taint can be
-// joined onto it): the receiver of a recvMutator method, or arg0 of an argMutator function.
-func mutatedVar(call nir.Call) string {
+// mutatedReceiverVar returns the receiver variable a builder/accumulator method mutates.
+func mutatedReceiverVar(call nir.Call) string {
 	if recvMutators[call.Method] {
 		if at, ok := call.Callee.(nir.Attr); ok {
 			if nm, ok := at.Base.(nir.Name); ok {
@@ -1829,19 +1816,7 @@ func mutatedVar(call nir.Call) string {
 			}
 		}
 	}
-	if argMutators[lastDot(call.Path)] && len(call.Args) > 0 {
-		if nm, ok := call.Args[0].(nir.Name); ok {
-			return nm.ID
-		}
-	}
 	return ""
-}
-
-func lastDot(p string) string {
-	if i := strings.LastIndex(p, "."); i >= 0 {
-		return p[i+1:]
-	}
-	return p
 }
 
 func collectKeyPathTokens(path []string, out *[]string) {
@@ -2159,7 +2134,49 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(av, result)
 		}
 	}
+	l.applyCallEffects(call, argVals, result, sc)
 	return result
+}
+
+func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result string, sc *scope) {
+	for _, effect := range call.Effects {
+		if effect.DestArg < 0 || effect.DestArg >= len(call.Args) {
+			continue
+		}
+		dest := callEffectDestName(call.Args[effect.DestArg])
+		if dest == "" {
+			continue
+		}
+		if effect.SourceResult {
+			sc.node[dest] = result
+			delete(sc.cnst, dest)
+			continue
+		}
+		if effect.SourceArg < 0 || effect.SourceArg >= len(argVals) {
+			continue
+		}
+		n := l.node("Concat", call.Loc, nil)
+		if cur := sc.node[dest]; cur != "" {
+			l.flow(cur, n)
+		}
+		for i := effect.SourceArg; i < len(argVals); i++ {
+			l.flow(argVals[i], n)
+		}
+		sc.node[dest] = n
+		delete(sc.cnst, dest)
+	}
+}
+
+func callEffectDestName(e nir.Expr) string {
+	switch ex := e.(type) {
+	case nir.Name:
+		return ex.ID
+	case nir.Thru:
+		return callEffectDestName(ex.Inner)
+	case nir.Unary:
+		return callEffectDestName(ex.Operand)
+	}
+	return ""
 }
 
 // --- call resolution (shared; docs/10 §"Call resolution") -------------

@@ -13,49 +13,34 @@ import (
 	"github.com/vyprai/vyql/extract/nir"
 )
 
-// ccConv walks a tree-sitter C CST into NIR. C has no string-concat operator:
-// untrusted data reaches a buffer through writer functions (sprintf/strcpy/…),
-// so those are modeled as an ASSIGNMENT to their destination argument, and
-// reader functions (fgets/gets/…) seed their destination buffer as a source.
+// ccConv walks a tree-sitter C-family CST into NIR. Adapter-declared call
+// effects model out-parameter dataflow for APIs that write into an argument.
 type ccConv struct {
 	src  []byte
 	file string
 	key  string
-}
-
-// cPropagators taint their dest (arg0) from the remaining (source) arguments.
-var cPropagators = map[string]bool{
-	"sprintf": true, "snprintf": true, "vsprintf": true, "vsnprintf": true,
-	"strcpy": true, "strncpy": true, "strcat": true, "strncat": true,
-	"memcpy": true, "memmove": true, "stpcpy": true,
-}
-
-// cReaders read external input into a destination BUFFER argument; the value is the
-// arg index of that buffer (recv/read take the buffer at arg1, not arg0).
-var cReaders = map[string]int{
-	"fgets": 0, "gets": 0, "fread": 0, "fscanf": 0,
-	"read": 1, "recv": 1, "recvfrom": 1, "pread": 1,
+	tech string
 }
 
 // ExtractC parses C files into one NIR Program (one module per file).
 func ExtractC(files []string, root string) (nir.Program, error) {
-	return extractCLike(files, root, ".c", tree_sitter.NewLanguage(tsc.Language()))
+	return extractCLike(files, root, ".c", "c", tree_sitter.NewLanguage(tsc.Language()))
 }
 
 // ExtractCPP parses C++ files. The C/C++ grammars share the ccConv walker; the
 // extra C++ node kinds (qualified_identifier, namespace/class, new_expression)
 // are handled there and are inert for C.
 func ExtractCPP(files []string, root string) (nir.Program, error) {
-	return extractCLike(files, root, ".cpp", tree_sitter.NewLanguage(tscpp.Language()))
+	return extractCLike(files, root, ".cpp", "cpp", tree_sitter.NewLanguage(tscpp.Language()))
 }
 
 // ExtractObjC parses Objective-C (.m) files. ObjC is a C superset; ccConv reuses
 // the C handling and adds message_expression + @implementation method nodes.
 func ExtractObjC(files []string, root string) (nir.Program, error) {
-	return extractCLike(files, root, ".m", tree_sitter.NewLanguage(objc.Language()))
+	return extractCLike(files, root, ".m", "objc", tree_sitter.NewLanguage(objc.Language()))
 }
 
-func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) (nir.Program, error) {
+func extractCLike(files []string, root, ext, tech string, lang *tree_sitter.Language) (nir.Program, error) {
 	// the *Language is immutable grammar data; each worker gets its own parser referencing it.
 	mods := parseModules(files, root,
 		func() *tree_sitter.Parser {
@@ -64,7 +49,7 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 			return p
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext)}
+			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), tech: tech}
 			body := c.decls(tree.RootNode())
 			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
@@ -388,45 +373,8 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.ExprStmt{Value: c.expr(left)}, nir.ExprStmt{Value: right}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
-	case "call_expression":
-		name := lastSeg(c.dotted(field(inner, "function")))
-		args := namedChildren(field(inner, "arguments"))
-		// buffer writers: the destination buffer is tainted from the source args / the read.
-		if len(args) > 0 {
-			if cPropagators[name] {
-				if dst := c.destName(args[0]); dst != "" { // dest is arg0 for str/mem copy
-					var parts []nir.Expr
-					for _, a := range args[1:] {
-						parts = append(parts, c.expr(a))
-					}
-					return []nir.Stmt{
-						nir.Assign{Targets: []string{dst}, Value: nir.Format{Parts: parts, Loc: c.loc(inner)}},
-						nir.ExprStmt{Value: c.expr(inner)},
-					}
-				}
-			}
-			if idx, ok := cReaders[name]; ok && idx < len(args) {
-				if dst := c.destName(args[idx]); dst != "" { // read into the BUFFER arg (recv/read = arg1)
-					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
-				}
-			}
-		}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
-}
-
-// destName returns the buffer variable name of a writer's destination argument,
-// unwrapping a leading `&`.
-func (c *ccConv) destName(a *tree_sitter.Node) string {
-	if a.Kind() == "pointer_expression" || a.Kind() == "unary_expression" {
-		if arg := field(a, "argument"); arg != nil {
-			a = arg
-		}
-	}
-	if a.Kind() == "identifier" {
-		return c.text(a)
-	}
-	return ""
 }
 
 // cBranch flattens one if-branch body: a `{}` compound_statement, an else_clause wrapper,
@@ -704,7 +652,8 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "call_expression":
 		fn := field(n, "function")
 		path := c.dotted(fn)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
+		method := lastSeg(path)
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: method, Loc: L, Effects: callEffectsFor(c.tech, path, method)}
 	case "message_expression": // ObjC [receiver method:arg ...]
 		recv := field(n, "receiver")
 		methN := field(n, "method")
@@ -718,7 +667,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 			args = append(args, c.expr(ch))
 		}
-		return nir.Call{Callee: nir.Attr{Base: c.expr(recv), Attr: method, Path: path, Loc: L}, Args: args, Path: path, Method: method, Loc: L}
+		return nir.Call{Callee: nir.Attr{Base: c.expr(recv), Attr: method, Path: path, Loc: L}, Args: args, Path: path, Method: method, Loc: L, Effects: callEffectsFor(c.tech, path, method)}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))

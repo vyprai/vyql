@@ -613,6 +613,38 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.expect(tArrow, "->")
 		m.Concept = p.parseConceptRef()
 		return []AdapterMapping{m}
+	case p.atWord("flow"):
+		p.next()
+		kind := "flow_path"
+		if p.atWord("method") {
+			p.next()
+			kind = "flow_method"
+		} else if p.atWord("path") {
+			p.next()
+		}
+		m := AdapterMapping{Kind: kind, Pattern: p.parsePattern(), FlowSourceArg: -1}
+		p.expectWord("arg")
+		dest, err := strconv.Atoi(p.expect(tWord, "destination arg index").val)
+		if err != nil {
+			p.fail("invalid destination arg index")
+		}
+		m.FlowDestArg = dest
+		p.expectWord("from")
+		switch {
+		case p.atWord("result"):
+			p.next()
+			m.FlowSourceResult = true
+		case p.atWord("args"):
+			p.next()
+			src, err := strconv.Atoi(p.expect(tWord, "source arg start index").val)
+			if err != nil {
+				p.fail("invalid source arg index")
+			}
+			m.FlowSourceArg = src
+		default:
+			p.fail("expected result or args after flow source")
+		}
+		return []AdapterMapping{m}
 	case p.atWord("control"):
 		// `control "fn" [val "x"] [nval "y"] -> concept` labels a sanitizer/validator on
 		// the matching CALL node so `unless sanitized_by` can kill a flow through it. The

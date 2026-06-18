@@ -76,17 +76,20 @@ func (*AdapterDecl) isDecl() {}
 
 // AdapterMapping is one `source`/`sink`/`type`/`control` line in an adapter.
 type AdapterMapping struct {
-	Kind       string   // "source" | "sink_method" | "sink_path" | "type" | "control" variants
-	Pattern    string   // the callee path / method token (a string literal or dotted name)
-	Concept    string   // the concept it maps to (qualified); for "type", the type name
-	Constraint string   // optional `on <type>` receiver-type constraint for sinks
-	ArgIndex   int      // which argument position is targeted (default 0; `arg N`)
-	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
-	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
-	Packages   []string // inherited from `package "name" { ... }` — fire only when import/SBOM package evidence is present
-	Collection bool     // `collection` — also flag a Seq/collection-literal arg
-	Exact      bool     // exact path match (currently used by `mark exact`)
-	About      string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
+	Kind             string   // "source" | "sink_method" | "sink_path" | "type" | "control" variants
+	Pattern          string   // the callee path / method token (a string literal or dotted name)
+	Concept          string   // the concept it maps to (qualified); for "type", the type name
+	Constraint       string   // optional `on <type>` receiver-type constraint for sinks
+	ArgIndex         int      // which argument position is targeted (default 0; `arg N`)
+	ValMatches       []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
+	ValAbsents       []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
+	Packages         []string // inherited from `package "name" { ... }` — fire only when import/SBOM package evidence is present
+	Collection       bool     // `collection` — also flag a Seq/collection-literal arg
+	Exact            bool     // exact path match (currently used by `mark exact`)
+	About            string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
+	FlowDestArg      int      // for `flow`: destination out-param argument index
+	FlowSourceArg    int      // for `flow`: first source argument index; -1 when source is the call result
+	FlowSourceResult bool     // for `flow`: call result flows into destination out-param
 }
 
 // ThreatDecl is a `threat <ns>.<Name> { cwe: [...] }` weakness-class declaration

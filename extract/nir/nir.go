@@ -67,14 +67,24 @@ type Index struct {
 // Call is a call expression; Path is the callee path (e.g. "db.query") and
 // Method is its last segment (e.g. "query").
 type Call struct {
-	Callee Expr
-	Args   []Expr
-	Path   string
-	Method string
-	Loc    string
+	Callee  Expr
+	Args    []Expr
+	Path    string
+	Method  string
+	Loc     string
+	Effects []CallEffect
 	// IsCtor marks a constructor / `new T(args)` call: the constructed object contains its
 	// arguments, so the lowerer flows tainted args into the call result (wrapper-object taint).
 	IsCtor bool
+}
+
+// CallEffect is adapter-declared dataflow for calls with out-parameters or accumulator
+// arguments. It is intentionally generic: adapters name the API, while lowering only
+// applies "argument/result flows into destination argument".
+type CallEffect struct {
+	DestArg      int
+	SourceArg    int
+	SourceResult bool
 }
 
 // Format is a taint-propagating string build (f-string, %, +, .format).

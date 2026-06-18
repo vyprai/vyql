@@ -267,6 +267,8 @@ adapter python {
   sink method "execute" -> code.SqlExecution
   sink path "os.system" -> code.CommandExecution
   sink receiver "openConnection" -> code.UrlFetch
+  flow path "copy_into" arg 0 from args 1
+  flow path "read_into" arg 0 from result
   control receiver method "checked" -> core.InputValidation
   mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
   mark exact "Random" -> code.WeakRandomValue
@@ -289,7 +291,7 @@ adapter python {
 	if th == nil || th.QualifiedName() != "injection.SqlInjection" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 9 {
+	if ad == nil || ad.Name != "python" || len(ad.Mappings) != 11 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "code.HttpInput" {
@@ -307,15 +309,21 @@ adapter python {
 	if ad.Mappings[5].Kind != "sink_receiver" || ad.Mappings[5].Concept != "code.UrlFetch" {
 		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[5])
 	}
-	if ad.Mappings[6].Kind != "control_receiver_method" || ad.Mappings[6].Concept != "core.InputValidation" {
-		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[6])
+	if ad.Mappings[6].Kind != "flow_path" || ad.Mappings[6].FlowDestArg != 0 || ad.Mappings[6].FlowSourceArg != 1 {
+		t.Fatalf("flow args mapping wrong: %+v", ad.Mappings[6])
 	}
-	if ad.Mappings[7].Kind != "mark_method" || ad.Mappings[7].Pattern != "setAllowsAnyHTTPSCertificate" ||
-		ad.Mappings[7].Concept != "code.CertValidationDisabled" || len(ad.Mappings[7].ValMatches) != 1 {
-		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[7])
+	if ad.Mappings[7].Kind != "flow_path" || ad.Mappings[7].FlowDestArg != 0 || !ad.Mappings[7].FlowSourceResult {
+		t.Fatalf("flow result mapping wrong: %+v", ad.Mappings[7])
 	}
-	if ad.Mappings[8].Kind != "mark" || !ad.Mappings[8].Exact || ad.Mappings[8].Pattern != "Random" {
-		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[8])
+	if ad.Mappings[8].Kind != "control_receiver_method" || ad.Mappings[8].Concept != "core.InputValidation" {
+		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[8])
+	}
+	if ad.Mappings[9].Kind != "mark_method" || ad.Mappings[9].Pattern != "setAllowsAnyHTTPSCertificate" ||
+		ad.Mappings[9].Concept != "code.CertValidationDisabled" || len(ad.Mappings[9].ValMatches) != 1 {
+		t.Fatalf("mark_method mapping wrong: %+v", ad.Mappings[9])
+	}
+	if ad.Mappings[10].Kind != "mark" || !ad.Mappings[10].Exact || ad.Mappings[10].Pattern != "Random" {
+		t.Fatalf("mark exact mapping wrong: %+v", ad.Mappings[10])
 	}
 }
 

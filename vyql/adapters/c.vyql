@@ -1,6 +1,4 @@
 // c framework adapter (docs/07) — framework→concept content.
-// C has no string concat; the frontend models writer fns (sprintf/strcpy) as
-// assignments to their dest, and reader fns (fgets/gets) as sources on the dest.
 adapter c {
   meta { fidelity: resolved }
 
@@ -12,6 +10,26 @@ adapter c {
   source "fread" -> code.HttpInput
   source "recv" -> code.HttpInput
   source "recvfrom" -> code.HttpInput
+
+  flow path "sprintf" arg 0 from args 1
+  flow path "snprintf" arg 0 from args 1
+  flow path "vsprintf" arg 0 from args 1
+  flow path "vsnprintf" arg 0 from args 1
+  flow path "strcpy" arg 0 from args 1
+  flow path "strncpy" arg 0 from args 1
+  flow path "strcat" arg 0 from args 1
+  flow path "strncat" arg 0 from args 1
+  flow path "memcpy" arg 0 from args 1
+  flow path "memmove" arg 0 from args 1
+  flow path "stpcpy" arg 0 from args 1
+  flow path "fgets" arg 0 from result
+  flow path "gets" arg 0 from result
+  flow path "fread" arg 0 from result
+  flow path "fscanf" arg 0 from result
+  flow path "read" arg 1 from result
+  flow path "recv" arg 1 from result
+  flow path "recvfrom" arg 1 from result
+  flow path "pread" arg 1 from result
 
   // command execution (the program/command string is arg0)
   sink path "system" -> code.CommandExecution
