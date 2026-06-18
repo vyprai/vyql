@@ -76,6 +76,10 @@ func TestFrontendDoesNotHardcodeOntologyConcepts(t *testing.T) {
 			return err
 		}
 		text := string(raw)
+		if strings.Contains(text, `Concept: "`) || strings.Contains(text, "Concept: `") {
+			rel, _ := filepath.Rel(root, path)
+			hits = append(hits, rel+": direct concept literal")
+		}
 		for _, needle := range concepts {
 			if strings.Contains(text, needle) {
 				rel, _ := filepath.Rel(root, path)
