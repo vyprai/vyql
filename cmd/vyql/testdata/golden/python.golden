@@ -1,6 +1,5 @@
-attr request.args
 call analysis.function.context
 call analysis.function.context.sink
 call analysis.function.context.source
-call cursor.execute
-call request.args.get
+call source.value
+call worker.run

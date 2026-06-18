@@ -1,2 +1,4 @@
+call $source.value
+call $worker.run
+call analysis.function.context
 call analysis.module.context
-call mysqli_query

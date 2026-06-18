@@ -1,3 +1,4 @@
 call analysis.parameter.entry
-call r.getParameter
-call st.executeQuery
+call analysis.parameter.entry
+call source.value
+call worker.run

@@ -1,3 +1,2 @@
-call System.cmd
-call analysis.parameter.entry
-call analysis.parameter.entry
+call Source.value
+call Worker.run

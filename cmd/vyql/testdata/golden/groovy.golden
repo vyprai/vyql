@@ -1,2 +1,2 @@
-attr params.BRANCH
-call sh
+call source.value
+call worker.run
