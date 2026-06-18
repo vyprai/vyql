@@ -42,7 +42,7 @@ type Name struct {
 type Const struct {
 	Loc string
 	// Value is the unquoted literal text for STRING constants, used by
-	// value-matching sinks (`val "..."`, e.g. CORS '*', cipher 'ECB'); empty otherwise.
+	// value-matching adapters (`val "..."`, e.g. option names or modes); empty otherwise.
 	Value string
 }
 
@@ -100,9 +100,9 @@ type Seq struct {
 	KeyPath []string
 }
 
-// Pair is a named key/value entry: a keyword argument (`verify=False`), a
-// dict/object/hash entry (`{algorithm: "none"}`), or a struct field
-// (`tls.Config{InsecureSkipVerify: true}`). Key is the literal name; taint flows
+// Pair is a named key/value entry: a keyword argument (`enabled=false`), a
+// dict/object/hash entry (`{mode: "fast"}`), or a struct field
+// (`Options{Limit: 10}`). Key is the literal name; taint flows
 // through Value. Used by named-value matching (`val "key=value"`); frontends that
 // don't emit Pair keep flattening such entries to their Value (no key).
 type Pair struct {
@@ -328,7 +328,7 @@ type Program struct {
 	Modules  []Module
 	SelfName string
 	// Properties holds resolved key→value pairs from bundled config files
-	// (.properties, etc.), so a config-read like `getProperty("hashAlg1")` can be
+	// (.properties, etc.), so a config-read like `getProperty("featureMode")` can be
 	// const-folded to its real value during lowering.
 	Properties map[string]string
 }

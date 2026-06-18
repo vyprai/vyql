@@ -7,10 +7,10 @@ func TestRustStringValuePreservesLiteralPayload(t *testing.T) {
 		raw  string
 		want string
 	}{
-		{`"0000000000000000"`, `"0000000000000000"`},
-		{`b"0000000000000000"`, `"0000000000000000"`},
-		{`r#"http://example.com"#`, `"http://example.com"`},
-		{`br##"/tmp/vyql-cache"##`, `"/tmp/vyql-cache"`},
+		{`"plain literal"`, `"plain literal"`},
+		{`b"byte literal"`, `"byte literal"`},
+		{`r#"raw literal"#`, `"raw literal"`},
+		{`br##"raw byte literal"##`, `"raw byte literal"`},
 		{`"line\nbreak"`, `"linenbreak"`},
 	}
 	for _, c := range cases {

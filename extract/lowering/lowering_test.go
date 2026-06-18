@@ -81,12 +81,12 @@ func TestCollectValTokensDescendsIntoFormat(t *testing.T) {
 	collectValTokens(nir.Format{
 		Parts: []nir.Expr{
 			nir.Const{Value: "prefix="},
-			nir.Const{Value: "http://example.com"},
+			nir.Const{Value: "sample-value"},
 		},
 	}, "", &toks)
 
 	for _, tok := range toks {
-		if tok == "http://example.com" {
+		if tok == "sample-value" {
 			return
 		}
 	}
@@ -98,7 +98,7 @@ func TestLowerMaterializesImportNodes(t *testing.T) {
 		Key:  "app",
 		File: "app.py",
 		Imports: []nir.Import{{
-			Local: "yaml", Module: "yaml", IsModule: true,
+			Local: "samplepkg", Module: "samplepkg", IsModule: true,
 		}},
 	}}}, true)
 	if err != nil {
@@ -109,7 +109,7 @@ func TestLowerMaterializesImportNodes(t *testing.T) {
 		t.Fatalf("import node count = %d, want 1", len(ids))
 	}
 	n, _, _ := g.GetNode(ids[0])
-	if n.Prop("module") != "yaml" || n.Prop("local") != "yaml" || n.Prop("package") != "yaml" {
+	if n.Prop("module") != "samplepkg" || n.Prop("local") != "samplepkg" || n.Prop("package") != "samplepkg" {
 		t.Fatalf("import props wrong: %+v", n.Props)
 	}
 }
