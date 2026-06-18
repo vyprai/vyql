@@ -89,7 +89,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			case "identifier", "simple_identifier":
 				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 			case "navigation_expression", "indexing_expression":
-				// member/subscript write `obj.role = p` / `a[k] = p` — model as a path-sink
+				// member/subscript write `obj.field = p` / `a[k] = p` — model as a path-sink
 				// Call (Method="") so the assigned value flows into a write node, matching how
 				// JS path-sink-writes and python __setitem__ are modeled.
 				L := c.loc(n)

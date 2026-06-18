@@ -25,6 +25,24 @@ adapter javascript {
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcMain" val "call_method:once" nval "param_index:0" -> code.HttpInput
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcRenderer" val "call_method:on" nval "param_index:0" -> code.HttpInput
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcRenderer" val "call_method:once" nval "param_index:0" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:all" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:delete" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:get" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:head" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:options" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:patch" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:post" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:put" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:use" val "param_index:0" nval "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:all" val "param_index:1" val "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:delete" val "param_index:1" val "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:get" val "param_index:1" val "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:head" val "param_index:1" val "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:options" val "param_index:1" val "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:patch" val "param_index:1" val "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:post" val "param_index:1" val "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:put" val "param_index:1" val "param_count:4" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:use" val "param_index:1" val "param_count:4" -> code.HttpInput
   source "req.body" -> code.HttpInput
   source "req.query" -> code.HttpInput
   source "req.params" -> code.HttpInput

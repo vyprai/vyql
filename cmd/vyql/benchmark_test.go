@@ -183,7 +183,7 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		}
 		return cats[c]
 	}
-	dumpCat, dumpKind := os.Getenv("BENCH_DUMP_CAT"), os.Getenv("BENCH_DUMP_KIND") // e.g. sqli / fp; cat "all" dumps every category
+	dumpCat, dumpKind := os.Getenv("BENCH_DUMP_CAT"), os.Getenv("BENCH_DUMP_KIND") // cat "all" dumps every category
 	var dumped []string
 	byCat := map[string][]string{} // for dumpCat=="all": category -> matching test names
 	for name, e := range expected {

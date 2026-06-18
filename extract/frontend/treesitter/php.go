@@ -178,14 +178,14 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			}
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// member-property write ($obj->role = v) — model as a PATH-sink Call (Method empty so
+		// member-property write ($obj->field = v) — model as a PATH-sink Call (Method empty so
 		// it never collides with method-name mappings) so path mappings can match writes.
 		if left != nil && left.Kind() == "member_access_expression" {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: c.loc(inner)}}}
 		}
 		// subscript write ($arr[$k] = v) — two effects: (1) a write to the base's path
-		// ($_SESSION['role'] -> "_SESSION") so path mappings can match writes;
+		// ($bag['key'] -> "bag") so path mappings can match writes;
 		// (2) when the base is a plain variable, a flow join `$arr = combine($arr, v)` so a
 		// later read of $arr carries v's flow (an array built element-by-element stays linked).
 		// Without (2)

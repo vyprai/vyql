@@ -773,6 +773,7 @@ func (c *jsConv) markCallLambdaParams(path string, lam nir.Lambda, L string) nir
 			"entry_kind:call_lambda_param",
 			"call_path:" + path,
 			"call_method:" + method,
+			"param_count:" + itoa(len(lam.Params)),
 			"param_name:" + p,
 			"param_index:" + itoa(i),
 		}
@@ -998,13 +999,6 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 				arglist[i] = c.markCallLambdaParams(path, lam, L)
 			}
 		}
-		if c.isExpressRouteRegistration(path) {
-			for i, a := range arglist {
-				if lam, ok := a.(nir.Lambda); ok {
-					arglist[i] = c.typeExpressLambda(lam)
-				}
-			}
-		}
 		method := path
 		if i := strings.LastIndex(path, "."); i >= 0 {
 			method = path[i+1:]
@@ -1090,42 +1084,6 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
-}
-
-var jsExpressRouteMethods = map[string]bool{
-	"all": true, "delete": true, "get": true, "head": true, "options": true,
-	"patch": true, "post": true, "put": true, "use": true,
-}
-
-func (c *jsConv) isExpressRouteRegistration(path string) bool {
-	i := strings.LastIndex(path, ".")
-	if i < 0 {
-		return false
-	}
-	return jsExpressRouteMethods[path[i+1:]]
-}
-
-func (c *jsConv) typeExpressLambda(lam nir.Lambda) nir.Lambda {
-	if len(lam.Params) == 0 {
-		return lam
-	}
-	if lam.ParamTypes == nil {
-		lam.ParamTypes = map[string]string{}
-	}
-	offset := 0
-	if len(lam.Params) >= 4 {
-		offset = 1 // Express error middleware: (err, req, res, next)
-	}
-	if offset < len(lam.Params) {
-		lam.ParamTypes[lam.Params[offset]] = "express.Request"
-	}
-	if offset+1 < len(lam.Params) {
-		lam.ParamTypes[lam.Params[offset+1]] = "express.Response"
-	}
-	if offset+2 < len(lam.Params) {
-		lam.ParamTypes[lam.Params[offset+2]] = "express.NextFunction"
-	}
-	return lam
 }
 
 func (c *jsConv) bindingNames(n *tree_sitter.Node) []string {

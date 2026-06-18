@@ -320,14 +320,14 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			left := field(inner, "left")
 			tgts := c.targets(left)
-			// subscript store `container[k] = v` (e.g. session[bar] = v, map[k] = param): no
+			// subscript store `container[k] = v` (e.g. bag[key] = v, map[k] = param): no
 			// simple name target, so model it as a mutating setitem that taints the container
 			// from v — otherwise a later read `x = container[k]` loses the taint.
 			if len(tgts) == 0 && left != nil && left.Kind() == "subscript" {
 				base := c.expr(field(left, "value"))
 				args := []nir.Expr{val}
 				if k := field(left, "subscript"); k != nil {
-					args = append(args, c.expr(k)) // include the key: session[tainted_key] = x
+					args = append(args, c.expr(k)) // include the key: bag[dynamic_key] = x
 				}
 				path := c.dotted(field(left, "value"))
 				if path != "" {

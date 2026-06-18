@@ -89,7 +89,7 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 			case "identifier":
 				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 			case "field_expression", "indexed_expression":
-				// member/subscript write `obj.role = p` / `a(k) = p` — model as a path-sink
+				// member/subscript write `obj.field = p` / `a(k) = p` — model as a path-sink
 				// Call (Method="") so the assigned value flows into a write node.
 				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 					Callee: c.expr(left), Args: []nir.Expr{right},

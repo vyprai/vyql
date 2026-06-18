@@ -62,3 +62,15 @@ test "javascript untyped lookalike body does not reach query sink"
     db.query("select * from users where name = '" + payload.body.name + "'");
   });
   ```
+
+test "javascript express error middleware request body reaches query sink"
+  lang javascript
+  expect VYQL-INJ-001
+  code
+  ```
+  const express = require("express");
+  const app = express();
+  app.use((err, incoming, outgoing, next) => {
+    db.query("select * from users where name = '" + incoming.body.name + "'");
+  });
+  ```
