@@ -137,17 +137,9 @@ func (c *solConv) exprStmt(n *tree_sitter.Node) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// A member/index assignment writes through a composite target. Emit a generic
-		// structural event; adapter data decides what that means for this language.
+		// A member/index assignment writes contract storage; emit a markable state-write event.
 		L := c.loc(n)
-		path := "analysis.assignment.write"
-		sw := nir.Call{
-			Callee: nir.Name{ID: path, Loc: L},
-			Args: []nir.Expr{
-				nir.Const{Loc: L, Value: "target_kind=" + left.Kind()},
-			},
-			Path: path, Method: "write", Loc: L,
-		}
+		sw := nir.Call{Callee: nir.Name{ID: "state_write", Loc: L}, Path: "state_write", Method: "state_write", Loc: L}
 		return []nir.Stmt{nir.ExprStmt{Value: right}, nir.ExprStmt{Value: sw}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}

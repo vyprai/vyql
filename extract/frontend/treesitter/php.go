@@ -78,6 +78,10 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.block(field(n, "body"))
 		body = append(body, c.phpFunctionContext(n)...)
 		c.funcName = prevFunc
+		if n.Kind() == "method_declaration" && phpIsWPListTableColumn(name) && len(params) > 0 {
+			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
+				Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.row", Loc: L}, Path: "wp.list_table.row", Method: "row", Loc: L}}}, body...)
+		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
 			Params:        params,
@@ -111,6 +115,11 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		kids := namedChildren(n)
 		if len(kids) > 0 {
 			value := c.expr(kids[0])
+			if phpIsWPListTableColumn(c.funcName) {
+				render := nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.render", Loc: L},
+					Args: []nir.Expr{value}, Path: "wp.list_table.render", Method: "render", Loc: L}}
+				return []nir.Stmt{render, nir.Return{Value: value}}
+			}
 			return []nir.Stmt{nir.Return{Value: value}}
 		}
 		return []nir.Stmt{nir.Return{}}
@@ -427,6 +436,10 @@ func (c *phConv) phpFunctionTokens(name string) []string {
 		return nil
 	}
 	return []string{"function_name:" + name}
+}
+
+func phpIsWPListTableColumn(name string) bool {
+	return name == "column_default" || strings.HasPrefix(name, "column_")
 }
 
 func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string]string) []nir.ParamEntry {

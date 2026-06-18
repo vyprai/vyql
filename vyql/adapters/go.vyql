@@ -59,16 +59,6 @@ adapter go {
   source ".Params" -> code.HttpInput
   source ".Param" -> code.HttpInput
 
-  flow prefix "parse" arg 1 from args 0
-  flow prefix "decode" arg 1 from args 0
-  flow prefix "unmarshal" arg 1 from args 0
-  flow prefix "bind" arg 1 from args 0
-  flow prefix "scan" arg 1 from args 0
-  flow prefix "populate" arg 1 from args 0
-  flow prefix "deserialize" arg 1 from args 0
-  flow prefix "readinto" arg 1 from args 0
-  flow prefix "readbody" arg 1 from args 0
-
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution

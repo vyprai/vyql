@@ -68,7 +68,7 @@ adapter php {
   sink method "get_var" -> code.SqlExecution
   sink method "get_row" -> code.SqlExecution
   sink method "get_col" -> code.SqlExecution
-  source path "analysis.parameter.entry" val "function_name:column_" val "param_index:0" -> code.DatabaseRead
+  source "wp.list_table.row" -> code.DatabaseRead
   source method "get_results" -> code.DatabaseRead
   source method "get_var" -> code.DatabaseRead
   source method "get_row" -> code.DatabaseRead
@@ -133,7 +133,7 @@ adapter php {
   sink path "Html.rawElement" arg 1 -> code.HtmlRender
   sink path "Html.rawElement" arg 2 -> code.HtmlRender
   sink path "Html.element" arg 1 -> code.HtmlRender
-  sink path "analysis.function.return" val "function_name:column_" -> code.HtmlRender
+  sink "wp.list_table.render" -> code.HtmlRender
   // Stored CMS/page HTML writes. Aimeos text reference items are later rendered as page
   // content, so writing editor-controlled HTML through the ref item must be sanitized.
   mark "$refItem.fromArray" -> code.StoredHtmlWrite

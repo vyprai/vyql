@@ -1348,10 +1348,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.functionReturnAnalysisEvent(rv, "", l.curDecorators)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
-		// Receiver-mutating builder/accumulator methods fold their args into the
-		// object you later read back. Model it as a taint-join on that variable.
+		// Builder/accumulator calls fold their args into the object/buffer you
+		// later read back. Model them as a taint-join on the mutated variable.
 		if call, ok := st.Value.(nir.Call); ok && callNode != "" {
-			if v := mutatedReceiverVar(call); v != "" {
+			if v := mutatedVar(call); v != "" {
 				n := l.node("Concat", call.Loc, nil)
 				if cur := sc.node[v]; cur != "" {
 					l.flow(cur, n) // preserve the builder's existing taint (`var b` may be unbound)
@@ -1806,8 +1806,17 @@ var recvMutators = map[string]bool{
 	"append": true, "push": true, // StringBuilder.append / list-ish builders
 }
 
-// mutatedReceiverVar returns the receiver variable a builder/accumulator method mutates.
-func mutatedReceiverVar(call nir.Call) string {
+// argMutators are C/stdlib accumulator functions whose first argument gains the
+// other args' taint.
+var argMutators = map[string]bool{
+	"strcat": true, "strncat": true, "strlcat": true,
+	"g_string_append": true, "g_string_append_printf": true, "g_string_append_len": true,
+	"g_string_prepend": true, "g_string_insert": true,
+}
+
+// mutatedVar returns the variable a builder/accumulator call mutates: the
+// receiver of a recvMutator method, or arg0 of an argMutator function.
+func mutatedVar(call nir.Call) string {
 	if recvMutators[call.Method] {
 		if at, ok := call.Callee.(nir.Attr); ok {
 			if nm, ok := at.Base.(nir.Name); ok {
@@ -1815,7 +1824,19 @@ func mutatedReceiverVar(call nir.Call) string {
 			}
 		}
 	}
+	if argMutators[lastDot(call.Path)] && len(call.Args) > 0 {
+		if nm, ok := call.Args[0].(nir.Name); ok {
+			return nm.ID
+		}
+	}
 	return ""
+}
+
+func lastDot(p string) string {
+	if i := strings.LastIndex(p, "."); i >= 0 {
+		return p[i+1:]
+	}
+	return p
 }
 
 func collectKeyPathTokens(path []string, out *[]string) {

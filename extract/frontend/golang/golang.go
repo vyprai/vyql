@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/nir"
 )
 
@@ -257,14 +256,21 @@ func (c *conv) goParamEntries(name string, params []string, paramTypes map[strin
 	return out
 }
 
-// callOutParams returns the identifiers a call writes through as address-of
-// out-parameters. This is Go language mechanics; adapter-declared call effects
-// cover library-specific plain-argument destinations.
+// callOutParams returns the identifiers a call writes through as out-parameters:
+// every `&x` address-of arg, plus, when the callee name is a bind/parse/decode
+// verb, every plain-identifier arg.
 func (c *conv) callOutParams(call *ast.CallExpr) []string {
 	var outs []string
 	for _, a := range call.Args {
 		if u, ok := a.(*ast.UnaryExpr); ok && u.Op == token.AND {
 			if id, ok := u.X.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
+				outs = append(outs, id.Name)
+			}
+		}
+	}
+	if isBindName(calleeName(call.Fun)) {
+		for _, a := range call.Args {
+			if id, ok := a.(*ast.Ident); ok && id.Name != "_" && id.Name != "" {
 				outs = append(outs, id.Name)
 			}
 		}
@@ -276,14 +282,28 @@ func (c *conv) callOutParams(call *ast.CallExpr) []string {
 // taint-JOIN, not a redefinition: a plain `o = …` would SHADOW any taint o already had, so
 // f(&taintedVar) would clear it (false negative). The join adds taint AND preserves o's.
 //
-// The joined taint is the call itself. Adapter-declared call effects handle APIs
-// whose input argument, not result, flows into a destination argument.
+// For `&x` on an arbitrary call, the joined taint is the call itself. For
+// bind/parse/decode helpers, the return is often only an error while the input
+// value flows into the destination arg, so also join simple receiver/argument
+// expressions that can safely be re-evaluated.
 func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc string) []nir.Stmt {
 	outs := c.callOutParams(call)
 	if len(outs) == 0 {
 		return nil
 	}
 	srcs := []nir.Expr{callExpr}
+	if isBindName(calleeName(call.Fun)) {
+		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+			if e := c.simpleTaintExpr(sel.X); e != nil {
+				srcs = append(srcs, e)
+			}
+		}
+		for _, a := range call.Args {
+			if e := c.simpleTaintExpr(a); e != nil {
+				srcs = append(srcs, e)
+			}
+		}
+	}
 	var stmts []nir.Stmt
 	for _, o := range outs {
 		parts := append([]nir.Expr{nir.Name{ID: o, Loc: loc}}, srcs...)
@@ -291,6 +311,49 @@ func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc strin
 			Value: nir.Format{Parts: parts, Loc: loc}})
 	}
 	return stmts
+}
+
+// simpleTaintExpr lowers an argument/receiver expression only when it is
+// side-effect-free, so the out-param join can safely evaluate it again.
+func (c *conv) simpleTaintExpr(e ast.Expr) nir.Expr {
+	switch x := e.(type) {
+	case *ast.Ident:
+		if x.Name == "_" || x.Name == "" || x.Name == "nil" {
+			return nil
+		}
+		return c.expr(x)
+	case *ast.SelectorExpr, *ast.StarExpr:
+		return c.expr(e)
+	case *ast.UnaryExpr:
+		if x.Op == token.AND {
+			return c.expr(e)
+		}
+	}
+	return nil
+}
+
+// calleeName returns the last identifier of a call's function expression.
+func calleeName(fun ast.Expr) string {
+	switch f := fun.(type) {
+	case *ast.Ident:
+		return f.Name
+	case *ast.SelectorExpr:
+		return f.Sel.Name
+	}
+	return ""
+}
+
+func isBindName(name string) bool {
+	if name == "" {
+		return false
+	}
+	low := strings.ToLower(name)
+	for _, p := range []string{"parse", "decode", "unmarshal", "bind", "scan", "populate", "deserialize", "readinto", "readbody"} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *conv) typeName(e ast.Expr) string {
@@ -555,7 +618,7 @@ func (c *conv) call(ex *ast.CallExpr) nir.Call {
 	if i := strings.LastIndex(p, "."); i >= 0 {
 		method = p[i+1:]
 	}
-	return nir.Call{Callee: c.expr(ex.Fun), Args: args, Path: p, Method: method, Loc: c.loc(ex.Pos()), Effects: frontend.CallEffectsFor("go", p, method)}
+	return nir.Call{Callee: c.expr(ex.Fun), Args: args, Path: p, Method: method, Loc: c.loc(ex.Pos())}
 }
 
 // path builds a dotted callee path for adapter matching, e.g. r.URL.Query().Get
