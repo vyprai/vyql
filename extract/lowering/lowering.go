@@ -1185,8 +1185,8 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				})
 			}
 			// recurse into the body to register NESTED LOCAL FUNCTIONS (C# local functions, JS
-			// inner function declarations) so a FORWARD reference — `coll.ForEach(x => Helper(x));
-			// … void Helper(...) {}` (RestSharp AddHeaders) — resolves regardless of declaration order.
+			// inner function declarations) so a FORWARD reference resolves regardless of
+			// declaration order.
 			l.register(modkey, st.Body, cls)
 		}
 	}
@@ -1794,9 +1794,8 @@ func constSetFactory(path, method string) bool {
 // tokens for named-value matching (`val`/`nval`). For each literal it emits the
 // bare value, and — when it sits under a key (a kwarg, dict/object/hash entry, or
 // struct field) — also a "key=value" token. Lists/objects are walked so nested
-// literals are reached, e.g. jwt(algorithms=["none"]) yields "none" and
-// "algorithms=none"; requests.get(url, verify=False) yields "False" and
-// "verify=False". Pair keys are also emitted on their own so adapters can
+// literals are reached, so call(options={mode:["fast"]}) yields "fast" and
+// "mode=fast". Pair keys are also emitted on their own so adapters can
 // recognize structured-field sinks even when the field value is non-literal
 // (`{ hypertext: userInput }`). Frontends that don't emit nir.Pair simply
 // contribute bare values.
@@ -1838,7 +1837,7 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		if v := unquoteLit(ex.Value); v != "" {
 			*out = append(*out, v)
 			if key != "" {
-				*out = append(*out, key+"="+v) // e.g. verify=False, algorithms=none
+				*out = append(*out, key+"="+v) // e.g. mode=fast, enabled=true
 			}
 		}
 	case nir.Pair:
@@ -1911,7 +1910,7 @@ func nirKind(e nir.Expr) string {
 		return "Seq"
 	case nir.Pair:
 		// A keyword/hash/struct entry is a collection-shaped arg, like Seq — sinks must
-		// treat it as a safe parameterized condition (e.g. Rails where(id: params[:id])),
+		// treat it as a structured argument rather than a raw scalar,
 		// NOT a raw value. Value-matching still sees it via str_args, and taint still
 		// flows through eval(Pair)->eval(Value); only arg-slot sink selection is affected.
 		return "Seq"
@@ -2031,8 +2030,8 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(recvNode, result)
 		}
 		// a collection/builder MUTATOR taints its receiver from the added value, so a
-		// later read or a sink fed the whole container sees the taint (e.g.
-		// list.add(param); ProcessBuilder(list)). Element-sensitive per constant key.
+		// later read or a sink fed the whole container sees the taint. Element-sensitive
+		// per constant key.
 		if mutatorMethods[call.Method] {
 			l.containerWrite(call, args, recvNode, sc)
 			// `base.field.add(v)` — the receiver is a member access, so the mutator taints a
@@ -2110,7 +2109,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		// object-sensitivity: alias the receiver with the callee's stable `this` node so field
 		// mutations performed via `this` inside the method reach the receiver object (and reads
 		// of the receiver's fields are visible inside the method). Enables fluent/builder
-		// mutators (`req.AddParameter(p)` whose body does `this.Parameters.Add(p)`).
+		// mutators whose bodies update fields on the receiver.
 		if recvNode != "" && target.selfNode != "" {
 			l.aliasReceiverSelf(recvNode, target.selfNode)
 		}
@@ -2128,7 +2127,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// wrapper-object taint: `new T(taintedArg)` builds an object that CONTAINS its args, so the
 	// constructed object (result) carries each arg's taint — even when the ctor body is resolved
 	// (args mapped to params). Lets a tainted value wrapped in an object propagate through it
-	// (e.g. RestSharp `new HeaderParameter(name, value)`). FN-safe over-approximation.
+	// FN-safe over-approximation.
 	if call.IsCtor {
 		for _, av := range argVals {
 			l.flow(av, result)

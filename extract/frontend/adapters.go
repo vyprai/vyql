@@ -276,7 +276,7 @@ func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 	return out
 }
 
-// assumeAdapter labels unsound-neutralizer calls (guards/escapers that cannot be proven
+// assumeAdapter labels unsound-neutralizer calls (guards/transforms that cannot be proven
 // sound) with the ontology role concept that the engine can surface as review context.
 func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 	concept := singleOntologyRoleConcept(ontology.AnalysisRoleNeutralizerAssumption)
@@ -478,8 +478,8 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 		case "sink_path":
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
 		case "sink_receiver":
-			// the tainted DATA is the receiver of a no-arg method (e.g. `URL(u).openConnection()`,
-			// `u.toRegex()`); match the bare method name, label the call node itself.
+			// the tainted DATA is the receiver of a no-arg method; match the bare
+			// method name and label the call node itself.
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
@@ -586,7 +586,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 //     recv_type unknown           → syntactic (medium, can't disprove)
 //     recv_type != T              → SKIP (known wrong type — not a sink here)
 //
-// Collection-literal arg0s (vkind == Seq, e.g. Rails where(id: x)) are skipped.
+// Collection-literal arg0s (vkind == Seq) are skipped.
 func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 	attributeSinks := ontologyRoleConcepts(ontology.AnalysisRoleAttributeSink)
 	return adapters.Adapter{
@@ -697,8 +697,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							continue // known, conflicting type — not this sink
 						}
 					}
-					// arg all (ArgIndex == -1): any tainted argument is the vuln (e.g. a
-					// writer .format/.printf where the injectable value can be at any position).
+					// arg all (ArgIndex == -1): any tainted argument may be relevant.
 					if sk.ArgIndex < 0 {
 						for ai := 0; ; ai++ {
 							arg := n.Prop("arg" + strconv.Itoa(ai))
@@ -729,7 +728,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 	}
 }
 
-// controlAdapter labels control concepts (escapers/validators) on the calls that
+// controlAdapter labels control concepts (transforms/validators) on the calls that
 // apply them, so `unless sanitized_by` can suppress a sanitized flow (docs/07).
 func (spec adapterSpec) controlAdapter() adapters.Adapter {
 	return adapters.Adapter{
@@ -837,7 +836,7 @@ func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 		if root := sca.PackageRoot(v); root != "" {
 			out[root] = true
 		}
-		// expand import→distribution aliases (e.g. `import yaml` ⇒ pyyaml) so package-gated
+		// expand import→distribution aliases so package-gated
 		// adapters keyed by the distribution name activate from imports, not just manifests.
 		for _, a := range sca.ImportAliases(v) {
 			out[a] = true

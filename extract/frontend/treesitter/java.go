@@ -480,7 +480,7 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		// model `new T(args)` as a constructor call with callee path "T", so
-		// sinks/types can match (e.g. new ProcessBuilder, new File, new URL).
+		// adapters can match constructor and type information.
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: arglist, Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))

@@ -379,8 +379,8 @@ func (e *Engine) charFilterAssumption(path []string, excluded string) string {
 			}
 			// A replace FILTERS its subject but emits its REPLACEMENT verbatim (arg1, in both
 			// `s.replace(pat,repl)` and `re.sub(pat,repl,s)`). If the taint entered through the
-			// replacement, the filter never touched it — it is template insertion, not
-			// sanitization — so this is a confident finding, not an assumption.
+			// replacement, the filter never touched it: this is a direct insertion,
+			// so this is a confident finding, not an assumption.
 			if n, ok, _ := e.Store.GetNode(id); ok {
 				if a1 := n.Prop("arg1"); a1 != "" && onPath[a1] {
 					continue
@@ -390,7 +390,7 @@ func (e *Engine) charFilterAssumption(path []string, excluded string) string {
 			if excluded == "" {
 				return "a character-filter replace(" + pat + ") is on the path but this sink declares no excluded_chars to verify against; finding holds unless the filter neutralizes by other means"
 			}
-			return "a character-filter replace(" + pat + ") is on the path but its bounded output is not proven to exclude [" + excluded + "]; false positive if it sanitizes correctly (e.g. an escaper or value-specific allowlist)"
+			return "a character-filter replace(" + pat + ") is on the path but its bounded output is not proven to exclude [" + excluded + "]; false positive if the transform is complete for this value set"
 		}
 	}
 	return ""
@@ -414,7 +414,7 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 			return
 		}
 		seen[key] = true
-		detail := "an unsound sanitizer " + pat + " is on the path but is not provably complete for this sink (e.g. an escaper/encoder vyql cannot verify); false positive if it neutralizes correctly"
+		detail := "an unsound sanitizer " + pat + " is on the path but is not provably complete for this sink; false positive if it neutralizes correctly"
 		if mode == "guard" {
 			detail = "an unsound guard " + pat + " dominates the sink but is not provably complete for this target; false positive if it blocks the relevant condition"
 		}
@@ -511,8 +511,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 
 	var out []*findings.Finding
 	// One finding per (rule, sink): a target sink reachable from N sources is ONE
-	// issue, not N. Reporting per source→sink path inflated real-world scans ~6× (e.g.
-	// a single `echo` reachable from 25 request reads). Keep the highest-confidence
+	// issue, not N. Reporting per source→sink path inflates real-world scans when
+	// many source reads converge on one target. Keep the highest-confidence
 	// source as the representative witness; bySink maps sinkID → index in `out`.
 	bySink := map[string]int{}
 	for _, fl := range flows {
@@ -690,7 +690,7 @@ func (e *Engine) prov(nodeID, concept string) string {
 			}
 			s := concept + " by " + l.Provenance.Adapter + "@" + fid
 			// an SCA advisory (CVE/GHSA) is the most specific provenance — prefer it over a
-			// generic adapter sink that labels the same node (e.g. yaml.load is both).
+			// generic adapter sink that labels the same node.
 			if strings.HasPrefix(l.Provenance.Adapter, "advisory:") {
 				return s
 			}

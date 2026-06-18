@@ -100,7 +100,7 @@ func TestOWASPBenchmark(t *testing.T) {
 }
 
 // hasAssumptionNote reports whether a finding is assumption-gated — an unsound neutralizer
-// (regex char-filter, prefix guard, unverifiable escaper) lies on or dominates its flow.
+// (regex char-filter, prefix guard, unverifiable transform) lies on or dominates its flow.
 func hasAssumptionNote(f *findings.Finding) bool {
 	for _, ne := range f.NegationEvidence {
 		if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
