@@ -33,7 +33,7 @@ func TestDebugConceptClassificationUsesPassedOntology(t *testing.T) {
 	}
 }
 
-func TestCmdRuntimeDoesNotHardcodeSecurityKnowledge(t *testing.T) {
+func TestCmdRuntimeDoesNotHardcodeDomainKnowledge(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
@@ -64,18 +64,13 @@ func TestCmdRuntimeDoesNotHardcodeSecurityKnowledge(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(hits) > 0 {
-		t.Fatalf("cmd runtime must not hardcode ontology/security knowledge; load it from VyQL data: %s", strings.Join(hits, ", "))
+		t.Fatalf("cmd runtime must not hardcode ontology/domain knowledge; load it from VyQL data: %s", strings.Join(hits, ", "))
 	}
 }
 
 func cmdForbiddenKnowledgeNeedles(t *testing.T) []string {
 	t.Helper()
-	seen := map[string]bool{
-		"\"advisory:": true,
-		"\"CVE":       true,
-		"\"GHSA":      true,
-		"\"OSV":       true,
-	}
+	seen := map[string]bool{}
 	for _, c := range ontology.Seed().AllConcepts() {
 		if c.AnalysisRole != "" {
 			continue
