@@ -2,6 +2,7 @@ package engine
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/findings"
@@ -730,6 +731,7 @@ func (e *Engine) sourceConcept(concept string) *ontology.Concept {
 
 func (e *Engine) prov(nodeID, concept string) string {
 	var fallback string
+	bestPriority := -1
 	for _, l := range e.labels(nodeID) {
 		if l.Concept == concept && l.Provenance.Adapter != "" {
 			fid := l.Provenance.Fidelity
@@ -737,17 +739,25 @@ func (e *Engine) prov(nodeID, concept string) string {
 				fid = "resolved"
 			}
 			s := concept + " by " + l.Provenance.Adapter + "@" + fid
-			// an SCA advisory (CVE/GHSA) is the most specific provenance — prefer it over a
-			// generic adapter sink that labels the same node.
-			if strings.HasPrefix(l.Provenance.Adapter, "advisory:") {
-				return s
-			}
-			if fallback == "" {
+			priority := labelProvenancePriority(l)
+			if fallback == "" || priority > bestPriority {
 				fallback = s
+				bestPriority = priority
 			}
 		}
 	}
 	return fallback
+}
+
+func labelProvenancePriority(l usg.Label) int {
+	if l.Detail == nil {
+		return 0
+	}
+	n, err := strconv.Atoi(l.Detail["provenance_priority"])
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 func (e *Engine) reviewConditions(nodeID, concept string) []findings.ReviewCondition {

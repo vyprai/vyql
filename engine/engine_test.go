@@ -174,6 +174,42 @@ func TestEngineDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	}
 }
 
+func TestEngineDoesNotHardcodeSecurityProvenancePrefixes(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "engine.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, needle := range []string{"advisory:", "CVE", "GHSA", "OSV"} {
+		if strings.Contains(string(raw), needle) {
+			t.Fatalf("engine must not hardcode security provenance %q; use generic provenance metadata instead", needle)
+		}
+	}
+}
+
+func TestLabelProvenancePrefersGenericPriority(t *testing.T) {
+	onto := testOntology()
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "target", Type: "code.Call", Props: map[string]string{"loc": "x:1"}})
+	store.AddLabel("target", usg.Label{
+		Concept:    "custom.Target",
+		Provenance: usg.Provenance{Adapter: "generic.adapter", Fidelity: "resolved"},
+	})
+	store.AddLabel("target", usg.Label{
+		Concept:    "custom.Target",
+		Provenance: usg.Provenance{Adapter: "priority.adapter", Fidelity: "semantic"},
+		Detail:     map[string]string{"provenance_priority": "100"},
+	})
+
+	got := New(onto, store).prov("target", "custom.Target")
+	if got != "custom.Target by priority.adapter@semantic" {
+		t.Fatalf("provenance priority not honored: %q", got)
+	}
+}
+
 func ontologyConceptNeedles(t *testing.T) []string {
 	t.Helper()
 	seen := map[string]bool{}
