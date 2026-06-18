@@ -148,7 +148,7 @@ func TestEngineDoesNotHardcodeOntologyConcepts(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	dir := filepath.Dir(file)
-	concepts := ontologyConceptNeedles(t)
+	concepts := ontologyVocabularyNeedles(t)
 	var hits []string
 	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil {
@@ -208,7 +208,7 @@ func TestLabelProvenancePriorityIgnoresAdapterName(t *testing.T) {
 	}
 }
 
-func ontologyConceptNeedles(t *testing.T) []string {
+func ontologyVocabularyNeedles(t *testing.T) []string {
 	t.Helper()
 	seen := map[string]bool{}
 	for _, c := range ontology.Seed().AllConcepts() {
@@ -217,6 +217,10 @@ func ontologyConceptNeedles(t *testing.T) []string {
 		}
 		seen["\""+c.Name+"\""] = true
 		seen["\""+c.QualifiedName()+"\""] = true
+	}
+	for _, tk := range ontology.ThreatKinds() {
+		seen["\""+tk.Name+"\""] = true
+		seen["\""+tk.QualifiedName()+"\""] = true
 	}
 	out := make([]string, 0, len(seen))
 	for needle := range seen {

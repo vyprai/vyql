@@ -82,6 +82,10 @@ func cmdForbiddenKnowledgeNeedles(t *testing.T) []string {
 		seen["\""+c.Name+"\""] = true
 		seen["\""+c.QualifiedName()+"\""] = true
 	}
+	for _, tk := range ontology.ThreatKinds() {
+		seen["\""+tk.Name+"\""] = true
+		seen["\""+tk.QualifiedName()+"\""] = true
+	}
 	out := make([]string, 0, len(seen))
 	for needle := range seen {
 		out = append(out, needle)

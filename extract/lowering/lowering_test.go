@@ -3,13 +3,13 @@ package lowering
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/extract/nir"
+	"github.com/vyprai/vyql/ontology"
 )
 
 func TestLoweringDoesNotHardcodeOntologyConcepts(t *testing.T) {
@@ -17,7 +17,7 @@ func TestLoweringDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	concepts := loweringForbiddenConceptLiterals(t, file)
+	concepts := loweringForbiddenConceptLiterals(t)
 	files, err := filepath.Glob(filepath.Join(filepath.Dir(file), "*.go"))
 	if err != nil {
 		t.Fatalf("glob lowering files: %v", err)
@@ -41,32 +41,23 @@ func TestLoweringDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	}
 }
 
-func loweringForbiddenConceptLiterals(t *testing.T, callerFile string) []string {
+func loweringForbiddenConceptLiterals(t *testing.T) []string {
 	t.Helper()
-	ontologyPath := filepath.Join(filepath.Dir(callerFile), "..", "..", "..", "vyql", "ontology", "concepts.vyql")
-	src, err := os.ReadFile(ontologyPath)
-	if err != nil {
-		t.Fatalf("read ontology: %v", err)
-	}
-
-	moduleRE := regexp.MustCompile(`(?m)^module\s+([A-Za-z][A-Za-z0-9_]*)\s*;`)
-	conceptRE := regexp.MustCompile(`(?m)^concept\s+([A-Za-z][A-Za-z0-9_]*)\s*:`)
-	var module string
 	out := map[string]bool{}
-	for _, line := range strings.Split(string(src), "\n") {
-		if m := moduleRE.FindStringSubmatch(line); m != nil {
-			module = m[1]
+	for _, c := range ontology.Seed().AllConcepts() {
+		if c.AnalysisRole != "" {
 			continue
 		}
-		if m := conceptRE.FindStringSubmatch(line); m != nil {
-			name := m[1]
-			out[`"`+name+`"`] = true
-			out["`"+name+"`"] = true
-			if module != "" {
-				out[`"`+module+"."+name+`"`] = true
-				out["`"+module+"."+name+"`"] = true
-			}
-		}
+		out[`"`+c.Name+`"`] = true
+		out["`"+c.Name+"`"] = true
+		out[`"`+c.QualifiedName()+`"`] = true
+		out["`"+c.QualifiedName()+"`"] = true
+	}
+	for _, tk := range ontology.ThreatKinds() {
+		out[`"`+tk.Name+`"`] = true
+		out["`"+tk.Name+"`"] = true
+		out[`"`+tk.QualifiedName()+`"`] = true
+		out["`"+tk.QualifiedName()+"`"] = true
 	}
 	concepts := make([]string, 0, len(out))
 	for concept := range out {
