@@ -236,49 +236,59 @@ func flattenAnd(e parser.Expr) []parser.Expr {
 	return []parser.Expr{e}
 }
 
-// crossDomainContext surfaces graph context that makes a finding matter more
-// where it is deployed (docs/10, /14, /17): the sink's service being
-// internet-reachable, and the sink's database holding sensitive asset kinds.
-// This is the cross-domain payoff at the individual-finding level and the input
-// to factor-based risk — derived and witness-backed, never a fabricated score.
+// crossDomainContext surfaces ontology-configured graph context around a finding.
+// Concepts define which sink properties point to related graph nodes and how
+// evidence should be rendered; the engine only follows those links.
 func (e *Engine) crossDomainContext(sinkID string) []string {
 	n, ok, _ := e.Store.GetNode(sinkID)
 	if !ok {
 		return nil
 	}
 	var ctx []string
-	if svc := n.Prop("service"); svc != "" {
-		if _, ok, _ := e.Store.GetNode(svc); ok {
-			for _, src := range e.contextReachSources() {
-				sourceIDs, _ := e.Store.NodesWithConcept(src.Concept)
-				if paths, _ := solvers.FindReach(e.Store, sourceIDs, []string{svc}, nil); len(paths) > 0 {
-					h := paths[0].Hops
-					via := ""
-					if len(h) > 0 {
-						via = h[len(h)-1].Rule
-					}
-					line := svc + " is " + src.Label + " (via " + via + ")"
-					for _, label := range e.contextConfirmations(svc) {
-						line += " — " + label
-					}
-					ctx = append(ctx, line)
-				}
+	for _, src := range e.contextReachSources() {
+		target := n.Prop(src.TargetProp)
+		if target == "" {
+			continue
+		}
+		if _, ok, _ := e.Store.GetNode(target); !ok {
+			continue
+		}
+		sourceIDs, _ := e.Store.NodesWithConcept(src.Concept)
+		if paths, _ := solvers.FindReach(e.Store, sourceIDs, []string{target}, nil); len(paths) > 0 {
+			h := paths[0].Hops
+			via := ""
+			if len(h) > 0 {
+				via = h[len(h)-1].Rule
 			}
+			line := target + " is " + src.Label + " (via " + via + ")"
+			for _, label := range e.contextConfirmations(target) {
+				line += " — " + label
+			}
+			ctx = append(ctx, line)
 		}
 	}
-	if db := n.Prop("database"); db != "" {
-		if _, ok, _ := e.Store.GetNode(db); ok {
-			if kinds := sortedSet(e.assetKinds(db)); len(kinds) > 0 {
-				ctx = append(ctx, "sink database "+db+" holds ["+strings.Join(kinds, " ")+"]")
-			}
+	for _, ac := range e.contextAssetConcepts() {
+		target := n.Prop(ac.TargetProp)
+		if target == "" {
+			continue
+		}
+		if _, ok, _ := e.Store.GetNode(target); !ok {
+			continue
+		}
+		if !e.nodeHasConcept(target, ac.Concept) {
+			continue
+		}
+		if kinds := sortedSet(e.assetKinds(target)); len(kinds) > 0 {
+			ctx = append(ctx, renderContextLabel(ac.Label, target, kinds))
 		}
 	}
 	return ctx
 }
 
 type contextReachSource struct {
-	Concept string
-	Label   string
+	Concept    string
+	Label      string
+	TargetProp string
 }
 
 func (e *Engine) contextReachSources() []contextReachSource {
@@ -287,12 +297,50 @@ func (e *Engine) contextReachSources() []contextReachSource {
 		if c.ContextReachSource != "true" {
 			continue
 		}
+		if c.ContextReachTargetProp == "" {
+			continue
+		}
 		label := c.ContextReachLabel
 		if label == "" {
 			label = c.Name
 		}
-		out = append(out, contextReachSource{Concept: c.QualifiedName(), Label: label})
+		out = append(out, contextReachSource{
+			Concept:    c.QualifiedName(),
+			Label:      label,
+			TargetProp: c.ContextReachTargetProp,
+		})
 	}
+	return out
+}
+
+type contextAssetConcept struct {
+	Concept    string
+	TargetProp string
+	Label      string
+}
+
+func (e *Engine) contextAssetConcepts() []contextAssetConcept {
+	var out []contextAssetConcept
+	for _, c := range e.Onto.AllConcepts() {
+		if c.ContextAssetTargetProp == "" {
+			continue
+		}
+		label := c.ContextAssetLabel
+		if label == "" {
+			label = "{target} holds [{kinds}]"
+		}
+		out = append(out, contextAssetConcept{
+			Concept:    c.QualifiedName(),
+			TargetProp: c.ContextAssetTargetProp,
+			Label:      label,
+		})
+	}
+	return out
+}
+
+func renderContextLabel(template, target string, kinds []string) string {
+	out := strings.ReplaceAll(template, "{target}", target)
+	out = strings.ReplaceAll(out, "{kinds}", strings.Join(kinds, " "))
 	return out
 }
 

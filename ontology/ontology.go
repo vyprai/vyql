@@ -44,6 +44,9 @@ type Concept struct {
 	AnalysisRole            string   `json:"analysis_role,omitempty"`
 	ContextReachSource      string   `json:"context_reach_source,omitempty"`
 	ContextReachLabel       string   `json:"context_reach_label,omitempty"`
+	ContextReachTargetProp  string   `json:"context_reach_target_prop,omitempty"`
+	ContextAssetTargetProp  string   `json:"context_asset_target_prop,omitempty"`
+	ContextAssetLabel       string   `json:"context_asset_label,omitempty"`
 	ContextConfirmDstProp   string   `json:"context_confirm_dst_prop,omitempty"`
 	ContextConfirmFlagProp  string   `json:"context_confirm_flag_prop,omitempty"`
 	ContextConfirmFlagValue string   `json:"context_confirm_flag_value,omitempty"`

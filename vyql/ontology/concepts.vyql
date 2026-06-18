@@ -8,10 +8,14 @@ concept Refund : action { }
 
 module cloud;
 
-concept Database : asset { }
+concept Database : asset {
+  context_asset_target_prop: database
+  context_asset_label: "sink database {target} holds [{kinds}]"
+}
 concept Internet : exposure {
   context_reach_source: true
   context_reach_label: "internet-reachable"
+  context_reach_target_prop: service
 }
 concept ObjectStore : asset { }
 concept PublicStorage : exposure { }

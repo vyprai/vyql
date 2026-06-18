@@ -103,7 +103,7 @@ func TestRuntimeConfirmationEscalatesRisk(t *testing.T) {
 		s := usg.NewInMemStore()
 		s.AddNode(usg.Node{ID: "svc", Type: "custom.Service", Props: map[string]string{"loc": "svc"}})
 		s.AddNode(usg.Node{ID: "in", Type: "code.X", Props: map[string]string{"loc": "flow:1"}})
-		s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "flow:2", "service": "svc"}})
+		s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "flow:2", "endpoint": "svc"}})
 		s.AddLabel("in", usg.Label{Concept: "custom.Input"})
 		s.AddLabel("q", usg.Label{Concept: "custom.Target"})
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})

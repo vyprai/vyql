@@ -12,13 +12,20 @@ import (
 func contextTestOntology() *ontology.Ontology {
 	onto := addFlowConcepts(ontology.New())
 	onto.Add(ontology.Concept{
-		Name:               "Edge",
-		Package:            "custom",
-		Kind:               "exposure",
-		ContextReachSource: "true",
-		ContextReachLabel:  "edge-reachable",
+		Name:                   "Edge",
+		Package:                "custom",
+		Kind:                   "exposure",
+		ContextReachSource:     "true",
+		ContextReachLabel:      "edge-reachable",
+		ContextReachTargetProp: "endpoint",
 	})
-	onto.Add(ontology.Concept{Name: "Asset", Package: "custom", Kind: "asset"})
+	onto.Add(ontology.Concept{
+		Name:                   "Asset",
+		Package:                "custom",
+		Kind:                   "asset",
+		ContextAssetTargetProp: "asset",
+		ContextAssetLabel:      "target asset {target} holds [{kinds}]",
+	})
 	return onto
 }
 
@@ -30,7 +37,7 @@ func buildContextGraph(exposed, important bool) usg.Store {
 		s.AddLabel("asset", usg.Label{Concept: "custom.Asset", Detail: map[string]string{"asset_kinds": "custom.Important"}})
 	}
 	s.AddNode(usg.Node{ID: "in", Type: "code.X", Props: map[string]string{"loc": "flow:1"}})
-	s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "flow:2", "service": "svc", "database": "asset"}})
+	s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "flow:2", "endpoint": "svc", "asset": "asset"}})
 	s.AddLabel("in", usg.Label{Concept: "custom.Input"})
 	s.AddLabel("q", usg.Label{Concept: "custom.Target"})
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
@@ -95,6 +102,7 @@ module custom;
 concept PublicEdge : exposure {
   context_reach_source: true
   context_reach_label: "public-edge-reachable"
+  context_reach_target_prop: endpoint
 }
 concept PublicEdgeObservation : observation {
   context_confirm_dst_prop: target
@@ -128,7 +136,7 @@ rule Flow {
 	s.AddNode(usg.Node{ID: "svc", Type: "runtime.Service"})
 	s.AddNode(usg.Node{ID: "in", Type: "code.Call", Props: map[string]string{"loc": "h:1"}})
 	s.AddLabel("in", usg.Label{Concept: "custom.Input"})
-	s.AddNode(usg.Node{ID: "sink", Type: "code.Call", Props: map[string]string{"loc": "h:2", "service": "svc"}})
+	s.AddNode(usg.Node{ID: "sink", Type: "code.Call", Props: map[string]string{"loc": "h:2", "endpoint": "svc"}})
 	s.AddLabel("sink", usg.Label{Concept: "custom.Target"})
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "sink"})
 	s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "svc", Props: map[string]string{"rule": "edge-rule", "proto": "tcp", "port": "443"}})
