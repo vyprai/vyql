@@ -891,6 +891,7 @@ concept RateLimit : control {
   neutralizes: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
   applies: endpoint
+  coverage_reserved_control: true
 }
 concept RedirectAllowlist : control {
   neutralizes: [request_forgery.OpenRedirect]

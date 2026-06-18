@@ -14,6 +14,7 @@ import (
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/frontend"
+	"github.com/vyprai/vyql/parser"
 )
 
 // readDataFiles returns {relpath: content} for every *.vyql under vyql/<sub>.
@@ -41,22 +42,36 @@ func readDataFiles(t *testing.T, sub, suffix string) map[string]string {
 	return out
 }
 
-var (
-	ruleIDRe    = regexp.MustCompile(`id:\s*"(VYQL-[A-Z]+-[0-9]+)"`)
-	conceptDef  = regexp.MustCompile(`(?m)^concept\s+([A-Za-z0-9_]+)`)
-	conceptKind = regexp.MustCompile(`(?m)^concept\s+([A-Za-z0-9_]+)\s*:\s*(sink|source|control)`)
-	conceptRef  = regexp.MustCompile(`(?:code|core)\.([A-Z][A-Za-z0-9_]+)`)
-	quoted      = regexp.MustCompile(`"[^"]*"`)
-	pkgLine     = regexp.MustCompile(`(?m)^(?:module|package)\s+([A-Za-z0-9_.]+)\s*;`)
-	threatDef   = regexp.MustCompile(`(?m)^threat\s+([A-Za-z0-9_]+)`)
-	threatRef   = regexp.MustCompile(`(?:vulnerable_to|neutralizes):\s*\[([^\]]+)\]`)
-)
+func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
+	t.Helper()
+	files := readDataFiles(t, sub, suffix)
+	out := map[string][]parser.Decl{}
+	for f, c := range files {
+		decls, err := parser.Parse(c)
+		if err != nil {
+			t.Fatalf("parse %s: %v", filepath.Base(f), err)
+		}
+		out[f] = decls
+	}
+	return out
+}
 
-func ruleIDs(files map[string]string) map[string]string { // id -> file
+func ruleIDs(t *testing.T, files map[string]string) map[string]string { // id -> file
+	t.Helper()
 	out := map[string]string{}
 	for f, c := range files {
-		for _, m := range ruleIDRe.FindAllStringSubmatch(c, -1) {
-			out[m[1]] = f
+		decls, err := parser.Parse(c)
+		if err != nil {
+			t.Fatalf("parse %s: %v", filepath.Base(f), err)
+		}
+		for _, decl := range decls {
+			r, ok := decl.(*parser.Rule)
+			if !ok {
+				continue
+			}
+			if id, _ := r.Meta["id"].(string); id != "" {
+				out[id] = f
+			}
 		}
 	}
 	return out
@@ -69,7 +84,7 @@ func TestRuleFiresCoverageGate(t *testing.T) {
 	// Every shipped rule now has an `expect` spec — the burn-down allowlist is empty.
 	unspecced := map[string]bool{}
 
-	rules := ruleIDs(readDataFiles(t, "packs", ".vyql"))
+	rules := ruleIDs(t, readDataFiles(t, "packs", ".vyql"))
 	// every .test.vyql `expect` (code AND graph specs alike — both live in one format).
 	specs := readDataFiles(t, "tests", ".test.vyql")
 	expected := map[string]bool{}
@@ -105,24 +120,26 @@ func TestRuleFiresCoverageGate(t *testing.T) {
 }
 
 // T0.2 — every code/core concept reference in adapters and packs resolves to a defined
-// concept. Quoted strings are stripped so string-literal sink paths (e.g. the Python
-// `code` stdlib module) are not mistaken for concept refs.
+// concept. References come from the parsed VyQL AST, so string-literal sink paths
+// (e.g. the Python `code` stdlib module) are not mistaken for concept refs.
 func TestConceptRefsResolveGate(t *testing.T) {
 	defined := map[string]bool{}
-	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
-		for _, m := range conceptDef.FindAllStringSubmatch(c, -1) {
-			defined[m[1]] = true
+	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+		for _, decl := range decls {
+			if cd, ok := decl.(*parser.ConceptDecl); ok {
+				defined[cd.Name] = true
+				defined[cd.QualifiedName()] = true
+			}
 		}
 	}
 	check := func(sub, suffix string) {
-		for f, c := range readDataFiles(t, sub, suffix) {
+		for f, refs := range conceptRefsByFile(t, sub, suffix) {
 			if isGeneratedAdapter(f) {
 				continue // generated corpus validated separately below
 			}
-			bare := quoted.ReplaceAllString(c, `""`)
-			for _, m := range conceptRef.FindAllStringSubmatch(bare, -1) {
-				if !defined[m[1]] {
-					t.Errorf("%s references concept %q which is not defined in concepts.vyql", filepath.Base(f), m[1])
+			for ref := range refs {
+				if !defined[ref] && !defined[shortConceptName(ref)] {
+					t.Errorf("%s references concept %q which is not defined in concepts.vyql", filepath.Base(f), ref)
 				}
 			}
 		}
@@ -132,14 +149,13 @@ func TestConceptRefsResolveGate(t *testing.T) {
 	// the dynamically-loaded generated package corpus must also reference only real
 	// concepts (a dead label otherwise), but it is excluded from the curated coherence
 	// gates below because it legitimately wires broad concepts that have no curated rule.
-	for f, c := range readDataFiles(t, "adapters", ".vyql") {
+	for f, refs := range conceptRefsByFile(t, "adapters", ".vyql") {
 		if !isGeneratedAdapter(f) {
 			continue
 		}
-		bare := quoted.ReplaceAllString(c, `""`)
-		for _, m := range conceptRef.FindAllStringSubmatch(bare, -1) {
-			if !defined[m[1]] {
-				t.Errorf("generated adapter %s references concept %q not defined in concepts.vyql", f, m[1])
+		for ref := range refs {
+			if !defined[ref] && !defined[shortConceptName(ref)] {
+				t.Errorf("generated adapter %s references concept %q not defined in concepts.vyql", f, ref)
 			}
 		}
 	}
@@ -154,19 +170,119 @@ func isGeneratedAdapter(path string) bool {
 }
 
 // conceptRefsIn returns the set of code/core concept names referenced (as targets or
-// in rule clauses) across the given vyql/<sub> files, quoted strings stripped.
+// in rule clauses) across the given vyql/<sub> files.
 func conceptRefsIn(t *testing.T, sub string) map[string]bool {
 	out := map[string]bool{}
-	for f, c := range readDataFiles(t, sub, ".vyql") {
+	for f, refs := range conceptRefsByFile(t, sub, ".vyql") {
 		if isGeneratedAdapter(f) {
 			continue // curated-coherence gates ignore the dynamically-loaded generated corpus
 		}
-		bare := quoted.ReplaceAllString(c, `""`)
-		for _, m := range conceptRef.FindAllStringSubmatch(bare, -1) {
-			out[m[1]] = true
+		for ref := range refs {
+			out[shortConceptName(ref)] = true
 		}
 	}
 	return out
+}
+
+func conceptRefsByFile(t *testing.T, sub, suffix string) map[string]map[string]bool {
+	t.Helper()
+	out := map[string]map[string]bool{}
+	for f, decls := range parseDataDecls(t, sub, suffix) {
+		refs := map[string]bool{}
+		for _, decl := range decls {
+			switch d := decl.(type) {
+			case *parser.AdapterDecl:
+				for _, m := range d.Mappings {
+					if m.Concept != "" && m.Kind != "type" {
+						addCoverageConceptRef(refs, m.Concept)
+					}
+					if m.About != "" && m.About != "*" {
+						addCoverageConceptRef(refs, m.About)
+					}
+				}
+			case *parser.Rule:
+				collectRuleConceptRefs(d, refs)
+			}
+		}
+		out[f] = refs
+	}
+	return out
+}
+
+func collectRuleConceptRefs(r *parser.Rule, refs map[string]bool) {
+	switch body := r.Body.(type) {
+	case *parser.FlowStmt:
+		addCoverageConceptRef(refs, body.Src.Concept)
+		addCoverageConceptRef(refs, body.Dst.Concept)
+	case *parser.OrderStmt:
+		addCoverageConceptRef(refs, body.First.Concept)
+		addCoverageConceptRef(refs, body.Second.Concept)
+	case *parser.MatchStmt:
+		if body.Concept != "" {
+			addCoverageConceptRef(refs, body.Concept)
+		}
+	}
+	for _, cl := range r.Clauses {
+		collectExprConceptRefs(cl.Where, refs)
+		switch ex := cl.Unless.(type) {
+		case parser.SanitizedBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.GuardedBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.ClosedBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.ExprException:
+			collectExprConceptRefs(ex.Expr, refs)
+		}
+	}
+}
+
+func collectExprConceptRefs(expr parser.Expr, refs map[string]bool) {
+	switch e := expr.(type) {
+	case nil:
+		return
+	case parser.And:
+		for _, part := range e.Parts {
+			collectExprConceptRefs(part, refs)
+		}
+	case parser.Not:
+		collectExprConceptRefs(e.Inner, refs)
+	case parser.Has:
+		addCoverageConceptRef(refs, e.Concept)
+	case parser.Is:
+		addCoverageConceptRef(refs, e.Concept)
+	case parser.SolverCall:
+		for _, arg := range e.Args {
+			if len(arg.Ref.Parts) >= 2 {
+				addCoverageConceptRef(refs, arg.Ref.String())
+			}
+		}
+	}
+}
+
+func addCoverageConceptRef(refs map[string]bool, ref string) {
+	if strings.HasPrefix(ref, "code.") || strings.HasPrefix(ref, "core.") {
+		refs[ref] = true
+	}
+}
+
+func shortConceptName(ref string) string {
+	if i := strings.LastIndex(ref, "."); i >= 0 {
+		return ref[i+1:]
+	}
+	return ref
+}
+
+func fieldStringList(fields map[string]any, key string) []string {
+	switch v := fields[key].(type) {
+	case []string:
+		return v
+	case string:
+		if v != "" {
+			return []string{v}
+		}
+	}
+	return nil
 }
 
 // T2.5 — concept-coverage gate. Every SINK concept that a rule consumes must be wired
@@ -177,12 +293,8 @@ func TestSinkConceptsWiredGate(t *testing.T) {
 	// no deferred sinks — every sink a rule consumes is adapter-wired.
 	deferred := map[string]bool{}
 	sinks := map[string]bool{}
-	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
-		for _, m := range conceptKind.FindAllStringSubmatch(c, -1) {
-			if m[2] == "sink" {
-				sinks[m[1]] = true
-			}
-		}
+	for s := range conceptsByKind(t, "sink") {
+		sinks[s] = true
 	}
 	adapterRefs := conceptRefsIn(t, "adapters")
 	ruleRefs := conceptRefsIn(t, "packs")
@@ -215,10 +327,11 @@ func countWired(sinks, wired map[string]bool) int {
 // conceptsByKind returns the set of concept names of the given kind (sink/source/control).
 func conceptsByKind(t *testing.T, kind string) map[string]bool {
 	out := map[string]bool{}
-	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
-		for _, m := range conceptKind.FindAllStringSubmatch(c, -1) {
-			if m[2] == kind {
-				out[m[1]] = true
+	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+		for _, decl := range decls {
+			cd, ok := decl.(*parser.ConceptDecl)
+			if ok && cd.Kind == kind {
+				out[cd.Name] = true
 			}
 		}
 	}
@@ -227,20 +340,14 @@ func conceptsByKind(t *testing.T, kind string) map[string]bool {
 
 func conceptsWithBoolField(t *testing.T, kind, field string) map[string]bool {
 	out := map[string]bool{}
-	fieldRe := regexp.MustCompile(`^\s*` + regexp.QuoteMeta(field) + `\s*:\s*true\s*$`)
-	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
-		cur, curKind := "", ""
-		for _, ln := range strings.Split(c, "\n") {
-			if m := conceptKind.FindStringSubmatch(ln); m != nil {
-				cur, curKind = m[1], m[2]
+	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+		for _, decl := range decls {
+			cd, ok := decl.(*parser.ConceptDecl)
+			if !ok || cd.Kind != kind {
 				continue
 			}
-			if cur != "" && fieldRe.MatchString(ln) && curKind == kind {
-				out[cur] = true
-				continue
-			}
-			if strings.TrimSpace(ln) == "}" {
-				cur, curKind = "", ""
+			if v, ok := cd.Fields[field].(string); ok && v == "true" {
+				out[cd.Name] = true
 			}
 		}
 	}
@@ -274,6 +381,7 @@ func TestSourceConceptsWiredGate(t *testing.T) {
 // nothing). This is the gate that catches the OutputEncoding-style mistake. (A control
 // defined-but-not-wired is just unused vocabulary and is fine.)
 func TestControlsWiredAreConsumedGate(t *testing.T) {
+	reserved := conceptsWithBoolField(t, "control", "coverage_reserved_control")
 	controls := conceptsByKind(t, "control")
 	wired := conceptRefsIn(t, "adapters")
 	consumed := map[string]bool{}
@@ -285,6 +393,9 @@ func TestControlsWiredAreConsumedGate(t *testing.T) {
 	}
 	var inert []string
 	for ctrl := range controls {
+		if reserved[ctrl] {
+			continue
+		}
 		if wired[ctrl] && !consumed[ctrl] {
 			inert = append(inert, ctrl)
 		}
@@ -326,26 +437,24 @@ func TestEveryLanguageHasATest(t *testing.T) {
 // correct package.
 func TestThreatRefsResolveGate(t *testing.T) {
 	defined := map[string]bool{} // "pkg.Threat"
-	for _, c := range readDataFiles(t, "ontology", "threatkinds.vyql") {
-		pkg := ""
-		for _, ln := range strings.Split(c, "\n") {
-			if m := pkgLine.FindStringSubmatch(ln); m != nil {
-				pkg = m[1]
-			}
-			if m := threatDef.FindStringSubmatch(ln); m != nil {
-				defined[pkg+"."+m[1]] = true
+	for _, decls := range parseDataDecls(t, "ontology", "threatkinds.vyql") {
+		for _, decl := range decls {
+			if td, ok := decl.(*parser.ThreatDecl); ok {
+				defined[td.QualifiedName()] = true
 			}
 		}
 	}
-	for f, c := range readDataFiles(t, "ontology", "concepts.vyql") {
-		for _, m := range threatRef.FindAllStringSubmatch(c, -1) {
-			for _, ref := range strings.Split(m[1], ",") {
-				ref = strings.TrimSpace(ref)
-				if ref == "" {
-					continue
-				}
-				if !defined[ref] {
-					t.Errorf("%s references threat %q which is not defined in threatkinds.vyql", filepath.Base(f), ref)
+	for f, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+		for _, decl := range decls {
+			cd, ok := decl.(*parser.ConceptDecl)
+			if !ok {
+				continue
+			}
+			for _, key := range []string{"vulnerable_to", "neutralizes"} {
+				for _, ref := range fieldStringList(cd.Fields, key) {
+					if !defined[ref] {
+						t.Errorf("%s references threat %q which is not defined in threatkinds.vyql", filepath.Base(f), ref)
+					}
 				}
 			}
 		}
@@ -356,9 +465,11 @@ func TestThreatRefsResolveGate(t *testing.T) {
 // T0.4 — no duplicate concept names, rule ids, or (package-qualified) threat names.
 func TestNoDuplicateNamesGate(t *testing.T) {
 	seen := map[string]int{}
-	for _, c := range readDataFiles(t, "ontology", "concepts.vyql") {
-		for _, m := range conceptDef.FindAllStringSubmatch(c, -1) {
-			seen[m[1]]++
+	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+		for _, decl := range decls {
+			if cd, ok := decl.(*parser.ConceptDecl); ok {
+				seen[cd.QualifiedName()]++
+			}
 		}
 	}
 	for n, k := range seen {
@@ -367,9 +478,15 @@ func TestNoDuplicateNamesGate(t *testing.T) {
 		}
 	}
 	ids := map[string]int{}
-	for _, c := range readDataFiles(t, "packs", ".vyql") {
-		for _, m := range ruleIDRe.FindAllStringSubmatch(c, -1) {
-			ids[m[1]]++
+	for _, decls := range parseDataDecls(t, "packs", ".vyql") {
+		for _, decl := range decls {
+			r, ok := decl.(*parser.Rule)
+			if !ok {
+				continue
+			}
+			if id, _ := r.Meta["id"].(string); id != "" {
+				ids[id]++
+			}
 		}
 	}
 	for n, k := range ids {
@@ -378,14 +495,10 @@ func TestNoDuplicateNamesGate(t *testing.T) {
 		}
 	}
 	thr := map[string]int{}
-	for _, c := range readDataFiles(t, "ontology", "threatkinds.vyql") {
-		pkg := ""
-		for _, ln := range strings.Split(c, "\n") {
-			if m := pkgLine.FindStringSubmatch(ln); m != nil {
-				pkg = m[1]
-			}
-			if m := threatDef.FindStringSubmatch(ln); m != nil {
-				thr[pkg+"."+m[1]]++
+	for _, decls := range parseDataDecls(t, "ontology", "threatkinds.vyql") {
+		for _, decl := range decls {
+			if td, ok := decl.(*parser.ThreatDecl); ok {
+				thr[td.QualifiedName()]++
 			}
 		}
 	}
