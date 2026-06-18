@@ -11,9 +11,9 @@ adapter swift {
   source ".parameters" -> code.HttpInput
   source ".queryParameters" -> code.HttpInput
   source ".headers" -> code.HttpInput
-  // iOS deep-link / WKScriptMessage entry-point params, seeded by the frontend:
-  // application(_:open:) url and userContentController(_:didReceive:) message.
-  source "url_scheme_input" -> code.URLSchemeInput
+  // iOS deep-link / WKScriptMessage entry-point params from callback-parameter events.
+  source path "analysis.callback.parameter" val "lang=swift" val "function_name:application" val "parameter_label:open" -> code.URLSchemeInput
+  source path "analysis.callback.parameter" val "lang=swift" val "function_name:userContentController" val "parameter_label:didReceive" -> code.URLSchemeInput
   // iOS clipboard (any app can seed the pasteboard)
   source "UIPasteboard.general.string" -> code.PasteboardInput
   source "UIPasteboard.general.strings" -> code.PasteboardInput

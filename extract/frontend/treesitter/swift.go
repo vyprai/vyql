@@ -65,18 +65,28 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		paramTypes := c.paramTypes(n)
 		body := c.block(c.swBody(n))
-		// Platform callback entry points seeded as external input:
-		//   application(_:open:) — deep-link URL param `open url:`
-		//   userContentController(_:didReceive:) — WKScriptMessage param (.body is web JS)
-		var seedParam string
+		// Callback parameter entry points are emitted as generic structural events;
+		// adapter data decides which callbacks represent trust boundaries.
+		var seedParam, seedLabel string
 		if name == "application" {
 			seedParam = labeledInternal(pairs, "open")
+			seedLabel = "open"
 		} else if name == "userContentController" {
 			seedParam = labeledInternal(pairs, "didReceive")
+			seedLabel = "didReceive"
 		}
 		if seedParam != "" {
+			path := "analysis.callback.parameter"
 			seed := nir.Assign{Targets: []string{seedParam},
-				Value: nir.Call{Callee: nir.Name{ID: "url_scheme_input", Loc: L}, Path: "url_scheme_input", Method: "url_scheme_input", Loc: L}}
+				Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: L},
+					Args: []nir.Expr{
+						nir.Const{Loc: L, Value: "lang=swift"},
+						nir.Const{Loc: L, Value: "function_name:" + name},
+						nir.Const{Loc: L, Value: "parameter_label:" + seedLabel},
+					},
+					Path: path, Method: "parameter", Loc: L,
+				}}
 			body = append([]nir.Stmt{seed}, body...)
 		}
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
