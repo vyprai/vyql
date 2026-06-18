@@ -14,6 +14,7 @@ import (
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/extract/parsecache"
+	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -160,7 +161,7 @@ func dumpGraph(paths []string, mode string) error {
 	case "graph":
 		return printUSG(g)
 	case "taint":
-		return printTaint(g)
+		return printTaint(ontology.Seed(), g)
 	default:
 		return fmt.Errorf("unknown -dump mode %q (use: graph | taint)", mode)
 	}
@@ -190,14 +191,14 @@ func printUSG(g usg.Store) error {
 
 // printTaint shows, for each source node, the set of FLOWS-reachable labelled nodes — so a
 // broken taint chain (source not reaching its sink) is visible at a glance.
-func printTaint(g usg.Store) error {
+func printTaint(onto *ontology.Ontology, g usg.Store) error {
 	nodes, err := g.AllNodes()
 	if err != nil {
 		return err
 	}
 	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
 	for _, n := range nodes {
-		if !isSource(g, n.ID) {
+		if !isSource(onto, g, n.ID) {
 			continue
 		}
 		fmt.Printf("\nSOURCE %s @ %s {%s}\n", n.ID, n.Prop("loc"), conceptsOf(g, n.ID))
@@ -221,7 +222,7 @@ func printTaint(g usg.Store) error {
 			}
 			if c := conceptsOf(g, m.ID); c != "" {
 				kind := "·"
-				if !isSource(g, m.ID) {
+				if !isSource(onto, g, m.ID) {
 					kind = "SINK?"
 				}
 				fmt.Printf("  %-5s reaches %s @ %s {%s}\n", kind, m.ID, m.Prop("loc"), c)
@@ -261,11 +262,11 @@ func conceptsOf(g usg.Store, id string) string {
 	return strings.Join(cs, ",")
 }
 
-// isSource reports whether a node carries an input/source concept label.
-func isSource(g usg.Store, id string) bool {
+// isSource reports whether a node carries a source concept label according to the loaded ontology.
+func isSource(onto *ontology.Ontology, g usg.Store, id string) bool {
 	labels, _ := g.Labels(id)
 	for _, l := range labels {
-		if isSourceConcept(l.Concept) {
+		if isSourceConcept(onto, l.Concept) {
 			return true
 		}
 	}

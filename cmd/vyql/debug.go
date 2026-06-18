@@ -43,15 +43,16 @@ func cmdTrace(args []string) error {
 		fmt.Println("(no analyzable source)")
 		return nil
 	}
+	onto := ontology.Seed()
 	nodes, _ := g.AllNodes()
 	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
 
 	connected, dead := 0, 0
 	for _, n := range nodes {
-		if !isSource(g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
+		if !isSource(onto, g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
 			continue
 		}
-		path, sink := shortestToSink(g, n.ID, *to)
+		path, sink := shortestToSink(onto, g, n.ID, *to)
 		fmt.Printf("\nSOURCE %s @ %s {%s}\n", n.ID, n.Prop("loc"), conceptsOf(g, n.ID))
 		if sink != "" {
 			connected++
@@ -63,7 +64,7 @@ func cmdTrace(args []string) error {
 		}
 		dead++
 		fmt.Printf("  ✗ reaches no %ssink — taint stops at:\n", toLabel(*to))
-		for _, f := range frontier(g, n.ID) {
+		for _, f := range frontier(onto, g, n.ID) {
 			fmt.Printf("      ⊣ %s\n", traceNode(g, f))
 		}
 	}
@@ -80,14 +81,14 @@ func toLabel(to string) string {
 
 // shortestToSink BFSes FLOWS edges and returns the shortest path (excluding the source) to the
 // first reachable sink-labelled node, or ("",[]) if none. `to` filters the sink concept.
-func shortestToSink(g usg.Store, src, to string) ([]string, string) {
+func shortestToSink(onto *ontology.Ontology, g usg.Store, src, to string) ([]string, string) {
 	type item struct{ id, prev string }
 	prev := map[string]string{src: ""}
 	queue := []string{src}
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
-		if cur != src && isSink(g, cur) && (to == "" || conceptMatch(g, cur, to)) {
+		if cur != src && isSink(onto, g, cur) && (to == "" || conceptMatch(g, cur, to)) {
 			var rev []string
 			for x := cur; x != "" && x != src; x = prev[x] {
 				rev = append([]string{x}, rev...)
@@ -108,7 +109,7 @@ func shortestToSink(g usg.Store, src, to string) ([]string, string) {
 // frontier returns the nodes where taint stopped: reachable Call nodes whose taint goes no
 // further toward a labelled node, plus any control (sanitizer/guard/assumption) that was hit.
 // These are the candidate "broken edges" — most often an unresolved or cross-package call.
-func frontier(g usg.Store, src string) []string {
+func frontier(onto *ontology.Ontology, g usg.Store, src string) []string {
 	seen := map[string]bool{src: true}
 	queue := []string{src}
 	var order []string
@@ -133,7 +134,7 @@ func frontier(g usg.Store, src string) []string {
 		// a terminal Call (taint reaches it but it has no outgoing FLOWS) is a likely
 		// unresolved/external callee — the classic cross-package dead-end.
 		es, _ := g.OutEdges(id, "FLOWS")
-		isControl := conceptsOf(g, id) != "" && !isSource(g, id)
+		isControl := conceptsOf(g, id) != "" && !isSource(onto, g, id)
 		if (n.Type == "code.Call" && len(es) == 0) || isControl {
 			out = append(out, id)
 		}
@@ -191,20 +192,25 @@ func locOf(g usg.Store, id string) string {
 	return "?"
 }
 
-// isSink reports whether a node carries a sink concept label (a `code.*` sink, i.e. not a
-// source and not a bare control).
-func isSink(g usg.Store, id string) bool {
+// isSink reports whether a node carries a sink concept label according to the loaded ontology.
+func isSink(onto *ontology.Ontology, g usg.Store, id string) bool {
 	for _, l := range labelsOf(g, id) {
-		if sinkConceptName(l) {
+		if ontologyConceptKind(onto, l) == "sink" {
 			return true
 		}
 	}
 	return false
 }
 
-func sinkConceptName(c string) bool {
-	cc, err := ontology.Seed().Get(c)
-	return err == nil && cc.Kind == "sink"
+func ontologyConceptKind(onto *ontology.Ontology, c string) string {
+	if onto == nil {
+		return ""
+	}
+	cc, err := onto.Get(c)
+	if err != nil {
+		return ""
+	}
+	return cc.Kind
 }
 
 // ── vyql explain ────────────────────────────────────────────────────────────────────
@@ -292,6 +298,7 @@ func cmdMatch(args []string) error {
 		fmt.Println("(no analyzable source)")
 		return nil
 	}
+	onto := ontology.Seed()
 	nodes, _ := g.AllNodes()
 	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
 	type row struct{ role, line string }
@@ -301,9 +308,9 @@ func cmdMatch(args []string) error {
 		for _, l := range labels {
 			role := "control/other"
 			switch {
-			case isSourceConcept(l.Concept):
+			case isSourceConcept(onto, l.Concept):
 				role = "source"
-			case sinkConceptName(l.Concept):
+			case ontologyConceptKind(onto, l.Concept) == "sink":
 				role = "sink"
 			}
 			prov := l.Provenance.Adapter
@@ -340,9 +347,8 @@ func calleeKey(n usg.Node) string {
 	return n.Type
 }
 
-func isSourceConcept(c string) bool {
-	cc, err := ontology.Seed().Get(c)
-	return err == nil && cc.Kind == "source"
+func isSourceConcept(onto *ontology.Ontology, c string) bool {
+	return ontologyConceptKind(onto, c) == "source"
 }
 
 // ── vyql resolve ────────────────────────────────────────────────────────────────────
@@ -428,7 +434,7 @@ func cmdGraph(args []string) error {
 		return nil
 	}
 	if *taint {
-		return printTaint(g)
+		return printTaint(ontology.Seed(), g)
 	}
 	return printUSG(g)
 }
@@ -717,12 +723,13 @@ func cmdQuery(args []string) error {
 	// reachability mode: every -from source that reaches a -to sink (path-aware, like trace
 	// but terse — one line per connected pair).
 	if *from != "" || *to != "" {
+		onto := ontology.Seed()
 		pairs := 0
 		for _, n := range nodes {
-			if !isSource(g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
+			if !isSource(onto, g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
 				continue
 			}
-			if path, sink := shortestToSink(g, n.ID, *to); sink != "" {
+			if path, sink := shortestToSink(onto, g, n.ID, *to); sink != "" {
 				pairs++
 				if !*count {
 					fmt.Printf("%s @ %s  →[%d hops]→  %s @ %s {%s}\n",
@@ -792,6 +799,7 @@ func printScanStats(paths []string) {
 	}
 	indeg := map[string]int{}
 	var nodeDeg []deg
+	onto := ontology.Seed()
 	for _, n := range nodes {
 		out := 0
 		for _, et := range edgeTypes {
@@ -804,10 +812,10 @@ func printScanStats(paths []string) {
 			}
 		}
 		edges += out
-		if isSource(g, n.ID) {
+		if isSource(onto, g, n.ID) {
 			srcCount++
 		}
-		if isSink(g, n.ID) {
+		if isSink(onto, g, n.ID) {
 			sinkCount++
 		}
 		nodeDeg = append(nodeDeg, deg{id: n.ID, out: out, loc: n.Prop("loc"), path: calleeKey(n)})
