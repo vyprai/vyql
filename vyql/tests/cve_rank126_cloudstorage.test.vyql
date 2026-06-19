@@ -1,0 +1,47 @@
+# Rank 126 / CVE-2024-50353: SAS URL token duration ignored.
+
+test "rank126: csharp SAS URL expiry with fixed duration is review-visible"
+  lang csharp
+  expect_review code.TimeBoundAccessTokenReview
+  code
+  ```
+  class AzureCloudStorageProvider {
+      public string CreateSASUrl(string container, string objectName, int tokenDuration) {
+          var blobClient = new BlobClient(_storageOptions.Value.StorageConnectionString, container, objectName);
+          if (blobClient.CanGenerateSasUri) {
+              var tokenBuilder = new BlobSasBuilder {
+                  BlobContainerName = container,
+                  BlobName = objectName,
+                  Resource = "b",
+                  ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+              };
+              tokenBuilder.SetPermissions(BlobSasPermissions.Read);
+              return blobClient.GenerateSasUri(tokenBuilder).ToString();
+          }
+          throw new InvalidOperationException();
+      }
+  }
+  ```
+
+test "rank126: csharp SAS URL expiry using requested duration is clean"
+  lang csharp
+  reject_review code.TimeBoundAccessTokenReview
+  code
+  ```
+  class AzureCloudStorageProvider {
+      public string CreateSASUrl(string container, string objectName, int tokenDuration) {
+          var blobClient = new BlobClient(_storageOptions.Value.StorageConnectionString, container, objectName);
+          if (blobClient.CanGenerateSasUri) {
+              var tokenBuilder = new BlobSasBuilder {
+                  BlobContainerName = container,
+                  BlobName = objectName,
+                  Resource = "b",
+                  ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(tokenDuration)
+              };
+              tokenBuilder.SetPermissions(BlobSasPermissions.Read);
+              return blobClient.GenerateSasUri(tokenBuilder).ToString();
+          }
+          throw new InvalidOperationException();
+      }
+  }
+  ```

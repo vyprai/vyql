@@ -78,6 +78,11 @@ review code.CredentialedEndpointReview {
   expected: [core.AuthorizationCheck]
   text: "review credentialed test endpoint for admin permission and request-method guards"
 }
+review code.TimeBoundAccessTokenReview {
+  category: "auth"
+  kind: "attention"
+  text: "review generated access tokens or signed URLs for configurable, appropriately bounded expiration"
+}
 review code.AuthAttemptLimitReview {
   category: "auth"
   kind: "attention"

@@ -567,6 +567,10 @@ concept CredentialedEndpointReview : sink {
   vulnerable_to: [access_control.MissingAuthorization, secrets.SecretLeak]
   cwe: [CWE_200, CWE_862]
 }
+concept TimeBoundAccessTokenReview : sink {
+  vulnerable_to: [access_control.BrokenAccess]
+  cwe: [CWE_284]
+}
 // Review-only: authentication challenge, retry, or attempt-limit logic. Used for
 // cases where static analysis should hand context to the AI/manual stage to verify
 // brute-force limits, rate limiting, and concurrency around failed-attempt counters.
