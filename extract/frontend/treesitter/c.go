@@ -21,6 +21,7 @@ type ccConv struct {
 	src  []byte
 	file string
 	key  string
+	lang string
 }
 
 // cPropagators write their source arguments into destination arg0.
@@ -64,7 +65,7 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 			return p
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext)}
+			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), lang: ccLang(ext)}
 			body := c.decls(tree.RootNode())
 			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
@@ -169,6 +170,24 @@ func minInt(a, b int) int {
 	return b
 }
 
+func ccLang(ext string) string {
+	switch ext {
+	case ".cpp":
+		return "cpp"
+	case ".m":
+		return "objc"
+	default:
+		return "c"
+	}
+}
+
+func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	return []string{"lang=" + c.lang, "name=" + name, compactCExprText(c.text(body))}
+}
+
 func (c *ccConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	for _, ch := range namedChildren(n) {
@@ -257,12 +276,14 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if len(params) == 0 {
 			params, paramTypes = c.paramsFromSignatureText(c.text(n))
 		}
+		name := c.declName(decl)
 		return []nir.Stmt{nir.FuncDef{
-			Name:       c.declName(decl),
-			Params:     params,
-			ParamTypes: paramTypes,
-			Body:       append(c.block(field(n, "body")), c.ccIndexAccessObservations(n)...),
-			Loc:        L,
+			Name:          name,
+			Params:        params,
+			ParamTypes:    paramTypes,
+			Body:          append(c.block(field(n, "body")), c.ccIndexAccessObservations(n)...),
+			Loc:           L,
+			ContextTokens: c.ccFunctionContext(name, field(n, "body")),
 		}}
 	case "struct_specifier", "union_specifier", "enum_specifier":
 		return nil
@@ -276,7 +297,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return out
 	case "method_definition", "method_declaration": // ObjC method
 		name, params, body := c.objcMethod(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: c.objcParamTypes(n, params), Body: c.block(body), Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: c.objcParamTypes(n, params), Body: c.block(body), Loc: L, ContextTokens: c.ccFunctionContext(name, body)}}
 	case "namespace_definition", "linkage_specification", "declaration_list": // C++
 		if b := field(n, "body"); b != nil {
 			return c.decls(b)

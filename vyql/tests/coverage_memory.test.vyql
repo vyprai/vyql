@@ -177,3 +177,58 @@ test "memory: unrelated zero-size exit guard does not suppress reallocarray life
       bits = reallocarray(bits, new_size, sizeof(GifPixelType));
   }
   ```
+
+test "memory: escaped terminator reaches decoded buffer write"
+  lang cpp
+  expect VYQL-MEM-013
+  code
+  ```
+  char unescapeChar(char c);
+
+  char *extractFrom(char *input) {
+      char *readPtr = input + 1;
+      char *writePtr = readPtr;
+      char c;
+
+      for (;;) {
+          c = *readPtr++;
+          if (c == '\0') return 0;
+          if (c == '"') break;
+          if (c == '\\') {
+              c = unescapeChar(*readPtr++);
+          }
+          *writePtr++ = c;
+      }
+
+      *writePtr = '\0';
+      return input + 1;
+  }
+  ```
+
+test "memory: escaped terminator check before decoded buffer write is clean"
+  lang cpp
+  reject VYQL-MEM-013
+  code
+  ```
+  char unescapeChar(char c);
+
+  char *extractFrom(char *input) {
+      char *readPtr = input + 1;
+      char *writePtr = readPtr;
+      char c;
+
+      for (;;) {
+          c = *readPtr++;
+          if (c == '\0') return 0;
+          if (c == '"') break;
+          if (c == '\\') {
+              c = unescapeChar(*readPtr++);
+              if (c == '\0') return 0;
+          }
+          *writePtr++ = c;
+      }
+
+      *writePtr = '\0';
+      return input + 1;
+  }
+  ```

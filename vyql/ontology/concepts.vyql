@@ -504,6 +504,15 @@ concept NullableDeref : sink {
   review_assumption: "the dereferenced value may be null on an attacker-triggerable path"
   review_confidence: low
 }
+concept EscapedTerminatorWrite : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_119, CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "an escape decoder writes a decoded byte without rejecting an escaped string terminator"
+  review_evidence: "escape decoder context {pattern} writes the decoded byte immediately after unescaping"
+  review_assumption: "attacker-controlled input can end with an escape marker followed by a terminator"
+  review_confidence: medium
+}
 concept AuthenticationRequiredOp : sink {
   vulnerable_to: [authentication.MissingAuthentication]
   cwe: [CWE_306]
