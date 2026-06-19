@@ -6,5 +6,6 @@ profile mobile_android {
   priority: "90"
   detect: ["file:AndroidManifest.xml", "file:app/src/main/AndroidManifest.xml",
            "dep:com.android.tools.build", "dep:androidx", "dep:com.android.application"]
-  entrypoints: [IntentInput, ExternalApiResponse, DatabaseRead, SecretValue, ComputedSizeValue]
+  entrypoints: [IntentInput, ExternalApiResponse, DatabaseRead, SecretValue, ComputedSizeValue,
+                ArchiveEntryName]
 }

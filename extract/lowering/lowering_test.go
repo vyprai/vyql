@@ -226,6 +226,42 @@ func TestLowerStampsReceiverTypeFromParamTypes(t *testing.T) {
 	t.Fatalf("svc.clean call not found")
 }
 
+func TestLowerPreservesDeclaredReceiverTypeAfterUntypedAssignment(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.java",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "handler", Body: []nir.Stmt{
+				nir.Assign{Targets: []string{"item"}, Type: "ExternalItem", Decl: true},
+				nir.Assign{Targets: []string{"item"}, Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "source", Loc: "app.java:3"}, Attr: "next", Path: "source.next", Loc: "app.java:3"},
+					Path:   "source.next", Method: "next", Loc: "app.java:3",
+				}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "item", Loc: "app.java:4"}, Attr: "name", Path: "item.name", Loc: "app.java:4"},
+					Path:   "item.name", Method: "name", Loc: "app.java:4",
+				}},
+			}, Loc: "app.java:1"},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") != "item.name" {
+			continue
+		}
+		if got := n.Prop("recv_type"); got != "ExternalItem" {
+			t.Fatalf("recv_type = %q, want ExternalItem; props=%+v", got, n.Props)
+		}
+		return
+	}
+	t.Fatalf("item.name call not found")
+}
+
 func TestLowerCallRecordsReceiverNode(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",

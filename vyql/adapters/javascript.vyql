@@ -300,7 +300,7 @@ adapter javascript {
     // Model the constructed archive as untrusted data and the extraction receiver
     // as the path-writing primitive; guarded_by PathAccessCheck handles preflight
     // entry containment loops.
-    source path "adm-zip" -> core.UserControlledData
+    source path "adm-zip" -> code.ArchiveEntryName
     sink receiver "extractAllTo" -> code.ArchiveEntryWrite
   }
   sink path "User.findById" -> code.ObjectLookupByUserInput

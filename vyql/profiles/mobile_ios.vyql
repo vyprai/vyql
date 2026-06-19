@@ -7,5 +7,6 @@ profile mobile_ios {
   priority: "90"
   detect: ["file:Info.plist", "file:Package.swift", "dep:UIKit", "dep:SwiftUI",
            "dep:WebKit", "ext:.xcodeproj", "ext:.swift"]
-  entrypoints: [PasteboardInput, URLSchemeInput, ExternalApiResponse, DatabaseRead, SecretValue, ComputedSizeValue]
+  entrypoints: [PasteboardInput, URLSchemeInput, ExternalApiResponse, DatabaseRead, SecretValue,
+                ComputedSizeValue, ArchiveEntryName]
 }

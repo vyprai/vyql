@@ -43,6 +43,7 @@ adapter java {
   // intercepted business call's runtime data — untrusted in an interceptor (e.g. @DS SpEL
   // routing evaluates them, CVE-2026-7045). Surfaces only if they reach a sink.
   source method "getArguments" -> code.HttpInput
+  source receiver "getName" on "ZipEntry" -> code.ArchiveEntryName
   // Android intent / deep-link inputs (attacker-controlled IPC entry points)
   source ".getStringExtra" -> code.IntentInput
   source ".getStringArrayExtra" -> code.IntentInput

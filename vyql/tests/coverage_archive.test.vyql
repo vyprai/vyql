@@ -116,6 +116,27 @@ test "path: java archive entry name reaching extraction is reported"
   }
   ```
 
+test "path: java ZipEntry name reaching file write is reported"
+  lang java
+  expect VYQL-PATH-001
+  code
+  ```
+  import java.io.File;
+  import java.io.FileOutputStream;
+  import java.util.zip.ZipEntry;
+  import java.util.zip.ZipInputStream;
+
+  class App {
+    void extract(ZipInputStream zipIn, File folder) throws Exception {
+      ZipEntry zipEntry;
+      while ((zipEntry = zipIn.getNextEntry()) != null) {
+        File file = new File(folder, zipEntry.getName());
+        new FileOutputStream(file);
+      }
+    }
+  }
+  ```
+
 test "path: go archive entry name reaching extraction is reported"
   lang go
   expect VYQL-PATH-004

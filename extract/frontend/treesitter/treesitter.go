@@ -24,7 +24,7 @@ func ListFiles(root string, exts map[string]bool) ([]string, error) {
 			return nil
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") && d.Name() != "." {
+			if shouldSkipDir(root, path, d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -55,7 +55,7 @@ func ListAllFiles(root string) []Entry {
 			return nil
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") && d.Name() != "." {
+			if shouldSkipDir(root, path, d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -75,4 +75,30 @@ func FilterEntries(entries []Entry, exts map[string]bool) []string {
 		}
 	}
 	return out
+}
+
+func shouldSkipDir(root, path, name string) bool {
+	if strings.HasPrefix(name, ".") && name != "." {
+		return true
+	}
+	if !skipDirs[name] {
+		return false
+	}
+	if name == "build" && isUnderSourceRoot(root, path) {
+		return false
+	}
+	return true
+}
+
+func isUnderSourceRoot(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == "." {
+		return false
+	}
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		if part == "src" {
+			return true
+		}
+	}
+	return false
 }

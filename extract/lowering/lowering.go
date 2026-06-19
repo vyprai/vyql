@@ -1498,6 +1498,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if !hasTyp && st.Type != "" { // declared type (no/foreign RHS), e.g. Spring DI field
 			if cm, ok := l.classModule(st.Type, l.importTables[l.curModule]); ok {
 				typ, hasTyp = [2]string{cm, st.Type}, true
+			} else {
+				// External/library declared types are still useful for adapter receiver
+				// constraints even when there is no project class body to resolve.
+				typ, hasTyp = [2]string{"", st.Type}, true
 			}
 		}
 		cv := constStr(st.Value)
@@ -1513,10 +1517,20 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		for _, t := range st.Targets {
 			localDecl := st.Decl && l.region != ""
+			targetTyp, targetHasTyp := typ, hasTyp
+			if !targetHasTyp {
+				if prev, ok := sc.typ[t]; ok && prev[1] != "" {
+					targetTyp, targetHasTyp = prev, true
+				}
+			}
+			targetVal := val
+			if targetHasTyp && targetTyp[1] != "" {
+				targetVal = l.typedBindingNode(val, targetTyp[1])
+			}
 			if sc.lex[t] && !st.Decl {
-				l.flow(val, sc.node[t])
-				if hasTyp {
-					sc.typ[t] = typ
+				l.flow(targetVal, sc.node[t])
+				if targetHasTyp {
+					sc.typ[t] = targetTyp
 				}
 				if cv != "" {
 					sc.cnst[t] = cv // x = "literal"
@@ -1526,10 +1540,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				continue
 			}
 			if slot := l.moduleGlobalSlot(t); slot != "" && !localDecl {
-				l.flow(val, slot)
+				l.flow(targetVal, slot)
 				sc.node[t] = slot
-				if hasTyp {
-					sc.typ[t] = typ
+				if targetHasTyp {
+					sc.typ[t] = targetTyp
 				}
 				if cv != "" {
 					sc.cnst[t] = cv // x = "literal"
@@ -1541,9 +1555,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			if st.Decl {
 				delete(sc.lex, t)
 			}
-			sc.node[t] = val
-			if hasTyp {
-				sc.typ[t] = typ
+			sc.node[t] = targetVal
+			if targetHasTyp {
+				sc.typ[t] = targetTyp
 			}
 			if cv != "" {
 				sc.cnst[t] = cv // x = "literal"
@@ -1706,6 +1720,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nil:
 		return ""
 	case nir.Name:
+		props := map[string]string{"callee_path": ex.ID, "method": ex.ID}
+		if typ, ok := sc.typ[ex.ID]; ok && typ[1] != "" {
+			props["decl_type"] = typ[1]
+		}
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
 		}
@@ -1719,7 +1737,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 				return l.elemNode(self, ex.ID, ex.Loc)
 			}
 		}
-		return l.node("Name", ex.Loc, map[string]string{"callee_path": ex.ID, "method": ex.ID})
+		return l.node("Name", ex.Loc, props)
 	case nir.Const:
 		return l.node("Const", ex.Loc, nil)
 	case nir.Thru:
@@ -2299,6 +2317,16 @@ func (l *lowerer) recvType(nodeID string) string {
 		}
 	}
 	return ""
+}
+
+func (l *lowerer) typedBindingNode(val, typ string) string {
+	loc := ""
+	if n, ok, _ := l.g.GetNode(val); ok {
+		loc = n.Loc
+	}
+	typed := l.node("Name", loc, map[string]string{"callee_path": typ, "method": typ, "decl_type": typ})
+	l.flow(val, typed)
+	return typed
 }
 
 func (l *lowerer) evalCall(call nir.Call, sc *scope) string {

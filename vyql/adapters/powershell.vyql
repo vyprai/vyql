@@ -49,7 +49,7 @@ adapter powershell {
   sink path "Select-Xml" -> code.XmlParse
 
   // path / file
-  source "entry.FullName" -> core.UserControlledData
+  source "entry.FullName" -> code.ArchiveEntryName
 
   sink path "Get-Content" -> code.FilePathAccess
   sink path "Set-Content" -> code.FilePathAccess
