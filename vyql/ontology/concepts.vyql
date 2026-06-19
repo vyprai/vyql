@@ -578,6 +578,10 @@ concept AuthAttemptLimitReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_307]
 }
+concept ProtocolFrameBindingReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+}
 concept ObjectLookupByUserInput : sink {
   vulnerable_to: [access_control.Idor]
   enabled_by: [taint.UntrustedData]

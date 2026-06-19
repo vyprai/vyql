@@ -89,6 +89,12 @@ review code.AuthAttemptLimitReview {
   expected: [core.RateLimit]
   text: "review authentication challenge or failed-attempt limit logic for brute-force resistance and concurrent bypasses"
 }
+review code.ProtocolFrameBindingReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review protocol frame/session identifier binding before accepting the frame as belonging to an existing authenticated session"
+}
 review code.ObjectLookupByUserInput {
   category: "auth"
   kind: "target"
