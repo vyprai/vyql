@@ -564,3 +564,35 @@ test "review: php secret key generation with restrictive chmod is clean"
     }
   }
   ```
+
+test "review: go repository/keyring config type without YAML redaction is surfaced"
+  lang go
+  expect_review code.ConfigExposureReview
+  code
+  ```
+  package types
+
+  type ImageContents struct {
+      Repositories []string `yaml:"repositories,omitempty"`
+      Keyring []string `yaml:"keyring,omitempty"`
+      Packages []string `yaml:"packages,omitempty"`
+  }
+  ```
+
+test "review: go repository/keyring config type with YAML redaction is clean"
+  lang go
+  reject_review code.ConfigExposureReview
+  code
+  ```
+  package types
+
+  type ImageContents struct {
+      Repositories []string `yaml:"repositories,omitempty"`
+      Keyring []string `yaml:"keyring,omitempty"`
+      Packages []string `yaml:"packages,omitempty"`
+  }
+
+  func (i ImageContents) MarshalYAML() (interface{}, error) {
+      return nil, nil
+  }
+  ```

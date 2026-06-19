@@ -13,6 +13,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -203,10 +204,13 @@ func (c *conv) imports(f *ast.File) []nir.Import {
 
 func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	var out []nir.Stmt
+	methods := c.methodMap(decls)
 	for _, d := range decls {
 		switch fn := d.(type) {
 		case *ast.FuncDecl:
 			out = append(out, c.funcDef(fn.Name.Name, fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
+		case *ast.GenDecl:
+			out = append(out, c.typeContextStmts(fn, methods)...)
 		}
 	}
 	// Flush func-literal bodies hoisted while lowering this decl set, so inline HTTP
@@ -214,6 +218,94 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	out = append(out, c.hoisted...)
 	c.hoisted = nil
 	return out
+}
+
+func (c *conv) methodMap(decls []ast.Decl) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	for _, d := range decls {
+		fn, ok := d.(*ast.FuncDecl)
+		if !ok || fn.Recv == nil || fn.Name == nil {
+			continue
+		}
+		recv := c.receiverType(fn.Recv)
+		if recv == "" {
+			continue
+		}
+		if out[recv] == nil {
+			out[recv] = map[string]bool{}
+		}
+		out[recv][fn.Name.Name] = true
+	}
+	return out
+}
+
+func (c *conv) receiverType(recv *ast.FieldList) string {
+	if recv == nil || len(recv.List) == 0 {
+		return ""
+	}
+	return c.typeName(recv.List[0].Type)
+}
+
+func (c *conv) typeContextStmts(g *ast.GenDecl, methods map[string]map[string]bool) []nir.Stmt {
+	var out []nir.Stmt
+	if g == nil || g.Tok != token.TYPE {
+		return out
+	}
+	for _, spec := range g.Specs {
+		ts, ok := spec.(*ast.TypeSpec)
+		if !ok || ts.Name == nil {
+			continue
+		}
+		fields := c.structFieldNames(ts.Type)
+		if len(fields) == 0 && len(methods[ts.Name.Name]) == 0 {
+			continue
+		}
+		tokens := []string{"type_name:" + ts.Name.Name}
+		for _, f := range fields {
+			tokens = append(tokens, "field:"+f)
+		}
+		var ms []string
+		for m := range methods[ts.Name.Name] {
+			ms = append(ms, m)
+		}
+		sort.Strings(ms)
+		for _, m := range ms {
+			tokens = append(tokens, "method:"+m)
+		}
+		out = append(out, nir.ExprStmt{Value: analysisCall("analysis.type.context", "context", c.loc(ts.Pos()), tokens...)})
+	}
+	return out
+}
+
+func (c *conv) structFieldNames(expr ast.Expr) []string {
+	st, ok := expr.(*ast.StructType)
+	if !ok || st.Fields == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, f := range st.Fields.List {
+		for _, n := range f.Names {
+			if n == nil || n.Name == "_" || seen[n.Name] {
+				continue
+			}
+			seen[n.Name] = true
+			out = append(out, n.Name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func analysisCall(path, method, loc string, tokens ...string) nir.Call {
+	args := make([]nir.Expr, 0, len(tokens))
+	for _, tok := range tokens {
+		if tok == "" {
+			continue
+		}
+		args = append(args, nir.Const{Loc: loc, Value: strconv.Quote(tok)})
+	}
+	return nir.Call{Callee: nir.Name{ID: path, Loc: loc}, Args: args, Path: path, Method: method, Loc: loc}
 }
 
 // funcDef builds a FuncDef from a function type+body (shared by top-level FuncDecl and

@@ -600,7 +600,12 @@ concept ResourceReview : sink {
 // logs, diagnostics, or support bundles.
 concept ConfigExposureReview : sink {
   vulnerable_to: [secrets.SecretLeak, crypto.CleartextStorage]
-  cwe: [CWE_200, CWE_312]
+  cwe: [CWE_200, CWE_312, CWE_522, CWE_532]
+  review_category: "secret"
+  review_condition: "configuration or diagnostic serialization may expose inline secrets without an observed redaction path"
+  review_evidence: "config-like serialization site {pattern} lacks a matching redaction control"
+  review_assumption: "repository, keyring, credential, or diagnostic fields may contain inline credentials"
+  review_confidence: possibility
 }
 concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]

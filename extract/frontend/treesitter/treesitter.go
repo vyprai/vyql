@@ -84,21 +84,12 @@ func shouldSkipDir(root, path, name string) bool {
 	if !skipDirs[name] {
 		return false
 	}
-	if name == "build" && isUnderSourceRoot(root, path) {
-		return false
-	}
-	return true
-}
-
-func isUnderSourceRoot(root, path string) bool {
-	rel, err := filepath.Rel(root, path)
-	if err != nil || rel == "." {
-		return false
-	}
-	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
-		if part == "src" {
+	if name == "build" {
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
 			return true
 		}
+		return filepath.ToSlash(rel) == "build"
 	}
-	return false
+	return true
 }
