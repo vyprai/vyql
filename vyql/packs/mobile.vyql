@@ -37,3 +37,11 @@ rule DebuggableApp {
   meta { id: "VYQL-MOB-005", severity: medium, cwe: [CWE_489] }
   match code.DebuggableApp as d
 }
+
+// Android app backup/restore allowed by configuration (CWE-922). Android backs up
+// app data by default unless android:allowBackup="false"; sensitive preferences can
+// otherwise be restored onto a device and bypass local protection.
+rule BackupAllowedConfig {
+  meta { id: "VYQL-MOB-006", severity: medium, cwe: [CWE_922] }
+  match code.BackupAllowedConfig as b
+}

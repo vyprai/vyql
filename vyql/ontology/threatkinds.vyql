@@ -133,6 +133,7 @@ module mobile;
 threat WebViewInjection { cwe: [CWE_749], desc: "Untrusted data loaded/evaluated in a WebView, or a native bridge exposed to it" }
 threat ExportedComponent { cwe: [CWE_926], desc: "Android component exported to other apps without permission (android:exported=\"true\")" }
 threat DebuggableBuild { cwe: [CWE_489], desc: "Application shipped with debugging enabled (android:debuggable=\"true\")" }
+threat BackupExposure { cwe: [CWE_922], desc: "Sensitive mobile app data can be included in platform backup or restore" }
 
 module desktop;
 threat InsecureElectronConfig { cwe: [CWE_829], desc: "Electron renderer with nodeIntegration enabled / contextIsolation disabled (untrusted web content can run Node)" }

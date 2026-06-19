@@ -13,6 +13,9 @@ adapter config {
       "application|usesCleartextTraffic|analysis.config.android.cleartext_enabled",
       "application|debuggable|analysis.config.android.debuggable_enabled"
     ],
+    config_xml_attr_not_value_events: [
+      "application|allowBackup|false|analysis.config.android.backup_allowed"
+    ],
     config_plist_true_keys: [
       "NSAllowsArbitraryLoads|analysis.config.plist.ats_arbitrary_loads",
       "NSAllowsArbitraryLoadsInWebContent|analysis.config.plist.ats_arbitrary_loads",
@@ -70,6 +73,8 @@ adapter config {
   mark "analysis.config.android.cleartext_enabled" -> code.CleartextConfig
   // Android: <application android:debuggable="true">
   mark "analysis.config.android.debuggable_enabled" -> code.DebuggableApp
+  // Android: backups are enabled by default unless <application android:allowBackup="false">
+  mark "analysis.config.android.backup_allowed" -> code.BackupAllowedConfig
   // iOS Info.plist: ATS NSAllowsArbitraryLoads(/InWebContent/ForMedia) = <true/>
   mark "analysis.config.plist.ats_arbitrary_loads" -> code.CleartextConfig
 

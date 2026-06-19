@@ -229,6 +229,13 @@ type boolAttrRule struct {
 	Event   string
 }
 
+type attrNotValueRule struct {
+	Element string
+	Attr    string
+	Value   string
+	Event   string
+}
+
 type scopedLineRule struct {
 	Scope string
 	Match string
@@ -264,6 +271,7 @@ type dotTemplateRule struct {
 
 type configProfile struct {
 	XMLTrueAttrs      []boolAttrRule
+	XMLAttrNotValues  []attrNotValueRule
 	PlistTrueKey      map[string]string
 	LineContains      []scopedLineRule
 	LineExactCompact  []scopedLineRule
@@ -309,6 +317,18 @@ func loadProfile() configProfile {
 				Element: parts[0],
 				Attr:    parts[1],
 				Event:   parts[2],
+			})
+		}
+		for _, entry := range metaList(meta, "config_xml_attr_not_value_events") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
+				panic("config: malformed config_xml_attr_not_value_events entry " + entry)
+			}
+			configProfileData.XMLAttrNotValues = append(configProfileData.XMLAttrNotValues, attrNotValueRule{
+				Element: parts[0],
+				Attr:    parts[1],
+				Value:   parts[2],
+				Event:   parts[3],
 			})
 		}
 		for _, entry := range metaList(meta, "config_plist_true_keys") {
@@ -400,6 +420,11 @@ func scanAndroidManifest(src []byte, file string) []nir.Stmt {
 		}
 		for _, rule := range cfg.XMLTrueAttrs {
 			if se.Name.Local == rule.Element && isTrue(attr(rule.Attr)) {
+				emit(rule.Event)
+			}
+		}
+		for _, rule := range cfg.XMLAttrNotValues {
+			if se.Name.Local == rule.Element && !strings.EqualFold(strings.TrimSpace(attr(rule.Attr)), rule.Value) {
 				emit(rule.Event)
 			}
 		}

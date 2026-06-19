@@ -215,6 +215,10 @@ concept DebuggableApp : sink {
   vulnerable_to: [mobile.DebuggableBuild]
   cwe: [CWE_489]
 }
+concept BackupAllowedConfig : sink {
+  vulnerable_to: [mobile.BackupExposure]
+  cwe: [CWE_922]
+}
 
 // IaC / container misconfig — presence findings from the config frontend (K8s YAML,
 // Dockerfile, Terraform). Each is a markable token labeled by the config adapter.
