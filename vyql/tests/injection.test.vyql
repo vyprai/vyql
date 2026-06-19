@@ -1143,6 +1143,23 @@ test "javascript: constant webpack shell plugin scripts are clean"
   new WebpackShellPlugin(shellPluginConfig);
   ```
 
+test "javascript: command output interpolated into a later shell command is command injection"
+  lang javascript
+  expect VYQL-INJ-002
+  code
+  ```
+  const { execSync } = require('child_process');
+  function loadCertificates() {
+    const keychains = execSync('security list-keychains')
+      .toString()
+      .split('\n')
+      .map((kc) => kc.trim().replace(/"/g, ''));
+    keychains.forEach((keychain) => {
+      execSync(`security find-certificate -a -p ${keychain}`).toString();
+    });
+  }
+  ```
+
 # --- Format string (VYQL-INJ-011) ---
 test "c: printf with a tainted format argument is a format-string bug"
   lang c

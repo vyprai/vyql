@@ -62,6 +62,11 @@ adapter javascript {
   // into shell-plugin script strings they become command injection input.
   source "process.env.NODE_ENV" -> core.UserControlledData
   source "process.env" -> code.SecretValue
+  // Parsed output from a shell command is external platform state. If a later
+  // shell command interpolates one of those parsed values, it is command input.
+  source path "execSync.toString.split.map" -> code.StoredDataRead
+  source path "child_process.execSync.toString.split.map" -> code.StoredDataRead
+  source path "cp.execSync.toString.split.map" -> code.StoredDataRead
   // vm2-style bridge boundary: arguments crossing from sandbox realm into host
   // function application are attacker-controlled by sandbox code.
   source "otherFromThisArguments" -> core.UserControlledData

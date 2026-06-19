@@ -5,6 +5,6 @@ profile electron {
   title: "Desktop app (Electron)"
   priority: "90"
   detect: ["dep:electron", "dep:electron-builder", "file:electron.js", "file:main.js"]
-  entrypoints: [UserControlledData, HttpInput, IntentInput, ExternalApiResponse, SecretValue, EnvVariable,
+  entrypoints: [UserControlledData, HttpInput, IntentInput, ExternalApiResponse, StoredDataRead, SecretValue, EnvVariable,
                 CliArgument, StdinInput, ComputedSizeValue, ArchiveEntryName]
 }
