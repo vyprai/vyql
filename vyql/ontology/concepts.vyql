@@ -658,6 +658,18 @@ concept RequestScopePolicyReview : sink {
   review_assumption: "the request may be authorized or dispatched under the wrong resource scope"
   review_confidence: possibility
 }
+// Review-only: external identity data is converted into local user/group ids
+// without an observed registration or uniqueness boundary. Used for identity
+// collision/spoofing CVEs where the exploitable condition needs product context.
+concept UserIdentityMappingReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_286, CWE_863]
+  review_category: "auth"
+  review_condition: "external identity data determines local user or group identifiers without an observed uniqueness boundary"
+  review_evidence: "identity mapping context {pattern} derives local ids from broker-provided user data"
+  review_assumption: "an attacker can influence the external username or identity data and local id collisions affect authorization"
+  review_confidence: possibility
+}
 // Review-only: an admission or policy hook ignores all subresources instead of
 // making the admitted subresources explicit. Used for bypasses where an alternate
 // API path skips the same admission/security policy applied to the primary object.

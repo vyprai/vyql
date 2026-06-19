@@ -119,6 +119,12 @@ review code.RequestScopePolicyReview {
   expected: [core.AuthorizationCheck]
   text: "review request/resource scope consistency before dispatching the resource handler"
 }
+review code.UserIdentityMappingReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review external identity to local UID/GID mapping for collision resistance and durable uniqueness"
+}
 review code.AdmissionSubresourcePolicyReview {
   category: "auth"
   kind: "attention"
