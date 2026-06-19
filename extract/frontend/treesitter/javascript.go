@@ -286,12 +286,25 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			cond = c.expr(cn)
 		}
 		return []nir.Stmt{nir.If{Cond: cond, Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
-	case "while_statement", "for_statement", "for_in_statement":
+	case "while_statement", "for_statement":
 		var cond nir.Expr
+		body := c.collectStatementBlocks(n)
 		if cn := field(n, "condition"); cn != nil {
+			if target, val, ok := c.jsAssignmentExpr(cn); ok {
+				body = append([]nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}}, body...)
+			}
 			cond = c.expr(cn)
 		}
-		return []nir.Stmt{nir.Loop{Cond: cond, Body: c.collectStatementBlocks(n)}}
+		return []nir.Stmt{nir.Loop{Cond: cond, Body: body}}
+	case "for_in_statement":
+		loop := nir.Loop{Body: c.collectStatementBlocks(n)}
+		if right := field(n, "right"); right != nil {
+			loop.Iter = c.expr(right)
+		}
+		if left := field(n, "left"); left != nil {
+			loop.Vars = c.bindingNames(left)
+		}
+		return []nir.Stmt{loop}
 	case "switch_statement":
 		return []nir.Stmt{c.switchStmt(n)}
 	case "try_statement":
@@ -308,6 +321,28 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return out
 	}
 	return nil
+}
+
+func (c *jsConv) jsAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
+	for n != nil && n.Kind() == "parenthesized_expression" {
+		kids := namedChildren(n)
+		if len(kids) != 1 {
+			return "", nil, false
+		}
+		n = kids[0]
+	}
+	if n == nil || n.Kind() != "assignment_expression" {
+		return "", nil, false
+	}
+	left := field(n, "left")
+	if left == nil || left.Kind() != "identifier" {
+		return "", nil, false
+	}
+	right := field(n, "right")
+	if right == nil {
+		return "", nil, false
+	}
+	return c.text(left), c.expr(right), true
 }
 
 func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []nir.Stmt {

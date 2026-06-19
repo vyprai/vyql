@@ -329,6 +329,66 @@ test "js: taint enters function-expression assigned to a variable"
   }
   ```
 
+test "js: unflatten for-in path keys can pollute prototypes"
+  lang javascript
+  profile library
+  expect VYQL-INJ-013
+  code
+  ```
+  function unflatten(obj = {}) {
+    const regex = /\.?([^.\[\]]+)|\[(\d+)\]/g;
+    const resultholder = {};
+
+    for (const p in obj) {
+      let curr = resultholder;
+      let prop = "";
+      let m = {};
+
+      while ((m = regex.exec(p))) {
+        curr = curr[prop] || (curr[prop] = m[2] ? [] : {});
+        prop = m[2] || m[1];
+      }
+
+      curr[prop] = obj[p];
+    }
+
+    return resultholder[""] || resultholder;
+  }
+
+  module.exports = unflatten;
+  ```
+
+test "js: unflatten constructor prototype split guard is clean"
+  lang javascript
+  profile library
+  reject VYQL-INJ-013
+  code
+  ```
+  function unflatten(obj = {}) {
+    const regex = /\.?([^.\[\]]+)|\[(\d+)\]/g;
+    const resultholder = {};
+
+    for (const p in obj) {
+      let curr = resultholder;
+      let prop = "";
+      let m = {};
+
+      while ((m = regex.exec(p))) {
+        if (curr[prop] === constructor.prototype)
+          curr[prop] = {};
+        curr = curr[prop] || (curr[prop] = m[2] ? [] : {});
+        prop = m[2] || m[1];
+      }
+
+      curr[prop] = obj[p];
+    }
+
+    return resultholder[""] || resultholder;
+  }
+
+  module.exports = unflatten;
+  ```
+
 # --- Stored XSS writes (VYQL-INJ-004) ---
 test "js: tainted Mongo hypertext update is stored XSS"
   lang javascript

@@ -1031,6 +1031,11 @@ concept InputValidation : control {
   neutralizes: [validation.TrustBoundary, validation.ImproperInputValidation]
   applies: path
 }
+concept PrototypePollutionGuard : control {
+  neutralizes: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  applies: endpoint
+}
 concept AuthenticationCheck : control {
   neutralizes: [authentication.MissingAuthentication]
   cwe: [CWE_306]

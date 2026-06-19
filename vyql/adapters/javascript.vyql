@@ -508,6 +508,7 @@ adapter javascript {
   sink path "$.extend" arg 2 -> code.ProtoPollute
   sink path "jQuery.extend" arg 2 -> code.ProtoPollute
   sink path "__js_dynamic_property_write" -> code.ProtoPollute
+  control "analysis.function.context" val "curr[prop]===constructor.prototype" val "curr[prop]={}" -> core.PrototypePollutionGuard
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute

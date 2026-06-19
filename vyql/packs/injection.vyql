@@ -153,6 +153,7 @@ rule MassAssignment {
 rule PrototypePollution {
   meta { id: "VYQL-INJ-013", severity: medium, cwe: [CWE_1321] }
   taint core.UserControlledData -> code.ProtoPollute
+  unless guarded_by core.PrototypePollutionGuard
 }
 
 rule SchemaCodegenValidationBypass {
