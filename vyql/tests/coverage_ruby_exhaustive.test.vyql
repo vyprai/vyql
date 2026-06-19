@@ -27,6 +27,31 @@ test "ruby exhaustive: params reach SQL command eval deser dynamic-load SSRF pat
   end
   ```
 
+test "ruby: SSLContext ca_file without peer verification is certificate validation failure"
+  lang ruby
+  expect VYQL-CFG-004
+  code
+  ```
+  def build_ssl_context
+    OpenSSL::SSL::SSLContext.new.tap do |context|
+      context.ca_file = @config.server_ca_cert
+    end
+  end
+  ```
+
+test "ruby: SSLContext ca_file with peer verification is clean"
+  lang ruby
+  reject VYQL-CFG-004
+  code
+  ```
+  def build_ssl_context
+    OpenSSL::SSL::SSLContext.new.tap do |context|
+      context.ca_file = @config.server_ca_cert
+      context.verify_mode = OpenSSL::SSL::VERIFY_PEER
+    end
+  end
+  ```
+
 test "ruby exhaustive: escapers constants basename and fixed paths suppress common findings"
   lang ruby
   reject VYQL-INJ-001

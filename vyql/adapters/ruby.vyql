@@ -231,6 +231,7 @@ adapter ruby {
   mark "JWT.encode" val "algorithm=none" -> code.JwtUnverified
   mark "skip_before_action" val "verify_authenticity_token" -> code.CsrfDisabled
   mark "verify_mode" val "VERIFY_NONE" -> code.CertValidationDisabled
+  mark exact "analysis.function.context" val "lang=ruby" val "SSLContext.new" val "ca_file" nval "verify_mode" -> code.CertValidationDisabled
   mark "File.chmod" val "0777" -> code.InsecurePermission
   mark "File.chmod" val "0666" -> code.InsecurePermission
   mark "File.open" val "/tmp/" val "w" -> code.InsecureTempFile

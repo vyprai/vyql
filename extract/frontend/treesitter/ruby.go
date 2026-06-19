@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"strings"
+	"unicode"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsruby "github.com/tree-sitter/tree-sitter-ruby/bindings/go"
@@ -70,13 +71,16 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// Ruby methods are PUBLIC by default (the gem's API surface). A `private`/`protected`
 		// marker would hide subsequent methods — not tracked yet, so this slightly
 		// over-marks; the library param-source is caller-conditional, which absorbs that.
-		return []nir.Stmt{nir.FuncDef{
+		body := field(n, "body")
+		out := c.rubyFunctionContext(n)
+		out = append(out, nir.FuncDef{
 			Name:     c.text(field(n, "name")),
 			Params:   c.params(field(n, "parameters")),
-			Body:     c.body(field(n, "body")),
+			Body:     c.body(body),
 			Loc:      L,
 			Exported: true,
-		}}
+		})
+		return out
 	case "class", "module":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "assignment":
@@ -149,6 +153,37 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	}
 	// any other expression used as a statement
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	name := c.text(field(fn, "name"))
+	loc := c.loc(fn)
+	text := c.text(body)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.function.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.function.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func rbCompactText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // rubyBody lowers the statements of a then/else clause node (or a bare body).
