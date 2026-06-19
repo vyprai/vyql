@@ -272,6 +272,9 @@ adapter go {
   // Review-only: writing security state through ordinary path opening of procfs control
   // files needs a verified procfs/open boundary to avoid link or mount redirection.
   mark exact "analysis.function.context" val "call_path:os.OpenFile" val "literal:/proc/self/attr/exec" nval "call:OpenProcRoot" nval "call:OpenThreadSelf" nval "call_path:pathrs.Reopen" -> code.SpecialFileAccessReview
+  // Review-only: request/header secrets compared after ordinary string conversion need
+  // constant-time comparison when attacker-controlled candidates can be repeated.
+  mark exact "analysis.function.context" val "function_name:ParseAndValidate" val "selector:r.Header.Get" val "call:string" nval "call:ConstantTimeCompare" -> code.SecretComparisonReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission

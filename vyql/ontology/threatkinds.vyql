@@ -40,6 +40,7 @@ threat WeakCrypto { cwe: [CWE_327], desc: "Use of a broken/risky cryptographic a
 threat ImproperCertValidation { cwe: [CWE_295], desc: "Improper certificate validation (verification disabled)" }
 threat ImproperSignatureCheck { cwe: [CWE_347], desc: "Improper verification of cryptographic signature (e.g. JWT alg none)" }
 threat IncompleteSecurityIdentifier { cwe: [CWE_358], desc: "Security-sensitive identity check uses a shortened or ambiguous identifier" }
+threat ObservableDiscrepancy { cwe: [CWE_203, CWE_208], desc: "Secret-dependent comparison may expose observable or timing differences" }
 
 module deserialization;
 threat DeserializationAbuse { cwe: [CWE_502], desc: "Deserialization of untrusted data" }
