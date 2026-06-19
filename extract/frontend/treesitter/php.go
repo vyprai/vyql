@@ -553,7 +553,13 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "unary_op_expression":
-		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "operand")), Loc: L}
+		operand := field(n, "operand")
+		if operand == nil {
+			if kids := namedChildren(n); len(kids) > 0 {
+				operand = kids[len(kids)-1]
+			}
+		}
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(operand), Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}

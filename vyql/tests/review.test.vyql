@@ -527,6 +527,56 @@ test "review: php idor policy config is surfaced"
   }
   ```
 
+test "review: php resource-scoped rule lookup without file access check is surfaced"
+  lang php
+  expect_review code.IdorPolicyReview
+  code
+  ```
+  <?php
+  class ApprovalService {
+    public function getUserRules(string $userId, string $role = 'requesters', ?int $fileId = null): array {
+      $userRules = [];
+      $rules = $this->ruleService->getRules();
+
+      foreach ($rules as $rule) {
+        if ($this->userIsAuthorizedByRule($userId, $rule, $role)) {
+          if ($role === 'requesters' && $fileId !== null && $this->tagObjectMapper->haveTag((string)$fileId, 'files', $rule['tagPending'])) {
+            continue;
+          }
+          $userRules[] = $rule;
+        }
+      }
+      return $userRules;
+    }
+  }
+  ```
+
+test "review: php resource-scoped rule lookup with file access check is clean"
+  lang php
+  expect_review core.AuthorizationCheck
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  <?php
+  class ApprovalService {
+    public function getUserRules(string $userId, string $role = 'requesters', ?int $fileId = null): array {
+      if ($fileId !== null && !$this->utilsService->userHasAccessTo($fileId, $userId)) {
+        throw new \InvalidArgumentException('File not found');
+      }
+
+      $userRules = [];
+      $rules = $this->ruleService->getRules();
+
+      foreach ($rules as $rule) {
+        if ($this->userIsAuthorizedByRule($userId, $rule, $role)) {
+          $userRules[] = $rule;
+        }
+      }
+      return $userRules;
+    }
+  }
+  ```
+
 test "review: php secret key generation without chmod hardening is surfaced"
   lang php
   expect_review code.SecretFilePermissionReview
