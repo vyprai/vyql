@@ -840,6 +840,10 @@ concept UnescapedSessionFlash : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
 }
+concept UnescapedExceptionMessageMarkup : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
 concept PdfJsEvalSupported : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_79]

@@ -128,14 +128,15 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration":
 		name := c.text(field(n, "name"))
-		params := c.params(field(n, "parameters"))
-		paramTypes := c.paramTypes(field(n, "parameters"))
+		paramsNode := field(n, "parameters")
+		params := c.params(paramsNode)
+		paramTypes := c.paramTypes(paramsNode)
 		body := c.block(field(n, "body"))
 		tokens := append([]string{}, c.classParamTokens...)
 		tokens = append(tokens, c.jvAnnotationTokens(n, "annotation:")...)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
 			ContextTokens: c.jvFunctionTokens(name, n),
-			ParamEntries:  c.jvParamEntries(name, params, paramTypes, tokens), Exported: c.javaPublic(n)}}
+			ParamEntries:  c.jvParamEntries(name, params, paramTypes, tokens, c.jvParamAnnotationTokens(paramsNode)), Exported: c.javaPublic(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
 		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution
@@ -513,7 +514,28 @@ func javaStringToken(raw string) string {
 	return raw
 }
 
-func (c *jvConv) jvParamEntries(name string, params []string, paramTypes map[string]string, base []string) []nir.ParamEntry {
+func (c *jvConv) jvParamAnnotationTokens(params *tree_sitter.Node) map[string][]string {
+	out := map[string][]string{}
+	if params == nil {
+		return out
+	}
+	for _, ch := range namedChildren(params) {
+		if ch.Kind() != "formal_parameter" && ch.Kind() != "spread_parameter" {
+			continue
+		}
+		nm := field(ch, "name")
+		if nm == nil {
+			continue
+		}
+		toks := c.jvAnnotationTokens(ch, "annotation:")
+		if len(toks) > 0 {
+			out[c.text(nm)] = toks
+		}
+	}
+	return out
+}
+
+func (c *jvConv) jvParamEntries(name string, params []string, paramTypes map[string]string, base []string, paramAnnotations map[string][]string) []nir.ParamEntry {
 	funcTokens := append([]string{}, base...)
 	for _, typ := range paramTypes {
 		if typ == "" {
@@ -530,6 +552,7 @@ func (c *jvConv) jvParamEntries(name string, params []string, paramTypes map[str
 			continue
 		}
 		tokens := append([]string{}, funcTokens...)
+		tokens = append(tokens, paramAnnotations[p]...)
 		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
 		if typ := paramTypes[p]; typ != "" {
 			tokens = append(tokens, "param_type:"+typ)

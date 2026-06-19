@@ -111,6 +111,12 @@ adapter java {
     control "PreAuthorize" -> AuthorizationCheck
     control "CsrfToken" -> CsrfProtection
   }
+  package "org.kohsuke.stapler" {
+    source path "analysis.parameter.entry" val "annotation:QueryParameter" -> HttpInput
+    sink path "FormValidation.errorWithMarkup" -> HtmlRender
+    control "Util.escape" -> HtmlEscape
+    mark exact "analysis.function.context" val "call_path:Pattern.compile" val "call_path:FormValidation.errorWithMarkup" val "call:getMessage" nval "call_path:Util.escape" -> code.UnescapedExceptionMessageMarkup
+  }
   package "commons-validator" {
     control "UrlValidator.isValid" -> RedirectAllowlist
   }
