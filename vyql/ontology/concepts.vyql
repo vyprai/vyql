@@ -940,6 +940,15 @@ concept IncompleteTemplateValidation : sink {
   vulnerable_to: [injection.TemplateInjection]
   cwe: [CWE_1336]
 }
+concept IncompleteArchiveFilenameValidation : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse, injection.MassAssignment]
+  cwe: [CWE_502, CWE_915]
+  review_category: "deserialization"
+  review_condition: "archive member filename validation omits dangerous URI or stream-wrapper schemes"
+  review_evidence: "archive filename validator {pattern} checks traversal strings but lacks scheme rejection"
+  review_assumption: "archive member names may be attacker-controlled and passed to filesystem APIs that resolve stream wrappers"
+  review_confidence: medium
+}
 concept ProtocolStateReview : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
   cwe: [CWE_349, CWE_404]

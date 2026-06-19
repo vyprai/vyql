@@ -162,6 +162,11 @@ review code.StructuredInputDecode {
   kind: "attention"
   text: "review structured decoder output validation against the target format"
 }
+review code.IncompleteArchiveFilenameValidation {
+  category: "deserialization"
+  kind: "attention"
+  text: "review archive member filename validation for dangerous URI or stream-wrapper schemes"
+}
 review code.CatastrophicRegex {
   category: "resource"
   kind: "attention"

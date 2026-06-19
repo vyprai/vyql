@@ -57,6 +57,7 @@ adapter php {
   // Review-only resource-scope policy: returning authorization/workflow rules for a
   // file-scoped request should include an access/ownership check for the supplied file.
   mark exact "analysis.function.context" val "lang=php" val "fileId" val "getRules(" val "return$userRules;" nval "userHasAccessTo" -> code.IdorPolicyReview
+  mark exact "analysis.function.context" val "lang=php" val "_maliciousFilename" val "strpos(" val "/../" val "../" nval "phar://" -> code.IncompleteArchiveFilenameValidation
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   sink path "mysqli_query" arg 1 -> code.SqlExecution

@@ -131,6 +131,49 @@ test "path: php archive metadata file write with containment guard is clean"
   ?>
   ```
 
+test "deserialization: php archive filename validator missing phar scheme is reported"
+  lang php
+  expect VYQL-DESER-005
+  code
+  ```
+  <?php
+  class Archive_Tar {
+      private function _maliciousFilename($file) {
+          if (strpos($file, '/../') !== false) {
+              return true;
+          }
+          if (strpos($file, '../') === 0) {
+              return true;
+          }
+          return false;
+      }
+  }
+  ?>
+  ```
+
+test "deserialization: php archive filename validator with phar scheme check is clean"
+  lang php
+  reject VYQL-DESER-005
+  code
+  ```
+  <?php
+  class Archive_Tar {
+      private function _maliciousFilename($file) {
+          if (strpos($file, 'phar://') === 0) {
+              return true;
+          }
+          if (strpos($file, '/../') !== false) {
+              return true;
+          }
+          if (strpos($file, '../') === 0) {
+              return true;
+          }
+          return false;
+      }
+  }
+  ?>
+  ```
+
 test "path: ruby archive entry name reaching extraction is reported"
   lang ruby
   expect VYQL-PATH-004

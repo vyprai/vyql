@@ -29,3 +29,8 @@ rule XxeUnhardened {
   unless guarded_by core.XmlHardening
   unless sanitized_by core.XmlHardening
 }
+
+rule IncompleteArchiveFilenameValidation {
+  meta { id: "VYQL-DESER-005", severity: high, cwe: [CWE_502, CWE_915], confidence_floor: medium }
+  match code.IncompleteArchiveFilenameValidation as validator
+}
