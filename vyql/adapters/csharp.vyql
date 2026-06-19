@@ -113,6 +113,7 @@ adapter csharp {
   sink path "Response.Write" -> code.HtmlRender
   sink method "Raw" -> code.HtmlRender
   sink path "MarkupString" -> code.HtmlRender
+  mark method "LoadHtml" -> code.HtmlSanitizerLogicReview
   // BTCPay ConfirmModel(title, description, action): the Description (arg 1) is rendered as
   // RAW HTML in the Confirm view, so an untrusted value interpolated into it is reflected XSS.
   sink path "ConfirmModel" arg 1 -> code.HtmlRender

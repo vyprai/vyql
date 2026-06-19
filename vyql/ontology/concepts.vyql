@@ -671,6 +671,18 @@ concept UnscannedPdfPreview : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
 }
+// HTML sanitizer/parser correctness review. Libraries that parse attacker-supplied HTML
+// and return a cleaned serialization can still have mutation-XSS/raw-text/comment edge
+// cases that static taint cannot prove as a normal app source->sink flow.
+concept HtmlSanitizerLogicReview : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
+  review_evidence: "HTML parser/sanitizer operation {pattern} is part of the cleaned-output pipeline"
+  review_assumption: "the parsed HTML may be attacker-controlled and the cleaned serialization is trusted by callers"
+  review_confidence: possibility
+}
 concept UnrestrictedVariableVariableAssignment : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

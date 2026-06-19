@@ -201,6 +201,25 @@ test "review: incomplete scala csrf token validation is surfaced"
   }
   ```
 
+test "review: csharp html sanitizer parser pipeline is surfaced"
+  lang csharp
+  expect_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  using HtmlAgilityPack;
+
+  class AntiSamyDomScanner {
+    public string Scan(string html) {
+      var htmlDocument = new HtmlDocument();
+      htmlDocument.LoadHtml(html);
+      ProcessChildren(htmlDocument.DocumentNode);
+      return htmlDocument.DocumentNode.InnerHtml.Trim();
+    }
+
+    private void ProcessChildren(HtmlNode node) {}
+  }
+  ```
+
 test "review: php access policy config is surfaced"
   lang php
   expect_review code.AccessPolicyReview

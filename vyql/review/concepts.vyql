@@ -144,6 +144,11 @@ review code.CatastrophicRegex {
   kind: "attention"
   text: "review static regex complexity and attacker-controlled match input length"
 }
+review code.HtmlSanitizerLogicReview {
+  category: "xss"
+  kind: "attention"
+  text: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
+}
 review code.ConfigExposureReview {
   category: "secret"
   kind: "attention"
