@@ -1,2 +1,3 @@
+call analysis.function.context
 call source.value
 call worker.run

@@ -73,6 +73,14 @@ func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
 		seen[tok] = true
 		out = append(out, tok)
 	}
+	rawItem := strings.Join(strings.Fields(c.text(n)), "")
+	if strings.HasPrefix(rawItem, "#[repr(") && strings.HasSuffix(rawItem, ")]") {
+		arg := strings.TrimSuffix(strings.TrimPrefix(rawItem, "#[repr("), ")]")
+		add("attr_name:repr")
+		add("attr_repr:" + arg)
+		add("attr:repr(" + arg + ")")
+		add("repr:" + arg)
+	}
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		if m.Kind() == "attribute" {
@@ -113,7 +121,9 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
 	case "impl_item", "mod_item", "trait_item":
 		return c.decls(field(n, "body"))
-	case "struct_item", "enum_item", "use_declaration", "const_item", "static_item":
+	case "enum_item":
+		return c.rsEnumMetadata(n, attrs)
+	case "struct_item", "use_declaration", "const_item", "static_item":
 		return nil
 	case "let_declaration":
 		val := field(n, "value")
@@ -144,6 +154,31 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	}
 	// a bare tail expression (block value) still matters for taint
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
+	if len(attrs) == 0 {
+		return nil
+	}
+	loc := c.loc(n)
+	path := "analysis.rust.enum"
+	name := c.text(field(n, "name"))
+	tokens := []string{"lang=rust", "kind:enum"}
+	if name != "" {
+		tokens = append(tokens, "enum_name:"+name)
+	}
+	tokens = append(tokens, attrs...)
+	args := make([]nir.Expr, 0, len(tokens))
+	for _, tok := range tokens {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: "enum",
+		Loc:    loc,
+	}}}
 }
 
 func (c *rsConv) rsParamEntries(name string, params []string, attrs []string) []nir.ParamEntry {

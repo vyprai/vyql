@@ -48,6 +48,11 @@ rule PotentialUnsafeMutableAlias {
   match code.UnsafeMutableAlias as a
 }
 
+rule PotentialFfiEnumLayoutRisk {
+  meta { id: "VYQL-MEM-014", severity: medium, cwe: [CWE_119], confidence_floor: low }
+  match code.FfiEnumLayoutRisk as e
+}
+
 rule PotentialFieldDerivedIndexAccess {
   meta { id: "VYQL-MEM-010", severity: medium, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: low }
   match code.FieldDerivedIndexAccess as idx

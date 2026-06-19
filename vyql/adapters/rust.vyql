@@ -22,6 +22,7 @@ adapter rust {
   sink method "arg" -> code.CommandExecution
   sink method "args" -> code.CommandExecution
   mark exact "analysis.function.context" val "lang=rust" val "&mut" val "as *const" val "as *mut" -> code.UnsafeMutableAlias
+  mark exact "analysis.rust.enum" val "kind:enum" val "repr:C" -> code.FfiEnumLayoutRisk
 
   // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
   sink path "reqwest.get" -> code.UrlFetch

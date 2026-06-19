@@ -76,3 +76,39 @@ test "rust memory: mutable buffer pointer cast is not immutable alias"
       }
   }
   ```
+
+test "rust memory: C repr enum crossing FFI is a layout review point"
+  lang rust
+  expect VYQL-MEM-014
+  expect_review code.FfiEnumLayoutRisk
+  code
+  ```
+  #[repr(C)]
+  #[derive(Clone, Copy, Debug, PartialEq)]
+  pub enum DType {
+      F32 = 0,
+      F64 = 1,
+  }
+
+  extern "C" {
+      fn af_create_array(out: *mut i64, dtype: DType) -> i32;
+  }
+  ```
+
+test "rust memory: explicit integer repr enum is clean for FFI layout"
+  lang rust
+  reject VYQL-MEM-014
+  reject_review code.FfiEnumLayoutRisk
+  code
+  ```
+  #[repr(u32)]
+  #[derive(Clone, Copy, Debug, PartialEq)]
+  pub enum DType {
+      F32 = 0,
+      F64 = 1,
+  }
+
+  extern "C" {
+      fn af_create_array(out: *mut i64, dtype: DType) -> i32;
+  }
+  ```

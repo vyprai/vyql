@@ -242,6 +242,11 @@ review code.UnsafeMutableAlias {
   kind: "attention"
   text: "review unsafe mutable reference construction from raw pointer casts and aliasing/lifetime guarantees"
 }
+review code.FfiEnumLayoutRisk {
+  category: "memory"
+  kind: "attention"
+  text: "review FFI enum representation and whether the foreign ABI expects a fixed integer width"
+}
 review code.SizeComputation {
   category: "memory"
   kind: "attention"

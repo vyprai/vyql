@@ -380,6 +380,15 @@ concept UnsafeMutableAlias : sink {
   vulnerable_to: [memory.OobWrite, memory.UseAfterFree]
   cwe: [CWE_787, CWE_416]
 }
+concept FfiEnumLayoutRisk : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_119]
+  review_category: "memory"
+  review_condition: "a language enum crosses an FFI boundary with ABI-sensitive representation"
+  review_evidence: "enum representation metadata {pattern} requires layout review"
+  review_assumption: "the foreign ABI expects a fixed-width integer representation"
+  review_confidence: low
+}
 concept FailurePathOwnedBufferFree : sink {
   vulnerable_to: [memory.DoubleFree]
   cwe: [CWE_415]
