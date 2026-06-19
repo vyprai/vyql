@@ -57,6 +57,9 @@ adapter php {
   // Review-only resource-scope policy: returning authorization/workflow rules for a
   // file-scoped request should include an access/ownership check for the supplied file.
   mark exact "analysis.function.context" val "lang=php" val "fileId" val "getRules(" val "return$userRules;" nval "userHasAccessTo" -> code.IdorPolicyReview
+  // Review-only WordPress public endpoint policy: returning post/meta data by a request
+  // selected object id should show either a publish-status gate or a read permission check.
+  mark exact "analysis.function.context" val "lang=php" val "audioigniter_playlist_id" val "get_post(" val "get_post_meta(" val "wp_send_json(" nval "post_status" nval "current_user_can" -> code.IdorPolicyReview
   mark exact "analysis.function.context" val "lang=php" val "_maliciousFilename" val "strpos(" val "/../" val "../" nval "phar://" -> code.IncompleteArchiveFilenameValidation
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
@@ -153,9 +156,11 @@ adapter php {
   control "Gate.allows" -> core.AuthorizationCheck
   control "Gate.authorize" -> core.AuthorizationCheck
   control method "access" -> core.AuthorizationCheck
+  control "current_user_can" -> core.AuthorizationCheck
   control "requireAuth" -> core.AuthenticationCheck
   control "ensureAuthenticated" -> core.AuthenticationCheck
   control "isAuthenticated" -> core.AuthenticationCheck
+  control "is_user_logged_in" -> core.AuthenticationCheck
   control "auth.check" -> core.AuthenticationCheck
   control "checkOwnership" -> core.OwnershipCheck
   control "requireOwner" -> core.OwnershipCheck
