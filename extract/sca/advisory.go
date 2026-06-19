@@ -11,31 +11,28 @@ type VulnerableEntrypoint struct {
 	Advisory   string   // CVE / GHSA / OSV id
 	Package    string   // PyPI package name (sbom node)
 	Version    string   // affected version
-	Symbol     string   // entrypoint call path, e.g. "yaml.load"
-	VulnClass  string   // → sink concept, e.g. "code.Deserialization"
+	Symbol     string   // entrypoint call path
+	VulnClass  string   // sink concept
 	TaintedArg int      // which argument carries attacker data (sink precision)
-	CWE        []string // optional CWE ids (e.g. CWE_502)
+	CWE        []string // optional CWE ids
 }
 
 // ProjectEntrypoints projects each advisory whose affected package version is
-// PRESENT and flagged vulnerable in the SBOM onto the application's real call
+// present and advisory-matched in the SBOM onto the application's real call
 // sites: it labels the tainted argument of every matching call with the
-// vuln-class sink concept and marks the package ReachableSymbol if any call
+// vuln-class sink concept and marks the package reachable if any call
 // exists. Relies on the import/type-resolved call graph the SAST frontend built.
 func ProjectEntrypoints(g usg.Store, entrypoints []VulnerableEntrypoint) error {
 	nodes, err := g.AllNodes()
 	if err != nil {
 		return err
 	}
-	// which (name, version) are present + flagged vulnerable in the sbom
+	// which (name, version) are present + advisory-matched in the sbom
 	vulnerable := map[PkgKey]string{} // key -> package node id
-	vulnIDs, err := g.NodesWithConcept("sbom.VulnerableDependency")
-	if err != nil {
-		return err
-	}
-	for _, id := range vulnIDs {
-		n, _, _ := g.GetNode(id)
-		vulnerable[PkgKey{n.Prop("name"), n.Prop("version")}] = id
+	for _, n := range nodes {
+		if n.Type == "sbom.PackageVersion" && hasPackageToken(n, "status=vulnerable") {
+			vulnerable[PkgKey{n.Prop("name"), n.Prop("version")}] = n.ID
+		}
 	}
 
 	for _, ve := range entrypoints {
@@ -63,8 +60,7 @@ func ProjectEntrypoints(g usg.Store, entrypoints []VulnerableEntrypoint) error {
 			}
 		}
 		if matched {
-			if err := g.AddLabel(pkgNode, usg.Label{Concept: "sbom.ReachableSymbol",
-				Provenance: usg.Provenance{Adapter: "advisory:" + ve.Advisory}}); err != nil {
+			if err := addPackageTokens(g, pkgNode, "reachable=true"); err != nil {
 				return err
 			}
 		}

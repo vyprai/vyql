@@ -1,14 +1,13 @@
 // Package sca implements the dependency/SBOM path and the vulnerable-library
 // entrypoint projection (docs/20, docs/11), ported from poc/extract/sbom.py
 // and advisory.py. Dependency resolution is DECOUPLED from the AST extractor: a
-// manifest reader produces sbom.* nodes, an advisory feed marks vulnerable
-// versions, and a linker connects code imports to package nodes and flags
-// REACHABLE packages. Reachability-gated SCA is then a cross-domain join over
-// the SAME graph the SAST extractor populated.
+// manifest reader produces package nodes, package intelligence adds neutral
+// analysis tokens, and VyQL adapters map those tokens to concepts/rules.
 package sca
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 
 	"github.com/vyprai/vyql/usg"
@@ -148,9 +147,11 @@ func normalizeVersion(v string) string {
 	return v
 }
 
-// MarkVulnerable labels sbom.PackageVersion nodes that match the explicit advisories map
-// ((name,version)->advisory id) as sbom.VulnerableDependency. Used where advisories come
-// from an explicit set rather than the loaded JSON feed (the entrypoint projector, tests).
+const scaPackageEvent = "analysis.sca.package"
+
+// MarkVulnerable records a neutral advisory-match token on package nodes that match the
+// explicit advisories map. Used where advisories come from an explicit set rather than
+// the loaded JSON feed (the entrypoint projector, tests).
 func MarkVulnerable(g usg.Store, advisories map[PkgKey]string) error {
 	nodes, err := g.AllNodes()
 	if err != nil {
@@ -161,8 +162,7 @@ func MarkVulnerable(g usg.Store, advisories map[PkgKey]string) error {
 			continue
 		}
 		if adv := advisories[PkgKey{n.Prop("name"), n.Prop("version")}]; adv != "" {
-			if err := g.AddLabel(n.ID, usg.Label{Concept: "sbom.VulnerableDependency",
-				Provenance: usg.Provenance{Adapter: "sbom.osv"}, Detail: map[string]string{"advisory": adv}}); err != nil {
+			if err := addPackageTokens(g, n.ID, "status=vulnerable", "advisory="+adv); err != nil {
 				return err
 			}
 		}
@@ -170,7 +170,7 @@ func MarkVulnerable(g usg.Store, advisories map[PkgKey]string) error {
 	return nil
 }
 
-// BuildSBOM adds one sbom.PackageVersion node per dependency, tagged with its
+// BuildSBOM adds one package node per dependency, tagged with its
 // ecosystem ("pypi"/"npm"/…). Reputation labeling (vulnerable/malicious/suspicious) is
 // done separately by Analyze, which joins these nodes against the loaded reference data.
 func BuildSBOM(g usg.Store, eco string, deps []Dep, manifest string) error {
@@ -188,7 +188,9 @@ func BuildSBOM(g usg.Store, eco string, deps []Dep, manifest string) error {
 		if err := g.AddNode(usg.Node{ID: nid, Type: "sbom.PackageVersion",
 			Props: map[string]string{"loc": manifest + ":" + name, "name": name,
 				"version": version, "eco": eco, "package": root, "root": root,
-				"purl": "pkg:" + eco + "/" + name + "@" + version}}); err != nil {
+				"purl":        "pkg:" + eco + "/" + name + "@" + version,
+				"callee_path": scaPackageEvent, "method": "package",
+				"str_args": "kind=package"}}); err != nil {
 			return err
 		}
 	}
@@ -196,7 +198,7 @@ func BuildSBOM(g usg.Store, eco string, deps []Dep, manifest string) error {
 }
 
 // LinkReachability marks each package whose symbols are actually called (any
-// code node's callee_path rooted at the package name) with sbom.ReachableSymbol.
+// code node's callee_path rooted at the package name) with a neutral reachability token.
 // It reuses the import-resolved call graph the SAST frontend already produced.
 func LinkReachability(g usg.Store) error {
 	nodes, err := g.AllNodes()
@@ -226,12 +228,54 @@ func LinkReachability(g usg.Store) error {
 		if _, ok := pkgsByID[id]; !ok {
 			continue
 		}
-		if err := g.AddLabel(id, usg.Label{Concept: "sbom.ReachableSymbol",
-			Provenance: usg.Provenance{Adapter: "sbom.linker"}}); err != nil {
+		if err := addPackageTokens(g, id, "reachable=true"); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func addPackageTokens(g usg.Store, id string, tokens ...string) error {
+	n, ok, err := g.GetNode(id)
+	if err != nil || !ok {
+		return err
+	}
+	props := map[string]string{}
+	for k, v := range n.Props {
+		props[k] = v
+	}
+	props["callee_path"] = scaPackageEvent
+	props["method"] = "package"
+	seen := map[string]bool{}
+	if existing := props["str_args"]; existing != "" {
+		for _, tok := range strings.Split(existing, "\x00") {
+			if tok != "" {
+				seen[tok] = true
+			}
+		}
+	}
+	for _, tok := range tokens {
+		if tok != "" {
+			seen[tok] = true
+		}
+	}
+	var out []string
+	for tok := range seen {
+		out = append(out, tok)
+	}
+	sort.Strings(out)
+	props["str_args"] = strings.Join(out, "\x00")
+	n.Props = props
+	return g.AddNode(n)
+}
+
+func hasPackageToken(n usg.Node, token string) bool {
+	for _, tok := range strings.Split(n.Prop("str_args"), "\x00") {
+		if tok == token {
+			return true
+		}
+	}
+	return false
 }
 
 type importUse struct {

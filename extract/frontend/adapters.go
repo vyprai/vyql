@@ -922,7 +922,11 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			for i := range spec.Marks {
 				allowed[i] = packageAllowed(spec.Marks[i].Packages, pkgs)
 			}
-			for _, nodeType := range []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary"} {
+			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary"}
+			if crossLang {
+				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
+			}
+			for _, nodeType := range nodeTypes {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
 					n, _, _ := s.GetNode(id)
