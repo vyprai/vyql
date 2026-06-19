@@ -497,6 +497,13 @@ concept AuthFlowBypassReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]
 }
+// Review-only: authentication challenge, retry, or attempt-limit logic. Used for
+// cases where static analysis should hand context to the AI/manual stage to verify
+// brute-force limits, rate limiting, and concurrency around failed-attempt counters.
+concept AuthAttemptLimitReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_307]
+}
 concept ObjectLookupByUserInput : sink {
   vulnerable_to: [access_control.Idor]
   enabled_by: [taint.UntrustedData]

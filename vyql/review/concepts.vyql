@@ -54,6 +54,12 @@ review code.AuthFlowBypassReview {
   expected: [core.AuthenticationCheck]
   text: "review alternate UI or navigation exit paths in this authentication flow"
 }
+review code.AuthAttemptLimitReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.RateLimit]
+  text: "review authentication challenge or failed-attempt limit logic for brute-force resistance and concurrent bypasses"
+}
 review code.ObjectLookupByUserInput {
   category: "auth"
   kind: "target"
