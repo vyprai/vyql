@@ -28,6 +28,7 @@ type funcInfo struct {
 	module        string
 	cls           string
 	name          string
+	paramEntries  []nir.ParamEntry
 	resultEntries []nir.ResultEntry
 	abstract      bool   // an interface/abstract method (empty body) — dispatch to concrete impls
 	selfNode      string // stable `this` node for a method (alias target for the receiver); "" if none
@@ -1259,6 +1260,7 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		paramTypes: st.ParamTypes,
 		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
 		module:     modkey, cls: cls, name: st.Name,
+		paramEntries:  st.ParamEntries,
 		resultEntries: st.ResultEntries,
 		// an empty body marks an interface/abstract method: a call typed to it must dispatch
 		// to the concrete implementations (whose bodies carry the taint).
@@ -1395,7 +1397,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				l.p1.Funcs = append(l.p1.Funcs, fiGob{
 					Qual: qual, Short: st.Name, ParamNames: info.paramNames, Params: info.params,
 					ParamTypes: info.paramTypes, Ret: info.ret, Module: info.module, Cls: info.cls,
-					Name: info.name, ResultEntries: info.resultEntries, Abstract: info.abstract,
+					Name: info.name, ParamEntries: info.paramEntries, ResultEntries: info.resultEntries, Abstract: info.abstract,
 				})
 			}
 			// recurse into the body to register NESTED LOCAL FUNCTIONS (C# local functions, JS
@@ -1449,7 +1451,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			inner.node["__ret__"] = info.ret
 		}
 		if info != nil {
-			for _, pe := range st.ParamEntries {
+			for _, pe := range l.effectiveParamEntries(info) {
 				if paramNode := info.params[pe.Param]; paramNode != "" {
 					l.parameterEntry(paramNode, st.Loc, pe.Tokens)
 				}
@@ -2788,6 +2790,80 @@ func (l *lowerer) resolveDerivedMethods(class, method string) []*funcInfo {
 	}
 	walk(class)
 	return dedupeFuncInfos(out)
+}
+
+func (l *lowerer) effectiveParamEntries(info *funcInfo) []nir.ParamEntry {
+	if info == nil {
+		return nil
+	}
+	out := append([]nir.ParamEntry{}, info.paramEntries...)
+	if info.cls == "" {
+		return out
+	}
+	seen := map[string]bool{}
+	for _, pe := range out {
+		seen[paramEntryKey(pe)] = true
+	}
+	for _, base := range l.classBaseNames[info.module+"::"+info.cls] {
+		for _, baseInfo := range l.baseMethodInfos(info.module, base, info.name) {
+			if baseInfo == nil || !baseInfo.abstract || len(baseInfo.paramNames) != len(info.paramNames) {
+				continue
+			}
+			for _, pe := range baseInfo.paramEntries {
+				inherited, ok := remapParamEntry(pe, baseInfo.paramNames, info.paramNames)
+				if !ok {
+					continue
+				}
+				key := paramEntryKey(inherited)
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				out = append(out, inherited)
+			}
+		}
+	}
+	return out
+}
+
+func (l *lowerer) baseMethodInfos(modkey, base, method string) []*funcInfo {
+	var out []*funcInfo
+	if f := l.funcQual[modkey+"::"+base+"."+method]; f != nil {
+		out = append(out, f)
+	}
+	if mods := l.classDefs[base]; len(mods) == 1 {
+		for bm := range mods {
+			if f := l.funcQual[bm+"::"+base+"."+method]; f != nil {
+				out = append(out, f)
+			}
+		}
+	}
+	return dedupeFuncInfos(out)
+}
+
+func remapParamEntry(pe nir.ParamEntry, fromNames, toNames []string) (nir.ParamEntry, bool) {
+	idx := -1
+	for i, name := range fromNames {
+		if name == pe.Param {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || idx >= len(toNames) {
+		return nir.ParamEntry{}, false
+	}
+	param := toNames[idx]
+	tokens := append([]string{}, pe.Tokens...)
+	for i, tok := range tokens {
+		if strings.HasPrefix(tok, "param_name:") {
+			tokens[i] = "param_name:" + param
+		}
+	}
+	return nir.ParamEntry{Param: param, Tokens: tokens}, true
+}
+
+func paramEntryKey(pe nir.ParamEntry) string {
+	return pe.Param + "\x00" + strings.Join(pe.Tokens, "\x00")
 }
 
 func splitClassQual(qual string) (modkey, class string, ok bool) {

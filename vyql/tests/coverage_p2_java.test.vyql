@@ -30,6 +30,46 @@ test "java: JAX-RS constant query is clean"
   }
   ```
 
+test "java: JAX-RS interface route params reach implementing method"
+  lang java
+  expect VYQL-INJ-004
+  code
+  ```
+  @Path("/files")
+  interface UploadApi {
+    @GET
+    @Path("save/{version}")
+    void save(@PathParam("version") String version, PrintWriter out);
+  }
+
+  class UploadResource implements UploadApi {
+    public void save(String version, PrintWriter out) {
+      String v = StringEscapeUtils.escapeJavaScript(StringUtils.trim(version));
+      out.write(v);
+    }
+  }
+  ```
+
+test "java: JAX-RS interface route params sanitized in implementing method"
+  lang java
+  reject VYQL-INJ-004
+  code
+  ```
+  @Path("/files")
+  interface UploadApi {
+    @GET
+    @Path("save/{version}")
+    void save(@PathParam("version") String version, PrintWriter out);
+  }
+
+  class UploadResource implements UploadApi {
+    public void save(String version, PrintWriter out) {
+      String v = StringEscapeUtils.escapeHtml(StringUtils.trim(version));
+      out.write(v);
+    }
+  }
+  ```
+
 test "java: Micronaut @Get handler param -> command injection"
   lang java
   expect VYQL-INJ-002

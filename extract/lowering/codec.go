@@ -56,6 +56,13 @@ func (w *bufWriter) resultEntries(entries []nir.ResultEntry) {
 		w.strs(entry.Tokens)
 	}
 }
+func (w *bufWriter) paramEntries(entries []nir.ParamEntry) {
+	w.uvar(len(entries))
+	for _, entry := range entries {
+		w.str(entry.Param)
+		w.strs(entry.Tokens)
+	}
+}
 
 // --- reader (panics on overrun; callers recover into errCorruptDelta) -----------------------
 
@@ -134,6 +141,17 @@ func (r *bufReader) resultEntries() []nir.ResultEntry {
 	out := make([]nir.ResultEntry, n)
 	for i := range out {
 		out[i] = nir.ResultEntry{Tokens: r.strs()}
+	}
+	return out
+}
+func (r *bufReader) paramEntries() []nir.ParamEntry {
+	n := r.uvar()
+	if n == 0 {
+		return nil
+	}
+	out := make([]nir.ParamEntry, n)
+	for i := range out {
+		out[i] = nir.ParamEntry{Param: r.str(), Tokens: r.strs()}
 	}
 	return out
 }
@@ -230,6 +248,7 @@ func encodePass1(d *pass1Delta) []byte {
 		w.str(f.Module)
 		w.str(f.Cls)
 		w.str(f.Name)
+		w.paramEntries(f.ParamEntries)
 		w.resultEntries(f.ResultEntries)
 		w.boolean(f.Abstract)
 	}
@@ -273,7 +292,7 @@ func decodePass1(raw []byte) (d *pass1Delta, err error) {
 				Qual: r.str(), Short: r.str(), ParamNames: r.strs(),
 				Params: r.smap(), ParamTypes: r.smap(),
 				Ret: r.str(), Module: r.str(), Cls: r.str(), Name: r.str(),
-				ResultEntries: r.resultEntries(), Abstract: r.boolean(),
+				ParamEntries: r.paramEntries(), ResultEntries: r.resultEntries(), Abstract: r.boolean(),
 			}
 		}
 	}

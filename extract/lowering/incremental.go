@@ -257,6 +257,7 @@ type fiGob struct {
 	Params, ParamTypes map[string]string
 	Ret, Module, Cls   string
 	Name               string
+	ParamEntries       []nir.ParamEntry
 	ResultEntries      []nir.ResultEntry
 	Abstract           bool
 }
@@ -293,7 +294,8 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 	for _, f := range d.Funcs {
 		fi := &funcInfo{
 			paramNames: f.ParamNames, params: f.Params, paramTypes: f.ParamTypes, ret: f.Ret,
-			module: f.Module, cls: f.Cls, name: f.Name, resultEntries: f.ResultEntries, abstract: f.Abstract,
+			module: f.Module, cls: f.Cls, name: f.Name, paramEntries: f.ParamEntries,
+			resultEntries: f.ResultEntries, abstract: f.Abstract,
 		}
 		l.funcQual[f.Qual] = fi
 		l.funcShort[f.Short] = append(l.funcShort[f.Short], fi)
