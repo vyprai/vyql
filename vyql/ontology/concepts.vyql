@@ -934,6 +934,11 @@ concept HtmlEscape : control {
   neutralizes: [injection.Xss]
   applies: path
 }
+concept SafeResponseContentType : control {
+  neutralizes: [injection.Xss]
+  cwe: [CWE_79]
+  applies: endpoint
+}
 concept PdfScanCheck : control {
   neutralizes: [injection.Xss]
   cwe: [CWE_79]

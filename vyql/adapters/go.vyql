@@ -176,6 +176,10 @@ adapter go {
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "html.EscapeString" -> core.HtmlEscape
   control "template.HTMLEscapeString" -> core.HtmlEscape
+  control "ctx.Header" val "content-type" val "image/" -> core.SafeResponseContentType
+  control "c.Header" val "content-type" val "image/" -> core.SafeResponseContentType
+  control "Header.Set" val "content-type" val "image/" -> core.SafeResponseContentType
+  control "Header.Add" val "content-type" val "image/" -> core.SafeResponseContentType
   // filepath.Base strips all directory components — no `/`, `\`, or `..` survives, so it
   // confines a path to a single segment (the Go analogue of path.basename).
   control "filepath.Base" -> core.PathCanonicalization

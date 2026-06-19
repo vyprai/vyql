@@ -44,6 +44,7 @@ rule Xss {
   meta { id: "VYQL-INJ-004", severity: high, cwe: [CWE_79], benchmark: xss }
   taint core.UserControlledData -> code.HtmlRender
   unless sanitized_by core.HtmlEscape
+  unless guarded_by core.SafeResponseContentType
 }
 
 rule UnsafeEmbeddableAllowlist {
