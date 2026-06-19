@@ -450,7 +450,7 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(tok string) {
-		if tok == "" || seen[tok] || len(out) >= 128 {
+		if tok == "" || seen[tok] || len(out) >= 512 {
 			return
 		}
 		seen[tok] = true
@@ -461,7 +461,7 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 	}
 	var walk func(*tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
-		if m == nil || len(out) >= 128 {
+		if m == nil || len(out) >= 512 {
 			return
 		}
 		switch m.Kind() {

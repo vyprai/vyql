@@ -784,3 +784,70 @@ test "review: java internal document serialization with hidden visibility is cle
     }
   }
   ```
+
+test "review: java federation downstream packet deploy requires authentication"
+  lang java
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  class CoreProtocolManager {
+    void handlePacket(Packet packet, Server server) throws Exception {
+      if (packet.getType() == PacketImpl.FEDERATION_DOWNSTREAM_CONNECT) {
+        FederationConfiguration config = new FederationConfiguration();
+        server.getFederationManager().deploy(config);
+      }
+    }
+  }
+  ```
+
+test "review: java federation downstream packet deploy with subject check is clean"
+  lang java
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  class CoreProtocolManager {
+    void handlePacket(Packet packet, Server server, Connection rc) throws Exception {
+      if (packet.getType() == PacketImpl.FEDERATION_DOWNSTREAM_CONNECT) {
+        if (rc.getSubject() == null) {
+          rc.close();
+          return;
+        }
+        if (!server.getFederationManager().authorizeDownstreamDeployment(rc.getSubject())) {
+          rc.close();
+          return;
+        }
+        FederationConfiguration config = new FederationConfiguration();
+        server.getFederationManager().deploy(config);
+      }
+    }
+  }
+  ```
+
+test "review: java large packet handler still surfaces downstream deploy auth target"
+  lang java
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  class CoreProtocolManager {
+    void handlePacket(Packet packet, Server server, Noise noise) throws Exception {
+      noise.c00(); noise.c01(); noise.c02(); noise.c03(); noise.c04();
+      noise.c05(); noise.c06(); noise.c07(); noise.c08(); noise.c09();
+      noise.c10(); noise.c11(); noise.c12(); noise.c13(); noise.c14();
+      noise.c15(); noise.c16(); noise.c17(); noise.c18(); noise.c19();
+      noise.c20(); noise.c21(); noise.c22(); noise.c23(); noise.c24();
+      noise.c25(); noise.c26(); noise.c27(); noise.c28(); noise.c29();
+      noise.c30(); noise.c31(); noise.c32(); noise.c33(); noise.c34();
+      noise.c35(); noise.c36(); noise.c37(); noise.c38(); noise.c39();
+      noise.c40(); noise.c41(); noise.c42(); noise.c43(); noise.c44();
+      noise.c45(); noise.c46(); noise.c47(); noise.c48(); noise.c49();
+      noise.c50(); noise.c51(); noise.c52(); noise.c53(); noise.c54();
+      noise.c55(); noise.c56(); noise.c57(); noise.c58(); noise.c59();
+      noise.c60(); noise.c61(); noise.c62(); noise.c63(); noise.c64();
+      noise.c65(); noise.c66(); noise.c67(); noise.c68(); noise.c69();
+      if (packet.getType() == PacketImpl.FEDERATION_DOWNSTREAM_CONNECT) {
+        FederationConfiguration config = new FederationConfiguration();
+        server.getFederationManager().deploy(config);
+      }
+    }
+  }
+  ```
