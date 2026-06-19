@@ -623,10 +623,11 @@ type scope struct {
 	node map[string]string
 	typ  map[string][2]string
 	cnst map[string]string // variable -> its string-constant value (lightweight const-prop)
+	lex  map[string]bool   // JS/TS captured lexical bindings shared across nested functions
 }
 
 func newScope() *scope {
-	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}}
+	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}, lex: map[string]bool{}}
 }
 
 func (s *scope) clone() *scope {
@@ -640,7 +641,204 @@ func (s *scope) clone() *scope {
 	for k, v := range s.cnst {
 		c.cnst[k] = v
 	}
+	for k, v := range s.lex {
+		c.lex[k] = v
+	}
 	return c
+}
+
+func (l *lowerer) promoteCapturedJSBindings(stmts []nir.Stmt, params []string, sc *scope, loc string) {
+	if !isJSLikeModule(l.curNS) {
+		return
+	}
+	for name := range freeNames(stmts, params) {
+		if sc.node[name] != "" {
+			l.ensureLexicalBinding(sc, name, loc)
+		}
+	}
+}
+
+func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
+	if name == "" || sc.node[name] == "" || sc.lex[name] {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	slot := l.node("Name", loc, map[string]string{
+		"callee_path":     name,
+		"method":          name,
+		"lexical_binding": "true",
+	})
+	l.flow(sc.node[name], slot)
+	sc.node[name] = slot
+	sc.lex[name] = true
+}
+
+func freeNames(stmts []nir.Stmt, params []string) map[string]bool {
+	local := map[string]bool{}
+	for _, p := range params {
+		local[p] = true
+	}
+	collectLocalDecls(stmts, local)
+
+	used := map[string]bool{}
+	for _, st := range stmts {
+		collectStmtNames(st, used)
+	}
+	for name := range local {
+		delete(used, name)
+	}
+	return used
+}
+
+func collectLocalDecls(stmts []nir.Stmt, local map[string]bool) {
+	for _, st := range stmts {
+		switch s := st.(type) {
+		case nir.Assign:
+			if s.Decl {
+				for _, t := range s.Targets {
+					if t != "" && !strings.ContainsAny(t, ".[") {
+						local[t] = true
+					}
+				}
+			}
+		case nir.FuncDef:
+			if s.Name != "" {
+				local[s.Name] = true
+			}
+		case nir.ClassDef:
+			if s.Name != "" {
+				local[s.Name] = true
+			}
+		case nir.Block:
+			collectLocalDecls(s.Stmts, local)
+		case nir.If:
+			collectLocalDecls(s.Then, local)
+			collectLocalDecls(s.Else, local)
+		case nir.Loop:
+			collectLocalDecls(s.Body, local)
+		case nir.Switch:
+			for _, c := range s.Cases {
+				collectLocalDecls(c, local)
+			}
+			collectLocalDecls(s.Default, local)
+		case nir.Try:
+			collectLocalDecls(s.Body, local)
+			for _, h := range s.Handlers {
+				collectLocalDecls(h, local)
+			}
+			collectLocalDecls(s.Finally, local)
+		}
+	}
+}
+
+func collectStmtNames(st nir.Stmt, used map[string]bool) {
+	switch s := st.(type) {
+	case nir.Assign:
+		if !s.Decl {
+			for _, t := range s.Targets {
+				if t != "" && !strings.ContainsAny(t, ".[") {
+					used[t] = true
+				}
+			}
+		}
+		collectExprNames(s.Value, used)
+	case nir.AugAssign:
+		if s.Target != "" {
+			used[s.Target] = true
+		}
+		collectExprNames(s.Value, used)
+	case nir.Return:
+		collectExprNames(s.Value, used)
+	case nir.ExprStmt:
+		collectExprNames(s.Value, used)
+	case nir.Block:
+		for _, child := range s.Stmts {
+			collectStmtNames(child, used)
+		}
+	case nir.If:
+		collectExprNames(s.Cond, used)
+		for _, child := range s.Then {
+			collectStmtNames(child, used)
+		}
+		for _, child := range s.Else {
+			collectStmtNames(child, used)
+		}
+	case nir.Loop:
+		collectExprNames(s.Cond, used)
+		for _, child := range s.Body {
+			collectStmtNames(child, used)
+		}
+	case nir.Switch:
+		collectExprNames(s.Subject, used)
+		for _, labels := range s.Labels {
+			for _, label := range labels {
+				collectExprNames(label, used)
+			}
+		}
+		for _, c := range s.Cases {
+			for _, child := range c {
+				collectStmtNames(child, used)
+			}
+		}
+		for _, child := range s.Default {
+			collectStmtNames(child, used)
+		}
+	case nir.Try:
+		for _, child := range s.Body {
+			collectStmtNames(child, used)
+		}
+		for _, h := range s.Handlers {
+			for _, child := range h {
+				collectStmtNames(child, used)
+			}
+		}
+		for _, child := range s.Finally {
+			collectStmtNames(child, used)
+		}
+	}
+}
+
+func collectExprNames(ex nir.Expr, used map[string]bool) {
+	switch e := ex.(type) {
+	case nil:
+	case nir.Name:
+		if e.ID != "" {
+			used[e.ID] = true
+		}
+	case nir.Attr:
+		collectExprNames(e.Base, used)
+	case nir.Index:
+		collectExprNames(e.Base, used)
+		collectExprNames(e.Key, used)
+	case nir.Call:
+		collectExprNames(e.Callee, used)
+		for _, a := range e.Args {
+			collectExprNames(a, used)
+		}
+	case nir.Format:
+		for _, p := range e.Parts {
+			collectExprNames(p, used)
+		}
+	case nir.Seq:
+		for _, p := range e.Parts {
+			collectExprNames(p, used)
+		}
+	case nir.Pair:
+		collectExprNames(e.Value, used)
+	case nir.Thru:
+		collectExprNames(e.Inner, used)
+	case nir.BinOp:
+		collectExprNames(e.Left, used)
+		collectExprNames(e.Right, used)
+	case nir.Unary:
+		collectExprNames(e.Operand, used)
+	case nir.Ternary:
+		collectExprNames(e.Cond, used)
+		collectExprNames(e.Then, used)
+		collectExprNames(e.Else, used)
+	}
 }
 
 type analysisEventSpec struct {
@@ -1235,6 +1433,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
 		}
+		l.promoteCapturedJSBindings(st.Body, st.Params, sc, st.Loc)
 		// closure capture: a nested function sees the enclosing scope's bindings, so a free
 		// variable's taint flows into the body. Params are reseeded below, shadowing.
 		inner := sc.clone()
@@ -1314,6 +1513,18 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		for _, t := range st.Targets {
 			localDecl := st.Decl && l.region != ""
+			if sc.lex[t] && !st.Decl {
+				l.flow(val, sc.node[t])
+				if hasTyp {
+					sc.typ[t] = typ
+				}
+				if cv != "" {
+					sc.cnst[t] = cv // x = "literal"
+				} else {
+					delete(sc.cnst, t) // reassigned to a non-constant -> value unknown
+				}
+				continue
+			}
 			if slot := l.moduleGlobalSlot(t); slot != "" && !localDecl {
 				l.flow(val, slot)
 				sc.node[t] = slot
@@ -1326,6 +1537,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					delete(sc.cnst, t) // reassigned to a non-constant → value unknown
 				}
 				continue
+			}
+			if st.Decl {
+				delete(sc.lex, t)
 			}
 			sc.node[t] = val
 			if hasTyp {
@@ -1341,6 +1555,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		n := l.node("Concat", st.Loc, nil)
 		l.flow(l.eval(st.Value, sc), n)
 		l.flow(sc.node[st.Target], n)
+		if sc.lex[st.Target] {
+			l.flow(n, sc.node[st.Target])
+			delete(sc.cnst, st.Target)
+			return
+		}
 		if slot := l.moduleGlobalSlot(st.Target); slot != "" {
 			l.flow(n, slot)
 			sc.node[st.Target] = slot
@@ -1609,6 +1828,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// object property holding user input).
 		return l.eval(ex.Value, sc)
 	case nir.Lambda:
+		l.promoteCapturedJSBindings(ex.Body, ex.Params, sc, ex.Loc)
 		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
 		// thunk, .then, event handler) thus fires with the captured taint.

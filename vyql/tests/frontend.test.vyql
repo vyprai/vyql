@@ -91,6 +91,60 @@ test "clean: parsed API model field -> textContent"
   }
   ```
 
+test "DOM-XSS: reassigned API array element -> innerHTML"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  document.addEventListener("DOMContentLoaded", async () => {
+    let discordMembers = [];
+    async function loadDiscordMembers() {
+      const response = await fetch("/api/discord-members");
+      const data = await response.json();
+      if (data.success && data.members) {
+        discordMembers = data.members;
+        populateDiscordMemberSelect();
+      }
+    }
+    function populateDiscordMemberSelect() {
+      const optionsContainer = document.querySelector(".custom-select-options");
+      discordMembers.forEach((member) => {
+        const option = document.createElement("div");
+        option.innerHTML = `<img src="${member.avatar}" alt="">`;
+        optionsContainer.appendChild(option);
+      });
+    }
+  });
+  ```
+
+test "clean: reassigned API array element rendered with DOM API"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  document.addEventListener("DOMContentLoaded", async () => {
+    let discordMembers = [];
+    async function loadDiscordMembers() {
+      const response = await fetch("/api/discord-members");
+      const data = await response.json();
+      if (data.success && data.members) {
+        discordMembers = data.members;
+        populateDiscordMemberSelect();
+      }
+    }
+    function populateDiscordMemberSelect() {
+      const optionsContainer = document.querySelector(".custom-select-options");
+      discordMembers.forEach((member) => {
+        const option = document.createElement("div");
+        const avatar = document.createElement("img");
+        avatar.src = member.avatar;
+        option.appendChild(avatar);
+        optionsContainer.appendChild(option);
+      });
+    }
+  });
+  ```
+
 test "open redirect: location.hash -> location.href"
   lang javascript
   expect VYQL-RF-002
