@@ -621,6 +621,18 @@ concept ProtocolFrameBindingReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]
 }
+// Review-only: authentication/forward-auth handlers must fail closed with the
+// response code expected by the integrating proxy. Static analysis can surface
+// the mismatched error path, but proxy behavior determines exploitability.
+concept AuthFailureResponseReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+  review_category: "auth"
+  review_condition: "authentication verification error handling returns a generic failure response instead of an observed fail-closed unauthorized response"
+  review_evidence: "auth verification error path {pattern} handles malformed forwarded target data with a generic error response"
+  review_assumption: "an upstream proxy interprets the generic error response as successful authentication or otherwise fails open"
+  review_confidence: possibility
+}
 concept ObjectLookupByUserInput : sink {
   vulnerable_to: [access_control.Idor]
   enabled_by: [taint.UntrustedData]

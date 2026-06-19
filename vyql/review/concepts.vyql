@@ -95,6 +95,12 @@ review code.ProtocolFrameBindingReview {
   expected: [core.AuthenticationCheck]
   text: "review protocol frame/session identifier binding before accepting the frame as belonging to an existing authenticated session"
 }
+review code.AuthFailureResponseReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review authentication verification error responses for fail-closed unauthorized behavior expected by the proxy"
+}
 review code.ObjectLookupByUserInput {
   category: "auth"
   kind: "target"
