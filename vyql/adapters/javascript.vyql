@@ -76,6 +76,7 @@ adapter javascript {
   source "location.hash" -> code.DomInput
   source "location.href" -> code.DomInput
   source "location.pathname" -> code.DomInput
+  source "window.location" -> code.DomInput
   source "window.location.search" -> code.DomInput
   source "window.location.hash" -> code.DomInput
   source "window.location.href" -> code.DomInput
@@ -441,6 +442,8 @@ adapter javascript {
   control "validator.isInt" -> core.InputValidation
   control "validator.isNumeric" -> core.InputValidation
   control "encode" -> core.HtmlEscape
+  control "encodeEntities" -> core.HtmlEscape
+  control "escapeHTML" -> core.HtmlEscape
   control "escape-html" -> core.HtmlEscape
   control "he.encode" -> core.HtmlEscape
   control "validator.escape" -> core.HtmlEscape
