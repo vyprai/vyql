@@ -138,6 +138,10 @@ adapter go {
   sink path "analysis.function.return" val "<html" -> code.HtmlRender
   sink path "analysis.function.return" val "<body" -> code.HtmlRender
   sink path "analysis.function.return" val "<a " -> code.HtmlRender
+  // Gin/http response writer bodies. These are the last-hop render boundary for
+  // raw strings/bytes assembled by handlers.
+  sink path "Writer.WriteString" -> code.HtmlRender
+  sink path "Writer.Write" -> code.HtmlRender
   sink path "http.Redirect" -> code.RedirectTarget
   sink path "c.Redirect" -> code.RedirectTarget
   sink path "ctx.Redirect" -> code.RedirectTarget

@@ -221,3 +221,22 @@ test "go exhaustive: public HTML helper return is an XSS sink"
     return buf.Bytes()
   }
   ```
+
+test "go exhaustive: gin response writer string is an XSS sink"
+  lang go
+  expect VYQL-INJ-004
+  code
+  ```
+  package controllers
+
+  import (
+    "fmt"
+    "github.com/gin-gonic/gin"
+  )
+
+  func Plist(c *gin.Context) {
+    name := c.Param("data")
+    plist := fmt.Sprintf("<plist><string>%s</string></plist>", name)
+    c.Writer.WriteString(plist)
+  }
+  ```
