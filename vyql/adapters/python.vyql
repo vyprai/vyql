@@ -420,6 +420,7 @@ adapter python {
   mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "::jsonb" -> code.UnparameterizedSqlQueryParser
   mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "=ANY(" -> code.UnparameterizedSqlQueryParser
   mark exact "analysis.function.context" val "_original_transport" val "_reader._transport" val "_writer._transport" nval "_reader._buffer.clear" -> code.ProtocolStateReview
+  mark exact "analysis.function.context" val "name=_recv_packet" val "MSG_USERAUTH_LAST" val "process_packet(pkttype,seq,packet" nval "Invalid request received before" -> code.ProtocolStateReview
   sink path "redirect" -> code.RedirectTarget
   sink path "flask.redirect" -> code.RedirectTarget
   sink path "HttpResponseRedirect" -> code.RedirectTarget

@@ -1038,7 +1038,7 @@ concept IncompleteArchiveFilenameValidation : sink {
 }
 concept ProtocolStateReview : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
-  cwe: [CWE_349, CWE_404]
+  cwe: [CWE_287, CWE_349, CWE_404]
 }
 concept RequestPolicyStripped : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
