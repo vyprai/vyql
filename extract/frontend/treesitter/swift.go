@@ -86,19 +86,25 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		name := c.bindingName(field(n, "name"))
 		if name != "" {
-			return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(v)}}
+			out := []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(v)}}
+			return append(out, c.trailingLambdaStmts(v)...)
 		}
 		// `let _ = expr` binds no name, but the call still matters for sinks/marks.
-		return []nir.Stmt{nir.ExprStmt{Value: c.expr(v)}}
+		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(v)}}
+		return append(out, c.trailingLambdaStmts(v)...)
 	case "assignment":
 		target := field(n, "target")
-		result := c.expr(field(n, "result"))
+		resultNode := field(n, "result")
+		result := c.expr(resultNode)
 		if nm := c.assignTargetName(target); nm != "" {
-			return []nir.Stmt{nir.Assign{Targets: []string{nm}, Value: result}}
+			out := []nir.Stmt{nir.Assign{Targets: []string{nm}, Value: result}}
+			return append(out, c.trailingLambdaStmts(resultNode)...)
 		}
-		return []nir.Stmt{nir.ExprStmt{Value: result}}
+		out := []nir.Stmt{nir.ExprStmt{Value: result}}
+		return append(out, c.trailingLambdaStmts(resultNode)...)
 	case "call_expression", "navigation_expression":
-		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+		return append(out, c.trailingLambdaStmts(n)...)
 	case "control_transfer_statement":
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() != "throw_keyword" {
@@ -230,7 +236,27 @@ func (c *swConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 			switch ch.Kind() {
 			case "statements", "function_body":
 				out = append(out, c.decls(ch)...)
-			case "if_statement", "else", "switch_entry", "catch_block":
+			case "if_statement", "else", "switch_entry", "catch_block", "lambda_literal":
+				walk(ch)
+			}
+		}
+	}
+	walk(n)
+	return out
+}
+
+// trailingLambdaStmts lowers synchronously executed Swift closure bodies that are
+// attached to a call (`foo { ... }` or `foo({ ... })`). Without this, calls inside
+// buffer/read/write helper closures disappear from the graph.
+func (c *swConv) trailingLambdaStmts(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		for _, ch := range children(m) {
+			switch ch.Kind() {
+			case "lambda_literal":
+				out = append(out, c.collectBlocks(ch)...)
+			case "call_suffix", "value_arguments", "_fn_call_lambda_arguments", "value_argument":
 				walk(ch)
 			}
 		}

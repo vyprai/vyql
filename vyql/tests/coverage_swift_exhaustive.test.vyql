@@ -342,3 +342,27 @@ test "swift exhaustive: resource handles leak"
     h.readDataToEndOfFile()
   }
   ```
+
+test "swift exhaustive: OpenSSL BIO_puts inside byte-buffer closure is memory attention"
+  lang swift
+  expect VYQL-MEM-002
+  code
+  ```
+  func sign(buffer: ByteBuffer, bio: OpaquePointer) {
+    let res = buffer.withUnsafeReadableBytes { ptr in
+      Int(BIO_puts(bio, ptr.baseAddress?.assumingMemoryBound(to: Int8.self)))
+    }
+  }
+  ```
+
+test "swift exhaustive: OpenSSL BIO_write inside byte-buffer closure uses explicit length"
+  lang swift
+  reject VYQL-MEM-002
+  code
+  ```
+  func sign(buffer: ByteBuffer, bio: OpaquePointer) {
+    let res = buffer.withUnsafeReadableBytes { ptr in
+      BIO_write(bio, ptr.baseAddress, CInt(ptr.count))
+    }
+  }
+  ```

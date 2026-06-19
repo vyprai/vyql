@@ -105,6 +105,9 @@ adapter swift {
   mark "FileHandle.forWritingAtPath" -> code.ResourceHandle
   control method "closeFile" -> core.ResourceRelease
 
+  // memory safety
+  mark "BIO_puts" -> code.UnboundedCopySmell
+
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
   control "escapeXPath" -> core.XpathEscape
