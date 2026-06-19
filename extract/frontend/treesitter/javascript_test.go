@@ -36,6 +36,35 @@ export abstract class AssetGroup {
 	}
 }
 
+func TestTypeScriptObjectGeneratorMethodsAreExtracted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "login.ts")
+	src := []byte(`
+const Model = {
+  effects: {
+    *login() {
+      window.location.href = redirect;
+    },
+  },
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := findFuncDef(prog, "login")
+	if !ok {
+		t.Fatalf("object generator method login was not extracted; program=%#v", prog)
+	}
+	if !funcBodyHasPath(fn.Body, "window.location.href") {
+		t.Fatalf("object generator method body did not include location assignment; body=%#v", fn.Body)
+	}
+}
+
 func findFuncDef(prog nir.Program, name string) (nir.FuncDef, bool) {
 	for _, mod := range prog.Modules {
 		if fn, ok := findFuncDefInStmts(mod.Body, name); ok {
@@ -86,6 +115,75 @@ func findFuncDefInStmts(stmts []nir.Stmt, name string) (nir.FuncDef, bool) {
 		}
 	}
 	return nir.FuncDef{}, false
+}
+
+func funcBodyHasPath(stmts []nir.Stmt, path string) bool {
+	for _, st := range stmts {
+		switch s := st.(type) {
+		case nir.ExprStmt:
+			if exprHasPath(s.Value, path) {
+				return true
+			}
+		case nir.Return:
+			if exprHasPath(s.Value, path) {
+				return true
+			}
+		case nir.Assign:
+			if exprHasPath(s.Value, path) {
+				return true
+			}
+		case nir.Block:
+			if funcBodyHasPath(s.Stmts, path) {
+				return true
+			}
+		case nir.If:
+			if funcBodyHasPath(s.Then, path) || funcBodyHasPath(s.Else, path) {
+				return true
+			}
+		case nir.Loop:
+			if funcBodyHasPath(s.Body, path) {
+				return true
+			}
+		case nir.Try:
+			if funcBodyHasPath(s.Body, path) {
+				return true
+			}
+			for _, h := range s.Handlers {
+				if funcBodyHasPath(h, path) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func exprHasPath(expr nir.Expr, path string) bool {
+	switch e := expr.(type) {
+	case nir.Call:
+		if e.Path == path {
+			return true
+		}
+		for _, arg := range e.Args {
+			if exprHasPath(arg, path) {
+				return true
+			}
+		}
+		return exprHasPath(e.Callee, path)
+	case nir.Attr:
+		return exprHasPath(e.Base, path)
+	case nir.Index:
+		return exprHasPath(e.Base, path) || exprHasPath(e.Key, path)
+	case nir.Thru:
+		return exprHasPath(e.Inner, path)
+	case nir.Format:
+		for _, part := range e.Parts {
+			if exprHasPath(part, path) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func funcBodyHasCall(stmts []nir.Stmt, method string) bool {

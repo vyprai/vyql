@@ -253,6 +253,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				}
 				if name != nil && name.Kind() == "identifier" {
 					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Decl: true})
+					if val != nil && val.Kind() == "object" {
+						out = append(out, c.objectMethodFuncDefs(val, false)...)
+					}
 				} else if targets := c.bindingNames(name); len(targets) > 0 {
 					for _, target := range targets {
 						out = append(out, nir.Assign{Targets: []string{target}, Value: v, Decl: true})
@@ -305,6 +308,35 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return out
 	}
 	return nil
+}
+
+func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []nir.Stmt {
+	if obj == nil || obj.Kind() != "object" {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, pr := range namedChildren(obj) {
+		switch pr.Kind() {
+		case "method_definition":
+			name := c.text(field(pr, "name"))
+			out = append(out, nir.FuncDef{Name: name, Params: c.funcParams(pr),
+				ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: c.loc(pr), Exported: exported})
+		case "pair":
+			v := field(pr, "value")
+			if isJsFuncNode(v) {
+				name := c.keyName(field(pr, "key"))
+				params := c.funcParams(v)
+				paramTypes := c.funcParamTypes(v)
+				if len(params) == 0 {
+					params = c.paramsFromFunctionText(pr)
+				}
+				out = append(out, nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes,
+					Body: c.funcBody(v), Loc: c.loc(pr), Exported: exported})
+			}
+			out = append(out, c.objectMethodFuncDefs(v, exported)...)
+		}
+	}
+	return out
 }
 
 // resolveRequire normalizes a relative require/import specifier to the dotted,

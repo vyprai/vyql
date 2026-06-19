@@ -74,6 +74,7 @@ adapter javascript {
   source "window.location.search" -> code.DomInput
   source "window.location.hash" -> code.DomInput
   source "window.location.href" -> code.DomInput
+  source "getPageQuery" -> code.DomInput
   source "document.location" -> code.DomInput
   source "document.URL" -> code.DomInput
   source "document.documentURI" -> code.DomInput
