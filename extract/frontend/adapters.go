@@ -160,9 +160,6 @@ func valCondsForNode(s usg.Store, idx *flowTokenIndex, n usg.Node, vals, nvals [
 	if strings.HasPrefix(n.Prop("callee_path"), "analysis.") {
 		return false
 	}
-	if direct == "" {
-		return false
-	}
 	if len(vals) == 0 {
 		return false
 	}
@@ -171,6 +168,35 @@ func valCondsForNode(s usg.Store, idx *flowTokenIndex, n usg.Node, vals, nvals [
 
 func valCondsDirectForNode(n usg.Node, vals, nvals []string) bool {
 	return len(vals) == 0 && len(nvals) == 0 || valConds(n.Prop("str_args"), vals, nvals)
+}
+
+func valCondsForSink(s usg.Store, idx *flowTokenIndex, call usg.Node, sk sinkSpec) bool {
+	if len(sk.ValMatches) == 0 && len(sk.ValAbsents) == 0 {
+		return true
+	}
+	if valCondsForNode(s, idx, call, sk.ValMatches, sk.ValAbsents) {
+		return true
+	}
+	checkArg := func(arg string) bool {
+		if arg == "" {
+			return false
+		}
+		n, ok, err := s.GetNode(arg)
+		return err == nil && ok && valCondsForNode(s, idx, n, sk.ValMatches, sk.ValAbsents)
+	}
+	if sk.ArgIndex >= 0 {
+		return checkArg(call.Prop("arg" + strconv.Itoa(sk.ArgIndex)))
+	}
+	for ai := 0; ; ai++ {
+		arg := call.Prop("arg" + strconv.Itoa(ai))
+		if arg == "" {
+			break
+		}
+		if checkArg(arg) {
+			return true
+		}
+	}
+	return false
 }
 
 var callablePropTypes = []string{
@@ -853,7 +879,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						!sk.ByMethod && matchSinkPath(path, sk.Pattern)
 					// value-matched sink: every `val` must be present and every `nval`
 					// absent among the literal arg/option tokens (case-insensitive).
-					if hit && !valCondsForNode(s, &flowIdx, n, sk.ValMatches, sk.ValAbsents) {
+					if hit && !valCondsForSink(s, &flowIdx, n, sk) {
 						hit = false
 					}
 					if !hit {

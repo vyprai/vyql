@@ -66,6 +66,7 @@ adapter php {
   sink path "mysql_query" -> code.SqlExecution
   sink path "pg_query" arg 1 -> code.SqlExecution
   sink path "sqlite_query" -> code.SqlExecution
+  sink path "queryDB" -> code.SqlExecution
   sink method "query" -> code.SqlExecution
   sink method "exec" -> code.SqlExecution
   sink method "prepare" -> code.SqlExecution
@@ -214,6 +215,10 @@ adapter php {
   mark method "insert" -> code.StateChangingOp
   mark method "update" -> code.StateChangingOp
   mark method "delete" -> code.StateChangingOp
+  sink path "queryDB" val "insert into" -> code.StateChangingOp
+  sink path "queryDB" val "replace into" -> code.StateChangingOp
+  sink path "queryDB" val "update " val " set " -> code.StateChangingOp
+  sink path "queryDB" val "delete from" -> code.StateChangingOp
   mark "changePassword" -> code.AuthenticationRequiredOp
   mark "updatePassword" -> code.AuthenticationRequiredOp
   mark "resetPassword" -> code.AuthenticationRequiredOp
@@ -268,6 +273,10 @@ adapter php {
   // JWT signature not verified (CWE-347) — firebase/php-jwt decode allowing alg "none"
   mark "JWT.decode" val "none" -> code.JwtUnverified
   mark "withoutMiddleware" val "VerifyCsrfToken" -> code.CsrfDisabled
+  control "csrf_token" -> core.CsrfProtection
+  control "validate_csrf_token" -> core.CsrfProtection
+  control "check_csrf_token" -> core.CsrfProtection
+  control "verify_csrf_token" -> core.CsrfProtection
 
   // TLS cert validation disabled (CWE-295) — curl_setopt_array([CURLOPT_SSL_VERIFYPEER => false])
   mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYPEER=false" -> code.CertValidationDisabled

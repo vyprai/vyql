@@ -361,6 +361,34 @@ func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
 	}
 }
 
+func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:    "custom.Target",
+			Pattern:    "queryDB",
+			ValMatches: []string{"insert into"},
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "sql", Type: "code.Format", Props: map[string]string{
+		"loc": "sample.x:1", "str_args": "INSERT INTO users VALUES (?)",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "queryDB", "method": "queryDB", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "sql", Dst: "arg0"})
+
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "arg0" || got[0].Concept != "custom.Target" {
+		t.Fatalf("value-matched sink did not use upstream tokens when call had no direct strings: %+v", got)
+	}
+}
+
 func TestCollectionFirstSinkTargetsIndexedElement(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",

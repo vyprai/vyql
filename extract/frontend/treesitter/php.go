@@ -508,6 +508,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		if len(parts) > 0 {
+			parts = append([]nir.Expr{nir.Const{Loc: L, Value: c.text(n)}}, parts...)
 			return nir.Format{Parts: parts, Loc: L}
 		}
 		return nir.Const{Loc: L, Value: c.text(n)} // non-interpolated → literal value
