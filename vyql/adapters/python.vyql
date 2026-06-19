@@ -78,6 +78,8 @@ adapter python {
   source "ctx.request.json" -> code.HttpInput
   source "req.params" -> code.HttpInput
   source "req.media" -> code.HttpInput
+  source path "analysis.function.context.source" val "class_bases=serializers.ModelSerializer" val "fields" val "is_superuser" val "validated_data" val "objects.create" nval "pop('is_superuser'" nval "pop(\"is_superuser\"" -> code.HttpInput
+  source path "analysis.function.context.source" val "class_bases=serializers.ModelSerializer" val "fields" val "is_superuser" val "validated_data" val "super().update" nval "pop('is_superuser'" nval "pop(\"is_superuser\"" -> code.HttpInput
   source "req.get_param" -> code.HttpInput
   source "req.stream" -> code.HttpInput
   source "sys.argv" -> code.CliArgument
@@ -316,6 +318,8 @@ adapter python {
   sink path "User.objects.create" arg all -> code.MassAssign
   sink path "Model.objects.create" arg all -> code.MassAssign
   sink path "serializer.save" arg all -> code.MassAssign
+  sink path "analysis.function.context.sink" val "class_bases=serializers.ModelSerializer" val "fields" val "is_superuser" val "validated_data" val "objects.create" nval "pop('is_superuser'" nval "pop(\"is_superuser\"" -> code.MassAssign
+  sink path "analysis.function.context.sink" val "class_bases=serializers.ModelSerializer" val "fields" val "is_superuser" val "validated_data" val "super().update" nval "pop('is_superuser'" nval "pop(\"is_superuser\"" -> code.MassAssign
 
   sink path "open" -> code.FilePathAccess
   sink path "io.open" -> code.FilePathAccess

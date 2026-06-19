@@ -311,6 +311,45 @@ test "python: request body bulk update is mass assignment"
       User.update(request.get_json())
   ```
 
+test "python: DRF serializer exposes privileged field to model create"
+  lang python
+  expect VYQL-INJ-012
+  code
+  ```
+  from rest_framework import serializers
+
+  class CustomUserSerializer(serializers.ModelSerializer):
+      class Meta:
+          model = CustomUser
+          fields = ["id", "username", "is_superuser", "password"]
+          read_only_fields = ["id"]
+
+      def create(self, validated_data):
+          user = CustomUser.objects.create(**validated_data)
+          return user
+  ```
+
+test "python: DRF serializer strips privileged field before model create"
+  lang python
+  reject VYQL-INJ-012
+  code
+  ```
+  from rest_framework import serializers
+
+  class CustomUserSerializer(serializers.ModelSerializer):
+      class Meta:
+          model = CustomUser
+          fields = ["id", "username", "is_superuser", "password"]
+          read_only_fields = ["id"]
+
+      def create(self, validated_data):
+          request = self.context.get("request")
+          if not (request and request.user.is_superuser):
+              validated_data.pop("is_superuser", None)
+          user = CustomUser.objects.create(**validated_data)
+          return user
+  ```
+
 test "java: request parameter map copied into bean is mass assignment"
   lang java
   expect VYQL-INJ-012

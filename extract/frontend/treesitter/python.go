@@ -24,6 +24,7 @@ type pyConv struct {
 	file          string // current file (display path, relative to root)
 	key           string // current module key (source-root dotted)
 	moduleContext string
+	classContext  []string
 }
 
 // ExtractPython parses Python files into one NIR Program (one module per file,
@@ -304,7 +305,13 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return out
 	case "class_definition":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L, Bases: c.pyClassBases(n)}}
+		name := c.text(field(n, "name"))
+		bases := c.pyClassBases(n)
+		ctx := c.pyClassContext(n, name, bases)
+		c.classContext = append(c.classContext, ctx...)
+		body := c.block(field(n, "body"))
+		c.classContext = c.classContext[:len(c.classContext)-len(ctx)]
+		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L, Bases: bases}}
 	case "expression_statement":
 		kids := namedChildren(n)
 		if len(kids) == 0 {
@@ -500,6 +507,9 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
 		nir.Const{Loc: loc, Value: c.moduleContext},
 	}
+	for _, tok := range c.classContext {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	contextPath := "analysis.function.context"
 	sourcePath := "analysis.function.context.source"
 	sinkPath := "analysis.function.context.sink"
@@ -527,6 +537,16 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 			Method: "sink",
 			Loc:    loc,
 		}},
+	}
+}
+
+func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string) []string {
+	body := c.text(field(n, "body"))
+	return []string{
+		"class_name=" + name,
+		"class_bases=" + strings.Join(bases, ","),
+		body,
+		strings.Join(strings.Fields(body), ""),
 	}
 }
 
