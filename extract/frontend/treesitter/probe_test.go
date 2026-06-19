@@ -170,6 +170,12 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 			"cpp":        `void r(std::string p){ auto q = "a" + p; sink(q); }`,
 			"objc":       `void r(NSString* p){ NSString* q = [@"a" stringByAppendingString:p]; sink(q); }`,
 		}},
+		{"splat arg taint", flowToSink("p", "sink"), map[string]string{
+			"python": "def r(p):\n    sink(*p)",
+		}},
+		{"vararg splat taint", flowToSink("args", "sink"), map[string]string{
+			"python": "def r(*args):\n    sink(*args)",
+		}},
 		{"new T(x)→Call", hasCall("File"), map[string]string{
 			"java":       `class T { void r(String p){ new File(p); } }`,
 			"javascript": `function r(p){ new File(p); }`,
@@ -358,6 +364,29 @@ func TestFrontendCapabilityMatrix(t *testing.T) {
 	// gap summary
 	fmt.Println("\n== GAPS (MISS, excluding N/A) ==")
 	_ = sort.Strings
+}
+
+func TestPythonClassBasesAreRecorded(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.py")
+	if err := os.WriteFile(path, []byte("class Child(Base):\n    pass\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPython([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mod := range prog.Modules {
+		for _, st := range mod.Body {
+			if cls, ok := st.(nir.ClassDef); ok && cls.Name == "Child" {
+				if len(cls.Bases) != 1 || cls.Bases[0] != "Base" {
+					t.Fatalf("Child bases = %#v, want [Base]", cls.Bases)
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("Child class not found")
 }
 
 func TestJavaScriptIIFELowersBody(t *testing.T) {

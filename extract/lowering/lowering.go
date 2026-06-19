@@ -2464,17 +2464,40 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
+	l.applyTargetArgsCallback(call, argVals, sc)
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
 	// function's body (arg → param → … → ret → result), so an in-body transform is
 	// honoured — `bar = my_wrapper(p)` where my_wrapper transforms p is clean. Only an
 	// arg NOT mapped to any resolved param keeps the conservative direct `arg → result` edge
 	// (unknown/library callee, or a vararg beyond the param list), preserving recall there.
 	targets := l.resolveTargets(call.Callee, sc)
+	dynamicCallback := len(targets) == 0 && l.dynamicFunctionParamCall(call.Callee, sc)
+	if dynamicCallback {
+		targets = l.dynamicCallbackTargets()
+	}
 	mapped := make([]bool, len(args))
 	for _, target := range targets {
+		if dynamicCallback {
+			for i, a := range args {
+				l.flowValueToAllParams(a, target)
+				mapped[i] = true
+			}
+			l.flow(target.ret, result)
+			continue
+		}
+		paramOffset := 0
+		if recvNode != "" && target.cls != "" && len(target.paramNames) > 0 && target.paramNames[0] == l.selfName {
+			selfParam := target.params[target.paramNames[0]]
+			l.flow(recvNode, selfParam)
+			if l.containers[recvNode] != nil {
+				l.aliasReceiverSelf(recvNode, selfParam)
+			}
+			paramOffset = 1
+		}
 		for i, a := range args {
-			if i < len(target.paramNames) {
-				pnode := target.params[target.paramNames[i]]
+			paramIndex := i + paramOffset
+			if paramIndex < len(target.paramNames) {
+				pnode := target.params[target.paramNames[paramIndex]]
 				l.flow(a, pnode)
 				// cross-method object identity: C# objects are reference types, so a field
 				// mutation inside the callee (`p.field = …` / `p.list.Add(…)`) is visible to the
@@ -2518,6 +2541,72 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	l.applyCallEffects(call, argVals, result, sc)
 	return result
+}
+
+func (l *lowerer) applyTargetArgsCallback(call nir.Call, argVals []string, sc *scope) {
+	if len(call.Args) != len(argVals) {
+		return
+	}
+	targetExpr, argsVal, ok := targetArgsPair(call.Args, argVals)
+	if !ok {
+		return
+	}
+	for _, target := range l.resolveTargets(targetExpr, sc) {
+		l.flowValueToAllParams(argsVal, target)
+	}
+}
+
+func targetArgsPair(args []nir.Expr, argVals []string) (nir.Expr, string, bool) {
+	var target nir.Expr
+	argsVal := ""
+	for i, arg := range args {
+		pair, ok := arg.(nir.Pair)
+		if !ok {
+			continue
+		}
+		switch pair.Key {
+		case "target":
+			target = pair.Value
+		case "args":
+			argsVal = argVals[i]
+		}
+	}
+	return target, argsVal, target != nil && argsVal != ""
+}
+
+func (l *lowerer) dynamicFunctionParamCall(callee nir.Expr, sc *scope) bool {
+	name, ok := callee.(nir.Name)
+	if !ok {
+		return false
+	}
+	id := sc.node[name.ID]
+	if id == "" {
+		return false
+	}
+	n, ok, _ := l.g.GetNode(id)
+	return ok && n.Type == "code.Param"
+}
+
+func (l *lowerer) dynamicCallbackTargets() []*funcInfo {
+	var out []*funcInfo
+	for _, funcs := range l.funcShort {
+		out = append(out, funcs...)
+	}
+	return dedupeFuncInfos(out)
+}
+
+func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
+	if value == "" || target == nil {
+		return
+	}
+	for _, pname := range target.paramNames {
+		if pname == l.selfName {
+			continue
+		}
+		if pnode := target.params[pname]; pnode != "" {
+			l.flow(value, pnode)
+		}
+	}
 }
 
 func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result string, sc *scope) {
@@ -2632,6 +2721,7 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 			}
 		}
 		if typ, ok := sc.typ[obj]; ok { // instance/self method
+			var out []*funcInfo
 			if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
 				if m.abstract {
 					// interface/abstract method — the concrete runtime target is unknown, so
@@ -2639,9 +2729,16 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 					// unresolved: the conservative direct arg→result edge then carries taint
 					// through the call (over-approximate, recall-safe), while concrete callees
 					// still route through their real body so in-body sanitizers are honoured.
-					return nil
+					return l.resolveDerivedMethods(typ[1], attr)
 				}
-				return []*funcInfo{m}
+				out = append(out, m)
+			}
+			out = append(out, l.resolveDerivedMethods(typ[1], attr)...)
+			if len(out) > 0 {
+				return dedupeFuncInfos(out)
+			}
+			if bases := l.resolveBaseMethods(typ[0], typ[1], attr); len(bases) > 0 {
+				return bases
 			}
 		}
 		// Cross-file fallback: the receiver type is unresolved (common with dynamically-typed
@@ -2654,6 +2751,60 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		}
 	}
 	return nil
+}
+
+func dedupeFuncInfos(in []*funcInfo) []*funcInfo {
+	seen := map[*funcInfo]bool{}
+	var out []*funcInfo
+	for _, f := range in {
+		if f == nil || seen[f] {
+			continue
+		}
+		seen[f] = true
+		out = append(out, f)
+	}
+	return out
+}
+
+func (l *lowerer) resolveDerivedMethods(class, method string) []*funcInfo {
+	var out []*funcInfo
+	seenClass := map[string]bool{}
+	var walk func(string)
+	walk = func(parentClass string) {
+		for qual, bases := range l.classBaseNames {
+			if seenClass[qual] {
+				continue
+			}
+			childMod, childClass, ok := splitClassQual(qual)
+			if !ok || !classBasesInclude(parentClass, bases) {
+				continue
+			}
+			seenClass[qual] = true
+			if f := l.funcQual[childMod+"::"+childClass+"."+method]; f != nil {
+				out = append(out, f)
+			}
+			walk(childClass)
+		}
+	}
+	walk(class)
+	return dedupeFuncInfos(out)
+}
+
+func splitClassQual(qual string) (modkey, class string, ok bool) {
+	i := strings.LastIndex(qual, "::")
+	if i < 0 {
+		return "", "", false
+	}
+	return qual[:i], qual[i+2:], true
+}
+
+func classBasesInclude(class string, bases []string) bool {
+	for _, base := range bases {
+		if base == class || strings.HasSuffix(base, "."+class) || strings.HasSuffix(base, "::"+class) {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *lowerer) resolveBaseMethods(modkey, class, method string) []*funcInfo {

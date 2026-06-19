@@ -1143,3 +1143,30 @@ test "python: shlex.quote neutralizes the command injection"
       x = request.args['q']
       os.system("ping " + shlex.quote(x))
   ```
+
+test "python: SQLAlchemy stored value reaches command execution"
+  lang python
+  expect VYQL-INJ-032
+  code
+  ```
+  import os
+  import sqlalchemy
+
+  def run_submission(submission_hash):
+      submission = Submission.query.get(submission_hash)
+      os.system("jpseek " + submission.password)
+  ```
+
+test "python: SQLAlchemy stored value reaches asyncio exec splat"
+  lang python
+  expect VYQL-INJ-032
+  code
+  ```
+  import asyncio
+  import sqlalchemy
+
+  async def run_submission(submission_hash):
+      submission = Submission.query.get(submission_hash)
+      cmd = ["bash", "-c", "jpseek " + submission.password]
+      await asyncio.create_subprocess_exec(*cmd)
+  ```

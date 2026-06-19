@@ -20,6 +20,12 @@ rule Command {
   unless sanitized_by core.ShellEscape
 }
 
+rule StoredCommand {
+  meta { id: "VYQL-INJ-032", severity: high, cwe: [CWE_78] }
+  taint code.DatabaseRead -> code.CommandExecution
+  unless sanitized_by core.ShellEscape
+}
+
 rule CommandOptionInjection {
   meta { id: "VYQL-INJ-031", severity: high, cwe: [CWE_74, CWE_88], confidence_floor: medium }
   match code.CommandOptionInjection as sink

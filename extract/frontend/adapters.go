@@ -1170,8 +1170,9 @@ func constraintAllows(constraint, recvType string) bool {
 }
 
 // matchPath reports whether a callee_path matches any of the patterns. Default
-// mode "prefix" matches exact / dotted / subscript continuations; "contains"
-// matches any substring (for languages whose receiver name varies, e.g. Go r/req).
+// mode "prefix" matches exact / dotted / subscript continuations and dotted
+// suffix/interior segments; "contains" matches any substring (for languages
+// whose receiver name varies, e.g. Go r/req).
 func matchPath(path string, patterns []string, mode string) bool {
 	for _, p := range patterns {
 		if mode == "contains" {
@@ -1180,7 +1181,7 @@ func matchPath(path string, patterns []string, mode string) bool {
 			}
 			continue
 		}
-		if path == p || strings.HasPrefix(path, p+".") || strings.HasPrefix(path, p+"[") {
+		if matchSinkPath(path, p) {
 			return true
 		}
 	}

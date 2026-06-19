@@ -304,7 +304,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return out
 	case "class_definition":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
+		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L, Bases: c.pyClassBases(n)}}
 	case "expression_statement":
 		kids := namedChildren(n)
 		if len(kids) == 0 {
@@ -651,6 +651,27 @@ func (c *pyConv) pyDecoratorPath(n *tree_sitter.Node) string {
 	return ""
 }
 
+func (c *pyConv) pyClassBases(n *tree_sitter.Node) []string {
+	var bases []string
+	args := field(n, "superclasses")
+	if args == nil {
+		return bases
+	}
+	for _, ch := range namedChildren(args) {
+		if ch.Kind() == "keyword_argument" {
+			continue
+		}
+		base := c.dotted(ch)
+		if base == "" && ch.Kind() == "call" {
+			base = c.dotted(field(ch, "function"))
+		}
+		if base != "" {
+			bases = append(bases, base)
+		}
+	}
+	return bases
+}
+
 func (c *pyConv) params(params *tree_sitter.Node) []string {
 	if params == nil {
 		return nil
@@ -659,12 +680,12 @@ func (c *pyConv) params(params *tree_sitter.Node) []string {
 	for _, ch := range namedChildren(params) {
 		switch ch.Kind() {
 		case "identifier":
-			out = append(out, c.text(ch))
+			out = append(out, pyParamName(c.text(ch)))
 		case "default_parameter", "typed_parameter", "typed_default_parameter":
 			if nm := field(ch, "name"); nm != nil {
-				out = append(out, c.text(nm))
+				out = append(out, pyParamName(c.text(nm)))
 			} else if kids := namedChildren(ch); len(kids) > 0 {
-				out = append(out, c.text(kids[0]))
+				out = append(out, pyParamName(c.text(kids[0])))
 			}
 		}
 	}
@@ -681,14 +702,18 @@ func (c *pyConv) paramTypes(params *tree_sitter.Node) map[string]string {
 		case "typed_parameter", "typed_default_parameter":
 			name := ""
 			if nm := field(ch, "name"); nm != nil {
-				name = c.text(nm)
+				name = pyParamName(c.text(nm))
 			} else if kids := namedChildren(ch); len(kids) > 0 {
-				name = c.text(kids[0])
+				name = pyParamName(c.text(kids[0]))
 			}
 			putParamType(out, name, paramTypeFromField(c, ch))
 		}
 	}
 	return out
+}
+
+func pyParamName(name string) string {
+	return strings.TrimLeft(name, "*")
 }
 
 func (c *pyConv) targets(left *tree_sitter.Node) []string {
@@ -741,6 +766,11 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "keyword_argument":
 		return nir.Pair{Key: c.keyName(field(n, "name")), Value: c.expr(field(n, "value")), Loc: L}
+	case "list_splat", "dictionary_splat":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return nir.Thru{Inner: c.expr(kids[0])}
+		}
+		return nir.Const{Loc: L}
 	case "dictionary":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {

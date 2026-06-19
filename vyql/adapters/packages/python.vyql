@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, DatabaseRead}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter python {
@@ -53,6 +53,22 @@ adapter python {
     sink path "sqlalchemy.text" -> SqlExecution
     control "sqlalchemy.text" -> SqlParameterization
     control method "bindparams" -> SqlParameterization
+  }
+  package "flask-sqlalchemy" {
+    source path "query.get" -> DatabaseRead
+    source path "query.get_or_404" -> DatabaseRead
+    source path "query.first" -> DatabaseRead
+    source path "query.one" -> DatabaseRead
+    source path "query.one_or_none" -> DatabaseRead
+    source path "query.all" -> DatabaseRead
+  }
+  package "sqlalchemy" {
+    source path "query.get" -> DatabaseRead
+    source path "query.get_or_404" -> DatabaseRead
+    source path "query.first" -> DatabaseRead
+    source path "query.one" -> DatabaseRead
+    source path "query.one_or_none" -> DatabaseRead
+    source path "query.all" -> DatabaseRead
   }
   package "psycopg2" {
     sink method "execute" -> SqlExecution

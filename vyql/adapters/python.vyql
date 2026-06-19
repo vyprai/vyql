@@ -225,7 +225,7 @@ adapter python {
   sink path "os.spawnv" -> code.CommandExecution
   sink path "os.spawnl" -> code.CommandExecution
   sink path "asyncio.create_subprocess_shell" -> code.CommandExecution
-  sink path "asyncio.create_subprocess_exec" -> code.CommandExecution
+  sink path "asyncio.create_subprocess_exec" arg all collection -> code.CommandExecution
   sink path "popen2.popen2" -> code.CommandExecution
   sink path "popen2.popen3" -> code.CommandExecution
   sink path "eval" -> code.CodeEval

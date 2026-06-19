@@ -41,6 +41,9 @@ func TestMatchPath(t *testing.T) {
 	if !matchPath("source.value.get", []string{"source.value"}, "prefix") {
 		t.Error("dotted continuation should match")
 	}
+	if !matchPath("Model.query.get", []string{"query.get"}, "prefix") {
+		t.Error("dotted suffix should match a path behind a receiver/model segment")
+	}
 	if matchPath("source.valued", []string{"source.value"}, "prefix") {
 		t.Error("a longer word should NOT prefix-match (source.valued != source.value.)")
 	}

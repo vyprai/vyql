@@ -269,6 +269,16 @@ test "package catalog: python"
   node control code.Call { loc = python.py:2, callee_path = markupsafe.escape, method = escape }
   ```
 
+test "package catalog: python SQLAlchemy model query reads"
+  adapter python
+  expect_label row code.DatabaseRead
+  graph
+  ```
+  node imp code.Import { loc = python.py:1, module = sqlalchemy, package = sqlalchemy, root = sqlalchemy }
+  node arg code.Arg { loc = python.py:2 }
+  node row code.Call { loc = python.py:2, callee_path = Submission.query.get, method = get, arg0 = arg }
+  ```
+
 test "package catalog: ruby"
   adapter ruby
   expect_label src code.HttpInput
