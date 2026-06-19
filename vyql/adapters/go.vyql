@@ -251,6 +251,7 @@ adapter go {
   mark "MarshalConfig" val "false" -> code.ConfigExposureReview
   mark "instance.MarshalConfig" val "false" -> code.ConfigExposureReview
   mark exact "analysis.type.context" val "field:Repositories" val "field:Keyring" nval "method:MarshalYAML" -> code.ConfigExposureReview
+  mark "settingspkg.Settings" val "PasswordPattern" -> code.SensitiveSettingsExposureReview
   // Review-only: protocol/state handlers that stop a registration timer without
   // first checking the corresponding state can accept out-of-sequence messages.
   mark exact "analysis.function.context" val "call:StopT3550" nval "selector:ue.T3550" -> code.ProtocolStateReview

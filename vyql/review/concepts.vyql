@@ -183,6 +183,12 @@ review code.ConfigExposureReview {
   expected: [core.SecretRedaction]
   text: "verify config or diagnostic serialization redacts inline secrets before exposure"
 }
+review code.SensitiveSettingsExposureReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "verify sensitive settings fields are only returned to authenticated callers"
+}
 review code.InternalContentExposureReview {
   category: "secret"
   kind: "attention"

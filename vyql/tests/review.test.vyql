@@ -647,6 +647,41 @@ test "review: go repository/keyring config type with YAML redaction is clean"
   }
   ```
 
+test "review: go settings response exposing password pattern is surfaced"
+  lang go
+  expect_review code.SensitiveSettingsExposureReview
+  code
+  ```
+  package settings
+
+  func Get() interface{} {
+      cfg := loadSettings()
+      return settingspkg.Settings{
+          URL: "https://argo.example",
+          PasswordPattern: cfg.PasswordPattern,
+      }
+  }
+  ```
+
+test "review: go settings password pattern gated behind login is clean"
+  lang go
+  reject_review code.SensitiveSettingsExposureReview
+  code
+  ```
+  package settings
+
+  func Get(ctx context.Context) interface{} {
+      cfg := loadSettings()
+      set := settingspkg.Settings{
+          URL: "https://argo.example",
+      }
+      if sessionmgr.LoggedIn(ctx) {
+          set.PasswordPattern = cfg.PasswordPattern
+      }
+      return set
+  }
+  ```
+
 test "review: go special procfs write without secure boundary is surfaced"
   lang go
   expect_review code.SpecialFileAccessReview

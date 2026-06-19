@@ -630,6 +630,17 @@ concept ConfigExposureReview : sink {
   review_assumption: "repository, keyring, credential, or diagnostic fields may contain inline credentials"
   review_confidence: possibility
 }
+// Review-only: API settings responses that include password policy, token, or
+// similar security-setting fields should be gated by authentication.
+concept SensitiveSettingsExposureReview : sink {
+  vulnerable_to: [authentication.MissingAuthentication, secrets.SecretLeak]
+  cwe: [CWE_306, CWE_287, CWE_200]
+  review_category: "auth"
+  review_condition: "sensitive settings fields are included in an API settings response without an observed authentication gate"
+  review_evidence: "settings response construction {pattern} includes a sensitive settings field"
+  review_assumption: "the settings response can be requested by unauthenticated callers"
+  review_confidence: possibility
+}
 // Review-only: generated/internal application content is serialized into a platform
 // document or page without an observed visibility/access-control hardening step. Used for
 // CWE-200 cases where the issue is not taint, but default platform visibility.
