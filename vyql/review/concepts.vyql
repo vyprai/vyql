@@ -145,6 +145,11 @@ review code.ResourceReview {
   expected: [core.ResourceRelease]
   text: "verify resource usage is bounded, timed out, and released"
 }
+review code.StructuredInputDecode {
+  category: "input_validation"
+  kind: "attention"
+  text: "review structured decoder output validation against the target format"
+}
 review code.CatastrophicRegex {
   category: "resource"
   kind: "attention"

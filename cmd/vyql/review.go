@@ -187,6 +187,7 @@ func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConcept
 		byID[n.ID] = n
 	}
 	var out []reviewItem
+	seen := map[string]bool{}
 	for _, n := range nodes {
 		labels, _ := g.Labels(n.ID)
 		for _, l := range labels {
@@ -194,6 +195,11 @@ func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConcept
 			if !ok {
 				continue
 			}
+			key := reviewDedupKey(l.Concept, n)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
 			cp := reviewItem{
 				Category:   info.category,
 				Kind:       info.kind,
@@ -217,6 +223,14 @@ func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConcept
 		return reviewItemOrder(out[i]) < reviewItemOrder(out[j])
 	})
 	return out
+}
+
+func reviewDedupKey(concept string, n usg.Node) string {
+	loc := n.Prop("loc")
+	if loc == "" {
+		loc = n.ID
+	}
+	return concept + "\x00" + loc + "\x00" + n.Prop("path") + "\x00" + n.Prop("method")
 }
 
 func relatedReviewChecks(g usg.Store, nodes map[string]usg.Node, targetID string, expected []string, reviewConcepts map[string]reviewConceptInfo) []reviewRelatedCheck {

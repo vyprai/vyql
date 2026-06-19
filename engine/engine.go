@@ -57,10 +57,11 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 		}
 		nodes, _ := e.Store.NodesWithConcept(qn)
 		for _, id := range nodes {
-			if covered[id] || seen[id] {
+			key := e.possibilityKey(qn, id)
+			if covered[id] || seen[key] {
 				continue
 			}
-			seen[id] = true
+			seen[key] = true
 			rc := possibilityReview(c)
 			out = append(out, &findings.Finding{
 				RuleID:      "VYQL-POSS-" + c.Name,
@@ -79,6 +80,18 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 		}
 	}
 	return out
+}
+
+func (e *Engine) possibilityKey(concept, nodeID string) string {
+	n, ok, _ := e.Store.GetNode(nodeID)
+	if !ok {
+		return concept + "\x00" + nodeID
+	}
+	loc := n.Prop("loc")
+	if loc == "" {
+		loc = nodeID
+	}
+	return concept + "\x00" + loc + "\x00" + n.Prop("path") + "\x00" + n.Prop("method")
 }
 
 func possibilityReview(c ontology.Concept) findings.ReviewCondition {

@@ -134,6 +134,28 @@ test "review: memory attention points are surfaced"
   }
   ```
 
+test "review: go structured decoder byte parsing is surfaced"
+  lang go
+  expect_review code.StructuredInputDecode
+  code
+  ```
+  package aper
+
+  type perBitData struct { bytes []byte }
+
+  func (pd *perBitData) parseOctetString() ([]byte, error) {
+      return pd.bytes, nil
+  }
+
+  func parseField(pd *perBitData) (string, error) {
+      octets, err := pd.parseOctetString()
+      if err != nil {
+          return "", err
+      }
+      return string(octets), nil
+  }
+  ```
+
 test "review: starttls buffer handoff is surfaced"
   lang python
   expect_review code.ProtocolStateReview

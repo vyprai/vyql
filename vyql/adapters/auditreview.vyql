@@ -49,4 +49,8 @@ adapter auditreview {
   mark "fopen" -> code.ResourceReview
   mark "opendir" -> code.ResourceReview
   mark "socket" -> code.ResourceReview
+
+  // --- structured input decoders (format-validation review) ---
+  mark method "parseOctetString" -> code.StructuredInputDecode
+  mark method "parseBitString" -> code.StructuredInputDecode
 }

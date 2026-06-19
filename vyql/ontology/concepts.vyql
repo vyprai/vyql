@@ -297,6 +297,15 @@ concept ResourceHandle : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_772]
 }
+concept StructuredInputDecode : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "structured input bytes are decoded and should be validated against the target format"
+  review_evidence: "decoder operation {pattern} consumes structured bytes"
+  review_assumption: "malformed or out-of-alphabet input can reach callers that trust the decoded value"
+  review_confidence: possibility
+}
 concept OwnerFieldClear : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_401]
