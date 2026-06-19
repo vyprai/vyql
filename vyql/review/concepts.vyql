@@ -84,6 +84,12 @@ review code.RequestScopePolicyReview {
   expected: [core.AuthorizationCheck]
   text: "review request/resource scope consistency before dispatching the resource handler"
 }
+review code.AdmissionSubresourcePolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review subresource admission handling for alternate paths that bypass the primary resource policy"
+}
 review code.WorkflowPolicyReview {
   category: "auth"
   kind: "attention"

@@ -248,6 +248,9 @@ adapter go {
   // then dispatch a resource handler need a visible request/resource scope consistency
   // check before dispatch.
   mark exact "analysis.function.context" val "function_name:ServeHTTP" val "call:RequestInfoFrom" val "call:Get" val "call:serveResource" nval "selector:apiextensions.NamespaceScoped" -> code.RequestScopePolicyReview
+  // Review-only: admission ignore helpers that skip every non-empty subresource
+  // need manual review for alternate API paths that bypass the primary policy.
+  mark exact "analysis.function.context" val "function_name:shouldIgnore" val "call:GetSubresource" nval "ignoredSubresources" -> code.AdmissionSubresourcePolicyReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission

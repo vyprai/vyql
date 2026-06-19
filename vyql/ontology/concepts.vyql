@@ -550,6 +550,18 @@ concept RequestScopePolicyReview : sink {
   review_assumption: "the request may be authorized or dispatched under the wrong resource scope"
   review_confidence: possibility
 }
+// Review-only: an admission or policy hook ignores all subresources instead of
+// making the admitted subresources explicit. Used for bypasses where an alternate
+// API path skips the same admission/security policy applied to the primary object.
+concept AdmissionSubresourcePolicyReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_288, CWE_863]
+  review_category: "auth"
+  review_condition: "admission logic returns early for a non-empty subresource without an observed explicit subresource policy"
+  review_evidence: "admission ignore context {pattern} checks subresource presence but does not show an allowlist or handled-subresource branch"
+  review_assumption: "an alternate subresource path may bypass the policy applied to the primary resource"
+  review_confidence: possibility
+}
 // Review-only: business workflow/status policy that guards a protected action (for
 // example payment state before a digital download). Inert for confirmed scan rules.
 concept WorkflowPolicyReview : sink {

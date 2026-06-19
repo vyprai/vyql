@@ -367,6 +367,79 @@ test "review: go request-resource scope mismatch guard is clean"
   }
   ```
 
+test "review: go admission ignoring all pod subresources is surfaced"
+  lang go
+  expect_review code.AdmissionSubresourcePolicyReview
+  code
+  ```
+  package main
+  type Attributes interface {
+    GetResource() Resource
+    GetSubresource() string
+  }
+  type Resource string
+  func (r Resource) GroupResource() Resource { return r }
+  type Constraint struct{}
+  func (c *Constraint) Admit(a Attributes) error {
+    ignore, err := shouldIgnore(a)
+    if err != nil {
+      return err
+    }
+    if ignore {
+      return nil
+    }
+    return c.computeSecurityContext(a)
+  }
+  func (c *Constraint) computeSecurityContext(a Attributes) error { return nil }
+  func shouldIgnore(a Attributes) (bool, error) {
+    if a.GetResource().GroupResource() != Resource("pods") {
+      return true, nil
+    }
+    if len(a.GetSubresource()) != 0 {
+      return true, nil
+    }
+    return false, nil
+  }
+  ```
+
+test "review: go admission explicit pod subresource policy is clean"
+  lang go
+  reject_review code.AdmissionSubresourcePolicyReview
+  code
+  ```
+  package main
+  type Attributes interface {
+    GetResource() Resource
+    GetSubresource() string
+  }
+  type Resource string
+  func (r Resource) GroupResource() Resource { return r }
+  type stringSet struct{}
+  func (s stringSet) Has(v string) bool { return true }
+  var ignoredSubresources = stringSet{}
+  type Constraint struct{}
+  func (c *Constraint) Admit(a Attributes) error {
+    ignore, err := shouldIgnore(a)
+    if err != nil {
+      return err
+    }
+    if ignore {
+      return nil
+    }
+    return c.computeSecurityContext(a)
+  }
+  func (c *Constraint) computeSecurityContext(a Attributes) error { return nil }
+  func shouldIgnore(a Attributes) (bool, error) {
+    if a.GetResource().GroupResource() != Resource("pods") {
+      return true, nil
+    }
+    if subresource := a.GetSubresource(); len(subresource) != 0 && ignoredSubresources.Has(subresource) {
+      return true, nil
+    }
+    return false, nil
+  }
+  ```
+
 test "review: incomplete scala csrf token validation is surfaced"
   lang scala
   expect_review code.IncompleteCsrfTokenValidation
