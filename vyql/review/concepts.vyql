@@ -54,6 +54,30 @@ review code.AuthFlowBypassReview {
   expected: [core.AuthenticationCheck]
   text: "review alternate UI or navigation exit paths in this authentication flow"
 }
+review code.LocalRequestBypassReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "review localhost or local-request bypasses on protected routes"
+}
+review code.PrivilegedEntryPointReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review privileged entry point dispatch and caller privilege checks"
+}
+review code.IgnoredAuthorizationResult {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review authorization check result usage; a failed check must stop the operation"
+}
+review code.CredentialedEndpointReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review credentialed test endpoint for admin permission and request-method guards"
+}
 review code.AuthAttemptLimitReview {
   category: "auth"
   kind: "attention"
@@ -157,6 +181,16 @@ review code.ResourceReview {
   expected: [core.ResourceRelease]
   text: "verify resource usage is bounded, timed out, and released"
 }
+review code.UnboundedResourceOperation {
+  category: "resource"
+  kind: "attention"
+  text: "review long-lived resource operation for timeouts, message limits, and cancellation"
+}
+review code.UnboundedStateGrowthReview {
+  category: "resource"
+  kind: "attention"
+  text: "review state keyed by attacker-controlled or high-cardinality values for fail-closed limits"
+}
 review code.StructuredInputDecode {
   category: "input_validation"
   kind: "attention"
@@ -241,6 +275,11 @@ review code.UnsafeMutableAlias {
   category: "memory"
   kind: "attention"
   text: "review unsafe mutable reference construction from raw pointer casts and aliasing/lifetime guarantees"
+}
+review code.UnsafeAutoTraitImpl {
+  category: "concurrency"
+  kind: "attention"
+  text: "review unsafe Send/Sync implementation and whether generic bounds preserve thread-safety invariants"
 }
 review code.FfiEnumLayoutRisk {
   category: "memory"

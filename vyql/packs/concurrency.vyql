@@ -11,3 +11,8 @@ rule LocklessSharedMutation {
   meta { id: "VYQL-RACE-002", severity: low, cwe: [CWE_362], confidence_floor: low }
   match code.LocklessSharedMutation as m
 }
+
+rule UnsafeAutoTraitImplementation {
+  meta { id: "VYQL-RACE-003", severity: medium, cwe: [CWE_362, CWE_119], confidence_floor: medium }
+  match code.UnsafeAutoTraitImpl as m
+}

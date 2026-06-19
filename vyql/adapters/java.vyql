@@ -203,13 +203,20 @@ adapter java {
   control method "hasRole" -> core.AuthorizationCheck
   control method "checkPermission" -> core.AuthorizationCheck
   mark "Login.accurevLoginFromGlobalConfig" -> code.SensitiveOperation
-  // Accumulo-style permission gates: review-only context for authz CVEs where the bug is
-  // an ignored/unenforced boolean result rather than taint reaching a sink.
-  control method "canFlush" -> core.AuthorizationCheck
-  control method "canPerformSystemActions" -> core.AuthorizationCheck
-  control method "canAlterNamespace" -> core.AuthorizationCheck
-  control method "canAlterTable" -> core.AuthorizationCheck
-  control method "canObtainDelegationToken" -> core.AuthorizationCheck
+  // Accumulo-style permission gates: a bare can* call is not a guard unless its false
+  // result stops the operation. Surface ignored results for review; treat throw-on-false
+  // contexts as authorization checks.
+  mark exact "analysis.function.context" val "call:canFlush" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  mark exact "analysis.function.context" val "call:canPerformSystemActions" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  mark exact "analysis.function.context" val "call:canAlterNamespace" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  mark exact "analysis.function.context" val "call:canAlterTable" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  mark exact "analysis.function.context" val "call:canObtainDelegationToken" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  control "analysis.function.context" val "call:canFlush" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  control "analysis.function.context" val "call:canPerformSystemActions" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  control "analysis.function.context" val "call:canAlterNamespace" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  control "analysis.function.context" val "call:canAlterTable" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  control "analysis.function.context" val "call:canObtainDelegationToken" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  mark exact "analysis.function.context" val "function_name:doTest" val "call:setCredentialsId" val "call:accurevLoginFromGlobalConfig" nval "call:hasPermission" -> code.CredentialedEndpointReview
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.
   mark method "getSomeWorkspace" -> code.SensitiveOperation

@@ -268,6 +268,7 @@ adapter go {
   // Review-only: admission ignore helpers that skip every non-empty subresource
   // need manual review for alternate API paths that bypass the primary policy.
   mark exact "analysis.function.context" val "function_name:shouldIgnore" val "call:GetSubresource" nval "ignoredSubresources" -> code.AdmissionSubresourcePolicyReview
+  mark exact "analysis.function.context" val "call:LoadOrStore" val "literal:overflow" -> code.UnboundedStateGrowthReview
   // Review-only: writing security state through ordinary path opening of procfs control
   // files needs a verified procfs/open boundary to avoid link or mount redirection.
   mark exact "analysis.function.context" val "call_path:os.OpenFile" val "literal:/proc/self/attr/exec" nval "call:OpenProcRoot" nval "call:OpenThreadSelf" nval "call_path:pathrs.Reopen" -> code.SpecialFileAccessReview

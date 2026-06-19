@@ -380,6 +380,10 @@ concept UnsafeMutableAlias : sink {
   vulnerable_to: [memory.OobWrite, memory.UseAfterFree]
   cwe: [CWE_787, CWE_416]
 }
+concept UnsafeAutoTraitImpl : sink {
+  vulnerable_to: [concurrency.RaceCondition, memory.OobRead, memory.OobWrite]
+  cwe: [CWE_362, CWE_119]
+}
 concept FfiEnumLayoutRisk : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   cwe: [CWE_119]
@@ -547,6 +551,22 @@ concept AuthFlowBypassReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]
 }
+concept LocalRequestBypassReview : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_266, CWE_285, CWE_862]
+}
+concept PrivilegedEntryPointReview : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+}
+concept IgnoredAuthorizationResult : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_252, CWE_285, CWE_863]
+}
+concept CredentialedEndpointReview : sink {
+  vulnerable_to: [access_control.MissingAuthorization, secrets.SecretLeak]
+  cwe: [CWE_200, CWE_862]
+}
 // Review-only: authentication challenge, retry, or attempt-limit logic. Used for
 // cases where static analysis should hand context to the AI/manual stage to verify
 // brute-force limits, rate limiting, and concurrency around failed-attempt counters.
@@ -634,6 +654,14 @@ concept IncompleteServerPortValidation : sink {
 concept ResourceReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
+}
+concept UnboundedResourceOperation : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_772]
+}
+concept UnboundedStateGrowthReview : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770]
 }
 // Configuration or diagnostic serialization that may include inline secrets unless redacted.
 // Review-only: static analysis cannot know which config fields are sensitive in every

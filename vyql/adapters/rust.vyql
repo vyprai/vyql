@@ -23,7 +23,10 @@ adapter rust {
   sink method "args" -> code.CommandExecution
   mark exact "analysis.function.context" val "lang=rust" val "&mut" val "as *const" val "as *mut" -> code.UnsafeMutableAlias
   mark exact "analysis.rust.enum" val "kind:enum" val "repr:C" -> code.FfiEnumLayoutRisk
+  mark exact "analysis.rust.unsafe_impl" val "trait:Send" nval "bound:Send" -> code.UnsafeAutoTraitImpl
+  mark exact "analysis.rust.unsafe_impl" val "trait:Sync" nval "bound:Sync" -> code.UnsafeAutoTraitImpl
   mark exact "analysis.function.context" val "lang=rust" val "with_capacity" val "as_mut_ptr" val "from_raw_parts_mut" val "read_exact" val "set_len" -> code.UninitializedBufferExposure
+  mark exact "analysis.function.context" val "lang=rust" val ".next().await" nval "timeout" -> code.UnboundedResourceOperation
 
   // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
   sink path "reqwest.get" -> code.UrlFetch

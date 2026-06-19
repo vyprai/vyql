@@ -119,7 +119,11 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 			}
 		}
 		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
-	case "impl_item", "mod_item", "trait_item":
+	case "impl_item":
+		out := c.rsUnsafeImplMetadata(n)
+		out = append(out, c.decls(field(n, "body"))...)
+		return out
+	case "mod_item", "trait_item":
 		return c.decls(field(n, "body"))
 	case "enum_item":
 		return c.rsEnumMetadata(n, attrs)
@@ -177,6 +181,41 @@ func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt 
 		Args:   args,
 		Path:   path,
 		Method: "enum",
+		Loc:    loc,
+	}}}
+}
+
+func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
+	text := c.text(n)
+	compact := rustCompactText(text)
+	if !strings.HasPrefix(strings.TrimSpace(text), "unsafe impl") {
+		return nil
+	}
+	var trait string
+	for _, name := range []string{"Send", "Sync"} {
+		if strings.Contains(compact, name+"for") || strings.Contains(compact, name+"<") {
+			trait = name
+			break
+		}
+	}
+	if trait == "" {
+		return nil
+	}
+	loc := c.loc(n)
+	tokens := []string{"lang=rust", "kind:unsafe_impl", "trait:" + trait}
+	if strings.Contains(compact, "+"+trait) || strings.Contains(compact, ":"+trait) {
+		tokens = append(tokens, "bound:"+trait)
+	}
+	args := make([]nir.Expr, 0, len(tokens))
+	for _, tok := range tokens {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	path := "analysis.rust.unsafe_impl"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: "unsafe_impl",
 		Loc:    loc,
 	}}}
 }
