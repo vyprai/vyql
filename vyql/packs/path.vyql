@@ -26,3 +26,8 @@ rule ArchiveExtractionTraversal {
   unless sanitized_by core.PathCanonicalization
   unless guarded_by core.PathAccessCheck
 }
+
+rule PackageEntryPointScriptTraversal {
+  meta { id: "VYQL-PATH-005", severity: high, cwe: [CWE_22] }
+  match code.PackageEntryPointScriptWrite as sink
+}

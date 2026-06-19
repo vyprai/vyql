@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, DatabaseRead}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, PackageEntryPointScriptWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, DatabaseRead}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter python {
@@ -102,6 +102,9 @@ adapter python {
   package "pyyaml" {
     sink path "yaml.load" -> Deserialization
     control "yaml.safe_load" -> SafeDeserialization
+  }
+  package "pip" {
+    mark exact "analysis.function.context" val "PipScriptMaker" val "super().make" val "_raise_for_invalid_entrypoint(specification)" nval "self.target_dir" -> PackageEntryPointScriptWrite
   }
   package "pickle" {
     sink path "pickle.loads" -> Deserialization
