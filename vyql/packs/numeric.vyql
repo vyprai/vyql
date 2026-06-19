@@ -15,4 +15,5 @@ rule TaintedDivisionDenominator {
 rule TaintedIntegerSizeArithmetic {
   meta { id: "VYQL-NUM-003", severity: low, cwe: [CWE_190], confidence_floor: low }
   taint core.UserControlledData -> code.IntegerSizeArithmetic
+  unless guarded_by core.IntegerOverflowGuard
 }

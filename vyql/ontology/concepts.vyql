@@ -1054,6 +1054,11 @@ concept ZeroValueExclusion : control {
   cwe: [CWE_415]
   applies: path
 }
+concept IntegerOverflowGuard : control {
+  neutralizes: [memory.IntegerOverflow]
+  cwe: [CWE_190]
+  applies: endpoint
+}
 // Privacy/data-collection opt-in or opt-out controls exposed by SDKs.
 concept DataCollectionControl : control {
   applies: scope

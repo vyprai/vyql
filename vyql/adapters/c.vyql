@@ -103,6 +103,7 @@ adapter c {
   source "__binop.mul" -> code.ComputedSizeValue
   mark "__binop.mul" -> code.IntegerSizeArithmetic
   mark "__binop.shl" -> code.IntegerSizeArithmetic
+  control "analysis.function.context" val "(int)size<0" val "save+size<save" -> core.IntegerOverflowGuard
   control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 
   // TOCTOU / race (CWE-367): check before use on the same CFG path. The rule is

@@ -354,15 +354,51 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1); Cond nil (C did not evaluate the predicate) -> byte-identical.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.cBranch(field(n, "consequence")), Else: c.cBranch(field(n, "alternative"))}}
+		condNode := field(n, "condition")
+		ifn := nir.If{Cond: c.expr(condNode), Then: c.cBranch(field(n, "consequence")), Else: c.cBranch(field(n, "alternative"))}
+		if target, val, ok := c.ccAssignmentExpr(condNode); ok {
+			return []nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}, ifn}
+		}
+		return []nir.Stmt{ifn}
 	case "while_statement", "for_statement", "do_statement":
-		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+		body := c.collectBlocks(n)
+		if target, val, ok := c.ccAssignmentExpr(field(n, "condition")); ok {
+			body = append([]nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}}, body...)
+		}
+		return []nir.Stmt{nir.Loop{Body: body}}
 	case "switch_statement":
 		return []nir.Stmt{c.cSwitch(n)}
 	case "compound_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
+}
+
+func (c *ccConv) ccAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
+	for n != nil && n.Kind() == "parenthesized_expression" {
+		kids := namedChildren(n)
+		if len(kids) != 1 {
+			return "", nil, false
+		}
+		n = kids[0]
+	}
+	if n == nil || n.Kind() != "assignment_expression" {
+		for _, ch := range namedChildren(n) {
+			if target, val, ok := c.ccAssignmentExpr(ch); ok {
+				return target, val, true
+			}
+		}
+		return "", nil, false
+	}
+	left := field(n, "left")
+	if left == nil || left.Kind() != "identifier" {
+		return "", nil, false
+	}
+	right := field(n, "right")
+	if right == nil {
+		return "", nil, false
+	}
+	return c.text(left), c.expr(right), true
 }
 
 // vexingCtorArgs decides whether a function_declarator's parameter_list is really a

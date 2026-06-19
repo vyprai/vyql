@@ -37,3 +37,43 @@ test "numeric: attacker-controlled size arithmetic is reported (c)"
       return n * 1024;
   }
   ```
+
+test "numeric: C assignment in condition reaches later offset arithmetic"
+  lang c
+  expect VYQL-NUM-003
+  code
+  ```
+  int atoi(const char *);
+  void parse_qt(unsigned end);
+  void fseek(void *fp, unsigned off, int whence);
+  void parse(int argc, char **argv, int end, void *fp) {
+      unsigned save, size;
+      save = 10;
+      if ((size = atoi(argv[1])) < 8)
+          return;
+      parse_qt(save + size);
+      fseek(fp, save + size, 0);
+  }
+  ```
+
+test "numeric: C offset overflow guards suppress later arithmetic"
+  lang c
+  reject VYQL-NUM-003
+  code
+  ```
+  int atoi(const char *);
+  void parse_qt(unsigned end);
+  void fseek(void *fp, unsigned off, int whence);
+  void parse(int argc, char **argv, int end, void *fp) {
+      unsigned save, size;
+      save = 10;
+      if ((size = atoi(argv[1])) < 8)
+          return;
+      if ((int)size < 0)
+          return;
+      if (save + size < save)
+          return;
+      parse_qt(save + size);
+      fseek(fp, save + size, 0);
+  }
+  ```
