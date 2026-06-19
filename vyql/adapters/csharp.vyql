@@ -191,6 +191,8 @@ adapter csharp {
   mark "TokenValidationParameters" val "ValidateIssuerSigningKey=false" -> code.JwtUnverified
   mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
   mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
+  mark exact "analysis.function.context" val "lang=csharp" val "name=GetOrAddNode" val "GetOrAddNode(subKey)" nval "MaxStateDepth" -> code.UnboundedStateGrowthReview
+  mark exact "analysis.function.context" val "lang=csharp" val "name=GetValidity" val "GetValidity(node.ChildNodes[i])" nval "MaxValidationDepth" -> code.UnboundedStateGrowthReview
   mark "File.Open" -> code.ResourceHandle
   mark "File.OpenRead" -> code.ResourceHandle
   mark "TcpClient" -> code.ResourceHandle

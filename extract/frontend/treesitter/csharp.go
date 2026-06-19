@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tscs "github.com/tree-sitter/tree-sitter-c-sharp/bindings/go"
 
@@ -99,6 +101,7 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
+		body = append(body, c.csFunctionContext(n)...)
 		methodTokens := append([]string{}, c.classParamTokens...)
 		methodTokens = append(methodTokens, c.csAttributeTokens(n, "method_attribute:")...)
 		if n.Kind() == "method_declaration" && len(c.propertyEntryInfo) > 0 {
@@ -284,6 +287,33 @@ func (c *csConv) csAnalysisCall(path, loc string, tokens []string) nir.Expr {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return nir.Call{Callee: nir.Name{ID: path, Loc: loc}, Args: args, Path: path, Method: "entry", Loc: loc}
+}
+
+func (c *csConv) csFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	loc := c.loc(fn)
+	text := c.text(body)
+	path := "analysis.function.context"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=csharp"},
+			nir.Const{Loc: loc, Value: "name=" + c.text(field(fn, "name"))},
+			nir.Const{Loc: loc, Value: "function_name:" + c.text(field(fn, "name"))},
+			nir.Const{Loc: loc, Value: text},
+			nir.Const{Loc: loc, Value: csCompactText(text)},
+		},
+		Path:   path,
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func csCompactText(s string) string {
+	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
 }
 
 func (c *csConv) declaratorValue(d *tree_sitter.Node) *tree_sitter.Node {
