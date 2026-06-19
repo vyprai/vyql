@@ -178,6 +178,16 @@ concept CryptoOperation : sink {
   cwe: [CWE_327]
 }
 
+concept AuthenticatedDecryptionTagReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+  cwe: [CWE_287, CWE_347]
+  review_category: "crypto"
+  review_condition: "authenticated decryption accepts a decoded authentication tag without an observed fixed-length check"
+  review_evidence: "decryption context {pattern} passes a decoded tag into an authenticated cipher"
+  review_assumption: "the encrypted payload or authentication tag can be supplied or replayed by an attacker"
+  review_confidence: medium
+}
+
 concept SessionId : sink {
   vulnerable_to: [session.SessionFixation]
   enabled_by: [taint.UntrustedData]

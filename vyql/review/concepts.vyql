@@ -176,6 +176,11 @@ review code.CryptoOperation {
   expected: [core.CertificateValidation, core.EncryptionAtRest, core.EncryptionInTransit]
   text: "verify algorithm choice, key/IV handling, and signature or certificate checks"
 }
+review code.AuthenticatedDecryptionTagReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review authenticated decryption tag validation for fixed length and fail-closed behavior"
+}
 review code.ExternalResourceIntegrityReview {
   category: "supply_chain"
   kind: "attention"

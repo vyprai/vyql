@@ -261,6 +261,7 @@ adapter php {
   mark "openssl_encrypt" val "rc2" -> code.WeakCipher
   mark "openssl_encrypt" val "bf-" -> code.WeakCipher
   mark "openssl_encrypt" val "ecb" -> code.WeakCipher
+  mark exact "analysis.function.context" val "lang=php" val "openssl_decrypt" val "VAL_CRYPTO_ALGO" val "base64_decode" val "['tag']" nval "strlen($tag)" -> code.AuthenticatedDecryptionTagReview
   mark "mcrypt_encrypt" val "des" -> code.WeakCipher
   mark "mcrypt_encrypt" val "rc4" -> code.WeakCipher
   mark "openssl_encrypt" val "0000000000000000" -> code.StaticIv
