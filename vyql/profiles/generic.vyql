@@ -4,6 +4,7 @@
 // profile; browser/mobile entry points are likewise scoped to their own profiles.
 profile generic {
   title: "Generic application (no archetype detected)"
+  priority: "0"
   entrypoints: [HttpInput, HttpHeader, HttpRequest, Cookie, FileUpload, SecretValue,
                 DatabaseRead, ExternalApiResponse, MessageInput, IntentInput, PasteboardInput,
                 CliArgument, EnvVariable, StdinInput, ConfigFileInput]

@@ -3,6 +3,7 @@
 // INPUT (or a higher-privilege context invoking the tool). Browser/HTTP threats N/A.
 profile cli {
   title: "Command-line tool"
+  priority: "20"
   detect: ["dep:cobra", "dep:click", "dep:argparse", "dep:clap", "dep:commander",
            "dep:yargs", "dep:picocli", "dep:thor"]
   entrypoints: [CliArgument, EnvVariable, StdinInput, ConfigFileInput,

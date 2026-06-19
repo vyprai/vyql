@@ -3,6 +3,7 @@
 // JavaScript reads back from data-* attributes. Classic injection/XSS/CSRF/SSRF surface.
 profile web {
   title: "Server-rendered web application"
+  priority: "80"
   detect: ["dep:flask", "dep:django", "dep:rails", "dep:express", "dep:laravel",
            "dep:spring-boot-starter-web", "file:config/routes.rb"]
   entrypoints: [HttpInput, HttpHeader, Cookie, FileUpload, SecretValue, DatabaseRead, DomInput]

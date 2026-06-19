@@ -379,7 +379,7 @@ adapter python {
   // the response BODY reflected to the browser (Flask make_response / Response / HttpResponse).
   // and the synthetic http_response wrapping a route handler's return value).
   sink path "make_response" -> code.HtmlRender
-  sink path "Response" nval "text/plain" -> code.HtmlRender
+  sink path "Response" nval "text/plain" nval "application/json" -> code.HtmlRender
   sink path "HttpResponse" -> code.HtmlRender
   sink path "Markup" -> code.HtmlRender
   sink path "markupsafe.Markup" -> code.HtmlRender

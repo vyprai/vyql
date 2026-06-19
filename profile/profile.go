@@ -19,6 +19,7 @@ import (
 type Profile struct {
 	Name        string
 	Title       string
+	Priority    int      // tie-breaker when profiles have the same detection score
 	Detect      []string // fingerprints: "dep:x" | "file:rel" | "ext:.x"
 	Entrypoints []string // active source concept short names ("DomInput"); empty = all
 }
@@ -71,6 +72,7 @@ func Load() ([]Profile, error) {
 			out = append(out, Profile{
 				Name:        pd.Name,
 				Title:       str(pd.Fields["title"]),
+				Priority:    intField(pd.Fields["priority"]),
 				Detect:      list(pd.Fields["detect"]),
 				Entrypoints: list(pd.Fields["entrypoints"]),
 			})
@@ -90,7 +92,8 @@ func ByName(profiles []Profile, name string) (Profile, bool) {
 }
 
 // Detect picks the best-matching profile for a project rooted at the given paths,
-// by counting fingerprint hits; ties break by the order profiles are listed.
+// by counting fingerprint hits; ties use the data-defined profile priority, then
+// the order profiles are listed.
 // Returns the generic profile when nothing matches.
 func Detect(paths []string, profiles []Profile) Profile {
 	manifests := readManifests(paths)
@@ -129,7 +132,7 @@ func Detect(paths []string, profiles []Profile) Profile {
 				}
 			}
 		}
-		if score > bestScore {
+		if score > bestScore || (score == bestScore && score > 0 && p.Priority > best.Priority) {
 			best, bestScore = p, score
 		}
 	}
@@ -256,7 +259,8 @@ func npmPublishable(paths []string) bool {
 // scanned roots, so "dep:x" fingerprints can substring-match a declared dep.
 func readManifests(paths []string) string {
 	names := []string{"package.json", "requirements.txt", "pyproject.toml", "go.mod",
-		"Gemfile", "Gemfile.lock", "pom.xml", "build.gradle", "Cargo.toml", "composer.json"}
+		"Pipfile", "Pipfile.lock", "poetry.lock", "Gemfile", "Gemfile.lock", "pom.xml",
+		"build.gradle", "Cargo.toml", "composer.json"}
 	var b strings.Builder
 	for _, root := range roots(paths) {
 		for _, n := range names {
@@ -306,6 +310,21 @@ func roots(paths []string) []string {
 func str(v any) string {
 	s, _ := v.(string)
 	return s
+}
+
+func intField(v any) int {
+	s := strings.TrimSpace(str(v))
+	if s == "" {
+		return 0
+	}
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n
 }
 
 func list(v any) []string {

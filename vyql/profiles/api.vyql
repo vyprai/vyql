@@ -3,6 +3,7 @@
 // SSRF, deserialization, and JWT handling.
 profile api {
   title: "HTTP API server"
+  priority: "80"
   detect: ["dep:fastapi", "dep:@nestjs/core", "dep:gin-gonic/gin", "dep:express",
            "dep:grpc", "file:openapi.yaml", "file:openapi.json",
            // Go HTTP routers/servers — a service exposing these has an HTTP attack

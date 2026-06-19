@@ -726,6 +726,38 @@ test "python: Flask text/plain Response route return is clean"
       return Response(value, mimetype="text/plain")
   ```
 
+test "python: Flask JSON Response without JSON mimetype can reflect route params as XSS"
+  lang python
+  profile web
+  expect VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, Response
+  import json
+
+  app = Flask(__name__)
+
+  @app.route("/api/preferences/set/<key>/<value>")
+  def pref_set(key, value):
+      return Response(json.dumps({"key": key, "success": ""})), 201
+  ```
+
+test "python: Flask JSON Response with JSON mimetype is clean"
+  lang python
+  profile web
+  reject VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, Response
+  import json
+
+  app = Flask(__name__)
+
+  @app.route("/api/preferences/set/<key>/<value>")
+  def pref_set(key, value):
+      return Response(json.dumps({"key": key, "success": ""}), mimetype="application/json"), 201
+  ```
+
 test "javascript: generate-function builder receives tainted source"
   lang javascript
   profile library
