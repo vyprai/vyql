@@ -437,11 +437,14 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 					continue
 				}
 				pattern, repl := n.Prop("lit0"), n.Prop("lit1")
-				alphabet, bounded := outputAlphabet(pattern, repl, global)
+				alphabet, bounded, removed := replaceCharEffects(pattern, repl, global)
 				detail := map[string]string{"bounded": "false", "pattern": pattern}
 				if bounded {
 					detail["bounded"] = "true"
 					detail["alphabet"] = alphabet
+				}
+				if removed != "" {
+					detail["removed"] = removed
 				}
 				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Detail: detail})
 			}

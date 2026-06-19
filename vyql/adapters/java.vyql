@@ -387,17 +387,17 @@ adapter java {
 
   // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
   // are a LogOutput sink (user data → log injection) AND a LogWrite mark (secret → leak).
-  sink path "logger.info" -> code.LogOutput
-  sink path "logger.warn" -> code.LogOutput
-  sink path "logger.error" -> code.LogOutput
-  sink path "logger.debug" -> code.LogOutput
-  sink path "log.info" -> code.LogOutput
-  sink path "log.warn" -> code.LogOutput
-  sink path "log.error" -> code.LogOutput
-  sink path "log.debug" -> code.LogOutput
-  sink path "LOG.info" -> code.LogOutput
-  sink path "LOG.error" -> code.LogOutput
-  sink path "System.out.println" -> code.LogOutput
+  sink path "logger.info" arg all -> code.LogOutput
+  sink path "logger.warn" arg all -> code.LogOutput
+  sink path "logger.error" arg all -> code.LogOutput
+  sink path "logger.debug" arg all -> code.LogOutput
+  sink path "log.info" arg all -> code.LogOutput
+  sink path "log.warn" arg all -> code.LogOutput
+  sink path "log.error" arg all -> code.LogOutput
+  sink path "log.debug" arg all -> code.LogOutput
+  sink path "LOG.info" arg all -> code.LogOutput
+  sink path "LOG.error" arg all -> code.LogOutput
+  sink path "System.out.println" arg all -> code.LogOutput
   mark "logger.info" -> code.LogWrite
   mark "logger.warn" -> code.LogWrite
   mark "logger.error" -> code.LogWrite

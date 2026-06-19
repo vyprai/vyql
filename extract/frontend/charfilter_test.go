@@ -1,6 +1,9 @@
 package frontend
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestOutputAlphabet(t *testing.T) {
 	cases := []struct {
@@ -36,5 +39,23 @@ func TestOutputAlphabet(t *testing.T) {
 				t.Errorf("excludesMarkupChars=%v want %v (alpha=%q)", got, c.excludesMarkupChars, alpha)
 			}
 		})
+	}
+}
+
+func TestReplaceCharEffectsRemovedCharacters(t *testing.T) {
+	_, bounded, removed := replaceCharEffects(`[^\n\r]`, "_", true)
+	if !bounded {
+		t.Fatalf("negated class should still produce a bounded alphabet")
+	}
+	_, bounded, removed = replaceCharEffects(`[\n\r]`, "_", true)
+	if bounded {
+		t.Fatalf("positive class replacement is not a bounded alphabet proof")
+	}
+	if !strings.ContainsRune(removed, '\n') || !strings.ContainsRune(removed, '\r') {
+		t.Fatalf("removed=%q, want newline and carriage return", removed)
+	}
+	_, _, removed = replaceCharEffects(`[\n\r]`, `\n`, true)
+	if strings.ContainsRune(removed, '\n') {
+		t.Fatalf("replacement reintroduces newline, removed=%q", removed)
 	}
 }

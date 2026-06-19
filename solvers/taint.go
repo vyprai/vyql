@@ -33,6 +33,15 @@ func excludesAll(alphabet, excluded string) bool {
 	return true
 }
 
+func coversAll(chars, excluded string) bool {
+	for _, d := range excluded {
+		if !strings.ContainsRune(chars, d) {
+			return false
+		}
+	}
+	return true
+}
+
 func firstKey(m map[string]bool) string {
 	for k := range m {
 		return k
@@ -114,10 +123,15 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 				killMemo[id], killConcept[id] = 1, l.Concept
 				return true, l.Concept
 			}
-			if charFilters[l.Concept] && excluded != "" &&
-				l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
-				killMemo[id], killConcept[id] = 1, l.Concept
-				return true, l.Concept
+			if charFilters[l.Concept] && excluded != "" {
+				if l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
+					killMemo[id], killConcept[id] = 1, l.Concept
+					return true, l.Concept
+				}
+				if removed := l.Detail["removed"]; removed != "" && coversAll(removed, excluded) {
+					killMemo[id], killConcept[id] = 1, l.Concept
+					return true, l.Concept
+				}
 			}
 		}
 		killMemo[id] = 2
@@ -256,11 +270,17 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 				killConcept[i] = l.Concept
 				return true, l.Concept
 			}
-			if charFilters[l.Concept] && excluded != "" &&
-				l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
-				killMemo[i] = 1
-				killConcept[i] = l.Concept
-				return true, l.Concept
+			if charFilters[l.Concept] && excluded != "" {
+				if l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
+					killMemo[i] = 1
+					killConcept[i] = l.Concept
+					return true, l.Concept
+				}
+				if removed := l.Detail["removed"]; removed != "" && coversAll(removed, excluded) {
+					killMemo[i] = 1
+					killConcept[i] = l.Concept
+					return true, l.Concept
+				}
 			}
 		}
 		killMemo[i] = 2

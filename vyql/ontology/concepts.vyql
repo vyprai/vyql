@@ -726,6 +726,7 @@ concept LogOutput : sink {
   vulnerable_to: [injection.LogInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_117]
+  excluded_chars: "\n\r"
   possibility: exclude
 }
 concept LogWrite : sink {

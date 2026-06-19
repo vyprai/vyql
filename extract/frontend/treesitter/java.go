@@ -123,7 +123,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "class_declaration", "interface_declaration", "enum_declaration", "record_declaration":
 		prev := c.classParamTokens
 		c.classParamTokens = append(append([]string{}, prev...), c.jvAnnotationTokens(n, "class_annotation:")...)
-		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}
+		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L, Bases: c.jvClassBases(n)}
 		c.classParamTokens = prev
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration":
@@ -358,6 +358,50 @@ func (c *jvConv) paramTypes(params *tree_sitter.Node) map[string]string {
 		}
 	}
 	return out
+}
+
+func (c *jvConv) jvClassBases(n *tree_sitter.Node) []string {
+	var out []string
+	add := func(base string) {
+		base = javaBaseTypeName(base)
+		if base == "" {
+			return
+		}
+		for _, seen := range out {
+			if seen == base {
+				return
+			}
+		}
+		out = append(out, base)
+	}
+	var walkTypes func(*tree_sitter.Node)
+	walkTypes = func(m *tree_sitter.Node) {
+		if m == nil {
+			return
+		}
+		switch m.Kind() {
+		case "type_identifier", "scoped_type_identifier", "generic_type":
+			add(c.text(m))
+			return
+		}
+		for _, ch := range namedChildren(m) {
+			walkTypes(ch)
+		}
+	}
+	walkTypes(field(n, "superclass"))
+	walkTypes(field(n, "interfaces"))
+	return out
+}
+
+func javaBaseTypeName(s string) string {
+	if i := strings.IndexByte(s, '<'); i >= 0 {
+		s = s[:i]
+	}
+	s = strings.TrimSpace(s)
+	if i := strings.LastIndexByte(s, '.'); i >= 0 {
+		s = s[i+1:]
+	}
+	return s
 }
 
 // jvAnnotationTokens extracts syntax-level annotation names without interpreting

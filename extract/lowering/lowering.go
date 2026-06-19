@@ -55,10 +55,10 @@ type lowerer struct {
 	importTables  map[string]map[string]importEntry
 	moduleGlobals map[string]map[string]string // JS/TS module-level binding name -> stable slot node
 
-	// inheritance-aware implicit-`this` member resolution (populated by frontends that set
-	// ClassDef.Members/Bases — currently C#). directMembers: "modkey::Class" -> declared member
-	// set; classBaseNames: "modkey::Class" -> base SHORT names; membersOfShort: short class name
-	// -> union of declared members (for resolving inherited members by name across files).
+	// inheritance-aware dispatch and implicit-`this` member resolution (populated by frontends
+	// that set ClassDef.Bases/Members). directMembers: "modkey::Class" -> declared member set;
+	// classBaseNames: "modkey::Class" -> base SHORT names; membersOfShort: short class name ->
+	// union of declared members (for resolving inherited members by name across files).
 	directMembers  map[string]map[string]bool
 	classBaseNames map[string][]string
 	membersOfShort map[string]map[string]bool
@@ -2357,6 +2357,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for i, a := range call.Args {
 		var toks []string
 		collectValTokens(a, "", &toks)
+		if sv, ok := l.constStrVal(a, sc); ok {
+			toks = append([]string{sv}, toks...)
+		}
 		if len(toks) > 0 {
 			props["lit"+strconv.Itoa(i)] = toks[0]
 		}
@@ -2587,6 +2590,9 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 			return nil
 		}
 		obj, attr := base.ID, c.Attr
+		if obj == "super" && l.curClass != "" {
+			return l.resolveBaseMethods(l.curModule, l.curClass, attr)
+		}
 		if imp, ok := imports[obj]; ok && imp.kind == "mod" { // module.func
 			if f := l.funcQual[imp.module+"::"+attr]; f != nil {
 				return []*funcInfo{f}
@@ -2620,6 +2626,34 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		}
 	}
 	return nil
+}
+
+func (l *lowerer) resolveBaseMethods(modkey, class, method string) []*funcInfo {
+	bases := l.classBaseNames[modkey+"::"+class]
+	if len(bases) == 0 {
+		return nil
+	}
+	var out []*funcInfo
+	seen := map[*funcInfo]bool{}
+	add := func(fi *funcInfo) {
+		if fi == nil || fi.abstract || seen[fi] {
+			return
+		}
+		seen[fi] = true
+		out = append(out, fi)
+	}
+	for _, base := range bases {
+		if f := l.funcQual[modkey+"::"+base+"."+method]; f != nil {
+			add(f)
+			continue
+		}
+		if mods := l.classDefs[base]; len(mods) == 1 {
+			for bm := range mods {
+				add(l.funcQual[bm+"::"+base+"."+method])
+			}
+		}
+	}
+	return out
 }
 
 // classModule returns the module key a class name resolves to (ok=false if it

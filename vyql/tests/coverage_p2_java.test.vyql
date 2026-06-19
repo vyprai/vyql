@@ -43,3 +43,86 @@ test "java: Micronaut @Get handler param -> command injection"
     }
   }
   ```
+
+test "java: JAX-RS array handler param through loop -> logger.warn is log injection"
+  lang java
+  expect VYQL-INJ-009
+  code
+  ```
+  @Path("/broadcasts")
+  class BroadcastRestService {
+    @DELETE
+    @Path("/bulk")
+    public Result deleteBroadcasts(String[] streamIds) {
+      for (String id : streamIds) {
+        logger.warn("It cannot delete {} and breaking the loop", id);
+      }
+      return new Result(false);
+    }
+  }
+  ```
+
+test "java: JAX-RS array handler param through superclass loop -> logger.warn is log injection"
+  lang java
+  expect VYQL-INJ-009
+  code
+  ```
+  @Path("/broadcasts")
+  class BroadcastRestService extends RestServiceBase {
+    @DELETE
+    @Path("/bulk")
+    public Result deleteBroadcasts(String[] streamIds) {
+      return super.deleteBroadcasts(streamIds);
+    }
+  }
+
+  class RestServiceBase {
+    protected Result deleteBroadcasts(String[] streamIds) {
+      Result result = new Result(false);
+      if (streamIds != null) {
+        for (String id : streamIds) {
+          result = deleteBroadcast(id);
+          if (!result.isSuccess()) {
+            logger.warn("It cannot delete {} and breaking the loop", id);
+            break;
+          }
+        }
+      }
+      return result;
+    }
+  }
+  ```
+
+test "java: JAX-RS array handler param stripped of newlines before logger.warn is clean"
+  lang java
+  reject VYQL-INJ-009
+  code
+  ```
+  @Path("/broadcasts")
+  class BroadcastRestService extends RestServiceBase {
+    @DELETE
+    @Path("/bulk")
+    public Result deleteBroadcasts(String[] streamIds) {
+      return super.deleteBroadcasts(streamIds);
+    }
+  }
+
+  class RestServiceBase {
+    private static final String REPLACE_CHARS_FOR_SECURITY = "[\n\r]";
+
+    protected Result deleteBroadcasts(String[] streamIds) {
+      Result result = new Result(false);
+      if (streamIds != null) {
+        for (String id : streamIds) {
+          result = deleteBroadcast(id);
+          if (!result.isSuccess()) {
+            id = id.replaceAll(REPLACE_CHARS_FOR_SECURITY, "_");
+            logger.warn("It cannot delete {} and breaking the loop", id);
+            break;
+          }
+        }
+      }
+      return result;
+    }
+  }
+  ```
