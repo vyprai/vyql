@@ -53,6 +53,11 @@ rule PotentialFfiEnumLayoutRisk {
   match code.FfiEnumLayoutRisk as e
 }
 
+rule PotentialUninitializedBufferExposure {
+  meta { id: "VYQL-MEM-015", severity: medium, cwe: [CWE_908], confidence_floor: medium }
+  match code.UninitializedBufferExposure as b
+}
+
 rule PotentialFieldDerivedIndexAccess {
   meta { id: "VYQL-MEM-010", severity: medium, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: low }
   match code.FieldDerivedIndexAccess as idx

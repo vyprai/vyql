@@ -82,6 +82,7 @@ threat NullDereference { cwe: [CWE_476], desc: "NULL pointer dereference" }
 threat OobRead { cwe: [CWE_125], desc: "Out-of-bounds read" }
 threat OobWrite { cwe: [CWE_787], desc: "Out-of-bounds write (buffer overflow)" }
 threat TypeConfusion { cwe: [CWE_843], desc: "Type confusion" }
+threat UninitializedUse { cwe: [CWE_908], desc: "Use of uninitialized resource" }
 threat UseAfterFree { cwe: [CWE_416], desc: "Use after free" }
 
 module numeric;

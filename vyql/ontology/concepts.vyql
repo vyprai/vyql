@@ -389,6 +389,15 @@ concept FfiEnumLayoutRisk : sink {
   review_assumption: "the foreign ABI expects a fixed-width integer representation"
   review_confidence: low
 }
+concept UninitializedBufferExposure : sink {
+  vulnerable_to: [memory.UninitializedUse]
+  cwe: [CWE_908]
+  review_category: "memory"
+  review_condition: "a buffer with reserved capacity is exposed as initialized mutable storage"
+  review_evidence: "uninitialized buffer lifecycle {pattern} is present"
+  review_assumption: "the callee can observe or depend on bytes before they are initialized"
+  review_confidence: medium
+}
 concept FailurePathOwnedBufferFree : sink {
   vulnerable_to: [memory.DoubleFree]
   cwe: [CWE_415]

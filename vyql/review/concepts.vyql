@@ -247,6 +247,11 @@ review code.FfiEnumLayoutRisk {
   kind: "attention"
   text: "review FFI enum representation and whether the foreign ABI expects a fixed integer width"
 }
+review code.UninitializedBufferExposure {
+  category: "memory"
+  kind: "attention"
+  text: "review reserved-capacity buffer exposure and whether every byte is initialized before the callee can observe it"
+}
 review code.SizeComputation {
   category: "memory"
   kind: "attention"
