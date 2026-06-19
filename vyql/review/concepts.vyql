@@ -78,6 +78,12 @@ review code.AccessPolicyReview {
   expected: [core.AuthorizationCheck]
   text: "review role or group policy configuration for overly broad access"
 }
+review code.RequestScopePolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review request/resource scope consistency before dispatching the resource handler"
+}
 review code.WorkflowPolicyReview {
   category: "auth"
   kind: "attention"

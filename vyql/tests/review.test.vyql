@@ -274,6 +274,99 @@ test "review: go previous-state protocol check is surfaced"
   }
   ```
 
+test "review: go request-resource scope mismatch check is surfaced"
+  lang go
+  expect_review code.RequestScopePolicyReview
+  code
+  ```
+  package main
+  import "net/http"
+  type RequestInfo struct {
+    APIGroup string
+    Resource string
+    Namespace string
+    Verb string
+  }
+  var apirequest = struct {
+    RequestInfoFrom func(any) (*RequestInfo, bool)
+  }{}
+  var apiextensions = struct {
+    HasServedCRDVersion func(*CRD, string) bool
+  }{}
+  type CRD struct {
+    Spec struct { Scope string }
+  }
+  type Lister struct{}
+  func (l Lister) Get(name string) (*CRD, error) { return nil, nil }
+  type Handler struct { crdLister Lister }
+  func (r *Handler) serveResource(w http.ResponseWriter, req *http.Request, crd *CRD) {}
+  func (r *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+    requestInfo, _ := apirequest.RequestInfoFrom(req.Context())
+    crdName := requestInfo.Resource + "." + requestInfo.APIGroup
+    crd, _ := r.crdLister.Get(crdName)
+    if !apiextensions.HasServedCRDVersion(crd, "v1") {
+      return
+    }
+    r.serveResource(w, req, crd)
+  }
+  ```
+
+test "review: go request-resource scope mismatch guard is clean"
+  lang go
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  package main
+  import "net/http"
+  type RequestInfo struct {
+    APIGroup string
+    Resource string
+    Namespace string
+    Verb string
+  }
+  var apirequest = struct {
+    RequestInfoFrom func(any) (*RequestInfo, bool)
+  }{}
+  var apiextensions = struct {
+    HasServedCRDVersion func(*CRD, string) bool
+    NamespaceScoped string
+  }{}
+  var possiblyAcrossAllNamespacesVerbs = struct {
+    Has func(string) bool
+  }{}
+  type CRD struct {
+    Spec struct { Scope string }
+  }
+  type Lister struct{}
+  func (l Lister) Get(name string) (*CRD, error) { return nil, nil }
+  type Delegate struct{}
+  func (d Delegate) ServeHTTP(w http.ResponseWriter, req *http.Request) {}
+  type Handler struct {
+    crdLister Lister
+    delegate Delegate
+  }
+  func (r *Handler) serveResource(w http.ResponseWriter, req *http.Request, crd *CRD) {}
+  func (r *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+    requestInfo, _ := apirequest.RequestInfoFrom(req.Context())
+    crdName := requestInfo.Resource + "." + requestInfo.APIGroup
+    crd, _ := r.crdLister.Get(crdName)
+    namespacedCRD := crd.Spec.Scope == apiextensions.NamespaceScoped
+    namespacedReq := len(requestInfo.Namespace) > 0
+    if !namespacedCRD && namespacedReq {
+      r.delegate.ServeHTTP(w, req)
+      return
+    }
+    if namespacedCRD && !namespacedReq && !possiblyAcrossAllNamespacesVerbs.Has(requestInfo.Verb) {
+      r.delegate.ServeHTTP(w, req)
+      return
+    }
+    if !apiextensions.HasServedCRDVersion(crd, "v1") {
+      return
+    }
+    r.serveResource(w, req, crd)
+  }
+  ```
+
 test "review: incomplete scala csrf token validation is surfaced"
   lang scala
   expect_review code.IncompleteCsrfTokenValidation

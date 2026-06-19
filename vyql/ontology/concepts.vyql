@@ -538,6 +538,18 @@ concept AccessPolicyReview : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_863]
 }
+// Review-only: a handler resolves request metadata and resource metadata but does
+// not show a consistency check between request scope and resource scope. Used for
+// authz CVEs where the policy boundary is the request/resource scope contract.
+concept RequestScopePolicyReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_863]
+  review_category: "auth"
+  review_condition: "request metadata and resource metadata are used without an observed request/resource scope consistency check"
+  review_evidence: "handler context {pattern} resolves request and resource metadata without a scope comparison"
+  review_assumption: "the request may be authorized or dispatched under the wrong resource scope"
+  review_confidence: possibility
+}
 // Review-only: business workflow/status policy that guards a protected action (for
 // example payment state before a digital download). Inert for confirmed scan rules.
 concept WorkflowPolicyReview : sink {

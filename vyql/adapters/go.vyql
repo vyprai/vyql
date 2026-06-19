@@ -244,6 +244,10 @@ adapter go {
   // Review-only: protocol handlers that compare an incoming previous-state pointer
   // against the last stored state need manual review for stale or forked-chain cases.
   mark exact "analysis.function.context" val "PrevATXID" val "call:GetLastIDByNodeID" -> code.ProtocolStateReview
+  // Review-only: request handlers that derive request metadata, load resource metadata,
+  // then dispatch a resource handler need a visible request/resource scope consistency
+  // check before dispatch.
+  mark exact "analysis.function.context" val "function_name:ServeHTTP" val "call:RequestInfoFrom" val "call:Get" val "call:serveResource" nval "selector:apiextensions.NamespaceScoped" -> code.RequestScopePolicyReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission
