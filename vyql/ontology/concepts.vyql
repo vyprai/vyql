@@ -78,6 +78,16 @@ concept CommandOptionInjection : sink {
   cwe: [CWE_74, CWE_88]
 }
 
+concept CommandLineAssemblyReview : sink {
+  vulnerable_to: [injection.CommandInjection, injection.ArgumentInjection, injection.UnsafeDynamicLoading]
+  cwe: [CWE_77, CWE_88, CWE_829]
+  review_category: "command"
+  review_condition: "command line text is assembled from contextual values without observed shell quoting"
+  review_evidence: "command-line assembly context {pattern} appends a placeholder value before process/application launch"
+  review_assumption: "the appended value can be influenced through a document, URI, desktop action, or caller-controlled parameter"
+  review_confidence: medium
+}
+
 concept FormatString : sink {
   vulnerable_to: [injection.FormatString]
   enabled_by: [taint.UntrustedData]

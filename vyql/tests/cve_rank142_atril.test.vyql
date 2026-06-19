@@ -1,0 +1,73 @@
+# Rank 142 / CVE-2026-46529: Atril appended document-controlled destination
+# and search strings into a GLib command line before application launch.
+
+test "rank142: c glib command line assembly with unquoted placeholders requires review"
+  lang c
+  expect_review code.CommandLineAssemblyReview
+  code
+  ```
+  #include <glib.h>
+
+  typedef struct _EvLinkDest EvLinkDest;
+  typedef int EvWindowRunMode;
+  const char *ev_link_dest_get_page_label(EvLinkDest *dest);
+  const char *ev_link_dest_get_named_dest(EvLinkDest *dest);
+
+  static void ev_spawn(const char *uri,
+                       EvLinkDest *dest,
+                       EvWindowRunMode mode,
+                       const char *search_string) {
+    GString *cmd = g_string_new(NULL);
+    char *cmdline;
+
+    g_string_append_printf(cmd, " --page-label=%s",
+                           ev_link_dest_get_page_label(dest));
+    g_string_append_printf(cmd, " --named-dest=%s",
+                           ev_link_dest_get_named_dest(dest));
+    if (search_string) {
+      g_string_append_printf(cmd, " --find=%s", search_string);
+    }
+
+    cmdline = g_string_free(cmd, FALSE);
+    g_app_info_create_from_commandline(cmdline, NULL, 0, NULL);
+  }
+  ```
+
+test "rank142: c glib command line assembly with shell quoting is clean"
+  lang c
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  #include <glib.h>
+
+  typedef struct _EvLinkDest EvLinkDest;
+  typedef int EvWindowRunMode;
+  const char *ev_link_dest_get_page_label(EvLinkDest *dest);
+  const char *ev_link_dest_get_named_dest(EvLinkDest *dest);
+
+  static void ev_spawn(const char *uri,
+                       EvLinkDest *dest,
+                       EvWindowRunMode mode,
+                       const char *search_string) {
+    GString *cmd = g_string_new(NULL);
+    char *cmdline;
+    char *quoted;
+
+    quoted = g_shell_quote(ev_link_dest_get_page_label(dest));
+    g_string_append_printf(cmd, " --page-label=%s", quoted);
+    g_free(quoted);
+
+    quoted = g_shell_quote(ev_link_dest_get_named_dest(dest));
+    g_string_append_printf(cmd, " --named-dest=%s", quoted);
+    g_free(quoted);
+
+    if (search_string) {
+      quoted = g_shell_quote(search_string);
+      g_string_append_printf(cmd, " --find=%s", quoted);
+      g_free(quoted);
+    }
+
+    cmdline = g_string_free(cmd, FALSE);
+    g_app_info_create_from_commandline(cmdline, NULL, 0, NULL);
+  }
+  ```

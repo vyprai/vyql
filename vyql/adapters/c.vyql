@@ -25,6 +25,7 @@ adapter c {
   sink path "g_spawn_command_line_sync" -> code.CommandExecution
   sink path "g_spawn_command_line_async" -> code.CommandExecution
   sink path "g_app_info_create_from_commandline" -> code.CommandExecution
+  mark exact "analysis.function.context" val "g_app_info_create_from_commandline(cmdline" val "g_string_append_printf(cmd,\"--find=%s\",search_string)" nval "g_shell_quote" -> code.CommandLineAssemblyReview
 
   // SQL (procedural — the query is arg1)
   sink path "mysql_query" arg 1 -> code.SqlExecution
