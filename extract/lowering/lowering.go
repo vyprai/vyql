@@ -1635,6 +1635,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		elseB := cloneStrMap(sc.node)
 		sc.node = before
 		l.mergeBindings(sc, before, []map[string]string{thenB, elseB})
+		if name, ok := zeroExitGuardName(st.Cond, st.Then, st.Else); ok {
+			if observed := before[name]; observed != "" {
+				sc.node[name] = l.guardObservation("analysis.guard.value_exclusion", "value_exclusion", observed, "", "value=0")
+				delete(sc.cnst, name)
+			}
+		}
 	case nir.Loop:
 		l.eval(st.Cond, sc)
 		before := cloneStrMap(sc.node)
@@ -1924,6 +1930,80 @@ func unaryMethod(op string) string {
 func isMissingTernaryArm(e nir.Expr) bool {
 	c, ok := e.(nir.Const)
 	return ok && c.Loc == "?:0" && c.Value == ""
+}
+
+func zeroExitGuardName(cond nir.Expr, thenStmts, elseStmts []nir.Stmt) (string, bool) {
+	name, zeroOnThen, ok := zeroComparisonName(cond)
+	if !ok {
+		return "", false
+	}
+	if zeroOnThen && branchDefinitelyExits(thenStmts) {
+		return name, true
+	}
+	if !zeroOnThen && branchDefinitelyExits(elseStmts) {
+		return name, true
+	}
+	return "", false
+}
+
+func zeroComparisonName(cond nir.Expr) (name string, zeroOnThen bool, ok bool) {
+	b, ok := peelThru(cond).(nir.BinOp)
+	if !ok {
+		return "", false, false
+	}
+	switch b.Op {
+	case "==":
+		name, ok = nameComparedToConst(b.Left, b.Right, "0")
+		return name, true, ok
+	case "!=":
+		name, ok = nameComparedToConst(b.Left, b.Right, "0")
+		return name, false, ok
+	}
+	return "", false, false
+}
+
+func nameComparedToConst(a, b nir.Expr, value string) (string, bool) {
+	if n, ok := peelThru(a).(nir.Name); ok && isConstValue(b, value) {
+		return n.ID, true
+	}
+	if n, ok := peelThru(b).(nir.Name); ok && isConstValue(a, value) {
+		return n.ID, true
+	}
+	return "", false
+}
+
+func isConstValue(e nir.Expr, value string) bool {
+	c, ok := peelThru(e).(nir.Const)
+	return ok && unquoteLit(c.Value) == value
+}
+
+func peelThru(e nir.Expr) nir.Expr {
+	for {
+		t, ok := e.(nir.Thru)
+		if !ok {
+			return e
+		}
+		e = t.Inner
+	}
+}
+
+func branchDefinitelyExits(stmts []nir.Stmt) bool {
+	if len(stmts) == 0 {
+		return false
+	}
+	for i := len(stmts) - 1; i >= 0; i-- {
+		switch st := stmts[i].(type) {
+		case nir.Return:
+			return true
+		case nir.Block:
+			if branchDefinitelyExits(st.Stmts) {
+				return true
+			}
+		case nir.If:
+			return branchDefinitelyExits(st.Then) && branchDefinitelyExits(st.Else)
+		}
+	}
+	return false
 }
 
 // allowlistMembershipVar recognizes a constant-set membership test — `["a","b"].includes(x)`,

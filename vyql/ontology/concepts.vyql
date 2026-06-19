@@ -308,6 +308,9 @@ concept FailurePathOwnedBufferFree : sink {
   vulnerable_to: [memory.DoubleFree]
   cwe: [CWE_415]
 }
+concept ComputedSizeValue : source {
+  taint: [taint.ComputedSize]
+}
 concept SizeComputation : sink {
   vulnerable_to: [memory.IntegerOverflow]
   enabled_by: [taint.UntrustedData]
@@ -386,6 +389,16 @@ concept IntegerSizeArithmetic : sink {
   review_condition: "attacker-controlled value participates in size-sensitive arithmetic"
   review_evidence: "arithmetic operation {pattern} receives tainted input"
   review_assumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
+  review_confidence: low
+}
+concept ZeroSizeReallocation : sink {
+  vulnerable_to: [memory.DoubleFree]
+  enabled_by: [taint.ComputedSize]
+  cwe: [CWE_415]
+  review_category: "memory"
+  review_condition: "computed allocation size reaches a reallocation primitive that can treat zero size as free"
+  review_evidence: "computed size value reaches {pattern}"
+  review_assumption: "zero is not excluded on the same size value before reallocation"
   review_confidence: low
 }
 concept PointerFree : sink {
@@ -835,6 +848,11 @@ concept AuthorizationCheck : control {
 concept CsrfProtection : control {
   neutralizes: [request_forgery.Csrf]
   applies: endpoint
+}
+concept ZeroValueExclusion : control {
+  neutralizes: [memory.DoubleFree]
+  cwe: [CWE_415]
+  applies: path
 }
 // Privacy/data-collection opt-in or opt-out controls exposed by SDKs.
 concept DataCollectionControl : control {

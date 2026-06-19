@@ -6,5 +6,5 @@ profile electron {
   priority: "90"
   detect: ["dep:electron", "dep:electron-builder", "file:electron.js", "file:main.js"]
   entrypoints: [UserControlledData, HttpInput, IntentInput, ExternalApiResponse, SecretValue, EnvVariable,
-                CliArgument, StdinInput]
+                CliArgument, StdinInput, ComputedSizeValue]
 }

@@ -55,7 +55,10 @@ adapter cpp {
   sink path "malloc" -> code.SizeComputation
   sink path "calloc" arg all -> code.SizeComputation
   sink path "realloc" arg 1 -> code.SizeComputation
+  sink path "reallocarray" arg 1 -> code.SizeComputation
   sink path "operator new" -> code.SizeComputation
+  mark "realloc" -> code.ZeroSizeReallocation
+  mark "reallocarray" -> code.ZeroSizeReallocation
   mark "alloca" -> code.StackAllocationSmell
   mark "mktemp" -> code.InsecureTempFile
   mark "tmpnam" -> code.InsecureTempFile
@@ -81,8 +84,10 @@ adapter cpp {
   sink path "__binop.mod" arg 1 -> code.DivisionDenominator
   mark "__binop.add" -> code.IntegerSizeArithmetic
   mark "__binop.sub" -> code.IntegerSizeArithmetic
+  source "__binop.mul" -> code.ComputedSizeValue
   mark "__binop.mul" -> code.IntegerSizeArithmetic
   mark "__binop.shl" -> code.IntegerSizeArithmetic
+  control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 
   // TOCTOU / race (CWE-367)
   mark "access" -> code.FileCheck

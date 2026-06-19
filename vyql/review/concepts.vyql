@@ -192,6 +192,11 @@ review code.IntegerSizeArithmetic {
   kind: "attention"
   text: "review integer arithmetic used for address, size, or bounds calculations"
 }
+review code.ZeroSizeReallocation {
+  category: "memory"
+  kind: "attention"
+  text: "review reallocation size guards and zero-size lifetime behavior"
+}
 review code.PointerFree {
   category: "memory"
   kind: "attention"

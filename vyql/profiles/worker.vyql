@@ -6,5 +6,5 @@ profile worker {
   priority: "60"
   detect: ["dep:celery", "dep:sidekiq", "dep:bull", "dep:bullmq", "dep:kafkajs",
            "dep:amqplib", "dep:@aws-sdk/client-sqs"]
-  entrypoints: [MessageInput, ExternalApiResponse, HttpInput, FileUpload, DatabaseRead, SecretValue]
+  entrypoints: [MessageInput, ExternalApiResponse, HttpInput, FileUpload, DatabaseRead, SecretValue, ComputedSizeValue]
 }

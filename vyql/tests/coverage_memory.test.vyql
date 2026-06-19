@@ -126,3 +126,54 @@ test "memory: C++ local temporary freed on failure path is clean"
     return true;
   }
   ```
+
+test "memory: computed size reaches reallocarray without a zero-size exit guard"
+  lang c
+  expect VYQL-MEM-012
+  code
+  ```
+  typedef unsigned char GifPixelType;
+  void *reallocarray(void *, unsigned long, unsigned long);
+
+  void resize(unsigned int width, unsigned int height, GifPixelType *bits) {
+      unsigned long new_size = width * height;
+      bits = reallocarray(bits, new_size, sizeof(GifPixelType));
+  }
+  ```
+
+test "memory: zero-size exit guard suppresses reallocarray lifetime smell"
+  lang c
+  reject VYQL-MEM-012
+  code
+  ```
+  typedef unsigned char GifPixelType;
+  void *reallocarray(void *, unsigned long, unsigned long);
+  void free(void *);
+
+  void resize(unsigned int width, unsigned int height, GifPixelType *bits) {
+      unsigned long new_size = width * height;
+      if (new_size == 0) {
+          free(bits);
+          bits = 0;
+          return;
+      }
+      bits = reallocarray(bits, new_size, sizeof(GifPixelType));
+  }
+  ```
+
+test "memory: unrelated zero-size exit guard does not suppress reallocarray lifetime smell"
+  lang c
+  expect VYQL-MEM-012
+  code
+  ```
+  typedef unsigned char GifPixelType;
+  void *reallocarray(void *, unsigned long, unsigned long);
+
+  void resize(unsigned int width, unsigned int height, unsigned long other, GifPixelType *bits) {
+      unsigned long new_size = width * height;
+      if (other == 0) {
+          return;
+      }
+      bits = reallocarray(bits, new_size, sizeof(GifPixelType));
+  }
+  ```

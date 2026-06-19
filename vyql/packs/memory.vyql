@@ -57,3 +57,9 @@ rule FailurePathOwnedBufferFree {
   meta { id: "VYQL-MEM-011", severity: high, cwe: [CWE_415], confidence_floor: low }
   match code.FailurePathOwnedBufferFree as free
 }
+
+rule PotentialZeroSizeReallocation {
+  meta { id: "VYQL-MEM-012", severity: high, cwe: [CWE_415], confidence_floor: low }
+  taint code.ComputedSizeValue -> code.ZeroSizeReallocation
+    unless sanitized_by core.ZeroValueExclusion
+}

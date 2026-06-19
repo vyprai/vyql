@@ -7,5 +7,6 @@ profile library {
   priority: "40"
   detect: ["file:setup.py", "file:pyproject.toml", "npm:publishable",
            "dep:rollup", "dep:tsup", "manifest:publishable"]
-  entrypoints: [UserControlledData, ExternalEntryInput, DomInput, ExternalApiResponse, HttpInput, DatabaseRead, SecretValue]
+  entrypoints: [UserControlledData, ExternalEntryInput, DomInput, ExternalApiResponse, HttpInput, DatabaseRead,
+                SecretValue, ComputedSizeValue]
 }
