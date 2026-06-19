@@ -21,6 +21,47 @@ test "path: canonicalized archive entry name is clean (javascript)"
   }
   ```
 
+test "path: adm-zip bulk extraction from untrusted archive is reported (javascript)"
+  lang javascript
+  expect VYQL-PATH-004
+  code
+  ```
+  const path = require("path");
+  const AdmZip = require("adm-zip");
+
+  function importPlugin(req) {
+    const zipFilePath = path.resolve("/tmp/plugins", req.query.name + ".zip");
+    const pluginFolder = path.resolve("/tmp/plugins", req.query.name);
+    const zip = new AdmZip(zipFilePath);
+    zip.extractAllTo(pluginFolder);
+  }
+  ```
+
+test "path: adm-zip bulk extraction with entry containment check is clean (javascript)"
+  lang javascript
+  reject VYQL-PATH-004
+  code
+  ```
+  const path = require("path");
+  const AdmZip = require("adm-zip");
+  const { isWithin } = require("./files");
+
+  function importPlugin(req) {
+    const zipFilePath = path.resolve("/tmp/plugins", req.query.name + ".zip");
+    const pluginFolder = path.resolve("/tmp/plugins", req.query.name);
+    const zip = new AdmZip(zipFilePath);
+
+    for (const entry of zip.getEntries()) {
+      const entryPath = path.resolve(pluginFolder, entry.entryName);
+      if (!isWithin(pluginFolder, entryPath) && pluginFolder !== entryPath) {
+        throw new Error("bad zip entry");
+      }
+    }
+
+    zip.extractAllTo(pluginFolder);
+  }
+  ```
+
 test "path: python archive entry name reaching extraction is reported"
   lang python
   expect VYQL-PATH-004

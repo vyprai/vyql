@@ -295,6 +295,14 @@ adapter javascript {
   sink path "zip.extractEntryTo" -> code.ArchiveEntryWrite
   sink path "admZip.extractEntryTo" -> code.ArchiveEntryWrite
   sink path "entry.pipe" -> code.ArchiveEntryWrite
+  package "adm-zip" {
+    // Bulk extraction writes archive entry names chosen by the archive content.
+    // Model the constructed archive as untrusted data and the extraction receiver
+    // as the path-writing primitive; guarded_by PathAccessCheck handles preflight
+    // entry containment loops.
+    source path "adm-zip" -> core.UserControlledData
+    sink receiver "extractAllTo" -> code.ArchiveEntryWrite
+  }
   sink path "User.findById" -> code.ObjectLookupByUserInput
   sink path "Account.findById" -> code.ObjectLookupByUserInput
   sink path "Order.findById" -> code.ObjectLookupByUserInput
@@ -465,6 +473,7 @@ adapter javascript {
   control method "sanitizeFilePath" -> core.PathCanonicalization
   control "checkLoadingAccess" -> core.PathAccessCheck
   control "isParentDirectory" -> core.PathAccessCheck
+  control "isWithin" -> core.PathAccessCheck
   // Custom / library LDAP & XPath escapers we cannot verify are complete for the sink grammar.
   assume sanitizer method "ldapEscape"      -> code.LdapQuery
   assume sanitizer path   "ldap.escapeFilter" -> code.LdapQuery

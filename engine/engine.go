@@ -882,8 +882,49 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 				return true
 			}
 		}
+		for _, gid := range guards {
+			if gid != sinkID && e.preflightLoopGuarded(gid, sinkID) {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+// preflightLoopGuarded recognizes "validate every item, then run one bulk operation"
+// shapes. The guard itself does not dominate a post-loop sink because a loop body may
+// execute zero times, but for bulk APIs a guard in the loop body can still be the
+// program's preflight validation. Adapter data decides which calls are real guards;
+// this helper only models the structured-control relation.
+func (e *Engine) preflightLoopGuarded(guardID, sinkID string) bool {
+	gn, ok1, _ := e.Store.GetNode(guardID)
+	sn, ok2, _ := e.Store.GetNode(sinkID)
+	if !ok1 || !ok2 {
+		return false
+	}
+	parent, ok := nearestLoopParent(gn.Prop("region"))
+	if !ok {
+		return false
+	}
+	sinkRegion := sn.Prop("region")
+	if sinkRegion != parent && !strings.HasPrefix(sinkRegion, parent+"/") {
+		return false
+	}
+	return solvers.Reaches(e.Store, guardID, sinkID)
+}
+
+func nearestLoopParent(region string) (string, bool) {
+	parts := strings.Split(region, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if strings.HasPrefix(parts[i], "loop") {
+			parent := strings.Join(parts[:i], "/")
+			if parent == "" {
+				parent = "/"
+			}
+			return parent, true
+		}
+	}
+	return "", false
 }
 
 // endpointClosed reports whether a release carrying `control` POST-DOMINATES the alloc —
