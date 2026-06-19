@@ -75,6 +75,56 @@ test "review: fixed starttls buffer handoff is clean"
               super().connection_made(transport)
   ```
 
+test "review: go timer stop without state guard is surfaced"
+  lang go
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  package main
+  import "fmt"
+  type UE struct { T3550 *Timer }
+  type Timer struct{}
+  func (t *Timer) Stop() {}
+  func (ue *UE) StopT3550() {
+    if ue.T3550 == nil {
+      return
+    }
+    ue.T3550.Stop()
+    ue.T3550 = nil
+  }
+  func HandleRegistrationComplete(ue *UE) error {
+    ue.StopT3550()
+    return nil
+  }
+  var _ = fmt.Errorf
+  ```
+
+test "review: go timer stop with state guard is clean"
+  lang go
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  package main
+  import "fmt"
+  type UE struct { T3550 *Timer }
+  type Timer struct{}
+  func (t *Timer) Stop() {}
+  func (ue *UE) StopT3550() {
+    if ue.T3550 == nil {
+      return
+    }
+    ue.T3550.Stop()
+    ue.T3550 = nil
+  }
+  func HandleRegistrationComplete(ue *UE) error {
+    if ue.T3550 == nil {
+      return fmt.Errorf("unexpected Registration Complete: T3550 not running")
+    }
+    ue.StopT3550()
+    return nil
+  }
+  ```
+
 test "review: incomplete scala csrf token validation is surfaced"
   lang scala
   expect_review code.IncompleteCsrfTokenValidation

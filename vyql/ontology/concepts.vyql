@@ -765,7 +765,7 @@ concept IncompleteTemplateValidation : sink {
 }
 concept ProtocolStateReview : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
-  cwe: [CWE_349]
+  cwe: [CWE_349, CWE_404]
 }
 concept UrlFetch : sink {
   vulnerable_to: [request_forgery.Ssrf]

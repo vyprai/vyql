@@ -649,10 +649,26 @@ type analysisEventSpec struct {
 }
 
 var (
-	analysisFunctionReturn = analysisEventSpec{path: "analysis.function.return", method: "return"}
-	analysisFunctionResult = analysisEventSpec{path: "analysis.function.result", method: "result"}
-	analysisParameterEntry = analysisEventSpec{path: "analysis.parameter.entry", method: "entry"}
+	analysisFunctionReturn  = analysisEventSpec{path: "analysis.function.return", method: "return"}
+	analysisFunctionContext = analysisEventSpec{path: "analysis.function.context", method: "context"}
+	analysisFunctionResult  = analysisEventSpec{path: "analysis.function.result", method: "result"}
+	analysisParameterEntry  = analysisEventSpec{path: "analysis.parameter.entry", method: "entry"}
 )
+
+func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []string) {
+	if len(contextTokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{
+		"callee_path": analysisFunctionContext.path,
+		"method":      analysisFunctionContext.method,
+		"str_args":    strings.Join(contextTokens, "\x00"),
+	}
+	l.node("Call", loc, props)
+}
 
 func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []string) {
 	if id == "" || len(contextTokens) == 0 {
@@ -1267,6 +1283,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.region = l.curNS + "/fn" + l.nextBranch()
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
+		l.functionContextAnalysisEvent(st.Loc, st.ContextTokens)
 		l.block(st.Body, inner)
 		l.curDecorators = saveDecorators
 		l.region = saveRegion

@@ -244,37 +244,57 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 
 func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
 	var out []string
+	seen := map[string]bool{}
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 128 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
 	if name != "" {
-		out = append(out, "function_name:"+name)
+		add("function_name:" + name)
 	}
 	if body == nil {
 		return out
 	}
-	seen := map[string]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
-		if len(seen) >= 64 {
+		if len(out) >= 128 {
 			return false
 		}
-		lit, ok := n.(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return true
-		}
-		v, err := strconv.Unquote(lit.Value)
-		if err != nil || v == "" {
-			return true
-		}
-		if len(v) > 256 {
-			v = v[:256]
-		}
-		if !seen[v] {
-			seen[v] = true
-			out = append(out, "literal:"+v)
+		switch x := n.(type) {
+		case *ast.BasicLit:
+			if x.Kind != token.STRING {
+				return true
+			}
+			v, err := strconv.Unquote(x.Value)
+			if err != nil || v == "" {
+				return true
+			}
+			if len(v) > 256 {
+				v = v[:256]
+			}
+			add("literal:" + v)
+		case *ast.SelectorExpr:
+			if p := c.path(x); p != "" {
+				add("selector:" + p)
+			}
+		case *ast.CallExpr:
+			p := c.path(x.Fun)
+			if p == "" {
+				return true
+			}
+			add("call_path:" + p)
+			if i := strings.LastIndex(p, "."); i >= 0 {
+				add("call:" + p[i+1:])
+			} else {
+				add("call:" + p)
+			}
 		}
 		return true
 	})
 	return out
 }
-
 func (c *conv) goParamEntries(name string, params []string, paramTypes map[string]string) []nir.ParamEntry {
 	var out []nir.ParamEntry
 	for i, p := range params {

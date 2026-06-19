@@ -1,3 +1,4 @@
+call analysis.function.context
 call analysis.parameter.entry
 call analysis.parameter.entry
 call source.Value
