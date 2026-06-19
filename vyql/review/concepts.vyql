@@ -139,6 +139,11 @@ review code.ResourceReview {
   expected: [core.ResourceRelease]
   text: "verify resource usage is bounded, timed out, and released"
 }
+review code.CatastrophicRegex {
+  category: "resource"
+  kind: "attention"
+  text: "review static regex complexity and attacker-controlled match input length"
+}
 review code.ConfigExposureReview {
   category: "secret"
   kind: "attention"

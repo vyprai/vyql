@@ -87,6 +87,16 @@ concept RegexMatch : sink {
   cwe: [CWE_1333]
 }
 
+concept CatastrophicRegex : sink {
+  vulnerable_to: [dos.ReDoS, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_1333, CWE_400]
+  review_category: "resource"
+  review_condition: "a static regular expression has catastrophic-backtracking structure"
+  review_evidence: "regex construction {pattern} contains nested or ambiguous quantified branches"
+  review_assumption: "an attacker can supply input matched by this exported or reachable regex"
+  review_confidence: medium
+}
+
 concept MassAssign : sink {
   vulnerable_to: [injection.MassAssignment]
   enabled_by: [taint.UntrustedData]
