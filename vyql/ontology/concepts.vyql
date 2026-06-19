@@ -759,6 +759,18 @@ concept HardcodedSecret : sink {
   vulnerable_to: [secrets.HardcodedCredentials]
   cwe: [CWE_798]
 }
+// Secret/key material is generated or written in a function without an observed
+// restrictive permission hardening call. Review-only because default file modes
+// depend on framework helpers and process umask.
+concept SecretFilePermissionReview : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.InsecurePermission]
+  cwe: [CWE_522, CWE_732]
+  review_category: "secret"
+  review_condition: "secret or key material is generated without an observed restrictive file-permission hardening call"
+  review_evidence: "key-generation context {pattern} does not include a chmod-style permission hardening call"
+  review_assumption: "the helper may create the private key file with permissions broader than intended"
+  review_confidence: possibility
+}
 // Insecure (non-cryptographic) PRNG — Math.random / random.* / rand() etc. A PRESENCE
 // finding (CWE-330): security-sensitive code should use a CSPRNG (secrets / os.urandom /
 // SystemRandom / crypto.randomBytes / SecureRandom), which are deliberately NOT marked.

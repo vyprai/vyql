@@ -265,6 +265,9 @@ adapter php {
   mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYHOST=0" -> code.CertValidationDisabled
   mark "chmod" val "0777" -> code.InsecurePermission
   mark "chmod" val "0666" -> code.InsecurePermission
+  // Review-only: private key generation helpers should be followed by restrictive
+  // file permissions; function-context text suppresses this when chmod is present.
+  mark exact "analysis.function.context" val "generateKey" val "keyfile" nval "chmod" -> code.SecretFilePermissionReview
   mark "fopen" val "/tmp/" val "w" -> code.InsecureTempFile
   mark "fopen" -> code.ResourceHandle
   mark "fsockopen" -> code.ResourceHandle

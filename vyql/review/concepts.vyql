@@ -166,6 +166,11 @@ review code.ConfigExposureReview {
   expected: [core.SecretRedaction]
   text: "verify config or diagnostic serialization redacts inline secrets before exposure"
 }
+review code.SecretFilePermissionReview {
+  category: "secret"
+  kind: "attention"
+  text: "verify generated key material is stored with restrictive file permissions"
+}
 review code.LockAcquire {
   category: "concurrency"
   kind: "target"

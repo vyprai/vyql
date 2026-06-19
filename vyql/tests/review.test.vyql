@@ -360,3 +360,41 @@ test "review: php idor policy config is surfaced"
     }
   }
   ```
+
+test "review: php secret key generation without chmod hardening is surfaced"
+  lang php
+  expect_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class Api {
+    public function install() {
+      $location = $this->freepbx->PKCS->getKeysLocation();
+      $keyfile = "$location/$this->oauthKey.key";
+      $this->freepbx->PKCS->generateKey($this->oauthKey);
+      $this->freepbx->PKCS->extractPublicKey($this->oauthKey);
+      if (file_exists($keyfile)) {
+        $this->setConfig('key-regenerated', true);
+      }
+    }
+  }
+  ```
+
+test "review: php secret key generation with restrictive chmod is clean"
+  lang php
+  reject_review code.SecretFilePermissionReview
+  code
+  ```
+  <?php
+  class Api {
+    public function install() {
+      $location = $this->freepbx->PKCS->getKeysLocation();
+      $keyfile = "$location/$this->oauthKey.key";
+      $this->freepbx->PKCS->generateKey($this->oauthKey);
+      $this->freepbx->PKCS->extractPublicKey($this->oauthKey);
+      if (file_exists($keyfile)) {
+        chmod($keyfile, 0600);
+      }
+    }
+  }
+  ```
