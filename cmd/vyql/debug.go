@@ -28,7 +28,7 @@ func cmdTrace(args []string) error {
 	fs := flag.NewFlagSet("trace", flag.ExitOnError)
 	from := fs.String("from", "", "only trace sources whose concept contains this substring")
 	to := fs.String("to", "", "only count sinks whose concept contains this substring")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -221,7 +221,7 @@ func ontologyConceptKind(onto *ontology.Ontology, c string) string {
 func cmdExplain(args []string) error {
 	fs := flag.NewFlagSet("explain", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "rule file/dir (default: vyql/packs)")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -283,7 +283,7 @@ func cmdExplain(args []string) error {
 
 func cmdMatch(args []string) error {
 	fs := flag.NewFlagSet("match", flag.ExitOnError)
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -357,7 +357,7 @@ func isSourceConcept(onto *ontology.Ontology, c string) bool {
 
 func cmdResolve(args []string) error {
 	fs := flag.NewFlagSet("resolve", flag.ExitOnError)
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -418,7 +418,7 @@ func cmdResolve(args []string) error {
 func cmdGraph(args []string) error {
 	fs := flag.NewFlagSet("graph", flag.ExitOnError)
 	taint := fs.Bool("taint", false, "show per-source FLOWS reachability instead of the full graph")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -701,7 +701,7 @@ func cmdQuery(args []string) error {
 	to := fs.String("to", "", "reachability mode: sink concept (with -from)")
 	edges := fs.Bool("edges", false, "also print each matching node's outgoing edges")
 	count := fs.Bool("count", false, "print only the number of matches")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {

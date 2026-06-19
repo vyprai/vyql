@@ -208,6 +208,9 @@ func frontendOntologyConceptNeedles(t *testing.T) []string {
 			seen["\""+id+"\""] = true
 		}
 	}
+	for _, phrase := range []string{"threat-model", "threat model", "trust boundary"} {
+		seen[phrase] = true
+	}
 	out := make([]string, 0, len(seen))
 	for needle := range seen {
 		out = append(out, needle)

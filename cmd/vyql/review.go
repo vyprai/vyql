@@ -103,7 +103,7 @@ func reviewList(fields map[string]any, key string) []string {
 func cmdReview(args []string) error {
 	fs := flag.NewFlagSet("review", flag.ExitOnError)
 	format := fs.String("format", "text", "output format: text | json")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	category := fs.String("category", "all", "review category filter")
 	loc := fs.String("loc", "", "location substring filter, e.g. core.c:422")
 	checksOnly := fs.Bool("checks", false, "show only check/control sites")

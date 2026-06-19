@@ -100,7 +100,7 @@ func cmdScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
 	format := fs.String("format", "text", "output format: text | sarif | json")
-	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
+	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	_ = fs.Parse(args)
@@ -175,8 +175,8 @@ func parseBytes(s string) (int64, error) {
 	return int64(f * float64(mult)), nil
 }
 
-// applyProfile selects the threat-model profile (explicit name or auto-detected),
-// sets the source trust boundary, and returns it for reporting.
+// applyProfile selects the analysis profile (explicit name or auto-detected),
+// sets the active source families, and returns it for reporting.
 func applyProfile(paths []string, name string) profile.Profile {
 	profiles, _ := profile.Load()
 	var p profile.Profile
@@ -309,7 +309,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		b, _ := json.MarshalIndent(findingsJSON(all), "", "  ")
 		fmt.Println(string(b))
 	default:
-		fmt.Printf("threat model: %s (%s)\n\n", prof.Title, prof.Name)
+		fmt.Printf("analysis profile: %s (%s)\n\n", prof.Title, prof.Name)
 		printReport(all)
 		printSummary(stats, len(all))
 	}

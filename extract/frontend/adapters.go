@@ -58,15 +58,14 @@ type controlSpec struct {
 }
 
 // activeSources, when non-nil, restricts which source concepts the input adapters
-// emit — i.e. the active profile's trust boundary. nil = every source active.
+// emit for the active analysis profile. nil = every source active.
 var activeSources map[string]bool
 
-// SetActiveSources sets the trust-boundary filter for source labelling (the
-// active application profile's entry-point families). Pass nil to disable.
+// SetActiveSources sets the active-profile filter for source labelling. Pass nil to disable.
 func SetActiveSources(s map[string]bool) { activeSources = s }
 
-// ActiveSourcesKey returns a deterministic fingerprint of the active source set (the profile's
-// trust boundary), for the incremental adapter-label cache: changing the profile changes which
+// ActiveSourcesKey returns a deterministic fingerprint of the active source set for the
+// incremental adapter-label cache: changing the profile changes which
 // source labels adapters emit, so cached labels from one profile must not be reused under
 // another. "*" means no filter (every source active).
 func ActiveSourcesKey() string {
@@ -559,7 +558,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 							!valConds(n.Prop("str_args"), in.ValMatches, in.ValAbsents) {
 							continue
 						}
-						// trust-boundary gating: an active profile restricts which
+						// active-profile gating: a profile restricts which
 						// source families are active for this profile.
 						if activeSources == nil || activeSources[in.Concept] {
 							spec := 0
@@ -1140,9 +1139,8 @@ func AutoAdapters() []adapters.Adapter {
 }
 
 // paramSourceAdapter labels function/method parameter nodes with the spec's
-// `source param -> X` concept(s) — the library/SDK trust boundary. The knowledge
-// (which concept) is the .vyql line;
-// this is only the mechanism.
+// `source param -> X` concept(s) for profiles that opt into parameter entrypoints.
+// The concrete concept is declared by the .vyql line; this is only the mechanism.
 //
 // Default-OFF, opt-in: unlike the pattern source adapter (where activeSources==nil means
 // "no profile → every source on"), a parameter source fires ONLY when a profile is set AND
@@ -1156,7 +1154,7 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 		Fidelity: "syntactic", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			if activeSources == nil {
-				return nil // no trust boundary set → parameters are not sources
+				return nil // no active source set -> parameters are not sources
 			}
 			active := make([]string, 0, len(concepts))
 			for _, c := range concepts {
