@@ -94,6 +94,43 @@ test "path: php archive entry name reaching extraction is reported"
   ?>
   ```
 
+test "path: php archive metadata name reaching file write is reported"
+  lang php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+  class Zip {
+      private $metadata;
+
+      function extract($destination, $buffer) {
+          $path = Path::clean($destination . "/" . $this->metadata[0]["name"]);
+          File::write($path, $buffer);
+      }
+  }
+  ?>
+  ```
+
+test "path: php archive metadata file write with containment guard is clean"
+  lang php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+  class Zip {
+      private $metadata;
+
+      function extract($destination, $buffer) {
+          $path = Path::clean($destination . "/" . $this->metadata[0]["name"]);
+          if (!$this->isBelow($destination, $destination . "/" . $this->metadata[0]["name"])) {
+              throw new RuntimeException("outside destination");
+          }
+          File::write($path, $buffer);
+      }
+  }
+  ?>
+  ```
+
 test "path: ruby archive entry name reaching extraction is reported"
   lang ruby
   expect VYQL-PATH-004

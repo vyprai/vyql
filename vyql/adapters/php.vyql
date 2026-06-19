@@ -13,6 +13,8 @@ adapter php {
   source "$_COOKIE" -> code.HttpInput
   source "$_FILES" -> code.HttpInput
   source "$_SERVER" -> code.HttpInput
+  source path "$this.metadata" -> code.ArchiveEntryName
+  source method "getNameIndex" -> code.ArchiveEntryName
   // framework request-object accessors (Utopia/Appwrite, Symfony-style): the request URI /
   // query / path are attacker-controlled. Method form → receiver-agnostic.
   source method "getURI" -> code.HttpInput
@@ -175,6 +177,7 @@ adapter php {
   // core.PathAccessCheck). Leaving it out lets realpath-without-check traversal surface.
   // control "realpath" -> core.PathCanonicalization
   control "basename" -> core.PathCanonicalization
+  control method "isBelow" -> core.PathAccessCheck
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "preg_match" -> code.RegexCompile
@@ -223,6 +226,7 @@ adapter php {
   sink path "fputcsv" arg 1 collection -> code.CsvCell
   sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
   sink path "$this.context.fs.write" -> code.UnsafeUpload
+  sink path "File.write" -> code.FilePathAccess
   sink method "extractTo" arg all -> code.ArchiveEntryWrite
   sink path "ZipArchive.extractTo" arg all -> code.ArchiveEntryWrite
 
