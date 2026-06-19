@@ -34,6 +34,8 @@ adapter kotlin {
   sink method "loadDataWithBaseURL" arg 1 -> code.WebViewLoad
   sink method "evaluateJavascript" -> code.WebViewLoad
   mark "addJavascriptInterface" -> code.WebViewJsInterface
+  mark method "moveTaskToBack" -> code.AuthFlowBypassReview
+  mark method "finishAndRemoveTask" -> code.AuthFlowBypassReview
 
   // SQL — JDBC + Android SQLite
   sink method "executeQuery" -> code.SqlExecution

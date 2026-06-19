@@ -48,6 +48,12 @@ review code.AuthenticationRequiredOp {
   expected: [core.AuthenticationCheck]
   text: "verify an authenticated user is required before this operation"
 }
+review code.AuthFlowBypassReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review alternate UI or navigation exit paths in this authentication flow"
+}
 review code.ObjectLookupByUserInput {
   category: "auth"
   kind: "target"

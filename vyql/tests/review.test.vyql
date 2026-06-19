@@ -26,6 +26,32 @@ test "review: auth checks and targets are surfaced"
   }
   ```
 
+test "review: android passcode back navigation bypass is surfaced"
+  lang kotlin
+  expect_review code.AuthFlowBypassReview
+  code
+  ```
+  import android.view.KeyEvent
+
+  class PassCodeActivity {
+    companion object {
+      const val ACTION_CHECK = "ACTION_CHECK"
+    }
+    val intent: Intent = Intent()
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+      if (keyCode == KeyEvent.KEYCODE_BACK && event.repeatCount == 0) {
+        if (ACTION_CHECK == intent.action) {
+          moveTaskToBack(true)
+          finishAndRemoveTask()
+        }
+        return true
+      }
+      return super.onKeyDown(keyCode, event)
+    }
+  }
+  ```
+
 test "review: memory attention points are surfaced"
   lang c
   expect_review code.IndexAccess

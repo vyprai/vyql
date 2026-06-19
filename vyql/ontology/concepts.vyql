@@ -420,6 +420,13 @@ concept AuthenticationRequiredOp : sink {
   review_assumption: "the enclosing endpoint or entry point can be reached by an unauthenticated actor"
   review_confidence: low
 }
+// Review-only: UI/navigation exit paths from an authentication or lock flow. This is not
+// a confirmed vulnerability by itself; it gives the review/AI pass the code locations where
+// alternate platform exits may bypass the expected authentication state.
+concept AuthFlowBypassReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+}
 concept ObjectLookupByUserInput : sink {
   vulnerable_to: [access_control.Idor]
   enabled_by: [taint.UntrustedData]
