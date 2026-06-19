@@ -52,12 +52,20 @@ func loweringForbiddenConceptLiterals(t *testing.T) []string {
 		out["`"+c.Name+"`"] = true
 		out[`"`+c.QualifiedName()+`"`] = true
 		out["`"+c.QualifiedName()+"`"] = true
+		for _, id := range append(append([]string{}, c.CWE...), append(c.CAPEC, c.Attack...)...) {
+			out[`"`+id+`"`] = true
+			out["`"+id+"`"] = true
+		}
 	}
 	for _, tk := range ontology.ThreatKinds() {
 		out[`"`+tk.Name+`"`] = true
 		out["`"+tk.Name+"`"] = true
 		out[`"`+tk.QualifiedName()+`"`] = true
 		out["`"+tk.QualifiedName()+"`"] = true
+		for _, id := range tk.CWE {
+			out[`"`+id+`"`] = true
+			out["`"+id+"`"] = true
+		}
 	}
 	concepts := make([]string, 0, len(out))
 	for concept := range out {

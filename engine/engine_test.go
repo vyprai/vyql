@@ -217,10 +217,16 @@ func ontologyVocabularyNeedles(t *testing.T) []string {
 		}
 		seen["\""+c.Name+"\""] = true
 		seen["\""+c.QualifiedName()+"\""] = true
+		for _, id := range append(append([]string{}, c.CWE...), append(c.CAPEC, c.Attack...)...) {
+			seen["\""+id+"\""] = true
+		}
 	}
 	for _, tk := range ontology.ThreatKinds() {
 		seen["\""+tk.Name+"\""] = true
 		seen["\""+tk.QualifiedName()+"\""] = true
+		for _, id := range tk.CWE {
+			seen["\""+id+"\""] = true
+		}
 	}
 	out := make([]string, 0, len(seen))
 	for needle := range seen {
