@@ -8,8 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/ontology"
+	"github.com/vyprai/vyql/parser"
 )
 
 func TestLoweringDoesNotHardcodeOntologyConcepts(t *testing.T) {
@@ -67,12 +69,44 @@ func loweringForbiddenConceptLiterals(t *testing.T) []string {
 			out["`"+id+"`"] = true
 		}
 	}
+	addPackRuleIDNeedles(t, out)
 	concepts := make([]string, 0, len(out))
 	for concept := range out {
 		concepts = append(concepts, concept)
 	}
 	sort.Strings(concepts)
 	return concepts
+}
+
+func addPackRuleIDNeedles(t *testing.T, out map[string]bool) {
+	t.Helper()
+	root := filepath.Join(datadir.Root(), "packs")
+	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".vyql") {
+			return err
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		decls, err := parser.Parse(string(raw))
+		if err != nil {
+			return err
+		}
+		for _, decl := range decls {
+			rule, ok := decl.(*parser.Rule)
+			if !ok {
+				continue
+			}
+			if id, _ := rule.Meta["id"].(string); id != "" {
+				out["\""+id+"\""] = true
+				out["`"+id+"`"] = true
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("read pack rule ids: %v", err)
+	}
 }
 
 func TestCollectValTokensDescendsIntoFormat(t *testing.T) {

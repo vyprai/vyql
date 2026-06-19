@@ -211,11 +211,43 @@ func frontendOntologyConceptNeedles(t *testing.T) []string {
 	for _, phrase := range []string{"threat-model", "threat model", "trust boundary"} {
 		seen[phrase] = true
 	}
+	addPackRuleIDNeedles(t, seen)
 	out := make([]string, 0, len(seen))
 	for needle := range seen {
 		out = append(out, needle)
 	}
 	return out
+}
+
+func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
+	t.Helper()
+	root := filepath.Join(datadir.Root(), "packs")
+	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".vyql") {
+			return err
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		decls, err := parser.Parse(string(raw))
+		if err != nil {
+			return err
+		}
+		for _, decl := range decls {
+			rule, ok := decl.(*parser.Rule)
+			if !ok {
+				continue
+			}
+			if id, _ := rule.Meta["id"].(string); id != "" {
+				seen["\""+id+"\""] = true
+				seen["`"+id+"`"] = true
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("read pack rule ids: %v", err)
+	}
 }
 
 func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
