@@ -98,3 +98,36 @@ test "path: csharp archive entry name reaching extraction is reported"
     }
   }
   ```
+
+test "path: powershell zip entry full name reaching extraction is reported"
+  lang powershell
+  expect VYQL-PATH-004
+  code
+  ```
+  Function Extract-Zip($src, $dest) {
+      foreach ($entry in $archive.Entries) {
+          $archive_name = $entry.FullName
+          $entry_target_path = [System.IO.Path]::Combine($dest, $archive_name)
+          [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $entry_target_path, $true)
+      }
+  }
+  ```
+
+test "path: powershell canonical destination guard cleans zip extraction"
+  lang powershell
+  reject VYQL-PATH-004
+  code
+  ```
+  Function Extract-Zip($src, $dest) {
+      foreach ($entry in $archive.Entries) {
+          $archive_name = $entry.FullName
+          $entry_target_path = [System.IO.Path]::Combine($dest, $archive_name)
+          $full_target_path = [System.IO.Path]::GetFullPath($entry_target_path)
+          $full_dest_path = [System.IO.Path]::GetFullPath($dest + [System.IO.Path]::DirectorySeparatorChar)
+          if (-not $full_target_path.StartsWith($full_dest_path)) {
+              Fail-Json -obj $result -message "bad path"
+          }
+          [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $entry_target_path, $true)
+      }
+  }
+  ```

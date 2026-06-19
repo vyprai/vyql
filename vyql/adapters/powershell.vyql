@@ -49,6 +49,8 @@ adapter powershell {
   sink path "Select-Xml" -> code.XmlParse
 
   // path / file
+  source "entry.FullName" -> core.UserControlledData
+
   sink path "Get-Content" -> code.FilePathAccess
   sink path "Set-Content" -> code.FilePathAccess
   sink path "Add-Content" -> code.FilePathAccess
@@ -60,5 +62,10 @@ adapter powershell {
   sink path "New-Item" -> code.FilePathAccess
   sink path "Test-Path" -> code.FilePathAccess
   sink path "Import-Module" -> code.DynamicCodeLoad
+  sink path "System.IO.Compression.ZipFileExtensions.ExtractToFile" arg 1 -> code.ArchiveEntryWrite
+
+  control "System.IO.Path.GetFullPath" -> core.PathCanonicalization
+  control "IO.Path.GetFullPath" -> core.PathCanonicalization
+  control method "StartsWith" -> core.PathAccessCheck
 
 }
