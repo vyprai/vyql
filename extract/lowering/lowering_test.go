@@ -285,6 +285,51 @@ func TestTargetArgsCallbackDispatchesDynamicCallee(t *testing.T) {
 	}
 }
 
+func TestAllowlistMembershipIfBoundsTrueBranchValue(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "render", Loc: "app.py:1", Params: []string{"layout"}, Body: []nir.Stmt{
+				nir.If{
+					Cond: nir.BinOp{
+						Left: nir.Name{ID: "layout", Loc: "app.py:2"},
+						Op:   "in",
+						Right: nir.Seq{Loc: "app.py:2", Parts: []nir.Expr{
+							nir.Const{Value: "\"dot\"", Loc: "app.py:2"},
+							nir.Const{Value: "\"neato\"", Loc: "app.py:2"},
+						}},
+						Loc: "app.py:2",
+					},
+					Then: []nir.Stmt{
+						nir.Assign{Loc: "app.py:3", Targets: []string{"args"}, Value: nir.Seq{Loc: "app.py:3", Parts: []nir.Expr{
+							nir.Name{ID: "layout", Loc: "app.py:3"},
+						}}},
+						nir.ExprStmt{Value: nir.Call{
+							Callee: nir.Attr{Base: nir.Name{ID: "subprocess", Loc: "app.py:4"}, Attr: "Popen", Path: "subprocess.Popen", Loc: "app.py:4"},
+							Args:   []nir.Expr{nir.Name{ID: "args", Loc: "app.py:4"}},
+							Path:   "subprocess.Popen", Method: "Popen", Loc: "app.py:4",
+						}},
+					},
+				},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "layout")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app.py:4")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[sinkArg] {
+		t.Fatalf("allowlisted branch value should not preserve taint into sink arg")
+	}
+}
+
 func findNodeID(t *testing.T, g usg.Store, typ string, props ...string) string {
 	t.Helper()
 	if len(props)%2 != 0 {

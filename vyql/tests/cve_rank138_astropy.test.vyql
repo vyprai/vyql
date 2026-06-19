@@ -1,0 +1,70 @@
+# Rank 138 / CVE-2023-41334: Astropy graphviz layout program selection.
+
+test "rank138: python public API parameter selects subprocess executable"
+  lang python
+  profile library
+  expect VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+  class TransformGraph:
+      def to_dot_graph(self, savefn=None, savelayout="plain", saveformat=None):
+          dotgraph = "digraph G {}"
+          if savefn is not None:
+              if savelayout == "plain":
+                  open(savefn, "w").write(dotgraph)
+              else:
+                  args = [savelayout]
+                  if saveformat is not None:
+                      args.append("-T" + saveformat)
+                  proc = subprocess.Popen(
+                      args,
+                      stdin=subprocess.PIPE,
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.PIPE,
+                  )
+                  proc.communicate(dotgraph)
+          return dotgraph
+  ```
+
+test "rank138: python literal allowlist bounds subprocess executable"
+  lang python
+  profile library
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+
+  class TransformGraph:
+      def to_dot_graph(self, savefn=None, savelayout="plain", saveformat=None):
+          dotgraph = "digraph G {}"
+          if savefn is not None:
+              if savelayout == "plain":
+                  open(savefn, "w").write(dotgraph)
+              elif savelayout in (
+                  "dot",
+                  "neato",
+                  "fdp",
+                  "sfdp",
+                  "circo",
+                  "twopi",
+                  "nop",
+                  "nop2",
+                  "osage",
+                  "patchwork",
+              ):
+                  args = [savelayout]
+                  if saveformat is not None:
+                      args.append("-T" + saveformat)
+                  proc = subprocess.Popen(
+                      args,
+                      stdin=subprocess.PIPE,
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.PIPE,
+                  )
+                  proc.communicate(dotgraph)
+              else:
+                  raise NotImplementedError("unsupported layout")
+          return dotgraph
+  ```

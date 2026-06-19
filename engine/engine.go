@@ -14,13 +14,29 @@ import (
 
 // Engine evaluates compiled rules against a USG store.
 type Engine struct {
-	Onto         *ontology.Ontology
-	Store        usg.Store
-	analysisRole map[string]map[string]bool
+	Onto               *ontology.Ontology
+	Store              usg.Store
+	analysisRole       map[string]map[string]bool
+	contextReach       []contextReachSource
+	contextReachSet    bool
+	contextAssets      []contextAssetConcept
+	contextAssetsSet   bool
+	contextConfirms    []contextConfirmation
+	contextConfirmsSet bool
+	cfg                map[string]bool
+	labelsByNode       map[string][]usg.Label
+	flowGuards         map[string][]string
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
-	return &Engine{Onto: onto, Store: store, analysisRole: map[string]map[string]bool{}}
+	return &Engine{
+		Onto:         onto,
+		Store:        store,
+		analysisRole: map[string]map[string]bool{},
+		cfg:          map[string]bool{},
+		labelsByNode: map[string][]usg.Label{},
+		flowGuards:   map[string][]string{},
+	}
 }
 
 var confOrder = map[string]int{"possibility": 0, "low": 1, "medium": 2, "high": 3}
@@ -306,6 +322,10 @@ type contextReachSource struct {
 }
 
 func (e *Engine) contextReachSources() []contextReachSource {
+	if e.contextReachSet {
+		return e.contextReach
+	}
+	e.contextReachSet = true
 	var out []contextReachSource
 	for _, c := range e.Onto.AllConcepts() {
 		if c.ContextReachSource != "true" {
@@ -324,7 +344,8 @@ func (e *Engine) contextReachSources() []contextReachSource {
 			TargetProp: c.ContextReachTargetProp,
 		})
 	}
-	return out
+	e.contextReach = out
+	return e.contextReach
 }
 
 type contextAssetConcept struct {
@@ -334,6 +355,10 @@ type contextAssetConcept struct {
 }
 
 func (e *Engine) contextAssetConcepts() []contextAssetConcept {
+	if e.contextAssetsSet {
+		return e.contextAssets
+	}
+	e.contextAssetsSet = true
 	var out []contextAssetConcept
 	for _, c := range e.Onto.AllConcepts() {
 		if c.ContextAssetTargetProp == "" {
@@ -349,7 +374,8 @@ func (e *Engine) contextAssetConcepts() []contextAssetConcept {
 			Label:      label,
 		})
 	}
-	return out
+	e.contextAssets = out
+	return e.contextAssets
 }
 
 func renderContextLabel(template, target string, kinds []string) string {
@@ -360,29 +386,54 @@ func renderContextLabel(template, target string, kinds []string) string {
 
 func (e *Engine) contextConfirmations(target string) []string {
 	var out []string
+	for _, c := range e.contextConfirmationSpecs() {
+		ids, _ := e.Store.NodesWithConcept(c.Concept)
+		for _, id := range ids {
+			n, _, _ := e.Store.GetNode(id)
+			if n.Prop(c.DstProp) != target {
+				continue
+			}
+			if c.FlagProp != "" && n.Prop(c.FlagProp) != c.FlagValue {
+				continue
+			}
+			out = append(out, c.Label)
+		}
+	}
+	return out
+}
+
+type contextConfirmation struct {
+	Concept   string
+	DstProp   string
+	FlagProp  string
+	FlagValue string
+	Label     string
+}
+
+func (e *Engine) contextConfirmationSpecs() []contextConfirmation {
+	if e.contextConfirmsSet {
+		return e.contextConfirms
+	}
+	e.contextConfirmsSet = true
+	var out []contextConfirmation
 	for _, c := range e.Onto.AllConcepts() {
 		if c.ContextConfirmDstProp == "" {
 			continue
 		}
-		flagProp := c.ContextConfirmFlagProp
-		flagValue := c.ContextConfirmFlagValue
 		label := c.ContextConfirmLabel
 		if label == "" {
 			label = "confirmed by " + c.Name
 		}
-		ids, _ := e.Store.NodesWithConcept(c.QualifiedName())
-		for _, id := range ids {
-			n, _, _ := e.Store.GetNode(id)
-			if n.Prop(c.ContextConfirmDstProp) != target {
-				continue
-			}
-			if flagProp != "" && n.Prop(flagProp) != flagValue {
-				continue
-			}
-			out = append(out, label)
-		}
+		out = append(out, contextConfirmation{
+			Concept:   c.QualifiedName(),
+			DstProp:   c.ContextConfirmDstProp,
+			FlagProp:  c.ContextConfirmFlagProp,
+			FlagValue: c.ContextConfirmFlagValue,
+			Label:     label,
+		})
 	}
-	return out
+	e.contextConfirms = out
+	return e.contextConfirms
 }
 
 func sortedSet(m map[string]bool) []string {
@@ -495,13 +546,13 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 	// (the tainted operand flows into it), so we scan those neighbours LOCALLY rather than the
 	// whole store — O(path · out-degree), not O(store · findings). Found nothing globally is
 	// the same as found nothing here, but cheap on large corpora.
-	if hasCFG(e.Store, sinkID) {
+	if e.hasCFG(sinkID) {
 		guarded := map[string]bool{}
 		for _, pid := range path {
 			edges, _ := e.Store.OutEdges(pid, "FLOWS")
 			for _, ed := range edges {
 				gid := ed.Dst
-				if gid == sinkID || guarded[gid] || !hasCFG(e.Store, gid) {
+				if gid == sinkID || guarded[gid] || !e.hasCFG(gid) {
 					continue
 				}
 				guarded[gid] = true
@@ -707,7 +758,11 @@ func (e *Engine) loc(nodeID string) string {
 }
 
 func (e *Engine) labels(nodeID string) []usg.Label {
+	if ls, ok := e.labelsByNode[nodeID]; ok {
+		return ls
+	}
 	ls, _ := e.Store.Labels(nodeID)
+	e.labelsByNode[nodeID] = ls
 	return ls
 }
 
@@ -863,7 +918,7 @@ func (e *Engine) conf(nodeIDs ...string) string {
 // graphs, frontends not yet converted to structured NIR) it falls back to presence
 // semantics at a lower fidelity, so existing behaviour and tests are unchanged.
 func (e *Engine) endpointGuarded(sinkID, control string) bool {
-	sinkCFG := hasCFG(e.Store, sinkID)
+	sinkCFG := e.hasCFG(sinkID)
 	// (1) an explicit PROTECTS/CHECKS edge (graph specs; a future endpoint-linking pass).
 	for _, et := range []string{"PROTECTS", "CHECKS"} {
 		edges, _ := e.Store.InEdges(sinkID, et)
@@ -872,7 +927,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 				if l.Concept != control {
 					continue
 				}
-				if sinkCFG && hasCFG(e.Store, ed.Src) {
+				if sinkCFG && e.hasCFG(ed.Src) {
 					if solvers.Dominates(e.Store, ed.Src, sinkID) {
 						return true // guard dominates → covers every path → suppress
 					}
@@ -891,7 +946,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	if sinkCFG {
 		guards, _ := e.Store.NodesWithConcept(control)
 		for _, gid := range guards {
-			if gid != sinkID && hasCFG(e.Store, gid) && solvers.Dominates(e.Store, gid, sinkID) {
+			if gid != sinkID && e.hasCFG(gid) && solvers.Dominates(e.Store, gid, sinkID) {
 				return true
 			}
 		}
@@ -920,11 +975,11 @@ func (e *Engine) flowGuarded(path []string, control string) bool {
 	}
 	for i, pid := range path {
 		for _, gid := range e.flowGuardCandidates(pid, control) {
-			if gid == pid || !hasCFG(e.Store, gid) {
+			if gid == pid || !e.hasCFG(gid) {
 				continue
 			}
 			for _, later := range path[i+1:] {
-				if later != gid && hasCFG(e.Store, later) && solvers.Dominates(e.Store, gid, later) {
+				if later != gid && e.hasCFG(later) && solvers.Dominates(e.Store, gid, later) {
 					return true
 				}
 			}
@@ -934,6 +989,10 @@ func (e *Engine) flowGuarded(path []string, control string) bool {
 }
 
 func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
+	key := control + "\x00" + nodeID
+	if out, ok := e.flowGuards[key]; ok {
+		return out
+	}
 	seen := map[string]bool{}
 	var out []string
 	add := func(id string) {
@@ -951,6 +1010,7 @@ func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
 			add(mid.Dst)
 		}
 	}
+	e.flowGuards[key] = out
 	return out
 }
 
@@ -995,13 +1055,13 @@ func nearestLoopParent(region string) (string, bool) {
 // CFG metadata it uses post-dominance; without it falls back to presence (any release
 // suppresses — conservative, to avoid leak false positives on unconverted frontends).
 func (e *Engine) endpointClosed(allocID, control string) bool {
-	allocCFG := hasCFG(e.Store, allocID)
+	allocCFG := e.hasCFG(allocID)
 	releases, _ := e.Store.NodesWithConcept(control)
 	for _, rid := range releases {
 		if rid == allocID {
 			continue
 		}
-		if allocCFG && hasCFG(e.Store, rid) {
+		if allocCFG && e.hasCFG(rid) {
 			if solvers.PostDominates(e.Store, rid, allocID) {
 				return true
 			}
@@ -1018,6 +1078,15 @@ func hasCFG(store usg.Store, id string) bool {
 		return n.Prop("region") != ""
 	}
 	return false
+}
+
+func (e *Engine) hasCFG(id string) bool {
+	if v, ok := e.cfg[id]; ok {
+		return v
+	}
+	v := hasCFG(e.Store, id)
+	e.cfg[id] = v
+	return v
 }
 
 func dedup(fs []*findings.Finding) []*findings.Finding {

@@ -113,6 +113,27 @@ func TestNpmLibraryDetectsDotRoot(t *testing.T) {
 	}
 }
 
+func TestLibraryDetectsFromNestedSourceFile(t *testing.T) {
+	profiles, err := Load()
+	if err != nil {
+		t.Fatalf("load profiles: %v", err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "setup.py"), []byte("from setuptools import setup\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "pkg", "subpkg", "module.py")
+	if err := os.MkdirAll(filepath.Dir(src), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(src, []byte("def f(x):\n    return x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := Detect([]string{src}, profiles); got.Name != "library" {
+		t.Fatalf("Detect(nested source file) = %q, want library", got.Name)
+	}
+}
+
 // explicit-by-name lookup is also exercised: ByName resolves each shipped profile.
 func TestProfileByName(t *testing.T) {
 	profiles, err := Load()

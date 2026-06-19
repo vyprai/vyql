@@ -297,14 +297,54 @@ func fileExists(paths []string, rel string) bool {
 
 func roots(paths []string) []string {
 	var out []string
+	seen := map[string]bool{}
 	for _, p := range paths {
-		if info, err := os.Stat(p); err == nil && info.IsDir() {
-			out = append(out, p)
-		} else {
-			out = append(out, filepath.Dir(p))
+		root := projectRoot(p)
+		if seen[root] {
+			continue
 		}
+		seen[root] = true
+		out = append(out, root)
 	}
 	return out
+}
+
+func projectRoot(p string) string {
+	base := filepath.Clean(p)
+	if info, err := os.Stat(p); err == nil && info.IsDir() {
+		base = p
+	} else {
+		base = filepath.Dir(p)
+	}
+	fallback := filepath.Clean(base)
+	for {
+		if hasProjectMarker(base) {
+			return base
+		}
+		parent := filepath.Dir(base)
+		if parent == base {
+			return fallback
+		}
+		base = parent
+	}
+}
+
+func hasProjectMarker(dir string) bool {
+	markers := []string{
+		".git", "package.json", "setup.py", "setup.cfg", "pyproject.toml", "go.mod",
+		"Pipfile", "requirements.txt", "Gemfile", "pom.xml", "build.gradle",
+		"Cargo.toml", "composer.json", "AndroidManifest.xml", "Info.plist",
+		"Package.swift",
+	}
+	for _, marker := range markers {
+		if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+			return true
+		}
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.xcodeproj")); len(matches) > 0 {
+		return true
+	}
+	return false
 }
 
 func str(v any) string {

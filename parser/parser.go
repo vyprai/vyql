@@ -600,6 +600,17 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		if p.atWord("collection") { // also flag a Seq/collection-literal arg
 			p.next()
 			m.Collection = true
+			if p.atWord("first") {
+				p.next()
+				m.CollectionFirst = true
+				m.CollectionIndex = 0
+			} else if p.at(tWord) {
+				if n, err := strconv.Atoi(p.peek().val); err == nil {
+					p.next()
+					m.CollectionFirst = true
+					m.CollectionIndex = n
+				}
+			}
 		}
 		if p.atWord("on") { // optional receiver-type constraint (one type or [list])
 			p.next()

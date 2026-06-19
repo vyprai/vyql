@@ -209,13 +209,18 @@ adapter python {
   sink path "os.popen2" -> code.CommandExecution
   sink path "os.popen3" -> code.CommandExecution
   sink path "os.popen4" -> code.CommandExecution
-  sink path "subprocess.call" -> code.CommandExecution
-  sink path "subprocess.run" -> code.CommandExecution
-  sink path "subprocess.Popen" -> code.CommandExecution
+  sink path "subprocess.call" collection first -> code.CommandExecution
+  sink path "subprocess.run" collection first -> code.CommandExecution
+  sink path "subprocess.Popen" collection first -> code.CommandExecution
+  sink path "subprocess.call" collection 2 val "-c" -> code.CommandExecution
+  sink path "subprocess.run" collection 2 val "-c" -> code.CommandExecution
+  sink path "subprocess.Popen" collection 2 val "-c" -> code.CommandExecution
   sink path "subprocess.Popen" val "self.args" val "tag.filename" nval "--" -> code.CommandOptionInjection
   sink path "subprocess.Popen" val "self.args" val "filename" nval "--" -> code.CommandOptionInjection
-  sink path "subprocess.check_output" -> code.CommandExecution
-  sink path "subprocess.check_call" -> code.CommandExecution
+  sink path "subprocess.check_output" collection first -> code.CommandExecution
+  sink path "subprocess.check_call" collection first -> code.CommandExecution
+  sink path "subprocess.check_output" collection 2 val "-c" -> code.CommandExecution
+  sink path "subprocess.check_call" collection 2 val "-c" -> code.CommandExecution
   sink path "subprocess.getoutput" -> code.CommandExecution
   sink path "subprocess.getstatusoutput" -> code.CommandExecution
   sink path "commands.getoutput" -> code.CommandExecution

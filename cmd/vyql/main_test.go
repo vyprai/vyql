@@ -11,7 +11,7 @@ import (
 
 func TestScanPathsNoSource(t *testing.T) {
 	rules, _ := loadRules("")
-	if _, _, err := scanPaths([]string{t.TempDir()}, rules); err == nil {
+	if _, _, _, err := scanPaths([]string{t.TempDir()}, rules); err == nil {
 		t.Fatal("scanning a dir with no supported source should error")
 	}
 }

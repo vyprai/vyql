@@ -37,6 +37,7 @@ import (
 	"github.com/vyprai/vyql/profile"
 	"github.com/vyprai/vyql/risk"
 	"github.com/vyprai/vyql/sarif"
+	"github.com/vyprai/vyql/usg"
 )
 
 const version = "0.1.0"
@@ -206,25 +207,25 @@ func profileNames() string {
 // scanPaths runs the full pipeline (extract → lower → adapters → compile →
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework adapters.
-func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, error) {
+func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, usg.Store, error) {
 	g, stats, err := buildGraph(paths)
 	if err != nil {
-		return nil, stats, err
+		return nil, stats, nil, err
 	}
 	if g == nil {
-		return nil, stats, nil // recognized files, but nothing to analyze
+		return nil, stats, nil, nil // recognized files, but nothing to analyze
 	}
 	onto := ontology.Seed()
 	decls, err := parser.Parse(rulesSrc)
 	if err != nil {
-		return nil, stats, fmt.Errorf("rule parse: %w", err)
+		return nil, stats, g, fmt.Errorf("rule parse: %w", err)
 	}
 	compiled, cerrs := engine.CompileRules(decls, onto)
 	if len(cerrs) != 0 {
 		for _, e := range cerrs {
 			fmt.Fprintln(os.Stderr, "rule error: "+e.Error())
 		}
-		return nil, stats, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
+		return nil, stats, g, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
 	}
 	eng := engine.New(onto, g)
 	var all []*findings.Finding
@@ -232,7 +233,7 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	for _, cr := range compiled {
 		got, err := eng.Evaluate(cr)
 		if err != nil {
-			return nil, stats, err
+			return nil, stats, g, err
 		}
 		all = append(all, got...)
 	}
@@ -243,7 +244,7 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 		all = append(all, eng.PossibilityFindings(all)...)
 	}
 	tk.mark("evaluate")
-	return all, stats, nil
+	return all, stats, g, nil
 }
 
 func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
@@ -273,6 +274,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	var rkey string
 	var all []*findings.Finding
 	var stats scanStats
+	var graph usg.Store
 	hit := false
 	if cache != nil && syncCollector == nil {
 		rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
@@ -282,7 +284,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	}
 	tk.mark("fingerprint")
 	if !hit {
-		all, stats, err = scanPaths(paths, src)
+		all, stats, graph, err = scanPaths(paths, src)
 		if err != nil {
 			return err
 		}
@@ -315,7 +317,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	}
 	if showStats {
 		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
-		printScanStats(paths)
+		printScanStats(graph, stats)
 	}
 	return nil
 }

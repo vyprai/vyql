@@ -34,16 +34,18 @@ type inputSpec struct {
 }
 
 type sinkSpec struct {
-	Concept    string
-	Pattern    string
-	ByMethod   bool     // match the bare method name vs the dotted callee path
-	Receiver   bool     // tainted data is the RECEIVER, not an arg — label the call node
-	Constraint string   // optional `on <type>` receiver-type constraint
-	ArgIndex   int      // which argument position is targeted (default 0)
-	ValMatches []string // `val "substr"` (AND) — every substr must be in some arg/option literal
-	ValAbsents []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
-	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
-	Collection bool     // also flag a Seq/collection-literal arg
+	Concept         string
+	Pattern         string
+	ByMethod        bool     // match the bare method name vs the dotted callee path
+	Receiver        bool     // tainted data is the RECEIVER, not an arg — label the call node
+	Constraint      string   // optional `on <type>` receiver-type constraint
+	ArgIndex        int      // which argument position is targeted (default 0)
+	ValMatches      []string // `val "substr"` (AND) — every substr must be in some arg/option literal
+	ValAbsents      []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
+	Packages        []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
+	Collection      bool     // also flag a Seq/collection-literal arg
+	CollectionFirst bool     // label a specific element of a Seq/collection arg when present
+	CollectionIndex int      // selected collection element index
 }
 
 type controlSpec struct {
@@ -85,19 +87,27 @@ func ActiveSourcesKey() string {
 // valContains reports whether the NUL-joined str_args prop contains sub,
 // case-insensitively. Used by `val`/`nval` matching.
 func valContains(tokens, sub string) bool {
-	return strings.Contains(strings.ToLower(tokens), strings.ToLower(sub))
+	return valContainsLower(strings.ToLower(tokens), sub)
+}
+
+func valContainsLower(lowerTokens, sub string) bool {
+	return strings.Contains(lowerTokens, strings.ToLower(sub))
 }
 
 // valConds reports whether every `val` substring is present (AND) and every
 // `nval` substring is absent among the value tokens. Empty lists pass.
 func valConds(tokens string, vals, nvals []string) bool {
+	return valCondsLower(strings.ToLower(tokens), vals, nvals)
+}
+
+func valCondsLower(lowerTokens string, vals, nvals []string) bool {
 	for _, v := range vals {
-		if !valContains(tokens, v) {
+		if !valContainsLower(lowerTokens, v) {
 			return false
 		}
 	}
 	for _, nv := range nvals {
-		if valContains(tokens, nv) {
+		if valContainsLower(lowerTokens, nv) {
 			return false
 		}
 	}
@@ -138,10 +148,54 @@ func valCondsForNode(s usg.Store, idx *flowTokenIndex, n usg.Node, vals, nvals [
 		return true
 	}
 	direct := n.Prop("str_args")
-	if len(nvals) == 0 && valConds(direct, vals, nil) {
+	lowerDirect := strings.ToLower(direct)
+	if valCondsLower(lowerDirect, vals, nvals) {
 		return true
 	}
+	for _, nv := range nvals {
+		if valContainsLower(lowerDirect, nv) {
+			return false
+		}
+	}
+	if strings.HasPrefix(n.Prop("callee_path"), "analysis.") {
+		return false
+	}
+	if direct == "" {
+		return false
+	}
+	if len(vals) == 0 {
+		return false
+	}
 	return valConds(flowingStringTokens(s, idx, n.ID, direct), vals, nvals)
+}
+
+func valCondsDirectForNode(n usg.Node, vals, nvals []string) bool {
+	return len(vals) == 0 && len(nvals) == 0 || valConds(n.Prop("str_args"), vals, nvals)
+}
+
+var callablePropTypes = []string{
+	"code.Call",
+	"code.Attr",
+	"code.Name",
+	"code.Subscript",
+	"code.BinOp",
+	"code.Unary",
+	"code.Seq",
+}
+
+func rangeCallablePropNodes(s usg.Store, fn func(usg.Node) bool) {
+	for _, typ := range callablePropTypes {
+		ids, _ := s.NodesOfType(typ)
+		for _, id := range ids {
+			n, ok, err := s.GetNode(id)
+			if err != nil || !ok {
+				continue
+			}
+			if !fn(n) {
+				return
+			}
+		}
+	}
 }
 
 func flowingStringTokens(s usg.Store, idx *flowTokenIndex, start, direct string) string {
@@ -177,6 +231,92 @@ func flowingStringTokens(s usg.Store, idx *flowTokenIndex, start, direct string)
 		}
 	}
 	return strings.Join(tokens, "\x00")
+}
+
+type collectionFlowIndex struct {
+	built       bool
+	reachesSeq  map[string][]string
+	seqElements map[string]map[int]string
+}
+
+func (idx *collectionFlowIndex) ensure(s usg.Store) {
+	if idx.built {
+		return
+	}
+	idx.built = true
+	idx.reachesSeq = map[string][]string{}
+	idx.seqElements = map[string]map[int]string{}
+	rg, _ := s.(interface {
+		RangeOutEdges(string, string, func(string) bool)
+	})
+	rangeOut := func(id string, fn func(string) bool) {
+		if rg != nil {
+			rg.RangeOutEdges(id, "FLOWS", fn)
+			return
+		}
+		edges, _ := s.OutEdges(id, "FLOWS")
+		for _, edge := range edges {
+			if !fn(edge.Dst) {
+				return
+			}
+		}
+	}
+	elemIDs, _ := s.NodesOfType("code.CollectionElement")
+	for _, id := range elemIDs {
+		elem, ok, err := s.GetNode(id)
+		if err != nil || !ok {
+			continue
+		}
+		elemIndex, err := strconv.Atoi(elem.Prop("collection_index"))
+		if err != nil {
+			continue
+		}
+		rangeOut(id, func(dst string) bool {
+			dstNode, ok, err := s.GetNode(dst)
+			if err == nil && ok && dstNode.Type == "code.Seq" {
+				if idx.seqElements[dst] == nil {
+					idx.seqElements[dst] = map[int]string{}
+				}
+				idx.seqElements[dst][elemIndex] = id
+			}
+			return true
+		})
+	}
+	seqIDs, _ := s.NodesOfType("code.Seq")
+	type item struct {
+		id    string
+		depth int
+	}
+	for _, seqID := range seqIDs {
+		seen := map[string]bool{seqID: true}
+		q := []item{{id: seqID}}
+		for len(q) > 0 && len(seen) < 64 {
+			cur := q[0]
+			q = q[1:]
+			if cur.depth > 4 {
+				continue
+			}
+			idx.reachesSeq[cur.id] = append(idx.reachesSeq[cur.id], seqID)
+			rangeOut(cur.id, func(dst string) bool {
+				if seen[dst] {
+					return true
+				}
+				seen[dst] = true
+				q = append(q, item{id: dst, depth: cur.depth + 1})
+				return true
+			})
+		}
+	}
+}
+
+func collectionElement(s usg.Store, idx *collectionFlowIndex, argID string, elemIndex int) string {
+	idx.ensure(s)
+	for _, seqID := range idx.reachesSeq[argID] {
+		if elemID := idx.seqElements[seqID][elemIndex]; elemID != "" {
+			return elemID
+		}
+	}
+	return ""
 }
 
 func detailWithPattern(detail map[string]string, pattern string) map[string]string {
@@ -368,7 +508,6 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 				allowed[i] = packageAllowed(spec.Assumes[i].Packages, pkgs)
 			}
 			var out []adapters.Mapping
-			var flowIdx flowTokenIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
@@ -382,7 +521,7 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 					if !(as.ByMethod && method == as.Pattern || !as.ByMethod && matchSinkPath(path, as.Pattern)) {
 						continue
 					}
-					if !valCondsForNode(s, &flowIdx, n, as.ValMatches, as.ValAbsents) {
+					if !valCondsDirectForNode(n, as.ValMatches, as.ValAbsents) {
 						continue
 					}
 					out = append(out, adapters.Mapping{NodeID: id, Concept: concept,
@@ -552,9 +691,9 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method; match the bare
 			// method name and label the call node itself.
@@ -611,8 +750,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				allowed[i] = packageAllowed(spec.Inputs[i].Packages, pkgs)
 			}
 			var out []adapters.Mapping
-			var flowIdx flowTokenIndex
-			rangeNodes(s, func(n usg.Node) bool {
+			rangeCallablePropNodes(s, func(n usg.Node) bool {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				if path == "" && method == "" {
 					return true
@@ -635,7 +773,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 						// value-constrained source: only a source when configured literal
 						// tokens are present or absent as declared by the adapter.
 						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&
-							!valCondsForNode(s, &flowIdx, n, in.ValMatches, in.ValAbsents) {
+							!valCondsDirectForNode(n, in.ValMatches, in.ValAbsents) {
 							continue
 						}
 						// active-profile gating: a profile restricts which
@@ -690,6 +828,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			}
 			var out []adapters.Mapping
 			var flowIdx flowTokenIndex
+			var collectionIdx collectionFlowIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
@@ -783,11 +922,17 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							if arg == "" {
 								break
 							}
-							if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && a.Prop("vkind") == "Seq" {
+							target := arg
+							if sk.CollectionFirst {
+								if first := collectionElement(s, &collectionIdx, arg, sk.CollectionIndex); first != "" {
+									target = first
+								}
+							}
+							if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && !sk.CollectionFirst && a.Prop("vkind") == "Seq" {
 								continue
 							}
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
-							out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
+							out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
 					}
@@ -795,11 +940,17 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if arg == "" {
 						continue
 					}
-					if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && a.Prop("vkind") == "Seq" {
+					target := arg
+					if sk.CollectionFirst {
+						if first := collectionElement(s, &collectionIdx, arg, sk.CollectionIndex); first != "" {
+							target = first
+						}
+					}
+					if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && !sk.CollectionFirst && a.Prop("vkind") == "Seq" {
 						continue
 					}
 					detail, conf := reviewDetail(sk.Concept, sk.Pattern)
-					out = append(out, adapters.Mapping{NodeID: arg, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
+					out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
 				}
 			}
 			return out
@@ -827,7 +978,6 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 				allowed[i] = packageAllowed(spec.Controls[i].Packages, pkgs)
 			}
 			var out []adapters.Mapping
-			var flowIdx flowTokenIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
@@ -841,7 +991,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 					}
 					// no break: a single call can be MULTIPLE controls, so attach every match.
 					hit := c.ByMethod && method == c.Pattern || !c.ByMethod && matchPath(path, []string{c.Pattern}, "prefix")
-					if hit && valCondsForNode(s, &flowIdx, n, c.ValMatches, c.ValAbsents) {
+					if hit && valCondsDirectForNode(n, c.ValMatches, c.ValAbsents) {
 						nodeID := id
 						if c.Receiver {
 							nodeID = n.Prop("recv")
@@ -1006,7 +1156,6 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			if crossLang {
 				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
 			}
-			var flowIdx flowTokenIndex
 			for _, nodeType := range nodeTypes {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
@@ -1030,7 +1179,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 						if !hit {
 							continue
 						}
-						if !valCondsForNode(s, &flowIdx, n, m.ValMatches, m.ValAbsents) {
+						if !valCondsDirectForNode(n, m.ValMatches, m.ValAbsents) {
 							continue
 						}
 						detail, conf := reviewDetail(m.Concept, m.Pattern)

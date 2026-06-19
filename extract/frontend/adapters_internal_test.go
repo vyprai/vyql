@@ -347,8 +347,146 @@ func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
 		}},
 	}
 	got = markSpec.markAdapter().Apply(store)
+	if len(got) != 0 {
+		t.Fatalf("value-matched mark used flowing string tokens: %+v", got)
+	}
+
+	directMarkStore := usg.NewInMemStore()
+	directMarkStore.AddNode(usg.Node{ID: "open", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "open", "method": "open", "str_args": "/tmp/fixed\x00w",
+	}})
+	got = markSpec.markAdapter().Apply(directMarkStore)
 	if len(got) != 1 || got[0].NodeID != "open" || got[0].Concept != "custom.Mark" {
-		t.Fatalf("value-matched mark did not use flowing string tokens: %+v", got)
+		t.Fatalf("value-matched mark did not use direct string tokens: %+v", got)
+	}
+}
+
+func TestCollectionFirstSinkTargetsIndexedElement(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:         "custom.Command",
+			Pattern:         "runtime.execv",
+			CollectionFirst: true,
+			CollectionIndex: 0,
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "elem0", Type: "code.CollectionElement", Props: map[string]string{
+		"loc": "sample.x:1", "collection_index": "0",
+	}})
+	store.AddNode(usg.Node{ID: "elem1", Type: "code.CollectionElement", Props: map[string]string{
+		"loc": "sample.x:1", "collection_index": "1",
+	}})
+	store.AddNode(usg.Node{ID: "seq", Type: "code.Seq", Props: map[string]string{
+		"loc": "sample.x:1", "callee_path": "__object_literal",
+	}})
+	store.AddNode(usg.Node{ID: "tmp", Type: "code.Name", Props: map[string]string{"loc": "sample.x:1"}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "runtime.execv", "method": "execv", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "elem0", Dst: "seq"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "elem1", Dst: "seq"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "seq", Dst: "tmp"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "tmp", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
+
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "elem0" || got[0].Concept != "custom.Command" {
+		t.Fatalf("collection first sink mapping wrong: %+v", got)
+	}
+}
+
+func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Inputs: []inputSpec{{
+			Concept:    "custom.Source",
+			Paths:      []string{"os.getenv"},
+			Match:      "prefix",
+			ValMatches: []string{"HTTP_PROXY"},
+		}},
+	}
+	adapter := spec.inputAdapter()
+
+	direct := usg.NewInMemStore()
+	direct.AddNode(usg.Node{ID: "src", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "os.getenv", "method": "getenv", "str_args": "HTTP_PROXY",
+	}})
+	if got := adapter.Apply(direct); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
+		t.Fatalf("value-matched source did not use direct string tokens: %+v", got)
+	}
+
+	flowed := usg.NewInMemStore()
+	flowed.AddNode(usg.Node{ID: "literal", Type: "code.Const", Props: map[string]string{
+		"loc": "sample.x:1", "str_args": "HTTP_PROXY",
+	}})
+	flowed.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	flowed.AddNode(usg.Node{ID: "src", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "os.getenv", "method": "getenv", "arg0": "arg0",
+	}})
+	flowed.AddEdge(usg.Edge{Type: "FLOWS", Src: "literal", Dst: "arg0"})
+	flowed.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "src"})
+	if got := adapter.Apply(flowed); len(got) != 0 {
+		t.Fatalf("value-matched source used flowing string tokens: %+v", got)
+	}
+}
+
+func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Inputs: []inputSpec{{
+			Concept: "custom.Source",
+			Paths: []string{
+				"call.source",
+				"attr.source",
+				"name_source",
+				"bag.__subscript",
+				"__binop.add",
+				"__unary.neg",
+				"__object_literal",
+			},
+			Match: "prefix",
+		}},
+	}
+	store := usg.NewInMemStore()
+	for _, tc := range []struct {
+		id   string
+		typ  string
+		path string
+	}{
+		{"call", "code.Call", "call.source"},
+		{"attr", "code.Attr", "attr.source"},
+		{"name", "code.Name", "name_source"},
+		{"subscript", "code.Subscript", "bag.__subscript"},
+		{"binop", "code.BinOp", "__binop.add"},
+		{"unary", "code.Unary", "__unary.neg"},
+		{"seq", "code.Seq", "__object_literal"},
+	} {
+		store.AddNode(usg.Node{ID: tc.id, Type: tc.typ, Props: map[string]string{
+			"loc": "sample.x:1", "callee_path": tc.path, "method": tc.path,
+		}})
+	}
+	got := spec.inputAdapter().Apply(store)
+	if len(got) != 7 {
+		t.Fatalf("input adapter missed callable node types: %+v", got)
+	}
+	seen := map[string]bool{}
+	for _, m := range got {
+		seen[m.NodeID] = true
+	}
+	for _, id := range []string{"call", "attr", "name", "subscript", "binop", "unary", "seq"} {
+		if !seen[id] {
+			t.Fatalf("input adapter missed %s in %+v", id, got)
+		}
 	}
 }
 

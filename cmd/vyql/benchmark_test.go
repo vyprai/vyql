@@ -55,7 +55,7 @@ func TestOWASPBenchmark(t *testing.T) {
 	if len(roots) == 0 {
 		roots = []string{dir}
 	}
-	fs, _, err := scanPaths(roots, rules)
+	fs, _, _, err := scanPaths(roots, rules)
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}

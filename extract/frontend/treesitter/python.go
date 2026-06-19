@@ -909,7 +909,7 @@ func replaceName(ex nir.Expr, name string, repl nir.Expr) nir.Expr {
 		return e
 	case nir.Name:
 		if e.ID == name {
-			return repl
+			return cloneExpr(repl)
 		}
 		return e
 	case nir.Attr:
@@ -958,6 +958,91 @@ func replaceName(ex nir.Expr, name string, repl nir.Expr) nir.Expr {
 	default:
 		return e
 	}
+}
+
+func cloneExpr(ex nir.Expr) nir.Expr {
+	switch e := ex.(type) {
+	case nil:
+		return e
+	case nir.Name, nir.Const:
+		return e
+	case nir.Attr:
+		e.Base = cloneExpr(e.Base)
+		return e
+	case nir.Index:
+		e.Base = cloneExpr(e.Base)
+		e.Key = cloneExpr(e.Key)
+		return e
+	case nir.Call:
+		e.Callee = cloneExpr(e.Callee)
+		e.Args = cloneExprs(e.Args)
+		return e
+	case nir.Format:
+		e.Parts = cloneExprs(e.Parts)
+		return e
+	case nir.Seq:
+		e.Parts = cloneExprs(e.Parts)
+		if len(e.KeyPath) > 0 {
+			e.KeyPath = append([]string(nil), e.KeyPath...)
+		}
+		return e
+	case nir.Pair:
+		e.Value = cloneExpr(e.Value)
+		return e
+	case nir.Thru:
+		e.Inner = cloneExpr(e.Inner)
+		return e
+	case nir.BinOp:
+		e.Left = cloneExpr(e.Left)
+		e.Right = cloneExpr(e.Right)
+		return e
+	case nir.Unary:
+		e.Operand = cloneExpr(e.Operand)
+		return e
+	case nir.Ternary:
+		e.Cond = cloneExpr(e.Cond)
+		e.Then = cloneExpr(e.Then)
+		e.Else = cloneExpr(e.Else)
+		return e
+	case nir.Lambda:
+		e.Body = cloneStmts(e.Body)
+		if e.ParamTypes != nil {
+			cp := map[string]string{}
+			for k, v := range e.ParamTypes {
+				cp[k] = v
+			}
+			e.ParamTypes = cp
+		}
+		if len(e.Params) > 0 {
+			e.Params = append([]string(nil), e.Params...)
+		}
+		if len(e.ParamEntries) > 0 {
+			e.ParamEntries = append([]nir.ParamEntry(nil), e.ParamEntries...)
+		}
+		return e
+	default:
+		return e
+	}
+}
+
+func cloneExprs(in []nir.Expr) []nir.Expr {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]nir.Expr, len(in))
+	for i, e := range in {
+		out[i] = cloneExpr(e)
+	}
+	return out
+}
+
+func cloneStmts(in []nir.Stmt) []nir.Stmt {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]nir.Stmt, len(in))
+	copy(out, in)
+	return out
 }
 
 // keyName returns the bare name of a Pair key node — an identifier as-is, or a

@@ -310,7 +310,7 @@ func TestVyqlSpecs(t *testing.T) {
 						applyProfile([]string{dir}, s.profile)
 						defer frontend.SetActiveSources(nil)
 					}
-					found, _, err := scanPaths([]string{dir}, rules)
+					found, _, _, err := scanPaths([]string{dir}, rules)
 					if err != nil {
 						t.Fatalf("scan: %v", err)
 					}

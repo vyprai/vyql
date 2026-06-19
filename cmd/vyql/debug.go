@@ -8,7 +8,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/findings"
@@ -232,7 +231,7 @@ func cmdExplain(args []string) error {
 	if err != nil {
 		return err
 	}
-	all, _, err := scanPaths(paths, src)
+	all, _, _, err := scanPaths(paths, src)
 	if err != nil {
 		return err
 	}
@@ -779,14 +778,11 @@ func cmdQuery(args []string) error {
 
 // ── scan -stats profiler ──────────────────────────────────────────────────────────────
 
-// printScanStats re-runs the pipeline with per-phase timing and reports graph size plus
-// taint-hub warnings (high FLOWS in/out-degree nodes — the shared callees that cause
-// super-linear blowup). Flag-driven, no env var.
-func printScanStats(paths []string) {
-	t0 := time.Now()
-	g, stats, err := buildGraph(paths)
-	tBuild := time.Since(t0)
-	if err != nil || g == nil {
+// printScanStats reports graph size plus taint-hub warnings (high FLOWS in/out-degree nodes —
+// the shared callees that cause super-linear blowup). It uses the graph already built for the
+// scan; rebuilding here would double the work for `scan --stats`.
+func printScanStats(g usg.Store, stats scanStats) {
+	if g == nil {
 		fmt.Println("\n[stats] no graph built")
 		return
 	}
@@ -823,8 +819,8 @@ func printScanStats(paths []string) {
 	for i := range nodeDeg {
 		nodeDeg[i].in = indeg[nodeDeg[i].id]
 	}
-	fmt.Printf("\n[stats] build %s | files %d | nodes %d | edges %d | sources %d | sinks %d\n",
-		tBuild.Round(time.Millisecond), totalFiles(stats), len(nodes), edges, srcCount, sinkCount)
+	fmt.Printf("[stats] files %d | nodes %d | edges %d | sources %d | sinks %d\n",
+		totalFiles(stats), len(nodes), edges, srcCount, sinkCount)
 
 	// taint hubs: high FLOWS in-degree = a callee shared by many call sites; the cross-product
 	// of in×out paths through such a node is what makes path-enumeration blow up.

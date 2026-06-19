@@ -60,10 +60,11 @@ type lowerer struct {
 	// that set ClassDef.Bases/Members). directMembers: "modkey::Class" -> declared member set;
 	// classBaseNames: "modkey::Class" -> base SHORT names; membersOfShort: short class name ->
 	// union of declared members (for resolving inherited members by name across files).
-	directMembers  map[string]map[string]bool
-	classBaseNames map[string][]string
-	membersOfShort map[string]map[string]bool
-	allMembersMemo map[string]map[string]bool // memoized transitive member set per "modkey::Class"
+	directMembers   map[string]map[string]bool
+	classBaseNames  map[string][]string
+	derivedChildren map[string][]string // base short name -> child class quals
+	membersOfShort  map[string]map[string]bool
+	allMembersMemo  map[string]map[string]bool // memoized transitive member set per "modkey::Class"
 
 	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
@@ -1004,6 +1005,14 @@ func lastPathSegment(path string) string {
 	return path[i+1:]
 }
 
+func shortClassName(name string) string {
+	name = lastPathSegment(strings.TrimSpace(name))
+	if i := strings.LastIndex(name, "::"); i >= 0 && i < len(name)-2 {
+		return name[i+2:]
+	}
+	return name
+}
+
 func isPathResolveParents(expr nir.Expr) bool {
 	attr, ok := expr.(nir.Attr)
 	if !ok || attr.Attr != "parents" {
@@ -1035,27 +1044,28 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 // incremental lowerer.
 func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]string) *lowerer {
 	return &lowerer{
-		prog:           prog,
-		selfName:       prog.Self(),
-		resolveImports: resolveImports,
-		ctorTypes:      ctorTypes,
-		g:              newGraphStore(0),
-		modCtr:         map[string]int{},
-		modOrder:       map[string]int{},
-		modBranch:      map[string]int{},
-		funcQual:       map[string]*funcInfo{},
-		funcShort:      map[string][]*funcInfo{},
-		classQual:      map[string]bool{},
-		classDefs:      map[string]map[string]bool{},
-		classFields:    map[string]map[string]string{},
-		importTables:   map[string]map[string]importEntry{},
-		moduleGlobals:  map[string]map[string]string{},
-		containers:     map[string]*containerInfo{},
-		lambdaParams:   map[string][]string{},
-		directMembers:  map[string]map[string]bool{},
-		classBaseNames: map[string][]string{},
-		membersOfShort: map[string]map[string]bool{},
-		allMembersMemo: map[string]map[string]bool{},
+		prog:            prog,
+		selfName:        prog.Self(),
+		resolveImports:  resolveImports,
+		ctorTypes:       ctorTypes,
+		g:               newGraphStore(0),
+		modCtr:          map[string]int{},
+		modOrder:        map[string]int{},
+		modBranch:       map[string]int{},
+		funcQual:        map[string]*funcInfo{},
+		funcShort:       map[string][]*funcInfo{},
+		classQual:       map[string]bool{},
+		classDefs:       map[string]map[string]bool{},
+		classFields:     map[string]map[string]string{},
+		importTables:    map[string]map[string]importEntry{},
+		moduleGlobals:   map[string]map[string]string{},
+		containers:      map[string]*containerInfo{},
+		lambdaParams:    map[string][]string{},
+		directMembers:   map[string]map[string]bool{},
+		classBaseNames:  map[string][]string{},
+		derivedChildren: map[string][]string{},
+		membersOfShort:  map[string]map[string]bool{},
+		allMembersMemo:  map[string]map[string]bool{},
 	}
 }
 
@@ -1394,7 +1404,11 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				}
 			}
 			if len(st.Bases) > 0 {
-				l.classBaseNames[modkey+"::"+st.Name] = st.Bases
+				qual := modkey + "::" + st.Name
+				l.classBaseNames[qual] = st.Bases
+				for _, base := range st.Bases {
+					l.derivedChildren[shortClassName(base)] = append(l.derivedChildren[shortClassName(base)], qual)
+				}
 			}
 			// record field -> declared class type (for cross-file method resolution
 			// on field receivers, e.g. Spring `@Autowired UserService svc; svc.m()`).
@@ -1680,7 +1694,19 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
-		l.inRegion("if"+b+".t", func() { l.block(st.Then, sc) })
+		l.inRegion("if"+b+".t", func() {
+			if name, ok := allowlistMembershipVar(st.Cond); ok && before[name] != "" {
+				loc := st.Loc
+				if loc == "" {
+					loc = "?:0"
+				}
+				sc.node[name] = l.node("AllowlistValue", loc, map[string]string{
+					"name": name,
+					"kind": "literal_membership",
+				})
+			}
+			l.block(st.Then, sc)
+		})
 		thenB := cloneStrMap(sc.node)
 		sc.node = cloneStrMap(before)
 		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
@@ -1857,8 +1883,13 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			props["str_args"] = strings.Join(valToks, "\x00")
 		}
 		n := l.node("Seq", ex.Loc, props)
-		for _, p := range ex.Parts {
-			l.flow(l.eval(p, sc), n)
+		for i, p := range ex.Parts {
+			elem := l.node("CollectionElement", ex.Loc, map[string]string{
+				"collection_index": strconv.Itoa(i),
+				"vkind":            nirKind(p),
+			})
+			l.flow(l.eval(p, sc), elem)
+			l.flow(elem, n)
 		}
 		return n
 	case nir.BinOp:
@@ -2830,12 +2861,12 @@ func (l *lowerer) resolveDerivedMethods(class, method string) []*funcInfo {
 	seenClass := map[string]bool{}
 	var walk func(string)
 	walk = func(parentClass string) {
-		for qual, bases := range l.classBaseNames {
+		for _, qual := range l.derivedChildren[shortClassName(parentClass)] {
 			if seenClass[qual] {
 				continue
 			}
 			childMod, childClass, ok := splitClassQual(qual)
-			if !ok || !classBasesInclude(parentClass, bases) {
+			if !ok {
 				continue
 			}
 			seenClass[qual] = true
