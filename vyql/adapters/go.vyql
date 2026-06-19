@@ -241,6 +241,9 @@ adapter go {
   // Review-only: protocol/state handlers that stop a registration timer without
   // first checking the corresponding state can accept out-of-sequence messages.
   mark exact "analysis.function.context" val "call:StopT3550" nval "selector:ue.T3550" -> code.ProtocolStateReview
+  // Review-only: protocol handlers that compare an incoming previous-state pointer
+  // against the last stored state need manual review for stale or forked-chain cases.
+  mark exact "analysis.function.context" val "PrevATXID" val "call:GetLastIDByNodeID" -> code.ProtocolStateReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission

@@ -241,6 +241,39 @@ test "review: go timer stop with state guard is clean"
   }
   ```
 
+test "review: go previous-state protocol check is surfaced"
+  lang go
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  package main
+  import "errors"
+  type ATXID [32]byte
+  type NodeID [32]byte
+  type ActivationTx struct {
+    PrevATXID ATXID
+    SmesherID NodeID
+  }
+  type DB struct{}
+  var db DB
+  var atxs = struct {
+    GetLastIDByNodeID func(DB, NodeID) (ATXID, error)
+  }{}
+  func ContextuallyValidateAtx(atx *ActivationTx) error {
+    lastAtx, err := atxs.GetLastIDByNodeID(db, atx.SmesherID)
+    if err == nil && atx.PrevATXID == lastAtx {
+      return nil
+    }
+    if err == nil && atx.PrevATXID != lastAtx {
+      return errors.New("last atx is not the one referenced")
+    }
+    if err != nil && atx.PrevATXID != (ATXID{}) {
+      return err
+    }
+    return nil
+  }
+  ```
+
 test "review: incomplete scala csrf token validation is surfaced"
   lang scala
   expect_review code.IncompleteCsrfTokenValidation
