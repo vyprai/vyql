@@ -209,6 +209,9 @@ adapter java {
   control method "canAlterNamespace" -> core.AuthorizationCheck
   control method "canAlterTable" -> core.AuthorizationCheck
   control method "canObtainDelegationToken" -> core.AuthorizationCheck
+  // Jenkins project workspace access requires an explicit item permission check in
+  // descriptor/form-validation paths.
+  mark method "getSomeWorkspace" -> code.SensitiveOperation
   control method "requireAuth" -> core.AuthenticationCheck
   control method "ensureAuthenticated" -> core.AuthenticationCheck
   control method "isAuthenticated" -> core.AuthenticationCheck

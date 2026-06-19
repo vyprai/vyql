@@ -26,6 +26,40 @@ test "review: auth checks and targets are surfaced"
   }
   ```
 
+test "review: jenkins workspace access is an authorization-sensitive operation"
+  lang java
+  expect_review code.SensitiveOperation
+  code
+  ```
+  class DescriptorImpl {
+    FormValidation doCheckApksToSign(AbstractProject project, String value) throws IOException {
+      if (project == null) {
+        return FormValidation.warning("no project");
+      }
+      FilePath someWorkspace = project.getSomeWorkspace();
+      return FormValidation.ok();
+    }
+  }
+  ```
+
+test "review: jenkins workspace permission check is surfaced near workspace access"
+  lang java
+  expect_review core.AuthorizationCheck
+  expect_review code.SensitiveOperation
+  code
+  ```
+  class DescriptorImpl {
+    FormValidation doCheckApksToSign(AbstractProject project, String value) throws IOException {
+      if (project == null) {
+        return FormValidation.warning("no project");
+      }
+      project.checkPermission(Item.WORKSPACE);
+      FilePath someWorkspace = project.getSomeWorkspace();
+      return FormValidation.ok();
+    }
+  }
+  ```
+
 test "review: android passcode back navigation bypass is surfaced"
   lang kotlin
   expect_review code.AuthFlowBypassReview
