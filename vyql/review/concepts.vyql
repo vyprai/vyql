@@ -196,6 +196,11 @@ review code.UnboundedStateGrowthReview {
   kind: "attention"
   text: "review state keyed by attacker-controlled or high-cardinality values for fail-closed limits"
 }
+review code.UnboundedAllocationReview {
+  category: "resource"
+  kind: "attention"
+  text: "review allocation sizes derived from parsed counts for per-item limits, aggregate consistency checks, and overflow"
+}
 review code.StructuredInputDecode {
   category: "input_validation"
   kind: "attention"

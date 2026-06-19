@@ -1,0 +1,67 @@
+# Rank 129 / CVE-2025-70069: Assimp FBX multi-material mesh allocation DoS.
+
+test "rank129: cpp mesh allocation from unbounded face counts is review-visible"
+  lang cpp
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  unsigned int ConvertMeshMultiMaterial(const MeshGeometry &mesh, MatIndexArray::value_type index) {
+      aiMesh *const out_mesh = SetupEmptyMesh(mesh, parent);
+      const MatIndexArray &mindices = mesh.GetMaterialIndices();
+      const std::vector<aiVector3D> &vertices = mesh.GetVertices();
+      const std::vector<unsigned int> &faces = mesh.GetFaceIndexCounts();
+      unsigned int count_faces = 0;
+      unsigned int count_vertices = 0;
+
+      std::vector<unsigned int>::const_iterator itf = faces.begin();
+      for (MatIndexArray::const_iterator it = mindices.begin(), end = mindices.end(); it != end; ++it, ++itf) {
+          if ((*it) != index) {
+              continue;
+          }
+          ++count_faces;
+          count_vertices += *itf;
+      }
+
+      out_mesh->mNumVertices = count_vertices;
+      out_mesh->mVertices = new aiVector3D[count_vertices];
+      out_mesh->mNumFaces = count_faces;
+      aiFace *fac = out_mesh->mFaces = new aiFace[count_faces]();
+      return 0;
+  }
+  ```
+
+test "rank129: cpp mesh allocation with per-face and aggregate bounds is clean"
+  lang cpp
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  unsigned int ConvertMeshMultiMaterial(const MeshGeometry &mesh, MatIndexArray::value_type index) {
+      aiMesh *const out_mesh = SetupEmptyMesh(mesh, parent);
+      const MatIndexArray &mindices = mesh.GetMaterialIndices();
+      const std::vector<aiVector3D> &vertices = mesh.GetVertices();
+      const std::vector<unsigned int> &faces = mesh.GetFaceIndexCounts();
+      unsigned int count_faces = 0;
+      unsigned int count_vertices = 0;
+
+      std::vector<unsigned int>::const_iterator itf = faces.begin();
+      for (MatIndexArray::const_iterator it = mindices.begin(), end = mindices.end(); it != end; ++it, ++itf) {
+          if ((*it) != index) {
+              continue;
+          }
+          ++count_faces;
+          if (*itf > AI_MAX_FACE_INDICES) {
+              return 0;
+          }
+          count_vertices += *itf;
+      }
+
+      if (count_vertices > vertices.size()) {
+          return 0;
+      }
+      out_mesh->mNumVertices = count_vertices;
+      out_mesh->mVertices = new aiVector3D[count_vertices];
+      out_mesh->mNumFaces = count_faces;
+      aiFace *fac = out_mesh->mFaces = new aiFace[count_faces]();
+      return 0;
+  }
+  ```
