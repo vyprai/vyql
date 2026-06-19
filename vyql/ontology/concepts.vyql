@@ -168,8 +168,8 @@ concept MailHeaderWrite : sink {
 }
 
 concept InsecureTempFile : sink {
-  vulnerable_to: [path.InsecureTempFile]
-  cwe: [CWE_377]
+  vulnerable_to: [path.InsecureTempFile, path.LinkFollowing]
+  cwe: [CWE_377, CWE_59]
 }
 
 concept CertValidationDisabled : sink {

@@ -16,7 +16,7 @@ rule FileInclusion {
 // Insecure temporary file (CWE-377) — predictable-name / race-prone temp APIs
 // (mktemp/tmpnam/tempnam). Presence rule: their use is the weakness, no taint needed.
 rule InsecureTempFile {
-  meta { id: "VYQL-PATH-003", severity: low, cwe: [CWE_377] }
+  meta { id: "VYQL-PATH-003", severity: low, cwe: [CWE_377, CWE_59] }
   match code.InsecureTempFile as t
 }
 

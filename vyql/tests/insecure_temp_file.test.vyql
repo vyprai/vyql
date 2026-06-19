@@ -41,6 +41,36 @@ test "python: fixed write under home is clean"
   fd = open(filename, "w")
   ```
 
+test "python: predictable lxc attach script files are insecure"
+  lang python
+  expect VYQL-PATH-003
+  code
+  ```
+  import os.path as path
+  import tempfile
+
+  script_file = path.join('/opt', '.lxc-attach-script')
+  f = open(script_file, 'wb')
+
+  tempdir = tempfile.gettempdir()
+  stdout_file = open(path.join(tempdir, 'lxc-attach-script.log'), 'ab')
+  stderr_file = open(path.join(tempdir, 'lxc-attach-script.err'), 'ab')
+  ```
+
+test "python: lxc attach script mkstemp files are clean"
+  lang python
+  reject VYQL-PATH-003
+  code
+  ```
+  import os
+  import tempfile
+
+  (fd, script_file) = tempfile.mkstemp(prefix='lxc-attach-script')
+  f = os.fdopen(fd, 'wb')
+  stdout_file = os.fdopen(tempfile.mkstemp(prefix='lxc-attach-script-log')[0], 'ab')
+  stderr_file = os.fdopen(tempfile.mkstemp(prefix='lxc-attach-script-err')[0], 'ab')
+  ```
+
 test "c: mktemp is insecure"
   lang c
   expect VYQL-PATH-003
