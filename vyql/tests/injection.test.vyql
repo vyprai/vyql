@@ -361,6 +361,49 @@ test "js: sanitize-html neutralizes stored XSS update"
   }
   ```
 
+test "javascript: SVG upload copied with preserved extension needs sanitization"
+  lang javascript
+  expect VYQL-INJ-028
+  code
+  ```
+  module.exports = {
+    methods(self) {
+      return {
+        async insert(file) {
+          const info = {
+            _id: self.apos.util.generateId(),
+            name: self.apos.util.slugify(file.name),
+            extension: path.extname(file.name).substr(1).toLowerCase()
+          };
+          await Promise.promisify(self.uploadfs.copyIn)(file.path, '/attachments/' + info._id + '-' + info.name + '.' + info.extension);
+        }
+      };
+    }
+  };
+  ```
+
+test "javascript: SVG upload sanitization before preserved-extension copy is clean"
+  lang javascript
+  reject VYQL-INJ-028
+  code
+  ```
+  module.exports = {
+    methods(self) {
+      return {
+        async insert(file) {
+          const info = {
+            _id: self.apos.util.generateId(),
+            name: self.apos.util.slugify(file.name),
+            extension: path.extname(file.name).substr(1).toLowerCase()
+          };
+          await self.sanitizeSvg(file.path);
+          await Promise.promisify(self.uploadfs.copyIn)(file.path, '/attachments/' + info._id + '-' + info.name + '.' + info.extension);
+        }
+      };
+    }
+  };
+  ```
+
 test "js: nested async Mongo helper preserves stored XSS taint"
   lang javascript
   expect VYQL-INJ-004

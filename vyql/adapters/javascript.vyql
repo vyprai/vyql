@@ -99,6 +99,7 @@ adapter javascript {
   // Parsed browser XML/HTML often comes from network responses; values extracted from it
   // are attacker-controlled unless independently verified.
   source method "parseFromString" -> core.UserControlledData
+  mark exact "analysis.function.context" val "lang=javascript" val "copyIn" val "file.path" val "info.extension" nval "sanitizeSvg" nval "DOMPurify" -> code.StoredHtmlWrite
   // Next.js App Router — searchParams (page prop / destructured) + nextUrl query
   source "searchParams" -> code.HttpInput
   source "req.nextUrl" -> code.HttpInput
