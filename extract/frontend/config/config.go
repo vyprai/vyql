@@ -17,7 +17,7 @@ import (
 	"github.com/vyprai/vyql/parser"
 )
 
-// Extract parses AndroidManifest.xml / *.plist files into one NIR Program. Other
+// Extract parses declarative config/template files into one NIR Program. Other
 // XML files (and unparseable input) yield no nodes — never an error.
 func Extract(files []string, root string) (nir.Program, error) {
 	var prog nir.Program
@@ -29,23 +29,31 @@ func Extract(files []string, root string) (nir.Program, error) {
 		}
 		rel := relPath(root, f)
 		var body []nir.Stmt
-		switch kind(f, src) {
-		case "android":
+		k := kind(f, src)
+		if k == "" {
+			if scope, ok := textTemplateScope(f, src, loadProfile()); ok {
+				k = "texttemplate:" + scope
+			}
+		}
+		switch {
+		case k == "android":
 			body = scanAndroidManifest(src, rel)
-		case "plist":
+		case k == "plist":
 			body = scanPlist(src, rel)
-		case "dockerfile":
+		case k == "dockerfile":
 			body = scanDockerfile(src, rel)
-		case "yaml":
+		case k == "yaml":
 			body = scanK8sYaml(src, rel)
-		case "terraform":
+		case k == "terraform":
 			body = scanTerraform(src, rel)
-		case "jelly":
+		case k == "jelly":
 			body = scanJelly(src, rel)
-		case "jsp":
+		case k == "jsp":
 			body = scanJSP(src, rel)
-		case "dottemplate":
+		case k == "dottemplate":
 			body = scanDotTemplate(src, rel)
+		case strings.HasPrefix(k, "texttemplate:"):
+			body = scanTextTemplate(src, rel, strings.TrimPrefix(k, "texttemplate:"))
 		}
 		if len(body) == 0 {
 			continue
@@ -136,6 +144,73 @@ func scanDotTemplate(src []byte, file string) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: call(rule.Event, file, firstLineContaining(text, rule.LineNeedle))}}
 	}
 	return nil
+}
+
+func scanTextTemplate(src []byte, file, scope string) []nir.Stmt {
+	cfg := loadProfile()
+	profile, ok := cfg.TextTemplates[scope]
+	if !ok {
+		return nil
+	}
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		loc := file + ":" + itoa(i+1)
+		for _, rule := range profile.LineEvents {
+			if containsMatch(line, rule.Match) {
+				out = append(out, nir.ExprStmt{Value: call(rule.Event, file, i+1)})
+			}
+		}
+		for _, rule := range profile.AssignEvents {
+			m := rule.AssignPattern.FindStringSubmatch(line)
+			if len(m) < 2 {
+				continue
+			}
+			expr := rule.SourcePattern.FindString(line)
+			if expr == "" {
+				continue
+			}
+			out = append(out, nir.Assign{
+				Targets: []string{m[1]},
+				Value:   textTemplateValue(rule.InputEvent, expr, loc),
+			})
+		}
+		for _, rule := range profile.FlowEvents {
+			if !containsMatch(line, rule.Match) {
+				continue
+			}
+			expr := rule.SourcePattern.FindString(line)
+			if expr == "" {
+				continue
+			}
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: rule.OperationEvent, Loc: loc},
+				Args:   []nir.Expr{textTemplateValue(rule.InputEvent, expr, loc)},
+				Path:   rule.OperationEvent,
+				Method: lastSeg(rule.OperationEvent),
+				Loc:    loc,
+			}})
+		}
+	}
+	return out
+}
+
+func textTemplateValue(inputEvent, expr, loc string) nir.Expr {
+	name := strings.TrimPrefix(expr, "$")
+	name = strings.TrimPrefix(name, "!")
+	if !strings.HasPrefix(name, "request.") {
+		return nir.Name{ID: name, Loc: loc}
+	}
+	return nir.Call{
+		Callee: nir.Name{ID: inputEvent, Loc: loc},
+		Args:   []nir.Expr{nir.Const{Value: expr, Loc: loc}},
+		Path:   inputEvent,
+		Method: "input",
+		Loc:    loc,
+	}
 }
 
 func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
@@ -269,6 +344,27 @@ type dotTemplateRule struct {
 	Event            string
 }
 
+type textTemplateFlowRule struct {
+	Match          string
+	SourcePattern  *regexp.Regexp
+	InputEvent     string
+	OperationEvent string
+}
+
+type textTemplateAssignRule struct {
+	AssignPattern *regexp.Regexp
+	SourcePattern *regexp.Regexp
+	InputEvent    string
+}
+
+type textTemplateProfile struct {
+	Extensions       []string
+	RequiredContains []string
+	LineEvents       []scopedLineRule
+	AssignEvents     []textTemplateAssignRule
+	FlowEvents       []textTemplateFlowRule
+}
+
 type configProfile struct {
 	XMLTrueAttrs      []boolAttrRule
 	XMLAttrNotValues  []attrNotValueRule
@@ -280,6 +376,7 @@ type configProfile struct {
 	QuotedStarFields  []scopedLineRule
 	Templates         map[string]templateProfile
 	DotRules          []dotTemplateRule
+	TextTemplates     map[string]textTemplateProfile
 }
 
 var (
@@ -305,8 +402,9 @@ func loadProfile() configProfile {
 			panic("config: missing adapter metadata")
 		}
 		configProfileData = configProfile{
-			PlistTrueKey: map[string]string{},
-			Templates:    map[string]templateProfile{},
+			PlistTrueKey:  map[string]string{},
+			Templates:     map[string]templateProfile{},
+			TextTemplates: map[string]textTemplateProfile{},
 		}
 		for _, entry := range metaList(meta, "config_xml_true_attrs") {
 			parts := strings.Split(entry, "|")
@@ -388,8 +486,72 @@ func loadProfile() configProfile {
 				Event:            parts[4],
 			})
 		}
+		for _, scope := range metaList(meta, "config_text_template_scopes") {
+			if scope == "" {
+				panic("config: malformed config text template profile")
+			}
+			profile := textTemplateProfile{
+				Extensions:       metaList(meta, "config_text_template_extensions_"+scope),
+				RequiredContains: metaList(meta, "config_text_template_required_contains_"+scope),
+			}
+			if len(profile.Extensions) == 0 || len(profile.RequiredContains) == 0 {
+				panic("config: malformed config text template classifier " + scope)
+			}
+			for _, entry := range metaList(meta, "config_text_template_line_events_"+scope) {
+				parts := strings.Split(entry, "|")
+				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+					panic("config: malformed config_text_template_line_events entry " + entry)
+				}
+				profile.LineEvents = append(profile.LineEvents, scopedLineRule{Scope: scope, Match: parts[0], Event: parts[1]})
+			}
+			for _, entry := range metaList(meta, "config_text_template_assign_events_"+scope) {
+				parts := strings.Split(entry, "|")
+				if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+					panic("config: malformed config_text_template_assign_events entry " + entry)
+				}
+				profile.AssignEvents = append(profile.AssignEvents, textTemplateAssignRule{
+					AssignPattern: regexp.MustCompile(parts[0]),
+					SourcePattern: regexp.MustCompile(parts[1]),
+					InputEvent:    parts[2],
+				})
+			}
+			for _, entry := range metaList(meta, "config_text_template_flow_events_"+scope) {
+				parts := strings.Split(entry, "|")
+				if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
+					panic("config: malformed config_text_template_flow_events entry " + entry)
+				}
+				profile.FlowEvents = append(profile.FlowEvents, textTemplateFlowRule{
+					Match:          parts[0],
+					SourcePattern:  regexp.MustCompile(parts[1]),
+					InputEvent:     parts[2],
+					OperationEvent: parts[3],
+				})
+			}
+			configProfileData.TextTemplates[scope] = profile
+		}
 	})
 	return configProfileData
+}
+
+func textTemplateScope(path string, src []byte, cfg configProfile) (string, bool) {
+	text := string(src)
+	ext := strings.ToLower(filepath.Ext(path))
+	for scope, profile := range cfg.TextTemplates {
+		if !extensionAllowed(ext, profile.Extensions) || !containsAll(text, profile.RequiredContains) {
+			continue
+		}
+		return scope, true
+	}
+	return "", false
+}
+
+func extensionAllowed(ext string, allowed []string) bool {
+	for _, candidate := range allowed {
+		if strings.EqualFold(ext, candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func scanAndroidManifest(src []byte, file string) []nir.Stmt {
@@ -537,6 +699,10 @@ func containsAll(text string, needles []string) bool {
 		}
 	}
 	return true
+}
+
+func containsMatch(text, needle string) bool {
+	return needle != "" && strings.Contains(strings.ToLower(text), strings.ToLower(needle))
 }
 
 func parseScopedLineRules(meta map[string]any, key string) []scopedLineRule {

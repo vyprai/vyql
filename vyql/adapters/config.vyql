@@ -64,6 +64,19 @@ adapter config {
       "_limitlength.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
       "_limitproperties.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
       "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated"
+    ],
+    config_text_template_scopes: ["xwiki_velocity"],
+    config_text_template_extensions_xwiki_velocity: [".xml"],
+    config_text_template_required_contains_xwiki_velocity: ["<content", "$request.", "#"],
+    config_text_template_line_events_xwiki_velocity: [
+      "$services.csrf.isTokenValid|analysis.template.xwiki_velocity.csrf_check"
+    ],
+    config_text_template_assign_events_xwiki_velocity: [
+      "#set\\s*\\(\\s*\\$([A-Za-z_][A-Za-z0-9_]*)\\s*=.*\\$!?request\\.[A-Za-z0-9_]+\\b|\\$!?request\\.[A-Za-z0-9_]+\\b|analysis.template.xwiki_velocity.input"
+    ],
+    config_text_template_flow_events_xwiki_velocity: [
+      "#ckeditor_convert|\\$!?request\\.[A-Za-z0-9_]+\\b|analysis.template.xwiki_velocity.input|analysis.template.xwiki_velocity.state_change",
+      "#ckeditor_convert|\\$text\\b|analysis.template.xwiki_velocity.input|analysis.template.xwiki_velocity.state_change"
     ]
   }
 
@@ -103,4 +116,10 @@ adapter config {
   // before the template emits validator code. Missing checks can let crafted
   // schemas steer generated code/prototype behavior.
   mark "analysis.template.dot.schema_codegen_unvalidated" -> code.SchemaCodegenValidationBypass
+
+  // XWiki Velocity pages embedded in XML: request-driven server-side conversion
+  // actions need CSRF validation before they execute.
+  source "analysis.template.xwiki_velocity.input" -> core.UserControlledData
+  sink   "analysis.template.xwiki_velocity.state_change" -> code.StateChangingOp
+  control "analysis.template.xwiki_velocity.csrf_check" -> core.CsrfProtection
 }
