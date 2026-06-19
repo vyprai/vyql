@@ -27,3 +27,57 @@ test "race: thread creation is low-confidence shared-state review queue (c)"
       pthread_create(&t, 0, worker, 0);
   }
   ```
+
+test "race: go package global roundtripper mutation is surfaced"
+  lang go
+  expect VYQL-RACE-002
+  code
+  ```
+  package metrics
+
+  type metricsRoundTripper struct {
+    ctx context.Context
+    roundTripper http.RoundTripper
+  }
+
+  var k8sMetrics metricsRoundTripper
+
+  func AddMetricsTransportWrapper(ctx context.Context, config *rest.Config) *rest.Config {
+    config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+      k8sMetrics.ctx = ctx
+      k8sMetrics.roundTripper = rt
+      return &k8sMetrics
+    }
+    return config
+  }
+  ```
+
+test "race: go per-request wrapper avoids package global roundtripper mutation"
+  lang go
+  reject VYQL-RACE-002
+  code
+  ```
+  package metrics
+
+  type metricsRoundTripperContext struct {
+    ctx context.Context
+    metrics *Metrics
+  }
+  type metricsRoundTripper struct {
+    *metricsRoundTripperContext
+    roundTripper http.RoundTripper
+  }
+
+  var k8sMetrics metricsRoundTripperContext
+
+  func addK8sRequests(m *Metrics) {
+    k8sMetrics.metrics = m
+  }
+
+  func AddMetricsTransportWrapper(ctx context.Context, config *rest.Config) *rest.Config {
+    config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+      return &metricsRoundTripper{roundTripper: rt, metricsRoundTripperContext: &k8sMetrics}
+    }
+    return config
+  }
+  ```

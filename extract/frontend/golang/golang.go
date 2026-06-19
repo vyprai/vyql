@@ -225,15 +225,20 @@ func (c *conv) valueDeclStmts(gd *ast.GenDecl) []nir.Stmt {
 	var out []nir.Stmt
 	for _, spec := range gd.Specs {
 		vs, ok := spec.(*ast.ValueSpec)
-		if !ok || len(vs.Names) == 0 || len(vs.Values) == 0 {
+		if !ok || len(vs.Names) == 0 {
 			continue
 		}
 		var targets []string
 		for _, n := range vs.Names {
 			targets = append(targets, n.Name)
 		}
+		typ := c.typeName(vs.Type)
+		if len(vs.Values) == 0 {
+			out = append(out, nir.Assign{Targets: targets, Value: nir.Const{Loc: c.loc(vs.Pos())}, Type: typ, Decl: true, Loc: c.loc(vs.Pos())})
+			continue
+		}
 		if len(vs.Values) == 1 {
-			out = append(out, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0]), Decl: true})
+			out = append(out, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0]), Type: typ, Decl: true, Loc: c.loc(vs.Pos())})
 			continue
 		}
 		limit := len(vs.Values)
@@ -241,7 +246,7 @@ func (c *conv) valueDeclStmts(gd *ast.GenDecl) []nir.Stmt {
 			limit = len(targets)
 		}
 		for i := 0; i < limit; i++ {
-			out = append(out, nir.Assign{Targets: []string{targets[i]}, Value: c.expr(vs.Values[i]), Decl: true})
+			out = append(out, nir.Assign{Targets: []string{targets[i]}, Value: c.expr(vs.Values[i]), Type: typ, Decl: true, Loc: c.loc(vs.Pos())})
 		}
 	}
 	return out
@@ -575,20 +580,17 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 			if ix, ok := st.Lhs[0].(*ast.IndexExpr); ok {
 				if base, ok := ix.X.(*ast.Ident); ok && base.Name != "_" {
 					return nir.Assign{Targets: []string{base.Name},
-						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: base.Name, Loc: c.loc(base.Pos())}, c.expr(st.Rhs[0])}, Loc: c.loc(st.Pos())}}
+						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: base.Name, Loc: c.loc(base.Pos())}, c.expr(st.Rhs[0])}, Loc: c.loc(st.Pos())},
+						Loc:   c.loc(st.Pos())}
 				}
 			}
 		}
 		var targets []string
 		for _, lhs := range st.Lhs {
-			if id, ok := lhs.(*ast.Ident); ok {
-				targets = append(targets, id.Name)
-			} else {
-				targets = append(targets, "_")
-			}
+			targets = append(targets, c.assignTarget(lhs))
 		}
 		if len(st.Rhs) == 1 {
-			assign := nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0])}
+			assign := nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0]), Loc: c.loc(st.Pos())}
 			// The result goes to err, but the call can also write through
 			// address-of out-parameter destinations; taint those too. The
 			// AssignStmt path covers `if err := f(&x); err != nil`.
@@ -604,7 +606,7 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		blk := nir.Block{}
 		for i := range st.Lhs {
 			if i < len(st.Rhs) {
-				blk.Stmts = append(blk.Stmts, nir.Assign{Targets: []string{targets[i]}, Value: c.expr(st.Rhs[i])})
+				blk.Stmts = append(blk.Stmts, nir.Assign{Targets: []string{targets[i]}, Value: c.expr(st.Rhs[i]), Loc: c.loc(st.Pos())})
 			}
 		}
 		return blk
@@ -666,6 +668,20 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 	return nil
 }
 
+func (c *conv) assignTarget(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.Ident:
+		return x.Name
+	case *ast.SelectorExpr:
+		if p := c.path(x); p != "" {
+			return p
+		}
+	case *ast.StarExpr:
+		return c.assignTarget(x.X)
+	}
+	return "_"
+}
+
 // switchStmt converts a switch body to a branch-structured nir.Switch. Each case clause
 // body becomes a branch; a default clause (nil case list) is the Default branch. Flatten-
 // lowering lowers every branch body in turn — the same node set the prior Block produced.
@@ -712,7 +728,7 @@ func (c *conv) declStmt(st *ast.DeclStmt) nir.Stmt {
 			targets = append(targets, n.Name)
 		}
 		if len(vs.Values) == 1 {
-			blk.Stmts = append(blk.Stmts, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0])})
+			blk.Stmts = append(blk.Stmts, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0]), Loc: c.loc(vs.Pos())})
 		}
 	}
 	return blk

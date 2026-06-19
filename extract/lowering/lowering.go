@@ -858,6 +858,7 @@ var (
 	analysisFunctionContext = analysisEventSpec{path: "analysis.function.context", method: "context"}
 	analysisFunctionResult  = analysisEventSpec{path: "analysis.function.result", method: "result"}
 	analysisParameterEntry  = analysisEventSpec{path: "analysis.parameter.entry", method: "entry"}
+	analysisGlobalMutation  = analysisEventSpec{path: "analysis.global.mutation", method: "mutation"}
 )
 
 func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []string) {
@@ -871,6 +872,21 @@ func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []strin
 		"callee_path": analysisFunctionContext.path,
 		"method":      analysisFunctionContext.method,
 		"str_args":    strings.Join(contextTokens, "\x00"),
+	}
+	l.node("Call", loc, props)
+}
+
+func (l *lowerer) globalMutationAnalysisEvent(loc string, tokens []string) {
+	if len(tokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{
+		"callee_path": analysisGlobalMutation.path,
+		"method":      analysisGlobalMutation.method,
+		"str_args":    strings.Join(tokens, "\x00"),
 	}
 	l.node("Call", loc, props)
 }
@@ -1132,7 +1148,7 @@ func (l *lowerer) run() error {
 
 func (l *lowerer) moduleScope(m nir.Module) *scope {
 	sc := newScope()
-	if !isJSLikeModule(m.File) {
+	if !usesModuleGlobalSlots(m.File) {
 		return sc
 	}
 	globals := l.moduleGlobals[ModuleNS(m)]
@@ -1150,6 +1166,10 @@ func (l *lowerer) moduleScope(m nir.Module) *scope {
 		sc.node[name] = slot
 	}
 	return sc
+}
+
+func usesModuleGlobalSlots(file string) bool {
+	return isJSLikeModule(file) || strings.HasSuffix(file, ".go")
 }
 
 func isJSLikeModule(file string) bool {
@@ -1535,6 +1555,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			if targetHasTyp && targetTyp[1] != "" {
 				targetVal = l.typedBindingNode(val, targetTyp[1])
 			}
+			if base, field, ok := splitFieldTarget(t); ok && !localDecl {
+				if slot := l.moduleGlobalSlot(base); slot != "" {
+					l.globalMutationAnalysisEvent(st.Loc, []string{
+						"base:" + base,
+						"field:" + field,
+						"target:" + t,
+					})
+					l.flow(targetVal, slot)
+				}
+			}
 			if sc.lex[t] && !st.Decl {
 				l.flow(targetVal, sc.node[t])
 				if targetHasTyp {
@@ -1729,6 +1759,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		l.inRegion("try"+b+".f", func() { l.block(st.Finally, sc) })
 	}
+}
+
+func splitFieldTarget(target string) (base, field string, ok bool) {
+	if target == "" || target == "_" {
+		return "", "", false
+	}
+	i := strings.IndexByte(target, '.')
+	if i <= 0 || i == len(target)-1 {
+		return "", "", false
+	}
+	return target[:i], target[i+1:], true
 }
 
 // --- expressions --------------------------------------------------------

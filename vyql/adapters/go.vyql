@@ -308,6 +308,8 @@ adapter go {
   // lifecycle / locking (CWE-667)
   mark "Lock" -> code.LockAcquire
   mark "RLock" -> code.LockAcquire
+  mark exact "analysis.global.mutation" val "field:ctx" -> code.LocklessSharedMutation
+  mark exact "analysis.global.mutation" val "field:roundTripper" -> code.LocklessSharedMutation
   control method "Unlock" -> core.LockRelease
   control method "RUnlock" -> core.LockRelease
 
