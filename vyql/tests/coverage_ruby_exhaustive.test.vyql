@@ -27,6 +27,55 @@ test "ruby exhaustive: params reach SQL command eval deser dynamic-load SSRF pat
   end
   ```
 
+test "ruby: asciidoctor include target reaches pipe-opening IO.foreach"
+  lang ruby
+  expect VYQL-INJ-002
+  code
+  ```
+  class IncludeProcessor
+    def process(_, reader, target, attributes)
+      unless (path = resolve_target_path(target, reader))
+        return
+      end
+      read_lines(path, nil)
+    end
+
+    def resolve_target_path(target, reader)
+      path = reader.document.normalize_system_path(target, reader.dir, nil)
+      path if File.file?(path)
+    end
+
+    def read_lines(path, selector)
+      IO.foreach(path).select.with_index(1, &selector)
+    end
+  end
+  ```
+
+test "ruby: asciidoctor include target read through File.open is clean"
+  lang ruby
+  reject VYQL-INJ-002
+  code
+  ```
+  class IncludeProcessor
+    def process(_, reader, target, attributes)
+      unless (path = resolve_target_path(target, reader))
+        return
+      end
+      read_lines(path, nil)
+    end
+
+    def resolve_target_path(target, reader)
+      path = reader.document.normalize_system_path(target, reader.dir, nil)
+      path if File.file?(path)
+    end
+
+    def read_lines(path, selector)
+      io = target_http?(path) ? URI : File
+      io.open(path) { |f| f.each.select.with_index(1, &selector) }
+    end
+  end
+  ```
+
 test "ruby: SSLContext ca_file without peer verification is certificate validation failure"
   lang ruby
   expect VYQL-CFG-004

@@ -64,6 +64,17 @@ func (c *rbConv) body(n *tree_sitter.Node) []nir.Stmt {
 	return c.blockChildren(n)
 }
 
+func (c *rbConv) rbMethodBody(n *tree_sitter.Node) []nir.Stmt {
+	stmts := c.body(n)
+	if len(stmts) == 0 {
+		return stmts
+	}
+	if last, ok := stmts[len(stmts)-1].(nir.ExprStmt); ok {
+		stmts[len(stmts)-1] = nir.Return{Value: last.Value}
+	}
+	return stmts
+}
+
 func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
@@ -72,13 +83,16 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// marker would hide subsequent methods — not tracked yet, so this slightly
 		// over-marks; the library param-source is caller-conditional, which absorbs that.
 		body := field(n, "body")
+		name := c.text(field(n, "name"))
+		params := c.params(field(n, "parameters"))
 		out := c.rubyFunctionContext(n)
 		out = append(out, nir.FuncDef{
-			Name:     c.text(field(n, "name")),
-			Params:   c.params(field(n, "parameters")),
-			Body:     c.body(body),
-			Loc:      L,
-			Exported: true,
+			Name:         name,
+			Params:       params,
+			ParamEntries: c.rbParamEntries(name, params),
+			Body:         c.rbMethodBody(body),
+			Loc:          L,
+			Exported:     true,
 		})
 		return out
 	case "class", "module":
@@ -126,11 +140,21 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "if":
 		// separate Then/Else so the join-merge keeps the live branch tainted and a constant
 		// condition prunes.
-		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}}
+		cond := field(n, "condition")
+		ifn := nir.If{Cond: c.expr(cond), Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}
+		if target, val, ok := c.rbAssignmentExpr(cond); ok {
+			return []nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}, ifn}
+		}
+		return []nir.Stmt{ifn}
 	case "unless":
 		// `unless c` runs the body when c is FALSE — split branches for the join-merge, but
 		// leave Cond nil (no const-prune, to avoid inverting the condition incorrectly).
-		return []nir.Stmt{nir.If{Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}}
+		cond := field(n, "condition")
+		ifn := nir.If{Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}
+		if target, val, ok := c.rbAssignmentExpr(cond); ok {
+			return []nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}, ifn}
+		}
+		return []nir.Stmt{ifn}
 	case "while", "until", "for":
 		return []nir.Stmt{nir.Loop{Body: c.collectBodies(n)}}
 	case "begin":
@@ -175,6 +199,48 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *rbConv) rbParamEntries(name string, params []string) []nir.ParamEntry {
+	out := make([]nir.ParamEntry, 0, len(params))
+	for i, p := range params {
+		if p == "" {
+			continue
+		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: []string{
+			"function_name:" + name,
+			"param_name:" + p,
+			"param_index:" + itoa(i),
+		}})
+	}
+	return out
+}
+
+func (c *rbConv) rbAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
+	for n != nil && n.Kind() == "parenthesized_statements" {
+		kids := namedChildren(n)
+		if len(kids) != 1 {
+			return "", nil, false
+		}
+		n = kids[0]
+	}
+	if n == nil || n.Kind() != "assignment" {
+		for _, ch := range namedChildren(n) {
+			if target, val, ok := c.rbAssignmentExpr(ch); ok {
+				return target, val, true
+			}
+		}
+		return "", nil, false
+	}
+	left := field(n, "left")
+	if left == nil || left.Kind() != "identifier" {
+		return "", nil, false
+	}
+	right := field(n, "right")
+	if right == nil {
+		return "", nil, false
+	}
+	return c.text(left), c.expr(right), true
 }
 
 func rbCompactText(s string) string {

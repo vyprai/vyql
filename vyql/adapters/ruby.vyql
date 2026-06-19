@@ -19,6 +19,7 @@ adapter ruby {
   source "request.headers" -> code.HttpInput
   source "request.path_parameters" -> code.HttpInput
   source "request.raw_post" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_name:process" val "param_name:target" -> code.HttpInput
   source "request.query_string" -> code.HttpInput
 
   // stored / second-order data — ActiveRecord reads (CWE-79 stored XSS when rendered
@@ -95,6 +96,8 @@ adapter ruby {
   sink path "Kernel.exec" -> code.CommandExecution
   sink path "Kernel.spawn" -> code.CommandExecution
   sink path "IO.popen" -> code.CommandExecution
+  sink path "IO.foreach" -> code.CommandExecution
+  sink path "URI.open" -> code.CommandExecution
   sink path "Open3.capture2" -> code.CommandExecution
   sink path "Open3.capture2e" -> code.CommandExecution
   sink path "Open3.capture3" -> code.CommandExecution
