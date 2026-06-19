@@ -288,6 +288,7 @@ adapter java {
   mark "setWritable" val "true" val "false" -> code.InsecurePermission
   mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
   mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
+  mark exact "analysis.function.context" val "call:setContent" val "call:toJson" val "call:saveDocument" nval "call:setHidden" -> code.InternalContentExposureReview
   mark "Socket" -> code.ResourceHandle
   mark "Files.newInputStream" -> code.ResourceHandle
   mark "Files.newOutputStream" -> code.ResourceHandle

@@ -596,3 +596,35 @@ test "review: go repository/keyring config type with YAML redaction is clean"
       return nil, nil
   }
   ```
+
+test "review: java internal document serialization without hidden visibility is surfaced"
+  lang java
+  expect_review code.InternalContentExposureReview
+  code
+  ```
+  class Manager {
+    void persist(Object wiki, Object countDoc, Object pagesDoc, Object gson, Object data) {
+      countDoc.setContent(gson.toJson(data));
+      wiki.saveDocument(countDoc);
+      pagesDoc.setContent(gson.toJson(data));
+      wiki.saveDocument(pagesDoc);
+    }
+  }
+  ```
+
+test "review: java internal document serialization with hidden visibility is clean"
+  lang java
+  reject_review code.InternalContentExposureReview
+  code
+  ```
+  class Manager {
+    void persist(Object wiki, Object countDoc, Object pagesDoc, Object gson, Object data) {
+      countDoc.setHidden(true);
+      pagesDoc.setHidden(true);
+      countDoc.setContent(gson.toJson(data));
+      wiki.saveDocument(countDoc);
+      pagesDoc.setContent(gson.toJson(data));
+      wiki.saveDocument(pagesDoc);
+    }
+  }
+  ```

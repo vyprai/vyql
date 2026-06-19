@@ -178,6 +178,12 @@ review code.ConfigExposureReview {
   expected: [core.SecretRedaction]
   text: "verify config or diagnostic serialization redacts inline secrets before exposure"
 }
+review code.InternalContentExposureReview {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "verify generated internal content has hidden or restricted visibility before it is saved"
+}
 review code.SecretFilePermissionReview {
   category: "secret"
   kind: "attention"

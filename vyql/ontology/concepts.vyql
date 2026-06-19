@@ -607,6 +607,18 @@ concept ConfigExposureReview : sink {
   review_assumption: "repository, keyring, credential, or diagnostic fields may contain inline credentials"
   review_confidence: possibility
 }
+// Review-only: generated/internal application content is serialized into a platform
+// document or page without an observed visibility/access-control hardening step. Used for
+// CWE-200 cases where the issue is not taint, but default platform visibility.
+concept InternalContentExposureReview : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.IncorrectAuthorization]
+  cwe: [CWE_200, CWE_863]
+  review_category: "secret"
+  review_condition: "internal or diagnostic content is persisted without an observed visibility restriction"
+  review_evidence: "document serialization context {pattern} lacks a matching hidden or access-policy hardening call"
+  review_assumption: "the generated page or document may be readable by principals beyond the intended operators"
+  review_confidence: possibility
+}
 concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   enabled_by: [taint.UntrustedData]

@@ -447,11 +447,70 @@ func (c *jvConv) jvAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 }
 
 func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
+	seen := map[string]bool{}
 	var out []string
-	if name != "" {
-		out = append(out, "function_name:"+name)
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 128 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
 	}
+	if name != "" {
+		add("function_name:" + name)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil || len(out) >= 128 {
+			return
+		}
+		switch m.Kind() {
+		case "method_invocation":
+			if p := c.dotted(m); p != "" && p != "?" {
+				add("call_path:" + p)
+			}
+			if nm := c.text(field(m, "name")); nm != "" {
+				add("call:" + nm)
+			}
+		case "object_creation_expression":
+			if typ := c.dotted(field(m, "type")); typ != "" && typ != "?" {
+				add("call_path:" + typ)
+				add("call:" + lastSeg(typ))
+			}
+		case "field_access":
+			if p := c.dotted(m); p != "" && p != "?" {
+				add("selector:" + p)
+			}
+			if fld := c.text(field(m, "field")); fld != "" {
+				add("selector:" + fld)
+			}
+		case "string_literal":
+			if lit := javaStringToken(c.text(m)); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
 	return out
+}
+
+func javaStringToken(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	raw = strings.TrimPrefix(raw, "\"")
+	raw = strings.TrimSuffix(raw, "\"")
+	if raw == "" {
+		return ""
+	}
+	if len(raw) > 256 {
+		raw = raw[:256]
+	}
+	return raw
 }
 
 func (c *jvConv) jvParamEntries(name string, params []string, paramTypes map[string]string, base []string) []nir.ParamEntry {
