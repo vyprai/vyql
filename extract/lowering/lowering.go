@@ -1345,7 +1345,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 		}
-		l.functionReturnAnalysisEvent(rv, "", l.curDecorators)
+		retTokens := append([]string{}, l.curDecorators...)
+		collectValTokens(st.Value, "", &retTokens)
+		l.functionReturnAnalysisEvent(rv, "", retTokens)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
 		// Builder/accumulator calls fold their args into the object/buffer you

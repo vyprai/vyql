@@ -99,6 +99,11 @@ adapter java {
   sink method "queryForLong" -> code.SqlExecution
   sink method "queryForStream" -> code.SqlExecution
   sink method "batchUpdate" -> code.SqlExecution
+  // Driver/parser helpers that return hand-built SQL literal casts instead of
+  // routing text through the shared quoting routine.
+  mark exact "analysis.function.return" val "function_name:toString" val "::uuid" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.return" val "function_name:toString" val "::point" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.return" val "function_name:toString" val "::box" -> code.UnparameterizedSqlQueryParser
 
   // Command execution. arg all: the tainted value can be the command, an argument, or the
   // environment array — Runtime.exec(cmd) / exec(cmdarray, envp), ProcessBuilder(a, b, …),

@@ -134,7 +134,8 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		tokens := append([]string{}, c.classParamTokens...)
 		tokens = append(tokens, c.jvAnnotationTokens(n, "annotation:")...)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
-			ParamEntries: c.jvParamEntries(name, params, paramTypes, tokens), Exported: c.javaPublic(n)}}
+			ContextTokens: c.jvFunctionTokens(name, n),
+			ParamEntries:  c.jvParamEntries(name, params, paramTypes, tokens), Exported: c.javaPublic(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
 		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution
@@ -397,6 +398,14 @@ func (c *jvConv) jvAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 		if ch.Kind() == "modifiers" {
 			walk(ch)
 		}
+	}
+	return out
+}
+
+func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
+	var out []string
+	if name != "" {
+		out = append(out, "function_name:"+name)
 	}
 	return out
 }
