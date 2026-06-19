@@ -1,0 +1,28 @@
+test "request policy: reconstructing Request with headers only drops redirect policy"
+  lang javascript
+  expect VYQL-SEC-003
+  file snippet.ts
+  code
+  ```
+  abstract class AssetGroup {
+    private newRequestWithMetadata(url: string, options: RequestInit): Request {
+      return this.adapter.newRequest(url, {headers: options.headers});
+    }
+  }
+  ```
+
+test "request policy: reconstructing Request with redirect preserved is clean"
+  lang javascript
+  reject VYQL-SEC-003
+  file snippet.ts
+  code
+  ```
+  abstract class AssetGroup {
+    private newRequestWithMetadata(url: string, options: RequestInit): Request {
+      return this.adapter.newRequest(url, {
+        headers: options.headers,
+        redirect: options.redirect,
+      });
+    }
+  }
+  ```

@@ -558,6 +558,9 @@ adapter javascript {
   // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
   // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.
   mark "axios" val "http://" nval "127.0" -> code.CleartextChannel
+  // Reconstructing a browser Request while copying headers but dropping redirect policy
+  // can turn caller-specified `redirect: "error"` into the default follow behavior.
+  sink method "newRequest" arg 1 collection val "headers" nval "redirect" -> code.RequestPolicyStripped
 
   // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled (omission not flagged).
   mark "res.cookie" val "httpOnly=false" -> code.InsecureCookie

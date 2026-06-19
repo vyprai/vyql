@@ -809,6 +809,10 @@ concept ProtocolStateReview : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
   cwe: [CWE_349, CWE_404]
 }
+concept RequestPolicyStripped : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion]
+  cwe: [CWE_200, CWE_441, CWE_524]
+}
 concept UrlFetch : sink {
   vulnerable_to: [request_forgery.Ssrf]
   enabled_by: [taint.UntrustedData]

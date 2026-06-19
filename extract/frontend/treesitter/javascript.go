@@ -228,7 +228,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.funcBody(n)
 		decorators := c.jsDecoratorTokens(n)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: c.exported[name]}}
-	case "class_declaration":
+	case "class_declaration", "abstract_class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "lexical_declaration", "variable_declaration":
 		var out []nir.Stmt
