@@ -19,6 +19,42 @@ test "file-perm: a restrictive mode is clean (python)"
   os.chmod("/var/data", 0o600)
   ```
 
+test "file-perm: os.open world-writable create is flagged (python)"
+  lang python
+  expect VYQL-CFG-008
+  code
+  ```
+  import os
+  os.open("/var/data", os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o666)
+  ```
+
+test "file-perm: os.open restrictive create mode is clean (python)"
+  lang python
+  reject VYQL-CFG-008
+  code
+  ```
+  import os
+  os.open("/var/data", os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+  ```
+
+test "file-perm: mkdir recursive default mode is flagged (python)"
+  lang python
+  expect VYQL-CFG-008
+  code
+  ```
+  from pathlib import Path
+  Path("/var/data").mkdir(parents=True, exist_ok=True)
+  ```
+
+test "file-perm: mkdir restrictive explicit mode is clean (python)"
+  lang python
+  reject VYQL-CFG-008
+  code
+  ```
+  from pathlib import Path
+  Path("/var/data").mkdir(parents=True, exist_ok=True, mode=0o700)
+  ```
+
 test "file-perm: world-writable WriteFile is flagged (go)"
   lang go
   expect VYQL-CFG-008

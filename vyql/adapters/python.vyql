@@ -506,7 +506,10 @@ adapter python {
   mark "os.chmod" val "0o666" -> code.InsecurePermission
   mark "os.fchmod" val "0o777" -> code.InsecurePermission
   mark "os.fchmod" val "0o666" -> code.InsecurePermission
+  mark "os.open" val "0o777" -> code.InsecurePermission
+  mark "os.open" val "0o666" -> code.InsecurePermission
   mark "Path.chmod" val "0o777" -> code.InsecurePermission
+  mark method "mkdir" val "parents=True" val "exist_ok=True" nval "mode=" -> code.InsecurePermission
 
   // resource lifecycle (CWE-772, RES-001) — a raw socket handle that must be closed on
   // every path. close() is receiver-agnostic (control method). Context-manager (`with`)
