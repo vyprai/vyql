@@ -756,7 +756,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(interps) > 0 {
 			return nir.Format{Parts: interps, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)}
 	case "integer", "float":
 		// carry the literal text so value-matching can see numeric modes/flags
 		// (e.g. os.chmod(p, 0o777)); taint is unaffected (Value is val-match only).

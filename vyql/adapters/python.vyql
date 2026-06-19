@@ -490,6 +490,9 @@ adapter python {
   sink path "re.search" -> code.RegexCompile
   sink path "re.sub" -> code.RegexCompile
   sink path "re.findall" -> code.RegexCompile
+  // Static catastrophic regex: a repeated segment that can consume an optional slash
+  // creates ambiguous partitions for long event strings.
+  sink path "re.match" val "+/?)+" -> code.CatastrophicRegex
 
   // weak crypto (CWE-327/328) — presence marker on the call node
   mark "hashlib.md5" -> code.WeakHash
