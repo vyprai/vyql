@@ -474,6 +474,7 @@ adapter javascript {
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "RegExp" -> code.RegexCompile
+  sink receiver "replace" val "+)*m" -> code.RegexMatch
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "bulkCreate" -> code.MassAssign

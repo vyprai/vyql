@@ -10,6 +10,6 @@ rule ReDoS {
 // Untrusted data matched against a regex pattern with static catastrophic-backtracking
 // structure — ReDoS (CWE-1333).
 rule StaticRegexReDoS {
-  meta { id: "VYQL-DOS-002", severity: medium, cwe: [CWE_1333], confidence_floor: low }
+  meta { id: "VYQL-DOS-002", severity: medium, cwe: [CWE_1333, CWE_400], confidence_floor: low }
   taint core.UserControlledData -> code.RegexMatch
 }
