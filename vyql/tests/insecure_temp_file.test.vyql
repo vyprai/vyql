@@ -19,6 +19,28 @@ test "python: NamedTemporaryFile is safe"
   f = tempfile.NamedTemporaryFile()
   ```
 
+test "python: fixed write under shared tmp is insecure"
+  lang python
+  expect VYQL-PATH-003
+  code
+  ```
+  import os
+  filename = "%s.retry" % os.path.basename(playbook)
+  filename = os.path.join("/var/tmp/ansible", filename)
+  fd = open(filename, "w")
+  ```
+
+test "python: fixed write under home is clean"
+  lang python
+  reject VYQL-PATH-003
+  code
+  ```
+  import os
+  filename = "%s.retry" % os.path.basename(playbook)
+  filename = os.path.join(os.path.expandvars("$HOME/"), filename)
+  fd = open(filename, "w")
+  ```
+
 test "c: mktemp is insecure"
   lang c
   expect VYQL-PATH-003

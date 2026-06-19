@@ -560,6 +560,7 @@ adapter python {
 
   // insecure temp file (CWE-377) — tempfile.mktemp is documented-insecure (race)
   mark "tempfile.mktemp" -> code.InsecureTempFile
+  mark "open" val "/tmp/" val "w" -> code.InsecureTempFile
 
   // TLS cert validation disabled (CWE-295) — requests/httpx verify=False
   mark "requests" val "verify=False" -> code.CertValidationDisabled

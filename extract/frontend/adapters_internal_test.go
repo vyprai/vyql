@@ -296,6 +296,59 @@ func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
 	}
 }
 
+func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:    "custom.Target",
+			Pattern:    "open",
+			ValMatches: []string{"/tmp/", "w"},
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "tmp", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:1", "callee_path": "path.join", "method": "join", "str_args": "/tmp/fixed",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "arg1", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Const",
+	}})
+	store.AddNode(usg.Node{ID: "open", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "open", "method": "open", "arg0": "arg0", "arg1": "arg1", "str_args": "w",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "tmp", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "open"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg1", Dst: "open"})
+
+	openNode, _, _ := store.GetNode("open")
+	var flowIdx flowTokenIndex
+	if !valCondsForNode(store, &flowIdx, openNode, []string{"/tmp/", "w"}, nil) {
+		t.Fatalf("flowing string tokens did not satisfy value constraints: %q", flowingStringTokens(store, &flowIdx, "open", openNode.Prop("str_args")))
+	}
+
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "arg0" || got[0].Concept != "custom.Target" {
+		t.Fatalf("value-matched sink did not use flowing string tokens: %+v", got)
+	}
+
+	markSpec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Marks: []controlSpec{{
+			Concept:    "custom.Mark",
+			Pattern:    "open",
+			ValMatches: []string{"/tmp/", "w"},
+		}},
+	}
+	got = markSpec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "open" || got[0].Concept != "custom.Mark" {
+		t.Fatalf("value-matched mark did not use flowing string tokens: %+v", got)
+	}
+}
+
 func TestPackageGatedSourceRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
