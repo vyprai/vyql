@@ -262,6 +262,24 @@ concept ResourceHandle : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_772]
 }
+concept OwnerFieldClear : sink {
+  vulnerable_to: [resource.ResourceLeak]
+  cwe: [CWE_401]
+  review_category: "resource"
+  review_condition: "an owned field is cleared before the owning object is released"
+  review_evidence: "field-clear operation {pattern} dominates owner release"
+  review_assumption: "the cleared field owns nested allocation state that the owner release would otherwise free"
+  review_confidence: low
+}
+concept OwnerFree : sink {
+  vulnerable_to: [resource.ResourceLeak]
+  cwe: [CWE_401]
+  review_category: "resource"
+  review_condition: "owner release follows a dominating field clear"
+  review_evidence: "owner release primitive {pattern} is reached after an owned field clear"
+  review_assumption: "the release routine frees nested fields unless they are cleared first"
+  review_confidence: low
+}
 concept LockAcquire : sink {
   vulnerable_to: [concurrency.Deadlock]
   cwe: [CWE_667]

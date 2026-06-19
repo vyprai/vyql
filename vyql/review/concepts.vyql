@@ -177,6 +177,16 @@ review code.StackAllocationSmell {
   kind: "attention"
   text: "review stack allocation size and whether it is bounded"
 }
+review code.OwnerFieldClear {
+  category: "resource"
+  kind: "attention"
+  text: "review whether clearing the owner field before release leaks nested state"
+}
+review code.OwnerFree {
+  category: "resource"
+  kind: "attention"
+  text: "review owner release and fields cleared before it"
+}
 review code.IndexAccess {
   category: "memory"
   kind: "attention"

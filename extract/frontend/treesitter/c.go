@@ -240,6 +240,9 @@ func (c *ccConv) declName(d *tree_sitter.Node) string {
 
 func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
+	if n.IsError() || strings.HasPrefix(n.Kind(), "preproc_") {
+		return c.decls(n)
+	}
 	switch n.Kind() {
 	case "function_definition":
 		decl := field(n, "declarator")
@@ -381,13 +384,13 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	case "assignment_expression":
 		left := field(inner, "left")
 		right := c.expr(field(inner, "right"))
+		if ev := c.fieldClearNullEvent(inner, left, field(inner, "right")); ev != nil {
+			return append([]nir.Stmt{*ev}, c.assignmentFallback(left, right)...)
+		}
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		if left != nil {
-			return []nir.Stmt{nir.ExprStmt{Value: c.expr(left)}, nir.ExprStmt{Value: right}}
-		}
-		return []nir.Stmt{nir.ExprStmt{Value: right}}
+		return c.assignmentFallback(left, right)
 	case "call_expression":
 		name := lastSeg(c.dotted(field(inner, "function")))
 		args := namedChildren(field(inner, "arguments"))
@@ -412,6 +415,58 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+func (c *ccConv) assignmentFallback(left *tree_sitter.Node, right nir.Expr) []nir.Stmt {
+	if left != nil {
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(left)}, nir.ExprStmt{Value: right}}
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: right}}
+}
+
+func (c *ccConv) fieldClearNullEvent(assign, left, right *tree_sitter.Node) *nir.ExprStmt {
+	if left == nil || right == nil || !c.isNullExpr(right) {
+		return nil
+	}
+	base, fld, ok := c.fieldTarget(left)
+	if !ok {
+		return nil
+	}
+	path := "analysis.field.clear_null"
+	return &nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: c.loc(assign)},
+		Args: []nir.Expr{
+			c.expr(base),
+			nir.Const{Loc: c.loc(left), Value: "field=" + fld},
+		},
+		Path:   path,
+		Method: "clear_null",
+		Loc:    c.loc(assign),
+	}}
+}
+
+func (c *ccConv) fieldTarget(n *tree_sitter.Node) (*tree_sitter.Node, string, bool) {
+	if n == nil || n.Kind() != "field_expression" {
+		return nil, "", false
+	}
+	base := field(n, "argument")
+	fld := c.text(field(n, "field"))
+	return base, fld, base != nil && fld != ""
+}
+
+func (c *ccConv) isNullExpr(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Kind() {
+	case "identifier":
+		return c.text(n) == "NULL"
+	case "number_literal":
+		return c.text(n) == "0"
+	case "null", "nullptr":
+		return true
+	}
+	return false
 }
 
 // destName returns the buffer variable name of a writer's destination argument,

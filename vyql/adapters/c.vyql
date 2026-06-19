@@ -90,6 +90,8 @@ adapter c {
   mark "__subscript" -> code.IndexAccess
   mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
   mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
+  mark "analysis.field.clear_null" -> code.OwnerFieldClear
+  mark "xmlFreeDoc" -> code.OwnerFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree

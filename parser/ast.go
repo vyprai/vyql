@@ -283,4 +283,4 @@ func (NotIn) isExpr()          {}
 
 // FlowVerbs / SolverVerbs (docs/05).
 var FlowVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "assume": true}
-var SolverVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "assume": true, "can_access": true}
+var SolverVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "assume": true, "can_access": true, "dominates": true}
