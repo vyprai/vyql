@@ -1744,7 +1744,13 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
 		key := l.eval(ex.Key, sc)
-		n := l.node("Subscript", ex.Loc, map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key})
+		props := map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key}
+		var valToks []string
+		collectValTokens(ex.Key, "", &valToks)
+		if len(valToks) > 0 {
+			props["str_args"] = strings.Join(valToks, "\x00")
+		}
+		n := l.node("Subscript", ex.Loc, props)
 		l.flow(key, n)
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
@@ -1754,7 +1760,13 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Call:
 		return l.evalCall(ex, sc)
 	case nir.Format:
-		n := l.node("Format", ex.Loc, nil)
+		props := map[string]string{}
+		var valToks []string
+		collectValTokens(ex, "", &valToks)
+		if len(valToks) > 0 {
+			props["str_args"] = strings.Join(valToks, "\x00")
+		}
+		n := l.node("Format", ex.Loc, props)
 		for _, p := range ex.Parts {
 			l.flow(l.eval(p, sc), n)
 		}

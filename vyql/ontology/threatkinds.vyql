@@ -39,6 +39,7 @@ threat MissingEncryption { cwe: [CWE_311], desc: "Missing encryption of sensitiv
 threat WeakCrypto { cwe: [CWE_327], desc: "Use of a broken/risky cryptographic algorithm" }
 threat ImproperCertValidation { cwe: [CWE_295], desc: "Improper certificate validation (verification disabled)" }
 threat ImproperSignatureCheck { cwe: [CWE_347], desc: "Improper verification of cryptographic signature (e.g. JWT alg none)" }
+threat IncompleteSecurityIdentifier { cwe: [CWE_358], desc: "Security-sensitive identity check uses a shortened or ambiguous identifier" }
 
 module deserialization;
 threat DeserializationAbuse { cwe: [CWE_502], desc: "Deserialization of untrusted data" }

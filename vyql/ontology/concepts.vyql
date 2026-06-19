@@ -182,6 +182,27 @@ concept JwtUnverified : sink {
   cwe: [CWE_347]
 }
 
+concept ShortSecurityIdentifier : source {
+  taint: [taint.WeakSecurityIdentifier]
+  cwe: [CWE_358]
+  review_category: "crypto"
+  review_condition: "a security identifier is shortened before it is used for a trust decision"
+  review_evidence: "identifier truncation {pattern} produces a shortened value"
+  review_assumption: "the shortened identifier can collide with a different trusted identity"
+  review_confidence: medium
+}
+
+concept SecurityKeyTrustOperation : sink {
+  vulnerable_to: [crypto.IncompleteSecurityIdentifier, crypto.ImproperSignatureCheck]
+  enabled_by: [taint.WeakSecurityIdentifier]
+  cwe: [CWE_358, CWE_347]
+  review_category: "crypto"
+  review_condition: "a shortened security key identifier reaches a key trust operation"
+  review_evidence: "trust operation {pattern} receives a shortened identifier"
+  review_assumption: "the keyserver or trust store may contain a colliding key identifier"
+  review_confidence: medium
+}
+
 concept CleartextChannel : sink {
   vulnerable_to: [crypto.CleartextTransmission]
   cwe: [CWE_319]

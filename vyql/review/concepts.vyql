@@ -123,6 +123,16 @@ review code.CryptoOperation {
   expected: [core.CertificateValidation, core.EncryptionAtRest, core.EncryptionInTransit]
   text: "verify algorithm choice, key/IV handling, and signature or certificate checks"
 }
+review code.ShortSecurityIdentifier {
+  category: "crypto"
+  kind: "attention"
+  text: "review shortened security identifiers for collision-resistant trust decisions"
+}
+review code.SecurityKeyTrustOperation {
+  category: "crypto"
+  kind: "target"
+  text: "verify trust/key operations use a full collision-resistant identifier"
+}
 review code.ResourceReview {
   category: "resource"
   kind: "target"

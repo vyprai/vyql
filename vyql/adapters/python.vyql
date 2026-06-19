@@ -84,6 +84,7 @@ adapter python {
   source "input" -> code.StdinInput
   source "sys.stdin" -> code.StdinInput
   source "fileinput.input" -> code.StdinInput
+  source method "[]" val "-8:" -> code.ShortSecurityIdentifier
   source "os.environ" -> code.SecretValue
   source "os.getenv" -> code.SecretValue
   source "config.get" -> code.SecretValue
@@ -215,6 +216,7 @@ adapter python {
   sink path "subprocess.getstatusoutput" -> code.CommandExecution
   sink path "commands.getoutput" -> code.CommandExecution
   sink path "commands.getstatusoutput" -> code.CommandExecution
+  sink path "module.run_command" val "apt-key" val "--recv" -> code.SecurityKeyTrustOperation
   sink path "pty.spawn" -> code.CommandExecution
   sink path "os.execv" -> code.CommandExecution
   sink path "os.execve" -> code.CommandExecution

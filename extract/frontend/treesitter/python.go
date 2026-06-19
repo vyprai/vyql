@@ -753,6 +753,8 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "attribute")), Path: c.dotted(n), Loc: L}
 	case "subscript":
 		return nir.Index{Base: c.expr(field(n, "value")), Key: c.expr(field(n, "subscript")), Path: c.dotted(field(n, "value")), Loc: L}
+	case "slice":
+		return nir.Const{Loc: L, Value: c.text(n)}
 	case "call":
 		fn := field(n, "function")
 		path := c.dotted(fn)

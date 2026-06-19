@@ -28,3 +28,8 @@ rule StaticIvOrNonce {
   meta { id: "VYQL-CRY-004", severity: medium, cwe: [CWE_329], confidence_floor: low }
   match code.StaticIv as iv
 }
+
+rule ShortSecurityIdentifierTrust {
+  meta { id: "VYQL-CRY-005", severity: medium, cwe: [CWE_358, CWE_347] }
+  taint code.ShortSecurityIdentifier -> code.SecurityKeyTrustOperation
+}

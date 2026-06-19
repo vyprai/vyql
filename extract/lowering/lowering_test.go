@@ -126,6 +126,51 @@ func TestCollectValTokensDescendsIntoFormat(t *testing.T) {
 	t.Fatalf("expected formatted literal token, got %#v", toks)
 }
 
+func TestLoweringCarriesLiteralTokensOnFormatAndSubscript(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.Assign{Targets: []string{"short"}, Value: nir.Index{
+				Base: nir.Name{ID: "key_id", Loc: "app.py:1"},
+				Key:  nir.Const{Loc: "app.py:1", Value: "-8:"},
+				Path: "key_id.upper",
+				Loc:  "app.py:1",
+			}},
+			nir.Assign{Targets: []string{"cmd"}, Value: nir.Format{
+				Parts: []nir.Expr{
+					nir.Const{Loc: "app.py:2", Value: "\"apt-key adv --recv \""},
+					nir.Name{ID: "short", Loc: "app.py:2"},
+				},
+				Loc: "app.py:2",
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+
+	var sawSubscript, sawFormat bool
+	ids, _ := g.NodesOfType("code.Subscript")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if strings.Contains(n.Prop("str_args"), "-8:") {
+			sawSubscript = true
+		}
+	}
+	ids, _ = g.NodesOfType("code.Format")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if strings.Contains(n.Prop("str_args"), "--recv") {
+			sawFormat = true
+		}
+	}
+	if !sawSubscript || !sawFormat {
+		t.Fatalf("literal tokens missing: subscript=%v format=%v", sawSubscript, sawFormat)
+	}
+}
+
 func TestLowerMaterializesImportNodes(t *testing.T) {
 	g, err := Lower(nir.Program{Modules: []nir.Module{{
 		Key:  "app",
