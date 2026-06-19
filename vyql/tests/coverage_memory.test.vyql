@@ -28,12 +28,24 @@ test "memory: constant strcpy is only the low-confidence smell (c)"
 test "memory: attacker-controlled memcpy size is reported (c)"
   lang c
   expect VYQL-MEM-003
+  expect VYQL-MEM-016
   code
   ```
   int atoi(const char *);
   void f(int argc, char **argv, char *dst, char *src) {
       int n = atoi(argv[1]);
       memcpy(dst, src, n);
+  }
+  ```
+
+test "memory: raw memcpy size without taint is reported as low-confidence attention (c)"
+  lang c
+  expect VYQL-MEM-016
+  reject VYQL-MEM-003
+  code
+  ```
+  void f(char *dst, char *src, int frames, int bytes_per_frame) {
+      memcpy(dst, src, frames * bytes_per_frame);
   }
   ```
 

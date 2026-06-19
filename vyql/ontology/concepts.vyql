@@ -400,9 +400,9 @@ concept RawMemoryCopySize : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_787]
   review_category: "memory"
-  review_condition: "attacker-controlled size reaches a raw memory copy"
-  review_evidence: "copy-size argument to {pattern} is tainted"
-  review_assumption: "the size can exceed the destination object bounds"
+  review_condition: "raw memory copy size expression needs bounds review"
+  review_evidence: "copy-size argument to {pattern} is computed or externally influenced"
+  review_assumption: "the size or source offset can exceed the destination/source object bounds"
   review_confidence: medium
 }
 concept UnsafeMutableAlias : sink {

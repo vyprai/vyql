@@ -18,6 +18,11 @@ rule TaintedRawMemoryCopySize {
   taint core.UserControlledData -> code.RawMemoryCopySize
 }
 
+rule PotentialRawMemoryCopySize {
+  meta { id: "VYQL-MEM-016", severity: medium, cwe: [CWE_119, CWE_787], confidence_floor: low }
+  match code.RawMemoryCopySize as c
+}
+
 rule StackAllocationSmell {
   meta { id: "VYQL-MEM-004", severity: low, cwe: [CWE_400], confidence_floor: low }
   match code.StackAllocationSmell as a
