@@ -1144,6 +1144,19 @@ test "python: shlex.quote neutralizes the command injection"
       os.system("ping " + shlex.quote(x))
   ```
 
+test "python: shell quote inside generator join neutralizes command injection"
+  lang python
+  reject VYQL-INJ-002
+  code
+  ```
+  from pipes import quote
+
+  def safe():
+      args = [request.args['tool'], request.args['input'], "-d", "/tmp/out"]
+      command = " ".join(quote(arg) for arg in args)
+      os.system(command)
+  ```
+
 test "python: SQLAlchemy stored value reaches command execution"
   lang python
   expect VYQL-INJ-032

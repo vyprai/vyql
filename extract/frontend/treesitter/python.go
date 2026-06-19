@@ -790,8 +790,12 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		path := c.dotted(fn)
 		var arglist []nir.Expr
 		if args := field(n, "arguments"); args != nil {
-			for _, a := range namedChildren(args) {
-				arglist = append(arglist, c.expr(a))
+			if args.Kind() == "generator_expression" {
+				arglist = append(arglist, c.expr(args))
+			} else {
+				for _, a := range namedChildren(args) {
+					arglist = append(arglist, c.expr(a))
+				}
 			}
 		}
 		method := path
@@ -837,6 +841,8 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
+	case "generator_expression", "list_comprehension", "set_comprehension":
+		return c.comprehensionValue(n, L)
 	case "parenthesized_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return c.expr(kids[0])
@@ -847,6 +853,91 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
+	body := field(n, "body")
+	if body == nil {
+		var parts []nir.Expr
+		for _, ch := range namedChildren(n) {
+			parts = append(parts, c.expr(ch))
+		}
+		return nir.Seq{Parts: parts, Loc: loc}
+	}
+	out := c.expr(body)
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "for_in_clause" {
+			continue
+		}
+		names := c.targets(field(ch, "left"))
+		iter := field(ch, "right")
+		if len(names) == 0 || iter == nil {
+			break
+		}
+		repl := c.expr(iter)
+		for _, name := range names {
+			out = replaceName(out, name, repl)
+		}
+		break
+	}
+	return out
+}
+
+func replaceName(ex nir.Expr, name string, repl nir.Expr) nir.Expr {
+	switch e := ex.(type) {
+	case nil:
+		return e
+	case nir.Name:
+		if e.ID == name {
+			return repl
+		}
+		return e
+	case nir.Attr:
+		e.Base = replaceName(e.Base, name, repl)
+		return e
+	case nir.Index:
+		e.Base = replaceName(e.Base, name, repl)
+		e.Key = replaceName(e.Key, name, repl)
+		return e
+	case nir.Call:
+		e.Callee = replaceName(e.Callee, name, repl)
+		for i, a := range e.Args {
+			e.Args[i] = replaceName(a, name, repl)
+		}
+		return e
+	case nir.Format:
+		for i, p := range e.Parts {
+			e.Parts[i] = replaceName(p, name, repl)
+		}
+		return e
+	case nir.Seq:
+		for i, p := range e.Parts {
+			e.Parts[i] = replaceName(p, name, repl)
+		}
+		return e
+	case nir.Pair:
+		e.Value = replaceName(e.Value, name, repl)
+		return e
+	case nir.Thru:
+		e.Inner = replaceName(e.Inner, name, repl)
+		return e
+	case nir.BinOp:
+		e.Left = replaceName(e.Left, name, repl)
+		e.Right = replaceName(e.Right, name, repl)
+		return e
+	case nir.Unary:
+		e.Operand = replaceName(e.Operand, name, repl)
+		return e
+	case nir.Ternary:
+		e.Cond = replaceName(e.Cond, name, repl)
+		e.Then = replaceName(e.Then, name, repl)
+		e.Else = replaceName(e.Else, name, repl)
+		return e
+	case nir.Lambda:
+		return e
+	default:
+		return e
+	}
 }
 
 // keyName returns the bare name of a Pair key node — an identifier as-is, or a
