@@ -603,7 +603,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		ne = append(ne, e.neutralizerAssumptions(fl.Path, fl.SinkID, sinkConcepts)...)
 		suppressed := false
 		for _, g := range guards {
-			ok := e.endpointGuarded(fl.SinkID, g)
+			ok := e.endpointGuarded(fl.SinkID, g) || e.flowGuarded(fl.Path, g)
 			detail := "no guard on sink"
 			if ok {
 				detail = "guard covers sink"
@@ -902,6 +902,56 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 		}
 	}
 	return false
+}
+
+// flowGuarded reports whether a guard consumes the tainted value and dominates
+// a later node on this same source-to-sink path. This covers the common shape:
+//
+//	v := source()
+//	if !validate(v) { return }
+//	wrapper(v) // endpoint is inside wrapper
+//
+// The guard does not dominate the callee-internal sink, so endpointGuarded cannot
+// see it. It does dominate the path boundary that forwards the checked value,
+// which is enough for guard-style allowlist validators.
+func (e *Engine) flowGuarded(path []string, control string) bool {
+	if len(path) == 0 {
+		return false
+	}
+	for i, pid := range path {
+		for _, gid := range e.flowGuardCandidates(pid, control) {
+			if gid == pid || !hasCFG(e.Store, gid) {
+				continue
+			}
+			for _, later := range path[i+1:] {
+				if later != gid && hasCFG(e.Store, later) && solvers.Dominates(e.Store, gid, later) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(id string) {
+		if id == "" || seen[id] || !e.nodeHasConcept(id, control) {
+			return
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	edges, _ := e.Store.OutEdges(nodeID, "FLOWS")
+	for _, ed := range edges {
+		add(ed.Dst)
+		midEdges, _ := e.Store.OutEdges(ed.Dst, "FLOWS")
+		for _, mid := range midEdges {
+			add(mid.Dst)
+		}
+	}
+	return out
 }
 
 // preflightLoopGuarded recognizes "validate every item, then run one bulk operation"

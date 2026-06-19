@@ -58,6 +58,11 @@ adapter go {
   source ".Cookie" -> code.HttpInput
   source ".Params" -> code.HttpInput
   source ".Param" -> code.HttpInput
+  // OIDC issuers/subjects/audiences are parsed from untrusted bearer tokens before
+  // verification; provider discovery on those values is an SSRF-sensitive fetch.
+  source "auth.ExtractIssuer" -> code.HttpInput
+  source "apiauth.ExtractIssuer" -> code.HttpInput
+  source "ExtractIssuer" -> code.HttpInput
 
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
@@ -100,6 +105,8 @@ adapter go {
   sink path "client.Post" -> code.UrlFetch
   sink path "client.Do" -> code.UrlFetch
   sink path "client.Head" -> code.UrlFetch
+  sink path "provider.Get" arg 1 val "issuer" -> code.UrlFetch
+  sink path "oidc.NewProvider" arg 1 -> code.UrlFetch
   sink path "resty.R" -> code.UrlFetch
   sink path "req.Get" -> code.UrlFetch
   sink path "os.Open" -> code.FilePathAccess
@@ -195,6 +202,8 @@ adapter go {
   control method "CheckOwnership" -> core.OwnershipCheck
   control method "RequireOwner" -> core.OwnershipCheck
   control method "IsOwner" -> core.OwnershipCheck
+  control "oidcvalidate.IsValidIssuer" -> core.AllowlistValidation
+  control "IsValidIssuer" -> core.AllowlistValidation
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "regexp.Compile" -> code.RegexCompile
