@@ -176,6 +176,11 @@ review code.CryptoOperation {
   expected: [core.CertificateValidation, core.EncryptionAtRest, core.EncryptionInTransit]
   text: "verify algorithm choice, key/IV handling, and signature or certificate checks"
 }
+review code.ExternalResourceIntegrityReview {
+  category: "supply_chain"
+  kind: "attention"
+  text: "review external script/style integrity handling for allowlist decisions before trusting provided SRI metadata"
+}
 review code.ShortSecurityIdentifier {
   category: "crypto"
   kind: "attention"

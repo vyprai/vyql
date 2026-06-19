@@ -174,6 +174,7 @@ adapter javascript {
   control "isUrlAllowed" -> core.AllowlistValidation
   control "isAllowedHost" -> core.AllowlistValidation
   control "validateUrl" -> core.AllowlistValidation
+  mark exact "analysis.function.context" val "name=updateDynamicPageSriHashes" val "integrityRegex.exec(attrs)" val "globalHashes[t2].set(src,sriHash)" nval "Detected reference to not explicitly allowed external resource" -> code.ExternalResourceIntegrityReview
   // Electron: shell.openExternal can launch arbitrary apps/protocols from a URL
   sink path "shell.openExternal" -> code.CommandExecution
   // Electron insecure renderer config (named-value on the BrowserWindow options)

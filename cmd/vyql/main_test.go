@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +15,22 @@ func TestScanPathsNoSource(t *testing.T) {
 	rules, _ := loadRules("")
 	if _, _, _, err := scanPaths([]string{t.TempDir()}, rules); err == nil {
 		t.Fatal("scanning a dir with no supported source should error")
+	}
+}
+
+func TestExtractAllSupportsJavaScriptModules(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "core.mjs")
+	if err := os.WriteFile(src, []byte("export const answer = () => 42\n"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	_, _, _, stats, err := extractAll([]string{src})
+	if err != nil {
+		t.Fatalf("extractAll .mjs: %v", err)
+	}
+	if got := stats.files["javascript"]; got != 1 {
+		t.Fatalf(".mjs should route through javascript frontend, got count %d stats=%v", got, stats.files)
 	}
 }
 

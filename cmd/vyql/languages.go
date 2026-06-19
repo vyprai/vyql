@@ -27,7 +27,7 @@ type language struct {
 var languages = []language{
 	{"go", map[string]bool{".go": true}, golang.Extract, frontend.GoAdapters},
 	{"python", map[string]bool{".py": true}, treesitter.ExtractPython, frontend.PythonAdapters},
-	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true},
+	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true},
 		treesitter.ExtractJavaScript, frontend.JsAdapters},
 	{"ruby", map[string]bool{".rb": true}, treesitter.ExtractRuby, frontend.RubyAdapters},
 	{"java", map[string]bool{".java": true}, treesitter.ExtractJava, frontend.JavaAdapters},
