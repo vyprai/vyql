@@ -85,6 +85,8 @@ adapter python {
   source "sys.stdin" -> code.StdinInput
   source "fileinput.input" -> code.StdinInput
   source method "[]" val "-8:" -> code.ShortSecurityIdentifier
+  source "os.environ.get" val "HTTP_PROXY" -> code.HttpInput
+  source "os.getenv" val "HTTP_PROXY" -> code.HttpInput
   source "os.environ" -> code.SecretValue
   source "os.getenv" -> code.SecretValue
   source "config.get" -> code.SecretValue
@@ -285,6 +287,7 @@ adapter python {
   sink path "urllib2.urlopen" -> code.UrlFetch
   sink path "urllib2.Request" -> code.UrlFetch
   sink path "urllib3.request" -> code.UrlFetch
+  sink path "urllib3.ProxyManager" -> code.UrlFetch
   sink path "urllib3.PoolManager" -> code.UrlFetch
   sink path "httpx.get" -> code.UrlFetch
   sink path "httpx.post" -> code.UrlFetch

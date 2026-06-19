@@ -2,7 +2,7 @@
 module vypr.request_forgery;
 
 rule Ssrf {
-  meta { id: "VYQL-RF-001", severity: high, cwe: [CWE_918] }
+  meta { id: "VYQL-RF-001", severity: high, cwe: [CWE_918, CWE_20] }
   taint core.UserControlledData -> code.UrlFetch
   unless sanitized_by core.AllowlistValidation
   unless guarded_by core.AllowlistValidation

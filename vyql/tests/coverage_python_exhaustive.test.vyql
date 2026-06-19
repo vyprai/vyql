@@ -106,6 +106,38 @@ test "python exhaustive: URL allowlist basename and safe archive path suppress f
       archive.extract(path)
   ```
 
+test "python: HTTP_PROXY environment controls urllib3 proxy manager"
+  lang python
+  expect VYQL-RF-001
+  code
+  ```
+  import os
+  import urllib3
+
+  def make_transport():
+      proxy_url = os.environ.get("HTTPS_PROXY", os.environ.get("HTTP_PROXY"))
+      if proxy_url:
+          return urllib3.ProxyManager(proxy_url)
+      return urllib3.PoolManager()
+  ```
+
+test "python: stdlib proxy lookup with bypass check is clean"
+  lang python
+  reject VYQL-RF-001
+  code
+  ```
+  import urllib3
+  from elasticapm.utils import compat
+
+  def make_transport(url):
+      url_parts = compat.urlparse.urlparse(url)
+      proxies = compat.getproxies_environment()
+      proxy_url = proxies.get("https", proxies.get("http", None))
+      if proxy_url and not compat.proxy_bypass_environment(url_parts.netloc):
+          return urllib3.ProxyManager(proxy_url)
+      return urllib3.PoolManager()
+  ```
+
 test "python exhaustive: realpath base plus separator guard suppresses path traversal"
   lang python
   reject VYQL-PATH-001
