@@ -191,6 +191,9 @@ adapter go {
   // filepath.Base strips all directory components — no `/`, `\`, or `..` survives, so it
   // confines a path to a single segment (the Go analogue of path.basename).
   control "filepath.Base" -> core.PathCanonicalization
+  control "pathrs.Reopen" -> core.PathAccessCheck
+  control "procfs.OpenProcRoot" -> core.PathAccessCheck
+  control method "OpenThreadSelf" -> core.PathAccessCheck
   // benchmark-harness escapers/validators (wrap real neutralization the rule honors).
   control "support.EscapeLDAP" -> core.LdapEscape
   control "support.XPathLiteral" -> core.XpathEscape
@@ -261,6 +264,9 @@ adapter go {
   // Review-only: admission ignore helpers that skip every non-empty subresource
   // need manual review for alternate API paths that bypass the primary policy.
   mark exact "analysis.function.context" val "function_name:shouldIgnore" val "call:GetSubresource" nval "ignoredSubresources" -> code.AdmissionSubresourcePolicyReview
+  // Review-only: writing security state through ordinary path opening of procfs control
+  // files needs a verified procfs/open boundary to avoid link or mount redirection.
+  mark exact "analysis.function.context" val "call_path:os.OpenFile" val "literal:/proc/self/attr/exec" nval "call:OpenProcRoot" nval "call:OpenThreadSelf" nval "call_path:pathrs.Reopen" -> code.SpecialFileAccessReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission

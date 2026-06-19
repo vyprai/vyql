@@ -189,6 +189,16 @@ review code.SecretFilePermissionReview {
   kind: "attention"
   text: "verify generated key material is stored with restrictive file permissions"
 }
+review core.PathAccessCheck {
+  category: "path"
+  kind: "check"
+}
+review code.SpecialFileAccessReview {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "verify special filesystem paths are opened through a boundary that prevents link or mount redirection"
+}
 review code.LockAcquire {
   category: "concurrency"
   kind: "target"

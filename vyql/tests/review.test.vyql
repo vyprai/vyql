@@ -647,6 +647,77 @@ test "review: go repository/keyring config type with YAML redaction is clean"
   }
   ```
 
+test "review: go special procfs write without secure boundary is surfaced"
+  lang go
+  expect_review code.SpecialFileAccessReview
+  code
+  ```
+  package apparmor
+
+  import (
+    "fmt"
+    "os"
+  )
+
+  func LoadProfile(profile string) error {
+    f, err := os.OpenFile("/proc/self/attr/exec", os.O_WRONLY, 0)
+    if err != nil {
+      return err
+    }
+    defer f.Close()
+
+    p := "exec " + profile
+    if _, err := f.Write([]byte(p)); err != nil {
+      return fmt.Errorf("failed to set apparmor profile (%s)", err)
+    }
+    return nil
+  }
+  ```
+
+test "review: go special procfs write with secure boundary is clean"
+  lang go
+  expect_review core.PathAccessCheck
+  reject_review code.SpecialFileAccessReview
+  code
+  ```
+  package apparmor
+
+  import (
+    "fmt"
+
+    "github.com/cyphar/filepath-securejoin/pathrs-lite"
+    "github.com/cyphar/filepath-securejoin/pathrs-lite/procfs"
+    "golang.org/x/sys/unix"
+  )
+
+  func LoadProfile(profile string) error {
+    proc, err := procfs.OpenProcRoot()
+    if err != nil {
+      return err
+    }
+    defer proc.Close()
+
+    attrExec, closer, err := proc.OpenThreadSelf("attr/exec")
+    if err != nil {
+      return err
+    }
+    defer closer()
+    defer attrExec.Close()
+
+    f, err := pathrs.Reopen(attrExec, unix.O_WRONLY|unix.O_CLOEXEC)
+    if err != nil {
+      return err
+    }
+    defer f.Close()
+
+    p := "exec " + profile
+    if _, err := f.Write([]byte(p)); err != nil {
+      return fmt.Errorf("failed to set apparmor profile (%s)", err)
+    }
+    return nil
+  }
+  ```
+
 test "review: java internal document serialization without hidden visibility is surfaced"
   lang java
   expect_review code.InternalContentExposureReview

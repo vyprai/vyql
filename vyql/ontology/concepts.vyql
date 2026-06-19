@@ -182,6 +182,20 @@ concept InsecureTempFile : sink {
   cwe: [CWE_377, CWE_59]
 }
 
+// Review-only: security-sensitive virtual filesystem paths (for example procfs
+// control files) opened through ordinary path APIs may be redirected or resolved
+// outside the intended special filesystem. This stays review-only because the
+// exploitability depends on mount/user namespace context.
+concept SpecialFileAccessReview : sink {
+  vulnerable_to: [path.LinkFollowing]
+  cwe: [CWE_61, CWE_706]
+  review_category: "path"
+  review_condition: "security-sensitive virtual filesystem path is opened without an observed secure filesystem boundary"
+  review_evidence: "special-file access context {pattern} uses ordinary path opening"
+  review_assumption: "the path may be redirected away from the intended special filesystem"
+  review_confidence: possibility
+}
+
 concept CertValidationDisabled : sink {
   vulnerable_to: [crypto.ImproperCertValidation]
   cwe: [CWE_295]
