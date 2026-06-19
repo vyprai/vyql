@@ -20,6 +20,11 @@ rule Command {
   unless sanitized_by core.ShellEscape
 }
 
+rule CommandOptionInjection {
+  meta { id: "VYQL-INJ-031", severity: high, cwe: [CWE_74, CWE_88], confidence_floor: medium }
+  match code.CommandOptionInjection as sink
+}
+
 rule Code {
   meta { id: "VYQL-INJ-003", severity: critical, cwe: [CWE_94], benchmark: codeinj }
   taint core.UserControlledData -> code.CodeEval

@@ -207,6 +207,8 @@ adapter python {
   sink path "subprocess.call" -> code.CommandExecution
   sink path "subprocess.run" -> code.CommandExecution
   sink path "subprocess.Popen" -> code.CommandExecution
+  sink path "subprocess.Popen" val "self.args" val "tag.filename" nval "--" -> code.CommandOptionInjection
+  sink path "subprocess.Popen" val "self.args" val "filename" nval "--" -> code.CommandOptionInjection
   sink path "subprocess.check_output" -> code.CommandExecution
   sink path "subprocess.check_call" -> code.CommandExecution
   sink path "subprocess.getoutput" -> code.CommandExecution

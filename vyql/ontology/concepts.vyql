@@ -64,6 +64,10 @@ concept CommandExecution : sink {
   cwe: [CWE_78]
   excluded_chars: ";|&$<>()"
 }
+concept CommandOptionInjection : sink {
+  vulnerable_to: [injection.ArgumentInjection]
+  cwe: [CWE_74, CWE_88]
+}
 
 concept FormatString : sink {
   vulnerable_to: [injection.FormatString]
