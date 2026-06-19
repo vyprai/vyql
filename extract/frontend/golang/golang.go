@@ -238,7 +238,41 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 		body = c.stmts(bodyNode.List)
 	}
 	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
-		ParamEntries: c.goParamEntries(name, params, paramTypes), Exported: exported}
+		ContextTokens: c.goFunctionTokens(name, bodyNode),
+		ParamEntries:  c.goParamEntries(name, params, paramTypes), Exported: exported}
+}
+
+func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
+	var out []string
+	if name != "" {
+		out = append(out, "function_name:"+name)
+	}
+	if body == nil {
+		return out
+	}
+	seen := map[string]bool{}
+	ast.Inspect(body, func(n ast.Node) bool {
+		if len(seen) >= 64 {
+			return false
+		}
+		lit, ok := n.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		v, err := strconv.Unquote(lit.Value)
+		if err != nil || v == "" {
+			return true
+		}
+		if len(v) > 256 {
+			v = v[:256]
+		}
+		if !seen[v] {
+			seen[v] = true
+			out = append(out, "literal:"+v)
+		}
+		return true
+	})
+	return out
 }
 
 func (c *conv) goParamEntries(name string, params []string, paramTypes map[string]string) []nir.ParamEntry {

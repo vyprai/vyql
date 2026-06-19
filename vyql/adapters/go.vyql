@@ -131,6 +131,13 @@ adapter go {
   sink path "template.HTML" -> code.HtmlRender
   sink path "template.JS" -> code.HtmlRender
   sink path "template.URL" -> code.HtmlRender
+  // Helpers that construct and return raw HTML bytes/strings are response render
+  // boundaries when caller-controlled values are interpolated into the returned value.
+  // The Go frontend emits neutral function literal evidence; this adapter assigns the
+  // security meaning in data.
+  sink path "analysis.function.return" val "<html" -> code.HtmlRender
+  sink path "analysis.function.return" val "<body" -> code.HtmlRender
+  sink path "analysis.function.return" val "<a " -> code.HtmlRender
   sink path "http.Redirect" -> code.RedirectTarget
   sink path "c.Redirect" -> code.RedirectTarget
   sink path "ctx.Redirect" -> code.RedirectTarget

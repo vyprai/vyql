@@ -199,3 +199,25 @@ test "go exhaustive: stronger crypto secure config closed resources and unlocked
     mu.Unlock()
   }
   ```
+
+test "go exhaustive: public HTML helper return is an XSS sink"
+  lang go
+  profile library
+  expect VYQL-INJ-004
+  code
+  ```
+  package themes
+
+  import "bytes"
+
+  func MessagePageBytes(title string, body []byte, theme string) []byte {
+    var buf bytes.Buffer
+    buf.WriteString("<!doctype html><html><head><title>")
+    buf.WriteString(title)
+    buf.WriteString("</title></head><body><h1>")
+    buf.WriteString(title)
+    buf.WriteString("</h1>")
+    buf.Write(body)
+    return buf.Bytes()
+  }
+  ```
