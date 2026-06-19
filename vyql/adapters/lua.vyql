@@ -9,6 +9,9 @@ adapter lua {
   source "ngx.req.get_post_args" -> code.HttpInput
   source "ngx.req.get_headers" -> code.HttpInput
   source "ngx.req.get_body_data" -> code.HttpInput
+  source path "obj.password" -> code.SecretValue
+  source path "matcher.password" -> code.SecretValue
+  source path "cur_consumer.auth_conf.password" -> code.SecretValue
 
   // command execution (the shell command is arg0)
   sink path "os.execute" -> code.CommandExecution
@@ -44,6 +47,17 @@ adapter lua {
   // XSS — OpenResty response writers reflect tainted output (any arg)
   sink path "ngx.say" arg all -> code.HtmlRender
   sink path "ngx.print" arg all -> code.HtmlRender
+  // log injection (CWE-117) + secret-in-log (CWE-532).
+  sink path "core.log.info" arg all -> code.LogOutput
+  sink path "core.log.warn" arg all -> code.LogOutput
+  sink path "core.log.warning" arg all -> code.LogOutput
+  sink path "core.log.error" arg all -> code.LogOutput
+  sink path "core.log.debug" arg all -> code.LogOutput
+  mark "core.log.info" -> code.LogWrite
+  mark "core.log.warn" -> code.LogWrite
+  mark "core.log.warning" -> code.LogWrite
+  mark "core.log.error" -> code.LogWrite
+  mark "core.log.debug" -> code.LogWrite
 
   // SSRF — luasocket http.request / resty.http request_uri
   sink path "http.request" -> code.UrlFetch
