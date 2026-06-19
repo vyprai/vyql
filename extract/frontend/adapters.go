@@ -215,7 +215,7 @@ type filterSpec struct {
 }
 
 // assumeSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
-// *might* defuse a threat but cannot be proven to. It never kills a flow; the engine
+// might apply but cannot be proven to. It never kills a flow; the engine
 // attaches an assumption note instead.
 type assumeSpec struct {
 	Pattern    string

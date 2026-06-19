@@ -4,7 +4,7 @@
 // ExternalEntryInput labels function parameters as a (low-confidence) source.
 profile library {
   title: "Library / SDK"
-  detect: ["file:setup.py", "file:pyproject.toml", "npm:library",
-           "dep:rollup", "dep:tsup", "manifest:library"]
+  detect: ["file:setup.py", "file:pyproject.toml", "npm:publishable",
+           "dep:rollup", "dep:tsup", "manifest:publishable"]
   entrypoints: [UserControlledData, ExternalEntryInput, DomInput, ExternalApiResponse, HttpInput, DatabaseRead, SecretValue]
 }
