@@ -48,6 +48,90 @@ test "go exhaustive: constants and filepath.Base suppress command path upload ar
   }
   ```
 
+test "go exhaustive: repository filepath reaches read"
+  lang go
+  expect VYQL-PATH-001
+  code
+  ```
+  package main
+
+  func h(r *http.Request) ([]byte, error) {
+    filePath := r.URL.Query().Get("filePath")
+    return ioutil.ReadFile(fmt.Sprintf("%s/%s", "/repo", filePath))
+  }
+  ```
+
+test "go exhaustive: repository filepath denylist and symlink check guard read"
+  lang go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+  var notAllowedInPath = []string{"..", "~", "\\"}
+
+  func h(r *http.Request) ([]byte, error) {
+    filePath := r.URL.Query().Get("filePath")
+    for _, na := range notAllowedInPath {
+      if strings.Contains(filePath, na) {
+        return nil, fmt.Errorf("bad path")
+      }
+    }
+    fullPath := fmt.Sprintf("%s/%s", "/repo", filePath)
+    isSymbolLink, err := isSymbolLink(fullPath)
+    if err != nil {
+      return nil, err
+    }
+    if isSymbolLink {
+      return nil, fmt.Errorf("symbolic link is not allowed")
+    }
+    return ioutil.ReadFile(fullPath)
+  }
+
+  func isSymbolLink(filepath string) (bool, error) {
+    fi, err := os.Lstat(path.Clean(filepath))
+    if err != nil {
+      return false, err
+    }
+    if fi.Mode()&os.ModeSymlink != 0 {
+      return true, nil
+    }
+    return false, nil
+  }
+  ```
+
+test "go exhaustive: repository filepath symlink check alone does not guard traversal"
+  lang go
+  expect VYQL-PATH-001
+  code
+  ```
+  package main
+
+  func h(r *http.Request) ([]byte, error) {
+    filePath := r.URL.Query().Get("filePath")
+    fullPath := fmt.Sprintf("%s/%s", "/repo", filePath)
+    isSymbolLink, err := isSymbolLink(fullPath)
+    if err != nil {
+      return nil, err
+    }
+    if isSymbolLink {
+      return nil, fmt.Errorf("symbolic link is not allowed")
+    }
+    return ioutil.ReadFile(fullPath)
+  }
+
+  func isSymbolLink(filepath string) (bool, error) {
+    fi, err := os.Lstat(path.Clean(filepath))
+    if err != nil {
+      return false, err
+    }
+    if fi.Mode()&os.ModeSymlink != 0 {
+      return true, nil
+    }
+    return false, nil
+  }
+  ```
+
 test "go exhaustive: custom parse helper flows request data into destination"
   lang go
   expect VYQL-INJ-001

@@ -256,9 +256,13 @@ type If struct {
 	Loc  string
 }
 
-// Loop covers while/for/foreach — a Cond (may be nil for infinite/range loops) and Body.
+// Loop covers while/for/foreach. Cond may be nil for infinite/range loops.
+// Iter/Vars are optional foreach/range metadata: values from Iter may bind to
+// each variable in Vars before the loop body.
 type Loop struct {
 	Cond Expr
+	Iter Expr
+	Vars []string
 	Body []Stmt
 	Loc  string
 }

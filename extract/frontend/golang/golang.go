@@ -211,12 +211,39 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 			out = append(out, c.funcDef(fn.Name.Name, fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
 		case *ast.GenDecl:
 			out = append(out, c.typeContextStmts(fn, methods)...)
+			out = append(out, c.valueDeclStmts(fn)...)
 		}
 	}
 	// Flush func-literal bodies hoisted while lowering this decl set, so inline HTTP
 	// handlers / goroutines registered as closures are analyzed as functions.
 	out = append(out, c.hoisted...)
 	c.hoisted = nil
+	return out
+}
+
+func (c *conv) valueDeclStmts(gd *ast.GenDecl) []nir.Stmt {
+	var out []nir.Stmt
+	for _, spec := range gd.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok || len(vs.Names) == 0 || len(vs.Values) == 0 {
+			continue
+		}
+		var targets []string
+		for _, n := range vs.Names {
+			targets = append(targets, n.Name)
+		}
+		if len(vs.Values) == 1 {
+			out = append(out, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0]), Decl: true})
+			continue
+		}
+		limit := len(vs.Values)
+		if len(targets) < limit {
+			limit = len(targets)
+		}
+		for i := 0; i < limit; i++ {
+			out = append(out, nir.Assign{Targets: []string{targets[i]}, Value: c.expr(vs.Values[i]), Decl: true})
+		}
+	}
 	return out
 }
 
@@ -622,7 +649,13 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 	case *ast.ForStmt:
 		return nir.Loop{Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 	case *ast.RangeStmt:
-		return nir.Loop{Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
+		var vars []string
+		for _, e := range []ast.Expr{st.Key, st.Value} {
+			if id, ok := e.(*ast.Ident); ok && id.Name != "_" {
+				vars = append(vars, id.Name)
+			}
+		}
+		return nir.Loop{Iter: c.expr(st.X), Vars: vars, Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 	case *ast.SwitchStmt:
 		return c.switchStmt(st.Body, st.Tag)
 	// NOTE: *ast.TypeSwitchStmt is intentionally left to the nil default (it was a no-op

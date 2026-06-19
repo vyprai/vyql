@@ -191,6 +191,9 @@ adapter go {
   // filepath.Base strips all directory components — no `/`, `\`, or `..` survives, so it
   // confines a path to a single segment (the Go analogue of path.basename).
   control "filepath.Base" -> core.PathCanonicalization
+  // A path denylist that rejects parent-directory and Windows separator tokens is
+  // a real traversal guard; weaker substring checks remain ordinary calls.
+  control "strings.Contains" val ".." val "\\" -> core.PathAccessCheck
   control "pathrs.Reopen" -> core.PathAccessCheck
   control "procfs.OpenProcRoot" -> core.PathAccessCheck
   control method "OpenThreadSelf" -> core.PathAccessCheck

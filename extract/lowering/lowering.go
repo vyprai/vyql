@@ -718,6 +718,11 @@ func collectLocalDecls(stmts []nir.Stmt, local map[string]bool) {
 			collectLocalDecls(s.Then, local)
 			collectLocalDecls(s.Else, local)
 		case nir.Loop:
+			for _, name := range s.Vars {
+				if name != "" && !strings.ContainsAny(name, ".[") {
+					local[name] = true
+				}
+			}
 			collectLocalDecls(s.Body, local)
 		case nir.Switch:
 			for _, c := range s.Cases {
@@ -768,6 +773,7 @@ func collectStmtNames(st nir.Stmt, used map[string]bool) {
 		}
 	case nir.Loop:
 		collectExprNames(s.Cond, used)
+		collectExprNames(s.Iter, used)
 		for _, child := range s.Body {
 			collectStmtNames(child, used)
 		}
@@ -1660,6 +1666,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.Loop:
 		l.eval(st.Cond, sc)
 		before := cloneStrMap(sc.node)
+		iterNode := l.eval(st.Iter, sc)
+		if iterNode != "" {
+			for _, name := range st.Vars {
+				if name == "" || name == "_" {
+					continue
+				}
+				sc.node[name] = iterNode
+				delete(sc.cnst, name)
+			}
+		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
 		bodyB := cloneStrMap(sc.node)
 		sc.node = before
