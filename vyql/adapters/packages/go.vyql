@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile, NullableDeref}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter go {
@@ -96,5 +96,8 @@ adapter go {
   }
   package "github.com/casbin/casbin" {
     control method "Can" -> AuthorizationCheck
+  }
+  package "github.com/free5gc/ausf/internal/context" {
+    mark exact "analysis.function.context" val "function_name:UeAuthPostRequestProcedure" val "selector:updateAuthenticationInfo.ResynchronizationInfo" val "call:GetSupiFromSuciSupiMap" val "call:GetAusfUeContext" val "selector:ausfCurrentContext.Rand" nval "call:CheckIfSuciSupiPairExists" nval "call:CheckIfAusfUeContextExists" -> NullableDeref
   }
 }
