@@ -220,11 +220,16 @@ func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
 		return nil
 	}
 	var out []nir.Stmt
+	escapeActive := false
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
+		if containsAnyFold(line, profile.EscapeActiveContains) {
+			escapeActive = true
+		}
 		if line == "" || !strings.Contains(line, profile.ExprStart) || containsAny(line, profile.SkipContains) {
 			continue
 		}
+		defaultEscape := escapeActive && containsAnyFold(line, profile.EscapeLineContains)
 		for _, expr := range templateExpressions(line, profile.ExprStart, profile.ExprEnd) {
 			if expr == "" || !profile.InputPattern.MatchString(expr) {
 				continue
@@ -232,7 +237,7 @@ func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
 			loc := file + ":" + itoa(i+1)
 			out = append(out, nir.ExprStmt{Value: nir.Call{
 				Callee: nir.Name{ID: profile.RenderEvent, Loc: loc},
-				Args:   []nir.Expr{templateExpr(profile, expr, loc)},
+				Args:   []nir.Expr{templateExpr(profile, expr, loc, defaultEscape)},
 				Path:   profile.RenderEvent,
 				Method: "render",
 				Loc:    loc,
@@ -259,11 +264,20 @@ func templateExpressions(line, startDelim, endDelim string) []string {
 	}
 }
 
-func templateExpr(profile templateProfile, expr, loc string) nir.Expr {
+func templateExpr(profile templateProfile, expr, loc string, defaultEscape bool) nir.Expr {
 	if inner, ok := templateWrapperArg(expr, profile.EscapePrefix); ok {
 		return nir.Call{
 			Callee: nir.Name{ID: profile.EscapeEvent, Loc: loc},
 			Args:   []nir.Expr{templateInput(profile, inner, loc)},
+			Path:   profile.EscapeEvent,
+			Method: lastSeg(profile.EscapeEvent),
+			Loc:    loc,
+		}
+	}
+	if defaultEscape && profile.EscapeEvent != "" {
+		return nir.Call{
+			Callee: nir.Name{ID: profile.EscapeEvent, Loc: loc},
+			Args:   []nir.Expr{templateInput(profile, expr, loc)},
 			Path:   profile.EscapeEvent,
 			Method: lastSeg(profile.EscapeEvent),
 			Loc:    loc,
@@ -326,14 +340,16 @@ type directiveValueRule struct {
 }
 
 type templateProfile struct {
-	ExprStart    string
-	ExprEnd      string
-	InputPattern *regexp.Regexp
-	SkipContains []string
-	InputEvent   string
-	RenderEvent  string
-	EscapePrefix string
-	EscapeEvent  string
+	ExprStart            string
+	ExprEnd              string
+	InputPattern         *regexp.Regexp
+	SkipContains         []string
+	InputEvent           string
+	RenderEvent          string
+	EscapePrefix         string
+	EscapeEvent          string
+	EscapeActiveContains []string
+	EscapeLineContains   []string
 }
 
 type dotTemplateRule struct {
@@ -463,14 +479,16 @@ func loadProfile() configProfile {
 				panic("config: malformed config template profile " + scope)
 			}
 			configProfileData.Templates[scope] = templateProfile{
-				ExprStart:    exprStart,
-				ExprEnd:      exprEnd,
-				InputPattern: regexp.MustCompile(pattern),
-				SkipContains: metaList(meta, "config_template_skip_contains_"+scope),
-				InputEvent:   inputEvent,
-				RenderEvent:  renderEvent,
-				EscapePrefix: metaString(meta, "config_template_escape_prefix_"+scope),
-				EscapeEvent:  metaString(meta, "config_template_escape_event_"+scope),
+				ExprStart:            exprStart,
+				ExprEnd:              exprEnd,
+				InputPattern:         regexp.MustCompile(pattern),
+				SkipContains:         metaList(meta, "config_template_skip_contains_"+scope),
+				InputEvent:           inputEvent,
+				RenderEvent:          renderEvent,
+				EscapePrefix:         metaString(meta, "config_template_escape_prefix_"+scope),
+				EscapeEvent:          metaString(meta, "config_template_escape_event_"+scope),
+				EscapeActiveContains: metaList(meta, "config_template_escape_active_contains_"+scope),
+				EscapeLineContains:   metaList(meta, "config_template_escape_line_contains_"+scope),
 			}
 		}
 		for _, entry := range metaList(meta, "config_dot_template_rules") {
@@ -686,6 +704,16 @@ func isTrue(v string) bool { return strings.EqualFold(strings.TrimSpace(v), "tru
 func containsAny(text string, needles []string) bool {
 	for _, needle := range needles {
 		if needle != "" && strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAnyFold(text string, needles []string) bool {
+	low := strings.ToLower(text)
+	for _, needle := range needles {
+		if needle != "" && strings.Contains(low, strings.ToLower(needle)) {
 			return true
 		}
 	}

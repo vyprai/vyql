@@ -26,6 +26,36 @@ test "jelly: escaped parameter title is clean"
   </j:jelly>
   ```
 
+test "jelly: disabled entry title-description escaping is XSS"
+  lang config
+  expect VYQL-INJ-004
+  file index.jelly
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+    <j:set var="escapeEntryTitleAndDescription" value="false"/>
+    <f:entry title="${it.name}" description="${it.description}">
+      <div>static</div>
+    </f:entry>
+  </j:jelly>
+  ```
+
+test "jelly: enabled entry title-description escaping is clean"
+  lang config
+  reject VYQL-INJ-004
+  file index.jelly
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+    <j:set var="escapeEntryTitleAndDescription" value="true"/>
+    <f:entry title="${it.name}" description="${it.description}">
+      <div>static</div>
+    </f:entry>
+  </j:jelly>
+  ```
+
 test "jsp: raw JMS destination in link is XSS"
   lang config
   expect VYQL-INJ-004

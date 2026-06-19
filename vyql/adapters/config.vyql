@@ -54,6 +54,8 @@ adapter config {
     config_template_render_event_jelly: "analysis.template.jelly.render",
     config_template_escape_prefix_jelly: "h.escape(",
     config_template_escape_event_jelly: "analysis.template.jelly.escape",
+    config_template_escape_active_contains_jelly: ["escapeEntryTitleAndDescription\" value=\"true"],
+    config_template_escape_line_contains_jelly: ["title=", "description="],
     config_template_input_pattern_jsp: "\\b(requestContext|request|param|row|queues|value|text|name|defaultValue|JMSDestination)\\b",
     config_template_skip_contains_jsp: ["<%@", "<c:out", "<c:forEach", "<c:if", " items=", " test="],
     config_template_input_event_jsp: "analysis.template.jsp.input",
