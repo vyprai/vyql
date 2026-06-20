@@ -1283,6 +1283,15 @@ concept MethodGatedRedirectValidationBypass : sink {
   review_assumption: "a GET or other non-matching method can carry attacker-controlled redirect/callback URL parameters"
   review_confidence: medium
 }
+concept ChecksumErrorLogoutRedirect : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "checksum-error handling can redirect to a request-supplied logout URL"
+  review_evidence: "checksum error context {pattern} calls the generic invalid redirect path without disabling logoutURL"
+  review_assumption: "the API redirects validation failures and exposes logoutURL as a request parameter"
+  review_confidence: medium
+}
 concept ReflectionInvoke : sink {
   vulnerable_to: [deserialization.UnsafeReflection]
   enabled_by: [taint.UntrustedData]

@@ -134,6 +134,12 @@ review code.MethodGatedRedirectValidationBypass {
   expected: [core.RedirectAllowlist]
   text: "review HTTP method gates that skip redirect or callback URL origin validation"
 }
+review code.ChecksumErrorLogoutRedirect {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review checksum-error redirect handling that can fall back to request-supplied logout URLs"
+}
 review code.SensitiveOperation {
   category: "auth"
   kind: "target"
@@ -209,6 +215,12 @@ review code.MissingHttpMethodAssertion {
   kind: "attention"
   expected: [core.CsrfProtection, core.AuthenticationCheck]
   text: "review state-changing HTTP actions for explicit allowed-method assertions"
+}
+review code.ChecksumErrorLogoutRedirect {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review checksum-error redirect handling for request-supplied logout URLs"
 }
 review code.InsecurePermission {
   category: "permission"

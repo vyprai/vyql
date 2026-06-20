@@ -30,6 +30,11 @@ rule MethodGatedRedirectValidationBypass {
   match code.MethodGatedRedirectValidationBypass as bypass
 }
 
+rule ChecksumErrorLogoutRedirect {
+  meta { id: "VYQL-RF-009", severity: medium, cwe: [CWE_601], confidence_floor: medium }
+  match code.ChecksumErrorLogoutRedirect as redirect
+}
+
 rule IncompleteCsrfTokenValidation {
   meta { id: "VYQL-RF-006", severity: medium, cwe: [CWE_352], confidence_floor: medium }
   match code.IncompleteCsrfTokenValidation as guard
