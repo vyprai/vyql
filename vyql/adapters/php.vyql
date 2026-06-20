@@ -315,6 +315,7 @@ adapter php {
   control "validate_csrf_token" -> core.CsrfProtection
   control "check_csrf_token" -> core.CsrfProtection
   control "verify_csrf_token" -> core.CsrfProtection
+  control method "checkToken" -> core.CsrfProtection
   control "check_admin_referer" -> core.CsrfProtection
   control "wp_verify_nonce" -> core.CsrfProtection
 
