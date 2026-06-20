@@ -27,6 +27,8 @@ adapter auditreview {
   mark method "setPermissions" -> code.SensitiveOperation
   mark method "makeAdmin" -> code.SensitiveOperation
   mark method "setAdmin" -> code.SensitiveOperation
+  mark method "update" val "password" -> code.SensitiveOperation
+  mark method "update!" val "password" -> code.SensitiveOperation
   mark method "elevate" -> code.SensitiveOperation
   mark method "impersonate" -> code.SensitiveOperation
   mark method "assumeRole" -> code.SensitiveOperation

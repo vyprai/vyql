@@ -26,6 +26,26 @@ test "review: auth checks and targets are surfaced"
   }
   ```
 
+test "review: ruby rails password update and action auth level are surfaced"
+  lang ruby
+  expect_review code.SensitiveOperation
+  expect_review core.AuthorizationCheck
+  code
+  ```
+  class UsersController < ApplicationController
+    action_auth_level :update_password_for_user, :administrator
+
+    def update_password_for_user
+      @user = User.find_by(id: params[:id])
+      return if params[:user].nil? || @user.nil?
+
+      if @user.update(password: params[:user][:password])
+        redirect_to(root_path)
+      end
+    end
+  end
+  ```
+
 test "review: jenkins workspace access is an authorization-sensitive operation"
   lang java
   expect_review code.SensitiveOperation

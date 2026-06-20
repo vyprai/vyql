@@ -79,6 +79,7 @@ adapter ruby {
   control "require_auth" -> core.AuthenticationCheck
   control "ensure_authenticated" -> core.AuthenticationCheck
   control "signed_in?" -> core.AuthenticationCheck
+  control "action_auth_level" -> core.AuthorizationCheck
   // authorization checks (guards BIZ-001) — Pundit/CanCan predicates (path-sensitive via B1).
   control "authorize" -> core.AuthorizationCheck
   control "authorize!" -> core.AuthorizationCheck
