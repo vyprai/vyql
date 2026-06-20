@@ -31,3 +31,13 @@ rule PackageEntryPointScriptTraversal {
   meta { id: "VYQL-PATH-005", severity: high, cwe: [CWE_22] }
   match code.PackageEntryPointScriptWrite as sink
 }
+
+rule RemoteListingDownloadTraversal {
+  meta { id: "VYQL-PATH-006", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.RemoteListingDownloadPath as sink
+}
+
+rule IncompleteRemoteFilenameValidation {
+  meta { id: "VYQL-PATH-006", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.IncompleteRemoteFilenameValidation as sink
+}

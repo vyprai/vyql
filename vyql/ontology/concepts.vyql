@@ -890,6 +890,15 @@ concept PackageEntryPointScriptWrite : sink {
   review_assumption: "a package can provide an entry point name with path separators or parent-directory components"
   review_confidence: medium
 }
+concept RemoteListingDownloadPath : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "remote directory listing filenames are joined into local download paths without rejecting path components"
+  review_evidence: "recursive download context {pattern} combines a local directory with a remote listing filename"
+  review_assumption: "the remote server can provide listing names containing path separators or traversal components"
+  review_confidence: medium
+}
 concept StaticIv : sink {
   vulnerable_to: [crypto.StaticIv]
   cwe: [CWE_329]
@@ -960,6 +969,15 @@ concept FilePathAccess : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_22]
   excluded_chars: "/\\"
+}
+concept IncompleteRemoteFilenameValidation : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "remote listing filenames are joined into local filesystem paths without validating that each name is a basename"
+  review_evidence: "remote filename handling context {pattern} joins a remote file name into a local path without an observed basename or containment check"
+  review_assumption: "the remote endpoint can return filenames containing path separators or traversal segments"
+  review_confidence: high
 }
 concept FileUpload : source {
   taint: [taint.UntrustedData]

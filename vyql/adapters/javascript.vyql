@@ -173,6 +173,7 @@ adapter javascript {
   control "ownsResource" -> core.OwnershipCheck
   mark exact "analysis.function.context" val "isLocalRequest" val "isLocal||awaithasValidToken" nval "hasValidCliToken" -> code.LocalRequestBypassReview
   mark exact "analysis.function.context" val "lang=javascript" val "user==username&&pass==password" nval "timingSafeCompare" nval "tsscmp" -> code.SecretComparisonReview
+  mark exact "analysis.function.context" val "lang=javascript" val "name=Client._downloadFromWorkingDir" val "join(localDirPath,file.name)" val "downloadTo(localPath,file.name)" nval "basename(file.name)" nval "path.basename(file.name)" -> code.IncompleteRemoteFilenameValidation
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
   control "isSafeRedirect" -> core.RedirectAllowlist
   control "isValidRedirect" -> core.RedirectAllowlist
@@ -582,6 +583,7 @@ adapter javascript {
   control "fs.close" -> core.ResourceRelease
   mark exact "analysis.function.context" val "maxContentLength" val "Buffer.concat(responseBuffer).length>config.maxContentLength" val "reject(createError" nval "stream.destroy" -> code.UnstoppedLimitedStream
   mark exact "analysis.function.context" val "name=processMessage" val "protocolMsg" val "HISTORY_SYNC_NOTIFICATION" val "APP_STATE_SYNC_KEY_SHARE" val "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" nval "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe" -> code.ProtocolStateReview
+  mark exact "analysis.function.context" val "_downloadFromWorkingDir" val "join(localDirPath,file.name)" val "downloadTo(localPath,file.name)" nval "basename(file.name)" -> code.RemoteListingDownloadPath
 
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
   mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified
