@@ -487,6 +487,11 @@ review code.IntegerSizeArithmetic {
   kind: "attention"
   text: "review integer arithmetic used for address, size, or bounds calculations"
 }
+review code.UncheckedEncodedLengthArithmetic {
+  category: "numeric"
+  kind: "attention"
+  text: "review serialized length arithmetic that narrows or scales sizes without checked overflow handling"
+}
 review code.UnderwidthFormattedIndex {
   category: "numeric"
   kind: "attention"

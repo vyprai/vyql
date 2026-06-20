@@ -191,6 +191,12 @@ adapter csharp {
   mark "TokenValidationParameters" val "ValidateIssuerSigningKey=false" -> code.JwtUnverified
   mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
   mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
+  mark exact "analysis.function.context" val "lang=csharp" val "ReadVarUInt32" val "(int)input.ReadVarUInt32()" nval "checked" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "ReadVarUInt32" val "input.ReadVarUInt32()<<1" nval "checked" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "input.SkipBytes(count*sizeof(" nval "checked(count*sizeof(" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "name=SkipBytes" val "position+=count" nval "checked(position+count)" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "currentLength+=count" nval "checked(stackFrame.currentLength+count)" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "value.Length<<1" nval "checked(value.Length*2)" -> code.UncheckedEncodedLengthArithmetic
   mark exact "analysis.function.context" val "lang=csharp" val "name=GetOrAddNode" val "GetOrAddNode(subKey)" nval "MaxStateDepth" -> code.UnboundedStateGrowthReview
   mark exact "analysis.function.context" val "lang=csharp" val "name=GetValidity" val "GetValidity(node.ChildNodes[i])" nval "MaxValidationDepth" -> code.UnboundedStateGrowthReview
   mark exact "analysis.function.context" val "lang=csharp" val "BlobSasBuilder" val "ExpiresOn" val "AddHours(1)" val "GenerateSasUri" nval "AddMinutes(tokenDuration)" -> code.TimeBoundAccessTokenReview

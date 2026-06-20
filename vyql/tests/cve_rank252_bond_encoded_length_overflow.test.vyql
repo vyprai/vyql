@@ -1,0 +1,73 @@
+test "rank252: Bond C# encoded container lengths need checked arithmetic"
+  lang csharp
+  expect VYQL-NUM-005
+  expect_review code.UncheckedEncodedLengthArithmetic
+  code
+  ```
+  using System.Text;
+
+  namespace Bond.Protocols
+  {
+      public struct CompactBinaryReader<I>
+      {
+          readonly IInput input;
+
+          public void ReadContainerBegin(out int count, out BondDataType elementType)
+          {
+              elementType = (BondDataType)input.ReadUInt8();
+              count = (int)input.ReadVarUInt32();
+          }
+
+          public string ReadWString()
+          {
+              var length = (int)input.ReadVarUInt32();
+              return length == 0 ? string.Empty : input.ReadString(Encoding.Unicode, length << 1);
+          }
+
+          void SkipContainer(BondDataType elementType, int count)
+          {
+              if (elementType == BondDataType.BT_DOUBLE)
+              {
+                  input.SkipBytes(count * sizeof(double));
+              }
+          }
+      }
+  }
+  ```
+
+test "rank252: Bond C# encoded container lengths use checked arithmetic"
+  lang csharp
+  reject VYQL-NUM-005
+  reject_review code.UncheckedEncodedLengthArithmetic
+  code
+  ```
+  using System.Text;
+
+  namespace Bond.Protocols
+  {
+      public struct CompactBinaryReader<I>
+      {
+          readonly IInput input;
+
+          public void ReadContainerBegin(out int count, out BondDataType elementType)
+          {
+              elementType = (BondDataType)input.ReadUInt8();
+              count = checked((int)input.ReadVarUInt32());
+          }
+
+          public string ReadWString()
+          {
+              var length = checked((int)(input.ReadVarUInt32() * 2));
+              return length == 0 ? string.Empty : input.ReadString(Encoding.Unicode, length);
+          }
+
+          void SkipContainer(BondDataType elementType, int count)
+          {
+              if (elementType == BondDataType.BT_DOUBLE)
+              {
+                  input.SkipBytes(checked(count * sizeof(double)));
+              }
+          }
+      }
+  }
+  ```

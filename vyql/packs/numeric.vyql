@@ -22,3 +22,8 @@ rule UnderwidthFormattedIndex {
   meta { id: "VYQL-NUM-004", severity: medium, cwe: [CWE_192, CWE_125], confidence_floor: medium }
   match code.UnderwidthFormattedIndex as idx
 }
+
+rule UncheckedEncodedLengthArithmetic {
+  meta { id: "VYQL-NUM-005", severity: medium, cwe: [CWE_190, CWE_835], confidence_floor: medium }
+  match code.UncheckedEncodedLengthArithmetic as arithmetic
+}

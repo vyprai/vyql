@@ -656,6 +656,15 @@ concept IntegerSizeArithmetic : sink {
   review_assumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
   review_confidence: low
 }
+concept UncheckedEncodedLengthArithmetic : sink {
+  vulnerable_to: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_190, CWE_835]
+  review_category: "numeric"
+  review_condition: "serialized protocol length arithmetic lacks checked overflow handling"
+  review_evidence: "protocol length context {pattern} narrows or scales serialized lengths without checked arithmetic"
+  review_assumption: "a malformed serialized payload can supply oversized container or string lengths"
+  review_confidence: medium
+}
 concept UnderwidthFormattedIndex : sink {
   vulnerable_to: [memory.BoundsError]
   cwe: [CWE_192, CWE_125]
