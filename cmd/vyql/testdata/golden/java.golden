@@ -1,3 +1,4 @@
+call analysis.class.context
 call analysis.function.context
 call analysis.parameter.entry
 call analysis.parameter.entry
