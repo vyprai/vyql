@@ -223,6 +223,8 @@ adapter java {
   mark exact "analysis.function.context" val "function_name:doTest" val "call:setCredentialsId" val "call:accurevLoginFromGlobalConfig" nval "call:hasPermission" -> code.CredentialedEndpointReview
   mark exact "analysis.function.context" val "function_name:doFillCredentialsIdItems" val "call:lookupCredentials" nval "call:hasPermission" -> code.CredentialedEndpointReview
   mark exact "analysis.parameter.entry" val "param_name:awsSecretKey" val "param_type:Secret" -> code.SecretDatabindingReview
+  mark exact "analysis.function.context" val "function_name:setAkid" nval "call:fromString" -> code.SecretDatabindingReview
+  mark exact "analysis.function.context" val "function_name:setSkid" nval "call:fromString" -> code.SecretDatabindingReview
   mark exact "analysis.function.context" val "function_name:doFill" nval "call:checkPermission" -> code.StateChangingOp
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.

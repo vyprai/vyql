@@ -781,7 +781,7 @@ concept ConfigExposureReview : sink {
 }
 concept SecretDatabindingReview : sink {
   vulnerable_to: [secrets.SecretLeak, crypto.CleartextStorage]
-  cwe: [CWE_522]
+  cwe: [CWE_311, CWE_522]
   review_category: "secret"
   review_condition: "secret configuration data is databound without an observed protected-secret conversion"
   review_evidence: "secret parameter {pattern} is accepted at a configuration boundary"
