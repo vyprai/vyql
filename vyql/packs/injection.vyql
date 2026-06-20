@@ -34,6 +34,7 @@ rule CommandOptionInjection {
 rule Code {
   meta { id: "VYQL-INJ-003", severity: critical, cwe: [CWE_94], benchmark: codeinj }
   taint core.UserControlledData -> code.CodeEval
+  unless guarded_by core.CodeExecutionValidation
 }
 
 rule Vm2HostCallbackBridge {
