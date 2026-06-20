@@ -580,6 +580,7 @@ adapter javascript {
   control "fs.closeSync" -> core.ResourceRelease
   control "fs.close" -> core.ResourceRelease
   mark exact "analysis.function.context" val "maxContentLength" val "Buffer.concat(responseBuffer).length>config.maxContentLength" val "reject(createError" nval "stream.destroy" -> code.UnstoppedLimitedStream
+  mark exact "analysis.function.context" val "name=processMessage" val "protocolMsg" val "HISTORY_SYNC_NOTIFICATION" val "APP_STATE_SYNC_KEY_SHARE" val "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" nval "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe" -> code.ProtocolStateReview
 
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
   mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified
