@@ -34,6 +34,25 @@ func TestExtractAllSupportsJavaScriptModules(t *testing.T) {
 	}
 }
 
+func TestExtractAllSupportsVueSingleFileComponents(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "Component.vue")
+	if err := os.WriteFile(src, []byte("<script>\nexport default { mounted() { return 42 } }\n</script>\n"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	prog, _, _, stats, err := extractAll([]string{src})
+	if err != nil {
+		t.Fatalf("extractAll .vue: %v", err)
+	}
+	if got := stats.files["javascript"]; got != 1 {
+		t.Fatalf(".vue should route through javascript frontend, got count %d stats=%v", got, stats.files)
+	}
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
+		t.Fatalf(".vue should extract script statements, got modules=%d body=%d", len(prog.Modules), len(prog.Modules[0].Body))
+	}
+}
+
 // The full default rule library (vyql/packs/*.vyql) must parse and type-check
 // against the ontology with zero errors.
 func TestDefaultPacksCompile(t *testing.T) {

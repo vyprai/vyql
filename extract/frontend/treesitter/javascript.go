@@ -39,10 +39,12 @@ func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
 // matching grammar by extension (.ts → typescript, .tsx → tsx, else javascript); all
 // share the jsConv walker.
 func ExtractJavaScript(files []string, root string) (nir.Program, error) {
-	var js, ts, tsx []string
+	var js, ts, tsx, vue []string
 	for _, f := range files {
 		l := strings.ToLower(f)
 		switch {
+		case strings.HasSuffix(l, ".vue"):
+			vue = append(vue, f)
 		case strings.HasSuffix(l, ".tsx"):
 			tsx = append(tsx, f)
 		case strings.HasSuffix(l, ".ts") || strings.HasSuffix(l, ".mts") || strings.HasSuffix(l, ".cts"):
@@ -61,7 +63,87 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 	mods = append(mods, parseModules(js, root, jsParserFor(tsjs.Language()), build)...)
 	mods = append(mods, parseModules(ts, root, jsParserFor(tstypescript.LanguageTypescript()), build)...)
 	mods = append(mods, parseModules(tsx, root, jsParserFor(tstypescript.LanguageTSX()), build)...)
+	mods = append(mods, parseVueModules(vue, root, build)...)
 	return nir.Program{SelfName: "this", Modules: mods}, nil
+}
+
+func parseVueModules(
+	files []string,
+	root string,
+	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+) []nir.Module {
+	if len(files) == 0 {
+		return nil
+	}
+	out := make([]nir.Module, 0, len(files))
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		script, lang, ok := vueScriptSource(src)
+		if !ok {
+			continue
+		}
+		parserFactory := jsParserFor(tsjs.Language())
+		if lang == "ts" {
+			parserFactory = jsParserFor(tstypescript.LanguageTypescript())
+		} else if lang == "tsx" {
+			parserFactory = jsParserFor(tstypescript.LanguageTSX())
+		}
+		parser := parserFactory()
+		tree := parser.Parse(script, nil)
+		if tree == nil {
+			parser.Close()
+			continue
+		}
+		m, good := build(script, f, relPath(root, f), tree)
+		tree.Close()
+		parser.Close()
+		if good {
+			m.Hash = contentHash(src)
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func vueScriptSource(src []byte) ([]byte, string, bool) {
+	lower := strings.ToLower(string(src))
+	start := strings.Index(lower, "<script")
+	if start < 0 {
+		return nil, "", false
+	}
+	tagEndRel := strings.IndexByte(lower[start:], '>')
+	if tagEndRel < 0 {
+		return nil, "", false
+	}
+	tagEnd := start + tagEndRel
+	codeStart := tagEnd + 1
+	endRel := strings.Index(lower[codeStart:], "</script>")
+	if endRel < 0 {
+		return nil, "", false
+	}
+	codeEnd := codeStart + endRel
+	out := make([]byte, len(src))
+	for i, b := range src {
+		switch b {
+		case '\n', '\r':
+			out[i] = b
+		default:
+			out[i] = ' '
+		}
+	}
+	copy(out[codeStart:codeEnd], src[codeStart:codeEnd])
+	tag := lower[start:tagEnd]
+	switch {
+	case strings.Contains(tag, `lang="tsx"`) || strings.Contains(tag, `lang='tsx'`) || strings.Contains(tag, "lang=tsx"):
+		return out, "tsx", true
+	case strings.Contains(tag, `lang="ts"`) || strings.Contains(tag, `lang='ts'`) || strings.Contains(tag, "lang=ts"):
+		return out, "ts", true
+	default:
+		return out, "js", true
+	}
 }
 
 func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
@@ -324,6 +406,10 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// declaration inside is analyzed (Next.js route handlers are all exports).
 		var out []nir.Stmt
 		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "object" {
+				out = append(out, c.objectMethodFuncDefs(ch, true)...)
+				continue
+			}
 			out = append(out, c.stmt(ch)...)
 		}
 		return out

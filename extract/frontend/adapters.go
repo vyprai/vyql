@@ -1043,7 +1043,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 // repos — e.g. one language's adapter matching another language's same-named call).
 var extTech = map[string]string{
 	".go": "go", ".py": "python",
-	".js": "javascript", ".jsx": "javascript", ".ts": "javascript", ".tsx": "javascript",
+	".js": "javascript", ".jsx": "javascript", ".ts": "javascript", ".tsx": "javascript", ".vue": "javascript",
 	".rb": "ruby", ".java": "java", ".php": "php", ".phtml": "php", ".cs": "csharp",
 	".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
 	".rs": "rust", ".sh": "bash", ".bash": "bash", ".scala": "scala", ".sc": "scala", ".lua": "lua", ".kt": "kotlin", ".kts": "kotlin", ".ps1": "powershell", ".psm1": "powershell", ".swift": "swift", ".pl": "perl", ".pm": "perl", ".cgi": "perl", ".sol": "solidity", ".m": "objc",

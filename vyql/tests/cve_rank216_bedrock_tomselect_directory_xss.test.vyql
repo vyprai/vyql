@@ -1,0 +1,61 @@
+test "rank216: TomSelect directory renderer returns unescaped option HTML"
+  lang javascript
+  file ConcreteFileDirectoryInput.vue
+  expect VYQL-INJ-041
+  code
+  ```
+  <template>
+    <input ref="directoryInput" />
+  </template>
+  <script>
+  export default {
+    mounted() {
+      this.selectMenu = new TomSelect(this.$refs.directoryInput, {
+        render: {
+          option: function (data, escape) {
+            return `<div class="level-${data.directoryLevel}"><i class="fa fa-folder"></i> ${data.directoryName}</div>`
+          },
+          item: function (item, escape) {
+            return `<div class="level-${item.directoryLevel}"><i class="fa fa-folder"></i> ${item.directoryName}</div>`
+          }
+        }
+      })
+    }
+  }
+  </script>
+  ```
+
+test "rank216: TomSelect directory renderer escapes option HTML"
+  lang javascript
+  file ConcreteFileDirectoryInput.vue
+  reject VYQL-INJ-041
+  code
+  ```
+  <template>
+    <input ref="directoryInput" />
+  </template>
+  <script>
+  export default {
+    mounted() {
+      var my = this
+      this.selectMenu = new TomSelect(this.$refs.directoryInput, {
+        render: {
+          option: function (data, escape) {
+            return `<div class="level-${data.directoryLevel}"><i class="fa fa-folder"></i> ${my.sanitizeDirectoryName(data.directoryName)} </div>`
+          },
+          item: function (item, escape) {
+            return `<div class="level-${item.directoryLevel}"><i class="fa fa-folder"></i> ${my.sanitizeDirectoryName(item.directoryName)} </div>`
+          }
+        }
+      })
+    },
+    methods: {
+      sanitizeDirectoryName(directoryName) {
+        const div = document.createElement('div')
+        div.textContent = directoryName
+        return div.innerHTML
+      }
+    }
+  }
+  </script>
+  ```

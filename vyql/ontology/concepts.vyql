@@ -1047,6 +1047,15 @@ concept UnescapedRequestGlobalTemplateVar : sink {
   review_assumption: "the template variables are later rendered into HTML or script context"
   review_confidence: medium
 }
+concept UnescapedHtmlOptionRenderer : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "a frontend option renderer returns HTML containing model fields without escaping"
+  review_evidence: "HTML renderer {pattern} returns option markup"
+  review_assumption: "the rendered option label can contain stored or attacker-provided text"
+  review_confidence: medium
+}
 concept UnescapedExceptionMessageMarkup : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
