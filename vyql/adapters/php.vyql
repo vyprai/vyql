@@ -13,6 +13,7 @@ adapter php {
   source "$_COOKIE" -> code.HttpInput
   source "$_FILES" -> code.HttpInput
   source "$_SERVER" -> code.HttpInput
+  source path "Request.post" -> code.HttpInput
   source path "$this.metadata" -> code.ArchiveEntryName
   source method "getNameIndex" -> code.ArchiveEntryName
   // framework request-object accessors (Utopia/Appwrite, Symfony-style): the request URI /
@@ -236,6 +237,7 @@ adapter php {
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
   sink path "fputcsv" arg 1 collection -> code.CsvCell
   sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
+  sink path "FileSystem.write" -> code.UnsafeUpload
   sink path "$this.context.fs.write" -> code.UnsafeUpload
   sink path "File.write" -> code.FilePathAccess
   sink method "extractTo" arg all -> code.ArchiveEntryWrite
