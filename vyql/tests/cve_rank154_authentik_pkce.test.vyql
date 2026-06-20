@@ -1,0 +1,66 @@
+# Rank 154 / CVE-2024-23647: authentik accepted an OAuth2 token request
+# carrying a PKCE code_verifier even when the stored authorization code had no
+# code_challenge, allowing a PKCE downgrade path that must be reviewed.
+
+test "rank154: python authentik token PKCE verifier without stored challenge requires protocol-state review"
+  lang python
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  from authentik.providers.oauth2.models import AuthorizationCode
+
+  PKCE_METHOD_S256 = "S256"
+
+  class TokenError(Exception):
+      pass
+
+  class TokenParams:
+      def __post_init_code(self, raw_code, request):
+          self.authorization_code = AuthorizationCode.objects.filter(code=raw_code).first()
+          if not self.authorization_code:
+              raise TokenError("invalid_grant")
+
+          if self.authorization_code.code_challenge:
+              if not self.code_verifier:
+                  raise TokenError("invalid_request")
+              if self.authorization_code.code_challenge_method == PKCE_METHOD_S256:
+                  new_code_challenge = self.code_verifier.encode("ascii")
+              else:
+                  new_code_challenge = self.code_verifier
+
+              if new_code_challenge != self.authorization_code.code_challenge:
+                  raise TokenError("invalid_grant")
+  ```
+
+test "rank154: python authentik token rejects verifier without stored challenge"
+  lang python
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  from authentik.providers.oauth2.models import AuthorizationCode
+
+  PKCE_METHOD_S256 = "S256"
+
+  class TokenError(Exception):
+      pass
+
+  class TokenParams:
+      def __post_init_code(self, raw_code, request):
+          self.authorization_code = AuthorizationCode.objects.filter(code=raw_code).first()
+          if not self.authorization_code:
+              raise TokenError("invalid_grant")
+
+          if self.authorization_code.code_challenge:
+              if not self.code_verifier:
+                  raise TokenError("invalid_grant")
+              if self.authorization_code.code_challenge_method == PKCE_METHOD_S256:
+                  new_code_challenge = self.code_verifier.encode("ascii")
+              else:
+                  new_code_challenge = self.code_verifier
+
+              if new_code_challenge != self.authorization_code.code_challenge:
+                  raise TokenError("invalid_grant")
+
+          if not self.authorization_code.code_challenge and self.code_verifier:
+              raise TokenError("invalid_grant")
+  ```

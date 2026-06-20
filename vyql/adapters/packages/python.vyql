@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, PackageEntryPointScriptWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, DatabaseRead}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, PackageEntryPointScriptWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, DatabaseRead, ProtocolStateReview}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter python {
@@ -16,6 +16,9 @@ adapter python {
     control method "login_required" -> AuthenticationCheck
     control method "permission_required" -> AuthorizationCheck
     control "csrf_protect" -> CsrfProtection
+  }
+  package "authentik" {
+    mark exact "analysis.function.context" val "name=__post_init_code" val "self.authorization_code.code_challenge" val "self.code_verifier" val "new_code_challenge!=self.authorization_code.code_challenge" nval "ifnotself.authorization_code.code_challengeandself.code_verifier" -> ProtocolStateReview
   }
   package "djangorestframework" {
     source "request.query_params" -> HttpInput
