@@ -1246,6 +1246,15 @@ concept RedirectTarget : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_601]
 }
+concept MethodGatedRedirectValidationBypass : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "redirect or callback URL validation is skipped for non-matching HTTP methods"
+  review_evidence: "URL validation context {pattern} returns before checking callback or redirect URL parameters"
+  review_assumption: "a GET or other non-matching method can carry attacker-controlled redirect/callback URL parameters"
+  review_confidence: medium
+}
 concept ReflectionInvoke : sink {
   vulnerable_to: [deserialization.UnsafeReflection]
   enabled_by: [taint.UntrustedData]

@@ -113,11 +113,12 @@ type Pair struct {
 
 // Lambda is an inline anonymous function (e.g. an Express arrow handler).
 type Lambda struct {
-	Params       []string
-	ParamTypes   map[string]string
-	ParamEntries []ParamEntry
-	Body         []Stmt
-	Loc          string
+	Params        []string
+	ParamTypes    map[string]string
+	ParamEntries  []ParamEntry
+	Body          []Stmt
+	Loc           string
+	ContextTokens []string
 }
 
 // Thru is a transparent wrapper (await, starred) that passes taint through.

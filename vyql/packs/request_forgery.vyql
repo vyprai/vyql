@@ -25,6 +25,11 @@ rule OpenRedirect {
   unless guarded_by core.RedirectAllowlist
 }
 
+rule MethodGatedRedirectValidationBypass {
+  meta { id: "VYQL-RF-008", severity: high, cwe: [CWE_601], confidence_floor: medium }
+  match code.MethodGatedRedirectValidationBypass as bypass
+}
+
 rule IncompleteCsrfTokenValidation {
   meta { id: "VYQL-RF-006", severity: medium, cwe: [CWE_352], confidence_floor: medium }
   match code.IncompleteCsrfTokenValidation as guard

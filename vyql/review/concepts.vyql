@@ -122,6 +122,12 @@ review code.RequestSelectedDeserializationFormat {
   kind: "attention"
   text: "review request-selected deserialization formats for unsafe codecs such as pickle"
 }
+review code.MethodGatedRedirectValidationBypass {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review HTTP method gates that skip redirect or callback URL origin validation"
+}
 review code.SensitiveOperation {
   category: "auth"
   kind: "target"

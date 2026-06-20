@@ -3,6 +3,7 @@ package treesitter_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
@@ -130,6 +131,49 @@ module.exports.parse = (event) => {
 		}
 	}
 	t.Fatalf("nested new RegExp(boundary) was not lowered; nodes=%#v", nodes)
+}
+
+func TestJavaScriptInlineLambdaContextIsLowered(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "origin.ts")
+	src := []byte(`
+export const middleware = createAuthMiddleware(async (ctx) => {
+  if (ctx.request?.method !== "POST") {
+    return;
+  }
+  const callbackURL = ctx.query?.callbackURL;
+  callbackURL && validateURL(callbackURL, "callbackURL");
+});
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "name=<lambda>") &&
+			strings.Contains(tokens, "ctx.request?.method") &&
+			strings.Contains(tokens, "callbackURL") &&
+			strings.Contains(tokens, "validateURL") {
+			return
+		}
+	}
+	t.Fatalf("inline lambda context was not lowered; nodes=%#v", nodes)
 }
 
 func findFuncDef(prog nir.Program, name string) (nir.FuncDef, bool) {

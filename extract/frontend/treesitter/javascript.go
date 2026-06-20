@@ -1286,7 +1286,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	case "arrow_function", "function_expression", "function":
 		// a single bare arrow param `v => …` is under the `parameter` field, not `parameters`.
-		return nir.Lambda{Params: c.funcParams(n), ParamTypes: c.funcParamTypes(n), Body: c.funcBody(n), Loc: L}
+		return nir.Lambda{Params: c.funcParams(n), ParamTypes: c.funcParamTypes(n), Body: c.funcBody(n), Loc: L, ContextTokens: c.jsFunctionContext("<lambda>", n)}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))

@@ -2039,6 +2039,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return l.eval(ex.Value, sc)
 	case nir.Lambda:
 		l.promoteCapturedJSBindings(ex.Body, ex.Params, sc, ex.Loc)
+		l.functionContextAnalysisEvent(ex.Loc, ex.ContextTokens)
 		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
 		// thunk, .then, event handler) thus fires with the captured taint.
