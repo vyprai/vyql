@@ -26,6 +26,7 @@ adapter rust {
   mark exact "analysis.rust.unsafe_impl" val "trait:Send" nval "bound:Send" -> code.UnsafeAutoTraitImpl
   mark exact "analysis.rust.unsafe_impl" val "trait:Sync" nval "bound:Sync" -> code.UnsafeAutoTraitImpl
   mark exact "analysis.function.context" val "lang=rust" val "with_capacity" val "as_mut_ptr" val "from_raw_parts_mut" val "read_exact" val "set_len" -> code.UninitializedBufferExposure
+  mark exact "analysis.function.context" val "lang=rust" val "as_mut_ptr" val "from_raw_parts_mut" val ".read(" val "set_len" -> code.UninitializedBufferExposure
   mark exact "analysis.function.context" val "lang=rust" val ".next().await" nval "timeout" -> code.UnboundedResourceOperation
 
   // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
