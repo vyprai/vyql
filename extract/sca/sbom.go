@@ -48,6 +48,137 @@ func ParseRequirements(content string) []Dep {
 	return out
 }
 
+// ParseSetupPy reads static setuptools install_requires lists from setup.py.
+// It intentionally handles literal lists/tuples only; dynamic Python execution is
+// outside the manifest reader's trust boundary.
+func ParseSetupPy(content string) []Dep {
+	var out []Dep
+	const key = "install_requires"
+	for off := 0; off < len(content); {
+		i := strings.Index(content[off:], key)
+		if i < 0 {
+			break
+		}
+		i += off
+		off = i + len(key)
+		if !identifierBoundary(content, i, off) {
+			continue
+		}
+		j := skipSpace(content, off)
+		if j >= len(content) || content[j] != '=' {
+			continue
+		}
+		j = skipSpace(content, j+1)
+		if j >= len(content) || (content[j] != '[' && content[j] != '(') {
+			continue
+		}
+		body, end, ok := balancedLiteralBody(content, j)
+		if !ok {
+			continue
+		}
+		off = end
+		for _, lit := range quotedLiterals(body) {
+			if name, ver, ok := splitRequirement(lit); ok {
+				out = append(out, Dep{NormalizePackageName(name), normalizeVersion(ver)})
+			} else if lit = strings.TrimSpace(lit); lit != "" {
+				out = append(out, Dep{NormalizePackageName(lit), "*"})
+			}
+		}
+	}
+	return out
+}
+
+func identifierBoundary(s string, start, end int) bool {
+	isIdent := func(b byte) bool {
+		return b == '_' || ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || ('0' <= b && b <= '9')
+	}
+	if start > 0 && isIdent(s[start-1]) {
+		return false
+	}
+	return end >= len(s) || !isIdent(s[end])
+}
+
+func skipSpace(s string, i int) int {
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n') {
+		i++
+	}
+	return i
+}
+
+func balancedLiteralBody(s string, start int) (string, int, bool) {
+	open := s[start]
+	close := byte(']')
+	if open == '(' {
+		close = ')'
+	}
+	depth := 0
+	inQuote := byte(0)
+	escaped := false
+	for i := start; i < len(s); i++ {
+		ch := s[i]
+		if inQuote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == inQuote {
+				inQuote = 0
+			}
+			continue
+		}
+		if ch == '\'' || ch == '"' {
+			inQuote = ch
+			continue
+		}
+		if ch == open {
+			depth++
+			continue
+		}
+		if ch == close {
+			depth--
+			if depth == 0 {
+				return s[start+1 : i], i + 1, true
+			}
+		}
+	}
+	return "", start, false
+}
+
+func quotedLiterals(s string) []string {
+	var out []string
+	for i := 0; i < len(s); i++ {
+		quote := s[i]
+		if quote != '\'' && quote != '"' {
+			continue
+		}
+		var b strings.Builder
+		escaped := false
+		for j := i + 1; j < len(s); j++ {
+			ch := s[j]
+			if escaped {
+				b.WriteByte(ch)
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == quote {
+				out = append(out, b.String())
+				i = j
+				break
+			}
+			b.WriteByte(ch)
+		}
+	}
+	return out
+}
+
 func splitRequirement(line string) (name, version string, ok bool) {
 	for _, op := range []string{"==", ">=", "<=", "~=", "!=", ">", "<", "="} {
 		if i := strings.Index(line, op); i >= 0 {
@@ -141,7 +272,7 @@ func normalizeVersion(v string) string {
 		return "*"
 	}
 	// take the first token of a range like "1.2.0 - 2.0.0" / "1.2 || 1.3".
-	if i := strings.IndexAny(v, " |,"); i >= 0 {
+	if i := strings.IndexAny(v, " |,;"); i >= 0 {
 		v = v[:i]
 	}
 	return v

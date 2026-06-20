@@ -17,6 +17,11 @@ rule HttpRequestSmugglingDependency {
   match sbom.HttpRequestSmugglingDependency as p
 }
 
+rule CertValidationDependency {
+  meta { id: "VYQL-SCA-006", severity: high, cwe: [CWE_295] }
+  match sbom.CertValidationDependency as p
+}
+
 // A dependency name that typosquats a popular package, or an unreviewed version of a
 // package with malicious history — name-intelligence, not a CVE feed (CWE-1357).
 rule SuspiciousDependency {

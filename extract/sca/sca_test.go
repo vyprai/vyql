@@ -27,6 +27,28 @@ func TestParseRequirements(t *testing.T) {
 	}
 }
 
+func TestParseSetupPyInstallRequires(t *testing.T) {
+	got := ParseSetupPy(`from setuptools import setup
+
+setup(
+    name="demo",
+    install_requires=[
+        'AwsCRT==0.11.20',
+        "requests>=2.31.0",
+    ],
+)
+`)
+	want := []Dep{{"awscrt", "0.11.20"}, {"requests", "2.31.0"}}
+	if len(got) != len(want) {
+		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSCARuntimeDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {

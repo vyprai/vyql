@@ -1,5 +1,6 @@
 {
   "pypi": {
+    "awscrt": [{"version": "0.11.20", "id": "CVE-2021-40828", "cwe": ["CWE-295"]}],
     "flask": [{"version": "0.12.2", "id": "CVE-2018-1000656"}],
     "pyyaml": [{"version": "5.1", "id": "CVE-2020-1747"}]
   },

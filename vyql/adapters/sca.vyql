@@ -7,6 +7,8 @@ adapter sca {
   mark exact "analysis.sca.package" val "status=vulnerable" -> sbom.VulnerableDependency
   mark exact "analysis.sca.package" val "advisory_cwe=CWE-444" -> sbom.HttpRequestSmugglingDependency
   mark exact "analysis.sca.package" val "advisory_cwe=CWE_444" -> sbom.HttpRequestSmugglingDependency
+  mark exact "analysis.sca.package" val "advisory_cwe=CWE-295" -> sbom.CertValidationDependency
+  mark exact "analysis.sca.package" val "advisory_cwe=CWE_295" -> sbom.CertValidationDependency
   mark exact "analysis.sca.package" val "status=suspicious" -> sbom.SuspiciousDependency
   mark exact "analysis.sca.package" val "status=malicious" -> sbom.MaliciousDependency
   mark exact "analysis.sca.package" val "reachable=true" -> sbom.ReachableSymbol

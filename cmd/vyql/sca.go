@@ -18,6 +18,7 @@ var manifestParsers = []struct {
 	parse func(string) []sca.Dep
 }{
 	{"requirements.txt", "pypi", sca.ParseRequirements},
+	{"setup.py", "pypi", sca.ParseSetupPy},
 	{"package.json", "npm", sca.ParsePackageJSON},
 }
 
