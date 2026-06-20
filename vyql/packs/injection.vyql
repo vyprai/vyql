@@ -194,6 +194,11 @@ rule UnrestrictedUpload {
   taint core.UserControlledData -> code.UnsafeUpload
 }
 
+rule IncompleteFileExtensionValidation {
+  meta { id: "VYQL-INJ-037", severity: medium, cwe: [CWE_434], confidence_floor: medium }
+  match code.IncompleteFileExtensionValidation as validator
+}
+
 // Untrusted data evaluated as an expression-language expression — SpEL/OGNL/MVEL/EL (CWE-917).
 rule ExpressionInjection {
   meta { id: "VYQL-INJ-016", severity: critical, cwe: [CWE_917] }
