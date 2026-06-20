@@ -14,6 +14,7 @@ adapter php {
   source "$_FILES" -> code.HttpInput
   source "$_SERVER" -> code.HttpInput
   source path "Request.post" -> code.HttpInput
+  source path "$request.request.all" -> code.HttpInput
   source path "$this.metadata" -> code.ArchiveEntryName
   source method "getNameIndex" -> code.ArchiveEntryName
   // framework request-object accessors (Utopia/Appwrite, Symfony-style): the request URI /
@@ -245,6 +246,7 @@ adapter php {
   mark method "insert" -> code.StateChangingOp
   mark method "update" -> code.StateChangingOp
   mark method "delete" -> code.StateChangingOp
+  sink method "setFromPost" -> code.StateChangingOp
   mark exact "analysis.class.context" val "Action" val "deleteBy" val "redirect" nval "assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
   mark exact "analysis.class.context" val "Action" val "$this->addToCompareList" val "$this->removeFromCompareList" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
   mark exact "analysis.class.context" val "Action" val "PasswordReset::class" val "->initiateReset" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
@@ -315,6 +317,7 @@ adapter php {
   control "validate_csrf_token" -> core.CsrfProtection
   control "check_csrf_token" -> core.CsrfProtection
   control "verify_csrf_token" -> core.CsrfProtection
+  control method "isCsrfTokenValid" -> core.CsrfProtection
   control method "checkToken" -> core.CsrfProtection
   control "check_admin_referer" -> core.CsrfProtection
   control "wp_verify_nonce" -> core.CsrfProtection
