@@ -130,6 +130,7 @@ adapter java {
   sink method "readValue" -> code.Deserialization
   sink path "yaml.load" -> code.Deserialization
   sink path "Yaml.load" -> code.Deserialization
+  mark exact "analysis.class.context" val "class_base:InvocationHandler" val "call:getMethod" val "call:invokeMethod" nval "function_name:readResolve" nval "function_name:readObject" nval "call:NotSerializableException" -> code.DeserializableInvocationHandler
   package "org.yaml.snakeyaml" {
     mark exact "analysis.class.context" val "class_base:Constructor" -> code.UnsafeYamlConstructor
   }

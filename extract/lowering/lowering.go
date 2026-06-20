@@ -878,15 +878,24 @@ func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []strin
 	l.node("Call", loc, props)
 }
 
-func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string) {
+func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, memberTokens []string) {
 	var tokens []string
+	seen := map[string]bool{}
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(tokens) >= 512 {
+			return
+		}
+		seen[tok] = true
+		tokens = append(tokens, tok)
+	}
 	if name != "" {
-		tokens = append(tokens, "class_name:"+name)
+		add("class_name:" + name)
 	}
 	for _, base := range bases {
-		if base != "" {
-			tokens = append(tokens, "class_base:"+base)
-		}
+		add("class_base:" + base)
+	}
+	for _, tok := range memberTokens {
+		add(tok)
 	}
 	if len(tokens) == 0 {
 		return
@@ -900,6 +909,49 @@ func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string) {
 		"str_args":    strings.Join(tokens, "\x00"),
 	}
 	l.node("Call", loc, props)
+}
+
+func classMemberContextTokens(stmts []nir.Stmt) []string {
+	var tokens []string
+	var walk func([]nir.Stmt)
+	walk = func(stmts []nir.Stmt) {
+		for _, s := range stmts {
+			if len(tokens) >= 512 {
+				return
+			}
+			switch st := s.(type) {
+			case nir.FuncDef:
+				tokens = append(tokens, st.ContextTokens...)
+				walk(st.Body)
+			case nir.ClassDef:
+				// Nested classes get their own class-context event; do not smear their
+				// member evidence onto the enclosing class.
+				continue
+			case nir.Block:
+				walk(st.Stmts)
+			case nir.If:
+				walk(st.Then)
+				walk(st.Else)
+			case nir.Loop:
+				walk(st.Body)
+			case nir.Switch:
+				for _, c := range st.Cases {
+					walk(c)
+				}
+			case nir.Try:
+				walk(st.Body)
+				for _, h := range st.Handlers {
+					walk(h)
+				}
+				walk(st.Finally)
+			}
+		}
+	}
+	walk(stmts)
+	if len(tokens) > 512 {
+		return tokens[:512]
+	}
+	return tokens
 }
 
 func (l *lowerer) globalMutationAnalysisEvent(loc string, tokens []string) {
@@ -1486,7 +1538,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.ClassDef:
 		prev := l.curClass
 		l.curClass = st.Name
-		l.classContextAnalysisEvent(st.Loc, st.Name, st.Bases)
+		l.classContextAnalysisEvent(st.Loc, st.Name, st.Bases, classMemberContextTokens(st.Body))
 		l.block(st.Body, newScope())
 		l.curClass = prev
 	case nir.FuncDef:

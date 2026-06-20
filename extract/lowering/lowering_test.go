@@ -583,6 +583,99 @@ func TestLowerClassDefCreatesContextEvent(t *testing.T) {
 	t.Fatalf("class context analysis event not found")
 }
 
+func TestLowerClassContextIncludesMemberFunctionTokens(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "C.java",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Handler", Loc: "C.java:3", Bases: []string{"InvocationHandler"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "invoke", Loc: "C.java:4", ContextTokens: []string{
+					"class_name:Handler",
+					"class_base:InvocationHandler",
+					"function_name:invoke",
+					"call:invokeImpl",
+				}},
+				nir.FuncDef{Name: "invokeImpl", Loc: "C.java:8", ContextTokens: []string{
+					"class_name:Handler",
+					"class_base:InvocationHandler",
+					"function_name:invokeImpl",
+					"call:getMethod",
+					"call:invokeMethod",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") != "analysis.class.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "class_name:Handler") &&
+			strings.Contains(args, "class_base:InvocationHandler") &&
+			strings.Contains(args, "function_name:invoke") &&
+			strings.Contains(args, "call:invokeImpl") &&
+			strings.Contains(args, "function_name:invokeImpl") &&
+			strings.Contains(args, "call:getMethod") &&
+			strings.Contains(args, "call:invokeMethod") {
+			return
+		}
+	}
+	t.Fatalf("class context did not include member function tokens")
+}
+
+func TestLowerClassContextKeepsNestedClassMemberTokensSeparate(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "C.java",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Outer", Loc: "C.java:1", Body: []nir.Stmt{
+				nir.ClassDef{Name: "Handler", Loc: "C.java:3", Bases: []string{"InvocationHandler"}, Body: []nir.Stmt{
+					nir.FuncDef{Name: "invoke", Loc: "C.java:4", ContextTokens: []string{
+						"class_name:Handler",
+						"class_base:InvocationHandler",
+						"function_name:invoke",
+						"call:invokeImpl",
+					}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	var outer, handler bool
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") != "analysis.class.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "class_name:Outer") {
+			outer = true
+			if strings.Contains(args, "class_base:InvocationHandler") ||
+				strings.Contains(args, "function_name:invoke") {
+				t.Fatalf("outer class context included nested handler evidence: %q", args)
+			}
+		}
+		if strings.Contains(args, "class_name:Handler") &&
+			strings.Contains(args, "class_base:InvocationHandler") &&
+			strings.Contains(args, "function_name:invoke") {
+			handler = true
+		}
+	}
+	if !outer || !handler {
+		t.Fatalf("expected separate outer and handler class context events, got outer=%v handler=%v", outer, handler)
+	}
+}
+
 func TestLowerResultEntryCreatesControlEventFlow(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",

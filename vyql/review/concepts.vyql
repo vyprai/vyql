@@ -112,6 +112,11 @@ review code.ObjectLookupByUserInput {
   expected: [core.OwnershipCheck, core.AuthorizationCheck]
   text: "verify object access is constrained to the current principal"
 }
+review code.DeserializableInvocationHandler {
+  category: "deserialization"
+  kind: "attention"
+  text: "review serializable dynamic-proxy invocation handlers that dispatch reflected or scripted methods without a deserialization rejection hook"
+}
 review code.SensitiveOperation {
   category: "auth"
   kind: "target"

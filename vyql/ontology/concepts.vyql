@@ -953,6 +953,15 @@ concept Deserialization : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_502]
 }
+concept DeserializableInvocationHandler : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+  review_category: "deserialization"
+  review_condition: "a dynamic-proxy invocation handler can be serialized without an observed rejection hook"
+  review_evidence: "invocation handler class context {pattern} lacks readResolve/readObject rejection"
+  review_assumption: "attacker-controlled serialized data can include or reach the proxy handler object graph"
+  review_confidence: medium
+}
 concept UnsafeYamlConstructor : sink {
   vulnerable_to: [deserialization.DeserializationAbuse]
   cwe: [CWE_502]

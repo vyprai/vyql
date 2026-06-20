@@ -49,3 +49,8 @@ rule ArchiveManifestDeserialization {
   meta { id: "VYQL-DESER-008", severity: high, cwe: [CWE_502], confidence_floor: medium }
   match code.ArchiveManifestDeserialization as deserialization
 }
+
+rule DeserializableInvocationHandler {
+  meta { id: "VYQL-DESER-009", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.DeserializableInvocationHandler as handler
+}
