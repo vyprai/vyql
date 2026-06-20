@@ -244,6 +244,9 @@ adapter php {
   mark method "update" -> code.StateChangingOp
   mark method "delete" -> code.StateChangingOp
   mark exact "analysis.class.context" val "Action" val "deleteBy" val "redirect" nval "assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
+  mark exact "analysis.class.context" val "Action" val "$this->addToCompareList" val "$this->removeFromCompareList" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
+  mark exact "analysis.class.context" val "Action" val "PasswordReset::class" val "->initiateReset" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
+  mark exact "analysis.class.context" val "Action" val "$this->backendUserSessionRepository->terminateSessionByIdentifier" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
   sink path "queryDB" val "insert into" -> code.StateChangingOp
   sink path "queryDB" val "replace into" -> code.StateChangingOp
   sink path "queryDB" val "update " val " set " -> code.StateChangingOp
