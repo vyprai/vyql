@@ -202,7 +202,7 @@ concept ExpressionEval : sink {
 concept WeakCipher : sink {
   vulnerable_to: [crypto.WeakCipher]
   enabled_by: [taint.UntrustedData]
-  cwe: [CWE_327]
+  cwe: [CWE_327, CWE_326]
 }
 // A cryptographic operation (sign/verify/encrypt/decrypt/hash/key-derivation) whose
 // CORRECTNESS — algorithm choice, signature verification, key/IV handling — can't be

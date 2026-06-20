@@ -8,9 +8,9 @@ rule WeakCrypto {
   match code.WeakHash as h
 }
 
-// Use of a broken/weak symmetric cipher (DES/RC4/Blowfish) — presence (CWE-327).
+// Use of a broken/weak symmetric cipher or mode — presence (CWE-327/CWE-326).
 rule WeakCipher {
-  meta { id: "VYQL-CRY-002", severity: medium, cwe: [CWE_327], benchmark: crypto }
+  meta { id: "VYQL-CRY-002", severity: medium, cwe: [CWE_327, CWE_326], benchmark: crypto }
   match code.WeakCipher as c
 }
 
