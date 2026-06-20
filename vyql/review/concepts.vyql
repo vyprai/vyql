@@ -228,6 +228,11 @@ review code.SecretComparisonReview {
   kind: "attention"
   text: "review secret comparisons for ordinary equality or early-exit behavior where constant-time comparison is expected"
 }
+review code.PremasterSecretLengthReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review TLS RSA premaster-secret decryption for exact 48-byte length validation and indistinguishable fallback behavior"
+}
 review code.ResourceReview {
   category: "resource"
   kind: "target"

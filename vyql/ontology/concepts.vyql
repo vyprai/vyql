@@ -305,6 +305,15 @@ concept SecretComparisonReview : sink {
   review_assumption: "an attacker can repeatedly submit candidate values and observe timing or error differences"
   review_confidence: medium
 }
+concept PremasterSecretLengthReview : sink {
+  vulnerable_to: [crypto.ObservableDiscrepancy]
+  cwe: [CWE_203]
+  review_category: "crypto"
+  review_condition: "TLS RSA premaster-secret decryption output is used without confirming the required 48-byte length"
+  review_evidence: "premaster-secret context {pattern} decrypts attacker-controlled ciphertext and later uses fixed premaster-secret offsets"
+  review_assumption: "an attacker can submit malformed RSA ciphertexts and observe alert, exception, or handshake behavior differences"
+  review_confidence: medium
+}
 
 concept CleartextChannel : sink {
   vulnerable_to: [crypto.CleartextTransmission]

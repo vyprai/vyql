@@ -69,6 +69,7 @@ adapter java {
   // Offset/length range checks must avoid additive overflow before a native or buffer
   // operation consumes the range. The patched idiom checks `offset > len - length`.
   mark exact "analysis.function.context" val "expr:offset+length>b.length" val "call_path:write" nval "expr:offset>b.length-length" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "function_name:safeDecryptPreMasterSecret" val "call:doFinal" val "call:createSecret" val "M[0]" nval "expr:m.length==48" -> code.PremasterSecretLengthReview
 
   // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
