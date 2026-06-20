@@ -93,6 +93,7 @@ adapter c {
   mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
   mark exact "analysis.function.context" val "lang=c" val "unescapeChar(*readPtr++);}*writePtr++=c;" -> code.EscapedTerminatorWrite
   mark exact "analysis.function.context" val "lang=c" val "name=match" val "cur->peercallno==callno" val "dcallno==cur->callno" nval "full_frame?dcallno==cur->callno" -> code.ProtocolFrameBindingReview
+  mark exact "analysis.function.context" val "lang=c" val "name=__of_unflatten_dtb" val "FDT_BEGIN_NODE" val "FDT_PROP" val "is_reserved_name(pathp)" val "is_reserved_name(name)" val "of_new_node(node,pathp)" val "of_new_property" nval "is_allowed_input_name" nval "strchr(name,'/')" -> code.ProtocolStateReview
   mark exact "analysis.function.context" val "name=perform_http_xact" val "CREATION_NOTIFICATION" val "run_post_create" nval "client_uid!=0" -> code.PrivilegedEntryPointReview
   mark exact "analysis.function.context" val "lang=c" val "AVAHI_FLAGS_VALID" val "AVAHI_PUBLISH_USE_WIDE_AREA" val "AVAHI_PUBLISH_USE_MULTICAST" val "transport_flags_from_domain" nval "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)" -> code.ReachableAssertionReview
   mark "analysis.field.clear_null" -> code.OwnerFieldClear
