@@ -671,6 +671,15 @@ concept NullableDeref : sink {
   review_assumption: "the dereferenced value may be null on an attacker-triggerable path"
   review_confidence: low
 }
+concept UncheckedNullableResultDeref : sink {
+  vulnerable_to: [memory.NullDereference]
+  cwe: [CWE_476]
+  review_category: "memory"
+  review_condition: "nullable factory or callback result is dereferenced before an observed null guard"
+  review_evidence: "nullable-result context {pattern} stores a result and dereferences it without a dominating null check"
+  review_assumption: "the callee can return null for attacker-controlled or unexpected protocol state"
+  review_confidence: medium
+}
 concept EscapedTerminatorWrite : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   cwe: [CWE_119, CWE_125, CWE_787]

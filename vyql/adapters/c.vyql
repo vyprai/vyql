@@ -97,6 +97,7 @@ adapter c {
   mark exact "analysis.function.context" val "lang=c" val "name=dispatch_cmd" val "OP_PUT" val "body_size=strtoul" val "body_size>job_data_size_limit" val "reply_msg(c,MSG_JOB_TOO_BIG)" nval "skip(c,body_size+2,MSG_JOB_TOO_BIG)" -> code.ProtocolCommandInjection
   mark exact "analysis.function.context" val "name=perform_http_xact" val "CREATION_NOTIFICATION" val "run_post_create" nval "client_uid!=0" -> code.PrivilegedEntryPointReview
   mark exact "analysis.function.context" val "lang=c" val "AVAHI_FLAGS_VALID" val "AVAHI_PUBLISH_USE_WIDE_AREA" val "AVAHI_PUBLISH_USE_MULTICAST" val "transport_flags_from_domain" nval "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)" -> code.ReachableAssertionReview
+  mark exact "analysis.function.context" val "lang=c" val "px->ft=imcb_file_send_start" val "px->ft->data=px" nval "if(!px->ft)" -> code.UncheckedNullableResultDeref
   mark "analysis.field.clear_null" -> code.OwnerFieldClear
   mark "xmlFreeDoc" -> code.OwnerFree
   mark "__deref" -> code.PointerUse

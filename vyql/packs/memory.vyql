@@ -89,3 +89,8 @@ rule CountDerivedElementAccess {
   match code.CountDerivedElementAccess as idx
   unless guarded_by core.MemoryBoundsCheck
 }
+
+rule UncheckedNullableResultDeref {
+  meta { id: "VYQL-MEM-018", severity: medium, cwe: [CWE_476], confidence_floor: medium }
+  match code.UncheckedNullableResultDeref as deref
+}

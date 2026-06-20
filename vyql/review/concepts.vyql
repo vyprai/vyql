@@ -496,6 +496,11 @@ review code.NullableDeref {
   kind: "attention"
   text: "review dereference and nearby null checks"
 }
+review code.UncheckedNullableResultDeref {
+  category: "memory"
+  kind: "attention"
+  text: "review nullable result assignment and ensure a null guard dominates later dereferences"
+}
 review code.EscapedTerminatorWrite {
   category: "memory"
   kind: "attention"
