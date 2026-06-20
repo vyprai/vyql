@@ -59,6 +59,12 @@ review code.AuthFlowBypassReview {
   expected: [core.AuthenticationCheck]
   text: "review alternate UI or navigation exit paths in this authentication flow"
 }
+review code.MissingSessionRotationAfterAuthentication {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review successful authentication flows that reuse the pre-login HTTP session instead of rotating it"
+}
 review code.LocalRequestBypassReview {
   category: "auth"
   kind: "attention"

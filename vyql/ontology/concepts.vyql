@@ -245,6 +245,16 @@ concept SessionId : sink {
   cwe: [CWE_384]
 }
 
+concept MissingSessionRotationAfterAuthentication : sink {
+  vulnerable_to: [session.SessionFixation]
+  cwe: [CWE_384]
+  review_category: "auth"
+  review_condition: "authentication completes without rotating or invalidating the existing HTTP session"
+  review_evidence: "authentication context {pattern} sets the authenticated security context while reusing session state"
+  review_assumption: "the pre-authentication session identifier can be fixed or known before login"
+  review_confidence: medium
+}
+
 concept PermissiveCors : sink {
   vulnerable_to: [access_control.PermissiveCors]
   enabled_by: [taint.UntrustedData]
