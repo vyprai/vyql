@@ -588,6 +588,7 @@ adapter javascript {
   mark exact "analysis.function.context" val "name=processMessage" val "protocolMsg" val "HISTORY_SYNC_NOTIFICATION" val "APP_STATE_SYNC_KEY_SHARE" val "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" nval "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe" -> code.ProtocolStateReview
   mark exact "analysis.function.context" val "_downloadFromWorkingDir" val "join(localDirPath,file.name)" val "downloadTo(localPath,file.name)" nval "basename(file.name)" -> code.RemoteListingDownloadPath
   mark exact "analysis.function.context" val "name=<lambda>" val "callbackData.hasOwnProperty(\"status\")" val "data.status==-1" val "callbackFun(callbackData)" nval "callbackData.status==-1" -> code.ClientAuthFailureResponseReview
+  mark exact "analysis.function.context" val "prisma.accounts.update" val "where:{id}" val "passwordHash" val "originalPassword" nval "currentUserId" nval "ctx.id" -> code.IdorPolicyReview
 
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
   mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified
