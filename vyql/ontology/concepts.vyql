@@ -188,6 +188,15 @@ concept ProtoPollute : sink {
   cwe: [CWE_1321]
   analysis_role: attribute_sink
 }
+concept UncheckedPrototypeConfigKey : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "configuration object keys are copied into plain object properties without filtering prototype-mutating names"
+  review_evidence: "prototype-sensitive config-key copy context {pattern} writes dynamic keys into output objects"
+  review_assumption: "a package, project, or build configuration can supply keys such as __proto__ or constructor"
+  review_confidence: medium
+}
 concept SchemaCodegenValidationBypass : sink {
   vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
   cwe: [CWE_1321, CWE_915]

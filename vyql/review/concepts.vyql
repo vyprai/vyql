@@ -134,6 +134,11 @@ review code.RequestSelectedDeserializationFormat {
   kind: "attention"
   text: "review request-selected deserialization formats for unsafe codecs such as pickle"
 }
+review code.UncheckedPrototypeConfigKey {
+  category: "prototype_pollution"
+  kind: "attention"
+  text: "review dynamic config-key copies for __proto__/constructor/prototype filtering before writing plain object properties"
+}
 review code.MethodGatedRedirectValidationBypass {
   category: "request_forgery"
   kind: "attention"

@@ -228,6 +228,11 @@ rule SchemaCodegenValidationBypass {
   match code.SchemaCodegenValidationBypass as sink
 }
 
+rule UncheckedPrototypeConfigKey {
+  meta { id: "VYQL-INJ-048", severity: medium, cwe: [CWE_1321], confidence_floor: medium }
+  match code.UncheckedPrototypeConfigKey as key
+}
+
 // Untrusted data written to a CSV/spreadsheet cell — formula injection (CWE-1236).
 rule CsvInjection {
   meta { id: "VYQL-INJ-014", severity: low, cwe: [CWE_1236] }
