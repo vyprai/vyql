@@ -254,6 +254,12 @@ review code.ExternalResourceIntegrityReview {
   kind: "attention"
   text: "review external script/style integrity handling for allowlist decisions before trusting provided SRI metadata"
 }
+review code.PackageVersionSpecifierValidationReview {
+  category: "supply_chain"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review package version specifier validation before using the specifier in package installation"
+}
 review code.CommandLineAssemblyReview {
   category: "command"
   kind: "attention"

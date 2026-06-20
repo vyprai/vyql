@@ -1,0 +1,37 @@
+test "rank237: Python action accepts arbitrary black package specifier suffix"
+  lang python
+  expect_review code.PackageVersionSpecifierValidationReview
+  code
+  ```
+  import re
+
+  BLACK_VERSION_RE = re.compile(r"^black([^A-Z0-9._-]+.*)$", re.IGNORECASE)
+
+  def find_black_version_in_array(array):
+      for item in array:
+          item = item.split(";")[0]
+          if m := BLACK_VERSION_RE.match(item):
+              return m.group(1).strip()
+      return None
+  ```
+
+test "rank237: Python action restricts black package specifier syntax"
+  lang python
+  reject_review code.PackageVersionSpecifierValidationReview
+  code
+  ```
+  import re
+
+  BLACK_VERSION_RE = re.compile(
+      r"^black((?:\s*(?:~=|==|!=|<=|>=|<|>|===)\s*[A-Za-z0-9*+._-]+)"
+      r"(?:\s*,\s*(?:~=|==|!=|<=|>=|<|>|===)\s*[A-Za-z0-9*+._-]+)*)\s*$",
+      re.IGNORECASE,
+  )
+
+  def find_black_version_in_array(array):
+      for item in array:
+          item = item.split(";")[0]
+          if m := BLACK_VERSION_RE.match(item):
+              return m.group(1).strip()
+      return None
+  ```

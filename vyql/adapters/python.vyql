@@ -499,6 +499,7 @@ adapter python {
   assume sanitizer path "posixpath.normpath" -> code.FilePathAccess
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  mark exact "re.compile" val "^black([^A-Z0-9._-]+.*)$" -> code.PackageVersionSpecifierValidationReview
   sink path "re.compile" -> code.RegexCompile
   sink path "re.match" -> code.RegexCompile
   sink path "re.search" -> code.RegexCompile
