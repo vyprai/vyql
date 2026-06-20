@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, PackageEntryPointScriptWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, DatabaseRead, ProtocolStateReview}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, PackageEntryPointScriptWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, DatabaseRead, ProtocolStateReview, UnboundedResourceOperation}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter python {
@@ -142,6 +142,9 @@ adapter python {
   }
   package "re" {
     sink path "re.compile" -> RegexCompile
+  }
+  package "zlib" {
+    mark path "zlib.decompress" -> UnboundedResourceOperation
   }
   package "builtins" {
     sink path "eval" -> CodeEval

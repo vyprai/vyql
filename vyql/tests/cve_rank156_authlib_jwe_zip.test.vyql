@@ -1,0 +1,48 @@
+# Rank 156 / CVE-2025-62706: Authlib's JWE DEF zip decompression used
+# direct zlib.decompress on attacker-controlled compressed payload bytes,
+# allowing unbounded output expansion. The fix streams through a decompressor
+# with MAX_SIZE and rejects unconsumed tail.
+
+test "rank156: python authlib JWE direct zlib decompress requires resource review"
+  lang python
+  expect_review code.UnboundedResourceOperation
+  code
+  ```
+  import zlib
+
+  class JWEZipAlgorithm:
+      pass
+
+  class DeflateZipAlgorithm(JWEZipAlgorithm):
+      name = "DEF"
+
+      def decompress(self, s):
+          return zlib.decompress(s, -zlib.MAX_WBITS)
+  ```
+
+test "rank156: python authlib JWE bounded decompressobj is clean"
+  lang python
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  import zlib
+
+  GZIP_HEAD = bytes([120, 156])
+  MAX_SIZE = 250 * 1024
+
+  class JWEZipAlgorithm:
+      pass
+
+  class DeflateZipAlgorithm(JWEZipAlgorithm):
+      name = "DEF"
+
+      def decompress(self, s: bytes) -> bytes:
+          if s.startswith(GZIP_HEAD):
+              decompressor = zlib.decompressobj()
+          else:
+              decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
+          value = decompressor.decompress(s, MAX_SIZE)
+          if decompressor.unconsumed_tail:
+              raise ValueError(f"Decompressed string exceeds {MAX_SIZE} bytes")
+          return value
+  ```
