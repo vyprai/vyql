@@ -1033,6 +1033,15 @@ concept UnescapedSessionFlash : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
 }
+concept UnescapedRequestGlobalTemplateVar : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "request data is copied through PHP globals into template variables without an observed HTML escape"
+  review_evidence: "PHP template context {pattern} copies request-backed globals into render variables"
+  review_assumption: "the template variables are later rendered into HTML or script context"
+  review_confidence: medium
+}
 concept UnescapedExceptionMessageMarkup : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

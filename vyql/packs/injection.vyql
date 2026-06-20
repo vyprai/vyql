@@ -79,6 +79,11 @@ rule UnescapedSessionFlash {
   match code.UnescapedSessionFlash as sink
 }
 
+rule UnescapedRequestGlobalTemplateVar {
+  meta { id: "VYQL-INJ-039", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedRequestGlobalTemplateVar as sink
+}
+
 rule UnescapedExceptionMessageMarkup {
   meta { id: "VYQL-INJ-033", severity: high, cwe: [CWE_79], confidence_floor: medium }
   match code.UnescapedExceptionMessageMarkup as sink
