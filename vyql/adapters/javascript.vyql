@@ -274,6 +274,7 @@ adapter javascript {
   // headless-browser navigation (Puppeteer/Playwright `page.goto(url)`) fetches an
   // attacker-controllable URL server-side -> SSRF (CVE-2026-5323, a11y-mcp).
   sink method "goto" -> code.UrlFetch
+  mark exact "analysis.function.context" val "page.goto(request.url,requestOptions)" nval "request.url.trim().toLowerCase().substring(0,4)==='file'" -> code.LocalFileUrlNavigation
   sink path "request.get" -> code.UrlFetch
   sink path "request.post" -> code.UrlFetch
   sink path "needle.get" -> code.UrlFetch

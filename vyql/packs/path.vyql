@@ -42,3 +42,8 @@ rule ArchiveSymlinkFilterBypass {
   meta { id: "VYQL-PATH-007", severity: high, cwe: [CWE_22, CWE_59], confidence_floor: medium }
   match code.ArchiveSymlinkFilterBypass as sink
 }
+
+rule LocalFileUrlNavigation {
+  meta { id: "VYQL-PATH-008", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.LocalFileUrlNavigation as sink
+}

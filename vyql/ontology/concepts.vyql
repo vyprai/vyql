@@ -1201,6 +1201,15 @@ concept FilePathAccess : sink {
   cwe: [CWE_22]
   excluded_chars: "/\\"
 }
+concept LocalFileUrlNavigation : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "caller-controlled file URLs can be navigated by a headless browser and expose local file contents"
+  review_evidence: "headless-browser navigation context {pattern} passes a request URL to page navigation without an observed file-protocol branch"
+  review_assumption: "the request URL can use the file:// protocol and the rendered output is returned to the caller"
+  review_confidence: medium
+}
 concept FileUpload : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_434]

@@ -204,6 +204,11 @@ review code.IncompleteIpDenylist {
   kind: "attention"
   text: "review network address validation for missing special-use IP ranges such as unspecified or broadcast"
 }
+review code.LocalFileUrlNavigation {
+  category: "path"
+  kind: "attention"
+  text: "review headless-browser navigation for file:// URL handling before caller-controlled URLs reach page.goto"
+}
 review code.ProtocolStateReview {
   category: "request"
   kind: "attention"
