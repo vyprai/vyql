@@ -1,0 +1,49 @@
+test "rank259: bostr noscraper flag bypasses authorized key allowlist"
+  lang javascript
+  expect_review code.AccessPolicyReview
+  code
+  ```
+  let { authorized_keys, private_keys, noscraper } = require("./config");
+
+  module.exports = (authKey, data, ws, req) => {
+    if (!authorized_keys?.length && !Object.keys(private_keys).length && !noscraper) return;
+    if (!validateEvent(data) || !verifyEvent(data)) {
+      ws.send(JSON.stringify(["NOTICE", "error: invalid challenge response."]));
+      return false;
+    }
+
+    if (!authorized_keys?.includes(data.pubkey) && !private_keys[data.pubkey] && !noscraper) {
+      ws.send(JSON.stringify(["OK", data.id, false, "unauthorized."]));
+      return false;
+    }
+
+    ws.send(JSON.stringify(["OK", data.id, true, `Hello ${data.pubkey}`]));
+    return true;
+  };
+  ```
+
+test "rank259: bostr authorized key allowlist rejects unknown pubkeys even with noscraper"
+  lang javascript
+  reject_review code.AccessPolicyReview
+  code
+  ```
+  let { authorized_keys, private_keys, noscraper } = require("./config");
+
+  module.exports = (authKey, data, ws, req) => {
+    if (!authorized_keys?.length && !Object.keys(private_keys).length && !noscraper) return;
+    if (!validateEvent(data) || !verifyEvent(data)) {
+      ws.send(JSON.stringify(["NOTICE", "error: invalid challenge response."]));
+      return false;
+    }
+
+    let pubkeyInConfig = authorized_keys?.includes(data.pubkey) || data.pubkey in private_keys;
+
+    if (authorized_keys?.length && !pubkeyInConfig) {
+      ws.send(JSON.stringify(["OK", data.id, false, "unauthorized."]));
+      return false;
+    }
+
+    ws.send(JSON.stringify(["OK", data.id, true, `Hello ${data.pubkey}`]));
+    return true;
+  };
+  ```
