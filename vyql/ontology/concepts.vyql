@@ -105,6 +105,11 @@ concept CommandOptionInjection : sink {
   cwe: [CWE_74, CWE_88]
 }
 
+concept ProtocolCommandInjection : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion]
+  cwe: [CWE_349]
+}
+
 concept CommandLineAssemblyReview : sink {
   vulnerable_to: [injection.CommandInjection, injection.ArgumentInjection, injection.UnsafeDynamicLoading]
   cwe: [CWE_77, CWE_88, CWE_829]
