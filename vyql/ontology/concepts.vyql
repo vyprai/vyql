@@ -815,6 +815,10 @@ concept InternalContentExposureReview : sink {
   review_assumption: "the generated page or document may be readable by principals beyond the intended operators"
   review_confidence: possibility
 }
+concept AbsolutePathDisclosure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200]
+}
 concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   enabled_by: [taint.UntrustedData]

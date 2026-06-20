@@ -230,6 +230,7 @@ adapter java {
   mark exact "analysis.function.context" val "function_name:setSkid" nval "call:fromString" -> code.SecretDatabindingReview
   mark exact "analysis.function.context" val "function_name:doConfigure" val "call:configure" val "call:save" nval "call:checkPermission" -> code.SensitiveOperation
   mark exact "analysis.function.context" val "function_name:doFill" nval "call:checkPermission" -> code.StateChangingOp
+  mark exact "analysis.function.context" val "selector:Constants.MC_REALPATH" val "selector:Constants.MC_RELATIVE_PATH" val "call:FileReader" nval "call:FileNotFoundException" -> code.AbsolutePathDisclosure
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.
   mark method "getSomeWorkspace" -> code.SensitiveOperation
