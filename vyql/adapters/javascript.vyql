@@ -534,6 +534,7 @@ adapter javascript {
   // weak cipher (CWE-327) value-matched
   // weak cipher (CWE-327): fire unless a strong AEAD/256-bit algorithm literal is present
   // (catches ecb/cbc/des/rc4/aes-128 + dynamic algorithm vars; accepts FP on dynamic-strong).
+  mark "simplecrypt" val "aes-192-ecb" -> code.WeakCipher
   mark "createCipheriv" nval "gcm" nval "chacha" nval "poly1305" -> code.WeakCipher
   mark "createCipheriv" val "0000000000000000" -> code.StaticIv
   mark "createCipheriv" val "000000000000" -> code.StaticIv
