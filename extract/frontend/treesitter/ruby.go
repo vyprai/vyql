@@ -93,6 +93,8 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return out
 	case "class", "module":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
+	case "singleton_class":
+		return c.body(field(n, "body"))
 	case "assignment":
 		left := field(n, "left")
 		right := c.expr(field(n, "right"))

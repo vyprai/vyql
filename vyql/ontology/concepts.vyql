@@ -100,6 +100,16 @@ concept CommandExecution : sink {
   cwe: [CWE_78]
   excluded_chars: ";|&$<>()"
 }
+concept RubyPipeOpenCommandExecution : sink {
+  vulnerable_to: [injection.CommandInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "caller-controlled Ruby open path can select process execution with a pipe prefix"
+  review_evidence: "Ruby Kernel.open context {pattern} receives caller-controlled input"
+  review_assumption: "the path can begin with a pipe character and reach Ruby's process-opening behavior"
+  review_confidence: high
+}
 concept CommandOptionInjection : sink {
   vulnerable_to: [injection.ArgumentInjection]
   cwe: [CWE_74, CWE_88]

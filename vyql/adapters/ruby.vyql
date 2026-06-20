@@ -96,6 +96,7 @@ adapter ruby {
   sink path "Kernel.system" -> code.CommandExecution
   sink path "Kernel.exec" -> code.CommandExecution
   sink path "Kernel.spawn" -> code.CommandExecution
+  sink path "Kernel.open" -> code.RubyPipeOpenCommandExecution
   sink path "IO.popen" -> code.CommandExecution
   sink path "IO.foreach" -> code.CommandExecution
   sink path "URI.open" -> code.CommandExecution

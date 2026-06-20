@@ -26,6 +26,12 @@ rule StoredCommand {
   unless sanitized_by core.ShellEscape
 }
 
+rule RubyPipeOpenCommand {
+  meta { id: "VYQL-INJ-042", severity: critical, cwe: [CWE_78], benchmark: cmdi, confidence_floor: medium }
+  taint core.UserControlledData -> code.RubyPipeOpenCommandExecution
+  unless sanitized_by core.ShellEscape
+}
+
 rule CommandOptionInjection {
   meta { id: "VYQL-INJ-031", severity: high, cwe: [CWE_74, CWE_88], confidence_floor: medium }
   match code.CommandOptionInjection as sink

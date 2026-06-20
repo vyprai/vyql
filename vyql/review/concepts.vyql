@@ -235,6 +235,11 @@ review code.CommandLineAssemblyReview {
   kind: "attention"
   text: "review command-line assembly for unquoted placeholder values before process or application launch"
 }
+review code.RubyPipeOpenCommandExecution {
+  category: "command"
+  kind: "attention"
+  text: "review Ruby Kernel.open callers for pipe-prefixed path command execution"
+}
 review code.ShortSecurityIdentifier {
   category: "crypto"
   kind: "attention"
