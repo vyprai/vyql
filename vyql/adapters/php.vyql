@@ -34,6 +34,7 @@ adapter php {
   mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "$port<1024" -> code.IncompleteServerPortValidation
   mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "1024>$port" -> code.IncompleteServerPortValidation
   mark exact "analysis.module.context" val "lang=php" val "param('params'" val "unserialize($params" nval "substr" nval "a:" -> code.UnrestrictedRequestParamDeserialization
+  mark exact "analysis.module.context" val "lang=php" val "CHttpRequest::get_Value('period')" val "DateTimeUtil::getLastDaysIntervals($period)" val "getStoredBytes" val "getStoredFiles" nval "array_key_exists" nval "filter_var($period" -> code.UnboundedReportPeriod
   mark exact "analysis.function.context" val "lang=php" val "Tar" val "extract(" val "manifest" val "file_get_contents" val "unserialize" nval "allowed_classes" -> code.ArchiveManifestDeserialization
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION['info']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"info\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash

@@ -23,3 +23,8 @@ rule UnstoppedLimitedStream {
   meta { id: "VYQL-DOS-004", severity: high, cwe: [CWE_400, CWE_772], confidence_floor: medium }
   match code.UnstoppedLimitedStream as stream
 }
+
+rule UnboundedReportPeriod {
+  meta { id: "VYQL-DOS-005", severity: high, cwe: [CWE_400], confidence_floor: medium }
+  match code.UnboundedReportPeriod as period
+}

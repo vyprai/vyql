@@ -1167,6 +1167,10 @@ concept UnparameterizedSqlQueryParser : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]
 }
+concept UnboundedReportPeriod : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+}
 concept StateChangingOp : sink {
   vulnerable_to: [request_forgery.Csrf]
   enabled_by: [taint.UntrustedData]
