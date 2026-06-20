@@ -711,6 +711,12 @@ concept IdorPolicyReview : sink {
   vulnerable_to: [access_control.Idor]
   cwe: [CWE_639]
 }
+// Review-only: externally supplied polymorphic type/class names are written into
+// association state without being constrained to a configured allowlist.
+concept PolymorphicTypeSelectionReview : sink {
+  vulnerable_to: [validation.ImproperInputValidation, deserialization.UnsafeReflection]
+  cwe: [CWE_20, CWE_470]
+}
 // A network address denylist that recognizes special/private address classes but omits
 // ranges needed to keep SSRF fetches away from local or nonsensical endpoints.
 concept IncompleteIpDenylist : sink {

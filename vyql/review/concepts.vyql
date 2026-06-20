@@ -254,6 +254,12 @@ review code.StructuredInputDecode {
   kind: "attention"
   text: "review structured decoder output validation against the target format"
 }
+review code.PolymorphicTypeSelectionReview {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review polymorphic type or class selection against a configured allowlist before assigning model state"
+}
 review code.IncompleteArchiveFilenameValidation {
   category: "deserialization"
   kind: "attention"

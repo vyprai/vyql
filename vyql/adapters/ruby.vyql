@@ -255,6 +255,7 @@ adapter ruby {
 
   // character-filter: gsub is always global.
   filter method "gsub" global
+  mark exact "analysis.function.context" val "lang=ruby" val "polymorphic_as" val "_type=" val "params[\"#{polymorphic_as}_type\"]" val "model.send" nval "valid_polymorphic_class" -> code.PolymorphicTypeSelectionReview
   sink path "search" arg 1 -> code.LdapQuery
   sink path "Net::LDAP" arg 1 -> code.LdapQuery
   sink method "search" arg 1 -> code.LdapQuery

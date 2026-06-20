@@ -1,0 +1,64 @@
+test "rank168: Avo polymorphic association type is selected from request params"
+  lang ruby
+  expect_review code.PolymorphicTypeSelectionReview
+  code
+  ```
+  class BelongsToField
+    attr_reader :polymorphic_as
+
+    def fill_field(model, key, value, params)
+      return model unless model.methods.include? key.to_sym
+
+      if polymorphic_as.present?
+        model.send("#{polymorphic_as}_type=", params["#{polymorphic_as}_type"])
+
+        if params["#{polymorphic_as}_type"].blank?
+          model.send("#{polymorphic_as}_id=", nil)
+        else
+          model.send("#{polymorphic_as}_id=", params["#{polymorphic_as}_id"])
+        end
+      else
+        model.send("#{key}=", value)
+      end
+
+      model
+    end
+  end
+  ```
+
+test "rank168: Avo polymorphic association type is constrained to configured types"
+  lang ruby
+  reject_review code.PolymorphicTypeSelectionReview
+  code
+  ```
+  class BelongsToField
+    attr_reader :polymorphic_as
+    attr_reader :types
+
+    def fill_field(model, key, value, params)
+      return model unless model.methods.include? key.to_sym
+
+      valid_model_class = valid_polymorphic_class params["#{polymorphic_as}_type"]
+
+      if polymorphic_as.present?
+        model.send("#{polymorphic_as}_type=", valid_model_class)
+
+        if valid_model_class.blank?
+          model.send("#{polymorphic_as}_id=", nil)
+        else
+          model.send("#{polymorphic_as}_id=", params["#{polymorphic_as}_id"])
+        end
+      else
+        model.send("#{key}=", value)
+      end
+
+      model
+    end
+
+    def valid_polymorphic_class(possible_class)
+      types.find do |type|
+        type.to_s == possible_class.to_s
+      end
+    end
+  end
+  ```
