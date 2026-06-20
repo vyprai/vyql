@@ -66,6 +66,11 @@ adapter php {
   // Review-only WordPress public endpoint policy: returning post/meta data by a request
   // selected object id should show either a publish-status gate or a read permission check.
   mark exact "analysis.function.context" val "lang=php" val "audioigniter_playlist_id" val "get_post(" val "get_post_meta(" val "wp_send_json(" nval "post_status" nval "current_user_can" -> code.IdorPolicyReview
+  // Review-only WordPress/BuddyPress settings policy: submitted blog IDs and default role
+  // slugs that are persisted into group-blog settings need target blog permissions and
+  // role allowlist validation before saving.
+  mark exact "analysis.function.context" val "lang=php" val "groupblog_edit_settings" val "groupblog-blogid" val "groupblog_edit_base_settings" nval "groups_is_user_admin" nval "current_user_can_for_blog" -> code.AccessPolicyReview
+  mark exact "analysis.function.context" val "lang=php" val "bp_groupblog_create_screen_save" val "default-administrator" val "default-moderator" val "default-member" val "groupblog_edit_base_settings" nval "bp_groupblog_is_role_allowed" nval "current_user_can_for_blog" -> code.AccessPolicyReview
   // Review-only credentialed cloud-resource endpoint: posted credentials used to enumerate
   // buckets should have an admin/authorization gate before returning JSON.
   mark exact "analysis.function.context" val "lang=php" val "getRequiredBodyParam" val "loadBucketList" val "asJson" nval "requireAdmin" -> code.CredentialedEndpointReview
@@ -179,6 +184,8 @@ adapter php {
   control "Gate.authorize" -> core.AuthorizationCheck
   control method "access" -> core.AuthorizationCheck
   control "current_user_can" -> core.AuthorizationCheck
+  control "current_user_can_for_blog" -> core.AuthorizationCheck
+  control "groups_is_user_admin" -> core.AuthorizationCheck
   control "requireAuth" -> core.AuthenticationCheck
   control "requireAdmin" -> core.AuthorizationCheck
   control "ensureAuthenticated" -> core.AuthenticationCheck
