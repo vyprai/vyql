@@ -558,6 +558,31 @@ func TestLowerParamEntryCreatesSourceEventFlow(t *testing.T) {
 	t.Fatalf("parameter entry event does not flow to parameter")
 }
 
+func TestLowerClassDefCreatesContextEvent(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "C.java",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Child", Loc: "C.java:3", Bases: []string{"Base", "AutoCloseable"}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "analysis.class.context" &&
+			strings.Contains(n.Prop("str_args"), "class_name:Child") &&
+			strings.Contains(n.Prop("str_args"), "class_base:Base") &&
+			strings.Contains(n.Prop("str_args"), "class_base:AutoCloseable") {
+			return
+		}
+	}
+	t.Fatalf("class context analysis event not found")
+}
+
 func TestLowerResultEntryCreatesControlEventFlow(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",

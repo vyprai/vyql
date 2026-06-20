@@ -858,6 +858,7 @@ var (
 	analysisFunctionReturn  = analysisEventSpec{path: "analysis.function.return", method: "return"}
 	analysisFunctionContext = analysisEventSpec{path: "analysis.function.context", method: "context"}
 	analysisFunctionResult  = analysisEventSpec{path: "analysis.function.result", method: "result"}
+	analysisClassContext    = analysisEventSpec{path: "analysis.class.context", method: "context"}
 	analysisParameterEntry  = analysisEventSpec{path: "analysis.parameter.entry", method: "entry"}
 	analysisGlobalMutation  = analysisEventSpec{path: "analysis.global.mutation", method: "mutation"}
 )
@@ -873,6 +874,30 @@ func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []strin
 		"callee_path": analysisFunctionContext.path,
 		"method":      analysisFunctionContext.method,
 		"str_args":    strings.Join(contextTokens, "\x00"),
+	}
+	l.node("Call", loc, props)
+}
+
+func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string) {
+	var tokens []string
+	if name != "" {
+		tokens = append(tokens, "class_name:"+name)
+	}
+	for _, base := range bases {
+		if base != "" {
+			tokens = append(tokens, "class_base:"+base)
+		}
+	}
+	if len(tokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{
+		"callee_path": analysisClassContext.path,
+		"method":      analysisClassContext.method,
+		"str_args":    strings.Join(tokens, "\x00"),
 	}
 	l.node("Call", loc, props)
 }
@@ -1461,6 +1486,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.ClassDef:
 		prev := l.curClass
 		l.curClass = st.Name
+		l.classContextAnalysisEvent(st.Loc, st.Name, st.Bases)
 		l.block(st.Body, newScope())
 		l.curClass = prev
 	case nir.FuncDef:

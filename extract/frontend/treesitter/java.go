@@ -11,11 +11,12 @@ import (
 
 // jvConv walks a tree-sitter Java CST into NIR.
 type jvConv struct {
-	src              []byte
-	root             string
-	file             string
-	key              string
-	classParamTokens []string
+	src                []byte
+	root               string
+	file               string
+	key                string
+	classParamTokens   []string
+	classContextTokens []string
 }
 
 // javaPublic reports whether a method/constructor is part of the public API surface:
@@ -121,10 +122,15 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "class_declaration", "interface_declaration", "enum_declaration", "record_declaration":
-		prev := c.classParamTokens
-		c.classParamTokens = append(append([]string{}, prev...), c.jvAnnotationTokens(n, "class_annotation:")...)
-		cd := nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L, Bases: c.jvClassBases(n)}
-		c.classParamTokens = prev
+		name := c.text(field(n, "name"))
+		bases := c.jvClassBases(n)
+		prevParams := c.classParamTokens
+		prevContext := c.classContextTokens
+		c.classParamTokens = append(append([]string{}, prevParams...), c.jvAnnotationTokens(n, "class_annotation:")...)
+		c.classContextTokens = append(append([]string{}, prevContext...), javaClassContextTokens(name, bases)...)
+		cd := nir.ClassDef{Name: name, Body: c.decls(field(n, "body")), Loc: L, Bases: bases}
+		c.classParamTokens = prevParams
+		c.classContextTokens = prevContext
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration":
 		name := c.text(field(n, "name"))
@@ -134,8 +140,10 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.block(field(n, "body"))
 		tokens := append([]string{}, c.classParamTokens...)
 		tokens = append(tokens, c.jvAnnotationTokens(n, "annotation:")...)
+		contextTokens := append([]string{}, c.classContextTokens...)
+		contextTokens = append(contextTokens, c.jvFunctionTokens(name, n)...)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
-			ContextTokens: c.jvFunctionTokens(name, n),
+			ContextTokens: contextTokens,
 			ParamEntries:  c.jvParamEntries(name, params, paramTypes, tokens, c.jvParamAnnotationTokens(paramsNode)), Exported: c.javaPublic(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
@@ -403,6 +411,19 @@ func javaBaseTypeName(s string) string {
 		s = s[i+1:]
 	}
 	return s
+}
+
+func javaClassContextTokens(name string, bases []string) []string {
+	var out []string
+	if name != "" {
+		out = append(out, "class_name:"+name)
+	}
+	for _, base := range bases {
+		if base != "" {
+			out = append(out, "class_base:"+base)
+		}
+	}
+	return out
 }
 
 // jvAnnotationTokens extracts syntax-level annotation names without interpreting

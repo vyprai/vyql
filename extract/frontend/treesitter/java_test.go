@@ -3,9 +3,11 @@ package treesitter_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
+	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/nir"
 )
 
@@ -48,6 +50,42 @@ class RestServiceBase {}`)
 			t.Fatalf("unexpected base %q in %v", base, got)
 		}
 	}
+}
+
+func TestJavaFunctionContextIncludesClassBases(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "YamlCtor.java")
+	src := []byte(`class YamlCtor extends Constructor {
+  public Object construct(Node node) {
+    return constructMapping(node);
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.function.context" {
+			args := n.Prop("str_args")
+			if strings.Contains(args, "function_name:construct") &&
+				strings.Contains(args, "class_name:YamlCtor") &&
+				strings.Contains(args, "class_base:Constructor") {
+				return
+			}
+		}
+	}
+	t.Fatalf("function context did not include enclosing class base; nodes=%#v", nodes)
 }
 
 func TestJavaEnhancedForBindsElementToIterable(t *testing.T) {
