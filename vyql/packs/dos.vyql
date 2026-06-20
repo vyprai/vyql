@@ -28,3 +28,8 @@ rule UnboundedReportPeriod {
   meta { id: "VYQL-DOS-005", severity: high, cwe: [CWE_400], confidence_floor: medium }
   match code.UnboundedReportPeriod as period
 }
+
+rule LengthDerivedAllocation {
+  meta { id: "VYQL-DOS-006", severity: high, cwe: [CWE_400, CWE_789], confidence_floor: medium }
+  match code.LengthDerivedAllocation as allocation
+}

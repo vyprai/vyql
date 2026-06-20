@@ -869,6 +869,15 @@ concept UnboundedAllocationReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_770]
 }
+concept LengthDerivedAllocation : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_789]
+  review_category: "resource"
+  review_condition: "parsed length controls allocation before the available input bytes are proven"
+  review_evidence: "length-derived allocation context {pattern} allocates a buffer and then reads bytes into it"
+  review_assumption: "the encoded length can be attacker-controlled and larger than the remaining input"
+  review_confidence: medium
+}
 concept ReachableAssertionReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_617]

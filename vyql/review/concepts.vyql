@@ -293,6 +293,11 @@ review code.UnboundedAllocationReview {
   kind: "attention"
   text: "review allocation sizes derived from parsed counts for per-item limits, aggregate consistency checks, and overflow"
 }
+review code.LengthDerivedAllocation {
+  category: "resource"
+  kind: "attention"
+  text: "review length-derived allocation for a dominating remaining-buffer or maximum-size check"
+}
 review code.ReachableAssertionReview {
   category: "resource"
   kind: "attention"
