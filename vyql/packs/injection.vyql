@@ -37,6 +37,11 @@ rule Code {
   unless guarded_by core.CodeExecutionValidation
 }
 
+rule RequestReferenceEval {
+  meta { id: "VYQL-INJ-038", severity: critical, cwe: [CWE_94], confidence_floor: medium }
+  match code.RequestReferenceEval as sink
+}
+
 rule Vm2HostCallbackBridge {
   meta { id: "VYQL-INJ-035", severity: critical, cwe: [CWE_94], confidence_floor: medium }
   match code.Vm2HostCallbackBridge as bridge

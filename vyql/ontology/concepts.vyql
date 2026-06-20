@@ -53,6 +53,15 @@ concept Vm2HostCallbackBridge : sink {
   review_assumption: "template or sandbox-executed code can invoke the bridged host callbacks"
   review_confidence: medium
 }
+concept RequestReferenceEval : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94]
+  review_category: "code_execution"
+  review_condition: "request-controlled reference paths are evaluated as code to read response fields"
+  review_evidence: "request reference context {pattern} builds an eval string from parsed request path parts"
+  review_assumption: "an attacker can submit batch request paths containing reference expressions"
+  review_confidence: high
+}
 concept DynamicCodeLoad : sink {
   vulnerable_to: [injection.UnsafeDynamicLoading]
   enabled_by: [taint.UntrustedData]
