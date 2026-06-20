@@ -15,6 +15,7 @@ threat Clickjacking { cwe: [CWE_1021], desc: "Improper restriction of rendered U
 module authentication;
 threat ImproperAuthentication { cwe: [CWE_287], desc: "Improper authentication" }
 threat MissingAuthentication { cwe: [CWE_306], desc: "Missing authentication for critical function" }
+threat WeakPasswordRecovery { cwe: [CWE_640], desc: "Weak password recovery mechanism" }
 
 module business_logic;
 threat BusinessLogic { cwe: [CWE_841], desc: "Improper enforcement of behavioral workflow (business logic)" }

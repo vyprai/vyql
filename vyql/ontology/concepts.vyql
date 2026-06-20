@@ -630,6 +630,10 @@ concept AuthAttemptLimitReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_307]
 }
+concept PasswordRecoveryLinkHostControl : sink {
+  vulnerable_to: [authentication.WeakPasswordRecovery]
+  cwe: [CWE_640]
+}
 concept ProtocolFrameBindingReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]

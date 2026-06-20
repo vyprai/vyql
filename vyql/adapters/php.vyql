@@ -180,6 +180,7 @@ adapter php {
   control "requireOwner" -> core.OwnershipCheck
   control "isOwner" -> core.OwnershipCheck
   control method "userHasAccessTo" -> core.AuthorizationCheck
+  mark exact "analysis.function.context" val "ResetPassword" val "createToken" val "account:login-token" val "absolute: true" val "$email->text" nval "buildBaseUrl" nval "resolveUri" -> code.PasswordRecoveryLinkHostControl
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
   control "esc_html" -> core.HtmlEscape

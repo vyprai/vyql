@@ -14,3 +14,8 @@ rule InsecureDirectObjectReference {
   taint core.UserControlledData -> code.ObjectLookupByUserInput
   unless guarded_by core.OwnershipCheck
 }
+
+rule WeakPasswordRecoveryLinkHost {
+  meta { id: "VYQL-AUTH-003", severity: high, cwe: [CWE_640], confidence_floor: medium }
+  match code.PasswordRecoveryLinkHostControl as link
+}
