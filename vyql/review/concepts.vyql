@@ -432,6 +432,11 @@ review code.IntegerSizeArithmetic {
   kind: "attention"
   text: "review integer arithmetic used for address, size, or bounds calculations"
 }
+review code.UnderwidthFormattedIndex {
+  category: "numeric"
+  kind: "attention"
+  text: "review formatted numeric strings before fixed-position indexing"
+}
 review code.ZeroSizeReallocation {
   category: "memory"
   kind: "attention"

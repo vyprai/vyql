@@ -595,6 +595,15 @@ concept IntegerSizeArithmetic : sink {
   review_assumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
   review_confidence: low
 }
+concept UnderwidthFormattedIndex : sink {
+  vulnerable_to: [memory.BoundsError]
+  cwe: [CWE_192, CWE_125]
+  review_category: "numeric"
+  review_condition: "formatted numeric output may be shorter than a later fixed index expects"
+  review_evidence: "format/index context {pattern} indexes a formatted value beyond the requested minimum width"
+  review_assumption: "the formatted numeric value can be small enough to produce the minimum-width string"
+  review_confidence: medium
+}
 concept ZeroSizeReallocation : sink {
   vulnerable_to: [memory.DoubleFree]
   enabled_by: [taint.ComputedSize]

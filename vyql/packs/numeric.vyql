@@ -17,3 +17,8 @@ rule TaintedIntegerSizeArithmetic {
   taint core.UserControlledData -> code.IntegerSizeArithmetic
   unless guarded_by core.IntegerOverflowGuard
 }
+
+rule UnderwidthFormattedIndex {
+  meta { id: "VYQL-NUM-004", severity: medium, cwe: [CWE_192, CWE_125], confidence_floor: medium }
+  match code.UnderwidthFormattedIndex as idx
+}

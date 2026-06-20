@@ -386,6 +386,9 @@ func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
 		if len(out) >= 128 {
 			return false
 		}
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
 		switch x := n.(type) {
 		case *ast.BasicLit:
 			if x.Kind != token.STRING {
@@ -418,10 +421,49 @@ func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
 			if tok := c.goBinaryToken(x); tok != "" {
 				add(tok)
 			}
+		case *ast.IndexExpr:
+			for _, tok := range c.goIndexTokens(x.X, x.Index) {
+				add(tok)
+			}
+		case *ast.SliceExpr:
+			for _, tok := range c.goSliceTokens(x) {
+				add(tok)
+			}
 		}
 		return true
 	})
 	return out
+}
+
+func (c *conv) goIndexTokens(base ast.Expr, index ast.Expr) []string {
+	p := c.path(base)
+	if p == "" {
+		return nil
+	}
+	tokens := []string{"index:" + p}
+	if idx := c.goAtomToken(index); idx != "" {
+		tokens = append(tokens, "index:"+p+":"+idx)
+	}
+	return tokens
+}
+
+func (c *conv) goSliceTokens(x *ast.SliceExpr) []string {
+	p := c.path(x.X)
+	if p == "" {
+		return nil
+	}
+	tokens := []string{"slice:" + p}
+	if x.Low != nil {
+		if low := c.goAtomToken(x.Low); low != "" {
+			tokens = append(tokens, "slice:"+p+":"+low+":")
+		}
+	}
+	if x.High != nil {
+		if high := c.goAtomToken(x.High); high != "" {
+			tokens = append(tokens, "slice:"+p+"::"+high)
+		}
+	}
+	return tokens
 }
 
 func (c *conv) goBinaryToken(x *ast.BinaryExpr) string {
