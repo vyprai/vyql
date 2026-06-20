@@ -820,9 +820,55 @@ func (c *jsConv) isFunctionLikeDeclarator(n *tree_sitter.Node) bool {
 	}
 	return strings.HasPrefix(txt, "function") ||
 		strings.HasPrefix(txt, "async function") ||
-		strings.HasPrefix(txt, "async (") ||
-		strings.HasPrefix(txt, "(") && strings.Contains(txt, "=>") ||
-		isJSIdentPrefixArrow(txt)
+		isJSArrowFunctionText(txt)
+}
+
+func isJSArrowFunctionText(s string) bool {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "async ") {
+		s = strings.TrimSpace(strings.TrimPrefix(s, "async "))
+	}
+	if isJSIdentPrefixArrow(s) {
+		return true
+	}
+	if !strings.HasPrefix(s, "(") {
+		return false
+	}
+	depth, end := 0, -1
+	inQuote := byte(0)
+	escaped := false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if inQuote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == inQuote {
+				inQuote = 0
+			}
+			continue
+		}
+		if ch == '\'' || ch == '"' || ch == '`' {
+			inQuote = ch
+			continue
+		}
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				end = i
+				i = len(s)
+			}
+		}
+	}
+	return end > 0 && strings.HasPrefix(strings.TrimSpace(s[end+1:]), "=>")
 }
 
 func (c *jsConv) paramsFromFunctionText(n *tree_sitter.Node) []string {

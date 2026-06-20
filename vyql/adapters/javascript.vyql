@@ -58,6 +58,11 @@ adapter javascript {
   source "ctx.headers" -> code.HttpInput
   source "ctx.request.headers" -> code.HttpInput
   source "ctx.request.querystring" -> code.HttpInput
+  source "event.headers" -> code.HttpInput
+  source "event.multiValueHeaders" -> code.HttpInput
+  source "event.queryStringParameters" -> code.HttpInput
+  source "event.pathParameters" -> code.HttpInput
+  source "event.body" -> code.HttpInput
   // Build/CI environment variables are operator-controlled input; when concatenated
   // into shell-plugin script strings they become command injection input.
   source "process.env.NODE_ENV" -> core.UserControlledData

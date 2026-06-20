@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
+	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/nir"
 )
 
@@ -93,6 +94,42 @@ import workos from '@workos-inc/node';
 			t.Fatalf("missing import %q; imports=%#v", want, prog.Modules[0].Imports)
 		}
 	}
+}
+
+func TestJavaScriptNestedRegExpInConditionalChainIsLowered(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "index.js")
+	src := []byte(`
+module.exports.parse = (event) => {
+  const boundary = getValueIgnoringKeyCase(event.headers, 'Content-Type').split('=')[1];
+  const body = (event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('binary') : event.body)
+    .split(new RegExp(boundary))
+    .filter(item => item.match(/Content-Disposition/));
+  return body;
+};
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "RegExp" {
+			return
+		}
+	}
+	t.Fatalf("nested new RegExp(boundary) was not lowered; nodes=%#v", nodes)
 }
 
 func findFuncDef(prog nir.Program, name string) (nir.FuncDef, bool) {
