@@ -172,6 +172,7 @@ adapter javascript {
   control "isOwner" -> core.OwnershipCheck
   control "ownsResource" -> core.OwnershipCheck
   mark exact "analysis.function.context" val "isLocalRequest" val "isLocal||awaithasValidToken" nval "hasValidCliToken" -> code.LocalRequestBypassReview
+  mark exact "analysis.function.context" val "lang=javascript" val "user==username&&pass==password" nval "timingSafeCompare" nval "tsscmp" -> code.SecretComparisonReview
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
   control "isSafeRedirect" -> core.RedirectAllowlist
   control "isValidRedirect" -> core.RedirectAllowlist

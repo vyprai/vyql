@@ -1,0 +1,48 @@
+test "rank204: basic-auth-connect ordinary credential equality needs timing review"
+  lang javascript
+  expect_review code.SecretComparisonReview
+  code
+  ```
+  var http = require('http')
+
+  module.exports = function basicAuth(callback, realm) {
+    var username, password
+    if ('string' == typeof callback) {
+      username = callback
+      password = realm
+      callback = function(user, pass) {
+        return user == username && pass == password
+      }
+    }
+    return function(req, res, next) {
+      if (callback('alice', 'secret')) return next()
+      res.end('Unauthorized')
+    }
+  }
+  ```
+
+test "rank204: basic-auth-connect timing-safe credential compare is clean"
+  lang javascript
+  reject_review code.SecretComparisonReview
+  code
+  ```
+  var timingSafeCompare = require('tsscmp')
+  var http = require('http')
+
+  module.exports = function basicAuth(callback, realm) {
+    var username, password
+    if ('string' == typeof callback) {
+      username = callback
+      password = realm
+      callback = function(user, pass) {
+        const usernameValid = timingSafeCompare(user, username)
+        const passwordValid = timingSafeCompare(pass, password)
+        return usernameValid && passwordValid
+      }
+    }
+    return function(req, res, next) {
+      if (callback('alice', 'secret')) return next()
+      res.end('Unauthorized')
+    }
+  }
+  ```
