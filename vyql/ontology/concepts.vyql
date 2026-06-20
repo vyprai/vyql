@@ -54,6 +54,15 @@ concept DynamicCodeLoad : sink {
   review_assumption: "the resolved module/library path or search path can be influenced by the attacker"
   review_confidence: medium
 }
+concept UnqualifiedDatabaseRoutineReview : sink {
+  vulnerable_to: [injection.UnsafeDynamicLoading]
+  cwe: [CWE_426]
+  review_category: "path"
+  review_condition: "database routine names are resolved through the active search path instead of an explicit trusted schema"
+  review_evidence: "SQL routine reference {pattern} is unqualified"
+  review_assumption: "an attacker or tenant can influence routine resolution through database search-path state"
+  review_confidence: possibility
+}
 concept ExternalResourceIntegrityReview : sink {
   vulnerable_to: [injection.UnsafeDynamicLoading]
   cwe: [CWE_345, CWE_829]

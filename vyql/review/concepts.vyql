@@ -48,6 +48,11 @@ review code.AuthenticationRequiredOp {
   expected: [core.AuthenticationCheck]
   text: "verify an authenticated user is required before this operation"
 }
+review code.UnqualifiedDatabaseRoutineReview {
+  category: "path"
+  kind: "attention"
+  text: "review database routine references for explicit trusted schema qualification"
+}
 review code.AuthFlowBypassReview {
   category: "auth"
   kind: "attention"
