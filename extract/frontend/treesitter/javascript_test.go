@@ -176,6 +176,53 @@ export const middleware = createAuthMiddleware(async (ctx) => {
 	t.Fatalf("inline lambda context was not lowered; nodes=%#v", nodes)
 }
 
+func TestJavaScriptModuleContextIsLowered(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "table.js")
+	src := []byte(`
+const defaults = {
+  exportOptions: {
+    onCellHtmlData (cell, rowIndex, colIndex, htmlData) {
+      return htmlData;
+    }
+  }
+};
+function exportTable () {
+  tableExport({ escape: false });
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.module.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "lang=javascript") &&
+			strings.Contains(tokens, "onCellHtmlData") &&
+			strings.Contains(tokens, "returnhtmlData") &&
+			strings.Contains(tokens, "tableExport") &&
+			strings.Contains(tokens, "escape:false") {
+			return
+		}
+	}
+	t.Fatalf("module context was not lowered with file-level tokens; nodes=%#v", nodes)
+}
+
 func findFuncDef(prog nir.Program, name string) (nir.FuncDef, bool) {
 	for _, mod := range prog.Modules {
 		if fn, ok := findFuncDefInStmts(mod.Body, name); ok {

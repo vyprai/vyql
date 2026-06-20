@@ -57,7 +57,8 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 		c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
 		root0 := tree.RootNode()
 		c.exported = c.exportedNames(root0)
-		return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+		body := append(c.jsModuleContext(root0), c.blockChildren(root0)...)
+		return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: body}, true
 	}
 	var mods []nir.Module
 	mods = append(mods, parseModules(js, root, jsParserFor(tsjs.Language()), build)...)
@@ -225,6 +226,25 @@ func (c *jsConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *jsConv) jsModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=javascript"},
+			nir.Const{Loc: loc, Value: text},
+			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+		},
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
 }
 
 func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {

@@ -1201,6 +1201,15 @@ concept UnescapedHtmlOptionRenderer : sink {
   review_assumption: "the rendered option label can contain stored or attacker-provided text"
   review_confidence: medium
 }
+concept UnescapedTableExportHtml : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "table export callback preserves raw cell HTML"
+  review_evidence: "table export callback {pattern} returns raw cell HTML"
+  review_assumption: "exported table cells may contain attacker-controlled markup"
+  review_confidence: medium
+}
 concept UnescapedExceptionMessageMarkup : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

@@ -105,6 +105,11 @@ rule UnescapedHtmlOptionRenderer {
   match code.UnescapedHtmlOptionRenderer as sink
 }
 
+rule UnescapedTableExportHtml {
+  meta { id: "VYQL-INJ-045", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedTableExportHtml as sink
+}
+
 rule UnescapedExceptionMessageMarkup {
   meta { id: "VYQL-INJ-033", severity: high, cwe: [CWE_79], confidence_floor: medium }
   match code.UnescapedExceptionMessageMarkup as sink

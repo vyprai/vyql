@@ -113,6 +113,7 @@ adapter javascript {
   mark exact "analysis.function.context" val "lang=javascript" val "copyIn" val "file.path" val "info.extension" nval "sanitizeSvg" nval "DOMPurify" -> code.StoredHtmlWrite
   mark exact "analysis.function.context" val "lang=javascript" val "newTomSelect" val "directoryName" val "return`<" nval "sanitizeDirectoryName" nval "textContent" nval "innerHTML" -> code.UnescapedHtmlOptionRenderer
   mark exact "analysis.function.context" val "lang=javascript" val "getAttribute" val "data-content" val "optionContent" val "innerHTML" val "appendChild" nval "sanitizeHtml" nval "DOMPurify" nval "sanitize-html" -> code.UnescapedHtmlOptionRenderer
+  mark exact "analysis.module.context" val "lang=javascript" val "onCellHtmlData" val "htmlData" val "returnhtmlData" val "tableExport" val "escape:false" nval "escape:true" nval "returncell.text" nval "returncell.text()" -> code.UnescapedTableExportHtml
   // Next.js App Router — searchParams (page prop / destructured) + nextUrl query
   source "searchParams" -> code.HttpInput
   source "req.nextUrl" -> code.HttpInput

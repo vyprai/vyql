@@ -362,6 +362,11 @@ review code.UnescapedHtmlOptionRenderer {
   kind: "attention"
   text: "review option-renderer HTML assembled from option metadata and whether it is sanitized before insertion"
 }
+review code.UnescapedTableExportHtml {
+  category: "xss"
+  kind: "attention"
+  text: "review table-export callbacks that return raw cell HTML instead of text or escaped content"
+}
 review code.HtmlAttributeRewriteReview {
   category: "xss"
   kind: "attention"
