@@ -73,6 +73,11 @@ rule UnescapedExceptionMessageMarkup {
   match code.UnescapedExceptionMessageMarkup as sink
 }
 
+rule IncompleteHtmlEntityEscape {
+  meta { id: "VYQL-INJ-034", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.IncompleteHtmlEntityEscape as sink
+}
+
 rule PdfJsEvalSupported {
   meta { id: "VYQL-INJ-022", severity: high, cwe: [CWE_79] }
   taint code.PdfJsEvalSupported -> code.PdfJsDocumentLoad

@@ -969,6 +969,10 @@ concept HtmlSanitizerLogicReview : sink {
   review_assumption: "the parsed HTML may be attacker-controlled and the cleaned serialization is trusted by callers"
   review_confidence: possibility
 }
+concept IncompleteHtmlEntityEscape : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
 concept HtmlAttributeRewriteReview : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

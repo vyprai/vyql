@@ -1,0 +1,25 @@
+test "rank189: Backbone escapeHTML misses numeric HTML entities"
+  lang javascript
+  expect VYQL-INJ-034
+  code
+  ```
+  var escapeHTML = function(string) {
+    return string.replace(/&(?!\w+;)/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  };
+  ```
+
+test "rank189: Backbone escapeHTML preserves named decimal and hex entities"
+  lang javascript
+  reject VYQL-INJ-034
+  code
+  ```
+  var escapeHTML = function(string) {
+    return string.replace(/&(?!\w+;|#\d+;|#x[\da-f]+;)/gi, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  };
+  ```

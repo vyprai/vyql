@@ -448,6 +448,7 @@ adapter javascript {
   control "validator.isAlphanumeric" -> core.InputValidation
   control "validator.isInt" -> core.InputValidation
   control "validator.isNumeric" -> core.InputValidation
+  mark "string.replace" val "&amp;" val "\\w+;" nval "#\\d" nval "#x" -> code.IncompleteHtmlEntityEscape
   control "encode" -> core.HtmlEscape
   control "encodeEntities" -> core.HtmlEscape
   control "escapeHTML" -> core.HtmlEscape
