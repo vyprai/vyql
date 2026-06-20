@@ -979,6 +979,15 @@ concept ArchiveManifestDeserialization : sink {
   vulnerable_to: [deserialization.DeserializationAbuse]
   cwe: [CWE_502]
 }
+concept RequestSelectedDeserializationFormat : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+  review_category: "deserialization"
+  review_condition: "request-controlled media type selects a deserialization format before HTTP request body decoding"
+  review_evidence: "request deserialization context {pattern} selects a serde from request Content-Type"
+  review_assumption: "the selected serde registry includes an unsafe object deserialization format"
+  review_confidence: medium
+}
 concept EnvVariable : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData

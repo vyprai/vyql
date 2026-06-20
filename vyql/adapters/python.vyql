@@ -267,6 +267,7 @@ adapter python {
   sink path "joblib.load" -> code.Deserialization
   sink path "numpy.load" -> code.Deserialization
   sink path "pandas.read_pickle" -> code.Deserialization
+  mark exact "analysis.function.context" val "name=api_endpoint" val "request.headers.get" val "Content-Type" val "ALL_SERDE.get" val "from_http_request" nval "name=api_endpoint_wrapper" nval "UNSUPPORTED_MEDIA_TYPE" -> code.RequestSelectedDeserializationFormat
   sink path "etree.parse" -> code.XmlParse
   sink path "etree.fromstring" -> code.XmlParse
   sink path "etree.XML" -> code.XmlParse

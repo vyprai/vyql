@@ -54,3 +54,8 @@ rule DeserializableInvocationHandler {
   meta { id: "VYQL-DESER-009", severity: high, cwe: [CWE_502], confidence_floor: medium }
   match code.DeserializableInvocationHandler as handler
 }
+
+rule RequestSelectedDeserializationFormat {
+  meta { id: "VYQL-DESER-010", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.RequestSelectedDeserializationFormat as deserialization
+}
