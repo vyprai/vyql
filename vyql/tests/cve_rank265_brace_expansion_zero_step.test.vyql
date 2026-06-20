@@ -1,0 +1,56 @@
+# Rank 265 / CVE-2026-33750: brace-expansion accepted a zero numeric
+# sequence step, leaving the expansion loop unable to advance.
+
+test "rank265: brace expansion sequence step may be zero"
+  lang javascript
+  expect VYQL-DOS-009
+  expect_review code.ZeroStepSequenceExpansion
+  code
+  ```
+  function numeric(str) {
+    return parseInt(str, 10) == str ? parseInt(str, 10) : str.charCodeAt(0);
+  }
+
+  function expand(m) {
+    var n = m.body.split(/\.\./);
+    var x = numeric(n[0]);
+    var y = numeric(n[1]);
+    var incr = n.length == 3
+      ? Math.abs(numeric(n[2]))
+      : 1;
+    var test = i => i <= y;
+    var N = [];
+
+    for (var i = x; test(i, y); i += incr) {
+      N.push(String(i));
+    }
+    return N;
+  }
+  ```
+
+test "rank265: brace expansion sequence step is clamped away from zero"
+  lang javascript
+  reject VYQL-DOS-009
+  reject_review code.ZeroStepSequenceExpansion
+  code
+  ```
+  function numeric(str) {
+    return parseInt(str, 10) == str ? parseInt(str, 10) : str.charCodeAt(0);
+  }
+
+  function expand(m) {
+    var n = m.body.split(/\.\./);
+    var x = numeric(n[0]);
+    var y = numeric(n[1]);
+    var incr = n.length == 3
+      ? Math.max(Math.abs(numeric(n[2])), 1)
+      : 1;
+    var test = i => i <= y;
+    var N = [];
+
+    for (var i = x; test(i, y); i += incr) {
+      N.push(String(i));
+    }
+    return N;
+  }
+  ```

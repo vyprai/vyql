@@ -306,6 +306,11 @@ review code.UnboundedResourceOperation {
   kind: "attention"
   text: "review long-lived resource operation for timeouts, message limits, and cancellation"
 }
+review code.ZeroStepSequenceExpansion {
+  category: "resource"
+  kind: "attention"
+  text: "review sequence expansion loops for parsed zero steps that prevent loop progress"
+}
 review code.UnboundedStateGrowthReview {
   category: "resource"
   kind: "attention"

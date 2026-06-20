@@ -947,6 +947,15 @@ concept UnboundedResourceOperation : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_772]
 }
+concept ZeroStepSequenceExpansion : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "sequence expansion loop can use a zero increment"
+  review_evidence: "sequence expansion context {pattern} derives the loop step from parsed input without excluding zero before incrementing the loop variable"
+  review_assumption: "a zero step leaves the loop variable unchanged while the loop condition remains true"
+  review_confidence: high
+}
 concept UnstoppedLimitedStream : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_772]

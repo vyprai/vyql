@@ -43,3 +43,8 @@ rule UnboundedProtocolStateByIdentifier {
   meta { id: "VYQL-DOS-008", severity: high, cwe: [CWE_400, CWE_770], confidence_floor: medium }
   match code.UnboundedProtocolStateByIdentifier as state
 }
+
+rule ZeroStepSequenceExpansion {
+  meta { id: "VYQL-DOS-009", severity: high, cwe: [CWE_400], confidence_floor: high }
+  match code.ZeroStepSequenceExpansion as loop
+}
