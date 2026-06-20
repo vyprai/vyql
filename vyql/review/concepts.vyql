@@ -216,12 +216,6 @@ review code.MissingHttpMethodAssertion {
   expected: [core.CsrfProtection, core.AuthenticationCheck]
   text: "review state-changing HTTP actions for explicit allowed-method assertions"
 }
-review code.ChecksumErrorLogoutRedirect {
-  category: "request_forgery"
-  kind: "attention"
-  expected: [core.RedirectAllowlist]
-  text: "review checksum-error redirect handling for request-supplied logout URLs"
-}
 review code.InsecurePermission {
   category: "permission"
   kind: "target"
