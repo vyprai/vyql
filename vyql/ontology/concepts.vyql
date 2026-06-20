@@ -916,6 +916,15 @@ concept HtmlSanitizerLogicReview : sink {
   review_assumption: "the parsed HTML may be attacker-controlled and the cleaned serialization is trusted by callers"
   review_confidence: possibility
 }
+concept HtmlAttributeRewriteReview : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "review HTML attribute rewrite logic that injects dynamic values into markup without an attribute-aware parser or escaping"
+  review_evidence: "attribute rewrite context {pattern} injects a dynamic value into generated HTML"
+  review_assumption: "the rewritten markup or injected attribute value may be attacker-influenced before browser parsing"
+  review_confidence: possibility
+}
 concept UnrestrictedVariableVariableAssignment : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

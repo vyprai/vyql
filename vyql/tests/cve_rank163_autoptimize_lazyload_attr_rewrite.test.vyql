@@ -1,0 +1,36 @@
+test "rank163: Autoptimize lazyload preg_replace placeholder rewrite needs XSS review"
+  lang php
+  expect_review code.HtmlAttributeRewriteReview
+  code
+  ```
+  <?php
+  class autoptimizeImages {
+      public function add_lazyload( $tag, $placeholder = '' ) {
+          if ( ! $placeholder || empty( $placeholder ) ) {
+              $placeholder = apply_filters( 'autoptimize_filter_imgopt_lazyload_placeholder', $this->get_default_lazyload_placeholder( $width, $height ) );
+          }
+          $tag = preg_replace( '/(\s)src=/', ' src=\'' . $placeholder . '\' data-src=', $tag, 1 );
+          $tag = preg_replace( '/(\s)srcset=/', ' data-srcset=', $tag, 1 );
+          return $tag;
+      }
+  }
+  ```
+
+test "rank163: Autoptimize fixed str_replace placeholder insertion is clean for lazyload rewrite review"
+  lang php
+  reject_review code.HtmlAttributeRewriteReview
+  code
+  ```
+  <?php
+  class autoptimizeImages {
+      public function add_lazyload( $tag, $placeholder = '' ) {
+          if ( ! $placeholder || empty( $placeholder ) ) {
+              $placeholder = apply_filters( 'autoptimize_filter_imgopt_lazyload_placeholder', $this->get_default_lazyload_placeholder( $width, $height ) );
+          }
+          $tag = str_replace( ' src=', ' data-src=', $tag );
+          $tag = str_replace( ' srcset=', ' data-srcset=', $tag );
+          $tag = str_replace( '<img ', '<img src="' . $placeholder . '" ', $tag );
+          return $tag;
+      }
+  }
+  ```

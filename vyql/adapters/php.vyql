@@ -61,6 +61,9 @@ adapter php {
   // Review-only WordPress public endpoint policy: returning post/meta data by a request
   // selected object id should show either a publish-status gate or a read permission check.
   mark exact "analysis.function.context" val "lang=php" val "audioigniter_playlist_id" val "get_post(" val "get_post_meta(" val "wp_send_json(" nval "post_status" nval "current_user_can" -> code.IdorPolicyReview
+  // Review-only HTML attribute rewrites: string/regex-based lazyload rewrites that splice a
+  // dynamic placeholder into generated image markup should be inspected for attribute breakouts.
+  mark exact "analysis.function.context" val "lang=php" val "autoptimize_filter_imgopt_lazyload_placeholder" val "preg_replace" val "$placeholder" val "data-src" val "data-srcset" -> code.HtmlAttributeRewriteReview
   mark exact "analysis.function.context" val "lang=php" val "_maliciousFilename" val "strpos(" val "/../" val "../" nval "phar://" -> code.IncompleteArchiveFilenameValidation
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0

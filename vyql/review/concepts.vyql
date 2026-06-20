@@ -264,6 +264,11 @@ review code.HtmlSanitizerLogicReview {
   kind: "attention"
   text: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
 }
+review code.HtmlAttributeRewriteReview {
+  category: "xss"
+  kind: "attention"
+  text: "review HTML attribute rewrite logic that injects dynamic values into generated markup"
+}
 review code.ConfigExposureReview {
   category: "secret"
   kind: "attention"
