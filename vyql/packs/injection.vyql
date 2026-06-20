@@ -225,6 +225,11 @@ rule IncompleteFileExtensionValidation {
   match code.IncompleteFileExtensionValidation as validator
 }
 
+rule UncheckedUploadedImageProcessing {
+  meta { id: "VYQL-INJ-043", severity: medium, cwe: [CWE_434], confidence_floor: medium }
+  match code.UncheckedUploadedImageProcessing as processor
+}
+
 // Untrusted data evaluated as an expression-language expression — SpEL/OGNL/MVEL/EL (CWE-917).
 rule ExpressionInjection {
   meta { id: "VYQL-INJ-016", severity: critical, cwe: [CWE_917] }

@@ -262,6 +262,7 @@ adapter php {
   mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
+  mark exact "analysis.function.context" val "lang=php" val "imagecopyresampled" val "$imgt($new_image,$thumb_path)" val "$imgt($old_image,$source_path)" val "returntrue" nval "===false" nval "return$imgt" -> code.UncheckedUploadedImageProcessing
   sink path "fputcsv" arg 1 collection -> code.CsvCell
   sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
   sink path "FileSystem.write" -> code.UnsafeUpload

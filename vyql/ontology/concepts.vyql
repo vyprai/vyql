@@ -216,6 +216,10 @@ concept IncompleteFileExtensionValidation : sink {
   review_assumption: "an attacker can preserve or submit a stored filename value that later controls an uploaded or served file extension"
   review_confidence: medium
 }
+concept UncheckedUploadedImageProcessing : sink {
+  vulnerable_to: [injection.UnrestrictedUpload]
+  cwe: [CWE_434]
+}
 
 concept ExpressionEval : sink {
   vulnerable_to: [injection.ExpressionLanguageInjection]
