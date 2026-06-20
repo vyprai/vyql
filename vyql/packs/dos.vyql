@@ -38,3 +38,8 @@ rule UnboundedDelimiterSplitCount {
   meta { id: "VYQL-DOS-007", severity: high, cwe: [CWE_400], confidence_floor: medium }
   match code.UnboundedDelimiterSplitCount as split
 }
+
+rule UnboundedProtocolStateByIdentifier {
+  meta { id: "VYQL-DOS-008", severity: high, cwe: [CWE_400, CWE_770], confidence_floor: medium }
+  match code.UnboundedProtocolStateByIdentifier as state
+}

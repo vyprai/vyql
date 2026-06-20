@@ -955,6 +955,15 @@ concept UnboundedStateGrowthReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_770]
 }
+concept UnboundedProtocolStateByIdentifier : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770]
+  review_category: "resource"
+  review_condition: "protocol message identifiers are stored in peer state or queued before per-identifier size/type limits are enforced"
+  review_evidence: "protocol state context {pattern} accepts remote message entries into state and task queues without an observed identifier size/type rejection"
+  review_assumption: "the identifier bytes can be supplied by a remote peer and can be large enough or numerous enough to amplify memory/CPU"
+  review_confidence: medium
+}
 concept UnboundedAllocationReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_770]

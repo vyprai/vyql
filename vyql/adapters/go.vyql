@@ -270,6 +270,7 @@ adapter go {
   // need manual review for alternate API paths that bypass the primary policy.
   mark exact "analysis.function.context" val "function_name:shouldIgnore" val "call:GetSubresource" nval "ignoredSubresources" -> code.AdmissionSubresourcePolicyReview
   mark exact "analysis.function.context" val "call:LoadOrStore" val "literal:overflow" -> code.UnboundedStateGrowthReview
+  mark exact "analysis.function.context" val "function_name:MessageReceived" val "call:Wantlist" val "call:splitWantsCancels" val "call:Wants" val "call:PushTasksTruncated" nval "call:ByteLen" nval "mh.IDENTITY" -> code.UnboundedProtocolStateByIdentifier
   mark exact "analysis.function.context" val "function_name:readBytes" val "call:ReadLong" val "call:int" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxSliceAllocSize" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxMapAllocSize" -> code.IntegerSizeArithmetic
