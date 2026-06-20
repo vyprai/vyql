@@ -68,6 +68,9 @@ adapter php {
   // Review-only installer/config entry point: rewriting a live PHP configuration file from
   // request data should have an install-state or authorization gate before the write.
   mark exact "analysis.module.context" val "lang=php" val "$_POST['systemRootPath']" val "videos/configuration.php" val "fopen" nval "../videos/configuration.php" -> code.PrivilegedEntryPointReview
+  // SSRF review: public thumbnail helpers that pass a request URL to ffmpeg (`-i`) need
+  // host parsing plus private/internal address rejection, not only URL syntax checks.
+  mark exact "analysis.module.context" val "lang=php" val "base64Url" val "get_ffmpeg()" val "-i" nval "parse_url($url)" nval "ip_is_private" -> code.IncompleteIpDenylist
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   sink path "mysqli_query" arg 1 -> code.SqlExecution
