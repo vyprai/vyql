@@ -121,6 +121,7 @@ threat PrivilegedContainer { cwe: [CWE_250], desc: "Container running privileged
 threat HostNamespaceShare { cwe: [CWE_653], desc: "Pod/container shares a host namespace or mounts a host path (weak compartmentalization)" }
 threat PublicNetworkExposure { cwe: [CWE_284], desc: "Security group / firewall rule open to 0.0.0.0/0" }
 threat WildcardIamPolicy { cwe: [CWE_284], desc: "IAM policy grants wildcard action or resource" }
+threat NetworkFilteringDisabled { cwe: [CWE_284], desc: "Network filtering or policy enforcement is explicitly disabled" }
 
 module validation;
 threat ImproperEncoding { cwe: [CWE_116], desc: "Improper encoding/escaping of output" }

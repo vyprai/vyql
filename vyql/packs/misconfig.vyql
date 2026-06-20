@@ -86,3 +86,10 @@ rule TrustBoundary {
   taint core.UserControlledData -> code.TrustBoundary
     unless sanitized_by core.InputValidation
 }
+
+// Network policy enforcement explicitly disabled. Linux bridge netfilter sysctls
+// set to 0 bypass iptables/ip6tables/arptables filtering for bridged traffic.
+rule NetworkFilteringDisabled {
+  meta { id: "VYQL-CFG-015", severity: high, cwe: [CWE_284] }
+  match code.NetworkFilteringDisabled as n
+}

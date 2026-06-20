@@ -348,6 +348,10 @@ concept WildcardIamPolicy : sink {
   vulnerable_to: [iac.WildcardIamPolicy]
   cwe: [CWE_284]
 }
+concept NetworkFilteringDisabled : sink {
+  vulnerable_to: [iac.NetworkFilteringDisabled]
+  cwe: [CWE_284]
+}
 
 concept ExternalCall : sink {
   vulnerable_to: [smartcontract.ExternalCallInjection]

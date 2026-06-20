@@ -49,11 +49,7 @@ func (c *rbConv) text(n *tree_sitter.Node) string {
 }
 
 func (c *rbConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	for _, st := range namedChildren(n) {
-		out = append(out, c.stmt(st)...)
-	}
-	return out
+	return c.rbStmtList(namedChildren(n))
 }
 
 func (c *rbConv) body(n *tree_sitter.Node) []nir.Stmt {
@@ -258,11 +254,7 @@ func (c *rbConv) rubyBody(n *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	if n.Kind() == "then" || n.Kind() == "else" || n.Kind() == "body_statement" {
-		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
-			out = append(out, c.stmt(ch)...)
-		}
-		return out
+		return c.rbStmtList(namedChildren(n))
 	}
 	return c.stmt(n)
 }
@@ -313,16 +305,60 @@ func (c *rbConv) rubyCase(n *tree_sitter.Node) nir.Stmt {
 // (flow-approximate).
 func (c *rbConv) collectBodies(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	kids := namedChildren(n)
+	for i := 0; i < len(kids); i++ {
+		ch := kids[i]
 		switch ch.Kind() {
 		case "body_statement", "then", "else", "elsif", "ensure", "when", "do_block", "block":
 			out = append(out, c.collectBodies(ch)...)
 		case "comment":
 		default:
+			if isRbCallNode(ch) && rbCallHasHeredocArg(ch) && i+1 < len(kids) && kids[i+1].Kind() == "heredoc_body" {
+				out = append(out, c.callStmtWithExtraArg(ch, c.expr(kids[i+1]))...)
+				i++
+				continue
+			}
 			out = append(out, c.stmt(ch)...)
 		}
 	}
 	return out
+}
+
+func (c *rbConv) rbStmtList(kids []*tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	for i := 0; i < len(kids); i++ {
+		ch := kids[i]
+		if isRbCallNode(ch) && rbCallHasHeredocArg(ch) && i+1 < len(kids) && kids[i+1].Kind() == "heredoc_body" {
+			out = append(out, c.callStmtWithExtraArg(ch, c.expr(kids[i+1]))...)
+			i++
+			continue
+		}
+		out = append(out, c.stmt(ch)...)
+	}
+	return out
+}
+
+func isRbCallNode(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Kind() {
+	case "call", "method_call", "command", "command_call":
+		return true
+	default:
+		return false
+	}
+}
+
+func rbCallHasHeredocArg(n *tree_sitter.Node) bool {
+	if al := field(n, "arguments"); al != nil {
+		for _, a := range namedChildren(al) {
+			if a.Kind() == "heredoc_beginning" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *rbConv) params(params *tree_sitter.Node) []string {
@@ -362,6 +398,8 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "true", "false":
 		return nir.Const{Loc: L, Value: c.text(n)} // boolean value for `val` matching
 	case "string":
+		return c.string(n, L)
+	case "heredoc_body", "heredoc_content":
 		return c.string(n, L)
 	case "regex":
 		if rubyRegexMayBacktrack(c.text(n)) {
@@ -582,6 +620,17 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 		}
 	}
 	return nir.Call{Callee: callee, Args: args, Path: path, Method: m, Loc: L}
+}
+
+func (c *rbConv) callStmtWithExtraArg(n *tree_sitter.Node, extra nir.Expr) []nir.Stmt {
+	L := c.loc(n)
+	call, ok := c.call(n, L).(nir.Call)
+	if !ok {
+		return c.stmt(n)
+	}
+	call.Args = append(call.Args, extra)
+	out := []nir.Stmt{nir.ExprStmt{Value: call}}
+	return append(out, c.callBlockStmts(n)...)
 }
 
 // callBlockStmts lowers a trailing block on a call (`recv.each { |x| … }`, `lambda { |v| … }`)
