@@ -37,6 +37,7 @@ type sinkSpec struct {
 	Concept         string
 	Pattern         string
 	ByMethod        bool     // match the bare method name vs the dotted callee path
+	Exact           bool     // exact path match instead of segment-prefix path matching
 	Receiver        bool     // tainted data is the RECEIVER, not an arg — label the call node
 	Constraint      string   // optional `on <type>` receiver-type constraint
 	ArgIndex        int      // which argument position is targeted (default 0)
@@ -719,7 +720,7 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 		case "sink_method":
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method; match the bare
 			// method name and label the call node itself.
@@ -876,7 +877,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						continue
 					}
 					hit := sk.ByMethod && method == sk.Pattern ||
-						!sk.ByMethod && matchSinkPath(path, sk.Pattern)
+						!sk.ByMethod && ((sk.Exact && path == sk.Pattern) || (!sk.Exact && matchSinkPath(path, sk.Pattern)))
 					// value-matched sink: every `val` must be present and every `nval`
 					// absent among the literal arg/option tokens (case-insensitive).
 					if hit && !valCondsForSink(s, &flowIdx, n, sk) {

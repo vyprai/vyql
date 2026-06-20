@@ -266,6 +266,7 @@ adapter neutral {
   source receiver "value" on "sample.Request" -> custom.Source
   sink method "emit" -> custom.Target
   sink path "runtime.run" -> custom.Action
+  sink exact "$" -> custom.Target
   sink path "runtime.execv" collection first -> custom.Action
   sink receiver "open" -> custom.Target
   flow path "copy_into" arg 0 from args 1
@@ -293,7 +294,7 @@ adapter neutral {
 	if th == nil || th.QualifiedName() != "sample.Condition" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "neutral" || len(ad.Mappings) != 13 {
+	if ad == nil || ad.Name != "neutral" || len(ad.Mappings) != 14 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "custom.Source" {
@@ -308,30 +309,33 @@ adapter neutral {
 	if ad.Mappings[3].Kind != "sink_method" || ad.Mappings[4].Kind != "sink_path" {
 		t.Fatalf("sink mapping kinds wrong: %+v", ad.Mappings[3:])
 	}
-	if ad.Mappings[5].Kind != "sink_path" || !ad.Mappings[5].Collection || !ad.Mappings[5].CollectionFirst {
-		t.Fatalf("collection first sink mapping wrong: %+v", ad.Mappings[5])
+	if ad.Mappings[5].Kind != "sink_path" || !ad.Mappings[5].Exact || ad.Mappings[5].Pattern != "$" {
+		t.Fatalf("exact sink mapping wrong: %+v", ad.Mappings[5])
 	}
-	if ad.Mappings[6].Kind != "sink_receiver" || ad.Mappings[6].Concept != "custom.Target" {
-		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[6])
+	if ad.Mappings[6].Kind != "sink_path" || !ad.Mappings[6].Collection || !ad.Mappings[6].CollectionFirst {
+		t.Fatalf("collection first sink mapping wrong: %+v", ad.Mappings[6])
 	}
-	if ad.Mappings[7].Kind != "flow_path" || ad.Mappings[7].FlowDestArg != 0 || ad.Mappings[7].FlowSourceArg != 1 {
-		t.Fatalf("flow args mapping wrong: %+v", ad.Mappings[7])
+	if ad.Mappings[7].Kind != "sink_receiver" || ad.Mappings[7].Concept != "custom.Target" {
+		t.Fatalf("sink_receiver mapping wrong: %+v", ad.Mappings[7])
 	}
-	if ad.Mappings[8].Kind != "flow_path" || ad.Mappings[8].FlowDestArg != 0 || !ad.Mappings[8].FlowSourceResult {
-		t.Fatalf("flow result mapping wrong: %+v", ad.Mappings[8])
+	if ad.Mappings[8].Kind != "flow_path" || ad.Mappings[8].FlowDestArg != 0 || ad.Mappings[8].FlowSourceArg != 1 {
+		t.Fatalf("flow args mapping wrong: %+v", ad.Mappings[8])
 	}
-	if ad.Mappings[9].Kind != "flow_prefix" || ad.Mappings[9].Pattern != "parse" || ad.Mappings[9].FlowDestArg != 1 || ad.Mappings[9].FlowSourceArg != 0 {
-		t.Fatalf("flow prefix mapping wrong: %+v", ad.Mappings[9])
+	if ad.Mappings[9].Kind != "flow_path" || ad.Mappings[9].FlowDestArg != 0 || !ad.Mappings[9].FlowSourceResult {
+		t.Fatalf("flow result mapping wrong: %+v", ad.Mappings[9])
 	}
-	if ad.Mappings[10].Kind != "control_receiver_method" || ad.Mappings[10].Concept != "custom.Transform" {
-		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[10])
+	if ad.Mappings[10].Kind != "flow_prefix" || ad.Mappings[10].Pattern != "parse" || ad.Mappings[10].FlowDestArg != 1 || ad.Mappings[10].FlowSourceArg != 0 {
+		t.Fatalf("flow prefix mapping wrong: %+v", ad.Mappings[10])
 	}
-	if ad.Mappings[11].Kind != "mark_method" || ad.Mappings[11].Pattern != "setMode" ||
-		len(ad.Mappings[11].ValMatches) != 1 || ad.Mappings[11].ValMatches[0] != "true" {
-		t.Fatalf("value-matched mark wrong: %+v", ad.Mappings[11])
+	if ad.Mappings[11].Kind != "control_receiver_method" || ad.Mappings[11].Concept != "custom.Transform" {
+		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[11])
 	}
-	if ad.Mappings[12].Kind != "mark" || !ad.Mappings[12].Exact {
-		t.Fatalf("exact mark wrong: %+v", ad.Mappings[12])
+	if ad.Mappings[12].Kind != "mark_method" || ad.Mappings[12].Pattern != "setMode" ||
+		len(ad.Mappings[12].ValMatches) != 1 || ad.Mappings[12].ValMatches[0] != "true" {
+		t.Fatalf("value-matched mark wrong: %+v", ad.Mappings[12])
+	}
+	if ad.Mappings[13].Kind != "mark" || !ad.Mappings[13].Exact {
+		t.Fatalf("exact mark wrong: %+v", ad.Mappings[13])
 	}
 }
 

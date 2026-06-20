@@ -581,6 +581,13 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 			return body
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+	case "unary_expression":
+		if arg := c.unaryArg(inner); arg != nil && arg.Kind() == "call_expression" {
+			if body := c.iife(arg, L); len(body) > 0 {
+				return body
+			}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 	case "assignment_expression":
 		left := field(inner, "left")
 		rhs := field(inner, "right")
@@ -688,6 +695,21 @@ func (c *jsConv) iife(call *tree_sitter.Node, L string) []nir.Stmt {
 		body = append([]nir.Stmt{nir.Assign{Targets: []string{p}, Value: c.expr(as[i])}}, body...)
 	}
 	return body
+}
+
+func (c *jsConv) unaryArg(n *tree_sitter.Node) *tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if arg := field(n, "argument"); arg != nil {
+		return arg
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "comment" {
+			return ch
+		}
+	}
+	return nil
 }
 
 // branchBody flattens one if-branch body: a `{}` block, an else_clause wrapper, or a
@@ -1295,7 +1317,16 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "unary_expression":
-		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "argument")), Loc: L}
+		arg := field(n, "argument")
+		if arg == nil {
+			for _, ch := range namedChildren(n) {
+				if ch.Kind() != "comment" {
+					arg = ch
+					break
+				}
+			}
+		}
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(arg), Loc: L}
 	case "ternary_expression":
 		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	case "template_string":

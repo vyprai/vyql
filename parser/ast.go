@@ -87,7 +87,7 @@ type AdapterMapping struct {
 	Collection       bool     // `collection` — also flag a Seq/collection-literal arg
 	CollectionFirst  bool     // `collection first` — target element 0 of a Seq/collection arg when present
 	CollectionIndex  int      // `collection N` / `collection first` target index; defaults to 0 when CollectionFirst is set
-	Exact            bool     // exact path match (currently used by `mark exact`)
+	Exact            bool     // exact path match (used by `sink exact` and `mark exact`)
 	About            string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
 	FlowDestArg      int      // for `flow`: destination out-param argument index
 	FlowSourceArg    int      // for `flow`: first source argument index; -1 when source is the call result

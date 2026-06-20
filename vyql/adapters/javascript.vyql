@@ -374,6 +374,10 @@ adapter javascript {
   sink path "outerHTML" -> code.HtmlRender
   sink path "document.write" -> code.HtmlRender
   sink path "insertAdjacentHTML" arg 1 -> code.HtmlRender
+  // jQuery root calls can parse an HTML string, unlike scoped lookups such as
+  // $(document).find(selector).
+  sink exact "$" val "selector" -> code.HtmlRender
+  sink exact "jQuery" val "selector" -> code.HtmlRender
   sink path "$.html" -> code.HtmlRender
   sink path "el.html" -> code.HtmlRender
   sink method "html" -> code.HtmlRender

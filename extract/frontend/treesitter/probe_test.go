@@ -401,6 +401,11 @@ func TestJavaScriptIIFELowersBody(t *testing.T) {
     nav.append('<li>' + content.field.children('.object-infos').data('object-label') + '</li>');
   });
 }(jQuery));`,
+		"unary_plus_call": `+function($) {
+  $(document).on('nested:fieldAdded', 'form', function(content) {
+    nav.append('<li>' + content.field.children('.object-infos').data('object-label') + '</li>');
+  });
+}(jQuery);`,
 	}
 	for name, code := range cases {
 		t.Run(name, func(t *testing.T) {
