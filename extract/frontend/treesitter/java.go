@@ -485,6 +485,10 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 			if fld := c.text(field(m, "field")); fld != "" {
 				add("selector:" + fld)
 			}
+		case "binary_expression":
+			if expr := javaExprToken(c.text(m)); expr != "" {
+				add("expr:" + expr)
+			}
 		case "string_literal":
 			if lit := javaStringToken(c.text(m)); lit != "" {
 				add("literal:" + lit)
@@ -496,6 +500,24 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 	}
 	walk(n)
 	return out
+}
+
+func javaExprToken(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(raw))
+	for _, r := range raw {
+		if r != ' ' && r != '\t' && r != '\n' && r != '\r' {
+			b.WriteRune(r)
+		}
+		if b.Len() >= 256 {
+			break
+		}
+	}
+	return b.String()
 }
 
 func javaStringToken(raw string) string {
