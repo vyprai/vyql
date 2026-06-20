@@ -158,6 +158,14 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 			mod := c.resolveRequire(strings.Trim(src, "'\"`"))
 			clause := field(n, "import_clause")
 			if clause == nil {
+				for _, ch := range namedChildren(n) {
+					if ch.Kind() == "import_clause" {
+						clause = ch
+						break
+					}
+				}
+			}
+			if clause == nil {
 				clause = n
 			}
 			for _, ch := range namedChildren(clause) {

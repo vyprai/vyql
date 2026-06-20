@@ -65,6 +65,36 @@ const Model = {
 	}
 }
 
+func TestTypeScriptImportsAreExtracted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.ts")
+	src := []byte(`
+import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+import workos from '@workos-inc/node';
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("module count = %d, want 1", len(prog.Modules))
+	}
+	got := map[string]bool{}
+	for _, imp := range prog.Modules[0].Imports {
+		got[imp.Module] = true
+	}
+	for _, want := range []string{"next/headers", "next/server", "@workos-inc/node"} {
+		if !got[want] {
+			t.Fatalf("missing import %q; imports=%#v", want, prog.Modules[0].Imports)
+		}
+	}
+}
+
 func findFuncDef(prog nir.Program, name string) (nir.FuncDef, bool) {
 	for _, mod := range prog.Modules {
 		if fn, ok := findFuncDefInStmts(mod.Body, name); ok {
