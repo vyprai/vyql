@@ -323,7 +323,7 @@ concept SecurityKeyTrustOperation : sink {
 
 concept SecretComparisonReview : sink {
   vulnerable_to: [crypto.ObservableDiscrepancy]
-  cwe: [CWE_203, CWE_208]
+  cwe: [CWE_200, CWE_203, CWE_208]
   review_category: "crypto"
   review_condition: "secret material is compared with an ordinary equality operation instead of a constant-time comparison"
   review_evidence: "secret comparison context {pattern} derives request data and secret data without an observed constant-time compare"
