@@ -779,6 +779,15 @@ concept ConfigExposureReview : sink {
   review_assumption: "repository, keyring, credential, or diagnostic fields may contain inline credentials"
   review_confidence: possibility
 }
+concept SecretDatabindingReview : sink {
+  vulnerable_to: [secrets.SecretLeak, crypto.CleartextStorage]
+  cwe: [CWE_522]
+  review_category: "secret"
+  review_condition: "secret configuration data is databound without an observed protected-secret conversion"
+  review_evidence: "secret parameter {pattern} is accepted at a configuration boundary"
+  review_assumption: "the configuration framework may persist or display the value unless it is converted to protected secret storage"
+  review_confidence: possibility
+}
 // Review-only: API settings responses that include password policy, token, or
 // similar security-setting fields should be gated by authentication.
 concept SensitiveSettingsExposureReview : sink {

@@ -291,6 +291,11 @@ review code.ConfigExposureReview {
   expected: [core.SecretRedaction]
   text: "verify config or diagnostic serialization redacts inline secrets before exposure"
 }
+review code.SecretDatabindingReview {
+  category: "secret"
+  kind: "attention"
+  text: "review secret configuration parameters for conversion into protected secret storage before persistence"
+}
 review code.SensitiveSettingsExposureReview {
   category: "auth"
   kind: "attention"
