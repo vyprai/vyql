@@ -43,6 +43,7 @@ adapter php {
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION['flash']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"flash\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
   mark exact "analysis.module.context" val "lang=php" val "$GLOBALS[" val "$_GET[" val "$this->_tplVars=$this->_globalVar" nval "htmlspecialchars($_GET" nval "htmlentities($_GET" nval "esc_html($_GET" nval "strip_tags($_GET" -> code.UnescapedRequestGlobalTemplateVar
+  mark exact "analysis.module.context" val "lang=php" val "<a href=\"<?=ADMIN_ROOT" val "$_GET[\"id\"]" nval "htmlspecialchars($_GET[\"id\"]" nval "htmlentities($_GET[\"id\"]" nval "esc_html($_GET[\"id\"]" -> code.UnescapedRequestHtmlAttribute
   // Review-only access-policy config: nested PHP arrays such as
   // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]
   // carry key-path tokens, so broad role grants on sensitive resource groups can

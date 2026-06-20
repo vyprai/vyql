@@ -1,0 +1,47 @@
+test "rank227: request id rendered into href without HTML escaping"
+  lang php
+  expect VYQL-INJ-043
+  expect_review code.UnescapedRequestHtmlAttribute
+  code
+  ```
+  <?
+    foreach ($integrity_errors as $field => $error_types) {
+      foreach ($error_types as $type => $errors) {
+        foreach ($errors as $error) {
+  ?>
+  <li>
+    <section class="integrity_errors">
+      <a href="<?=ADMIN_ROOT.$module["route"]."/".$action["route"]."/".$_GET["id"]?>/" target="_blank">Edit</a>
+      <p>Broken <?=$error?></p>
+    </section>
+  </li>
+  <?
+        }
+      }
+    }
+  ?>
+  ```
+
+test "rank227: request id rendered into href with HTML escaping"
+  lang php
+  reject VYQL-INJ-043
+  reject_review code.UnescapedRequestHtmlAttribute
+  code
+  ```
+  <?
+    foreach ($integrity_errors as $field => $error_types) {
+      foreach ($error_types as $type => $errors) {
+        foreach ($errors as $error) {
+  ?>
+  <li>
+    <section class="integrity_errors">
+      <a href="<?=ADMIN_ROOT.$module["route"]."/".$action["route"]."/".htmlspecialchars($_GET["id"])?>/" target="_blank">Edit</a>
+      <p>Broken <?=$error?></p>
+    </section>
+  </li>
+  <?
+        }
+      }
+    }
+  ?>
+  ```
