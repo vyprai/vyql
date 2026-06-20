@@ -3,6 +3,7 @@ package engine
 import (
 	"testing"
 
+	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
@@ -103,5 +104,56 @@ rule InvalidTransition {
 	gv.AddNode(usg.Node{ID: "t1", Type: "analysis.Transition", Props: map[string]string{"machine": "Workflow", "from": "Allowed", "to": "Done"}})
 	if c := compileEval(t, transitionRule, gv); c[0] != 0 {
 		t.Fatalf("valid transition: expected 0 findings, got %d", c[0])
+	}
+}
+
+func TestMatchGuardedByDominatingBranchCondition(t *testing.T) {
+	actionRule := `
+package test;
+rule GuardedAction {
+  match custom.Action as a
+  unless guarded_by custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Arg", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t/if2.t", Order: 11, HasOrder: true})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEval(t, actionRule, g); c[0] != 0 {
+		t.Fatalf("dominating branch guard should suppress match, got %d", c[0])
+	}
+}
+
+func TestMatchGuardedByDominatingBranchConditionWithQualifiedConcepts(t *testing.T) {
+	rule := `
+package vypr.memory;
+rule CountDerivedElementAccess {
+  meta { id: "TEST-MEM", severity: medium, cwe: [CWE_125] }
+  match code.CountDerivedElementAccess as idx
+  unless guarded_by core.MemoryBoundsCheck
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "bucket.go:666", Region: "bucket.go/fn143/if144.e/if149.t", Order: 2032, HasOrder: true})
+	g.AddLabel("guard", usg.Label{Concept: "core.MemoryBoundsCheck"})
+	g.AddNode(usg.Node{ID: "idx", Type: "code.Arg", Loc: "bucket.go:667", Region: "bucket.go/fn143/if144.e/if149.t/if150.t", Order: 2038, HasOrder: true})
+	g.AddLabel("idx", usg.Label{Concept: "code.CountDerivedElementAccess"})
+
+	decls, err := parser.Parse(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("qualified dominating branch guard should suppress match, got %d", len(fs))
 	}
 }

@@ -83,3 +83,9 @@ rule EscapedTerminatorWrite {
   meta { id: "VYQL-MEM-013", severity: medium, cwe: [CWE_119, CWE_125, CWE_787], confidence_floor: medium }
   match code.EscapedTerminatorWrite as w
 }
+
+rule CountDerivedElementAccess {
+  meta { id: "VYQL-MEM-017", severity: medium, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: medium }
+  match code.CountDerivedElementAccess as idx
+  unless guarded_by core.MemoryBoundsCheck
+}

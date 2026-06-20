@@ -1926,7 +1926,13 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		l.flow(left, leftArg)
 		l.flow(right, rightArg)
 		method := binopMethod(ex.Op)
-		n := l.node("BinOp", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg})
+		props := map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg}
+		var valToks []string
+		collectValTokens(ex, "", &valToks)
+		if len(valToks) > 0 {
+			props["str_args"] = strings.Join(valToks, "\x00")
+		}
+		n := l.node("BinOp", ex.Loc, props)
 		l.flow(leftArg, n)
 		l.flow(rightArg, n)
 		l.flow(left, n)
@@ -2339,6 +2345,9 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		for _, p := range ex.Parts {
 			collectValTokens(p, key, out)
 		}
+	case nir.BinOp:
+		collectValTokens(ex.Left, key, out)
+		collectValTokens(ex.Right, key, out)
 	case nir.Call:
 		collectValTokens(ex.Callee, key, out)
 		for _, a := range ex.Args {

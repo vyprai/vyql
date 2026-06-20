@@ -552,6 +552,15 @@ concept FieldDerivedIndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   cwe: [CWE_129, CWE_125, CWE_787]
 }
+concept CountDerivedElementAccess : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_129, CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "an element accessor uses a count-derived last index without a visible non-empty guard"
+  review_evidence: "element accessor {pattern} receives Count()-derived index"
+  review_assumption: "a malformed or attacker-influenced container can have zero elements"
+  review_confidence: medium
+}
 concept DivisionDenominator : sink {
   vulnerable_to: [numeric.DivideByZero]
   enabled_by: [taint.UntrustedData]
@@ -1332,6 +1341,11 @@ concept IntegerOverflowGuard : control {
   neutralizes: [memory.IntegerOverflow]
   cwe: [CWE_190]
   applies: endpoint
+}
+concept MemoryBoundsCheck : control {
+  neutralizes: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_125, CWE_787]
+  applies: path
 }
 // Privacy/data-collection opt-in or opt-out controls exposed by SDKs.
 concept DataCollectionControl : control {
