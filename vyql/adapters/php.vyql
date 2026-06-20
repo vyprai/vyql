@@ -83,6 +83,7 @@ adapter php {
   mark exact "analysis.module.context" val "lang=php" val "base64Url" val "get_ffmpeg()" val "-i" nval "parse_url($url)" nval "ip_is_private" -> code.IncompleteIpDenylist
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
+  mark exact "analysis.function.context" val "lang=php" val "toLegacyOrderBy" val "toLegacyOrderWay" val "orderBy" nval "isOrderBy" nval "isOrderWay" -> code.UnparameterizedSqlQueryParser
   sink path "mysqli_query" arg 1 -> code.SqlExecution
   sink path "mysqli_real_query" arg 1 -> code.SqlExecution
   sink path "mysqli_multi_query" arg 1 -> code.SqlExecution
