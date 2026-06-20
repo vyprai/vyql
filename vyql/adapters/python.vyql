@@ -386,6 +386,7 @@ adapter python {
   sink path "flask.render_template_string" -> code.HtmlRender
   sink path "analysis.function.context.sink" val "traceback.format_exc" val "<pre" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HtmlRender
   sink path "analysis.function.context.sink" val "traceback.format_exc" val "<html" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HtmlRender
+  mark exact "analysis.function.context" val "class_bases=HTMLSerializer" val "name=serialize" nval "escape_rcdata=True" -> code.HtmlSanitizerLogicReview
   sink path "analysis.function.return" val "decorator_method:get" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
   sink path "analysis.function.return" val "decorator_method:post" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
   sink path "analysis.function.return" val "decorator_method:put" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
