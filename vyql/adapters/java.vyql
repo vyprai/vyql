@@ -217,6 +217,7 @@ adapter java {
   control "analysis.function.context" val "call:canAlterTable" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canObtainDelegationToken" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   mark exact "analysis.function.context" val "function_name:doTest" val "call:setCredentialsId" val "call:accurevLoginFromGlobalConfig" nval "call:hasPermission" -> code.CredentialedEndpointReview
+  mark exact "analysis.function.context" val "function_name:doFill" nval "call:checkPermission" -> code.StateChangingOp
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.
   mark method "getSomeWorkspace" -> code.SensitiveOperation

@@ -1,0 +1,27 @@
+test "cve rank 162: Jenkins doFill endpoint without POST is surfaced for CSRF review"
+  lang java
+  expect_review code.StateChangingOp
+  code
+  ```
+  class DescriptorImpl {
+    public ListBoxModel doFillProjectItems(String aiqUrl, String login, Secret password) {
+      Option[] options = getProjectOptions(aiqUrl, login, password);
+      return new ListBoxModel(options);
+    }
+  }
+  ```
+
+test "cve rank 162: Jenkins doFill endpoint with POST is clean for CSRF review"
+  lang java
+  reject_review code.StateChangingOp
+  code
+  ```
+  class DescriptorImpl {
+    @POST
+    public ListBoxModel doFillProjectItems(String aiqUrl, String login, Secret password) {
+      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      Option[] options = getProjectOptions(aiqUrl, login, password);
+      return new ListBoxModel(options);
+    }
+  }
+  ```
