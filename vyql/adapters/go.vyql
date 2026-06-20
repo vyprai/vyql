@@ -292,6 +292,7 @@ adapter go {
   // Review-only: request/header secrets compared after ordinary string conversion need
   // constant-time comparison when attacker-controlled candidates can be repeated.
   mark exact "analysis.function.context" val "function_name:ParseAndValidate" val "selector:r.Header.Get" val "call:string" nval "call:ConstantTimeCompare" -> code.SecretComparisonReview
+  mark exact "analysis.function.context" val "call:BasicAuth" val "binary:username==wrapper.username" val "binary:password==wrapper.password" nval "call:ConstantTimeCompare" -> code.SecretComparisonReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission

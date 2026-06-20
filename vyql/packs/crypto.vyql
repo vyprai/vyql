@@ -33,3 +33,8 @@ rule ShortSecurityIdentifierTrust {
   meta { id: "VYQL-CRY-005", severity: medium, cwe: [CWE_358, CWE_347] }
   taint code.ShortSecurityIdentifier -> code.SecurityKeyTrustOperation
 }
+
+rule SecretComparisonObservableDiscrepancy {
+  meta { id: "VYQL-CRY-006", severity: medium, cwe: [CWE_203, CWE_208], confidence_floor: medium }
+  match code.SecretComparisonReview as cmp
+}
