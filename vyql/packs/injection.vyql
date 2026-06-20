@@ -36,6 +36,11 @@ rule Code {
   taint core.UserControlledData -> code.CodeEval
 }
 
+rule Vm2HostCallbackBridge {
+  meta { id: "VYQL-INJ-035", severity: critical, cwe: [CWE_94], confidence_floor: medium }
+  match code.Vm2HostCallbackBridge as bridge
+}
+
 rule DynamicCodeLoad {
   meta { id: "VYQL-INJ-023", severity: high, cwe: [CWE_829] }
   taint core.UserControlledData -> code.DynamicCodeLoad

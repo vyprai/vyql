@@ -230,6 +230,7 @@ adapter javascript {
   sink path "vm.runInContext" -> code.CodeEval
   sink path "vm.compileFunction" -> code.CodeEval
   sink path "vm2.run" -> code.CodeEval
+  mark exact "analysis.function.context" val "new VM" val "sandbox.templateFilters" val "sandbox.templateGlobals" val "vm.run" nval "isolated-vm" nval "Isolate" -> code.Vm2HostCallbackBridge
   sink path "globalEval" -> code.CodeEval
   sink path "require" -> code.DynamicCodeLoad
   sink path "import" -> code.DynamicCodeLoad
