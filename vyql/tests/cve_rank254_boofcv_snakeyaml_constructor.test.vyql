@@ -1,0 +1,41 @@
+# Rank 254 / CVE-2023-39010: BoofCV loaded camera calibration YAML with
+# SnakeYAML Constructor, allowing type tags in crafted calibration files to
+# instantiate arbitrary Java classes. The fix uses SafeConstructor.
+
+test "rank254: BoofCV calibration YAML uses unsafe SnakeYAML Constructor"
+  lang java
+  expect VYQL-DESER-006
+  expect_review code.UnsafeYamlConstructor
+  code
+  ```
+  import org.yaml.snakeyaml.LoaderOptions;
+  import org.yaml.snakeyaml.Yaml;
+  import org.yaml.snakeyaml.constructor.Constructor;
+  import org.yaml.snakeyaml.representer.Representer;
+
+  class CalibrationIO {
+    Object load(java.io.Reader reader, Representer representer) {
+      var yaml = new Yaml(new Constructor(new LoaderOptions()), representer);
+      return yaml.load(reader);
+    }
+  }
+  ```
+
+test "rank254: BoofCV calibration YAML uses SafeConstructor"
+  lang java
+  reject VYQL-DESER-006
+  reject_review code.UnsafeYamlConstructor
+  code
+  ```
+  import org.yaml.snakeyaml.LoaderOptions;
+  import org.yaml.snakeyaml.Yaml;
+  import org.yaml.snakeyaml.constructor.SafeConstructor;
+  import org.yaml.snakeyaml.representer.Representer;
+
+  class CalibrationIO {
+    Object load(java.io.Reader reader, Representer representer) {
+      var yaml = new Yaml(new SafeConstructor(new LoaderOptions()), representer);
+      return yaml.load(reader);
+    }
+  }
+  ```

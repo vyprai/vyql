@@ -36,7 +36,7 @@ rule IncompleteArchiveFilenameValidation {
 }
 
 rule UnsafeYamlConstructor {
-  meta { id: "VYQL-DESER-006", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  meta { id: "VYQL-DESER-006", severity: high, cwe: [CWE_502, CWE_94], confidence_floor: medium }
   match code.UnsafeYamlConstructor as constructor
 }
 
