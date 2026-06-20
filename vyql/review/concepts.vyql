@@ -106,6 +106,12 @@ review code.AuthFailureResponseReview {
   expected: [core.AuthenticationCheck]
   text: "review authentication verification error responses for fail-closed unauthorized behavior expected by the proxy"
 }
+review code.ClientAuthFailureResponseReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review client-side unauthorized response handling before invoking privileged success callbacks"
+}
 review code.ObjectLookupByUserInput {
   category: "auth"
   kind: "target"

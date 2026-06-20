@@ -745,6 +745,15 @@ concept AuthFailureResponseReview : sink {
   review_assumption: "an upstream proxy interprets the generic error response as successful authentication or otherwise fails open"
   review_confidence: possibility
 }
+concept ClientAuthFailureResponseReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+  review_category: "auth"
+  review_condition: "client-side request helper invokes success callbacks after an observed authorization failure response"
+  review_evidence: "AJAX response handler {pattern} checks a request object instead of the response status before calling the success callback"
+  review_assumption: "privileged UI callbacks trust the shared helper to stop unauthorized response handling"
+  review_confidence: medium
+}
 concept ObjectLookupByUserInput : sink {
   vulnerable_to: [access_control.Idor]
   enabled_by: [taint.UntrustedData]

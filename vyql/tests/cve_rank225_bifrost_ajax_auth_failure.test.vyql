@@ -1,0 +1,39 @@
+test "rank225: AJAX helper checks request status instead of authorization response status"
+  lang javascript
+  expect_review code.ClientAuthFailureResponseReview
+  code
+  ```
+  function Ajax(method, url, data, callbackFun) {
+    $.ajax({
+      success: function(callbackData) {
+        if (callbackData.hasOwnProperty("status")) {
+          if (data.status == -1) {
+            alert(data.msg);
+            return;
+          }
+        }
+        callbackFun(callbackData);
+      }
+    });
+  }
+  ```
+
+test "rank225: AJAX helper stops on authorization response status"
+  lang javascript
+  reject_review code.ClientAuthFailureResponseReview
+  code
+  ```
+  function Ajax(method, url, data, callbackFun) {
+    $.ajax({
+      success: function(callbackData) {
+        if (callbackData.hasOwnProperty("status")) {
+          if (callbackData.status == -1) {
+            alert(callbackData.msg);
+            return;
+          }
+        }
+        callbackFun(callbackData);
+      }
+    });
+  }
+  ```
