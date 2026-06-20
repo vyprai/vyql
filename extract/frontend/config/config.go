@@ -43,7 +43,7 @@ func Extract(files []string, root string) (nir.Program, error) {
 		case k == "dockerfile":
 			body = scanDockerfile(src, rel)
 		case k == "yaml":
-			body = scanK8sYaml(src, rel)
+			body = scanYaml(src, rel)
 		case k == "terraform":
 			body = scanTerraform(src, rel)
 		case k == "jelly":
@@ -91,11 +91,7 @@ func kind(path string, src []byte) string {
 		return "dottemplate"
 	}
 	if ext == ".yaml" || ext == ".yml" {
-		// only Kubernetes-shaped manifests yield nodes; other YAML is inert.
-		if bytes.Contains(src, []byte("apiVersion")) && bytes.Contains(src, []byte("kind")) {
-			return "yaml"
-		}
-		return ""
+		return "yaml"
 	}
 	// fall back to the root element for unconventionally-named files.
 	dec := xml.NewDecoder(bytes.NewReader(src))
@@ -331,6 +327,12 @@ type scopedLineRule struct {
 	Event string
 }
 
+type scopedFileContainsAllRule struct {
+	Scope   string
+	Event   string
+	Needles []string
+}
+
 type directiveValueRule struct {
 	Scope     string
 	Directive string
@@ -388,6 +390,7 @@ type configProfile struct {
 	LineContains      []scopedLineRule
 	LineExactCompact  []scopedLineRule
 	LinePrefixCompact []scopedLineRule
+	FileContainsAll   []scopedFileContainsAllRule
 	DirectiveValues   []directiveValueRule
 	QuotedStarFields  []scopedLineRule
 	Templates         map[string]templateProfile
@@ -455,6 +458,7 @@ func loadProfile() configProfile {
 		configProfileData.LineContains = parseScopedLineRules(meta, "config_line_contains_events")
 		configProfileData.LineExactCompact = parseScopedLineRules(meta, "config_line_exact_compact_events")
 		configProfileData.LinePrefixCompact = parseScopedLineRules(meta, "config_line_prefix_compact_events")
+		configProfileData.FileContainsAll = parseScopedFileContainsAllRules(meta, "config_file_contains_all_events")
 		configProfileData.QuotedStarFields = parseScopedLineRules(meta, "config_quoted_star_field_events")
 		for _, entry := range metaList(meta, "config_directive_value_events") {
 			parts := strings.Split(entry, "|")
@@ -666,14 +670,16 @@ func scanDockerfile(src []byte, file string) []nir.Stmt {
 	return out
 }
 
-func scanK8sYaml(src []byte, file string) []nir.Stmt {
+func scanYaml(src []byte, file string) []nir.Stmt {
 	cfg := loadProfile()
 	var out []nir.Stmt
+	out = append(out, scopedFileContainsAllEvents(cfg, "yaml", string(src), file)...)
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+		out = append(out, scopedContainsEvents(cfg, "yaml", line, file, i+1)...)
 		out = append(out, scopedCompactEvents(cfg.LineExactCompact, "yaml", line, false, file, i+1)...)
 		out = append(out, scopedCompactEvents(cfg.LinePrefixCompact, "yaml", line, true, file, i+1)...)
 	}
@@ -729,6 +735,16 @@ func containsAll(text string, needles []string) bool {
 	return true
 }
 
+func containsAllFold(text string, needles []string) bool {
+	low := strings.ToLower(text)
+	for _, needle := range needles {
+		if needle != "" && !strings.Contains(low, strings.ToLower(needle)) {
+			return false
+		}
+	}
+	return true
+}
+
 func containsMatch(text, needle string) bool {
 	return needle != "" && strings.Contains(strings.ToLower(text), strings.ToLower(needle))
 }
@@ -741,6 +757,37 @@ func parseScopedLineRules(meta map[string]any, key string) []scopedLineRule {
 			panic("config: malformed " + key + " entry " + entry)
 		}
 		out = append(out, scopedLineRule{Scope: parts[0], Match: parts[1], Event: parts[2]})
+	}
+	return out
+}
+
+func parseScopedFileContainsAllRules(meta map[string]any, key string) []scopedFileContainsAllRule {
+	var out []scopedFileContainsAllRule
+	for _, entry := range metaList(meta, key) {
+		parts := strings.SplitN(entry, "|", 3)
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+			panic("config: malformed " + key + " entry " + entry)
+		}
+		var needles []string
+		for _, needle := range strings.Split(parts[2], ";;") {
+			if needle = strings.TrimSpace(needle); needle != "" {
+				needles = append(needles, needle)
+			}
+		}
+		if len(needles) == 0 {
+			panic("config: malformed " + key + " entry " + entry)
+		}
+		out = append(out, scopedFileContainsAllRule{Scope: parts[0], Event: parts[1], Needles: needles})
+	}
+	return out
+}
+
+func scopedFileContainsAllEvents(cfg configProfile, scope, text, file string) []nir.Stmt {
+	var out []nir.Stmt
+	for _, rule := range cfg.FileContainsAll {
+		if rule.Scope == scope && containsAllFold(text, rule.Needles) {
+			out = append(out, nir.ExprStmt{Value: call(rule.Event, file, firstLineContainingFold(text, rule.Needles[0]))})
+		}
 	}
 	return out
 }
@@ -861,6 +908,16 @@ func lastSeg(path string) string {
 func firstLineContaining(text, needle string) int {
 	for i, line := range strings.Split(text, "\n") {
 		if strings.Contains(line, needle) {
+			return i + 1
+		}
+	}
+	return 1
+}
+
+func firstLineContainingFold(text, needle string) int {
+	lowNeedle := strings.ToLower(needle)
+	for i, line := range strings.Split(text, "\n") {
+		if strings.Contains(strings.ToLower(line), lowNeedle) {
 			return i + 1
 		}
 	}

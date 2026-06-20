@@ -15,6 +15,12 @@ var skipDirs = map[string]bool{
 	"venv": true, "testdata": true,
 }
 
+var scanHiddenDirs = map[string]bool{
+	".github":    true,
+	".circleci":  true,
+	".buildkite": true,
+}
+
 // ListFiles walks root and returns files whose extension is in exts (e.g.
 // {".py": true}). Dependency/build/VCS directories are skipped.
 func ListFiles(root string, exts map[string]bool) ([]string, error) {
@@ -79,7 +85,7 @@ func FilterEntries(entries []Entry, exts map[string]bool) []string {
 
 func shouldSkipDir(root, path, name string) bool {
 	if strings.HasPrefix(name, ".") && name != "." {
-		return true
+		return !scanHiddenDirs[name]
 	}
 	if !skipDirs[name] {
 		return false

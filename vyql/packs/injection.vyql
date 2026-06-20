@@ -68,6 +68,11 @@ rule PackageInstallCodeExecution {
   match code.PackageInstallExecution as sink
 }
 
+rule PrivilegedWorkflowUntrustedCodeExecution {
+  meta { id: "VYQL-INJ-044", severity: critical, cwe: [CWE_94, CWE_95], confidence_floor: medium }
+  match code.PrivilegedWorkflowUntrustedCodeExecution as sink
+}
+
 rule Xss {
   meta { id: "VYQL-INJ-004", severity: high, cwe: [CWE_79], benchmark: xss }
   taint core.UserControlledData -> code.HtmlRender

@@ -31,6 +31,9 @@ adapter config {
       "dockerfile|--privileged|analysis.config.container.privileged_mode",
       "terraform|0.0.0.0/0|analysis.config.terraform.open_cidr"
     ],
+    config_file_contains_all_events: [
+      "yaml|analysis.config.github_actions.privileged_pr_framework_execution|pull_request_target;;git show \"$PR_SHA:$file\" > \"$file\";;python manage.py makemigrations"
+    ],
     config_line_exact_compact_events: [
       "yaml|privileged: true|analysis.config.k8s.privileged_container",
       "yaml|allowprivilegeescalation: true|analysis.config.k8s.privileged_container",
@@ -102,6 +105,7 @@ adapter config {
   mark "analysis.config.k8s.host_path" -> code.HostNamespaceShare
   mark "analysis.config.terraform.open_cidr" -> code.PublicNetworkExposure
   mark "analysis.config.terraform.wildcard_iam" -> code.WildcardIamPolicy
+  mark "analysis.config.github_actions.privileged_pr_framework_execution" -> code.PrivilegedWorkflowUntrustedCodeExecution
 
   // Jenkins Jelly views: template model fields such as it.name/it.description
   // rendered into HTML-bearing attributes need escaping before display.

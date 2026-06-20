@@ -94,6 +94,15 @@ concept PackageInstallExecution : sink {
   vulnerable_to: [injection.CodeInjection]
   cwe: [CWE_94]
 }
+concept PrivilegedWorkflowUntrustedCodeExecution : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94, CWE_95]
+  review_category: "code_execution"
+  review_condition: "a privileged CI workflow stages untrusted pull-request code before invoking a code-loading framework command"
+  review_evidence: "workflow context {pattern} combines a privileged PR trigger, untrusted file copy, and framework code execution"
+  review_assumption: "the copied files can contain code imported by the framework command during the privileged workflow run"
+  review_confidence: high
+}
 concept PackageVersionSpecifierValidationReview : sink {
   vulnerable_to: [validation.ImproperInputValidation, injection.CodeInjection]
   cwe: [CWE_20, CWE_94]
