@@ -346,6 +346,12 @@ review code.StructuredInputDecode {
   kind: "attention"
   text: "review structured decoder output validation against the target format"
 }
+review code.UncheckedDecodeResult {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review structured decode errors that are unwrapped instead of returned or rejected"
+}
 review code.PolymorphicTypeSelectionReview {
   category: "input_validation"
   kind: "attention"

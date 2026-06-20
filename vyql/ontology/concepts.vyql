@@ -469,6 +469,15 @@ concept StructuredInputDecode : sink {
   review_assumption: "malformed or out-of-alphabet input can reach callers that trust the decoded value"
   review_confidence: possibility
 }
+concept UncheckedDecodeResult : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "structured decoding errors should be returned or rejected before decoded data is trusted"
+  review_evidence: "decode operation {pattern} unwraps or expects a successful result"
+  review_assumption: "malformed attacker-controlled encoded input can reach this decoder"
+  review_confidence: medium
+}
 concept OwnerFieldClear : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_401]

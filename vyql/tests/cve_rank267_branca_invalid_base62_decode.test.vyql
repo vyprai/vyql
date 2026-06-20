@@ -1,0 +1,46 @@
+# Rank 267 / CVE-2020-35918: branca decoded attacker-supplied base62
+# token data with expect(), so malformed alphabet data could panic instead
+# of returning InvalidBase62Token.
+
+test "rank267: base62 decode errors are unwrapped"
+  lang rust
+  expect VYQL-VAL-001
+  expect_review code.UncheckedDecodeResult
+  code
+  ```
+  pub fn decode(data: &str, key: &[u8], ttl: u32) -> Result<Vec<u8>, BrancaError> {
+      if data.len() < 61 {
+          return Err(BrancaError::InvalidBase62Token);
+      }
+
+      let decoded_data = b62_decode(BASE62, &data).expect("Base62 token is invalid.");
+      if decoded_data[0] != VERSION {
+          return Err(BrancaError::InvalidTokenVersion);
+      }
+
+      Ok(decoded_data)
+  }
+  ```
+
+test "rank267: base62 decode errors are returned"
+  lang rust
+  reject VYQL-VAL-001
+  reject_review code.UncheckedDecodeResult
+  code
+  ```
+  pub fn decode(data: &str, key: &[u8], ttl: u32) -> Result<Vec<u8>, BrancaError> {
+      if data.len() < 61 {
+          return Err(BrancaError::InvalidBase62Token);
+      }
+
+      let decoded_data = match b62_decode(BASE62, data) {
+          Ok(decoded) => decoded,
+          Err(_) => return Err(BrancaError::InvalidBase62Token),
+      };
+      if decoded_data[0] != VERSION {
+          return Err(BrancaError::InvalidTokenVersion);
+      }
+
+      Ok(decoded_data)
+  }
+  ```
