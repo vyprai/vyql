@@ -188,6 +188,11 @@ review code.CryptoOperation {
   expected: [core.CertificateValidation, core.EncryptionAtRest, core.EncryptionInTransit]
   text: "verify algorithm choice, key/IV handling, and signature or certificate checks"
 }
+review code.HeaderControlledJwkReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review signature or decryption key selection for fallback to attacker-controlled JWK header data"
+}
 review code.AuthenticatedDecryptionTagReview {
   category: "crypto"
   kind: "attention"

@@ -596,6 +596,8 @@ adapter python {
   mark "jwt.decode" val "verify_signature=False" -> code.JwtUnverified
   mark "jwt.decode" val "verify=False" -> code.JwtUnverified
   mark "jwt.encode" val "algorithm=none" -> code.JwtUnverified
+  mark exact "analysis.function.context" val "name=_prepare_algorithm_key" val "key is None and \"jwk\" in header" val "key = header[\"jwk\"]" val "prepare_key(key)" -> code.HeaderControlledJwkReview
+  mark exact "analysis.function.context" val "name=prepare_key" val "key is None and \"jwk\" in header" val "key = header[\"jwk\"]" val "prepare_key(key)" -> code.HeaderControlledJwkReview
 
   // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
   // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.

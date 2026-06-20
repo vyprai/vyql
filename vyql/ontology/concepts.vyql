@@ -234,6 +234,10 @@ concept JwtUnverified : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]
   cwe: [CWE_347]
 }
+concept HeaderControlledJwkReview : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+}
 
 concept ShortSecurityIdentifier : source {
   taint: [taint.WeakSecurityIdentifier]

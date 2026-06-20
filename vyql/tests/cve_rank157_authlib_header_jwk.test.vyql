@@ -1,0 +1,59 @@
+# Rank 157 / CVE-2026-27962: Authlib automatically trusted a JWS/JWE
+# protected header "jwk" value as the verification/decryption key when callers
+# passed key=None. The fix removes that attacker-controlled key fallback.
+
+test "rank157: python authlib JWS header jwk fallback requires crypto review"
+  lang python
+  expect_review code.HeaderControlledJwkReview
+  code
+  ```
+  class JsonWebSignature:
+      def _prepare_algorithm_key(self, header, payload, key):
+          alg = header["alg"]
+          algorithm = self.ALGORITHMS_REGISTRY[alg]
+          if callable(key):
+              key = key(header, payload)
+          elif key is None and "jwk" in header:
+              key = header["jwk"]
+          key = algorithm.prepare_key(key)
+          return algorithm, key
+  ```
+
+test "rank157: python authlib JWS caller-supplied key only is clean"
+  lang python
+  reject_review code.HeaderControlledJwkReview
+  code
+  ```
+  class JsonWebSignature:
+      def _prepare_algorithm_key(self, header, payload, key):
+          alg = header["alg"]
+          algorithm = self.ALGORITHMS_REGISTRY[alg]
+          if callable(key):
+              key = key(header, payload)
+          key = algorithm.prepare_key(key)
+          return algorithm, key
+  ```
+
+test "rank157: python authlib JWE header jwk fallback requires crypto review"
+  lang python
+  expect_review code.HeaderControlledJwkReview
+  code
+  ```
+  def prepare_key(alg, header, key):
+      if callable(key):
+          key = key(header, None)
+      elif key is None and "jwk" in header:
+          key = header["jwk"]
+      return alg.prepare_key(key)
+  ```
+
+test "rank157: python authlib JWE caller-supplied key only is clean"
+  lang python
+  reject_review code.HeaderControlledJwkReview
+  code
+  ```
+  def prepare_key(alg, header, key):
+      if callable(key):
+          key = key(header, None)
+      return alg.prepare_key(key)
+  ```
