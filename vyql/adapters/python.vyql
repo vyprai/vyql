@@ -571,6 +571,8 @@ adapter python {
   mark "ARC4.new" -> code.WeakCipher
   mark "Blowfish.new" -> code.WeakCipher
   mark "DES3.new" -> code.WeakCipher
+  // PyCrypto/PyCryptodome AES.new defaults to ECB when no MODE_* argument is supplied.
+  mark "AES.new" nval "MODE_" -> code.WeakCipher
   // ECB mode (CWE-327) — pycryptodome AES.MODE_ECB constant or cryptography modes.ECB().
   // The mode is a member access / call (not a string), so match the path on the Attr/Call.
   mark "AES.MODE_ECB" -> code.WeakCipher

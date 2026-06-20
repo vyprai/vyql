@@ -1,0 +1,35 @@
+test "rank211: pycrypto AES.new without an explicit mode uses weak default ECB"
+  lang python
+  expect VYQL-CRY-002
+  code
+  ```
+  from Crypto.Cipher import AES
+
+  def aesEncrypt(data, key):
+      cipher = AES.new(key)
+      data = data + (" " * (16 - (len(data) % 16)))
+      return cipher.encrypt(data)
+
+  def aesDecrypt(data, key):
+      cipher = AES.new(key)
+      return cipher.decrypt(data).rstrip()
+  ```
+
+test "rank211: pycrypto AES.new with explicit CTR mode is not default ECB"
+  lang python
+  reject VYQL-CRY-002
+  code
+  ```
+  from Crypto.Cipher import AES
+  from Crypto.Util import Counter
+
+  def aesEncrypt(data, key):
+      cipher = AES.new(key, AES.MODE_CTR,
+                       counter=Counter.new(128, initial_value=0))
+      return cipher.encrypt(data)
+
+  def aesDecrypt(data, key):
+      cipher = AES.new(key, AES.MODE_CTR,
+                       counter=Counter.new(128, initial_value=0))
+      return cipher.decrypt(data)
+  ```
