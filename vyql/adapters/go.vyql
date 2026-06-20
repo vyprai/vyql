@@ -166,6 +166,7 @@ adapter go {
   mark "GrantRole" -> code.AuthenticationRequiredOp
   mark "MakeAdmin" -> code.AuthenticationRequiredOp
   mark exact "analysis.function.context" val "function_name:SolveChallenge" val "selector:challenge.tries" val "selector:s.challenges" -> code.AuthAttemptLimitReview
+  mark exact "analysis.function.context" val "function_name:Verify" val "call:Get" val "binary:v==answer" nval "binary:v!=\"\"" -> code.EmptyVerifierAcceptance
   // HTTP response splitting / header injection (CWE-113).
   sink path "Header.Set" arg 1 -> code.ResponseHeaderWrite
   sink path "Header.Add" arg 1 -> code.ResponseHeaderWrite

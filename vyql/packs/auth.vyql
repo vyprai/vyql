@@ -29,3 +29,8 @@ rule AutoActiveSignupAccount {
   meta { id: "VYQL-AUTH-005", severity: high, cwe: [CWE_306, CWE_862], confidence_floor: medium }
   match code.AutoActiveSignupAccount as signup
 }
+
+rule EmptyVerifierAcceptance {
+  meta { id: "VYQL-AUTH-006", severity: medium, cwe: [CWE_345, CWE_670], confidence_floor: medium }
+  match code.EmptyVerifierAcceptance as verifier
+}

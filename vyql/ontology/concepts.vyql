@@ -629,6 +629,15 @@ concept AutoActiveSignupAccount : sink {
   review_assumption: "active status grants access to system resources before separate approval"
   review_confidence: medium
 }
+concept EmptyVerifierAcceptance : sink {
+  vulnerable_to: [authentication.AuthenticationBypass]
+  cwe: [CWE_345, CWE_670]
+  review_category: "auth"
+  review_condition: "verification succeeds when a missing stored challenge value equals an empty supplied answer"
+  review_evidence: "verifier context {pattern} compares the looked-up value to the supplied answer without excluding an empty stored value"
+  review_assumption: "a failed lookup returns an empty value and the verifier is reachable with attacker-supplied challenge id and answer"
+  review_confidence: medium
+}
 concept LocalRequestBypassReview : sink {
   vulnerable_to: [access_control.MissingAuthorization]
   cwe: [CWE_266, CWE_285, CWE_862]

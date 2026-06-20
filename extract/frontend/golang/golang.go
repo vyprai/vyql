@@ -414,10 +414,46 @@ func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
 			} else {
 				add("call:" + p)
 			}
+		case *ast.BinaryExpr:
+			if tok := c.goBinaryToken(x); tok != "" {
+				add(tok)
+			}
 		}
 		return true
 	})
 	return out
+}
+
+func (c *conv) goBinaryToken(x *ast.BinaryExpr) string {
+	left := c.goAtomToken(x.X)
+	right := c.goAtomToken(x.Y)
+	if left == "" || right == "" {
+		return ""
+	}
+	return "binary:" + left + x.Op.String() + right
+}
+
+func (c *conv) goAtomToken(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.Ident:
+		return x.Name
+	case *ast.SelectorExpr:
+		if p := c.path(x); p != "" {
+			return p
+		}
+	case *ast.BasicLit:
+		if x.Kind == token.STRING {
+			v, err := strconv.Unquote(x.Value)
+			if err != nil || len(v) > 64 {
+				return ""
+			}
+			return strconv.Quote(v)
+		}
+		if len(x.Value) <= 64 {
+			return x.Value
+		}
+	}
+	return ""
 }
 func (c *conv) goParamEntries(name string, params []string, paramTypes map[string]string) []nir.ParamEntry {
 	var out []nir.ParamEntry

@@ -1,0 +1,37 @@
+test "rank202: base64captcha accepts empty id and answer"
+  lang go
+  expect VYQL-AUTH-006
+  code
+  ```
+  package base64Captcha
+
+  type memoryStore struct{}
+
+  func (s *memoryStore) Get(id string, clear bool) (value string) {
+      return
+  }
+
+  func (s *memoryStore) Verify(id, answer string, clear bool) bool {
+      v := s.Get(id, clear)
+      return v == answer
+  }
+  ```
+
+test "rank202: base64captcha rejects missing stored answer"
+  lang go
+  reject VYQL-AUTH-006
+  code
+  ```
+  package base64Captcha
+
+  type memoryStore struct{}
+
+  func (s *memoryStore) Get(id string, clear bool) (value string) {
+      return
+  }
+
+  func (s *memoryStore) Verify(id, answer string, clear bool) bool {
+      v := s.Get(id, clear)
+      return v != "" && v == answer
+  }
+  ```
