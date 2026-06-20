@@ -1,0 +1,55 @@
+test "rank175: EFS CSI mount target IP is appended to mount options without IP validation"
+  lang go
+  expect VYQL-INJ-031
+  code
+  ```
+  package driver
+
+  func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+    mountOptions := []string{}
+    volContext := req.GetVolumeContext()
+    for k, v := range volContext {
+      switch strings.ToLower(k) {
+      case MountTargetIp:
+        ipAddr := volContext[MountTargetIp]
+        mountOptions = append(mountOptions, MountTargetIp+"="+ipAddr)
+      default:
+        _ = v
+      }
+    }
+    if err := d.mounter.Mount(source, target, fsType.String(), mountOptions); err != nil {
+      return nil, err
+    }
+    return &csi.NodePublishVolumeResponse{}, nil
+  }
+  ```
+
+test "rank175: EFS CSI mount target IP is validated before becoming a mount option"
+  lang go
+  reject VYQL-INJ-031
+  code
+  ```
+  package driver
+
+  import "net"
+
+  func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+    mountOptions := []string{}
+    volContext := req.GetVolumeContext()
+    for k, v := range volContext {
+      switch strings.ToLower(k) {
+      case MountTargetIp:
+        if net.ParseIP(v) == nil {
+          return nil, status.Error(codes.InvalidArgument, "invalid IP address")
+        }
+        mountOptions = append(mountOptions, MountTargetIp+"="+v)
+      default:
+        _ = v
+      }
+    }
+    if err := d.mounter.Mount(source, target, fsType.String(), mountOptions); err != nil {
+      return nil, err
+    }
+    return &csi.NodePublishVolumeResponse{}, nil
+  }
+  ```

@@ -278,6 +278,7 @@ adapter go {
   mark exact "analysis.function.context" val "literal:SELECT 'aurora_global_db_instance_status'::regproc" nval "pg_catalog.aurora_global_db_instance_status" -> code.UnqualifiedDatabaseRoutineReview
   mark exact "analysis.function.context" val "literal:SELECT count(1) FROM aurora_global_db_status()" nval "pg_catalog.aurora_global_db_status" -> code.UnqualifiedDatabaseRoutineReview
   mark exact "analysis.function.context" val "literal:FROM aurora_global_db_instance_status()" nval "pg_catalog.aurora_global_db_instance_status" -> code.UnqualifiedDatabaseRoutineReview
+  mark exact "analysis.function.context" val "function_name:NodePublishVolume" val "call:GetVolumeContext" val "call:append" val "call:Mount" nval "call:ParseIP" -> code.CommandOptionInjection
   // Review-only: writing security state through ordinary path opening of procfs control
   // files needs a verified procfs/open boundary to avoid link or mount redirection.
   mark exact "analysis.function.context" val "call_path:os.OpenFile" val "literal:/proc/self/attr/exec" nval "call:OpenProcRoot" nval "call:OpenThreadSelf" nval "call_path:pathrs.Reopen" -> code.SpecialFileAccessReview
