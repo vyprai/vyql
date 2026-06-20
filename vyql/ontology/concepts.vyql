@@ -742,6 +742,15 @@ concept UnboundedAllocationReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_770]
 }
+concept ReachableAssertionReview : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_617]
+  review_category: "resource"
+  review_condition: "externally reachable input can violate an internal assertion or invariant and terminate the process"
+  review_evidence: "input validation context {pattern} reaches assertion-backed invariant logic without an observed rejection branch"
+  review_assumption: "the validated fields can be supplied across a process or trust boundary"
+  review_confidence: possibility
+}
 // Configuration or diagnostic serialization that may include inline secrets unless redacted.
 // Review-only: static analysis cannot know which config fields are sensitive in every
 // project, so the AI/manual pass should verify redaction before exposure through APIs,

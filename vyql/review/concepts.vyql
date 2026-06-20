@@ -244,6 +244,11 @@ review code.UnboundedAllocationReview {
   kind: "attention"
   text: "review allocation sizes derived from parsed counts for per-item limits, aggregate consistency checks, and overflow"
 }
+review code.ReachableAssertionReview {
+  category: "resource"
+  kind: "attention"
+  text: "review externally reachable validation paths that can violate internal assertions or invariants"
+}
 review code.StructuredInputDecode {
   category: "input_validation"
   kind: "attention"
