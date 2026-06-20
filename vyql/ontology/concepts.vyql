@@ -749,6 +749,10 @@ concept UnboundedResourceOperation : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_772]
 }
+concept UnstoppedLimitedStream : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_772]
+}
 concept UnboundedStateGrowthReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_770]

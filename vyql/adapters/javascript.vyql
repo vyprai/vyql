@@ -572,10 +572,12 @@ adapter javascript {
   mark "https.get" val "rejectUnauthorized=false" -> code.CertValidationDisabled
   mark "https.Agent" val "rejectUnauthorized=false" -> code.CertValidationDisabled
   mark "tls.connect" val "rejectUnauthorized=false" -> code.CertValidationDisabled
+  mark exact "analysis.function.context" val "responseBuffer.push(chunk)" val "Buffer.concat(responseBuffer).length>config.maxContentLength" nval "stream.destroy()" -> code.UnboundedResourceOperation
   mark "fs.openSync" -> code.ResourceHandle
   mark "fs.open" -> code.ResourceHandle
   control "fs.closeSync" -> core.ResourceRelease
   control "fs.close" -> core.ResourceRelease
+  mark exact "analysis.function.context" val "maxContentLength" val "Buffer.concat(responseBuffer).length>config.maxContentLength" val "reject(createError" nval "stream.destroy" -> code.UnstoppedLimitedStream
 
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
   mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified
