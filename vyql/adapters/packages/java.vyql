@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile, UnparameterizedSqlQueryParser}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter java {
@@ -31,6 +31,9 @@ adapter java {
     sink method "executeQuery" -> SqlExecution
     sink method "executeUpdate" -> SqlExecution
     control "PreparedStatement" -> SqlParameterization
+  }
+  package "neo.dbaccess" {
+    mark exact "analysis.function.context" val "function_name:execute" val "call_path:t.getConnection.prepareStatement" val "call_path:st.executeQuery" nval "call:setString" -> UnparameterizedSqlQueryParser
   }
   package "hibernate-core" {
     sink method "createNativeQuery" -> SqlExecution
