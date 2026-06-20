@@ -198,6 +198,7 @@ adapter python {
   sink path "logger.debug" -> code.LogOutput
   sink path "log.info" -> code.LogOutput
   sink path "log.error" -> code.LogOutput
+  mark exact "analysis.function.context" val "name=parsedkim" val "_warnmsg" val "Unknown DKIM key type" val "dkim['k']" nval "_warnmsg(\"Unknown DKIM key type\")" -> code.UnneutralizedDiagnosticValue
   mark "logging.info" -> code.LogWrite
   mark "logging.warning" -> code.LogWrite
   mark "logging.error" -> code.LogWrite

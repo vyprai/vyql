@@ -1054,6 +1054,10 @@ concept LogOutput : sink {
   excluded_chars: "\n\r"
   possibility: exclude
 }
+concept UnneutralizedDiagnosticValue : sink {
+  vulnerable_to: [injection.LogInjection]
+  cwe: [CWE_150, CWE_117]
+}
 concept LogWrite : sink {
   vulnerable_to: [secrets.SecretLeak]
   enabled_by: [taint.SecretValue]

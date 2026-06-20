@@ -147,6 +147,11 @@ rule Log {
   taint core.UserControlledData -> code.LogOutput
 }
 
+rule UnneutralizedDiagnosticValue {
+  meta { id: "VYQL-INJ-036", severity: medium, cwe: [CWE_150, CWE_117], confidence_floor: medium }
+  match code.UnneutralizedDiagnosticValue as diagnostic
+}
+
 rule HttpResponseSplitting {
   meta { id: "VYQL-INJ-010", severity: medium, cwe: [CWE_113] }
   taint core.UserControlledData -> code.ResponseHeaderWrite
