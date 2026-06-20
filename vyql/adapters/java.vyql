@@ -256,10 +256,16 @@ adapter java {
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
+  control "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
+  control "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
+  control "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
   // materialize hardening as a node mark for the structural XXE rule's guarded_by
   mark "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   mark "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
   mark "setExpandEntityReferences" val "false" -> core.XmlHardening
+  mark "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
+  mark "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
+  mark "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
   mark "setProperty" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
   mark "setXIncludeAware" val "false" -> core.XmlHardening
   // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
