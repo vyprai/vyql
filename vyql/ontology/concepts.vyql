@@ -941,6 +941,15 @@ concept UnboundedAllocationReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_770]
 }
+concept UnboundedDelimiterSplitCount : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "a delimiter-count helper fully splits attacker-sized input before enforcing a count limit"
+  review_evidence: "delimiter-count context {pattern} materializes all split parts before comparing with the limit"
+  review_assumption: "the parsed input body can contain enough delimiters to amplify CPU or memory within the accepted byte limit"
+  review_confidence: medium
+}
 concept LengthDerivedAllocation : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_789]

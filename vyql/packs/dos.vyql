@@ -33,3 +33,8 @@ rule LengthDerivedAllocation {
   meta { id: "VYQL-DOS-006", severity: high, cwe: [CWE_400, CWE_789], confidence_floor: medium }
   match code.LengthDerivedAllocation as allocation
 }
+
+rule UnboundedDelimiterSplitCount {
+  meta { id: "VYQL-DOS-007", severity: high, cwe: [CWE_400], confidence_floor: medium }
+  match code.UnboundedDelimiterSplitCount as split
+}

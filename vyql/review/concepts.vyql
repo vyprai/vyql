@@ -316,6 +316,11 @@ review code.UnboundedAllocationReview {
   kind: "attention"
   text: "review allocation sizes derived from parsed counts for per-item limits, aggregate consistency checks, and overflow"
 }
+review code.UnboundedDelimiterSplitCount {
+  category: "resource"
+  kind: "attention"
+  text: "review delimiter counting that fully splits attacker-sized input before enforcing the count limit"
+}
 review code.LengthDerivedAllocation {
   category: "resource"
   kind: "attention"
