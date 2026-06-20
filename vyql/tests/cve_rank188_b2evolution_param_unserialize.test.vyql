@@ -1,0 +1,54 @@
+test "rank188: b2evolution request helper params are unserialized without array-only guard"
+  lang php
+  expect VYQL-DESER-007
+  code
+  ```
+  <?php
+
+  param( 'plugin_ID', 'integer', true );
+  param( 'method', 'string', '' );
+  param( 'params', 'string', null );
+
+  if( is_null($params) )
+  {
+    $params = array();
+  }
+  else
+  {
+    $params = @unserialize($params);
+  }
+
+  $Plugins->call_method( $Plugin->ID, 'htsrv_'.$method, $params );
+  ?>
+  ```
+
+test "rank188: b2evolution request helper params are restricted before unserialize"
+  lang php
+  reject VYQL-DESER-007
+  code
+  ```
+  <?php
+
+  param( 'plugin_ID', 'integer', true );
+  param( 'method', 'string', '' );
+  param( 'params', 'string', null );
+
+  if( is_null( $params ) )
+  {
+    $params = array();
+  }
+  else
+  {
+    if( substr( $params, 0, 2 ) == 'a:' )
+    {
+      $params = @unserialize( $params );
+    }
+    else
+    {
+      $params = array();
+    }
+  }
+
+  $Plugins->call_method( $Plugin->ID, 'htsrv_'.$method, $params );
+  ?>
+  ```

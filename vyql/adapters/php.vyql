@@ -33,6 +33,7 @@ adapter php {
   source "getenv" val "PATH_INFO" -> code.HttpInput
   mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "$port<1024" -> code.IncompleteServerPortValidation
   mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "1024>$port" -> code.IncompleteServerPortValidation
+  mark exact "analysis.module.context" val "lang=php" val "param('params'" val "unserialize($params" nval "substr" nval "a:" -> code.UnrestrictedRequestParamDeserialization
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION['info']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"info\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION['message']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
