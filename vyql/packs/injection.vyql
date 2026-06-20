@@ -120,6 +120,11 @@ rule IncompleteHtmlEntityEscape {
   match code.IncompleteHtmlEntityEscape as sink
 }
 
+rule UnescapedDiagnosticHtml {
+  meta { id: "VYQL-INJ-047", severity: medium, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedDiagnosticHtml as sink
+}
+
 rule PdfJsEvalSupported {
   meta { id: "VYQL-INJ-022", severity: high, cwe: [CWE_79] }
   taint code.PdfJsEvalSupported -> code.PdfJsDocumentLoad

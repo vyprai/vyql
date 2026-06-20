@@ -1250,6 +1250,15 @@ concept UnescapedExceptionMessageMarkup : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
 }
+concept UnescapedDiagnosticHtml : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "diagnostic or log text containing remote response data is rendered as HTML without escaping"
+  review_evidence: "diagnostic assembly context {pattern} appends unescaped data into an HTML-rendered log field"
+  review_assumption: "the diagnostic log is visible in a browser context"
+  review_confidence: medium
+}
 concept PdfJsEvalSupported : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_79]

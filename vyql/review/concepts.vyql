@@ -393,6 +393,12 @@ review code.HtmlAttributeRewriteReview {
   kind: "attention"
   text: "review HTML attribute rewrite logic that injects dynamic values into generated markup"
 }
+review code.UnescapedDiagnosticHtml {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review diagnostic log fields rendered as HTML for escaping of remote response data"
+}
 review code.AmbiguousQueryParameterSeparator {
   category: "request"
   kind: "attention"
