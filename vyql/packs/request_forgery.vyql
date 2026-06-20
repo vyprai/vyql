@@ -18,6 +18,11 @@ rule IncompleteServerPortValidation {
   match code.IncompleteServerPortValidation as guard
 }
 
+rule RequestHostUrlValidationBypass {
+  meta { id: "VYQL-RF-010", severity: high, cwe: [CWE_918, CWE_20], confidence_floor: medium }
+  match code.RequestHostUrlValidationBypass as guard
+}
+
 rule OpenRedirect {
   meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601], benchmark: redirect }
   taint core.UserControlledData -> code.RedirectTarget

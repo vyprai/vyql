@@ -140,6 +140,12 @@ review code.ChecksumErrorLogoutRedirect {
   expected: [core.RedirectAllowlist]
   text: "review checksum-error redirect handling that can fall back to request-supplied logout URLs"
 }
+review code.RequestHostUrlValidationBypass {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review URL host validation that trusts request Host or server-name metadata instead of a configured allowlist"
+}
 review code.SensitiveOperation {
   category: "auth"
   kind: "target"

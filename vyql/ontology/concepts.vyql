@@ -846,6 +846,18 @@ concept IncompleteServerPortValidation : sink {
   vulnerable_to: [request_forgery.Ssrf]
   cwe: [CWE_918]
 }
+// URL/domain validation that trusts the inbound Host header or request host as
+// the allowlist authority. Attackers who control Host can make an absolute URL
+// appear same-domain unless validation uses a configured allowlist.
+concept RequestHostUrlValidationBypass : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  cwe: [CWE_20, CWE_918]
+  review_category: "request_forgery"
+  review_condition: "absolute URL validation accepts hosts derived from the current HTTP request"
+  review_evidence: "URL host validation context {pattern} compares URL host against request host metadata"
+  review_assumption: "the request Host header or equivalent server-name metadata can be attacker-controlled"
+  review_confidence: medium
+}
 // A resource-acquiring / potentially-unbounded operation (open file/socket/connection,
 // spawn thread, allocate, read-all). POSSIBILITY-tier review concept for the resource/DoS
 // bucket: "verify this resource is bounded and released". Inert for confirmed rules.
