@@ -243,6 +243,7 @@ adapter php {
   mark method "insert" -> code.StateChangingOp
   mark method "update" -> code.StateChangingOp
   mark method "delete" -> code.StateChangingOp
+  mark exact "analysis.class.context" val "Action" val "deleteBy" val "redirect" nval "assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
   sink path "queryDB" val "insert into" -> code.StateChangingOp
   sink path "queryDB" val "replace into" -> code.StateChangingOp
   sink path "queryDB" val "update " val " set " -> code.StateChangingOp

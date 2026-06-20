@@ -187,6 +187,12 @@ review code.IncompleteCsrfTokenValidation {
   expected: [core.CsrfProtection]
   text: "review CSRF token validation for empty-token acceptance or missing freshness checks"
 }
+review code.MissingHttpMethodAssertion {
+  category: "csrf"
+  kind: "attention"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "review state-changing HTTP actions for explicit allowed-method assertions"
+}
 review code.InsecurePermission {
   category: "permission"
   kind: "target"

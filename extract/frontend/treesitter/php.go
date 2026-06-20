@@ -93,7 +93,10 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			Exported:      exported,
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
+		name := c.text(field(n, "name"))
+		body := c.block(field(n, "body"))
+		body = append(body, c.phpClassContext(n, name)...)
+		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L}}
 	case "expression_statement":
 		kids := namedChildren(n)
 		if len(kids) == 0 {
@@ -233,6 +236,14 @@ func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	}
 	name := c.text(field(fn, "name"))
 	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", "lang=php\x00name="+name, c.text(body))
+}
+
+func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt {
+	body := field(cls, "body")
+	if body == nil {
+		return nil
+	}
+	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", "lang=php\x00name="+name, c.text(body))
 }
 
 func (c *phConv) phpContextCall(path, loc, method, prefix, text string) []nir.Stmt {

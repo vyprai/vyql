@@ -30,6 +30,11 @@ rule IncompleteCsrfTokenValidation {
   match code.IncompleteCsrfTokenValidation as guard
 }
 
+rule MissingHttpMethodAssertion {
+  meta { id: "VYQL-RF-007", severity: medium, cwe: [CWE_352, CWE_749], confidence_floor: medium }
+  match code.MissingHttpMethodAssertion as action
+}
+
 rule Csrf {
   meta { id: "VYQL-RF-003", severity: medium, cwe: [CWE_352] }
   taint core.UserControlledData -> code.StateChangingOp
