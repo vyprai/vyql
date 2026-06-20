@@ -184,6 +184,7 @@ adapter php {
   control "checkOwnership" -> core.OwnershipCheck
   control "requireOwner" -> core.OwnershipCheck
   control "isOwner" -> core.OwnershipCheck
+  control "analysis.function.context" val "customer_id" val "auth()->guard" val "user()->id" -> core.OwnershipCheck
   control method "userHasAccessTo" -> core.AuthorizationCheck
   mark exact "analysis.function.context" val "ResetPassword" val "createToken" val "account:login-token" val "absolute: true" val "$email->text" nval "buildBaseUrl" nval "resolveUri" -> code.PasswordRecoveryLinkHostControl
   control "htmlspecialchars" -> core.HtmlEscape
