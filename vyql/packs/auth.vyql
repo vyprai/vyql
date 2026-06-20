@@ -19,3 +19,8 @@ rule WeakPasswordRecoveryLinkHost {
   meta { id: "VYQL-AUTH-003", severity: high, cwe: [CWE_640], confidence_floor: medium }
   match code.PasswordRecoveryLinkHostControl as link
 }
+
+rule MfaRedirectBypass {
+  meta { id: "VYQL-AUTH-004", severity: high, cwe: [CWE_288], confidence_floor: medium }
+  match code.MfaRedirectBypass as bypass
+}

@@ -603,6 +603,10 @@ concept AuthFlowBypassReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]
 }
+concept MfaRedirectBypass : sink {
+  vulnerable_to: [authentication.AuthenticationBypass]
+  cwe: [CWE_288]
+}
 concept LocalRequestBypassReview : sink {
   vulnerable_to: [access_control.MissingAuthorization]
   cwe: [CWE_266, CWE_285, CWE_862]
