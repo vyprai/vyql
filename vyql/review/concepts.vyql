@@ -492,6 +492,11 @@ review code.UncheckedEncodedLengthArithmetic {
   kind: "attention"
   text: "review serialized length arithmetic that narrows or scales sizes without checked overflow handling"
 }
+review code.PointerOffsetBoundsCheck {
+  category: "numeric"
+  kind: "attention"
+  text: "review pointer-plus-length bounds comparisons; compare the length to remaining buffer size before advancing the pointer"
+}
 review code.UnsafeYamlConstructor {
   category: "deserialization"
   kind: "attention"

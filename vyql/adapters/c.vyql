@@ -93,6 +93,7 @@ adapter c {
   mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
   mark exact "analysis.function.context" val "lang=c" val "name=bt_att_cancel" val "queue_remove_if(att->req_queue" val "queue_remove_if(att->ind_queue" val "queue_remove_if(att->write_queue" val "destroy_att_send_op(op)" nval "att->in_disc" nval "bt_att_disc_cancel" -> code.ReentrantQueueCleanupReview
   mark exact "analysis.function.context" val "lang=c" val "unescapeChar(*readPtr++);}*writePtr++=c;" -> code.EscapedTerminatorWrite
+  mark exact "analysis.function.context" val "lang=c" val "start+len+1>end" val "start+=len" nval "buff_size" nval "end-start-1" -> code.PointerOffsetBoundsCheck
   mark exact "analysis.function.context" val "lang=c" val "name=match" val "cur->peercallno==callno" val "dcallno==cur->callno" nval "full_frame?dcallno==cur->callno" -> code.ProtocolFrameBindingReview
   mark exact "analysis.function.context" val "lang=c" val "name=__of_unflatten_dtb" val "FDT_BEGIN_NODE" val "FDT_PROP" val "is_reserved_name(pathp)" val "is_reserved_name(name)" val "of_new_node(node,pathp)" val "of_new_property" nval "is_allowed_input_name" nval "strchr(name,'/')" -> code.ProtocolStateReview
   mark exact "analysis.function.context" val "lang=c" val "name=dispatch_cmd" val "OP_PUT" val "body_size=strtoul" val "body_size>job_data_size_limit" val "reply_msg(c,MSG_JOB_TOO_BIG)" nval "skip(c,body_size+2,MSG_JOB_TOO_BIG)" -> code.ProtocolCommandInjection

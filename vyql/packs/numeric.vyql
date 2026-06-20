@@ -27,3 +27,8 @@ rule UncheckedEncodedLengthArithmetic {
   meta { id: "VYQL-NUM-005", severity: medium, cwe: [CWE_190, CWE_835], confidence_floor: medium }
   match code.UncheckedEncodedLengthArithmetic as arithmetic
 }
+
+rule PointerOffsetBoundsCheck {
+  meta { id: "VYQL-NUM-006", severity: medium, cwe: [CWE_20, CWE_125, CWE_190], confidence_floor: medium }
+  match code.PointerOffsetBoundsCheck as bounds
+}

@@ -1,0 +1,61 @@
+test "rank256: bencoded length pointer offset check is unsafe"
+  lang cpp
+  expect VYQL-NUM-006
+  expect_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  typedef long long int64_t;
+  bool numeric(char c) { return c >= '0' && c <= '9'; }
+  char const* parse_int(char const* start, char const* end, char delimiter, int64_t& val, int& ec);
+  void fail();
+
+  void lazy_bdecode(char const* start, char const* end) {
+    char t = *start;
+    ++start;
+    if (!numeric(t)) fail();
+    int64_t len = t - '0';
+    int ec = 0;
+    start = parse_int(start, end, ':', len, ec);
+    if (ec) fail();
+
+    if (start + len + 1 > end)
+      fail();
+    if (len < 0)
+      fail();
+
+    ++start;
+    start += len;
+  }
+  ```
+
+test "rank256: bencoded length compared to remaining buffer is clean"
+  lang cpp
+  reject VYQL-NUM-006
+  reject_review code.PointerOffsetBoundsCheck
+  code
+  ```
+  typedef long long int64_t;
+  typedef long ptrdiff_t;
+  bool numeric(char c) { return c >= '0' && c <= '9'; }
+  char const* parse_int(char const* start, char const* end, char delimiter, int64_t& val, int& ec);
+  void fail();
+
+  void lazy_bdecode(char const* start, char const* end) {
+    char t = *start;
+    ++start;
+    if (!numeric(t)) fail();
+    int64_t len = t - '0';
+    int ec = 0;
+    start = parse_int(start, end, ':', len, ec);
+    if (ec) fail();
+
+    const ptrdiff_t buff_size = end - start - 1;
+    if (len > buff_size)
+      fail();
+    if (len < 0)
+      fail();
+
+    ++start;
+    start += len;
+  }
+  ```

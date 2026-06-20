@@ -665,6 +665,15 @@ concept UncheckedEncodedLengthArithmetic : sink {
   review_assumption: "a malformed serialized payload can supply oversized container or string lengths"
   review_confidence: medium
 }
+concept PointerOffsetBoundsCheck : sink {
+  vulnerable_to: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
+  cwe: [CWE_20, CWE_125, CWE_190]
+  review_category: "numeric"
+  review_condition: "a pointer is advanced by an encoded length before the bounds comparison is made"
+  review_evidence: "pointer-offset bounds context {pattern} compares pointer+length against an end pointer"
+  review_assumption: "a malformed serialized length can move the pointer outside the valid buffer before the check"
+  review_confidence: medium
+}
 concept UnderwidthFormattedIndex : sink {
   vulnerable_to: [memory.BoundsError]
   cwe: [CWE_192, CWE_125]
