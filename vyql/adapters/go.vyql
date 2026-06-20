@@ -275,6 +275,7 @@ adapter go {
   mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxMapAllocSize" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "call:SkipNBytes" val "call:int" nval "call:SkipNBytesInt64" nval "function_name:SkipNBytesInt64" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "function_name:readBlock" val "call:ReadLong" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "function_name:pgsqlFieldsParser" val "call:ReadString" val "call:BytesNtohs" val "binary:len(buf)<=off" nval "binary:len(buf)<off+2" -> code.FieldDerivedIndexAccess
   sink method "BranchPageElement" val "Count" -> code.CountDerivedElementAccess
   mark "__binop.ne" val "Count" val "0" -> core.MemoryBoundsCheck
   mark exact "analysis.function.context" val "literal:SELECT 'aurora_global_db_status'::regproc" nval "pg_catalog.aurora_global_db_status" -> code.UnqualifiedDatabaseRoutineReview

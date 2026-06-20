@@ -452,6 +452,25 @@ func (c *conv) goAtomToken(e ast.Expr) string {
 		if len(x.Value) <= 64 {
 			return x.Value
 		}
+	case *ast.CallExpr:
+		p := c.path(x.Fun)
+		if p == "len" && len(x.Args) == 1 {
+			arg := c.goAtomToken(x.Args[0])
+			if arg != "" {
+				return "len(" + arg + ")"
+			}
+		}
+	case *ast.BinaryExpr:
+		left := c.goAtomToken(x.X)
+		right := c.goAtomToken(x.Y)
+		if left != "" && right != "" && len(left)+len(right) <= 120 {
+			switch x.Op {
+			case token.ADD, token.SUB:
+				return left + x.Op.String() + right
+			}
+		}
+	case *ast.ParenExpr:
+		return c.goAtomToken(x.X)
 	}
 	return ""
 }
