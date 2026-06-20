@@ -138,9 +138,11 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(paramsNode)
 		paramTypes := c.paramTypes(paramsNode)
 		body := c.block(field(n, "body"))
+		annotationTokens := c.jvAnnotationTokens(n, "annotation:")
 		tokens := append([]string{}, c.classParamTokens...)
-		tokens = append(tokens, c.jvAnnotationTokens(n, "annotation:")...)
+		tokens = append(tokens, annotationTokens...)
 		contextTokens := append([]string{}, c.classContextTokens...)
+		contextTokens = append(contextTokens, annotationTokens...)
 		contextTokens = append(contextTokens, c.jvFunctionTokens(name, n)...)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
 			ContextTokens: contextTokens,
