@@ -65,6 +65,9 @@ adapter php {
   // dynamic placeholder into generated image markup should be inspected for attribute breakouts.
   mark exact "analysis.function.context" val "lang=php" val "autoptimize_filter_imgopt_lazyload_placeholder" val "preg_replace" val "$placeholder" val "data-src" val "data-srcset" -> code.HtmlAttributeRewriteReview
   mark exact "analysis.function.context" val "lang=php" val "_maliciousFilename" val "strpos(" val "/../" val "../" nval "phar://" -> code.IncompleteArchiveFilenameValidation
+  // Review-only installer/config entry point: rewriting a live PHP configuration file from
+  // request data should have an install-state or authorization gate before the write.
+  mark exact "analysis.module.context" val "lang=php" val "$_POST['systemRootPath']" val "videos/configuration.php" val "fopen" nval "../videos/configuration.php" -> code.PrivilegedEntryPointReview
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   sink path "mysqli_query" arg 1 -> code.SqlExecution
