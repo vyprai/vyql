@@ -516,7 +516,7 @@ adapter javascript {
   sink path "RegExp" -> code.RegexCompile
   sink receiver "replace" val "+)*m" -> code.RegexMatch
   mark "RegExp" val "d]*(?:;" -> code.CatastrophicRegex
-  mark exact "analysis.function.context" val "lang=javascript" val "this.match(/^\\{(,+(?:(\\{,+\\})*),*|,*(?:(\\{,+\\})*),+)\\}/)" nval "this.match(/^\\{((?:,|\\{,+\\})+)\\}/)" -> code.CatastrophicRegex
+  mark method "match" val "^\\{(,+(?:(\\{,+\\})*),*|,*(?:(\\{,+\\})*),+)\\}" nval "^\\{((?:,|\\{,+\\})+)\\}" -> code.CatastrophicRegex
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "bulkCreate" -> code.MassAssign
