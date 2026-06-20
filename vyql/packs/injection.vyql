@@ -95,11 +95,6 @@ rule UnescapedRequestGlobalTemplateVar {
   match code.UnescapedRequestGlobalTemplateVar as sink
 }
 
-rule UnescapedRequestHtmlAttribute {
-  meta { id: "VYQL-INJ-043", severity: high, cwe: [CWE_79], confidence_floor: medium }
-  match code.UnescapedRequestHtmlAttribute as sink
-}
-
 rule UnescapedHtmlOptionRenderer {
   meta { id: "VYQL-INJ-041", severity: high, cwe: [CWE_79], confidence_floor: medium }
   match code.UnescapedHtmlOptionRenderer as sink

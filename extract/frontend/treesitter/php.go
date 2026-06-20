@@ -50,7 +50,12 @@ func (c *phConv) text(n *tree_sitter.Node) string {
 
 func (c *phConv) block(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, st := range namedChildren(n) {
+	kids := namedChildren(n)
+	for i, st := range kids {
+		if i > 0 && c.phpOpensShorthandEcho(kids[i-1]) && st.Kind() == "expression_statement" {
+			out = append(out, c.phpEchoExprStmt(st)...)
+			continue
+		}
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -220,6 +225,33 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			Args: args, Path: "include", Method: "include", Loc: c.loc(inner)}}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+func (c *phConv) phpEchoExprStmt(n *tree_sitter.Node) []nir.Stmt {
+	kids := namedChildren(n)
+	if len(kids) == 0 {
+		return nil
+	}
+	L := c.loc(n)
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "echo", Loc: L},
+		Args:   []nir.Expr{c.expr(kids[0])},
+		Path:   "echo",
+		Method: "echo",
+		Loc:    L,
+	}}}
+}
+
+func (c *phConv) phpOpensShorthandEcho(n *tree_sitter.Node) bool {
+	if n == nil || n.Kind() != "text_interpolation" {
+		return false
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "php_tag" && strings.TrimSpace(c.text(ch)) == "<?=" {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *phConv) phpModuleContext(root *tree_sitter.Node) []nir.Stmt {

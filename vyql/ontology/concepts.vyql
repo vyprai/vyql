@@ -1084,15 +1084,6 @@ concept UnescapedRequestGlobalTemplateVar : sink {
   review_assumption: "the template variables are later rendered into HTML or script context"
   review_confidence: medium
 }
-concept UnescapedRequestHtmlAttribute : sink {
-  vulnerable_to: [injection.Xss]
-  cwe: [CWE_79]
-  review_category: "xss"
-  review_condition: "request data is interpolated into an HTML attribute without an observed HTML escape"
-  review_evidence: "PHP mixed-template context {pattern} renders request-backed data inside an HTML attribute"
-  review_assumption: "the rendered template is returned as HTML to a browser"
-  review_confidence: medium
-}
 concept UnescapedHtmlOptionRenderer : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

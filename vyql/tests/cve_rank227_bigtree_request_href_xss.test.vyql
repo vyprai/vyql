@@ -1,7 +1,6 @@
 test "rank227: request id rendered into href without HTML escaping"
   lang php
-  expect VYQL-INJ-043
-  expect_review code.UnescapedRequestHtmlAttribute
+  expect VYQL-INJ-004
   code
   ```
   <?
@@ -24,8 +23,7 @@ test "rank227: request id rendered into href without HTML escaping"
 
 test "rank227: request id rendered into href with HTML escaping"
   lang php
-  reject VYQL-INJ-043
-  reject_review code.UnescapedRequestHtmlAttribute
+  reject VYQL-INJ-004
   code
   ```
   <?
