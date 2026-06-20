@@ -406,7 +406,7 @@ review code.FieldDerivedIndexAccess {
   text: "review field-derived array index access and the dominating upper-bound checks"
 }
 review code.IntegerSizeArithmetic {
-  category: "memory"
+  category: "numeric"
   kind: "attention"
   text: "review integer arithmetic used for address, size, or bounds calculations"
 }
