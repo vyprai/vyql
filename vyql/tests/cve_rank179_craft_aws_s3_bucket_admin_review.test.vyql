@@ -1,0 +1,58 @@
+test "rank179: Craft AWS S3 bucket loader lists buckets without admin check"
+  lang php
+  expect_review code.CredentialedEndpointReview
+  code
+  ```
+  <?php
+
+  class BucketsController extends BaseController
+  {
+      public function actionLoadBucketData(): Response
+      {
+          $this->requirePostRequest();
+          $this->requireAcceptsJson();
+
+          $request = Craft::$app->getRequest();
+          $keyId = App::parseEnv($request->getRequiredBodyParam('keyId'));
+          $secret = App::parseEnv($request->getRequiredBodyParam('secret'));
+
+          try {
+              return $this->asJson([
+                  'buckets' => Fs::loadBucketList($keyId, $secret),
+              ]);
+          } catch (\Throwable $e) {
+              return $this->asFailure($e->getMessage());
+          }
+      }
+  }
+  ```
+
+test "rank179: Craft AWS S3 bucket loader requires admin before listing buckets"
+  lang php
+  reject_review code.CredentialedEndpointReview
+  code
+  ```
+  <?php
+
+  class BucketsController extends BaseController
+  {
+      public function actionLoadBucketData(): Response
+      {
+          $this->requireAdmin();
+          $this->requirePostRequest();
+          $this->requireAcceptsJson();
+
+          $request = Craft::$app->getRequest();
+          $keyId = App::parseEnv($request->getRequiredBodyParam('keyId'));
+          $secret = App::parseEnv($request->getRequiredBodyParam('secret'));
+
+          try {
+              return $this->asJson([
+                  'buckets' => Fs::loadBucketList($keyId, $secret),
+              ]);
+          } catch (\Throwable $e) {
+              return $this->asFailure($e->getMessage());
+          }
+      }
+  }
+  ```
