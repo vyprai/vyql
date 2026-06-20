@@ -970,15 +970,6 @@ concept FilePathAccess : sink {
   cwe: [CWE_22]
   excluded_chars: "/\\"
 }
-concept IncompleteRemoteFilenameValidation : sink {
-  vulnerable_to: [path.PathTraversal]
-  cwe: [CWE_22]
-  review_category: "path"
-  review_condition: "remote listing filenames are joined into local filesystem paths without validating that each name is a basename"
-  review_evidence: "remote filename handling context {pattern} joins a remote file name into a local path without an observed basename or containment check"
-  review_assumption: "the remote endpoint can return filenames containing path separators or traversal segments"
-  review_confidence: high
-}
 concept FileUpload : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_434]
