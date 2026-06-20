@@ -194,6 +194,11 @@ rule HttpResponseSplitting {
   taint core.UserControlledData -> code.ResponseHeaderWrite
 }
 
+rule AmbiguousQueryParameterSeparator {
+  meta { id: "VYQL-INJ-046", severity: medium, cwe: [CWE_444], confidence_floor: medium }
+  match code.AmbiguousQueryParameterSeparator as sink
+}
+
 // Untrusted data used as a printf-style FORMAT string (CWE-134).
 rule FormatString {
   meta { id: "VYQL-INJ-011", severity: high, cwe: [CWE_134] }

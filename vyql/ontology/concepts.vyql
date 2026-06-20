@@ -1419,6 +1419,15 @@ concept ResponseHeaderWrite : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_113]
 }
+concept AmbiguousQueryParameterSeparator : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion]
+  cwe: [CWE_444]
+  review_category: "request"
+  review_condition: "query parser accepts semicolon as an alternate parameter separator"
+  review_evidence: "query parsing context {pattern} rewrites semicolons into ampersands before splitting parameters"
+  review_assumption: "upstream components, caches, or security filters use ampersand-only query delimiter semantics"
+  review_confidence: medium
+}
 concept SecretValue : source {
   taint: [taint.SecretValue]
   coverage_reserved_source: true
@@ -1480,7 +1489,7 @@ concept IncompleteArchiveFilenameValidation : sink {
 }
 concept ProtocolStateReview : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
-  cwe: [CWE_287, CWE_349, CWE_404]
+  cwe: [CWE_287, CWE_349, CWE_404, CWE_841]
 }
 concept RequestPolicyStripped : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
