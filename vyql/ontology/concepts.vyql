@@ -903,6 +903,10 @@ concept UnrestrictedRequestParamDeserialization : sink {
   vulnerable_to: [deserialization.DeserializationAbuse]
   cwe: [CWE_502]
 }
+concept ArchiveManifestDeserialization : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+}
 concept EnvVariable : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData

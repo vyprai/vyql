@@ -44,3 +44,8 @@ rule UnrestrictedRequestParamDeserialization {
   meta { id: "VYQL-DESER-007", severity: high, cwe: [CWE_502], confidence_floor: medium }
   match code.UnrestrictedRequestParamDeserialization as deserialization
 }
+
+rule ArchiveManifestDeserialization {
+  meta { id: "VYQL-DESER-008", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.ArchiveManifestDeserialization as deserialization
+}
