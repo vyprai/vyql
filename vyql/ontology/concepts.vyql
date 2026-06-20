@@ -607,6 +607,15 @@ concept MfaRedirectBypass : sink {
   vulnerable_to: [authentication.AuthenticationBypass]
   cwe: [CWE_288]
 }
+concept AutoActiveSignupAccount : sink {
+  vulnerable_to: [authentication.MissingAuthentication, access_control.MissingAuthorization]
+  cwe: [CWE_306, CWE_862]
+  review_category: "auth"
+  review_condition: "self-service signup creates an active account before an observed administrator activation step"
+  review_evidence: "signup context {pattern} initializes a newly registered user as active"
+  review_assumption: "active status grants access to system resources before separate approval"
+  review_confidence: medium
+}
 concept LocalRequestBypassReview : sink {
   vulnerable_to: [access_control.MissingAuthorization]
   cwe: [CWE_266, CWE_285, CWE_862]

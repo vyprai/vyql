@@ -24,3 +24,8 @@ rule MfaRedirectBypass {
   meta { id: "VYQL-AUTH-004", severity: high, cwe: [CWE_288], confidence_floor: medium }
   match code.MfaRedirectBypass as bypass
 }
+
+rule AutoActiveSignupAccount {
+  meta { id: "VYQL-AUTH-005", severity: high, cwe: [CWE_306, CWE_862], confidence_floor: medium }
+  match code.AutoActiveSignupAccount as signup
+}

@@ -1,0 +1,59 @@
+test "rank191: backend.ai signup creates immediately active user and keypair"
+  lang python
+  expect VYQL-AUTH-005
+  code
+  ```
+  class AuthService:
+      async def signup(self, action):
+          data = {
+              "domain_name": action.domain_name,
+              "email": action.email,
+              "status": UserStatus.ACTIVE,
+              "role": UserRole.USER,
+              "resource_policy": "default",
+          }
+          ak, sk = generate_keypair()
+          kp_data = {
+              "user_id": action.email,
+              "access_key": ak,
+              "secret_key": sk,
+              "is_active": True if data.get("status") == UserStatus.ACTIVE else False,
+          }
+          user = await self._auth_repository.create_user_with_keypair(
+              user_data=data,
+              keypair_data=kp_data,
+              group_name="default",
+              domain_name=action.domain_name,
+          )
+          return SignupActionResult(user_id=user.uuid, access_key=ak, secret_key=sk)
+  ```
+
+test "rank191: backend.ai signup defaults to inactive pending administrator activation"
+  lang python
+  reject VYQL-AUTH-005
+  code
+  ```
+  class AuthService:
+      async def signup(self, action):
+          data = {
+              "domain_name": action.domain_name,
+              "email": action.email,
+              "status": UserStatus.INACTIVE,
+              "role": UserRole.USER,
+              "resource_policy": "default",
+          }
+          ak, sk = generate_keypair()
+          kp_data = {
+              "user_id": action.email,
+              "access_key": ak,
+              "secret_key": sk,
+              "is_active": True if data.get("status") == UserStatus.ACTIVE else False,
+          }
+          user = await self._auth_repository.create_user_with_keypair(
+              user_data=data,
+              keypair_data=kp_data,
+              group_name="default",
+              domain_name=action.domain_name,
+          )
+          return SignupActionResult(user_id=user.uuid, access_key=ak, secret_key=sk)
+  ```

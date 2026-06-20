@@ -93,6 +93,7 @@ adapter python {
   source "os.getenv" -> code.SecretValue
   source "config.get" -> code.SecretValue
   source "settings.SECRET_KEY" -> code.SecretValue
+  mark exact "analysis.function.context" val "name=signup" val "UserStatus.ACTIVE" val "UserRole.USER" val "generate_keypair" val "create_user_with_keypair" nval "UserStatus.INACTIVE" -> code.AutoActiveSignupAccount
 
   // stored / second-order data — DB cursor reads (CWE-79 stored XSS when later rendered
   // unescaped). Only unambiguous cursor fetch methods are marked (bare .get/.all/.first
