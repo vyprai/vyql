@@ -64,6 +64,7 @@ adapter php {
   // Review-only credentialed cloud-resource endpoint: posted credentials used to enumerate
   // buckets should have an admin/authorization gate before returning JSON.
   mark exact "analysis.function.context" val "lang=php" val "getRequiredBodyParam" val "loadBucketList" val "asJson" nval "requireAdmin" -> code.CredentialedEndpointReview
+  mark exact "analysis.function.context" val "lang=php" val "getRequiredBodyParam" val "loadContainerList" val "asJson" nval "requireAdmin" -> code.CredentialedEndpointReview
   // Review-only HTML attribute rewrites: string/regex-based lazyload rewrites that splice a
   // dynamic placeholder into generated image markup should be inspected for attribute breakouts.
   mark exact "analysis.function.context" val "lang=php" val "autoptimize_filter_imgopt_lazyload_placeholder" val "preg_replace" val "$placeholder" val "data-src" val "data-srcset" -> code.HtmlAttributeRewriteReview
