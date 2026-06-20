@@ -1045,6 +1045,15 @@ concept ArchiveEntryWrite : sink {
   review_assumption: "the entry name is not normalized, confined, or symlink-safe before writing"
   review_confidence: medium
 }
+concept ArchiveSymlinkFilterBypass : sink {
+  vulnerable_to: [path.PathTraversal, path.LinkFollowing]
+  cwe: [CWE_22, CWE_59]
+  review_category: "path"
+  review_condition: "archive extraction symlink filter appears wired to the wrong entry metadata shape"
+  review_evidence: "archive extraction context {pattern} uses a symlink ignore callback that checks stale or unreachable entry metadata"
+  review_assumption: "archive entries may contain symlinks that redirect later writes outside the intended extraction directory"
+  review_confidence: medium
+}
 concept ArchiveEntryName : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData

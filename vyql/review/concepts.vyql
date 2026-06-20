@@ -347,6 +347,11 @@ review code.IncompleteArchiveFilenameValidation {
   kind: "attention"
   text: "review archive member filename validation for dangerous URI or stream-wrapper schemes"
 }
+review code.ArchiveSymlinkFilterBypass {
+  category: "path"
+  kind: "attention"
+  text: "review archive extraction symlink filters for library-specific callback signatures and symlink type values"
+}
 review code.CatastrophicRegex {
   category: "resource"
   kind: "attention"
