@@ -555,6 +555,15 @@ concept FailurePathOwnedBufferFree : sink {
   vulnerable_to: [memory.DoubleFree]
   cwe: [CWE_415]
 }
+concept ReentrantQueueCleanupReview : sink {
+  vulnerable_to: [memory.DoubleFree, memory.UseAfterFree]
+  cwe: [CWE_415, CWE_416]
+  review_category: "memory"
+  review_condition: "queue cleanup and cancellation can both own queued entries without an observed reentrant cleanup guard"
+  review_evidence: "queue-cancel context {pattern} removes queued operations and destroys them without a disconnect-cleanup diversion"
+  review_assumption: "a callback invoked during queue cleanup can reenter cancellation for an operation still owned by the cleanup traversal"
+  review_confidence: medium
+}
 concept ComputedSizeValue : source {
   taint: [taint.ComputedSize]
 }

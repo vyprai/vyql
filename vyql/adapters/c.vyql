@@ -91,6 +91,7 @@ adapter c {
   mark "__subscript" -> code.IndexAccess
   mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
   mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
+  mark exact "analysis.function.context" val "lang=c" val "name=bt_att_cancel" val "queue_remove_if(att->req_queue" val "queue_remove_if(att->ind_queue" val "queue_remove_if(att->write_queue" val "destroy_att_send_op(op)" nval "att->in_disc" nval "bt_att_disc_cancel" -> code.ReentrantQueueCleanupReview
   mark exact "analysis.function.context" val "lang=c" val "unescapeChar(*readPtr++);}*writePtr++=c;" -> code.EscapedTerminatorWrite
   mark exact "analysis.function.context" val "lang=c" val "name=match" val "cur->peercallno==callno" val "dcallno==cur->callno" nval "full_frame?dcallno==cur->callno" -> code.ProtocolFrameBindingReview
   mark exact "analysis.function.context" val "lang=c" val "name=__of_unflatten_dtb" val "FDT_BEGIN_NODE" val "FDT_PROP" val "is_reserved_name(pathp)" val "is_reserved_name(name)" val "of_new_node(node,pathp)" val "of_new_property" nval "is_allowed_input_name" nval "strchr(name,'/')" -> code.ProtocolStateReview

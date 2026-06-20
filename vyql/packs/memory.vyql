@@ -73,6 +73,11 @@ rule FailurePathOwnedBufferFree {
   match code.FailurePathOwnedBufferFree as free
 }
 
+rule ReentrantQueueCleanup {
+  meta { id: "VYQL-MEM-019", severity: high, cwe: [CWE_415, CWE_416], confidence_floor: medium }
+  match code.ReentrantQueueCleanupReview as cleanup
+}
+
 rule PotentialZeroSizeReallocation {
   meta { id: "VYQL-MEM-012", severity: high, cwe: [CWE_415], confidence_floor: low }
   taint code.ComputedSizeValue -> code.ZeroSizeReallocation
