@@ -357,6 +357,11 @@ review code.HtmlSanitizerLogicReview {
   kind: "attention"
   text: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
 }
+review code.UnescapedHtmlOptionRenderer {
+  category: "xss"
+  kind: "attention"
+  text: "review option-renderer HTML assembled from option metadata and whether it is sanitized before insertion"
+}
 review code.HtmlAttributeRewriteReview {
   category: "xss"
   kind: "attention"
