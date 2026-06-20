@@ -274,6 +274,11 @@ review code.SecurityKeyTrustOperation {
   kind: "target"
   text: "verify trust/key operations use a full collision-resistant identifier"
 }
+review code.PublicKeyHashBindingReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review signature verification flows that accept a public key without checking it matches the committed key hash"
+}
 review code.SecretComparisonReview {
   category: "crypto"
   kind: "attention"

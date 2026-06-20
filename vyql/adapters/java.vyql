@@ -74,6 +74,7 @@ adapter java {
   mark exact "analysis.function.context" val "function_name:safeDecryptPreMasterSecret" val "call:doFinal" val "call:createSecret" val "M[0]" nval "expr:m.length==48" -> code.PremasterSecretLengthReview
   mark exact "analysis.function.context" val "call:getServerName" val "call:getHost" val "call:equals" nval "call:contains" -> code.RequestHostUrlValidationBypass
   mark exact "analysis.function.context" val "call:setAuthentication" val "call:getSession" nval "call:invalidate" -> code.MissingSessionRotationAfterAuthentication
+  mark exact "analysis.function.context" val "function_name:correctlySpends" val "call:fromPublicOnly" val "call:verify" val "hashFor" nval "call:sha256hash160" -> code.PublicKeyHashBindingReview
 
   // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution

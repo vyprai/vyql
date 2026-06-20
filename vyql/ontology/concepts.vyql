@@ -300,6 +300,16 @@ concept HeaderControlledJwkReview : sink {
   cwe: [CWE_347]
 }
 
+concept PublicKeyHashBindingReview : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+  review_category: "crypto"
+  review_condition: "signature verification accepts a public key without binding it to the expected key hash"
+  review_evidence: "signature verification context {pattern} derives a public key and verifies a signature without an observed key-hash comparison"
+  review_assumption: "the script, witness, or signed payload can provide a public key that must match a committed key hash"
+  review_confidence: medium
+}
+
 concept ShortSecurityIdentifier : source {
   taint: [taint.WeakSecurityIdentifier]
   cwe: [CWE_358]
