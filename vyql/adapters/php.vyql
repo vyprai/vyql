@@ -208,6 +208,7 @@ adapter php {
   // core.PathAccessCheck). Leaving it out lets realpath-without-check traversal surface.
   // control "realpath" -> core.PathCanonicalization
   control "basename" -> core.PathCanonicalization
+  control "in_array" val "$tpl" val "$templates" -> core.PathAccessCheck
   control method "isBelow" -> core.PathAccessCheck
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0

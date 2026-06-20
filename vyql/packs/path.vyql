@@ -11,6 +11,7 @@ rule Traversal {
 rule FileInclusion {
   meta { id: "VYQL-PATH-002", severity: high, cwe: [CWE_98] }
   taint core.UserControlledData -> code.FileInclude
+  unless guarded_by core.PathAccessCheck
 }
 
 // Insecure temporary file (CWE-377) — predictable-name / race-prone temp APIs

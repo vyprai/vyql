@@ -1605,8 +1605,8 @@ concept PathCanonicalization : control {
   applies: path
 }
 concept PathAccessCheck : control {
-  neutralizes: [path.PathTraversal]
-  cwe: [CWE_22]
+  neutralizes: [path.PathTraversal, path.FileInclusion]
+  cwe: [CWE_22, CWE_98]
   applies: endpoint
 }
 concept RateLimit : control {
