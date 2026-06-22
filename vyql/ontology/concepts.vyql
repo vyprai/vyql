@@ -1332,6 +1332,15 @@ concept EffectiveUidRootCheckBypass : sink {
   review_assumption: "daemon startup may change effective privileges before worker code executes while the real UID remains privileged"
   review_confidence: medium
 }
+concept ParsedUserIdDefaultRootPrivilegeEscalation : sink {
+  vulnerable_to: [access_control.PrivilegeEscalation]
+  cwe: [CWE_269]
+  review_category: "auth"
+  review_condition: "numeric user identity parsing can return a zero-initialized root UID/GID object before assigning the parsed UID"
+  review_evidence: "user identity parser context {pattern} parses UID text and returns on a bare UID before writing the parsed UID into the process user structure"
+  review_assumption: "the zero-initialized user structure represents root or another higher-privilege default when a caller supplies a non-root UID"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]

@@ -232,6 +232,11 @@ Rules:
      For privilege/permission CVEs, inspect static role, group, route, policy,
      and permission maps such as PermissionsByRole, roles, grants, ACLs, backup,
      restore, admin, manager, operator, or support-bundle permission lists.
+     Also inspect privileged identity parsers that parse UID, GID, user, group,
+     role, or capability values into zero-initialized process/security structs.
+     If a parser can return on a delimiter/end-of-string check before assigning
+     the parsed UID/GID/role into the target struct, use function_context and a
+     narrow scan mark such as code.ParsedUserIdDefaultRootPrivilegeEscalation.
      For filesystem permission and secret-storage shapes, inspect functions
      that write private keys, credentials, tokens, kubeconfigs, cloud-init,
      ignition, or other boot/config artifacts and check for chmod, mode,
@@ -897,6 +902,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"expand", "extract", "directory", "dirent", "name", "path", "romfs", "read", "mkdir", "open"}
 	case profileContainsAnyTerm(profile, []string{"contentlength", "content-length", "io.readfull", "limitreader", "maxbytesreader", "maxbodysize", "bodysizexceeded", "readrequestbody"}):
 		return []string{"contentlength", "readfull", "readall", "limitreader", "maxbytesreader", "maxbodysize", "body", "request"}
+	case profileContainsAnyTerm(profile, []string{"userspec", "strtoll", "uid", "gid", "process->user", "process user", "--user", "parse user"}):
+		return []string{"strtoll", "userspec", "uid", "gid", "endptr", "user", "group"}
 	case archiveOverwriteProfile(profile):
 		return []string{"zip", "openreader", "openfile", "o_trunc", "stat", "getinput", "overwrite"}
 	case nativeMemoryProfile(profile):
@@ -915,6 +922,9 @@ func requiredCallInventoryTerms(profile Profile) []string {
 }
 
 func requiresAssignmentInventory(profile Profile) bool {
+	if profileContainsAnyTerm(profile, []string{"userspec", "strtoll", "uid", "gid", "process->user", "process user", "--user", "parse user"}) {
+		return true
+	}
 	if profile.Languages["php"] == 0 && profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 && profile.Languages["python"] == 0 && profile.Languages["ruby"] == 0 && profile.Languages["java"] == 0 && profile.Languages["go"] == 0 {
 		return false
 	}
@@ -950,6 +960,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 		return []string{"update_event", "job", "data", "schedule", "config", "allow_event_updates_from_jobs"}
 	case defaultRelaySecretProfile(profile):
 		return []string{"host", "polling", "url", "token", "gurl", "connection", "encode"}
+	case profileContainsAnyTerm(profile, []string{"userspec", "strtoll", "uid", "gid", "process->user", "process user", "--user", "parse user"}):
+		return []string{"uid", "gid", "user", "group", "endptr", "return", "assign"}
 	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
 		return []string{"user", "model", "data", "response", "json", "secret", "token", "password", "credential", "fields"}
 	case profileContainsAnyTerm(profile, []string{"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl", "safecanonicalurl", "x-forwarded-host", "host header", "getpathinfo", "sanitizeurl"}):
@@ -1786,6 +1798,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.ThreadLocalScopeOverwriteWithoutCleanup", "surface": "scan", "use": "mark for request/session/scope lifecycle methods that overwrite ThreadLocal state or per-thread caches without ending/removing the previous scope first"},
 		{"concept": "code.DisabledRelationshipMetadataExposure", "surface": "scan", "use": "mark for public relationship/resource metadata helpers that return relationship targets for disabled fields or invisible resources without checking enabled/access/visibility"},
 		{"concept": "code.OverbroadRolePermissionGrant", "surface": "scan", "use": "mark for static role/group/permission tables that assign backup, restore, admin, or similarly privileged operations to non-admin roles"},
+		{"concept": "code.ParsedUserIdDefaultRootPrivilegeEscalation", "surface": "scan", "use": "mark for UID/GID/user/group parsers that allocate a zeroed process or security identity struct and can return on a bare parsed value before assigning the parsed UID/GID/role into that struct"},
 		{"concept": "code.JobOutputEventUpdateAuthorizationBypass", "surface": "scan", "use": "mark for scheduler/plugin child-output handlers that copy update_event from child JSON into job state and later persist it to schedule/event configuration without a config or authorization gate; include nval allow_event_updates_from_jobs or delete data.update_event"},
 		{"concept": "code.DefaultExternalRelaySecretExposure", "surface": "scan", "use": "mark for relay/proxy/websocket URL builders that select a hardcoded fallback host while embedding tokens, credentials, connection metadata, or encoded upstream URLs"},
 		{"concept": "code.MethodGatedRedirectValidationBypass", "surface": "scan", "use": "mark for URL validation skipped for some HTTP methods before redirect/callback handling"},
@@ -2306,7 +2319,9 @@ func assignmentRiskScore(entry assignmentEntry) int {
 		"x-forwarded-host": 24, "twig": 18, "ssti": 24, "host": 8,
 		"asmodelsuccess": 30, "modelname": 18, "getacceptsjson": 14,
 		"toarray": 14, "extrafields": 14, "serialize": 12, "json": 8,
-		"permission": 12, "role": 10, "admin": 8, "policy": 8, "session": 8,
+		"uid": 16, "gid": 16, "userspec": 28, "endptr": 18, "strtoll": 18,
+		"process->user": 22,
+		"permission":    12, "role": 10, "admin": 8, "policy": 8, "session": 8,
 		"path": 8, "filename": 10, "url": 8, "redirect": 12, "origin": 10,
 		"token": 8, "secret": 12, "password": 12, "key": 6,
 	} {
@@ -3673,6 +3688,8 @@ func suggestContextVals(name string, compact string) []string {
 		"do_directory", "expand_fs", "romfs_read", "child->namelen",
 		"memcpy(newpath+pathlen,romfs_read(offset),newlen)",
 		"strchr(name,'/')", "strcmp(name,\"..\")",
+		"strtoll(userspec,&endptr,10)", "if(*endptr=='\\0')returnu",
+		"u->uid=(int)l", "u->gid=(int)l",
 		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
 		"returnUrlHelper::absoluteUrlWithProtocol($url)",
 		"returnDynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))",
@@ -3804,6 +3821,8 @@ func securitySnippet(text string) string {
 		"memcpy(newpath + pathlen", "child->namelen", "do_directory",
 		"expand_fs", "romfs_read", "namelen", "dirent",
 		"bad filename", "strchr(name", "strcmp(name",
+		"userspec", "strtoll", "u->uid", "u->gid", "process->user",
+		"make_oci_process_user", "--user",
 		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
 		"sanitizeUserInput", "X-Forwarded-Host", "host header", "Twig", "SSTI",
 		"pollingHost", "connectionMetadata", "gurl", "encodeURIComponent",

@@ -24,6 +24,11 @@ rule EffectiveUidRootCheckBypass {
   match code.EffectiveUidRootCheckBypass as check
 }
 
+rule ParsedUserIdDefaultRootPrivilegeEscalation {
+  meta { id: "VYQL-AUTH-031", severity: high, cwe: [CWE_269], confidence_floor: high }
+  match code.ParsedUserIdDefaultRootPrivilegeEscalation as parser
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller

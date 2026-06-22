@@ -1068,6 +1068,84 @@ func UnzipDirectory(destination string, source string) error {
 	}
 }
 
+func TestPrepRanksPrivilegedUserParserProfile(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "exec.c")
+	src := `
+typedef struct { int uid; int gid; } runtime_spec_schema_config_schema_process_user;
+extern void *xmalloc0(unsigned long size);
+extern long long strtoll(const char *nptr, char **endptr, int base);
+
+static runtime_spec_schema_config_schema_process_user *
+make_oci_process_user(const char *userspec)
+{
+	runtime_spec_schema_config_schema_process_user *u;
+	char *endptr = 0;
+	long long l;
+
+	if (userspec == 0)
+		return 0;
+
+	u = xmalloc0(sizeof(runtime_spec_schema_config_schema_process_user));
+	l = strtoll(userspec, &endptr, 10);
+	if (*endptr == '\0')
+		return u;
+	if (*endptr != ':')
+		return 0;
+
+	u->uid = (int) l;
+	l = strtoll(endptr + 1, &endptr, 10);
+	u->gid = (int) l;
+	return u;
+}
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "noise.c"), []byte("void copy(char *d, char *s, int n){ for(int i=0;i<n;i++) d[i]=s[i]; }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected privileged parser profile to require symbol/call inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"strtoll", "userspec", "uid", "gid", "endptr"} {
+		if !containsString(callTerms, want) {
+			t.Fatalf("expected call inventory term %q in %#v", want, callTerms)
+		}
+	}
+	if !requiresAssignmentInventory(profile) {
+		t.Fatalf("expected privileged parser profile to require assignment inventory")
+	}
+	assignTerms := requiredAssignmentInventoryTerms(profile)
+	for _, want := range []string{"uid", "gid", "endptr", "assign"} {
+		if !containsString(assignTerms, want) {
+			t.Fatalf("expected assignment inventory term %q in %#v", want, assignTerms)
+		}
+	}
+	files, err := securityRelevantFiles(profile, "c", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != srcPath {
+		t.Fatalf("expected privileged parser file first, got %#v", files)
+	}
+	concepts := conceptReference("uid parser privilege")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.ParsedUserIdDefaultRootPrivilegeEscalation" && row["surface"] == "scan" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected parsed user id privilege concept reference, got %#v", concepts)
+	}
+}
+
 func TestPrepRanksJobOutputEventUpdateProfile(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "job.js")

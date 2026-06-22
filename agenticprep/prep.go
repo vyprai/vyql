@@ -405,6 +405,8 @@ func securityRelevanceScore(path string, text string) int {
 		"contentlength": 58, "content-length": 46, "io.readfull": 56,
 		"limitreader": 42, "maxbytesreader": 40, "maxbodysize": 40,
 		"bodysizexceeded": 30, "readrequestbody": 28, "request body": 18,
+		"userspec": 42, "strtoll": 22, "u->uid": 34, "u->gid": 24,
+		"process->user": 26, "make_oci_process_user": 44, "--user": 18,
 		"do_directory": 30, "expand_fs": 34, "romfs_read": 26, "namelen": 18,
 		"dirent": 16, "bad filename": 20, "strchr(name": 24, "strcmp(name": 20,
 		"rrdtool": 18, "shell_safe": 6, "escapeshellarg": 6,

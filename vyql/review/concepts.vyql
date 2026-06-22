@@ -82,6 +82,11 @@ review code.EffectiveUidRootCheckBypass {
   kind: "attention"
   text: "review root/superuser checks that use effective UID where real UID determines retained privilege"
 }
+review code.ParsedUserIdDefaultRootPrivilegeEscalation {
+  category: "auth"
+  kind: "attention"
+  text: "review UID/GID parsers that can return a zero-initialized privileged user before assigning the parsed UID"
+}
 review code.ClearanceKitPolicyApplyBeforeAdapterStart {
   category: "auth"
   kind: "attention"
