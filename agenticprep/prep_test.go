@@ -631,6 +631,129 @@ await server.connect(new StdioServerTransport());
 	}
 }
 
+func TestPrepRanksJenkinsCredentialsStartupLoad(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "src", "main", "java", "com", "cloudbees", "plugins", "credentials", "SystemCredentialsProvider.java")
+	if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `package com.cloudbees.plugins.credentials;
+import hudson.XmlFile;
+import jenkins.model.Jenkins;
+import java.io.File;
+import java.util.List;
+import java.util.Map;
+
+public class SystemCredentialsProvider {
+  private transient List<Credentials> credentials;
+  private Map<Domain, List<Credentials>> domainCredentialsMap;
+  public SystemCredentialsProvider() {
+    XmlFile xml = getConfigFile();
+    if (xml.exists()) {
+      xml.unmarshal(this);
+    }
+    domainCredentialsMap = DomainCredentials.migrateListToMap(domainCredentialsMap, credentials);
+    credentials = null;
+  }
+  public static XmlFile getConfigFile() {
+    return new XmlFile(Jenkins.XSTREAM2, new File(Jenkins.getActiveInstance().getRootDir(), "credentials.xml"));
+  }
+  public static SystemCredentialsProvider getInstance() {
+    return ExtensionList.lookup(SystemCredentialsProvider.class).get(SystemCredentialsProvider.class);
+  }
+}
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	noisePath := filepath.Join(dir, "src", "main", "java", "example", "JsonModel.java")
+	if err := os.MkdirAll(filepath.Dir(noisePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(noisePath, []byte("class JsonModel { Object serialize() { return response.data; } }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "java", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != srcPath {
+		t.Fatalf("expected SystemCredentialsProvider.java first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "SystemCredentialsProvider") || !strings.Contains(files[0].Snippet, "credentials") {
+		t.Fatalf("expected credentials startup-load snippet, got %q", files[0].Snippet)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected Jenkins credentials startup profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	if !containsString(callTerms, "unmarshal") || !containsString(callTerms, "initializer") {
+		t.Fatalf("expected focused Jenkins startup call terms, got %#v", callTerms)
+	}
+	if containsString(callTerms, "serialize") {
+		t.Fatalf("Jenkins startup profile should outrank generic serialization terms, got %#v", callTerms)
+	}
+	concepts := conceptReference("jenkins credentials startup")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.JenkinsCredentialsStartupLoadContextExposure" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected Jenkins startup scan concept in reference, got %#v", concepts)
+	}
+	functionContext := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "java",
+		Source: `adapter java {
+  mark exact "analysis.function.context" val "name=SystemCredentialsProvider" val "XmlFilexml=getConfigFile();" nval "@Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, functionContext, Config{}); err == nil || !strings.Contains(err.Error(), "too broadly") {
+		t.Fatalf("expected Jenkins startup function-context rejection, got %v", err)
+	}
+	tooBroadClass := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "java",
+		Source: `adapter java {
+  mark exact "analysis.class.context" val "SystemCredentialsProvider" nval "@Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, tooBroadClass, Config{}); err == nil || !strings.Contains(err.Error(), "too broadly") {
+		t.Fatalf("expected broad Jenkins startup class-context rejection, got %v", err)
+	}
+	migrationOnlyClass := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "java",
+		Source: `adapter java {
+  mark exact "analysis.class.context" val "domainCredentialsMap=DomainCredentials.migrateListToMap" nval "@Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, migrationOnlyClass, Config{}); err == nil || !strings.Contains(err.Error(), "too broadly") {
+		t.Fatalf("expected migration-only Jenkins startup class-context rejection, got %v", err)
+	}
+	classContext := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "java",
+		Source: `adapter java {
+  mark exact "analysis.class.context" val "class_name:SystemCredentialsProvider" val "call_path:xml.unmarshal" val "call_path:DomainCredentials.migrateListToMap" nval "annotation:Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, classContext, Config{}); err != nil {
+		t.Fatalf("expected Jenkins startup class-context mark to validate: %v", err)
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)

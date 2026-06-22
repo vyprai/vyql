@@ -1323,6 +1323,12 @@ review code.JenkinsPlaintextDataboundCredential {
   expected: [core.SecretRedaction]
   text: "review Jenkins databound credential fields for hudson.util.Secret storage before job config.xml persistence"
 }
+review code.JenkinsCredentialsStartupLoadContextExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins credentials providers for SYSTEM-context startup loading before persisted credential migration"
+}
 review code.CinnyServiceWorkerMediaAuthLeak {
   category: "secret"
   kind: "attention"

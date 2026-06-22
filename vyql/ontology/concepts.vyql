@@ -1917,6 +1917,15 @@ concept JenkinsPlaintextDataboundCredential : sink {
   review_assumption: "Jenkins persists job configuration fields in config.xml where users with Extended Read or filesystem access may read them"
   review_confidence: high
 }
+concept JenkinsCredentialsStartupLoadContextExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200]
+  review_category: "secret"
+  review_condition: "Jenkins system credentials are loaded or migrated outside an observed SYSTEM startup initializer"
+  review_evidence: "credentials provider class context {pattern} unmarshals and migrates credentials without a startup @Initializer force-load"
+  review_assumption: "lazy loading after startup can occur under a lower-privileged authentication context and expose credential metadata or material"
+  review_confidence: high
+}
 concept CinnyServiceWorkerMediaAuthLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_20, CWE_200, CWE_522]

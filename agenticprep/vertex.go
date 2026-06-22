@@ -278,6 +278,16 @@ Rules:
      important than adjacent redirect or request-parameter APIs. Use
      function_context and narrow context marks for local model serialization
      shapes; do not substitute redirect adapters for model exposure evidence.
+     For Jenkins credential/provider startup CVEs, inspect classes named
+     SystemCredentialsProvider, CredentialsProvider, or CredentialsStore that
+     read credentials.xml, call XmlFile.unmarshal, or migrate persisted
+     DomainCredentials. Check whether the same class has an @Initializer after
+     InitMilestone.JOB_LOADED that force-loads getInstance() under SYSTEM during
+     startup. If missing, prefer a narrow analysis.class.context mark to
+     code.JenkinsCredentialsStartupLoadContextExposure rather than ordinary
+     credential endpoint or authorization-check review concepts. Do not use
+     analysis.function.context for this concept: the fixed @Initializer method
+     is outside the constructor body, so function-context marks catch fixed code.
      For server-side template injection, host-header poisoning, canonical URL,
      or request URL helper shapes, inspect helpers that call absolute URL
      builders such as absoluteUrlWithProtocol, siteUrl, urlFor, canonicalUrl,
@@ -435,7 +445,8 @@ agentLoop:
 					validationWarnings = warnings
 					validAdapterCount = len(filtered.AdapterFiles)
 				}
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0
+				emptyJenkinsStartupOverlay := jenkinsCredentialStartupProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -461,6 +472,9 @@ agentLoop:
 				} else if missingFocusedAssignments {
 					toolResult["error"] = "assignment_inventory must be focused on repo output/trust-boundary evidence before finish_overlay; call assignment_inventory with one of these name_contains terms: " + strings.Join(requiredAssignmentTerms, ", ")
 					p.debugf("step=%d finish_overlay rejected: focused assignment_inventory required terms=%s", step, strings.Join(requiredAssignmentTerms, ","))
+				} else if emptyJenkinsStartupOverlay {
+					toolResult["error"] = "Jenkins credentials startup-load evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins credentials startup\", class/function context for SystemCredentialsProvider, and validate_overlay with an analysis.class.context mark to code.JenkinsCredentialsStartupLoadContextExposure or concrete evidence that @Initializer after InitMilestone.JOB_LOADED already force-loads getInstance"
+					p.debugf("step=%d finish_overlay rejected: empty Jenkins credentials startup overlay", step)
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -702,6 +716,9 @@ func requiresSymbolInventory(profile Profile) bool {
 	terms := []string{
 		"asmodelsuccess", "modelname", "getacceptsjson", "response.data",
 		"toarray", "extrafields", "serialize",
+		"systemcredentialsprovider", "domaincredentials.migratelisttomap",
+		"xml.unmarshal", "credentials.xml", "initmilestone.job_loaded",
+		"initializer", "forceloadduringstartup",
 		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
 		"generatederivativeresponse", "$this->cmd->execute",
 		"process::fromshellcommandline", "processbuilder", "command string",
@@ -757,6 +774,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 	switch {
 	case mcpToolProfile(profile):
 		return []string{"tool", "server.tool", "mcpserver", "exec", "execfile", "child_process", "z.number", "port"}
+	case jenkinsCredentialStartupProfile(profile):
+		return []string{"unmarshal", "migratelisttomap", "getinstance", "initializer", "job_loaded", "credentials"}
 	case commandWrapperProfile(profile):
 		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
@@ -799,6 +818,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 	switch {
 	case mcpToolProfile(profile):
 		return []string{"port", "args", "command", "pid", "exec", "tool", "schema"}
+	case jenkinsCredentialStartupProfile(profile):
+		return []string{"credentials", "domaincredentialsmap", "initializer", "authentication", "system", "startup"}
 	case commandWrapperProfile(profile):
 		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process"}
 	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
@@ -838,6 +859,17 @@ func mcpToolProfile(profile Profile) bool {
 	return profileContainsAnyTerm(profile, []string{
 		"@modelcontextprotocol", "mcpserver", "server.tool",
 		"stdioservertransport", "child_process", "z.number",
+	})
+}
+
+func jenkinsCredentialStartupProfile(profile Profile) bool {
+	if profile.Languages["java"] == 0 {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{
+		"systemcredentialsprovider", "domaincredentials.migratelisttomap",
+		"xml.unmarshal", "credentials.xml", "initmilestone.job_loaded",
+		"initializer", "forceloadduringstartup",
 	})
 }
 
@@ -1492,7 +1524,8 @@ code.UnparameterizedSqlQueryParser, code.ProtocolStateReview,
 code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
 code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
 code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal,
-code.CommandStringWrapperExecution, code.McpToolCommandTemplateExecution.
+code.CommandStringWrapperExecution, code.McpToolCommandTemplateExecution,
+code.JenkinsCredentialsStartupLoadContextExposure.
 `)
 }
 
@@ -1517,6 +1550,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
+		{"concept": "code.JenkinsCredentialsStartupLoadContextExposure", "surface": "scan", "use": "mark for Jenkins SystemCredentialsProvider-style classes that unmarshal or migrate persisted credentials without an @Initializer after InitMilestone.JOB_LOADED force-loading getInstance during startup"},
 		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "mark for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
 		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "mark for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
 		{"concept": "code.McpToolCommandTemplateExecution", "surface": "scan", "use": "mark for MCP server.tool handlers whose externally supplied tool callback parameters are interpolated into child_process.exec shell command templates instead of execFile argv arrays; include command-template vals and nval execFile/spawn hardening; use analysis.module.context when the server.tool registration wraps the handler body"},

@@ -371,6 +371,9 @@ func securityRelevanceScore(path string, text string) int {
 		"asmodelsuccess": 38, "modelname": 18, "getacceptsjson": 18,
 		"getcsrftoken": 10, "json": 8, "secret": 12, "token": 10,
 		"credential": 12, "password": 12,
+		"systemcredentialsprovider": 52, "domaincredentials.migratelisttomap": 46,
+		"xml.unmarshal": 34, "credentials.xml": 28, "initmilestone.job_loaded": 42,
+		"@initializer": 26, "forceloadduringstartup": 24,
 		"cmdexecuteservice": 52, "$cmd_string": 42, "x-islandora-args": 36,
 		"generateDerivativeResponse": 32, "$this->cmd->execute": 34,
 		"command string": 24, "array_merge": 14, "headerbag": 14,
@@ -465,6 +468,9 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				}
 				if broadMcpToolCommandMark(m) {
 					return fmt.Errorf("agentic prep: adapter %q maps a broad MCP tool command mark; include concrete exec command-template evidence and nval hardening such as execFile so fixed argv-array code is not flagged", lang)
+				}
+				if invalidJenkinsCredentialStartupMark(m) {
+					return fmt.Errorf("agentic prep: adapter %q maps Jenkins credential startup loading too broadly; use analysis.class.context with credential unmarshal/migration evidence and @Initializer/InitMilestone.JOB_LOADED absence checks so fixed force-load methods are not flagged", lang)
 				}
 				if localExactContextMapping(m) && len(m.Packages) > 0 {
 					return fmt.Errorf("agentic prep: adapter %q package-scopes an exact context mark; keep exact context marks unscoped and put package/dependency evidence in adapter evidence instead of a package gate", lang)
@@ -679,6 +685,41 @@ func broadMcpToolCommandMark(m parser.AdapterMapping) bool {
 		}
 	}
 	return !hasCommandTemplate || !hasHardeningNval
+}
+
+func invalidJenkinsCredentialStartupMark(m parser.AdapterMapping) bool {
+	if m.Concept != "code.JenkinsCredentialsStartupLoadContextExposure" {
+		return false
+	}
+	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.class.context" {
+		return true
+	}
+	hasCredentialLoad := false
+	hasSystemProviderIdentity := false
+	for _, v := range m.ValMatches {
+		lv := strings.ToLower(v)
+		if strings.Contains(lv, "unmarshal") ||
+			strings.Contains(lv, "migratelisttomap") ||
+			strings.Contains(lv, "credentials.xml") {
+			hasCredentialLoad = true
+		}
+		if strings.Contains(lv, "systemcredentialsprovider") ||
+			strings.Contains(lv, "credentials.xml") ||
+			strings.Contains(lv, "xml.unmarshal") {
+			hasSystemProviderIdentity = true
+		}
+	}
+	hasStartupAbsence := false
+	for _, nv := range m.ValAbsents {
+		lnv := strings.ToLower(nv)
+		if strings.Contains(lnv, "initializer") ||
+			strings.Contains(lnv, "job_loaded") ||
+			strings.Contains(lnv, "forceloadduringstartup") {
+			hasStartupAbsence = true
+			break
+		}
+	}
+	return !hasCredentialLoad || !hasSystemProviderIdentity || !hasStartupAbsence
 }
 
 func localExactContextMapping(m parser.AdapterMapping) bool {
@@ -1081,6 +1122,7 @@ func dependencyGapScore(c dependencyCandidate) int {
 		"crypto": 30, "cipher": 30, "signature": 35, "attestation": 40,
 		"predicate": 30, "sigstore": 28, "jms": 18, "message": 18,
 		"deserialize": 40, "objectmessage": 35, "cache": 10,
+		"jenkins": 25, "credentials": 25, "credentials-plugin": 35,
 		"modelcontextprotocol": 55, "mcp": 24, "stdio": 10,
 	} {
 		if strings.Contains(text, token) {
