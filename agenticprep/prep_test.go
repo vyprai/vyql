@@ -873,6 +873,93 @@ func UnzipDirectory(destination string, source string) error {
 	}
 }
 
+func TestPrepRanksJobOutputEventUpdateProfile(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "job.js")
+	src := `const cp = require('child_process');
+
+module.exports = Class.create({
+	handleChildResponse: function(job, worker, data) {
+		this.logDebug(10, "Got job update from child: " + job.pid, data);
+		['progress', 'complete', 'update_event'].forEach(function(key) {
+			if (key in data) job[key] = data[key];
+		});
+	},
+	finishLocalJob: function(job) {
+		if (job.update_event) this.storage.listFindUpdate('global/schedule', { id: job.event }, job.update_event, function(err) {});
+	}
+});
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if mcpToolProfile(profile) {
+		t.Fatalf("plain child_process usage should not imply MCP tool profile")
+	}
+	if !jobOutputEventUpdateProfile(profile) {
+		t.Fatalf("expected job output event-update profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected job output profile to require symbol/call inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"update_event", "handlechildresponse", "listfindupdate"} {
+		if !containsString(callTerms, want) {
+			t.Fatalf("expected call inventory term %q in %#v", want, callTerms)
+		}
+	}
+	assignTerms := requiredAssignmentInventoryTerms(profile)
+	for _, want := range []string{"update_event", "schedule", "config"} {
+		if !containsString(assignTerms, want) {
+			t.Fatalf("expected assignment inventory term %q in %#v", want, assignTerms)
+		}
+	}
+	files, err := securityRelevantFiles(profile, "javascript", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != srcPath {
+		t.Fatalf("expected job output file first, got %#v", files)
+	}
+	concepts := conceptReference("job output event update")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.JobOutputEventUpdateAuthorizationBypass" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected job output event-update scan concept in reference, got %#v", concepts)
+	}
+	broadSinkContext := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  mark exact "analysis.function.context" val "this.storage.listFindUpdate('global/schedule'" val "job.update_event" nval "allow_event_updates_from_jobs" nval "delete job.update_event" -> code.JobOutputEventUpdateAuthorizationBypass
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, broadSinkContext, Config{}); err == nil || !strings.Contains(err.Error(), "too broadly") {
+		t.Fatalf("expected broad job output event-update rejection, got %v", err)
+	}
+	handlerContext := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  mark exact "analysis.function.context" val "Got job update from child" val "update_event" val "job[key]=data[key]" nval "allow_event_updates_from_jobs" nval "delete data.update_event" -> code.JobOutputEventUpdateAuthorizationBypass
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, handlerContext, Config{}); err != nil {
+		t.Fatalf("expected handler context overlay to validate: %v", err)
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)

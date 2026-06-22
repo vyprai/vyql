@@ -556,6 +556,12 @@ review code.OverbroadRolePermissionGrant {
   expected: [core.AuthorizationCheck]
   text: "review non-admin role permission tables for backup, restore, or privileged operation grants"
 }
+review code.JobOutputEventUpdateAuthorizationBypass {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "review child job output handlers for authorization or configuration gates before accepting event or schedule update fields"
+}
 review code.InsecureExecutableDownload {
   category: "supply_chain"
   kind: "target"

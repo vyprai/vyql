@@ -321,6 +321,18 @@ Rules:
      value flows into a concatenated SQL string variable such as $sSQL before
      one of these wrappers, add or rely on a SQL execution sink for the wrapper
      instead of returning an empty overlay.
+     For scheduler, automation, or plugin-runner repositories, inspect child
+     job output handlers such as handleChildResponse, detachedJobUpdate,
+     finishLocalJob, update_event, listFindUpdate, and global/schedule. If
+     child/plugin JSON output can copy update_event into job state and later
+     persist it to schedule/event configuration, prefer a narrow
+     JobOutputEventUpdateAuthorizationBypass function-context mark with nvals
+     for explicit config/delete hardening such as allow_event_updates_from_jobs
+     or delete data.update_event. Do not finish empty merely because the same
+     repository also uses child_process command execution. Do not anchor this
+     concept only on the later listFindUpdate/storage update context; the
+     patched guard may be in the earlier child-output handler, so the mark must
+     include child-output copy evidence such as job[key]=data[key].
      For CORS, Origin, callback, trusted-origin, or wildcard host validators,
      call symbol_inventory with name_contains values such as origin, wildcard,
      cors, validate, and match before opening files. Inspect parsers that split,
@@ -468,7 +480,8 @@ agentLoop:
 					validAdapterCount = len(filtered.AdapterFiles)
 				}
 				emptyJenkinsStartupOverlay := jenkinsCredentialStartupProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay
+				emptyJobOutputEventOverlay := jobOutputEventUpdateProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJobOutputEventOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -497,6 +510,9 @@ agentLoop:
 				} else if emptyJenkinsStartupOverlay {
 					toolResult["error"] = "Jenkins credentials startup-load evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins credentials startup\", class/function context for SystemCredentialsProvider, and validate_overlay with an analysis.class.context mark to code.JenkinsCredentialsStartupLoadContextExposure or concrete evidence that @Initializer after InitMilestone.JOB_LOADED already force-loads getInstance"
 					p.debugf("step=%d finish_overlay rejected: empty Jenkins credentials startup overlay", step)
+				} else if emptyJobOutputEventOverlay {
+					toolResult["error"] = "job output event-update evidence is present; do not return an empty overlay until you have called concept_reference with topic \"job output event update\", function_context for the child-output handler containing update_event, and validate_overlay with an analysis.function.context mark to code.JobOutputEventUpdateAuthorizationBypass or concrete evidence that update_event is deleted or gated by allow_event_updates_from_jobs before copying child output into job state"
+					p.debugf("step=%d finish_overlay rejected: empty job output event-update overlay", step)
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -745,6 +761,8 @@ func requiresSymbolInventory(profile Profile) bool {
 		"generatederivativeresponse", "$this->cmd->execute",
 		"runquery", "querydb", "dbquery", "executequery", "$ssql",
 		"legacyfilterinputarr", "where di_",
+		"update_event", "handlechildresponse", "allow_event_updates_from_jobs",
+		"listfindupdate", "global/schedule",
 		"process::fromshellcommandline", "processbuilder", "command string",
 		"@modelcontextprotocol", "mcpserver", "server.tool",
 		"stdioservertransport", "child_process", "execfile", "z.number",
@@ -804,6 +822,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"unmarshal", "migratelisttomap", "getinstance", "initializer", "job_loaded", "credentials"}
 	case phpSqlWrapperProfile(profile):
 		return []string{"runquery", "querydb", "sql", "where", "legacyfilterinputarr", "get", "post"}
+	case jobOutputEventUpdateProfile(profile):
+		return []string{"update_event", "handlechildresponse", "listfindupdate", "schedule", "config", "delete"}
 	case commandWrapperProfile(profile):
 		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
@@ -855,6 +875,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 		return []string{"credentials", "domaincredentialsmap", "initializer", "authentication", "system", "startup"}
 	case commandWrapperProfile(profile):
 		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process"}
+	case jobOutputEventUpdateProfile(profile):
+		return []string{"update_event", "job", "data", "schedule", "config", "allow_event_updates_from_jobs"}
 	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
 		return []string{"user", "model", "data", "response", "json", "secret", "token", "password", "credential", "fields"}
 	case profileContainsAnyTerm(profile, []string{"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl", "safecanonicalurl", "x-forwarded-host", "host header", "getpathinfo", "sanitizeurl"}):
@@ -889,10 +911,13 @@ func mcpToolProfile(profile Profile) bool {
 	if profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 {
 		return false
 	}
-	return profileContainsAnyTerm(profile, []string{
-		"@modelcontextprotocol", "mcpserver", "server.tool",
-		"stdioservertransport", "child_process", "z.number",
+	hasMcpBoundary := profileContainsAnyTerm(profile, []string{
+		"@modelcontextprotocol", "mcpserver", "server.tool", "stdioservertransport",
 	})
+	if !hasMcpBoundary {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{"child_process", "execfile", "z.number", "z.string", "z.object", "port"})
 }
 
 func jenkinsCredentialStartupProfile(profile Profile) bool {
@@ -913,6 +938,16 @@ func phpSqlWrapperProfile(profile Profile) bool {
 	return profileContainsAnyTerm(profile, []string{
 		"runquery", "querydb", "dbquery", "executequery", "$ssql",
 		"legacyfilterinputarr", "where di_", "select ", "from ",
+	})
+}
+
+func jobOutputEventUpdateProfile(profile Profile) bool {
+	if profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{
+		"update_event", "handlechildresponse", "allow_event_updates_from_jobs",
+		"listfindupdate", "global/schedule",
 	})
 }
 
@@ -1603,7 +1638,8 @@ code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
 code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
 code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal,
 code.CommandStringWrapperExecution, code.McpToolCommandTemplateExecution,
-code.JenkinsCredentialsStartupLoadContextExposure.
+code.JenkinsCredentialsStartupLoadContextExposure,
+code.JobOutputEventUpdateAuthorizationBypass.
 `)
 }
 
@@ -1617,6 +1653,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.ThreadLocalScopeOverwriteWithoutCleanup", "surface": "scan", "use": "mark for request/session/scope lifecycle methods that overwrite ThreadLocal state or per-thread caches without ending/removing the previous scope first"},
 		{"concept": "code.DisabledRelationshipMetadataExposure", "surface": "scan", "use": "mark for public relationship/resource metadata helpers that return relationship targets for disabled fields or invisible resources without checking enabled/access/visibility"},
 		{"concept": "code.OverbroadRolePermissionGrant", "surface": "scan", "use": "mark for static role/group/permission tables that assign backup, restore, admin, or similarly privileged operations to non-admin roles"},
+		{"concept": "code.JobOutputEventUpdateAuthorizationBypass", "surface": "scan", "use": "mark for scheduler/plugin child-output handlers that copy update_event from child JSON into job state and later persist it to schedule/event configuration without a config or authorization gate; include nval allow_event_updates_from_jobs or delete data.update_event"},
 		{"concept": "code.MethodGatedRedirectValidationBypass", "surface": "scan", "use": "mark for URL validation skipped for some HTTP methods before redirect/callback handling"},
 		{"concept": "code.SessionStoredRedirectTarget", "surface": "scan", "use": "mark for redirects using session-stored or request-influenced targets without relative/same-origin validation"},
 		{"concept": "code.RedirectTarget", "surface": "scan", "use": "taint sink for redirect APIs or methods returning redirect destinations"},

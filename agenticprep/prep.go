@@ -373,6 +373,8 @@ func securityRelevanceScore(path string, text string) int {
 		"credential": 12, "password": 12,
 		"runquery": 42, "$ssql": 26, "legacyfilterinputarr": 24,
 		"where di_fr_id": 34, "donateditem_di": 18,
+		"update_event": 46, "handlechildresponse": 42, "allow_event_updates_from_jobs": 34,
+		"listfindupdate": 30, "global/schedule": 26,
 		"systemcredentialsprovider": 52, "domaincredentials.migratelisttomap": 46,
 		"xml.unmarshal": 34, "credentials.xml": 28, "initmilestone.job_loaded": 42,
 		"@initializer": 26, "forceloadduringstartup": 24,
@@ -475,6 +477,9 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				}
 				if invalidJenkinsCredentialStartupMark(m) {
 					return fmt.Errorf("agentic prep: adapter %q maps Jenkins credential startup loading too broadly; use minimal analysis.class.context vals for class_name:SystemCredentialsProvider, credential unmarshal/migration call_path evidence, function_name:getInstance, and structured @Initializer/forceLoad absence checks; do not add class_base or positive annotation vals", lang)
+				}
+				if invalidJobOutputEventUpdateMark(m) {
+					return fmt.Errorf("agentic prep: adapter %q maps child job output event updates too broadly; use analysis.function.context vals from the child-output handler showing update_event copied from data into job state, and nval hardening such as allow_event_updates_from_jobs or delete data.update_event", lang)
 				}
 				if localExactContextMapping(m) && len(m.Packages) > 0 {
 					return fmt.Errorf("agentic prep: adapter %q package-scopes an exact context mark; keep exact context marks unscoped and put package/dependency evidence in adapter evidence instead of a package gate", lang)
@@ -739,6 +744,40 @@ func invalidJenkinsCredentialStartupMark(m parser.AdapterMapping) bool {
 		}
 	}
 	return !hasStructuredContext || !hasCredentialLoad || !hasSystemProviderIdentity || !hasGetInstance || !hasStartupAbsence
+}
+
+func invalidJobOutputEventUpdateMark(m parser.AdapterMapping) bool {
+	if m.Concept != "code.JobOutputEventUpdateAuthorizationBypass" {
+		return false
+	}
+	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+		return true
+	}
+	hasChildOutputHandler := false
+	hasChildOutputCopy := false
+	for _, v := range m.ValMatches {
+		lv := strings.ToLower(v)
+		if strings.Contains(lv, "got job update from child") ||
+			strings.Contains(lv, "handlechildresponse") ||
+			strings.Contains(lv, "child sent us") {
+			hasChildOutputHandler = true
+		}
+		if strings.Contains(lv, "job[key]=data[key]") ||
+			strings.Contains(lv, "job[key] = data[key]") ||
+			(strings.Contains(lv, "update_event") && strings.Contains(lv, "data")) {
+			hasChildOutputCopy = true
+		}
+	}
+	hasHardeningAbsence := false
+	for _, nv := range m.ValAbsents {
+		lnv := strings.ToLower(nv)
+		if strings.Contains(lnv, "allow_event_updates_from_jobs") ||
+			strings.Contains(lnv, "delete data.update_event") {
+			hasHardeningAbsence = true
+			break
+		}
+	}
+	return !hasChildOutputHandler || !hasChildOutputCopy || !hasHardeningAbsence
 }
 
 func localExactContextMapping(m parser.AdapterMapping) bool {

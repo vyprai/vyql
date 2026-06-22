@@ -1496,6 +1496,15 @@ concept OverbroadRolePermissionGrant : sink {
   review_assumption: "the role can be held by a lower-privileged operator and the granted operation should be admin-only or separately scoped"
   review_confidence: high
 }
+concept JobOutputEventUpdateAuthorizationBypass : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+  review_category: "auth"
+  review_condition: "untrusted child job output can request persistent event or schedule updates without an explicit configuration or authorization gate"
+  review_evidence: "job child-output handler context {pattern} copies an update_event field from child output into job state before a later schedule update"
+  review_assumption: "plugin or child process output is less trusted than the scheduler configuration it can update"
+  review_confidence: high
+}
 concept DisabledRelationshipMetadataExposure : sink {
   vulnerable_to: [access_control.IncorrectAuthorization, access_control.MissingAuthorization]
   cwe: [CWE_284, CWE_863]

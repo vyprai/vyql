@@ -89,6 +89,11 @@ rule OverbroadRolePermissionGrant {
   match code.OverbroadRolePermissionGrant as grant
 }
 
+rule JobOutputEventUpdateAuthorizationBypass {
+  meta { id: "VYQL-AUTH-030", severity: high, cwe: [CWE_862], confidence_floor: high }
+  match code.JobOutputEventUpdateAuthorizationBypass as handler
+}
+
 rule UnvalidatedModelSelection {
   meta { id: "VYQL-AUTH-029", severity: medium, cwe: [CWE_20, CWE_863], confidence_floor: high }
   match code.UnvalidatedModelSelection as selector
