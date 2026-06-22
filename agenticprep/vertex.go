@@ -267,6 +267,11 @@ Rules:
      rejection of ".", "..", path separators, absolute paths, and traversal
      components before recursive extraction or filesystem writes. Prefer a
      narrow function_context mark for local parser/extractor ordering bugs.
+     For manual Go zip extraction, inspect zip.OpenReader/NewReader loops that
+     join f.Name into a destination path and call os.OpenFile with os.O_TRUNC.
+     If the patch adds os.Stat plus a GetInput/confirmation prompt before
+     truncation, prefer a narrow ManualZipEntryFileWrite function-context mark
+     with nvals for os.Stat/GetInput rather than a broad path sink.
      For upload XSS CVEs, inspect upload services/helpers that derive extensions
      from client filenames or MIME types and store SVG, HTML, or XML-capable files;
      check for SVG/XML sanitizers before storeAs/move/save/write.
@@ -746,6 +751,8 @@ func requiresSymbolInventory(profile Profile) bool {
 		"memcpy(newpath + pathlen", "child->namelen", "do_directory",
 		"expand_fs", "romfs_read", "namelen", "dirent",
 		"bad filename", "strchr(name", "strcmp(name", "extract", "unpack",
+		"zip.openreader", "zip.newreader", "os.openfile", "os.o_trunc",
+		"getinput", "overwrite",
 		"cors", "alloworigins", "alloworiginfunc", "allowallorigins",
 		"access-control-allow-origin", "trustedorigin", "trusted_origin",
 		"wildcard", "validateorigin", "checkorigin", "callback",
@@ -801,6 +808,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
 		return []string{"expand", "extract", "directory", "dirent", "name", "path", "romfs", "read", "mkdir", "open"}
+	case archiveOverwriteProfile(profile):
+		return []string{"zip", "openreader", "openfile", "o_trunc", "stat", "getinput", "overwrite"}
 	case nativeMemoryProfile(profile):
 		return []string{"alloc", "malloc", "calloc", "realloc", "memcpy", "copy", "size", "length", "capacity", "offset", "escape", "unicode"}
 	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
@@ -818,6 +827,9 @@ func requiredCallInventoryTerms(profile Profile) []string {
 
 func requiresAssignmentInventory(profile Profile) bool {
 	if profile.Languages["php"] == 0 && profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 && profile.Languages["python"] == 0 && profile.Languages["ruby"] == 0 && profile.Languages["java"] == 0 && profile.Languages["go"] == 0 {
+		return false
+	}
+	if archiveOverwriteProfile(profile) {
 		return false
 	}
 	return profileContainsAnyTerm(profile, []string{
@@ -901,6 +913,16 @@ func phpSqlWrapperProfile(profile Profile) bool {
 	return profileContainsAnyTerm(profile, []string{
 		"runquery", "querydb", "dbquery", "executequery", "$ssql",
 		"legacyfilterinputarr", "where di_", "select ", "from ",
+	})
+}
+
+func archiveOverwriteProfile(profile Profile) bool {
+	if profile.Languages["go"] == 0 {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{
+		"zip.openreader", "zip.newreader", "os.openfile", "os.o_trunc",
+		"getinput", "overwrite", "archive.file", "f.name",
 	})
 }
 

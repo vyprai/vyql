@@ -834,6 +834,45 @@ $rsDonatedItems = RunQuery($sSQL);
 	}
 }
 
+func TestPrepRanksGoArchiveOverwriteProfile(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "utils.go")
+	src := `package utils
+
+func UnzipDirectory(destination string, source string) error {
+	archive, _ := zip.OpenReader(source)
+	for _, f := range archive.File {
+		filePath := filepath.Join(destination, f.Name)
+		dstFile, _ := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		_ = dstFile
+	}
+	return nil
+}
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !archiveOverwriteProfile(profile) {
+		t.Fatalf("expected archive overwrite profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected archive overwrite profile to require symbol/call inventory")
+	}
+	if requiresAssignmentInventory(profile) {
+		t.Fatalf("archive overwrite profile should not require unrelated assignment inventory")
+	}
+	terms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"openreader", "openfile", "o_trunc"} {
+		if !containsString(terms, want) {
+			t.Fatalf("expected call inventory term %q in %#v", want, terms)
+		}
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)

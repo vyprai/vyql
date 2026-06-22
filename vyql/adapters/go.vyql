@@ -286,6 +286,7 @@ adapter go {
   mark exact "analysis.function.context" val "function_name:readBlock" val "call:ReadLong" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "function_name:readNBytes" val "call:make" val "call:ReadByte" nval "selector:reader.data" nval "selector:reader.pos" -> code.LengthDerivedAllocation
   mark exact "analysis.function.context" val "call:ReadString" val "call:BytesNtohs" val "binary:len(buf)<=off" nval "binary:len(buf)<off+2" -> code.FieldDerivedIndexAccess
+  mark exact "analysis.function.context" val "function_name:UnzipDirectory" val "call_path:zip.OpenReader" val "call_path:filepath.Join" val "selector:f.Name" val "call_path:os.OpenFile" val "call_arg:os.OpenFile:filePath" val "selector:os.O_TRUNC" nval "call_path:os.Stat" nval "call_path:GetInput" -> code.ManualZipEntryFileWrite
   mark exact "analysis.function.context" val "call_path:fmt.Sprintf" val "literal:%08b" val "index:capabilities:8" nval "literal:%016b" -> code.UnderwidthFormattedIndex
   sink method "BranchPageElement" val "Count" -> code.CountDerivedElementAccess
   mark "__binop.ne" val "Count" val "0" -> core.MemoryBoundsCheck

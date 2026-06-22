@@ -390,6 +390,8 @@ func securityRelevanceScore(path string, text string) int {
 		"request": 8, "request->query": 18, "$request->query": 18, "$_get": 12, "$_post": 12, "$_files": 12, "$_request": 12,
 		"upload": 10, "restore": 12, "import": 8, "backup": 8, "archive": 8, "extract": 8,
 		"filename": 8, "path": 6, "basename": 6, "../": 10,
+		"zip.openreader": 34, "os.openfile": 24, "os.o_trunc": 30,
+		"getinput": 18, "overwrite": 18,
 		"do_directory": 30, "expand_fs": 34, "romfs_read": 26, "namelen": 18,
 		"dirent": 16, "bad filename": 20, "strchr(name": 24, "strcmp(name": 20,
 		"rrdtool": 18, "shell_safe": 6, "escapeshellarg": 6,
