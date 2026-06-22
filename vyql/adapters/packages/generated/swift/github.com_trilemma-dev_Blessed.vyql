@@ -2,7 +2,11 @@ import code.{PrivilegedOp}
 
 adapter swift {
   package "github.com/trilemma-dev/Blessed" {
-    mark method "bless" -> code.PrivilegedOp
-    mark method "authorizeAndBless" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "bless"
+    }
+    flag code.PrivilegedOp on any {
+      method "authorizeAndBless"
+    }
   }
 }

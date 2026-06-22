@@ -1,11 +1,23 @@
 adapter cpp {
   package "aws-crt-cpp" {
     source method "Base64Decode" -> core.UserControlledData
-    mark method "SetBYOCryptoNewMD5Callback" -> code.WeakHash
-    mark method "SetBYOCryptoNewSHA1Callback" -> code.WeakHash
-    mark method "SetBYOCryptoNewSHA256HMACCallback" -> code.WeakCipher
-    mark method "SetBYOCryptoNewSHA512HMACCallback" -> code.WeakCipher
-    mark method "SetBYOCryptoClientTlsCallback" -> code.CertValidationDisabled
-    mark method "SetBYOCryptoTlsContextCallbacks" -> code.CertValidationDisabled
+    flag code.WeakHash on any {
+      method "SetBYOCryptoNewMD5Callback"
+    }
+    flag code.WeakHash on any {
+      method "SetBYOCryptoNewSHA1Callback"
+    }
+    flag code.WeakCipher on any {
+      method "SetBYOCryptoNewSHA256HMACCallback"
+    }
+    flag code.WeakCipher on any {
+      method "SetBYOCryptoNewSHA512HMACCallback"
+    }
+    flag code.CertValidationDisabled on any {
+      method "SetBYOCryptoClientTlsCallback"
+    }
+    flag code.CertValidationDisabled on any {
+      method "SetBYOCryptoTlsContextCallbacks"
+    }
   }
 }

@@ -1,6 +1,8 @@
 import code.{RegexCompile}
 adapter javascript {
   package "@babel/plugin-transform-named-capturing-groups-regex" {
-    mark method "default" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "default"
+    }
   }
 }

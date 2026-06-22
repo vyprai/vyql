@@ -5,6 +5,8 @@ adapter groovy {
     sink method "sendHttpRequest" -> code.UrlFetch
     sink method "newServerSocket" -> code.NetworkBind
     sink method "newClientSocket" -> code.NetworkConnect
-    mark method "openURI" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "openURI"
+    }
   }
 }

@@ -5,6 +5,8 @@ adapter ruby {
     sink method "send_initial_query" -> code.NetworkSend
     sink method "validate_max_connecting!" -> code.NetworkConnect
     sink method "decode" -> code.Deserialization
-    mark path "mongo.random" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      path "mongo.random"
+    }
   }
 }

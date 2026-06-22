@@ -4,6 +4,8 @@ import core.{UserControlledData}
 adapter scala {
   package "org.apache.shiro:shiro-web" {
     source method "decodeRequestString" -> core.UserControlledData
-    mark method "issueRedirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "issueRedirect"
+    }
   }
 }

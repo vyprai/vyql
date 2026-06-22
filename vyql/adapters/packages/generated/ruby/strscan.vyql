@@ -1,8 +1,14 @@
 import code.{RegexCompile}
 adapter ruby {
   package "strscan" {
-    mark method "scan" -> code.RegexCompile
-    mark method "scan_until" -> code.RegexCompile
-    mark method "search_full" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "scan"
+    }
+    flag code.RegexCompile on any {
+      method "scan_until"
+    }
+    flag code.RegexCompile on any {
+      method "search_full"
+    }
   }
 }

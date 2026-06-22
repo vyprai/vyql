@@ -2,8 +2,12 @@ import code.{HttpInput, RedirectTarget, ResponseHeaderWrite}
 adapter php {
   package "slim/slim" {
     source method "addBodyParsingMiddleware" -> code.HttpInput
-    mark method "handle" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "handle"
+    }
     sink method "emit" -> code.ResponseHeaderWrite
-    mark method "redirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "redirect"
+    }
   }
 }

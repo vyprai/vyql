@@ -21,7 +21,11 @@ adapter solidity {
   sink path "suicide" -> code.PrivilegedOp
 
   // tx.origin authorization anti-pattern (CWE-477) — presence of tx.origin
-  mark "tx.origin" -> code.TxOriginAuth
+  flag code.TxOriginAuth on any {
+    path "tx.origin"
+  }
   // storage write marker emitted by the frontend for member/mapping assignments.
-  mark "state_write" -> code.StateWrite
+  flag code.StateWrite on any {
+    path "state_write"
+  }
 }

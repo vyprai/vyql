@@ -137,12 +137,12 @@ Rules:
     }
   }
 - Keep mappings conservative and selector-backed.
-- Do not wrap context marks in package blocks. `mark context function`,
-  `mark context module`, and `mark context class` are already
+- Do not wrap context flags in package blocks. flag <concept> in function,
+  flag <concept> in module, and flag <concept> in class are already
   localized by exact repo evidence; put dependency evidence in the adapter file
   evidence list instead of creating a package gate.
 - For first-party/local project APIs, prefer generalized API mappings already
-  meaningful across projects, narrow context marks, or an
+  meaningful across projects, narrow context flags, or an
   empty overlay with notes. Empty-overlay notes must explicitly say whether a
   core scan concept/rule already covers the relevant surface, or whether no
   validated adapter target exists. Do not create adapters whose only locality
@@ -157,25 +157,25 @@ Rules:
   sink path "do_local_cmd" arg 0 -> code.CommandExecution
   sink path "run" arg all -> code.CommandExecution
 - For libraries/frameworks, public API parameters may be marked as external
-  entry input only when the same overlay also adds a concrete sink, mark, or
+  entry input only when the same overlay also adds a concrete sink, flag, or
   control that gives those parameters security meaning. Do not submit a
   source-only source param overlay; the validator rejects broad entry-point
   expansion. If source-only parameter expansion is the best available idea,
   call finish_overlay with no adapter files and explain the missing concrete
   security mapping.
 - For repo-local anti-patterns that need context instead of taint, use an
-  exact context mark with existing review concepts:
-  mark context function {
+  exact context flag with existing review concepts:
+  flag code.UnparameterizedSqlQueryParser in function {
     has "name=orderBy"
     has "$direction"
     has "processOrderBy"
     lacks "QUERY_ORDER_DESC"
-  } -> code.UnparameterizedSqlQueryParser
-  mark context function {
+  }
+  flag code.ProtocolStateReview in function {
     has "name=verify_and_process"
     has "request.query_params.get(\"state\")"
     lacks "request.cookies.get(\"sso_state\")"
-  } -> code.ProtocolStateReview
+  }
 - Invalid syntax examples: sink arg 2 "do_cmd" -> ...,
   sink "do_cmd" -> concept:, sink path "do_cmd" concept: ...
 - Do not put JSON/YAML/object fields such as concept:, confidence:, evidence:,
@@ -186,25 +186,25 @@ Rules:
 - Do not map generic standard library APIs unless the repo evidence shows a
   project/framework-specific meaning that shipped adapters cannot know.
 - Prefer repo-specific wrappers, public API boundaries, and narrow context
-  marks over broad generic mappings. If a CVE shape is visible in one function
-  and existing concepts already describe it, a narrow `mark context function`
+  flags over broad generic mappings. If a CVE shape is visible in one function
+  and existing concepts already describe it, a narrow flag <concept> in function
   overlay is
   usually better than trying to invent a source/sink flow.
 - Do not broaden an entire package just because it handles requests, protocols,
   plugins, controllers, or model objects. Generated adapters should identify a
   specific framework API, wrapper, sink, sanitizer/control, or narrow context
-  mark. Broad source-only overlays tend to increase noise without improving
+  flag. Broad source-only overlays tend to increase noise without improving
   scan precision.
-- Before writing `mark context function`, call function_context
+- Before writing flag <concept> in function, call function_context
   for the target function and choose has/lacks substrings from that returned
-  single function context. Do not combine vals from different functions. For Go
+  single function context. Do not combine values from different functions. For Go
   function contexts, use the returned suggested_vals token
   function_name:<Name>; do not use name=<Name>, which is not emitted by the Go
   frontend and will not match.
-- Before writing `mark context module`, call module_context
+- Before writing flag <concept> in module, call module_context
   for the target file and choose has/lacks substrings from one returned top-level
   declaration context. Use this for static role, permission, route, or policy maps.
-- Before writing `mark context class`, call class_context
+- Before writing flag <concept> in class, call class_context
   for the target class and choose has/lacks tokens from one returned class
   context. Prefer structured tokens such as class_name:, class_base:,
   function_name:, call_path:, and annotation: over loose source-text substrings.
@@ -256,7 +256,7 @@ Rules:
      role, or capability values into zero-initialized process/security structs.
      If a parser can return on a delimiter/end-of-string check before assigning
      the parsed UID/GID/role into the target struct, use function_context and a
-     narrow scan mark such as code.ParsedUserIdDefaultRootPrivilegeEscalation.
+     narrow scan flag such as code.ParsedUserIdDefaultRootPrivilegeEscalation.
      For filesystem permission and secret-storage shapes, inspect functions
      that write private keys, credentials, tokens, kubeconfigs, cloud-init,
      ignition, or other boot/config artifacts and check for chmod, mode,
@@ -267,10 +267,10 @@ Rules:
      values, paths, or args are interpolated into one command string before a
      wrapper execute call. Prefer argv arrays, process builders, or explicit
      shell escaping as hardening evidence; use function_context before proposing
-     a narrow command-string wrapper mark. Do not model generic execute wrappers
+     a narrow command-string wrapper flag. Do not model generic execute wrappers
      as code.CommandExecution sinks when the safe form is an argv array; that
      catches fixed code. Prefer code.CommandStringWrapperExecution exact context.
-     CommandStringWrapperExecution exact marks must include an nval for the
+     CommandStringWrapperExecution context flags must include an nval for the
      fixed form, such as $Env:, cmdEnv, argv array, process builder, execFile,
      or array_merge; otherwise the overlay will catch patched code.
      For Go/Windows PowerShell wrappers, inspect functions and calls named
@@ -278,11 +278,11 @@ Rules:
      Get-Item, Add-PartitionAccessPath, and Remove-PartitionAccessPath. If a
      parameter such as volumeID, path, mountpath, linkpath, or drivepath is
      interpolated into a PowerShell command string before RunPowershellCmd,
-     prefer a narrow code.CommandStringWrapperExecution function_context mark
+     prefer a narrow code.CommandStringWrapperExecution function_context flag
      with nvals for fixed hardening such as $Env: variables or
      RunPowershellCmd(cmd, cmdEnv...). Do not finish empty merely because
      os/exec.Command is a core sink; local string-command wrappers usually need
-     an exact context mark to distinguish vulnerable string interpolation from
+     an exact context flag to distinguish vulnerable string interpolation from
      fixed env/argv forms.
      For CLI option-taking commands such as gpg, git, tar, ssh, curl, unzip,
      or package managers, do not treat shell escaping alone as sufficient.
@@ -291,22 +291,22 @@ Rules:
      can still be parsed as a command option unless the command inserts "--"
      before positional user arguments or validates an option allowlist. Search
      operation/argument assembly, call function_context for the builder, and
-     prefer a narrow code.CommandOptionInjection mark with an nval for the fixed
+     prefer a narrow code.CommandOptionInjection flag with an nval for the fixed
      "--" delimiter or argv/allowlist hardening. CommandOptionInjection is a
-     scan mark, not a taint-only sink; do not finish empty merely because a
+     scan flag, not a taint-only sink; do not finish empty merely because a
      library has no HTTP/request source if the command builder itself has the
      missing delimiter pattern. Public API parameters and CLI/library wrapper
-     arguments are sufficient context for this mark.
+     arguments are sufficient context for this flag.
      For MCP server repositories, treat server.tool callback parameters as
      externally supplied tool input. Inspect @modelcontextprotocol/sdk imports,
      McpServer construction, server.tool schemas such as z.number/string/object,
      and child_process exec/execFile calls inside tool handlers. If a tool
      handler interpolates callback parameters into shell command templates,
-     prefer a narrow function_context mark to code.McpToolCommandTemplateExecution
+     prefer a narrow function_context flag to code.McpToolCommandTemplateExecution
      with execFile or argv-array calls as hardening evidence. If the
      framework call that establishes the tool boundary is outside the handler
-     body, call module_context and use a narrow analysis.module.context mark
-     containing both server.tool and the command templates. MCP command marks
+     body, call module_context and use a narrow analysis.module.context flag
+     containing both server.tool and the command templates. MCP command flags
      must include concrete exec command-template vals and an nval for fixed
      hardening such as execFile or argv arrays; schema-only marks like
      server.tool plus z.number are too broad and will catch fixed code. Do not
@@ -318,11 +318,11 @@ Rules:
      unpack, mkdir, open, and memcpy into path buffers. Check for explicit
      rejection of ".", "..", path separators, absolute paths, and traversal
      components before recursive extraction or filesystem writes. Prefer a
-     narrow function_context mark for local parser/extractor ordering bugs.
+     narrow function_context flag for local parser/extractor ordering bugs.
      For manual Go zip extraction, inspect zip.OpenReader/NewReader loops that
      join f.Name into a destination path and call os.OpenFile with os.O_TRUNC.
      If the patch adds os.Stat plus a GetInput/confirmation prompt before
-     truncation, prefer a narrow ManualZipEntryFileWrite function-context mark
+     truncation, prefer a narrow ManualZipEntryFileWrite function-context flag
      with nvals for os.Stat/GetInput rather than a broad path sink.
      For request-body resource DoS in Go or similar HTTP servers, inspect
      functions that derive allocation sizes from request ContentLength or
@@ -337,7 +337,7 @@ Rules:
      a Secure option/field/flag exists nearby. If a token, session, CSRF, auth,
      or credential cookie is set with a literal false secure argument, or a
      cookie object has Secure:false, prefer code.InsecureCookie. Use
-     function_context and a narrow analysis.function.context mark when the
+     function_context and a narrow analysis.function.context flag when the
      insecure value is positional in a framework wrapper; include an nval for
      the fixed option/field such as opt.Secure, Secure: true, or setSecure(true).
      Do not finish empty merely because net/http cookies are standard library
@@ -358,13 +358,13 @@ Rules:
      assignments and rendering/snapshot paths. Use assignment_inventory with
      name_contains values such as title, name, html, body, content, snapshot,
      encode, escape, and sanitize; then call function_context before proposing
-     a narrow analysis.function.context mark.
+     a narrow analysis.function.context flag.
      For sensitive data exposure through JSON/API responses, inspect model
      serialization helpers such as asModelSuccess, serialize, toArray, fields,
      extraFields, modelName, response.data, asJson, and getAcceptsJson. Full
      user/account/model objects returned through JSON success helpers are more
      important than adjacent redirect or request-parameter APIs. Use
-     function_context and narrow context marks for local model serialization
+     function_context and narrow context flags for local model serialization
      shapes; do not substitute redirect adapters for model exposure evidence.
      For Jenkins credential/provider startup CVEs, inspect classes named
      SystemCredentialsProvider, CredentialsProvider, or CredentialsStore that
@@ -372,11 +372,11 @@ Rules:
      DomainCredentials. Check whether the same class has an @Initializer after
      InitMilestone.JOB_LOADED that force-loads getInstance() under SYSTEM during
      startup. If missing, call class_context for SystemCredentialsProvider and
-     prefer a narrow analysis.class.context mark to
+     prefer a narrow analysis.class.context flag to
      code.JenkinsCredentialsStartupLoadContextExposure rather than ordinary
      credential endpoint or authorization-check review concepts. Do not use
      analysis.function.context for this concept: the fixed @Initializer method
-     is outside the constructor body, so function-context marks catch fixed code.
+     is outside the constructor body, so function-context flags catch fixed code.
      For that concept, use minimal positive vals from class_context:
      class_name:SystemCredentialsProvider, function_name:SystemCredentialsProvider,
      call_path:xml.unmarshal, call_path:DomainCredentials.migrateListToMap,
@@ -389,7 +389,7 @@ Rules:
      connect, request, openConnection, or similar outbound test APIs. These
      endpoints should normally require @POST and an admin/item permission check
      such as checkPermission or hasPermission before connecting. Prefer a narrow
-     function_context mark to code.JenkinsRemoteValidationMissingPostPermission
+     function_context flag to code.JenkinsRemoteValidationMissingPostPermission
      with nvals for annotation:POST and checkPermission/hasPermission hardening;
      do not finish empty just because the remote client class is first-party.
      For server-side template injection, host-header poisoning, canonical URL,
@@ -406,7 +406,7 @@ Rules:
      as relay exposure without hardcoded/default relay/proxy/tunnel evidence.
      If a helper uses a hardcoded third-party/default host while embedding
      token/gurl/conman/original URL metadata, call function_context and prefer a narrow
-     DefaultExternalRelaySecretExposure exact mark with an nval for trusted-host
+     DefaultExternalRelaySecretExposure context flag with an nval for trusted-host
      hardening. Do not finish empty merely because URL parsing or websocket
      libraries are standard.
      For Java Bean Validation, inspect ConstraintValidator implementations and
@@ -430,12 +430,12 @@ Rules:
      finishLocalJob, update_event, listFindUpdate, and global/schedule. If
      child/plugin JSON output can copy update_event into job state and later
      persist it to schedule/event configuration, prefer a narrow
-     JobOutputEventUpdateAuthorizationBypass function-context mark with nvals
+     JobOutputEventUpdateAuthorizationBypass function-context flag with nvals
      for explicit config/delete hardening such as allow_event_updates_from_jobs
      or delete data.update_event. Do not finish empty merely because the same
      repository also uses child_process command execution. Do not anchor this
      concept only on the later listFindUpdate/storage update context; the
-     patched guard may be in the earlier child-output handler, so the mark must
+     patched guard may be in the earlier child-output handler, so the flag must
      include child-output copy evidence such as job[key]=data[key].
      For CORS, Origin, callback, trusted-origin, or wildcard host validators,
      call symbol_inventory with name_contains values such as origin, wildcard,
@@ -458,7 +458,7 @@ Rules:
      function_context and prefer code.CryptoImproperBlinding with an nval for
      the fixed hardening such as r = modn.Square(r) before
      MultiplicativeInverse. Do not finish empty merely because the repository is
-     a standard cryptography library; these are semantic side-channel marks, not
+     a standard cryptography library; these are semantic side-channel flags, not
      framework dependency adapters.
      For .NET/C# dynamic assembly loading, inspect calls such as
      AssemblyLoadContext.Default.LoadFromAssemblyPath, Assembly.LoadFrom, and
@@ -477,9 +477,9 @@ Rules:
      calloc, realloc, memcpy, copy, size, length, capacity, offset, escape, and
      unicode; then open only the enclosing functions returned by inventory.
   6. read_files or read_file on exact evidence
-  7. function_context before analysis.function.context marks,
-     class_context before analysis.class.context marks,
-     or module_context before exact marks for top-level policy/config maps
+  7. function_context before analysis.function.context flags,
+     class_context before analysis.class.context flags,
+     or module_context before context flags for top-level policy/config maps
   8. validate_overlay if producing any non-empty adapter
   9. finish_overlay only after validation is clean, or empty if no useful
      repo-local adapter can improve scan.
@@ -637,22 +637,22 @@ agentLoop:
 					toolResult["error"] = "assignment_inventory must be focused on repo output/trust-boundary evidence before finish_overlay; call assignment_inventory with one of these name_contains terms: " + strings.Join(requiredAssignmentTerms, ", ")
 					p.debugf("step=%d finish_overlay rejected: focused assignment_inventory required terms=%s", step, strings.Join(requiredAssignmentTerms, ","))
 				} else if emptyJenkinsStartupOverlay {
-					toolResult["error"] = "Jenkins credentials startup-load evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins credentials startup\", class/function context for SystemCredentialsProvider, and validate_overlay with an analysis.class.context mark to code.JenkinsCredentialsStartupLoadContextExposure or concrete evidence that @Initializer after InitMilestone.JOB_LOADED already force-loads getInstance"
+					toolResult["error"] = "Jenkins credentials startup-load evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins credentials startup\", class/function context for SystemCredentialsProvider, and validate_overlay with an analysis.class.context flag to code.JenkinsCredentialsStartupLoadContextExposure or concrete evidence that @Initializer after InitMilestone.JOB_LOADED already force-loads getInstance"
 					p.debugf("step=%d finish_overlay rejected: empty Jenkins credentials startup overlay", step)
 				} else if emptyJenkinsRemoteValidationOverlay {
-					toolResult["error"] = "Jenkins remote validation endpoint evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins remote validation\", function_context for the doTest/doCheck/doFill method containing QueryParameter plus outbound test/connect calls, and validate_overlay with an analysis.function.context mark to code.JenkinsRemoteValidationMissingPostPermission or concrete evidence that @POST and checkPermission/hasPermission already gate the connection"
+					toolResult["error"] = "Jenkins remote validation endpoint evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins remote validation\", function_context for the doTest/doCheck/doFill method containing QueryParameter plus outbound test/connect calls, and validate_overlay with an analysis.function.context flag to code.JenkinsRemoteValidationMissingPostPermission or concrete evidence that @POST and checkPermission/hasPermission already gate the connection"
 					p.debugf("step=%d finish_overlay rejected: empty Jenkins remote validation overlay", step)
 				} else if emptyJobOutputEventOverlay {
-					toolResult["error"] = "job output event-update evidence is present; do not return an empty overlay until you have called concept_reference with topic \"job output event update\", function_context for the child-output handler containing update_event, and validate_overlay with an analysis.function.context mark to code.JobOutputEventUpdateAuthorizationBypass or concrete evidence that update_event is deleted or gated by allow_event_updates_from_jobs before copying child output into job state"
+					toolResult["error"] = "job output event-update evidence is present; do not return an empty overlay until you have called concept_reference with topic \"job output event update\", function_context for the child-output handler containing update_event, and validate_overlay with an analysis.function.context flag to code.JobOutputEventUpdateAuthorizationBypass or concrete evidence that update_event is deleted or gated by allow_event_updates_from_jobs before copying child output into job state"
 					p.debugf("step=%d finish_overlay rejected: empty job output event-update overlay", step)
 				} else if emptyDefaultRelayOverlay {
-					toolResult["error"] = "default relay URL evidence is present; do not return an empty overlay until you have called concept_reference with topic \"default relay host\", function_context for the URL builder containing host/token/encoded upstream URL assignments, and validate_overlay with an analysis.function.context mark to code.DefaultExternalRelaySecretExposure or concrete evidence that the default host is product-owned/trusted"
+					toolResult["error"] = "default relay URL evidence is present; do not return an empty overlay until you have called concept_reference with topic \"default relay host\", function_context for the URL builder containing host/token/encoded upstream URL assignments, and validate_overlay with an analysis.function.context flag to code.DefaultExternalRelaySecretExposure or concrete evidence that the default host is product-owned/trusted"
 					p.debugf("step=%d finish_overlay rejected: empty default relay overlay", step)
 				} else if emptyCommandWrapperOverlay {
 					toolResult["error"] = "command-wrapper evidence is present; do not return an empty overlay until you have called concept_reference with topic \"command wrapper\", function_context for the wrapper caller containing command-string construction and execute evidence, and validate_overlay with code.CommandStringWrapperExecution or concrete evidence that the command uses argv/process-builder/env-variable hardening. Do not rely on generic interprocedural taint through a local helper as the empty-overlay rationale."
 					p.debugf("step=%d finish_overlay rejected: empty command-wrapper overlay", step)
 				} else if emptyCommandOptionOverlay {
-					toolResult["error"] = "command option-injection evidence is present; empty-overlay notes must explicitly address code.CommandOptionInjection or end-of-options delimiter hardening such as --, and must not reject the mark merely because the library has no direct untrusted source. Shell escaping alone is not sufficient evidence for option-taking CLI arguments."
+					toolResult["error"] = "command option-injection evidence is present; empty-overlay notes must explicitly address code.CommandOptionInjection or end-of-options delimiter hardening such as --, and must not reject the flag merely because the library has no direct untrusted source. Shell escaping alone is not sufficient evidence for option-taking CLI arguments."
 					p.debugf("step=%d finish_overlay rejected: empty command option overlay without specific rationale", step)
 				} else if emptySecureCookieOverlay {
 					toolResult["error"] = "secure-cookie evidence is present; do not return an empty overlay until you have called concept_reference with topic \"secure cookie\", function_context for the cookie setter containing SetCookie plus token/session/csrf evidence, and validate_overlay with code.InsecureCookie or concrete evidence that the secure flag is passed from the configured option such as opt.Secure"
@@ -722,7 +722,7 @@ agentLoop:
 			contents = append(contents, map[string]any{
 				"role": "user",
 				"parts": []map[string]any{{
-					"text": "Decision checkpoint: stop searching now. Your next tool call must be validate_overlay if you have concrete source plus sink/mark/control evidence, or finish_overlay with adapter_files=[] if you do not. If finish_overlay is rejected because required symbol_inventory, call_inventory, or assignment_inventory is missing, call exactly those inventory tools with the requested focused terms, then call finish_overlay. Do not call search, read, repo, dependency, or reference tools after this checkpoint.",
+					"text": "Decision checkpoint: stop searching now. Your next tool call must be validate_overlay if you have concrete source plus sink/flag/control evidence, or finish_overlay with adapter_files=[] if you do not. If finish_overlay is rejected because required symbol_inventory, call_inventory, or assignment_inventory is missing, call exactly those inventory tools with the requested focused terms, then call finish_overlay. Do not call search, read, repo, dependency, or reference tools after this checkpoint.",
 				}},
 			})
 		}
@@ -1504,7 +1504,7 @@ func vertexPrepTools() []map[string]any {
 		},
 		{
 			"name":        "concept_reference",
-			"description": "Return existing VyQL concepts useful for repo-local prep marks and sinks.",
+			"description": "Return existing VyQL concepts useful for repo-local prep flags and sinks.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -1677,7 +1677,7 @@ func vertexPrepTools() []map[string]any {
 		},
 		{
 			"name":        "function_context",
-			"description": "Return matchable function context previews for exact analysis.function.context marks. Use before writing mark exact overlays.",
+			"description": "Return matchable function context previews for exact analysis.function.context flags. Use before writing context flag overlays.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -1691,7 +1691,7 @@ func vertexPrepTools() []map[string]any {
 		},
 		{
 			"name":        "class_context",
-			"description": "Return matchable class context previews for exact analysis.class.context marks. Use before writing class-level exact marks.",
+			"description": "Return matchable class context previews for exact analysis.class.context flags. Use before writing class-level context flags.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -1705,7 +1705,7 @@ func vertexPrepTools() []map[string]any {
 		},
 		{
 			"name":        "module_context",
-			"description": "Return matchable top-level declaration previews for exact analysis.module.context marks. Use for static role, route, permission, ACL, or policy maps.",
+			"description": "Return matchable top-level declaration previews for exact analysis.module.context flags. Use for static role, route, permission, ACL, or policy maps.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -2053,27 +2053,27 @@ adapter <language> {
     sink path "call.name" -> code.FilePathAccess
     sink path "call.name" arg 1 -> code.SqlExecution
     sink path "call.name" arg all -> code.CommandExecution
-    mark "call_or_context" val "required-substring" nval "missing-hardening" -> code.SomeReviewConcept
-    mark exact "analysis.function.context" val "name=handler" val "dangerous call" nval "patched guard" -> code.ProtocolStateReview
-    mark exact "analysis.module.context" val "var_name:PermissionsByRole" val "RoleNetworkManager" val "PermBackup" nval "RoleAdmin:{PermBackup" -> code.OverbroadRolePermissionGrant
+    flag code.SomeReviewConcept on any { path "call_or_context"; has "required-substring"; lacks "missing-hardening" }
+    flag code.ProtocolStateReview in function { has "name=handler"; has "dangerous call"; lacks "patched guard" }
+    flag code.OverbroadRolePermissionGrant in module { has "var_name:PermissionsByRole"; has "RoleNetworkManager"; has "PermBackup"; lacks "RoleAdmin:{PermBackup" }
   }
 }
 
 When package_reference returns third-party packages, wrap generated API source,
 sink, and control mappings in package blocks.
-Do not package-wrap exact analysis.*.context marks.
+Do not package-wrap local context flags.
 Do not package-wrap first-party workspace package names from local manifests.
 Use path/method/receiver only before the quoted pattern. Put arg after the pattern.
-Use source param only when the same overlay also adds a concrete sink, mark, or
+Use source param only when the same overlay also adds a concrete sink, flag, or
 control for the package. Do not emit source-only source param overlays.
-Use mark exact analysis.function.context for narrow local patterns already visible in the scanned function.
-Use mark exact analysis.module.context for top-level role, route, permission, ACL, or policy maps.
-Use mark exact analysis.class.context for class-level evidence that spans multiple methods.
-Call function_context before exact marks and copy short returned substrings from one context only.
-Call class_context before analysis.class.context marks and copy structured tokens from one context only.
-Call module_context before analysis.module.context marks and copy short returned substrings from one context only.
-For exact context marks, each val must be present in the compact context returned
-by function_context, class_context, or module_context, and each nval must be absent.
+Use flag <concept> in function for narrow local patterns already visible in the scanned function.
+Use flag <concept> in module for top-level role, route, permission, ACL, or policy maps.
+Use flag <concept> in class for class-level evidence that spans multiple methods.
+Call function_context before function flags and copy short returned substrings from one context only.
+Call class_context before class flags and copy structured tokens from one context only.
+Call module_context before module flags and copy short returned substrings from one context only.
+For context flags, each has value must be present in the compact context returned
+by function_context, class_context, or module_context, and each lacks value must be absent.
 Use existing code.* concepts only. Common target concepts include:
 code.CommandExecution, code.CodeEval, code.FilePathAccess, code.SqlExecution,
 code.HtmlRender, code.UrlFetch, code.Deserialization, code.RedirectTarget,
@@ -2098,39 +2098,39 @@ func conceptReference(topic string) []map[string]string {
 	topic = strings.ToLower(topic)
 	all := []map[string]string{
 		{"concept": "code.SqlExecution", "surface": "scan", "use": "taint sink for SQL execution APIs where caller-controlled data reaches executable query text"},
-		{"concept": "code.UnparameterizedSqlQueryParser", "surface": "scan", "use": "mark for query builders/parsers assembling SQL fragments such as order by, direction, filters, raw clauses, or identifiers without allowlists"},
+		{"concept": "code.UnparameterizedSqlQueryParser", "surface": "scan", "use": "flag for query builders/parsers assembling SQL fragments such as order by, direction, filters, raw clauses, or identifiers without allowlists"},
 		{"concept": "core.SqlParameterization", "surface": "control", "use": "control concept for parameterization or escaping that neutralizes SQL taint"},
-		{"concept": "code.ProtocolStateReview", "surface": "review_only", "use": "review mark for OAuth, protocol, auth, callback, or message state transitions missing required state/cookie/session/order validation"},
-		{"concept": "code.ThreadLocalScopeOverwriteWithoutCleanup", "surface": "scan", "use": "mark for request/session/scope lifecycle methods that overwrite ThreadLocal state or per-thread caches without ending/removing the previous scope first"},
-		{"concept": "code.DisabledRelationshipMetadataExposure", "surface": "scan", "use": "mark for public relationship/resource metadata helpers that return relationship targets for disabled fields or invisible resources without checking enabled/access/visibility"},
-		{"concept": "code.OverbroadRolePermissionGrant", "surface": "scan", "use": "mark for static role/group/permission tables that assign backup, restore, admin, or similarly privileged operations to non-admin roles"},
-		{"concept": "code.ParsedUserIdDefaultRootPrivilegeEscalation", "surface": "scan", "use": "mark for UID/GID/user/group parsers that allocate a zeroed process or security identity struct and can return on a bare parsed value before assigning the parsed UID/GID/role into that struct"},
-		{"concept": "code.JobOutputEventUpdateAuthorizationBypass", "surface": "scan", "use": "mark for scheduler/plugin child-output handlers that copy update_event from child JSON into job state and later persist it to schedule/event configuration without a config or authorization gate; include nval allow_event_updates_from_jobs or delete data.update_event"},
-		{"concept": "code.DefaultExternalRelaySecretExposure", "surface": "scan", "use": "mark for relay/proxy/websocket URL builders that select a hardcoded fallback host while embedding tokens, credentials, connection metadata, or encoded upstream URLs"},
-		{"concept": "code.MethodGatedRedirectValidationBypass", "surface": "scan", "use": "mark for URL validation skipped for some HTTP methods before redirect/callback handling"},
-		{"concept": "code.SessionStoredRedirectTarget", "surface": "scan", "use": "mark for redirects using session-stored or request-influenced targets without relative/same-origin validation"},
+		{"concept": "code.ProtocolStateReview", "surface": "review_only", "use": "review flag for OAuth, protocol, auth, callback, or message state transitions missing required state/cookie/session/order validation"},
+		{"concept": "code.ThreadLocalScopeOverwriteWithoutCleanup", "surface": "scan", "use": "flag for request/session/scope lifecycle methods that overwrite ThreadLocal state or per-thread caches without ending/removing the previous scope first"},
+		{"concept": "code.DisabledRelationshipMetadataExposure", "surface": "scan", "use": "flag for public relationship/resource metadata helpers that return relationship targets for disabled fields or invisible resources without checking enabled/access/visibility"},
+		{"concept": "code.OverbroadRolePermissionGrant", "surface": "scan", "use": "flag for static role/group/permission tables that assign backup, restore, admin, or similarly privileged operations to non-admin roles"},
+		{"concept": "code.ParsedUserIdDefaultRootPrivilegeEscalation", "surface": "scan", "use": "flag for UID/GID/user/group parsers that allocate a zeroed process or security identity struct and can return on a bare parsed value before assigning the parsed UID/GID/role into that struct"},
+		{"concept": "code.JobOutputEventUpdateAuthorizationBypass", "surface": "scan", "use": "flag for scheduler/plugin child-output handlers that copy update_event from child JSON into job state and later persist it to schedule/event configuration without a config or authorization gate; include nval allow_event_updates_from_jobs or delete data.update_event"},
+		{"concept": "code.DefaultExternalRelaySecretExposure", "surface": "scan", "use": "flag for relay/proxy/websocket URL builders that select a hardcoded fallback host while embedding tokens, credentials, connection metadata, or encoded upstream URLs"},
+		{"concept": "code.MethodGatedRedirectValidationBypass", "surface": "scan", "use": "flag for URL validation skipped for some HTTP methods before redirect/callback handling"},
+		{"concept": "code.SessionStoredRedirectTarget", "surface": "scan", "use": "flag for redirects using session-stored or request-influenced targets without relative/same-origin validation"},
 		{"concept": "code.RedirectTarget", "surface": "scan", "use": "taint sink for redirect APIs or methods returning redirect destinations"},
 		{"concept": "core.RedirectAllowlist", "surface": "control", "use": "control concept for same-origin, relative URL, or allowlist redirect validation"},
 		{"concept": "code.Deserialization", "surface": "scan", "use": "taint sink for unsafe object deserialization such as yaml.load, pickle, unserialize"},
 		{"concept": "core.SafeDeserialization", "surface": "control", "use": "control concept for safe deserialization APIs such as safe_load or explicit safe loaders"},
 		{"concept": "code.ExpressionEval", "surface": "scan", "use": "taint sink for expression-language or template-message evaluation such as SpEL, MVEL, OGNL, XPath, and Bean Validation buildConstraintViolationWithTemplate"},
 		{"concept": "code.HtmlRender", "surface": "scan", "use": "taint sink for raw HTML/template rendering or unescaped response content"},
-		{"concept": "code.UnsanitizedSvgUpload", "surface": "scan", "use": "mark for upload services that accept/store SVG files without sanitizing SVG XML/script content before saving"},
-		{"concept": "code.LengthDerivedAllocation", "surface": "scan", "use": "mark for resource DoS patterns where request/protocol/body length fields drive allocation or full buffering before an explicit max-size or available-data bound"},
-		{"concept": "code.InsecureCookie", "surface": "scan", "use": "mark for session, token, CSRF, auth, or credential cookies set with Secure:false or framework SetCookie wrappers that pass a literal false secure flag instead of the configured secure option"},
-		{"concept": "code.SecretComparisonReview", "surface": "scan", "use": "mark for validation functions comparing attacker-supplied CSRF tokens, API keys, webhook secrets, BasicAuth credentials, signatures, or passwords with ordinary equality instead of constant-time comparison; include nvals for scmp, timingSafeEqual, ConstantTimeCompare, MessageDigest.isEqual, or compare_digest"},
-		{"concept": "code.CatastrophicRegex", "surface": "scan", "use": "mark for static regular expressions with nested or ambiguous quantified branches used by parser/tokenizer/sanitizer match, replace, exec, or compile paths; include nvals for bounded, possessive, atomic, or linear fixed forms"},
+		{"concept": "code.UnsanitizedSvgUpload", "surface": "scan", "use": "flag for upload services that accept/store SVG files without sanitizing SVG XML/script content before saving"},
+		{"concept": "code.LengthDerivedAllocation", "surface": "scan", "use": "flag for resource DoS patterns where request/protocol/body length fields drive allocation or full buffering before an explicit max-size or available-data bound"},
+		{"concept": "code.InsecureCookie", "surface": "scan", "use": "flag for session, token, CSRF, auth, or credential cookies set with Secure:false or framework SetCookie wrappers that pass a literal false secure flag instead of the configured secure option"},
+		{"concept": "code.SecretComparisonReview", "surface": "scan", "use": "flag for validation functions comparing attacker-supplied CSRF tokens, API keys, webhook secrets, BasicAuth credentials, signatures, or passwords with ordinary equality instead of constant-time comparison; include nvals for scmp, timingSafeEqual, ConstantTimeCompare, MessageDigest.isEqual, or compare_digest"},
+		{"concept": "code.CatastrophicRegex", "surface": "scan", "use": "flag for static regular expressions with nested or ambiguous quantified branches used by parser/tokenizer/sanitizer match, replace, exec, or compile paths; include nvals for bounded, possessive, atomic, or linear fixed forms"},
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
-		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
-		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
-		{"concept": "code.JenkinsCredentialsStartupLoadContextExposure", "surface": "scan", "use": "mark for Jenkins SystemCredentialsProvider-style classes that unmarshal or migrate persisted credentials without an @Initializer after InitMilestone.JOB_LOADED force-loading getInstance during startup"},
-		{"concept": "code.JenkinsRemoteValidationMissingPostPermission", "surface": "scan", "use": "mark for Jenkins descriptor doTest/doCheck/doFill form-validation methods that accept @QueryParameter URL or credential values and perform outbound test/connect calls without @POST and checkPermission/hasPermission guards"},
-		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "mark for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
-		{"concept": "code.AssemblyLoadPathTraversal", "surface": "scan", "use": "mark for C#/.NET dynamic assembly loading paths built from caller-controlled type or assembly-name components plus AppContext.BaseDirectory without rejecting traversal or drive-qualified path components"},
-		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "mark for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
-		{"concept": "code.CommandOptionInjection", "surface": "scan", "use": "mark for command builders that pass escaped user-controlled positional arguments to option-taking CLIs without inserting an end-of-options delimiter such as -- or enforcing an option allowlist"},
-		{"concept": "code.McpToolCommandTemplateExecution", "surface": "scan", "use": "mark for MCP server.tool handlers whose externally supplied tool callback parameters are interpolated into child_process.exec shell command templates instead of execFile argv arrays; include command-template vals and nval execFile/spawn hardening; use analysis.module.context when the server.tool registration wraps the handler body"},
-		{"concept": "code.CryptoImproperBlinding", "surface": "scan", "use": "mark for private-key crypto operations where a randomized blinding factor is inverted or used for unblinding before required subgroup, Jacobi, or square hardening; include Randomize, MultiplicativeInverse, Jacobi/Square evidence and nval the fixed hardening"},
+		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "flag for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
+		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "flag for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
+		{"concept": "code.JenkinsCredentialsStartupLoadContextExposure", "surface": "scan", "use": "flag for Jenkins SystemCredentialsProvider-style classes that unmarshal or migrate persisted credentials without an @Initializer after InitMilestone.JOB_LOADED force-loading getInstance during startup"},
+		{"concept": "code.JenkinsRemoteValidationMissingPostPermission", "surface": "scan", "use": "flag for Jenkins descriptor doTest/doCheck/doFill form-validation methods that accept @QueryParameter URL or credential values and perform outbound test/connect calls without @POST and checkPermission/hasPermission guards"},
+		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "flag for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
+		{"concept": "code.AssemblyLoadPathTraversal", "surface": "scan", "use": "flag for C#/.NET dynamic assembly loading paths built from caller-controlled type or assembly-name components plus AppContext.BaseDirectory without rejecting traversal or drive-qualified path components"},
+		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "flag for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
+		{"concept": "code.CommandOptionInjection", "surface": "scan", "use": "flag for command builders that pass escaped user-controlled positional arguments to option-taking CLIs without inserting an end-of-options delimiter such as -- or enforcing an option allowlist"},
+		{"concept": "code.McpToolCommandTemplateExecution", "surface": "scan", "use": "flag for MCP server.tool handlers whose externally supplied tool callback parameters are interpolated into child_process.exec shell command templates instead of execFile argv arrays; include command-template vals and nval execFile/spawn hardening; use analysis.module.context when the server.tool registration wraps the handler body"},
+		{"concept": "code.CryptoImproperBlinding", "surface": "scan", "use": "flag for private-key crypto operations where a randomized blinding factor is inverted or used for unblinding before required subgroup, Jacobi, or square hardening; include Randomize, MultiplicativeInverse, Jacobi/Square evidence and nval the fixed hardening"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
 		{"concept": "core.PathAccessCheck", "surface": "control", "use": "control concept for containment, normalization, allowlist, or traversal guard"},
 	}
@@ -2979,7 +2979,7 @@ func adapterCoverage(profile Profile, lang string, max int) map[string]any {
 	}
 	if len(gaps) > 0 {
 		out["recommended_probe"] = map[string]any{"language": gaps[0].Language, "package": gaps[0].Package}
-		out["instruction"] = "Probe high-scoring uncovered dependencies, but only emit adapters for concrete security APIs with sources plus sinks/marks/controls."
+		out["instruction"] = "Probe high-scoring uncovered dependencies, but only emit adapters for concrete security APIs with sources plus sinks/flags/controls."
 	}
 	return out
 }
@@ -3210,28 +3210,28 @@ func overlayHints(profile Profile, proposal Proposal) []string {
 	for _, f := range proposal.AdapterFiles {
 		src := f.Source
 		if strings.Contains(src, "SqlExecution") && !strings.Contains(src, "source ") && !strings.Contains(src, "UnparameterizedSqlQueryParser") {
-			hints = append(hints, "SQL sinks need a source/control flow to fire; for library public APIs consider source param -> code.ExternalEntryInput, or use a narrow code.UnparameterizedSqlQueryParser mark for local query-fragment assembly.")
+			hints = append(hints, "SQL sinks need a source/control flow to fire; for library public APIs consider source param -> code.ExternalEntryInput, or use a narrow code.UnparameterizedSqlQueryParser flag for local query-fragment assembly.")
 		}
 		if strings.Contains(src, "RedirectTarget") && !strings.Contains(src, "source ") && !strings.Contains(src, "ProtocolStateReview") && !strings.Contains(src, "SessionStoredRedirectTarget") {
-			hints = append(hints, "Redirect sinks need a source/control flow to fire; for missing OAuth/state/callback validation consider a narrow code.ProtocolStateReview mark.")
+			hints = append(hints, "Redirect sinks need a source/control flow to fire; for missing OAuth/state/callback validation consider a narrow code.ProtocolStateReview flag.")
 		}
 		if strings.Contains(src, "ProtocolStateReview") {
 			hints = append(hints, "code.ProtocolStateReview is review_only in the current rule packs; it can support review/ATTENTION but will not improve vyql scan caught rate by itself.")
 		}
-		if strings.Contains(src, "source param") && !strings.Contains(src, "sink ") && !strings.Contains(src, "mark ") && !strings.Contains(src, "control ") {
-			hints = append(hints, "source param without a concrete sink, mark, or control is broad source-only expansion; return an empty overlay instead of widening public parameters.")
+		if strings.Contains(src, "source param") && !strings.Contains(src, "sink ") && !strings.Contains(src, "flag ") && !strings.Contains(src, "control ") {
+			hints = append(hints, "source param without a concrete sink, flag, or control is broad source-only expansion; return an empty overlay instead of widening public parameters.")
 		}
 		if !strings.Contains(src, "package \"") {
-			hints = append(hints, "When package_reference returns third-party candidates, wrap generated API source/sink/control mappings in package \"name\" { ... }; keep exact analysis.*.context marks unscoped.")
+			hints = append(hints, "When package_reference returns third-party candidates, wrap generated API source/sink/control mappings in package \"name\" { ... }; keep local context flags unscoped.")
 		}
 		for pkg := range firstPartyPackages {
 			if strings.Contains(src, `package "`+pkg+`"`) {
-				hints = append(hints, "Do not package-gate first-party workspace package "+pkg+"; use a generalized API mapping, exact context mark, or empty overlay.")
+				hints = append(hints, "Do not package-gate first-party workspace package "+pkg+"; use a generalized API mapping, local context flag, or empty overlay.")
 				break
 			}
 		}
-		if strings.Contains(src, "mark exact") && !strings.Contains(src, "analysis.function.context") {
-			hints = append(hints, "Prefer mark exact \"analysis.function.context\" for function-local anti-patterns so frontend context matching can apply.")
+		if strings.Contains(src, "flag ") && strings.Contains(src, " on any ") && !strings.Contains(src, " in function ") {
+			hints = append(hints, "Prefer flag <concept> in function for function-local anti-patterns so frontend context matching can apply.")
 		}
 	}
 	return hints

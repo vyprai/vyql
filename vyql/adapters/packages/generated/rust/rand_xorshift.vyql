@@ -1,6 +1,8 @@
 import code.{WeakRandomValue}
 adapter rust {
   package "rand_xorshift" {
-    mark method "from_seed" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "from_seed"
+    }
   }
 }

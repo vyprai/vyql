@@ -33,11 +33,31 @@ adapter powershell {
   sink path "wget" -> code.UrlFetch
   sink path "curl" -> code.UrlFetch
   sink path "Select-String" -> code.RegexCompile
-  mark "Invoke-WebRequest" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "Invoke-RestMethod" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "iwr" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "wget" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "curl" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "Invoke-WebRequest"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "Invoke-RestMethod"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "iwr"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "wget"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "curl"
+    has "http://"
+    lacks "127.0"
+  }
 
   // SQL
   sink path "Invoke-Sqlcmd" -> code.SqlExecution

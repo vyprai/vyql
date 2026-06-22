@@ -2,7 +2,11 @@ import code.{WeakHash}
 
 adapter rust {
   package "sha1" {
-    mark method "Sha1Core" -> code.WeakHash
-    mark method "compress" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "Sha1Core"
+    }
+    flag code.WeakHash on any {
+      method "compress"
+    }
   }
 }

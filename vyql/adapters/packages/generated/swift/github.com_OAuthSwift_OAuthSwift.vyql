@@ -1,6 +1,8 @@
 adapter swift {
   package "github.com/OAuthSwift/OAuthSwift" {
     source method "init" -> code.SecretValue
-    mark method "updateRequest" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "updateRequest"
+    }
   }
 }

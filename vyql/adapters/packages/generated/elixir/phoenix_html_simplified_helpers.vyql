@@ -1,6 +1,8 @@
 import code.{RedirectTarget}
 adapter elixir {
   package "phoenix_html_simplified_helpers" {
-    mark method "url_for" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "url_for"
+    }
   }
 }

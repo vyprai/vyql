@@ -2,8 +2,14 @@ import code.{WeakRandomValue}
 
 adapter swift {
   package "github.com/typelift/SwiftCheck" {
-    mark method "randomBound" -> code.WeakRandomValue
-    mark method "random" -> code.WeakRandomValue
-    mark method "randomInRange" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "randomBound"
+    }
+    flag code.WeakRandomValue on any {
+      method "random"
+    }
+    flag code.WeakRandomValue on any {
+      method "randomInRange"
+    }
   }
 }

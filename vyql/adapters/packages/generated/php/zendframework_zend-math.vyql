@@ -1,10 +1,20 @@
 import code.{WeakRandomValue}
 adapter php {
   package "zendframework/zend-math" {
-    mark method "Zend\Math\Rand::getBytes" -> code.WeakRandomValue
-    mark method "Zend\Math\Rand::getBoolean" -> code.WeakRandomValue
-    mark method "Zend\Math\Rand::getInteger" -> code.WeakRandomValue
-    mark method "Zend\Math\Rand::getFloat" -> code.WeakRandomValue
-    mark method "Zend\Math\Rand::getString" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "Zend\Math\Rand::getBytes"
+    }
+    flag code.WeakRandomValue on any {
+      method "Zend\Math\Rand::getBoolean"
+    }
+    flag code.WeakRandomValue on any {
+      method "Zend\Math\Rand::getInteger"
+    }
+    flag code.WeakRandomValue on any {
+      method "Zend\Math\Rand::getFloat"
+    }
+    flag code.WeakRandomValue on any {
+      method "Zend\Math\Rand::getString"
+    }
   }
 }

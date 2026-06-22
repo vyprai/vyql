@@ -7,7 +7,11 @@ adapter java {
     source method "getRequest" -> code.HttpInput
     sink method "print" -> code.HtmlRender
     sink method "println" -> code.HtmlRender
-    mark method "forward" -> code.RedirectTarget
-    mark method "include" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "forward"
+    }
+    flag code.RedirectTarget on any {
+      method "include"
+    }
   }
 }

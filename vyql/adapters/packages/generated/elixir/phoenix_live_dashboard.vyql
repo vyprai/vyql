@@ -1,6 +1,8 @@
 adapter elixir {
   package "phoenix_live_dashboard" {
-    mark method "redirect_to_current_node" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "redirect_to_current_node"
+    }
     source method "assign_params" -> core.UserControlledData
   }
 }

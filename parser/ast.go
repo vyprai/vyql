@@ -92,6 +92,29 @@ type AdapterMapping struct {
 	FlowDestArg      int      // for `flow`: destination out-param argument index
 	FlowSourceArg    int      // for `flow`: first source argument index; -1 when source is the call result
 	FlowSourceResult bool     // for `flow`: call result flows into destination out-param
+	Flag             *AdapterFlag
+}
+
+// AdapterFlag is an AST/graph-shaped presence annotation:
+// `flag <concept> on <node-kind> { ... }` or `flag <concept> in <scope> { ... }`.
+type AdapterFlag struct {
+	NodeKind   string
+	Scope      string
+	Predicates []AdapterFlagPredicate
+	Operands   []AdapterFlagOperand
+}
+
+type AdapterFlagPredicate struct {
+	Subject  string
+	Property string
+	Op       string
+	Values   []string
+	Exact    bool
+	Negative bool
+}
+
+type AdapterFlagOperand struct {
+	Predicates []AdapterFlagPredicate
 }
 
 // ThreatDecl is a `threat <ns>.<Name> { cwe: [...] }` weakness-class declaration

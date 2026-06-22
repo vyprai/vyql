@@ -3,6 +3,8 @@ import code.{NetworkSend, CertValidationDisabled}
 adapter ruby {
   package "faraday-net_http" {
     sink method "call" -> code.NetworkSend
-    mark method "configure_ssl" -> code.CertValidationDisabled
+    flag code.CertValidationDisabled on any {
+      method "configure_ssl"
+    }
   }
 }

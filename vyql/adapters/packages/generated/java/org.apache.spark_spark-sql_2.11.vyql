@@ -3,6 +3,8 @@ adapter java {
     sink method "open" -> code.SqlExecution
     control method "where" -> core.SqlParameterization
     sink method "decode" -> code.Deserialization
-    mark path "org.apache.spark.spark.sql_2.11.hash" -> code.WeakHash
+    flag code.WeakHash on any {
+      path "org.apache.spark.spark.sql_2.11.hash"
+    }
   }
 }

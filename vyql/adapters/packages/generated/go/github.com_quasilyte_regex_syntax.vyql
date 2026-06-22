@@ -1,5 +1,7 @@
 adapter go {
   package "github.com/quasilyte/regex/syntax" {
-    mark method "NewParser" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "NewParser"
+    }
   }
 }

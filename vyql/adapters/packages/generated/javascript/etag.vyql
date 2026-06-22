@@ -1,6 +1,8 @@
 import code.{WeakHash}
 adapter javascript {
   package "etag" {
-    mark method "etag" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "etag"
+    }
   }
 }

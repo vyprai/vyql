@@ -1,5 +1,7 @@
 adapter python {
   package "sympy" {
-    mark path "sympy.random" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      path "sympy.random"
+    }
   }
 }

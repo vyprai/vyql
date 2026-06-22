@@ -1,6 +1,8 @@
 import code.{RedirectTarget}
 adapter swift {
   package "github.com/poviolabs/PovioKit" {
-    mark method "openUrl" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "openUrl"
+    }
   }
 }

@@ -1,9 +1,17 @@
 import code.{WeakRandomValue}
 adapter perl {
   package "Text-DeLoreanIpsum" {
-    mark method "get_character" -> code.WeakRandomValue
-    mark method "get_word" -> code.WeakRandomValue
-    mark method "get_sentence" -> code.WeakRandomValue
-    mark method "get_paragraph" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "get_character"
+    }
+    flag code.WeakRandomValue on any {
+      method "get_word"
+    }
+    flag code.WeakRandomValue on any {
+      method "get_sentence"
+    }
+    flag code.WeakRandomValue on any {
+      method "get_paragraph"
+    }
   }
 }

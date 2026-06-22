@@ -2,7 +2,11 @@ import code.{RedirectTarget}
 
 adapter perl {
   package "Pickles" {
-    mark method "uri_for" -> code.RedirectTarget
-    mark method "redirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "uri_for"
+    }
+    flag code.RedirectTarget on any {
+      method "redirect"
+    }
   }
 }

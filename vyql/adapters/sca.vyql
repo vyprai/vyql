@@ -4,12 +4,36 @@
 adapter sca {
   meta { fidelity: resolved, cross_language: true, auto_apply: graph }
 
-  mark exact "analysis.sca.package" val "status=vulnerable" -> sbom.VulnerableDependency
-  mark exact "analysis.sca.package" val "advisory_cwe=CWE-444" -> sbom.HttpRequestSmugglingDependency
-  mark exact "analysis.sca.package" val "advisory_cwe=CWE_444" -> sbom.HttpRequestSmugglingDependency
-  mark exact "analysis.sca.package" val "advisory_cwe=CWE-295" -> sbom.CertValidationDependency
-  mark exact "analysis.sca.package" val "advisory_cwe=CWE_295" -> sbom.CertValidationDependency
-  mark exact "analysis.sca.package" val "status=suspicious" -> sbom.SuspiciousDependency
-  mark exact "analysis.sca.package" val "status=malicious" -> sbom.MaliciousDependency
-  mark exact "analysis.sca.package" val "reachable=true" -> sbom.ReachableSymbol
+  flag sbom.VulnerableDependency on any {
+    path exact "analysis.sca.package"
+    has "status=vulnerable"
+  }
+  flag sbom.HttpRequestSmugglingDependency on any {
+    path exact "analysis.sca.package"
+    has "advisory_cwe=CWE-444"
+  }
+  flag sbom.HttpRequestSmugglingDependency on any {
+    path exact "analysis.sca.package"
+    has "advisory_cwe=CWE_444"
+  }
+  flag sbom.CertValidationDependency on any {
+    path exact "analysis.sca.package"
+    has "advisory_cwe=CWE-295"
+  }
+  flag sbom.CertValidationDependency on any {
+    path exact "analysis.sca.package"
+    has "advisory_cwe=CWE_295"
+  }
+  flag sbom.SuspiciousDependency on any {
+    path exact "analysis.sca.package"
+    has "status=suspicious"
+  }
+  flag sbom.MaliciousDependency on any {
+    path exact "analysis.sca.package"
+    has "status=malicious"
+  }
+  flag sbom.ReachableSymbol on any {
+    path exact "analysis.sca.package"
+    has "reachable=true"
+  }
 }

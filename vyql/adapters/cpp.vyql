@@ -44,10 +44,18 @@ adapter cpp {
   sink path "strcat" arg 1 -> code.UnboundedCopy
   sink path "sprintf" arg all -> code.UnboundedCopy
   sink path "vsprintf" arg all -> code.UnboundedCopy
-  mark "strcpy" -> code.UnboundedCopySmell
-  mark "strcat" -> code.UnboundedCopySmell
-  mark "sprintf" -> code.UnboundedCopySmell
-  mark "vsprintf" -> code.UnboundedCopySmell
+  flag code.UnboundedCopySmell on any {
+    path "strcpy"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "strcat"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "sprintf"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "vsprintf"
+  }
   sink path "memcpy" arg 2 -> code.RawMemoryCopySize
   sink path "memmove" arg 2 -> code.RawMemoryCopySize
   sink path "strncpy" arg 2 -> code.RawMemoryCopySize
@@ -57,75 +65,257 @@ adapter cpp {
   sink path "realloc" arg 1 -> code.SizeComputation
   sink path "reallocarray" arg 1 -> code.SizeComputation
   sink path "operator new" -> code.SizeComputation
-  mark "realloc" -> code.ZeroSizeReallocation
-  mark "reallocarray" -> code.ZeroSizeReallocation
-  mark "alloca" -> code.StackAllocationSmell
-  mark "mktemp" -> code.InsecureTempFile
-  mark "tmpnam" -> code.InsecureTempFile
-  mark "tempnam" -> code.InsecureTempFile
-  mark "chmod" val "0777" -> code.InsecurePermission
-  mark "chmod" val "0666" -> code.InsecurePermission
-  mark "open" val "0777" -> code.InsecurePermission
-  mark "open" val "0666" -> code.InsecurePermission
+  flag code.ZeroSizeReallocation on any {
+    path "realloc"
+  }
+  flag code.ZeroSizeReallocation on any {
+    path "reallocarray"
+  }
+  flag code.StackAllocationSmell on any {
+    path "alloca"
+  }
+  flag code.InsecureTempFile on any {
+    path "mktemp"
+  }
+  flag code.InsecureTempFile on any {
+    path "tmpnam"
+  }
+  flag code.InsecureTempFile on any {
+    path "tempnam"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "0666"
+  }
+  flag code.InsecurePermission on any {
+    path "open"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "open"
+    has "0666"
+  }
   // disabled TLS certificate verification (CWE-295) — Qt / OpenSSL / curl
-  mark "setPeerVerifyMode" val "VerifyNone" -> code.CertValidationDisabled
-  mark "setPeerVerifyMode" val "QSslSocket::VerifyNone" -> code.CertValidationDisabled
-  mark "SSL_CTX_set_verify" val "SSL_VERIFY_NONE" -> code.CertValidationDisabled
-  mark "SSL_set_verify" val "SSL_VERIFY_NONE" -> code.CertValidationDisabled
-  mark "curl_easy_setopt" val "CURLOPT_SSL_VERIFYPEER" val "0" -> code.CertValidationDisabled
-  mark "setsslverify" val "false" -> code.CertValidationDisabled
-  mark "__subscript" -> code.IndexAccess
-  mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
-  mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
-  mark exact "analysis.function.context" val "lang=cpp" val "unescapeChar(*readPtr++);}*writePtr++=c;" -> code.EscapedTerminatorWrite
-  mark exact "analysis.function.context" val "lang=cpp" val "count_vertices+=*itf;" val "newaiVector3D[count_vertices]" nval "AI_MAX_FACE_INDICES" nval "count_vertices>vertices.size()" -> code.UnboundedAllocationReview
-  mark exact "analysis.function.context" val "lang=cpp" val "start+len+1>end" val "start+=len" nval "buff_size" nval "end-start-1" -> code.PointerOffsetBoundsCheck
-  mark exact "analysis.function.context" val "lang=cpp" val "inlineCompositeListElementCount" val "wordsPerElement" val "ListReader" nval "amplifiedRead" -> code.ProtocolListAmplification
-  mark exact "analysis.function.context" val "lang=cpp" val "elementSize" val "ElementSize::VOID" val "ListReader" nval "amplifiedRead" -> code.ProtocolListAmplification
-  mark exact "analysis.function.context" val "lang=cpp" val "propertyIdsForScopeSlotArray[sym->GetScopeSlot()]=sym->EnsurePosition(funcInfo)" val "propertyIdsForScopeSlotArray[funcInfo->thisScopeSlot]=Js::PropertyIds::_lexicalThisSlotSymbol" val "propertyIdsForScopeSlotArray[funcInfo->superCtorScopeSlot]=Js::PropertyIds::_superCtorReferenceSymbol" nval "setPropertyIdForScopeSlotArray(sym->GetScopeSlot(),sym->EnsurePosition(funcInfo))" nval "slot<0||(uint)slot>=scopeSlotCount" nval "Js::Throw::FatalInternalError()" -> code.ChakraScopeSlotArrayUncheckedIndex
-  mark exact "analysis.function.context" val "lang=cpp" val "visitBrOn(&curr)" val "validateTypeAnnotation(in,curr.ref)" val "curr.desc" nval "curr.ref->type.isRef" nval "curr.desc->type.isRef" -> code.ReachableAssertionReview
-  mark exact "analysis.function.context" val "lang=cpp" val "Record_Type::ApplicationData" val "callbacks().tls_record_received" nval "can_decrypt_application_traffic" -> code.ProtocolStateReview
-  mark exact "analysis.function.context" val "lang=cpp" val "name=HTTPAuthorized" val "strUserPass==strRPCUserColonPass" nval "nResult|=" -> code.SecretComparisonReview
-  mark exact "analysis.function.context" val "lang=cpp" val "r.Randomize" val "MultiplicativeInverse(r)" val "Jacobi" val "modn.Square(r)" val "modn.Multiply(y,rInv)" nval "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)" -> code.CryptoImproperBlinding
-  mark exact "analysis.function.context" val "lang=cpp" val "cimg::fsize(filename)" val "W*H*D>siz" nval "(cimg_int64)W*H*D>siz" -> code.CimgPnmDimensionProductOverflow
-  mark exact "analysis.function.context" val "lang=cpp" val "EMR_ALPHABLEND" val "getDIBV5HeaderSize" val "cbBmiSrc" val "nDeltaToDIB5HeaderSize" val "nTargetSize" val "newchar" val "ReadBytes" nval "cbBmiSrc>nHeaderSize" nval "bSafeRead=false" -> code.LibreOfficeEnhwmfDibHeaderSizeUnderflow
-  mark "analysis.field.clear_null" -> code.OwnerFieldClear
-  mark "xmlFreeDoc" -> code.OwnerFree
-  mark "__deref" -> code.PointerUse
-  mark "__deref" -> code.NullableDeref
-  mark "free" -> code.PointerFree
+  flag code.CertValidationDisabled on any {
+    path "setPeerVerifyMode"
+    has "VerifyNone"
+  }
+  flag code.CertValidationDisabled on any {
+    path "setPeerVerifyMode"
+    has "QSslSocket::VerifyNone"
+  }
+  flag code.CertValidationDisabled on any {
+    path "SSL_CTX_set_verify"
+    has "SSL_VERIFY_NONE"
+  }
+  flag code.CertValidationDisabled on any {
+    path "SSL_set_verify"
+    has "SSL_VERIFY_NONE"
+  }
+  flag code.CertValidationDisabled on any {
+    path "curl_easy_setopt"
+    has "CURLOPT_SSL_VERIFYPEER"
+    has "0"
+  }
+  flag code.CertValidationDisabled on any {
+    path "setsslverify"
+    has "false"
+  }
+  flag code.IndexAccess on any {
+    path "__subscript"
+  }
+  flag code.FieldDerivedIndexAccess on any {
+    path "analysis.index.access"
+    has "index_kind=field_derived"
+    has "guard=missing_upper_bound"
+  }
+  flag code.FailurePathOwnedBufferFree on any {
+    path "analysis.lifetime.release_then_return"
+    has "release=delete"
+    has "return=false"
+    has "storage=nonlocal"
+  }
+  flag code.EscapedTerminatorWrite in function {
+    has "lang=cpp"
+    has "unescapeChar(*readPtr++);}*writePtr++=c;"
+  }
+  flag code.UnboundedAllocationReview in function {
+    has "lang=cpp"
+    has "count_vertices+=*itf;"
+    has "newaiVector3D[count_vertices]"
+    lacks "AI_MAX_FACE_INDICES"
+    lacks "count_vertices>vertices.size()"
+  }
+  flag code.PointerOffsetBoundsCheck in function {
+    has "lang=cpp"
+    has "start+len+1>end"
+    has "start+=len"
+    lacks "buff_size"
+    lacks "end-start-1"
+  }
+  flag code.ProtocolListAmplification in function {
+    has "lang=cpp"
+    has "inlineCompositeListElementCount"
+    has "wordsPerElement"
+    has "ListReader"
+    lacks "amplifiedRead"
+  }
+  flag code.ProtocolListAmplification in function {
+    has "lang=cpp"
+    has "elementSize"
+    has "ElementSize::VOID"
+    has "ListReader"
+    lacks "amplifiedRead"
+  }
+  flag code.ChakraScopeSlotArrayUncheckedIndex in function {
+    has "lang=cpp"
+    has "propertyIdsForScopeSlotArray[sym->GetScopeSlot()]=sym->EnsurePosition(funcInfo)"
+    has "propertyIdsForScopeSlotArray[funcInfo->thisScopeSlot]=Js::PropertyIds::_lexicalThisSlotSymbol"
+    has "propertyIdsForScopeSlotArray[funcInfo->superCtorScopeSlot]=Js::PropertyIds::_superCtorReferenceSymbol"
+    lacks "setPropertyIdForScopeSlotArray(sym->GetScopeSlot(),sym->EnsurePosition(funcInfo))"
+    lacks "slot<0||(uint)slot>=scopeSlotCount"
+    lacks "Js::Throw::FatalInternalError()"
+  }
+  flag code.ReachableAssertionReview in function {
+    has "lang=cpp"
+    has "visitBrOn(&curr)"
+    has "validateTypeAnnotation(in,curr.ref)"
+    has "curr.desc"
+    lacks "curr.ref->type.isRef"
+    lacks "curr.desc->type.isRef"
+  }
+  flag code.ProtocolStateReview in function {
+    has "lang=cpp"
+    has "Record_Type::ApplicationData"
+    has "callbacks().tls_record_received"
+    lacks "can_decrypt_application_traffic"
+  }
+  flag code.SecretComparisonReview in function {
+    has "lang=cpp"
+    has "name=HTTPAuthorized"
+    has "strUserPass==strRPCUserColonPass"
+    lacks "nResult|="
+  }
+  flag code.CryptoImproperBlinding in function {
+    has "lang=cpp"
+    has "r.Randomize"
+    has "MultiplicativeInverse(r)"
+    has "Jacobi"
+    has "modn.Square(r)"
+    has "modn.Multiply(y,rInv)"
+    lacks "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)"
+  }
+  flag code.CimgPnmDimensionProductOverflow in function {
+    has "lang=cpp"
+    has "cimg::fsize(filename)"
+    has "W*H*D>siz"
+    lacks "(cimg_int64)W*H*D>siz"
+  }
+  flag code.LibreOfficeEnhwmfDibHeaderSizeUnderflow in function {
+    has "lang=cpp"
+    has "EMR_ALPHABLEND"
+    has "getDIBV5HeaderSize"
+    has "cbBmiSrc"
+    has "nDeltaToDIB5HeaderSize"
+    has "nTargetSize"
+    has "newchar"
+    has "ReadBytes"
+    lacks "cbBmiSrc>nHeaderSize"
+    lacks "bSafeRead=false"
+  }
+  flag code.OwnerFieldClear on any {
+    path "analysis.field.clear_null"
+  }
+  flag code.OwnerFree on any {
+    path "xmlFreeDoc"
+  }
+  flag code.PointerUse on any {
+    path "__deref"
+  }
+  flag code.NullableDeref on any {
+    path "__deref"
+  }
+  flag code.PointerFree on any {
+    path "free"
+  }
   sink path "__binop.div" arg 1 -> code.DivisionDenominator
   sink path "__binop.mod" arg 1 -> code.DivisionDenominator
-  mark "__binop.add" -> code.IntegerSizeArithmetic
-  mark "__binop.sub" -> code.IntegerSizeArithmetic
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.add"
+  }
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.sub"
+  }
   source "__binop.mul" -> code.ComputedSizeValue
-  mark "__binop.mul" -> code.IntegerSizeArithmetic
-  mark "__binop.shl" -> code.IntegerSizeArithmetic
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.mul"
+  }
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.shl"
+  }
   control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 
   // TOCTOU / race (CWE-367)
-  mark "access" -> code.FileCheck
-  mark "stat" -> code.FileCheck
-  mark "lstat" -> code.FileCheck
-  mark "std.filesystem.exists" -> code.FileCheck
-  mark "fopen" -> code.FileUse
-  mark "open" -> code.FileUse
-  mark "remove" -> code.FileUse
-  mark "unlink" -> code.FileUse
-  mark "rename" -> code.FileUse
-  mark "chmod" -> code.FileUse
-  mark "chown" -> code.FileUse
+  flag code.FileCheck on any {
+    path "access"
+  }
+  flag code.FileCheck on any {
+    path "stat"
+  }
+  flag code.FileCheck on any {
+    path "lstat"
+  }
+  flag code.FileCheck on any {
+    path "std.filesystem.exists"
+  }
+  flag code.FileUse on any {
+    path "fopen"
+  }
+  flag code.FileUse on any {
+    path "open"
+  }
+  flag code.FileUse on any {
+    path "remove"
+  }
+  flag code.FileUse on any {
+    path "unlink"
+  }
+  flag code.FileUse on any {
+    path "rename"
+  }
+  flag code.FileUse on any {
+    path "chmod"
+  }
+  flag code.FileUse on any {
+    path "chown"
+  }
 
   // lifecycle / concurrency
-  mark "pthread_mutex_lock" -> code.LockAcquire
-  mark "mtx_lock" -> code.LockAcquire
-  mark "mutex.lock" -> code.LockAcquire
-  mark method "lock" -> code.LockAcquire
+  flag code.LockAcquire on any {
+    path "pthread_mutex_lock"
+  }
+  flag code.LockAcquire on any {
+    path "mtx_lock"
+  }
+  flag code.LockAcquire on any {
+    path "mutex.lock"
+  }
+  flag code.LockAcquire on any {
+    method "lock"
+  }
   control "pthread_mutex_unlock" -> core.LockRelease
   control "mtx_unlock" -> core.LockRelease
   control method "unlock" -> core.LockRelease
-  mark "pthread_create" -> code.LocklessSharedMutation
-  mark "std.thread" -> code.LocklessSharedMutation
+  flag code.LocklessSharedMutation on any {
+    path "pthread_create"
+  }
+  flag code.LocklessSharedMutation on any {
+    path "std.thread"
+  }
 
   // XSS (CWE-79) — writing untrusted HTML to an output stream (arg0 is the text)
   sink path "fputs" -> code.HtmlRender
@@ -158,27 +348,63 @@ adapter cpp {
   sink path "xmlParseMemory" -> code.XmlParse
 
   // weak hash (CWE-328) — OpenSSL MD4/MD5/SHA1 (presence); SHA-256 is safe
-  mark "MD5_Init" -> code.WeakHash
-  mark "MD5" -> code.WeakHash
-  mark "MD4" -> code.WeakHash
-  mark "SHA1_Init" -> code.WeakHash
-  mark "SHA1" -> code.WeakHash
-  mark "EVP_md5" -> code.WeakHash
-  mark "EVP_sha1" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "MD5_Init"
+  }
+  flag code.WeakHash on any {
+    path "MD5"
+  }
+  flag code.WeakHash on any {
+    path "MD4"
+  }
+  flag code.WeakHash on any {
+    path "SHA1_Init"
+  }
+  flag code.WeakHash on any {
+    path "SHA1"
+  }
+  flag code.WeakHash on any {
+    path "EVP_md5"
+  }
+  flag code.WeakHash on any {
+    path "EVP_sha1"
+  }
 
   // weak cipher (CWE-327) — OpenSSL DES (presence); AES is safe
-  mark "DES_ecb_encrypt" -> code.WeakCipher
-  mark "DES_ncbc_encrypt" -> code.WeakCipher
-  mark "DES_set_key" -> code.WeakCipher
-  mark "RC4" -> code.WeakCipher
-  mark "BF_set_key" -> code.WeakCipher
-  mark "EVP_EncryptInit_ex" val "0000000000000000" -> code.StaticIv
-  mark "EVP_DecryptInit_ex" val "0000000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "DES_ecb_encrypt"
+  }
+  flag code.WeakCipher on any {
+    path "DES_ncbc_encrypt"
+  }
+  flag code.WeakCipher on any {
+    path "DES_set_key"
+  }
+  flag code.WeakCipher on any {
+    path "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "BF_set_key"
+  }
+  flag code.StaticIv on any {
+    path "EVP_EncryptInit_ex"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "EVP_DecryptInit_ex"
+    has "0000000000000000"
+  }
 
   // insecure randomness (CWE-330) — rand()/random() (presence); getrandom()/RAND_bytes safe
-  mark "rand" -> code.WeakRandomValue
-  mark "random" -> code.WeakRandomValue
-  mark "rand_r" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "rand"
+  }
+  flag code.WeakRandomValue on any {
+    path "random"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand_r"
+  }
 
   // controls (sanitizers) — realpath canonicalizes a path; preamble defines the rest
   control "realpath" -> core.PathCanonicalization

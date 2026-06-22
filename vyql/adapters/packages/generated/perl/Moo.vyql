@@ -1,7 +1,11 @@
 import code.{WeakHash}
 adapter perl {
   package "Moo" {
-    mark method "as_md5" -> code.WeakHash
-    mark method "as_sha1" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "as_md5"
+    }
+    flag code.WeakHash on any {
+      method "as_sha1"
+    }
   }
 }

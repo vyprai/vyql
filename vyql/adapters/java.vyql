@@ -68,26 +68,146 @@ adapter java {
 
   // Offset/length range checks must avoid additive overflow before a native or buffer
   // operation consumes the range. The patched idiom checks `offset > len - length`.
-  mark exact "analysis.function.context" val "expr:offset+length>b.length" val "call_path:write" nval "expr:offset>b.length-length" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "function_name:crypt_raw" val "expr:1<<log_rounds" nval "call:roundsForLogRounds" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "function_name:rateTopic" val "call_path:registry.rateResource" val "call_path:genericArtifact.getPath" nval "MAX_RATE" nval "MIN_RATE" -> code.UnvalidatedRatingRange
-  mark exact "analysis.function.context" val "function_name:doFilter" val "call_path:Meteor.build" val "call_path:httpReq.getParameter" val "call_path:pushContext.getSessionManager.getPushSession" val "call_path:httpResp.sendError" val "call:RequestImpl" val "call_order:Meteor.build>Collections.emptyList" val "call_order:Collections.emptyList>httpReq.getParameter" nval "call_order:httpResp.setContentType>Meteor.build" -> code.FrameworkRequestBeforeSessionValidation
-  mark exact "analysis.function.context" val "function_name:addResults" val "call_path:request.getParameter" val "literal:classifier" val "call_path:response.addHeader" val "call_path:ners.get.classifyToString" nval "identifier:nerModel" -> code.UnvalidatedModelSelection
-  mark "__binop.shl" val "log_rounds" val "1" nval "1L" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "function_name:safeDecryptPreMasterSecret" val "call:doFinal" val "call:createSecret" val "M[0]" nval "expr:m.length==48" -> code.PremasterSecretLengthReview
-  mark exact "analysis.function.context" val "call:getServerName" val "call:getHost" val "call:equals" nval "call:contains" -> code.RequestHostUrlValidationBypass
-  mark exact "analysis.function.context" val "function_name:isValidURL" val "call_path:isURLRelative" val "call_path:buildAbsoluteURL" nval "call_path:validateCallbackURL" -> code.MultiOptionUrlValidationBypass
-  mark exact "analysis.function.context" val "call:setAuthentication" val "call:getSession" nval "call:invalidate" -> code.MissingSessionRotationAfterAuthentication
-  mark exact "analysis.function.context" val "function_name:correctlySpends" val "call:fromPublicOnly" val "call:verify" val "hashFor" nval "call:sha256hash160" -> code.PublicKeyHashBindingReview
-  mark exact "analysis.function.context" val "function_name:prepareConnectionFactory" val "call_path:ConnectionConfig.copy" val "call_path:cc.setLdapUrl" val "call:DefaultConnectionFactory" nval "call_path:cc.setConnectionInitializers" -> code.LdapCrlCredentialReuse
-  mark exact "analysis.function.context" val "function_name:determineTargetUrl" val "SimpleUrlAuthenticationSuccessHandler" val "session.getAttribute" val "targetUrlSessionAttribute" val "targetUrl.substring" nval "Util.isSafeToRedirectTo" -> code.SessionStoredRedirectTarget
-  mark exact "analysis.function.context" val "function_name:createJMXServer" val "RMIExporter.EXPORTER_ATTRIBUTE" val "configureRMIRegistry" val "JMXConnectorServerFactory.newJMXConnectorServer" nval "LocateRegistry.createRegistry" nval "RMIJRMPServerImpl" -> code.JmxRmiRegistryExposure
-  mark exact "analysis.function.context" val "function_name:enableFullQueryLogger" val "archiveCommand" val "fqlOptions.archive_command" val "FullQueryLogger.instance.enableWithoutClean" nval "allow_nodetool_archive_command" -> code.NodetoolArchiveCommandPrivilegeEscalation
-  mark exact "analysis.function.context" val "function_name:blockSort" val "call:mainSort" val "call:randomiseBlock" val "expr:this.workDone>this.workLimit" nval "call:fallbackSort" -> code.CommonsCompressBzip2FallbackSortMissing
-  mark exact "analysis.function.context" val "function_name:jackson2ObjectMapperBuilderCustomizer" val "call_path:jacksonObjectMapperBuilder.deserializerByType" val "call_path:StringUtils.trim" val "call_path:jsonParser.getValueAsString" val "call_path:HtmlUtils.htmlEscape" val "identifier:escape" nval "call:shouldEscapeXss" nval "identifier:xssFilterUrlList" -> code.CordysRequestParamXssFilterDisabled
-  mark exact "analysis.function.context" val "function_name:sanitizeParameter" val "call_path:StringEscapeUtils.escapeSql" val "identifier:EVIL_SQL_WORDS" val "call:isValidSQLCharacter" nval "call:sanitizeSQL" nval "identifier:EVIL_SQL_CONDITION_WORDS" -> code.DotcmsSqlUtilBlacklistBypass
-  mark exact "analysis.function.context" val "class_name:ViewFormHandlerAction" val "function_name:_loadStructures" val "call_path:req.getParameter" val "call_path:StructureFactory.getStructuresByUser" nval "call_path:SQLUtil.sanitizeSortBy" -> code.DotcmsFormsOrderBySqlInjection
-  mark exact "DirectoryBrowserSupport" val "Compare Html Report" val "graph.gif" -> code.JenkinsPluginForkedDirectoryBrowserWithoutCsp
+  flag code.IntegerSizeArithmetic in function {
+    has "expr:offset+length>b.length"
+    has "call_path:write"
+    lacks "expr:offset>b.length-length"
+  }
+  flag code.IntegerSizeArithmetic in function {
+    has "function_name:crypt_raw"
+    has "expr:1<<log_rounds"
+    lacks "call:roundsForLogRounds"
+  }
+  flag code.UnvalidatedRatingRange in function {
+    has "function_name:rateTopic"
+    has "call_path:registry.rateResource"
+    has "call_path:genericArtifact.getPath"
+    lacks "MAX_RATE"
+    lacks "MIN_RATE"
+  }
+  flag code.FrameworkRequestBeforeSessionValidation in function {
+    has "function_name:doFilter"
+    has "call_path:Meteor.build"
+    has "call_path:httpReq.getParameter"
+    has "call_path:pushContext.getSessionManager.getPushSession"
+    has "call_path:httpResp.sendError"
+    has "call:RequestImpl"
+    has "call_order:Meteor.build>Collections.emptyList"
+    has "call_order:Collections.emptyList>httpReq.getParameter"
+    lacks "call_order:httpResp.setContentType>Meteor.build"
+  }
+  flag code.UnvalidatedModelSelection in function {
+    has "function_name:addResults"
+    has "call_path:request.getParameter"
+    has "literal:classifier"
+    has "call_path:response.addHeader"
+    has "call_path:ners.get.classifyToString"
+    lacks "identifier:nerModel"
+  }
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.shl"
+    has "log_rounds"
+    has "1"
+    lacks "1L"
+  }
+  flag code.PremasterSecretLengthReview in function {
+    has "function_name:safeDecryptPreMasterSecret"
+    has "call:doFinal"
+    has "call:createSecret"
+    has "M[0]"
+    lacks "expr:m.length==48"
+  }
+  flag code.RequestHostUrlValidationBypass in function {
+    has "call:getServerName"
+    has "call:getHost"
+    has "call:equals"
+    lacks "call:contains"
+  }
+  flag code.MultiOptionUrlValidationBypass in function {
+    has "function_name:isValidURL"
+    has "call_path:isURLRelative"
+    has "call_path:buildAbsoluteURL"
+    lacks "call_path:validateCallbackURL"
+  }
+  flag code.MissingSessionRotationAfterAuthentication in function {
+    has "call:setAuthentication"
+    has "call:getSession"
+    lacks "call:invalidate"
+  }
+  flag code.PublicKeyHashBindingReview in function {
+    has "function_name:correctlySpends"
+    has "call:fromPublicOnly"
+    has "call:verify"
+    has "hashFor"
+    lacks "call:sha256hash160"
+  }
+  flag code.LdapCrlCredentialReuse in function {
+    has "function_name:prepareConnectionFactory"
+    has "call_path:ConnectionConfig.copy"
+    has "call_path:cc.setLdapUrl"
+    has "call:DefaultConnectionFactory"
+    lacks "call_path:cc.setConnectionInitializers"
+  }
+  flag code.SessionStoredRedirectTarget in function {
+    has "function_name:determineTargetUrl"
+    has "SimpleUrlAuthenticationSuccessHandler"
+    has "session.getAttribute"
+    has "targetUrlSessionAttribute"
+    has "targetUrl.substring"
+    lacks "Util.isSafeToRedirectTo"
+  }
+  flag code.JmxRmiRegistryExposure in function {
+    has "function_name:createJMXServer"
+    has "RMIExporter.EXPORTER_ATTRIBUTE"
+    has "configureRMIRegistry"
+    has "JMXConnectorServerFactory.newJMXConnectorServer"
+    lacks "LocateRegistry.createRegistry"
+    lacks "RMIJRMPServerImpl"
+  }
+  flag code.NodetoolArchiveCommandPrivilegeEscalation in function {
+    has "function_name:enableFullQueryLogger"
+    has "archiveCommand"
+    has "fqlOptions.archive_command"
+    has "FullQueryLogger.instance.enableWithoutClean"
+    lacks "allow_nodetool_archive_command"
+  }
+  flag code.CommonsCompressBzip2FallbackSortMissing in function {
+    has "function_name:blockSort"
+    has "call:mainSort"
+    has "call:randomiseBlock"
+    has "expr:this.workDone>this.workLimit"
+    lacks "call:fallbackSort"
+  }
+  flag code.CordysRequestParamXssFilterDisabled in function {
+    has "function_name:jackson2ObjectMapperBuilderCustomizer"
+    has "call_path:jacksonObjectMapperBuilder.deserializerByType"
+    has "call_path:StringUtils.trim"
+    has "call_path:jsonParser.getValueAsString"
+    has "call_path:HtmlUtils.htmlEscape"
+    has "identifier:escape"
+    lacks "call:shouldEscapeXss"
+    lacks "identifier:xssFilterUrlList"
+  }
+  flag code.DotcmsSqlUtilBlacklistBypass in function {
+    has "function_name:sanitizeParameter"
+    has "call_path:StringEscapeUtils.escapeSql"
+    has "identifier:EVIL_SQL_WORDS"
+    has "call:isValidSQLCharacter"
+    lacks "call:sanitizeSQL"
+    lacks "identifier:EVIL_SQL_CONDITION_WORDS"
+  }
+  flag code.DotcmsFormsOrderBySqlInjection in function {
+    has "class_name:ViewFormHandlerAction"
+    has "function_name:_loadStructures"
+    has "call_path:req.getParameter"
+    has "call_path:StructureFactory.getStructuresByUser"
+    lacks "call_path:SQLUtil.sanitizeSortBy"
+  }
+  flag code.JenkinsPluginForkedDirectoryBrowserWithoutCsp on any {
+    path exact "DirectoryBrowserSupport"
+    has "Compare Html Report"
+    has "graph.gif"
+  }
   sink path "analysis.function.return" val "function_name:determineTargetUrl" val "SimpleUrlAuthenticationSuccessHandler" -> code.RedirectTarget
   control "Util.isSafeToRedirectTo" -> core.RedirectAllowlist
 
@@ -109,7 +229,9 @@ adapter java {
   // redirect sink (go/ruby/js do), so request-derived redirect targets were never flagged.
   sink method "sendRedirect" -> code.RedirectTarget
   // exposing a native bridge to WebView content (presence)
-  mark "addJavascriptInterface" -> code.WebViewJsInterface
+  flag code.WebViewJsInterface on any {
+    path "addJavascriptInterface"
+  }
   sink method "executeLargeUpdate" -> code.SqlExecution
   sink method "prepareStatement" -> code.SqlExecution
   sink method "prepareCall" -> code.SqlExecution
@@ -127,9 +249,21 @@ adapter java {
   sink method "batchUpdate" -> code.SqlExecution
   // Driver/parser helpers that return hand-built SQL literal casts instead of
   // routing text through the shared quoting routine.
-  mark exact "analysis.function.return" val "function_name:toString" val "::uuid" -> code.UnparameterizedSqlQueryParser
-  mark exact "analysis.function.return" val "function_name:toString" val "::point" -> code.UnparameterizedSqlQueryParser
-  mark exact "analysis.function.return" val "function_name:toString" val "::box" -> code.UnparameterizedSqlQueryParser
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "analysis.function.return"
+    has "function_name:toString"
+    has "::uuid"
+  }
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "analysis.function.return"
+    has "function_name:toString"
+    has "::point"
+  }
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "analysis.function.return"
+    has "function_name:toString"
+    has "::box"
+  }
 
   // Command execution. arg all: the tainted value can be the command, an argument, or the
   // environment array — Runtime.exec(cmd) / exec(cmdarray, envp), ProcessBuilder(a, b, …),
@@ -148,26 +282,75 @@ adapter java {
   sink method "readValue" -> code.Deserialization
   sink path "yaml.load" -> code.Deserialization
   sink path "Yaml.load" -> code.Deserialization
-  mark exact "analysis.class.context" val "class_base:InvocationHandler" val "call:getMethod" val "call:invokeMethod" nval "function_name:readResolve" nval "function_name:readObject" nval "call:NotSerializableException" -> code.DeserializableInvocationHandler
-  mark exact "analysis.function.context" val "selector:ObjectTypeAdapter.FACTORY" val "identifier:read" val "call:read" val "call_path:list.add" val "call_path:map.put" nval "call:tryBeginNesting" nval "call:readTerminal" -> code.GsonObjectTypeAdapterRecursiveRead
-  mark exact "analysis.function.context" val "function_name:createXStream" val "call_path:XStream" val "call:registerConverter" nval "call:addDefaultPermissions" nval "call:addPermissions" nval "call:addPermission" nval "call:denyPermission" -> code.UnrestrictedRequestParamDeserialization
+  flag code.DeserializableInvocationHandler in class {
+    has "class_base:InvocationHandler"
+    has "call:getMethod"
+    has "call:invokeMethod"
+    lacks "function_name:readResolve"
+    lacks "function_name:readObject"
+    lacks "call:NotSerializableException"
+  }
+  flag code.GsonObjectTypeAdapterRecursiveRead in function {
+    has "selector:ObjectTypeAdapter.FACTORY"
+    has "identifier:read"
+    has "call:read"
+    has "call_path:list.add"
+    has "call_path:map.put"
+    lacks "call:tryBeginNesting"
+    lacks "call:readTerminal"
+  }
+  flag code.UnrestrictedRequestParamDeserialization in function {
+    has "function_name:createXStream"
+    has "call_path:XStream"
+    has "call:registerConverter"
+    lacks "call:addDefaultPermissions"
+    lacks "call:addPermissions"
+    lacks "call:addPermission"
+    lacks "call:denyPermission"
+  }
   package "org.yaml.snakeyaml" {
-    mark exact "analysis.class.context" val "class_base:Constructor" -> code.UnsafeYamlConstructor
-    mark exact "org.yaml.snakeyaml.constructor.Constructor" -> code.UnsafeYamlConstructor
+    flag code.UnsafeYamlConstructor in class {
+      has "class_base:Constructor"
+    }
+    flag code.UnsafeYamlConstructor on any {
+      path exact "org.yaml.snakeyaml.constructor.Constructor"
+    }
   }
 
   // XXE
   sink method "parse" -> code.XmlParse
   sink method "newDocumentBuilder" -> code.XmlParse
   // structural XXE — precise parser-factory construction, flagged unless hardened
-  mark method "newSAXParser" -> code.XmlParserCreate
-  mark method "newDocumentBuilder" -> code.XmlParserCreate
-  mark method "createXMLReader" -> code.XmlParserCreate
-  mark method "createXMLStreamReader" -> code.XmlParserCreate
-  mark method "createXMLEventReader" -> code.XmlParserCreate
-  mark method "newTransformer" -> code.XmlParserCreate
-  mark exact "analysis.function.context" val "call_path:getTaskUnmarshaller.unmarshal" nval "call_path:getXMLStreamReader" -> code.XmlParserCreate
-  mark exact "analysis.function.context" val "function_name:setFeaturesBySystemProperty" val "class_name:LoadExternalDtdFeatureProvider" val "call_path:factory.setFeature" val "identifier:LOAD_EXTERNAL_DTD" val "identifier:EXTERNAL_GENERAL_ENTITIES" nval "identifier:EXTERNAL_PARAMETER_ENTITIES" -> code.CheckstyleExternalParameterEntitiesXxe
+  flag code.XmlParserCreate on any {
+    method "newSAXParser"
+  }
+  flag code.XmlParserCreate on any {
+    method "newDocumentBuilder"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLReader"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLStreamReader"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLEventReader"
+  }
+  flag code.XmlParserCreate on any {
+    method "newTransformer"
+  }
+  flag code.XmlParserCreate in function {
+    has "call_path:getTaskUnmarshaller.unmarshal"
+    lacks "call_path:getXMLStreamReader"
+  }
+  flag code.CheckstyleExternalParameterEntitiesXxe in function {
+    has "function_name:setFeaturesBySystemProperty"
+    has "class_name:LoadExternalDtdFeatureProvider"
+    has "call_path:factory.setFeature"
+    has "identifier:LOAD_EXTERNAL_DTD"
+    has "identifier:EXTERNAL_GENERAL_ENTITIES"
+    lacks "identifier:EXTERNAL_PARAMETER_ENTITIES"
+  }
 
   // Path / file. `new File(parent, child)` puts the tainted child path at arg 1, and
   // Paths.get(first, …more) / Files.write(path, …) likewise vary the path position — arg all.
@@ -200,14 +383,30 @@ adapter java {
   sink method "getReferenceById" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
   sink method "getOrder" -> code.ObjectLookupByUserInput
-  mark "changePassword" -> code.AuthenticationRequiredOp
-  mark "updatePassword" -> code.AuthenticationRequiredOp
-  mark "resetPassword" -> code.AuthenticationRequiredOp
-  mark "changeEmail" -> code.AuthenticationRequiredOp
-  mark "transferFunds" -> code.AuthenticationRequiredOp
-  mark "deleteAccount" -> code.AuthenticationRequiredOp
-  mark "grantRole" -> code.AuthenticationRequiredOp
-  mark "makeAdmin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "changePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "updatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "resetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "changeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "deleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "makeAdmin"
+  }
 
   // Code eval / scripting
   sink method "eval" -> code.CodeEval
@@ -235,44 +434,177 @@ adapter java {
   control method "hasAuthority" -> core.AuthorizationCheck
   control method "hasRole" -> core.AuthorizationCheck
   control method "checkPermission" -> core.AuthorizationCheck
-  mark "Login.accurevLoginFromGlobalConfig" -> code.SensitiveOperation
+  flag code.SensitiveOperation on any {
+    path "Login.accurevLoginFromGlobalConfig"
+  }
   // Accumulo-style permission gates: a bare can* call is not a guard unless its false
   // result stops the operation. Surface ignored results for review; treat throw-on-false
   // contexts as authorization checks.
-  mark exact "analysis.function.context" val "call:canFlush" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
-  mark exact "analysis.function.context" val "call:canPerformSystemActions" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
-  mark exact "analysis.function.context" val "call:canAlterNamespace" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
-  mark exact "analysis.function.context" val "call:canAlterTable" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
-  mark exact "analysis.function.context" val "call:canObtainDelegationToken" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  flag code.IgnoredAuthorizationResult in function {
+    has "call:canFlush"
+    lacks "call:ThriftSecurityException"
+  }
+  flag code.IgnoredAuthorizationResult in function {
+    has "call:canPerformSystemActions"
+    lacks "call:ThriftSecurityException"
+  }
+  flag code.IgnoredAuthorizationResult in function {
+    has "call:canAlterNamespace"
+    lacks "call:ThriftSecurityException"
+  }
+  flag code.IgnoredAuthorizationResult in function {
+    has "call:canAlterTable"
+    lacks "call:ThriftSecurityException"
+  }
+  flag code.IgnoredAuthorizationResult in function {
+    has "call:canObtainDelegationToken"
+    lacks "call:ThriftSecurityException"
+  }
   control "analysis.function.context" val "call:canFlush" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canPerformSystemActions" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canAlterNamespace" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canAlterTable" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canObtainDelegationToken" val "call:ThriftSecurityException" -> core.AuthorizationCheck
-  mark exact "analysis.function.context" val "function_name:doTest" val "call:setCredentialsId" val "call:accurevLoginFromGlobalConfig" nval "call:hasPermission" nval "call:checkPermission" -> code.CredentialedEndpointReview
-  mark exact "analysis.function.context" val "function_name:doFill" val "call:getBzmUtils" nval "call:checkPermission" -> code.CredentialedEndpointReview
-  mark exact "analysis.function.context" val "function_name:doFillCredentialsIdItems" val "call:lookupCredentials" nval "call:hasPermission" nval "call:checkPermission" -> code.CredentialedEndpointReview
-  mark exact "analysis.function.context" val "function_name:doFillConnectionIdItems" val "call:getHostConnections" nval "call:hasPermission" nval "call:checkPermission" -> code.JenkinsDescriptorConfigEnumerationMissingPermission
-  mark exact "analysis.function.context" val "function_name:doFillCredentialsIdItems" val "call:lookupCredentials" nval "call:hasPermission" nval "call:checkPermission" -> code.JenkinsDescriptorConfigEnumerationMissingPermission
-  mark exact "analysis.function.context" val "function_name:doCheckUrl" val "call:buildClient" val "call:getProjects" nval "annotation:POST" nval "call:checkPermissionForRemoteRequests" -> code.CodeDxJenkinsRemoteValidationMissingPostPermission
-  mark exact "analysis.function.context" val "function_name:doCheckSelfSignedCertificateFingerprint" val "call:buildClient" val "call:getProjects" nval "annotation:POST" nval "call:checkPermissionForRemoteRequests" -> code.CodeDxJenkinsRemoteValidationMissingPostPermission
-  mark exact "analysis.function.context" val "function_name:doFillProjectIdItems" val "call:buildClient" val "call:getProjects" nval "annotation:POST" nval "call:checkPermissionForRemoteRequests" -> code.CodeDxJenkinsRemoteValidationMissingPostPermission
-  mark exact "analysis.function.context" val "function_name:doTest" val "call:testConnection" val "call:CrowdConfigurationService" nval "annotation:POST" nval "call:checkPermission" nval "call:hasPermission" -> code.JenkinsRemoteValidationMissingPostPermission
-  mark exact "analysis.function.context" val "function_name:doCheck" val "call:testConnection" val "call:CrowdConfigurationService" nval "annotation:POST" nval "call:checkPermission" nval "call:hasPermission" -> code.JenkinsRemoteValidationMissingPostPermission
-  mark exact "analysis.class.context" val "class_base:Callable" val "function_name:call" val "function_name:checkRoles" val "call_path:System.getProperties" nval "class_base:MasterToSlaveCallable" nval "call:Roles.SLAVE" -> code.JenkinsRemotingCallableSystemPropertiesLeak
-  mark exact "analysis.parameter.entry" val "param_name:awsSecretKey" val "param_type:Secret" -> code.SecretDatabindingReview
-  mark exact "analysis.function.context" val "function_name:setAkid" nval "call:fromString" -> code.SecretDatabindingReview
-  mark exact "analysis.function.context" val "function_name:setSkid" nval "call:fromString" -> code.SecretDatabindingReview
-  mark exact "analysis.parameter.entry" val "annotation:DataBoundConstructor" val "param_name:apilogin" val "param_type:String" nval "param_type:Secret" -> code.JenkinsPlaintextDataboundCredential
-  mark exact "analysis.parameter.entry" val "annotation:DataBoundConstructor" val "param_name:apitoken" val "param_type:String" nval "param_type:Secret" -> code.JenkinsPlaintextDataboundCredential
-  mark exact "analysis.class.context" val "class_name:SystemCredentialsProvider" val "function_name:SystemCredentialsProvider" val "call_path:xml.unmarshal" val "call_path:DomainCredentials.migrateListToMap" val "function_name:getInstance" nval "annotation:Initializer" nval "function_name:forceLoadDuringStartup" -> code.JenkinsCredentialsStartupLoadContextExposure
-  mark exact "analysis.function.context" val "function_name:doConfigure" val "call:configure" val "call:save" nval "call:checkPermission" -> code.SensitiveOperation
-  mark exact "analysis.function.context" val "function_name:doAttachPublicIP" val "call:getNode" val "call:attachPublicIP" nval "call:checkPermission" -> code.SensitiveOperation
-  mark exact "analysis.function.context" val "function_name:doFill" nval "call:checkPermission" nval "annotation:POST" nval "annotation:RequirePOST" -> code.StateChangingOp
-  mark exact "analysis.function.context" val "selector:Constants.MC_REALPATH" val "selector:Constants.MC_RELATIVE_PATH" val "call:FileReader" nval "call:FileNotFoundException" -> code.AbsolutePathDisclosure
+  flag code.CredentialedEndpointReview in function {
+    has "function_name:doTest"
+    has "call:setCredentialsId"
+    has "call:accurevLoginFromGlobalConfig"
+    lacks "call:hasPermission"
+    lacks "call:checkPermission"
+  }
+  flag code.CredentialedEndpointReview in function {
+    has "function_name:doFill"
+    has "call:getBzmUtils"
+    lacks "call:checkPermission"
+  }
+  flag code.CredentialedEndpointReview in function {
+    has "function_name:doFillCredentialsIdItems"
+    has "call:lookupCredentials"
+    lacks "call:hasPermission"
+    lacks "call:checkPermission"
+  }
+  flag code.JenkinsDescriptorConfigEnumerationMissingPermission in function {
+    has "function_name:doFillConnectionIdItems"
+    has "call:getHostConnections"
+    lacks "call:hasPermission"
+    lacks "call:checkPermission"
+  }
+  flag code.JenkinsDescriptorConfigEnumerationMissingPermission in function {
+    has "function_name:doFillCredentialsIdItems"
+    has "call:lookupCredentials"
+    lacks "call:hasPermission"
+    lacks "call:checkPermission"
+  }
+  flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
+    has "function_name:doCheckUrl"
+    has "call:buildClient"
+    has "call:getProjects"
+    lacks "annotation:POST"
+    lacks "call:checkPermissionForRemoteRequests"
+  }
+  flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
+    has "function_name:doCheckSelfSignedCertificateFingerprint"
+    has "call:buildClient"
+    has "call:getProjects"
+    lacks "annotation:POST"
+    lacks "call:checkPermissionForRemoteRequests"
+  }
+  flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
+    has "function_name:doFillProjectIdItems"
+    has "call:buildClient"
+    has "call:getProjects"
+    lacks "annotation:POST"
+    lacks "call:checkPermissionForRemoteRequests"
+  }
+  flag code.JenkinsRemoteValidationMissingPostPermission in function {
+    has "function_name:doTest"
+    has "call:testConnection"
+    has "call:CrowdConfigurationService"
+    lacks "annotation:POST"
+    lacks "call:checkPermission"
+    lacks "call:hasPermission"
+  }
+  flag code.JenkinsRemoteValidationMissingPostPermission in function {
+    has "function_name:doCheck"
+    has "call:testConnection"
+    has "call:CrowdConfigurationService"
+    lacks "annotation:POST"
+    lacks "call:checkPermission"
+    lacks "call:hasPermission"
+  }
+  flag code.JenkinsRemotingCallableSystemPropertiesLeak in class {
+    has "class_base:Callable"
+    has "function_name:call"
+    has "function_name:checkRoles"
+    has "call_path:System.getProperties"
+    lacks "class_base:MasterToSlaveCallable"
+    lacks "call:Roles.SLAVE"
+  }
+  flag code.SecretDatabindingReview on any {
+    path exact "analysis.parameter.entry"
+    has "param_name:awsSecretKey"
+    has "param_type:Secret"
+  }
+  flag code.SecretDatabindingReview in function {
+    has "function_name:setAkid"
+    lacks "call:fromString"
+  }
+  flag code.SecretDatabindingReview in function {
+    has "function_name:setSkid"
+    lacks "call:fromString"
+  }
+  flag code.JenkinsPlaintextDataboundCredential on any {
+    path exact "analysis.parameter.entry"
+    has "annotation:DataBoundConstructor"
+    has "param_name:apilogin"
+    has "param_type:String"
+    lacks "param_type:Secret"
+  }
+  flag code.JenkinsPlaintextDataboundCredential on any {
+    path exact "analysis.parameter.entry"
+    has "annotation:DataBoundConstructor"
+    has "param_name:apitoken"
+    has "param_type:String"
+    lacks "param_type:Secret"
+  }
+  flag code.JenkinsCredentialsStartupLoadContextExposure in class {
+    has "class_name:SystemCredentialsProvider"
+    has "function_name:SystemCredentialsProvider"
+    has "call_path:xml.unmarshal"
+    has "call_path:DomainCredentials.migrateListToMap"
+    has "function_name:getInstance"
+    lacks "annotation:Initializer"
+    lacks "function_name:forceLoadDuringStartup"
+  }
+  flag code.SensitiveOperation in function {
+    has "function_name:doConfigure"
+    has "call:configure"
+    has "call:save"
+    lacks "call:checkPermission"
+  }
+  flag code.SensitiveOperation in function {
+    has "function_name:doAttachPublicIP"
+    has "call:getNode"
+    has "call:attachPublicIP"
+    lacks "call:checkPermission"
+  }
+  flag code.StateChangingOp in function {
+    has "function_name:doFill"
+    lacks "call:checkPermission"
+    lacks "annotation:POST"
+    lacks "annotation:RequirePOST"
+  }
+  flag code.AbsolutePathDisclosure in function {
+    has "selector:Constants.MC_REALPATH"
+    has "selector:Constants.MC_RELATIVE_PATH"
+    has "call:FileReader"
+    lacks "call:FileNotFoundException"
+  }
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.
-  mark method "getSomeWorkspace" -> code.SensitiveOperation
+  flag code.SensitiveOperation on any {
+    method "getSomeWorkspace"
+  }
   control method "requireAuth" -> core.AuthenticationCheck
   control method "ensureAuthenticated" -> core.AuthenticationCheck
   control method "isAuthenticated" -> core.AuthenticationCheck
@@ -280,7 +612,9 @@ adapter java {
   control method "checkOwnership" -> core.OwnershipCheck
   control method "requireOwner" -> core.OwnershipCheck
   control method "isOwner" -> core.OwnershipCheck
-  mark method "lock" -> code.LockAcquire
+  flag code.LockAcquire on any {
+    method "lock"
+  }
   control method "unlock" -> core.LockRelease
   control "validateRole" -> core.InputValidation
   // XXE hardening — a parser factory configured to disallow DOCTYPE / external entities,
@@ -298,20 +632,63 @@ adapter java {
   control "setProperty" val "IS_SUPPORTING_EXTERNAL_ENTITIES" nval "true" -> core.XmlHardening
   control "setProperty" val "SUPPORT_DTD" nval "true" -> core.XmlHardening
   // materialize hardening as a node mark for the structural XXE rule's guarded_by
-  mark "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
-  mark "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
-  mark "setFeature" val "FEATURE_SECURE_PROCESSING" val "true" -> core.XmlHardening
-  mark "setExpandEntityReferences" val "false" -> core.XmlHardening
-  mark method "getSecuredDocumentBuilder" -> core.XmlHardening
-  mark method "getSecureDocumentBuilderFactory" -> core.XmlHardening
-  mark method "setFeaturesBySystemProperty" -> core.XmlHardening
-  mark "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
-  mark "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
-  mark "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
-  mark "setProperty" val "IS_SUPPORTING_EXTERNAL_ENTITIES" nval "true" -> core.XmlHardening
-  mark "setProperty" val "SUPPORT_DTD" nval "true" -> core.XmlHardening
-  mark "setProperty" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
-  mark "setXIncludeAware" val "false" -> core.XmlHardening
+  flag core.XmlHardening on any {
+    path "setFeature"
+    has "disallow-doctype-decl"
+  }
+  flag core.XmlHardening on any {
+    path "setFeature"
+    has "external-general-entities"
+    lacks "true"
+  }
+  flag core.XmlHardening on any {
+    path "setFeature"
+    has "FEATURE_SECURE_PROCESSING"
+    has "true"
+  }
+  flag core.XmlHardening on any {
+    path "setExpandEntityReferences"
+    has "false"
+  }
+  flag core.XmlHardening on any {
+    method "getSecuredDocumentBuilder"
+  }
+  flag core.XmlHardening on any {
+    method "getSecureDocumentBuilderFactory"
+  }
+  flag core.XmlHardening on any {
+    method "setFeaturesBySystemProperty"
+  }
+  flag core.XmlHardening on any {
+    path "setAttribute"
+    has "ACCESS_EXTERNAL_DTD"
+  }
+  flag core.XmlHardening on any {
+    path "setAttribute"
+    has "ACCESS_EXTERNAL_SCHEMA"
+  }
+  flag core.XmlHardening on any {
+    path "setAttribute"
+    has "ACCESS_EXTERNAL_STYLESHEET"
+  }
+  flag core.XmlHardening on any {
+    path "setProperty"
+    has "IS_SUPPORTING_EXTERNAL_ENTITIES"
+    lacks "true"
+  }
+  flag core.XmlHardening on any {
+    path "setProperty"
+    has "SUPPORT_DTD"
+    lacks "true"
+  }
+  flag core.XmlHardening on any {
+    path "setProperty"
+    has "ACCESS_EXTERNAL_DTD"
+  }
+  flag core.XmlHardening on any {
+    path "setXIncludeAware"
+    has "false"
+  }
   // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
   // position is the attribute key/value (arg 0).
   // trust-boundary (CWE-501): user input stored into the HTTP SESSION (a trusted store).
@@ -358,22 +735,70 @@ adapter java {
   sink path "Pattern.compile" -> code.RegexCompile
 
   // csrf disabled (CWE-352) — presence marker
-  mark "csrf.disable" -> code.CsrfDisabled
-  mark "setHostnameVerifier" val "true" -> code.CertValidationDisabled
-  mark "setDefaultHostnameVerifier" val "true" -> code.CertValidationDisabled
-  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
-  mark "Algorithm.none" -> code.JwtUnverified
-  mark "setWritable" val "true" val "false" -> code.InsecurePermission
-  mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
-  mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
-  mark exact "analysis.function.context" val "class_name:RequestScopedCache" val "function_name:beginRequest" val "call_path:CACHE.set" nval "call:endRequest" nval "call_path:CACHE.remove" -> code.ThreadLocalScopeOverwriteWithoutCleanup
-  mark exact "analysis.function.context" val "call:setContent" val "call:toJson" val "call:saveDocument" nval "call:setHidden" -> code.InternalContentExposureReview
-  mark exact "analysis.function.context" val "call:getType" val "selector:FEDERATION_DOWNSTREAM_CONNECT" val "call:deploy" nval "call:getSubject" -> code.ProtocolStateReview
-  mark "Socket" -> code.ResourceHandle
-  mark "Files.newInputStream" -> code.ResourceHandle
-  mark "Files.newOutputStream" -> code.ResourceHandle
-  mark "Files.newBufferedReader" -> code.ResourceHandle
-  mark "Files.newBufferedWriter" -> code.ResourceHandle
+  flag code.CsrfDisabled on any {
+    path "csrf.disable"
+  }
+  flag code.CertValidationDisabled on any {
+    path "setHostnameVerifier"
+    has "true"
+  }
+  flag code.CertValidationDisabled on any {
+    path "setDefaultHostnameVerifier"
+    has "true"
+  }
+  flag code.CertValidationDisabled on any {
+    path "NoopHostnameVerifier"
+  }
+  flag code.JwtUnverified on any {
+    path "Algorithm.none"
+  }
+  flag code.InsecurePermission on any {
+    path "setWritable"
+    has "true"
+    has "false"
+  }
+  flag code.InsecurePermission on any {
+    path "Files.setPosixFilePermissions"
+    has "OTHERS_WRITE"
+  }
+  flag code.InsecureTempFile on any {
+    path "Files.createFile"
+    has "/tmp/"
+  }
+  flag code.ThreadLocalScopeOverwriteWithoutCleanup in function {
+    has "class_name:RequestScopedCache"
+    has "function_name:beginRequest"
+    has "call_path:CACHE.set"
+    lacks "call:endRequest"
+    lacks "call_path:CACHE.remove"
+  }
+  flag code.InternalContentExposureReview in function {
+    has "call:setContent"
+    has "call:toJson"
+    has "call:saveDocument"
+    lacks "call:setHidden"
+  }
+  flag code.ProtocolStateReview in function {
+    has "call:getType"
+    has "selector:FEDERATION_DOWNSTREAM_CONNECT"
+    has "call:deploy"
+    lacks "call:getSubject"
+  }
+  flag code.ResourceHandle on any {
+    path "Socket"
+  }
+  flag code.ResourceHandle on any {
+    path "Files.newInputStream"
+  }
+  flag code.ResourceHandle on any {
+    path "Files.newOutputStream"
+  }
+  flag code.ResourceHandle on any {
+    path "Files.newBufferedReader"
+  }
+  flag code.ResourceHandle on any {
+    path "Files.newBufferedWriter"
+  }
   control method "close" -> core.ResourceRelease
 
   // expression-language injection (CWE-917)
@@ -406,28 +831,80 @@ adapter java {
 
   // weak crypto (CWE-327) — named-value on the algorithm-spec string argument.
   // Weak cipher: DES/DESede(3DES)/RC4(ARCFOUR)/RC2/Blowfish, or ECB mode (any cipher).
-  mark "Cipher.getInstance" val "DES" -> code.WeakCipher
-  mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
-  mark "Cipher.getInstance" val "ARCFOUR" -> code.WeakCipher
-  mark "Cipher.getInstance" val "RC2" -> code.WeakCipher
-  mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
-  mark "Cipher.getInstance" val "ECB" -> code.WeakCipher
-  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
-  mark "GCMParameterSpec" val "000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "ARCFOUR"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "RC2"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "Blowfish"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "ECB"
+  }
+  flag code.StaticIv on any {
+    path "IvParameterSpec"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "GCMParameterSpec"
+    has "000000000000"
+  }
   // NullCipher (CWE-327) — a "cipher" that performs no encryption at all.
-  mark "NullCipher" -> code.WeakCipher
+  flag code.WeakCipher on any {
+    path "NullCipher"
+  }
   // weak randomness (CWE-330) — java.util.Random / Math.random (presence). SecureRandom is
   // the CSPRNG and is deliberately NOT marked.
-  mark "java.util.Random" -> code.WeakRandomValue
-  mark "Random" -> code.WeakRandomValue
-  mark "Math.random" -> code.WeakRandomValue
-  mark "ThreadLocalRandom.current" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "java.util.Random"
+  }
+  flag code.WeakRandomValue on any {
+    path "Random"
+  }
+  flag code.WeakRandomValue on any {
+    path "Math.random"
+  }
+  flag code.WeakRandomValue on any {
+    path "ThreadLocalRandom.current"
+  }
   // Weak hash: MD2/MD5/SHA-1 via MessageDigest.getInstance("MD5") etc.
-  mark "MessageDigest.getInstance" val "MD2" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "SHA1" -> code.WeakHash
-  mark exact "analysis.function.context" val "function_name:doIndex" val "call:getReloadTokenProperty" val "call:getRequestToken" val "call_path:token.equals" nval "call_path:MessageDigest.isEqual" -> code.SecretComparisonReview
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "MD2"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "MD5"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "SHA-1"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "SHA1"
+  }
+  flag code.SecretComparisonReview in function {
+    has "function_name:doIndex"
+    has "call:getReloadTokenProperty"
+    has "call:getRequestToken"
+    has "call_path:token.equals"
+    lacks "call_path:MessageDigest.isEqual"
+  }
 
   // server-side template injection (CWE-1336) — unambiguous engine entrypoints that
   // evaluate a STRING template (not load-by-name): Velocity static evaluate, Pebble
@@ -436,21 +913,55 @@ adapter java {
   sink method "getLiteralTemplate" -> code.TemplateRender
 
   // permissive CORS (CWE-942) — setHeader("Access-Control-Allow-Origin", "*")
-  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
-  mark "addHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  flag code.PermissiveCors on any {
+    path "setHeader"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  flag code.PermissiveCors on any {
+    path "addHeader"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
 
   // clickjacking (CWE-1021) — X-Frame-Options EXPLICITLY set to ALLOWALL (omission not flagged)
-  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
-  mark "addHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  flag code.MissingFrameProtection on any {
+    path "setHeader"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
+  flag code.MissingFrameProtection on any {
+    path "addHeader"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
 
   // insecure cookie (CWE-614) — a flag EXPLICITLY disabled: cookie.setHttpOnly(false)
-  mark "setHttpOnly" val "false" -> code.InsecureCookie
-  mark "setSecure" val "false" -> code.InsecureCookie
+  flag code.InsecureCookie on any {
+    path "setHttpOnly"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "setSecure"
+    has "false"
+  }
 
   // cleartext channel (CWE-319) — http:// URL to a client/connection (loopback excluded; low sev)
-  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "HttpGet" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "getForObject" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "URL"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "HttpGet"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "getForObject"
+    has "http://"
+    lacks "127.0"
+  }
 
   // unsafe reflection (CWE-470) — tainted class/method name dynamically invoked
   sink path "Class.forName" -> code.ReflectionInvoke
@@ -481,14 +992,30 @@ adapter java {
   sink path "LOG.info" arg all -> code.LogOutput
   sink path "LOG.error" arg all -> code.LogOutput
   sink path "System.out.println" arg all -> code.LogOutput
-  mark "logger.info" -> code.LogWrite
-  mark "logger.warn" -> code.LogWrite
-  mark "logger.error" -> code.LogWrite
-  mark "logger.debug" -> code.LogWrite
-  mark "log.info" -> code.LogWrite
-  mark "log.error" -> code.LogWrite
-  mark "LOG.info" -> code.LogWrite
-  mark "System.out.println" -> code.LogWrite
+  flag code.LogWrite on any {
+    path "logger.info"
+  }
+  flag code.LogWrite on any {
+    path "logger.warn"
+  }
+  flag code.LogWrite on any {
+    path "logger.error"
+  }
+  flag code.LogWrite on any {
+    path "logger.debug"
+  }
+  flag code.LogWrite on any {
+    path "log.info"
+  }
+  flag code.LogWrite on any {
+    path "log.error"
+  }
+  flag code.LogWrite on any {
+    path "LOG.info"
+  }
+  flag code.LogWrite on any {
+    path "System.out.println"
+  }
 
   // character-filter: String.replaceAll(regex, repl) is always global.
   filter method "replaceAll" global

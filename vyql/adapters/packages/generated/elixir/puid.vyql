@@ -2,6 +2,8 @@ import code.{Deserialization, WeakRandomValue}
 adapter elixir {
   package "puid" {
     sink method "decode" -> code.Deserialization
-    mark method "generate" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "generate"
+    }
   }
 }

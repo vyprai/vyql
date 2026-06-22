@@ -12,6 +12,8 @@ adapter groovy {
     sink method "renameFile" -> code.FilePathAccess
     sink method "renameFiles" -> code.FilePathAccess
     sink method "mergeSplitFiles" -> code.FilePathAccess
-    mark method "isEncrypted" -> code.WeakCipher
+    flag code.WeakCipher on any {
+      method "isEncrypted"
+    }
   }
 }

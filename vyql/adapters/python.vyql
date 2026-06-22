@@ -54,10 +54,25 @@ adapter python {
   // calibre RocketBook table-of-contents item names are archive member names.
   source path "analysis.function.context.source" val "name=get_text" val "toc_item.name.decode('utf-8')" val "os.path.join(output_dir,toc_item.name.decode('utf-8'))" nval "get_safe_path" -> code.ArchiveEntryName
   source path "analysis.function.context.source" val "name=get_image" val "toc_item.name.decode('utf-8')" val "os.path.join(output_dir,toc_item.name.decode('utf-8'))" nval "get_safe_path" -> code.ArchiveEntryName
-  mark exact "analysis.function.context" val "name=safe_extract" val "tar.getmembers()" val "os.path.join(path,member.name)" val "is_within_directory(path,member_path)" val "tar.extractall(path,members,numeric_owner=numeric_owner)" nval "member.issym()" nval "member.islnk()" nval "member.linkname" -> code.ArchiveSymlinkFilterBypass
+  flag code.ArchiveSymlinkFilterBypass in function {
+    has "name=safe_extract"
+    has "tar.getmembers()"
+    has "os.path.join(path,member.name)"
+    has "is_within_directory(path,member_path)"
+    has "tar.extractall(path,members,numeric_owner=numeric_owner)"
+    lacks "member.issym()"
+    lacks "member.islnk()"
+    lacks "member.linkname"
+  }
   source path "analysis.function.context.source" val "name=generate_auth_token" val "RemoteAuthToken.user_id==user_id" val "auth_token.user_id=user_id" nval "current_user.id!=user_id" -> code.HttpInput
   source path "analysis.function.context.source" val "name=delete_auth_token" val "RemoteAuthToken.user_id==user_id" val "delete()" nval "current_user.id!=user_id" -> code.HttpInput
-  mark exact "analysis.function.context" val "name=cookies" val "forcookieinself.headers.get(\"cookie\",\"\").split(\";\"):" val "cookies.load(cookie)" nval "exceptException" nval "continue" -> code.EmmettUnhandledCookieParseException
+  flag code.EmmettUnhandledCookieParseException in function {
+    has "name=cookies"
+    has "forcookieinself.headers.get(\"cookie\",\"\").split(\";\"):"
+    has "cookies.load(cookie)"
+    lacks "exceptException"
+    lacks "continue"
+  }
   source "request.META" -> code.HttpInput
   source "request.FILES" -> code.HttpInput
   source "request.path_info" -> code.HttpInput
@@ -93,23 +108,74 @@ adapter python {
   source "req.get_param" -> code.HttpInput
   source "req.stream" -> code.HttpInput
   source "sys.argv" -> code.CliArgument
-  mark exact "analysis.function.context" val "name=configure" val "CASE_DEMO_NONRANDOM_UUID_BASE" val "sys.argv[0]" val "command_original_path.resolve()" val "command_resolved_path.relative_to" val "demo_uuid_base_parts.append(str(command_resolved_path))" nval "_is_relative_to(command_resolved_path,venv_resolved_path)" nval "demo_uuid_base_parts.append(str(command_original_path))" -> code.AbsolutePathDisclosure
-  mark exact "analysis.function.context" val "name=load_config" val "yaml.safe_load" val "LOG.info" val "Config file:" nval "LOG.debug(\"Config file:" -> code.SensitiveConfigInfoLog
-  mark exact "analysis.function.context" val "name=run" val "conn.search(**query)" val "pysolr.SolrError" val "raise SearchError" val "SOLR returned an error running query" val "query, e" nval "SolrConnectionError" nval "Failed to connect to server" -> code.CkanSolrConnectionErrorDisclosure
-  mark exact "analysis.function.context" val "name=get_or_launch" val "os.path.join(self._data_dir,seed_key)" val "os.makedirs(user_data_dir" val "shutil.rmtree" nval "SAFE_SEED_RE.match(seed)" nval "_safe_rmtree" -> code.CloakserveFingerprintSeedPathTraversal
-  mark exact "analysis.function.context" val "name=main" val "AnsibleModule" val "authkey=dict(type='str')" val "privkey=dict(type='str')" val "cmdgen.UsmUserData" nval "authkey=dict(type='str',no_log=True)" nval "privkey=dict(type='str',no_log=True)" -> code.AnsibleSnmpFactsCredentialsNoLogMissing
+  flag code.AbsolutePathDisclosure in function {
+    has "name=configure"
+    has "CASE_DEMO_NONRANDOM_UUID_BASE"
+    has "sys.argv[0]"
+    has "command_original_path.resolve()"
+    has "command_resolved_path.relative_to"
+    has "demo_uuid_base_parts.append(str(command_resolved_path))"
+    lacks "_is_relative_to(command_resolved_path,venv_resolved_path)"
+    lacks "demo_uuid_base_parts.append(str(command_original_path))"
+  }
+  flag code.SensitiveConfigInfoLog in function {
+    has "name=load_config"
+    has "yaml.safe_load"
+    has "LOG.info"
+    has "Config file:"
+    lacks "LOG.debug(\"Config file:"
+  }
+  flag code.CkanSolrConnectionErrorDisclosure in function {
+    has "name=run"
+    has "conn.search(**query)"
+    has "pysolr.SolrError"
+    has "raise SearchError"
+    has "SOLR returned an error running query"
+    has "query, e"
+    lacks "SolrConnectionError"
+    lacks "Failed to connect to server"
+  }
+  flag code.CloakserveFingerprintSeedPathTraversal in function {
+    has "name=get_or_launch"
+    has "os.path.join(self._data_dir,seed_key)"
+    has "os.makedirs(user_data_dir"
+    has "shutil.rmtree"
+    lacks "SAFE_SEED_RE.match(seed)"
+    lacks "_safe_rmtree"
+  }
+  flag code.AnsibleSnmpFactsCredentialsNoLogMissing in function {
+    has "name=main"
+    has "AnsibleModule"
+    has "authkey=dict(type='str')"
+    has "privkey=dict(type='str')"
+    has "cmdgen.UsmUserData"
+    lacks "authkey=dict(type='str',no_log=True)"
+    lacks "privkey=dict(type='str',no_log=True)"
+  }
   source "input" -> code.StdinInput
   source "sys.stdin" -> code.StdinInput
   source "fileinput.input" -> code.StdinInput
   source method "[]" val "-8:" -> code.ShortSecurityIdentifier
-  mark exact "analysis.function.context" val "app.run" val "host='0.0.0.0'" val "debug=True" nval "use_evalex=False" -> code.WerkzeugDebugConsoleExposure
+  flag code.WerkzeugDebugConsoleExposure in function {
+    has "app.run"
+    has "host='0.0.0.0'"
+    has "debug=True"
+    lacks "use_evalex=False"
+  }
   source "os.environ.get" val "HTTP_PROXY" -> code.HttpInput
   source "os.getenv" val "HTTP_PROXY" -> code.HttpInput
   source "os.environ" -> code.SecretValue
   source "os.getenv" -> code.SecretValue
   source "config.get" -> code.SecretValue
   source "settings.SECRET_KEY" -> code.SecretValue
-  mark exact "analysis.function.context" val "name=signup" val "UserStatus.ACTIVE" val "UserRole.USER" val "generate_keypair" val "create_user_with_keypair" nval "UserStatus.INACTIVE" -> code.AutoActiveSignupAccount
+  flag code.AutoActiveSignupAccount in function {
+    has "name=signup"
+    has "UserStatus.ACTIVE"
+    has "UserRole.USER"
+    has "generate_keypair"
+    has "create_user_with_keypair"
+    lacks "UserStatus.INACTIVE"
+  }
 
   // stored / second-order data — DB cursor reads (CWE-79 stored XSS when later rendered
   // unescaped). Only unambiguous cursor fetch methods are marked (bare .get/.all/.first
@@ -149,16 +215,36 @@ adapter python {
   sink method "delete_account" -> code.StateChangingOp
   sink method "grant_role" -> code.StateChangingOp
   sink method "make_admin" -> code.StateChangingOp
-  mark "change_password" -> code.AuthenticationRequiredOp
-  mark "changePassword" -> code.AuthenticationRequiredOp
-  mark "update_password" -> code.AuthenticationRequiredOp
-  mark "reset_password" -> code.AuthenticationRequiredOp
-  mark "change_email" -> code.AuthenticationRequiredOp
-  mark "transfer_funds" -> code.AuthenticationRequiredOp
-  mark "transferFunds" -> code.AuthenticationRequiredOp
-  mark "delete_account" -> code.AuthenticationRequiredOp
-  mark "grant_role" -> code.AuthenticationRequiredOp
-  mark "make_admin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "change_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "changePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "update_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "reset_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "change_email"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transfer_funds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "delete_account"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grant_role"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "make_admin"
+  }
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "validate_csrf_token" -> core.CsrfProtection
   control "verify_authenticity_token" -> core.CsrfProtection
@@ -173,9 +259,26 @@ adapter python {
   control "has_permission" -> core.AuthorizationCheck
   control "permission_required" -> core.AuthorizationCheck
   control "user_passes_test" -> core.AuthorizationCheck
-  mark exact "analysis.function.context" val "name=run" val "os.geteuid()==0" val "superuser privileges" nval "name=run_worker" nval "os.getuid()==0" -> code.EffectiveUidRootCheckBypass
-  mark exact "analysis.function.context" val "name=create_shelf" val "ub.Shelf()" val "create_edit_shelf" val "page=\"shelfcreate\"" nval "role_edit_shelfs" -> code.AccessPolicyReview
-  mark exact "analysis.function.context" val "name=getGuidelineRules" val "rules_of_guideline" val "checkers_by_labels" nval "self.__require_view()guideline_rules=defaultdict(list)" -> code.CodeCheckerGuidelineRulesMissingViewCheck
+  flag code.EffectiveUidRootCheckBypass in function {
+    has "name=run"
+    has "os.geteuid()==0"
+    has "superuser privileges"
+    lacks "name=run_worker"
+    lacks "os.getuid()==0"
+  }
+  flag code.AccessPolicyReview in function {
+    has "name=create_shelf"
+    has "ub.Shelf()"
+    has "create_edit_shelf"
+    has "page=\"shelfcreate\""
+    lacks "role_edit_shelfs"
+  }
+  flag code.CodeCheckerGuidelineRulesMissingViewCheck in function {
+    has "name=getGuidelineRules"
+    has "rules_of_guideline"
+    has "checkers_by_labels"
+    lacks "self.__require_view()guideline_rules=defaultdict(list)"
+  }
   control method "check_ownership" -> core.OwnershipCheck
   control method "require_owner" -> core.OwnershipCheck
   control method "is_owner" -> core.OwnershipCheck
@@ -218,14 +321,34 @@ adapter python {
   sink path "logger.debug" -> code.LogOutput
   sink path "log.info" -> code.LogOutput
   sink path "log.error" -> code.LogOutput
-  mark exact "analysis.function.context" val "name=parsedkim" val "_warnmsg" val "Unknown DKIM key type" val "dkim['k']" nval "_warnmsg(\"Unknown DKIM key type\")" -> code.UnneutralizedDiagnosticValue
-  mark "logging.info" -> code.LogWrite
-  mark "logging.warning" -> code.LogWrite
-  mark "logging.error" -> code.LogWrite
-  mark "logging.debug" -> code.LogWrite
-  mark "logger.info" -> code.LogWrite
-  mark "logger.error" -> code.LogWrite
-  mark "log.info" -> code.LogWrite
+  flag code.UnneutralizedDiagnosticValue in function {
+    has "name=parsedkim"
+    has "_warnmsg"
+    has "Unknown DKIM key type"
+    has "dkim['k']"
+    lacks "_warnmsg(\"Unknown DKIM key type\")"
+  }
+  flag code.LogWrite on any {
+    path "logging.info"
+  }
+  flag code.LogWrite on any {
+    path "logging.warning"
+  }
+  flag code.LogWrite on any {
+    path "logging.error"
+  }
+  flag code.LogWrite on any {
+    path "logging.debug"
+  }
+  flag code.LogWrite on any {
+    path "logger.info"
+  }
+  flag code.LogWrite on any {
+    path "logger.error"
+  }
+  flag code.LogWrite on any {
+    path "log.info"
+  }
   sink path "os.system" -> code.CommandExecution
   sink path "os.popen" -> code.CommandExecution
   sink path "os.popen2" -> code.CommandExecution
@@ -248,9 +371,31 @@ adapter python {
   sink path "commands.getoutput" -> code.CommandExecution
   sink path "commands.getstatusoutput" -> code.CommandExecution
   sink path "module.run_command" val "apt-key" val "--recv" -> code.SecurityKeyTrustOperation
-  mark exact "analysis.function.context" val "name=_fork" val "path.replace" val "href" val "os.execv" val "\"-c\"" nval "shlex.quote(href)" -> code.CommandLineAssemblyReview
-  mark exact "analysis.function.context" val "name=run_ssh_command_with_credentials" val "escaped_password" val "escaped_command" val "{username}@{host}" val "-p {port}" val "run_command(ssh_command)" nval "quoted_username" nval "quoted_host" nval "port=int(port)" -> code.PartiallyEscapedSshCommand
-  mark exact "analysis.function.context" val "name=notify_provisioning_done" val "/baremetal/provisiondone/<mac>" val "server.notify_provisioning_done(mac)" nval "is_a_mac(mac)" -> code.CloudStackBaremetalMacCommandInjection
+  flag code.CommandLineAssemblyReview in function {
+    has "name=_fork"
+    has "path.replace"
+    has "href"
+    has "os.execv"
+    has "\"-c\""
+    lacks "shlex.quote(href)"
+  }
+  flag code.PartiallyEscapedSshCommand in function {
+    has "name=run_ssh_command_with_credentials"
+    has "escaped_password"
+    has "escaped_command"
+    has "{username}@{host}"
+    has "-p {port}"
+    has "run_command(ssh_command)"
+    lacks "quoted_username"
+    lacks "quoted_host"
+    lacks "port=int(port)"
+  }
+  flag code.CloudStackBaremetalMacCommandInjection in function {
+    has "name=notify_provisioning_done"
+    has "/baremetal/provisiondone/<mac>"
+    has "server.notify_provisioning_done(mac)"
+    lacks "is_a_mac(mac)"
+  }
   sink path "pty.spawn" -> code.CommandExecution
   sink path "os.execv" -> code.CommandExecution
   sink path "os.execve" -> code.CommandExecution
@@ -289,8 +434,21 @@ adapter python {
   sink path "joblib.load" -> code.Deserialization
   sink path "numpy.load" -> code.Deserialization
   sink path "pandas.read_pickle" -> code.Deserialization
-  mark exact "analysis.function.context" val "name=api_endpoint" val "request.headers.get" val "Content-Type" val "ALL_SERDE.get" val "from_http_request" nval "name=api_endpoint_wrapper" nval "UNSUPPORTED_MEDIA_TYPE" -> code.RequestSelectedDeserializationFormat
-  mark exact "analysis.function.context" val "class_bases=wsgi.MetadataXMLDeserializer" val "name=default" val "minidom.parseString(string)" nval "safe_minidom_parse_string(string)" -> code.CinderUnsafeMinidomXmlDeserializer
+  flag code.RequestSelectedDeserializationFormat in function {
+    has "name=api_endpoint"
+    has "request.headers.get"
+    has "Content-Type"
+    has "ALL_SERDE.get"
+    has "from_http_request"
+    lacks "name=api_endpoint_wrapper"
+    lacks "UNSUPPORTED_MEDIA_TYPE"
+  }
+  flag code.CinderUnsafeMinidomXmlDeserializer in function {
+    has "class_bases=wsgi.MetadataXMLDeserializer"
+    has "name=default"
+    has "minidom.parseString(string)"
+    lacks "safe_minidom_parse_string(string)"
+  }
   sink path "etree.parse" -> code.XmlParse
   sink path "etree.fromstring" -> code.XmlParse
   sink path "etree.XML" -> code.XmlParse
@@ -412,19 +570,105 @@ adapter python {
   sink path "flask.render_template_string" -> code.HtmlRender
   sink path "analysis.function.context.sink" val "traceback.format_exc" val "<pre" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HtmlRender
   sink path "analysis.function.context.sink" val "traceback.format_exc" val "<html" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HtmlRender
-  mark exact "analysis.function.context" val "class_bases=HTMLSerializer" val "name=serialize" nval "escape_rcdata=True" -> code.HtmlSanitizerLogicReview
-  mark exact "analysis.function.context" val "name=body" val "class_name=WaterfallHelp" val "request.args" val "show_reload_input" val "value=\"%s\"" val "<td>%s</td>" nval "html.escape(value)" nval "html.escape(name)" -> code.UnescapedHtmlOptionRenderer
-  mark exact "analysis.function.context" val "name=swagger_dashboard" val "req.query_params.get(\"version\")" val "openapi_url=root_path+f\"{self.openapi_url}?version={version}\"" val "get_swagger_ui_html" nval "quote(version,safe='')" -> code.UnescapedDocsOpenapiUrl
-  mark exact "analysis.function.context" val "name=redoc_dashboard" val "req.query_params.get(\"version\")" val "openapi_url=root_path+f\"{self.openapi_url}?version={version}\"" val "get_redoc_html" nval "quote(version,safe='')" -> code.UnescapedDocsOpenapiUrl
-  mark exact "analysis.function.context" val "name=link" val "self.get('url','')" val "ready_url=url" val "returnready_url" nval "is_safe_url(url)" nval "SAFE_PROTOCOL_REGEX" nval "return'DISABLED'" -> code.UnsafeWatchUrlProtocol
-  mark exact "analysis.function.context" val "name=_resolve_path" val "os.path.join(self.memory_dir,filename)" val "os.path.join(self.workspace_root,filename)" nval "os.path.realpath" nval "startswith(allowed+os.sep)" -> code.CowAgentMemoryFilenameTraversal
-  mark exact "analysis.function.context" val "class_name=FileSession" val "name=_get_file_path" val "os.path.join(self.storage_path,self.SESSION_PREFIX+self.id)" nval "os.path.normpath(f).startswith(self.storage_path)" -> code.CherryPySessionIdFilePathTraversal
-  mark exact "analysis.function.context" val "name=serve_protected_file" val "os.path.join(cr_settings['PROTECTED_MEDIA_ROOT'],path)" val "os.path.isfile(fullpath)" val "open(fullpath,'rb')" nval "fullpath.startswith(mediapath)" nval "os.path.abspath(os.path.join(mediapath,path))" -> code.CodeRedProtectedMediaPathTraversal
-  mark exact "analysis.function.context" val "class_name=HttpCli" val "name=handle_get" val "self.vpath.startswith(\".cpr\")" val "static_path=os.path.join(self.E.mod,\"web/\",self.vpath[5:])" val "self.tx_file(static_path)" nval "absreal(os.path.join(path_base,self.vpath[5:]))" nval "static_path.startswith(path_base)" -> code.CopypartyCprStaticPathTraversal
-  mark exact "analysis.function.context" val "class_name=SQLStorageAdapter" val "name=__init__" val "create_engine(self.database_uri)" val "sessionmaker(bind=self.engine,expire_on_commit=True)" nval "scoped_session" nval "pool_timeout" -> code.ChatterBotSqlalchemySessionPoolExhaustion
-  mark exact "analysis.function.context" val "class_name=SQLStorageAdapter" val "name=filter" val "session=self.Session()" val "yieldself.model_to_object(statement)" nval "finally" -> code.ChatterBotSqlalchemySessionPoolExhaustion
-  mark exact "analysis.function.context" val "name=get_all_data_required_for_activation_popout" val "PendingChangeSummary(" val "changeText=unescape(change[\"text\"])" nval "changeText=change[\"text\"]" -> code.CheckmkPendingChangeTextUnescapeXss
-  mark exact "analysis.function.context" val "name=title" val "class_name=TermViewlet" val "term-contact" val "objpath" val "self.title" nval "quote=True" nval "html.escape" nval "markupsafe.escape" -> code.CollectiveContactWidgetTitleXss
+  flag code.HtmlSanitizerLogicReview in function {
+    has "class_bases=HTMLSerializer"
+    has "name=serialize"
+    lacks "escape_rcdata=True"
+  }
+  flag code.UnescapedHtmlOptionRenderer in function {
+    has "name=body"
+    has "class_name=WaterfallHelp"
+    has "request.args"
+    has "show_reload_input"
+    has "value=\"%s\""
+    has "<td>%s</td>"
+    lacks "html.escape(value)"
+    lacks "html.escape(name)"
+  }
+  flag code.UnescapedDocsOpenapiUrl in function {
+    has "name=swagger_dashboard"
+    has "req.query_params.get(\"version\")"
+    has "openapi_url=root_path+f\"{self.openapi_url}?version={version}\""
+    has "get_swagger_ui_html"
+    lacks "quote(version,safe='')"
+  }
+  flag code.UnescapedDocsOpenapiUrl in function {
+    has "name=redoc_dashboard"
+    has "req.query_params.get(\"version\")"
+    has "openapi_url=root_path+f\"{self.openapi_url}?version={version}\""
+    has "get_redoc_html"
+    lacks "quote(version,safe='')"
+  }
+  flag code.UnsafeWatchUrlProtocol in function {
+    has "name=link"
+    has "self.get('url','')"
+    has "ready_url=url"
+    has "returnready_url"
+    lacks "is_safe_url(url)"
+    lacks "SAFE_PROTOCOL_REGEX"
+    lacks "return'DISABLED'"
+  }
+  flag code.CowAgentMemoryFilenameTraversal in function {
+    has "name=_resolve_path"
+    has "os.path.join(self.memory_dir,filename)"
+    has "os.path.join(self.workspace_root,filename)"
+    lacks "os.path.realpath"
+    lacks "startswith(allowed+os.sep)"
+  }
+  flag code.CherryPySessionIdFilePathTraversal in function {
+    has "class_name=FileSession"
+    has "name=_get_file_path"
+    has "os.path.join(self.storage_path,self.SESSION_PREFIX+self.id)"
+    lacks "os.path.normpath(f).startswith(self.storage_path)"
+  }
+  flag code.CodeRedProtectedMediaPathTraversal in function {
+    has "name=serve_protected_file"
+    has "os.path.join(cr_settings['PROTECTED_MEDIA_ROOT'],path)"
+    has "os.path.isfile(fullpath)"
+    has "open(fullpath,'rb')"
+    lacks "fullpath.startswith(mediapath)"
+    lacks "os.path.abspath(os.path.join(mediapath,path))"
+  }
+  flag code.CopypartyCprStaticPathTraversal in function {
+    has "class_name=HttpCli"
+    has "name=handle_get"
+    has "self.vpath.startswith(\".cpr\")"
+    has "static_path=os.path.join(self.E.mod,\"web/\",self.vpath[5:])"
+    has "self.tx_file(static_path)"
+    lacks "absreal(os.path.join(path_base,self.vpath[5:]))"
+    lacks "static_path.startswith(path_base)"
+  }
+  flag code.ChatterBotSqlalchemySessionPoolExhaustion in function {
+    has "class_name=SQLStorageAdapter"
+    has "name=__init__"
+    has "create_engine(self.database_uri)"
+    has "sessionmaker(bind=self.engine,expire_on_commit=True)"
+    lacks "scoped_session"
+    lacks "pool_timeout"
+  }
+  flag code.ChatterBotSqlalchemySessionPoolExhaustion in function {
+    has "class_name=SQLStorageAdapter"
+    has "name=filter"
+    has "session=self.Session()"
+    has "yieldself.model_to_object(statement)"
+    lacks "finally"
+  }
+  flag code.CheckmkPendingChangeTextUnescapeXss in function {
+    has "name=get_all_data_required_for_activation_popout"
+    has "PendingChangeSummary("
+    has "changeText=unescape(change[\"text\"])"
+    lacks "changeText=change[\"text\"]"
+  }
+  flag code.CollectiveContactWidgetTitleXss in function {
+    has "name=title"
+    has "class_name=TermViewlet"
+    has "term-contact"
+    has "objpath"
+    has "self.title"
+    lacks "quote=True"
+    lacks "html.escape"
+    lacks "markupsafe.escape"
+  }
   sink path "analysis.function.return" val "decorator_method:get" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
   sink path "analysis.function.return" val "decorator_method:post" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
   sink path "analysis.function.return" val "decorator_method:put" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
@@ -455,16 +699,70 @@ adapter python {
   sink path "mako.template.Template" -> code.TemplateRender
   sink path "Environment.from_string" -> code.TemplateRender
   sink path "render_template_string" -> code.TemplateRender
-  mark exact "analysis.function.context" val "Formatter().parse" val "." nval "format_spec" -> code.IncompleteTemplateValidation
-  mark exact "analysis.function.context" val "Formatter().parse" val "[" nval "format_spec" -> code.IncompleteTemplateValidation
-  mark exact "analysis.function.context" val "Formatter().parse" val "." val "format_spec" nval "{" nval "}" -> code.IncompleteTemplateValidation
-  mark exact "analysis.function.context" val "Formatter().parse" val "[" val "format_spec" nval "{" nval "}" -> code.IncompleteTemplateValidation
-  mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "ILIKE" -> code.UnparameterizedSqlQueryParser
-  mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "::jsonb" -> code.UnparameterizedSqlQueryParser
-  mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "=ANY(" -> code.UnparameterizedSqlQueryParser
-  mark exact "analysis.function.context" val "name=_parse_qsl" val "qs.replace(';','&').split('&')" -> code.AmbiguousQueryParameterSeparator
-  mark exact "analysis.function.context" val "_original_transport" val "_reader._transport" val "_writer._transport" nval "_reader._buffer.clear" -> code.ProtocolStateReview
-  mark exact "analysis.function.context" val "name=_recv_packet" val "MSG_USERAUTH_LAST" val "process_packet(pkttype,seq,packet" nval "Invalid request received before" -> code.ProtocolStateReview
+  flag code.IncompleteTemplateValidation in function {
+    has "Formatter().parse"
+    has "."
+    lacks "format_spec"
+  }
+  flag code.IncompleteTemplateValidation in function {
+    has "Formatter().parse"
+    has "["
+    lacks "format_spec"
+  }
+  flag code.IncompleteTemplateValidation in function {
+    has "Formatter().parse"
+    has "."
+    has "format_spec"
+    lacks "{"
+    lacks "}"
+  }
+  flag code.IncompleteTemplateValidation in function {
+    has "Formatter().parse"
+    has "["
+    has "format_spec"
+    lacks "{"
+    lacks "}"
+  }
+  flag code.UnparameterizedSqlQueryParser in function {
+    has "name=parse"
+    has "query_expr.parseString"
+    has "repr("
+    has ".replace("
+    has "__default_field__"
+    has "ILIKE"
+  }
+  flag code.UnparameterizedSqlQueryParser in function {
+    has "name=parse"
+    has "query_expr.parseString"
+    has "repr("
+    has ".replace("
+    has "__default_field__"
+    has "::jsonb"
+  }
+  flag code.UnparameterizedSqlQueryParser in function {
+    has "name=parse"
+    has "query_expr.parseString"
+    has "repr("
+    has ".replace("
+    has "__default_field__"
+    has "=ANY("
+  }
+  flag code.AmbiguousQueryParameterSeparator in function {
+    has "name=_parse_qsl"
+    has "qs.replace(';','&').split('&')"
+  }
+  flag code.ProtocolStateReview in function {
+    has "_original_transport"
+    has "_reader._transport"
+    has "_writer._transport"
+    lacks "_reader._buffer.clear"
+  }
+  flag code.ProtocolStateReview in function {
+    has "name=_recv_packet"
+    has "MSG_USERAUTH_LAST"
+    has "process_packet(pkttype,seq,packet"
+    lacks "Invalid request received before"
+  }
   sink path "redirect" -> code.RedirectTarget
   sink path "flask.redirect" -> code.RedirectTarget
   sink path "HttpResponseRedirect" -> code.RedirectTarget
@@ -543,7 +841,10 @@ adapter python {
   assume sanitizer path "posixpath.normpath" -> code.FilePathAccess
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
-  mark exact "re.compile" val "^black([^A-Z0-9._-]+.*)$" -> code.PackageVersionSpecifierValidationReview
+  flag code.PackageVersionSpecifierValidationReview on any {
+    path exact "re.compile"
+    has "^black([^A-Z0-9._-]+.*)$"
+  }
   sink path "re.compile" -> code.RegexCompile
   sink path "re.match" -> code.RegexCompile
   sink path "re.search" -> code.RegexCompile
@@ -560,131 +861,371 @@ adapter python {
   sink path "re.compile" val "[ \\n\\r\\t]*(.+?)[ \\n\\r\\t]*" -> code.CatastrophicRegex
 
   // weak crypto (CWE-327/328) — presence marker on the call node
-  mark "hashlib.md5" -> code.WeakHash
-  mark "hashlib.sha1" -> code.WeakHash
-  mark "hashlib.md4" -> code.WeakHash
-  mark "hashlib.md2" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "hashlib.md5"
+  }
+  flag code.WeakHash on any {
+    path "hashlib.sha1"
+  }
+  flag code.WeakHash on any {
+    path "hashlib.md4"
+  }
+  flag code.WeakHash on any {
+    path "hashlib.md2"
+  }
   // hashlib.new("md5") — algorithm by name (value-matched). "sha1"/"md5"/… only, never the
   // bare "sha" substring (it would match the strong sha224/256/384/512 family).
-  mark "hashlib.new" val "md5" -> code.WeakHash
-  mark "hashlib.new" val "md4" -> code.WeakHash
-  mark "hashlib.new" val "md2" -> code.WeakHash
-  mark "hashlib.new" val "sha1" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "hashlib.new"
+    has "md5"
+  }
+  flag code.WeakHash on any {
+    path "hashlib.new"
+    has "md4"
+  }
+  flag code.WeakHash on any {
+    path "hashlib.new"
+    has "md2"
+  }
+  flag code.WeakHash on any {
+    path "hashlib.new"
+    has "sha1"
+  }
 
   // insecure file permission (CWE-732) — world-writable / overly-broad mode. Restrictive
   // modes (0o600/0o640/0o644) are not matched. octal forms 0o777 and 0o666 are covered.
-  mark "os.chmod" val "0o777" -> code.InsecurePermission
-  mark "os.chmod" val "0o666" -> code.InsecurePermission
-  mark "os.fchmod" val "0o777" -> code.InsecurePermission
-  mark "os.fchmod" val "0o666" -> code.InsecurePermission
-  mark "os.open" val "0o777" -> code.InsecurePermission
-  mark "os.open" val "0o666" -> code.InsecurePermission
-  mark "Path.chmod" val "0o777" -> code.InsecurePermission
-  mark method "mkdir" val "parents=True" val "exist_ok=True" nval "mode=" -> code.InsecurePermission
+  flag code.InsecurePermission on any {
+    path "os.chmod"
+    has "0o777"
+  }
+  flag code.InsecurePermission on any {
+    path "os.chmod"
+    has "0o666"
+  }
+  flag code.InsecurePermission on any {
+    path "os.fchmod"
+    has "0o777"
+  }
+  flag code.InsecurePermission on any {
+    path "os.fchmod"
+    has "0o666"
+  }
+  flag code.InsecurePermission on any {
+    path "os.open"
+    has "0o777"
+  }
+  flag code.InsecurePermission on any {
+    path "os.open"
+    has "0o666"
+  }
+  flag code.InsecurePermission on any {
+    path "Path.chmod"
+    has "0o777"
+  }
+  flag code.InsecurePermission on any {
+    method "mkdir"
+    has "parents=True"
+    has "exist_ok=True"
+    lacks "mode="
+  }
 
   // resource lifecycle (CWE-772, RES-001) — a raw socket handle that must be closed on
   // every path. close() is receiver-agnostic (control method). Context-manager (`with`)
   // forms don't lower the alloc, so they aren't flagged.
-  mark "socket.socket" -> code.ResourceHandle
+  flag code.ResourceHandle on any {
+    path "socket.socket"
+  }
   control method "close" -> core.ResourceRelease
 
   // weak randomness (CWE-330) — presence of the non-crypto `random` module PRNG. Secure
   // RNG (secrets.*, os.urandom, SystemRandom) is deliberately NOT marked.
-  mark "random.random" -> code.WeakRandomValue
-  mark "random.randint" -> code.WeakRandomValue
-  mark "random.randrange" -> code.WeakRandomValue
-  mark "random.getrandbits" -> code.WeakRandomValue
-  mark "random.randbytes" -> code.WeakRandomValue
-  mark "random.choice" -> code.WeakRandomValue
-  mark "random.choices" -> code.WeakRandomValue
-  mark "random.sample" -> code.WeakRandomValue
-  mark "random.uniform" -> code.WeakRandomValue
-  mark "random.normalvariate" -> code.WeakRandomValue
-  mark "random.gauss" -> code.WeakRandomValue
-  mark "random.betavariate" -> code.WeakRandomValue
-  mark "random.gammavariate" -> code.WeakRandomValue
-  mark "random.expovariate" -> code.WeakRandomValue
-  mark "random.lognormvariate" -> code.WeakRandomValue
-  mark "random.paretovariate" -> code.WeakRandomValue
-  mark "random.weibullvariate" -> code.WeakRandomValue
-  mark "random.vonmisesvariate" -> code.WeakRandomValue
-  mark "random.triangular" -> code.WeakRandomValue
-  mark "random.shuffle" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "random.random"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.randint"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.randrange"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.getrandbits"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.randbytes"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.choice"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.choices"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.sample"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.uniform"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.normalvariate"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.gauss"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.betavariate"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.gammavariate"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.expovariate"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.lognormvariate"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.paretovariate"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.weibullvariate"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.vonmisesvariate"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.triangular"
+  }
+  flag code.WeakRandomValue on any {
+    path "random.shuffle"
+  }
 
   // csrf disabled (CWE-352) — presence marker
-  mark "csrf_exempt" -> code.CsrfDisabled
-  mark exact "analysis.function.context" val "name=sync" val "remote.background_sync" nval "decorator_path:require_POST" -> code.CobblerDjangoStateChangeGetCsrf
-  mark exact "analysis.function.context" val "name=reposync" val "remote.background_reposync" nval "decorator_path:require_POST" -> code.CobblerDjangoStateChangeGetCsrf
-  mark exact "analysis.function.context" val "name=hardlink" val "remote.background_hardlink" nval "decorator_path:require_POST" -> code.CobblerDjangoStateChangeGetCsrf
-  mark exact "analysis.function.context" val "name=buildiso" val "remote.background_buildiso" nval "decorator_path:require_POST" -> code.CobblerDjangoStateChangeGetCsrf
-  mark exact "analysis.function.context" val "name=generic_delete" val "remote.remove_item" nval "decorator_path:require_POST" -> code.CobblerDjangoStateChangeGetCsrf
+  flag code.CsrfDisabled on any {
+    path "csrf_exempt"
+  }
+  flag code.CobblerDjangoStateChangeGetCsrf in function {
+    has "name=sync"
+    has "remote.background_sync"
+    lacks "decorator_path:require_POST"
+  }
+  flag code.CobblerDjangoStateChangeGetCsrf in function {
+    has "name=reposync"
+    has "remote.background_reposync"
+    lacks "decorator_path:require_POST"
+  }
+  flag code.CobblerDjangoStateChangeGetCsrf in function {
+    has "name=hardlink"
+    has "remote.background_hardlink"
+    lacks "decorator_path:require_POST"
+  }
+  flag code.CobblerDjangoStateChangeGetCsrf in function {
+    has "name=buildiso"
+    has "remote.background_buildiso"
+    lacks "decorator_path:require_POST"
+  }
+  flag code.CobblerDjangoStateChangeGetCsrf in function {
+    has "name=generic_delete"
+    has "remote.remove_item"
+    lacks "decorator_path:require_POST"
+  }
 
   // CSV injection (CWE-1236)
   sink method "writerow" collection -> code.CsvCell
   sink method "writerows" collection -> code.CsvCell
 
   // weak cipher (CWE-327) — named broken ciphers
-  mark "DES.new" -> code.WeakCipher
-  mark "ARC4.new" -> code.WeakCipher
-  mark "Blowfish.new" -> code.WeakCipher
-  mark "DES3.new" -> code.WeakCipher
+  flag code.WeakCipher on any {
+    path "DES.new"
+  }
+  flag code.WeakCipher on any {
+    path "ARC4.new"
+  }
+  flag code.WeakCipher on any {
+    path "Blowfish.new"
+  }
+  flag code.WeakCipher on any {
+    path "DES3.new"
+  }
   // PyCrypto/PyCryptodome AES.new defaults to ECB when no MODE_* argument is supplied.
-  mark exact "AES.new" nval "MODE_" -> code.WeakCipher
+  flag code.WeakCipher on any {
+    path exact "AES.new"
+    lacks "MODE_"
+  }
   // ECB mode (CWE-327) — pycryptodome AES.MODE_ECB constant or cryptography modes.ECB().
   // The mode is a member access / call (not a string), so match the path on the Attr/Call.
-  mark "AES.MODE_ECB" -> code.WeakCipher
-  mark "DES.MODE_ECB" -> code.WeakCipher
-  mark "DES3.MODE_ECB" -> code.WeakCipher
-  mark "modes.ECB" -> code.WeakCipher
-  mark "AES.new" val "0000000000000000" -> code.StaticIv
-  mark "DES3.new" val "00000000" -> code.StaticIv
-  mark "Cipher" val "0000000000000000" -> code.StaticIv
-  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "AES.MODE_ECB"
+  }
+  flag code.WeakCipher on any {
+    path "DES.MODE_ECB"
+  }
+  flag code.WeakCipher on any {
+    path "DES3.MODE_ECB"
+  }
+  flag code.WeakCipher on any {
+    path "modes.ECB"
+  }
+  flag code.StaticIv on any {
+    path "AES.new"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "DES3.new"
+    has "00000000"
+  }
+  flag code.StaticIv on any {
+    path "Cipher"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "IvParameterSpec"
+    has "0000000000000000"
+  }
 
   // insecure temp file (CWE-377) — tempfile.mktemp is documented-insecure (race)
-  mark "tempfile.mktemp" -> code.InsecureTempFile
-  mark "os.path.join" val "/var/tmp/" -> code.InsecureTempFile
-  mark "open" val "/tmp/" val "w" -> code.InsecureTempFile
-  mark "open" val "/var/tmp/" val "w" -> code.InsecureTempFile
-  mark "open" val ".lxc-attach-script" val "w" -> code.InsecureTempFile
-  mark "open" val "lxc-attach-script.log" val "a" -> code.InsecureTempFile
-  mark "open" val "lxc-attach-script.err" val "a" -> code.InsecureTempFile
+  flag code.InsecureTempFile on any {
+    path "tempfile.mktemp"
+  }
+  flag code.InsecureTempFile on any {
+    path "os.path.join"
+    has "/var/tmp/"
+  }
+  flag code.InsecureTempFile on any {
+    path "open"
+    has "/tmp/"
+    has "w"
+  }
+  flag code.InsecureTempFile on any {
+    path "open"
+    has "/var/tmp/"
+    has "w"
+  }
+  flag code.InsecureTempFile on any {
+    path "open"
+    has ".lxc-attach-script"
+    has "w"
+  }
+  flag code.InsecureTempFile on any {
+    path "open"
+    has "lxc-attach-script.log"
+    has "a"
+  }
+  flag code.InsecureTempFile on any {
+    path "open"
+    has "lxc-attach-script.err"
+    has "a"
+  }
 
   // TLS cert validation disabled (CWE-295) — requests/httpx verify=False
-  mark "requests" val "verify=False" -> code.CertValidationDisabled
-  mark "httpx" val "verify=False" -> code.CertValidationDisabled
-  mark exact "analysis.function.context" val "use_ssl=False" val "Tls(" val "validate=ssl.CERT_REQUIRED" val "Server(" -> code.CertValidationDisabled
+  flag code.CertValidationDisabled on any {
+    path "requests"
+    has "verify=False"
+  }
+  flag code.CertValidationDisabled on any {
+    path "httpx"
+    has "verify=False"
+  }
+  flag code.CertValidationDisabled in function {
+    has "use_ssl=False"
+    has "Tls("
+    has "validate=ssl.CERT_REQUIRED"
+    has "Server("
+  }
 
   // JWT signature not verified (CWE-347) — pyjwt alg none / verify off
-  mark "jwt.decode" val "algorithms=none" -> code.JwtUnverified
-  mark "jwt.decode" val "verify_signature=False" -> code.JwtUnverified
-  mark "jwt.decode" val "verify=False" -> code.JwtUnverified
-  mark "jwt.encode" val "algorithm=none" -> code.JwtUnverified
-  mark exact "analysis.function.context" val "name=_prepare_algorithm_key" val "key is None and \"jwk\" in header" val "key = header[\"jwk\"]" val "prepare_key(key)" -> code.HeaderControlledJwkReview
-  mark exact "analysis.function.context" val "name=prepare_key" val "key is None and \"jwk\" in header" val "key = header[\"jwk\"]" val "prepare_key(key)" -> code.HeaderControlledJwkReview
-  mark exact "analysis.function.context" val "name=to_dict" val "self.__dict__.items" val "storage[k] = v" nval "api" -> code.ConfigExposureReview
+  flag code.JwtUnverified on any {
+    path "jwt.decode"
+    has "algorithms=none"
+  }
+  flag code.JwtUnverified on any {
+    path "jwt.decode"
+    has "verify_signature=False"
+  }
+  flag code.JwtUnverified on any {
+    path "jwt.decode"
+    has "verify=False"
+  }
+  flag code.JwtUnverified on any {
+    path "jwt.encode"
+    has "algorithm=none"
+  }
+  flag code.HeaderControlledJwkReview in function {
+    has "name=_prepare_algorithm_key"
+    has "key is None and \"jwk\" in header"
+    has "key = header[\"jwk\"]"
+    has "prepare_key(key)"
+  }
+  flag code.HeaderControlledJwkReview in function {
+    has "name=prepare_key"
+    has "key is None and \"jwk\" in header"
+    has "key = header[\"jwk\"]"
+    has "prepare_key(key)"
+  }
+  flag code.ConfigExposureReview in function {
+    has "name=to_dict"
+    has "self.__dict__.items"
+    has "storage[k] = v"
+    lacks "api"
+  }
 
   // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
   // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.
-  mark "requests" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "httpx" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "urllib.request.urlopen" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "requests"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "httpx"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "urllib.request.urlopen"
+    has "http://"
+    lacks "127.0"
+  }
 
   // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled. Pure omission is
   // not flagged (too many false positives from framework defaults / cookie deletions).
-  mark "set_cookie" val "httponly=False" -> code.InsecureCookie
-  mark "set_cookie" val "secure=False" -> code.InsecureCookie
+  flag code.InsecureCookie on any {
+    path "set_cookie"
+    has "httponly=False"
+  }
+  flag code.InsecureCookie on any {
+    path "set_cookie"
+    has "secure=False"
+  }
 
   // permissive CORS (CWE-942) — headers.add("Access-Control-Allow-Origin", "*")
   // or flask-cors CORS(app, origins="*") / cross_origin(origins="*").
-  mark "headers.add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
-  mark "CORS" val "origins=*" -> code.PermissiveCors
-  mark "cross_origin" val "origins=*" -> code.PermissiveCors
+  flag code.PermissiveCors on any {
+    path "headers.add"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  flag code.PermissiveCors on any {
+    path "CORS"
+    has "origins=*"
+  }
+  flag code.PermissiveCors on any {
+    path "cross_origin"
+    has "origins=*"
+  }
 
   // clickjacking (CWE-1021) — X-Frame-Options EXPLICITLY set to ALLOWALL via a header
   // call (omission / subscript-assignment not flagged).
-  mark "headers.add" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
-  mark "headers.setdefault" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  flag code.MissingFrameProtection on any {
+    path "headers.add"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
+  flag code.MissingFrameProtection on any {
+    path "headers.setdefault"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
 
   // character-filter: re.sub(pattern, repl, s) is always global.
   filter path "re.sub" global

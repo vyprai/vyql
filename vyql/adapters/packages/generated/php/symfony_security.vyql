@@ -4,7 +4,9 @@ import core.{AuthenticationCheck, PathCanonicalization, CsrfProtection}
 adapter php {
   package "symfony/security" {
     source method "getToken" -> code.SecretValue
-    mark method "createRedirectResponse" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "createRedirectResponse"
+    }
     control method "generateUri" -> core.PathCanonicalization
     control method "checkRequestPath" -> core.PathCanonicalization
     control method "refreshToken" -> core.CsrfProtection

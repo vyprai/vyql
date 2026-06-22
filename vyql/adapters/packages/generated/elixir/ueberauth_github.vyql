@@ -2,7 +2,9 @@ import code.{NetworkConnect, NetworkSend, SecretValue, RedirectTarget}
 
 adapter elixir {
   package "ueberauth_github" {
-    mark method "authorize_url!" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "authorize_url!"
+    }
     sink method "get" -> code.NetworkConnect
     sink method "get" -> code.NetworkSend
     sink method "get_token!" -> code.NetworkConnect

@@ -1,6 +1,8 @@
 import code.{PrivilegedOp}
 adapter cpp {
   package "boost-coroutine2" {
-    mark method "bind_to_processor" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "bind_to_processor"
+    }
   }
 }

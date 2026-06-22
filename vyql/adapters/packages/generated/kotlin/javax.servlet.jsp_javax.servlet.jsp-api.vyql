@@ -6,7 +6,9 @@ adapter kotlin {
     control method "validate" -> core.InputValidation
     source method "getRequestURI" -> core.UserControlledData
     source method "getRequest" -> code.HttpInput
-    mark method "getSession" -> code.SessionId
+    flag code.SessionId on any {
+      method "getSession"
+    }
     sink method "getExpressionEvaluator" -> code.ExpressionEval
   }
 }

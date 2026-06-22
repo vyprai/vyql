@@ -1,5 +1,7 @@
 adapter kotlin {
   package "org.clojure:clojure" {
-    mark path "org.clojure.clojure.hash" -> code.WeakHash
+    flag code.WeakHash on any {
+      path "org.clojure.clojure.hash"
+    }
   }
 }

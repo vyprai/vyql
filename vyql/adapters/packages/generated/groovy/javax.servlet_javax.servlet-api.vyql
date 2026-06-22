@@ -7,7 +7,9 @@ adapter groovy {
     source method "getHeader" -> code.HttpInput
     source method "getQueryString" -> code.HttpInput
     source method "getRequestURI" -> code.HttpInput
-    mark method "getSession" -> code.SessionId
+    flag code.SessionId on any {
+      method "getSession"
+    }
     source method "getSubmittedFileName" -> core.UserControlledData
   }
 }

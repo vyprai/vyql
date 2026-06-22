@@ -6,8 +6,12 @@ adapter csharp {
     source method "GetAuthenticatedUserFromCookie" -> code.Cookie
     source method "GetAuthenticatedUserFromCookie" -> code.SecretValue
     source method "EncryptAndSignCookie" -> code.SecretValue
-    mark method "UserLoggedInRedirectResponse" -> code.RedirectTarget
-    mark method "LogOutAndRedirectResponse" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "UserLoggedInRedirectResponse"
+    }
+    flag code.RedirectTarget on any {
+      method "LogOutAndRedirectResponse"
+    }
     control method "BuildCookie" -> core.AuthenticationCheck
     control method "DecryptAndValidateAuthenticationCookie" -> core.AuthenticationCheck
     control method "UserLoggedInResponse" -> core.AuthenticationCheck

@@ -1,6 +1,10 @@
 adapter swift {
   package "github.com/Kitura/BlueCryptor" {
-    mark method "Random" -> code.WeakRandomValue
-    mark method "digest" -> code.WeakHash
+    flag code.WeakRandomValue on any {
+      method "Random"
+    }
+    flag code.WeakHash on any {
+      method "digest"
+    }
   }
 }

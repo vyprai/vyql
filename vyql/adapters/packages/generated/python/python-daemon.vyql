@@ -3,7 +3,9 @@ adapter python {
   package "python-daemon" {
     sink method "change_root_directory" -> code.FilePathAccess
     sink method "change_working_directory" -> code.FilePathAccess
-    mark method "change_process_owner" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "change_process_owner"
+    }
     sink method "detach_process_context" -> code.CommandExecution
     sink method "fork_then_exit_parent" -> code.CommandExecution
     sink method "redirect_stream" -> code.FileUse

@@ -273,13 +273,18 @@ adapter neutral {
   flow path "read_into" arg 0 from result
   flow prefix "parse" arg 1 from args 0
   control receiver method "checked" -> custom.Transform
-  mark method "setMode" val "true" -> custom.Marker
-  mark exact "Widget" -> custom.Marker
-  mark context function {
+  flag custom.Marker on any {
+    method "setMode"
+    has "true"
+  }
+  flag custom.Marker on any {
+    path exact "Widget"
+  }
+  flag custom.Marker in function {
     has "lang=javascript"
     has "name=validate"
     lacks "timingSafeEqual"
-  } -> custom.Marker
+  }
 }
 `
 	decls, err := Parse(src)
@@ -335,19 +340,27 @@ adapter neutral {
 	if ad.Mappings[11].Kind != "control_receiver_method" || ad.Mappings[11].Concept != "custom.Transform" {
 		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[11])
 	}
-	if ad.Mappings[12].Kind != "mark_method" || ad.Mappings[12].Pattern != "setMode" ||
-		len(ad.Mappings[12].ValMatches) != 1 || ad.Mappings[12].ValMatches[0] != "true" {
-		t.Fatalf("value-matched mark wrong: %+v", ad.Mappings[12])
+	if ad.Mappings[12].Kind != "flag" || ad.Mappings[12].Flag == nil ||
+		ad.Mappings[12].Flag.NodeKind != "any" ||
+		len(ad.Mappings[12].Flag.Predicates) != 2 ||
+		ad.Mappings[12].Flag.Predicates[0].Property != "method" ||
+		ad.Mappings[12].Flag.Predicates[0].Values[0] != "setMode" ||
+		ad.Mappings[12].Flag.Predicates[1].Values[0] != "true" {
+		t.Fatalf("value-matched flag wrong: %+v", ad.Mappings[12])
 	}
-	if ad.Mappings[13].Kind != "mark" || !ad.Mappings[13].Exact {
-		t.Fatalf("exact mark wrong: %+v", ad.Mappings[13])
+	if ad.Mappings[13].Kind != "flag" || ad.Mappings[13].Flag == nil ||
+		len(ad.Mappings[13].Flag.Predicates) != 1 ||
+		ad.Mappings[13].Flag.Predicates[0].Property != "path" ||
+		!ad.Mappings[13].Flag.Predicates[0].Exact {
+		t.Fatalf("exact flag wrong: %+v", ad.Mappings[13])
 	}
-	if ad.Mappings[14].Kind != "mark" || !ad.Mappings[14].Exact ||
-		ad.Mappings[14].Pattern != "analysis.function.context" ||
-		len(ad.Mappings[14].ValMatches) != 2 || ad.Mappings[14].ValMatches[0] != "lang=javascript" ||
-		ad.Mappings[14].ValMatches[1] != "name=validate" ||
-		len(ad.Mappings[14].ValAbsents) != 1 || ad.Mappings[14].ValAbsents[0] != "timingSafeEqual" {
-		t.Fatalf("context mark wrong: %+v", ad.Mappings[14])
+	if ad.Mappings[14].Kind != "flag" || ad.Mappings[14].Concept != "custom.Marker" ||
+		ad.Mappings[14].Flag == nil || ad.Mappings[14].Flag.Scope != "function" ||
+		len(ad.Mappings[14].Flag.Predicates) != 3 ||
+		ad.Mappings[14].Flag.Predicates[0].Property != "tokens" ||
+		ad.Mappings[14].Flag.Predicates[0].Values[0] != "lang=javascript" ||
+		!ad.Mappings[14].Flag.Predicates[2].Negative {
+		t.Fatalf("context flag wrong: %+v", ad.Mappings[14])
 	}
 }
 

@@ -2,6 +2,8 @@ import code.{RegexCompile}
 
 adapter perl {
   package "Tapir" {
-    mark method "Tapir::Validator::Regex::new_from_string" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "Tapir::Validator::Regex::new_from_string"
+    }
   }
 }

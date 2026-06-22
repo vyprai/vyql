@@ -2,6 +2,8 @@ import code.{HttpInput, RedirectTarget}
 adapter php {
   package "laravel/lumen-framework" {
     source method "request" -> code.HttpInput
-    mark method "redirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "redirect"
+    }
   }
 }

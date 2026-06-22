@@ -2,6 +2,8 @@ import code.{HttpInput, RedirectTarget}
 adapter kotlin {
   package "org.apache.tomcat.embed:tomcat-embed-core" {
     source method "read" -> code.HttpInput
-    mark method "dispatch" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "dispatch"
+    }
   }
 }

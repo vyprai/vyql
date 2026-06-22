@@ -9,16 +9,38 @@ adapter kotlin {
     source method "SocialUser" -> core.UserControlledData
     source method "SocialAuthenticationToken" -> core.UserControlledData
 
-    mark method "postLoginUrl" -> code.RedirectTarget
-    mark method "alwaysUsePostLoginUrl" -> code.RedirectTarget
-    mark method "postFailureUrl" -> code.RedirectTarget
-    mark method "signupUrl" -> code.RedirectTarget
-    mark method "connectionAddedRedirectUrl" -> code.RedirectTarget
-    mark method "defaultFailureUrl" -> code.RedirectTarget
-    mark method "setSignupUrl" -> code.RedirectTarget
-    mark method "setDefaultFailureUrl" -> code.RedirectTarget
-    mark method "setConnectionAddedRedirectUrl" -> code.RedirectTarget
-    mark method "setPostLoginUrl" -> code.RedirectTarget
-    mark method "setPostFailureUrl" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "postLoginUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "alwaysUsePostLoginUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "postFailureUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "signupUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "connectionAddedRedirectUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "defaultFailureUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "setSignupUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "setDefaultFailureUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "setConnectionAddedRedirectUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "setPostLoginUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "setPostFailureUrl"
+    }
   }
 }

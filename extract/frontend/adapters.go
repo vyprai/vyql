@@ -61,6 +61,28 @@ type controlSpec struct {
 	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 }
 
+type flagPredicate struct {
+	Subject  string
+	Property string
+	Op       string
+	Values   []string
+	Exact    bool
+	Negative bool
+}
+
+type flagOperandSpec struct {
+	Predicates []flagPredicate
+}
+
+type flagSpec struct {
+	Concept    string
+	NodeKind   string
+	Scope      string
+	Predicates []flagPredicate
+	Operands   []flagOperandSpec
+	Packages   []string
+}
+
 // activeSources, when non-nil, restricts which source concepts the input adapters
 // emit for the active analysis profile. nil = every source active.
 var activeSources map[string]bool
@@ -489,6 +511,7 @@ type adapterSpec struct {
 	Sinks         []sinkSpec
 	Controls      []controlSpec
 	Marks         []controlSpec // presence markers (label the call node with a concept)
+	Flags         []flagSpec
 	Filters       []filterSpec
 	Assumes       []assumeSpec
 	ParamSources  []paramSourceSpec // `source param -> X`: concepts to label parameter nodes with
@@ -567,6 +590,9 @@ func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 	}
 	if len(spec.Marks) > 0 {
 		out = append(out, spec.markAdapter())
+	}
+	if len(spec.Flags) > 0 {
+		out = append(out, spec.flagAdapter())
 	}
 	if len(spec.Filters) > 0 {
 		out = append(out, spec.filterAdapter())
@@ -802,6 +828,25 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 		case "mark_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+		case "flag":
+			if mp.Flag != nil {
+				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages}
+				for _, pred := range mp.Flag.Predicates {
+					fs.Predicates = append(fs.Predicates, flagPredicate{
+						Subject: pred.Subject, Property: pred.Property, Op: pred.Op, Values: pred.Values, Exact: pred.Exact, Negative: pred.Negative,
+					})
+				}
+				for _, operand := range mp.Flag.Operands {
+					var os flagOperandSpec
+					for _, pred := range operand.Predicates {
+						os.Predicates = append(os.Predicates, flagPredicate{
+							Subject: pred.Subject, Property: pred.Property, Op: pred.Op, Values: pred.Values, Exact: pred.Exact, Negative: pred.Negative,
+						})
+					}
+					fs.Operands = append(fs.Operands, os)
+				}
+				s.Flags = append(s.Flags, fs)
+			}
 		case "filter_method":
 			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global", Packages: mp.Packages})
 		case "filter_path":
@@ -1217,6 +1262,301 @@ func packageInEvidence(want string, have map[string]bool) bool {
 		}
 	}
 	return false
+}
+
+// flagAdapter labels nodes with presence/review concepts through the AST-shaped
+// `flag <concept> on|in ... { ... }` DSL.
+func (spec adapterSpec) flagAdapter() adapters.Adapter {
+	return adapters.Adapter{
+		Name: spec.Name + ".flags", Technology: spec.Technology, Specificity: 2,
+		Fidelity: "resolved", Origin: "human",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			allowed := make([]bool, len(spec.Flags))
+			for i := range spec.Flags {
+				allowed[i] = packageAllowed(spec.Flags[i].Packages, pkgs)
+			}
+			flagIdx := buildSpecIndex(len(spec.Flags), func(i int) (methods, paths []string, loose bool) {
+				for _, pred := range spec.Flags[i].Predicates {
+					switch pred.Property {
+					case "path":
+						paths = append(paths, pred.Values...)
+					case "method":
+						methods = append(methods, pred.Values...)
+					}
+				}
+				return methods, paths, len(methods) == 0 && len(paths) == 0
+			})
+			var out []adapters.Mapping
+			var flowIdx flowTokenIndex
+			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary", "code.Name"}
+			if spec.crossLang {
+				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
+			}
+			for _, nodeType := range nodeTypes {
+				ids, _ := s.NodesOfType(nodeType)
+				for _, id := range ids {
+					n, ok, err := s.GetNode(id)
+					if err != nil || !ok {
+						continue
+					}
+					if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
+						continue
+					}
+					for _, i := range flagIdx.candidates(n.Prop("method"), n.Prop("callee_path")) {
+						if !allowed[i] {
+							continue
+						}
+						fl := spec.Flags[i]
+						if !flagNodeKindAllows(fl, n) {
+							continue
+						}
+						if !flagMatchesNode(s, &flowIdx, fl, n, spec.Technology, spec.crossLang) {
+							continue
+						}
+						detail, conf := reviewDetail(fl.Concept, flagPattern(fl))
+						specificity := 0
+						if len(fl.Packages) > 0 {
+							specificity = 3
+						}
+						out = append(out, adapters.Mapping{NodeID: n.ID, Concept: fl.Concept, Confidence: conf, Specificity: specificity, Detail: detail})
+					}
+				}
+			}
+			return out
+		},
+	}
+}
+
+func flagPattern(fl flagSpec) string {
+	for _, pred := range fl.Predicates {
+		if pred.Property == "path" || pred.Property == "method" || pred.Property == "op" || pred.Property == "tokens" {
+			return strings.Join(pred.Values, "|")
+		}
+	}
+	if fl.Scope != "" {
+		return "analysis." + fl.Scope + ".context"
+	}
+	return fl.NodeKind
+}
+
+func flagNodeKindAllows(fl flagSpec, n usg.Node) bool {
+	switch strings.ToLower(fl.Scope) {
+	case "function":
+		return n.Type == "code.Call"
+	case "module":
+		return n.Type == "code.Call"
+	case "class":
+		return n.Type == "code.Call"
+	default:
+		switch strings.ToLower(fl.NodeKind) {
+		case "", "any":
+			return true
+		case "call":
+			return n.Type == "code.Call"
+		case "attr", "attribute":
+			return n.Type == "code.Attr"
+		case "seq", "collection", "object":
+			return n.Type == "code.Seq"
+		case "subscript", "index":
+			return n.Type == "code.Subscript"
+		case "binop", "binary":
+			return n.Type == "code.BinOp"
+		case "unary":
+			return n.Type == "code.Unary"
+		case "name", "identifier":
+			return n.Type == "code.Name"
+		default:
+			return n.Type == "code."+strings.Title(fl.NodeKind)
+		}
+	}
+}
+
+func flagMatchesNode(s usg.Store, idx *flowTokenIndex, fl flagSpec, n usg.Node, tech string, crossLang bool) bool {
+	if fl.Scope != "" && n.Prop("callee_path") != "analysis."+strings.ToLower(fl.Scope)+".context" {
+		return false
+	}
+	for _, pred := range fl.Predicates {
+		if !flagPredicateMatches(s, pred, n, tech, crossLang) {
+			return false
+		}
+	}
+	if len(fl.Operands) == 0 {
+		return true
+	}
+	operands := flagOperandCandidates(s, idx, n)
+	used := make([]bool, len(operands))
+	var matchOperand func(int) bool
+	matchOperand = func(i int) bool {
+		if i == len(fl.Operands) {
+			return true
+		}
+		for oi, opNodes := range operands {
+			if used[oi] {
+				continue
+			}
+			if flagOperandMatches(fl.Operands[i], opNodes) {
+				used[oi] = true
+				if matchOperand(i + 1) {
+					return true
+				}
+				used[oi] = false
+			}
+		}
+		return false
+	}
+	return matchOperand(0)
+}
+
+func flagOperandCandidates(s usg.Store, idx *flowTokenIndex, n usg.Node) [][]usg.Node {
+	idx.ensure(s)
+	var out [][]usg.Node
+	for ai := 0; ; ai++ {
+		argID := n.Prop("arg" + strconv.Itoa(ai))
+		if argID == "" {
+			break
+		}
+		var nodes []usg.Node
+		if arg, ok, err := s.GetNode(argID); err == nil && ok {
+			nodes = append(nodes, arg)
+		}
+		for _, srcID := range idx.rev[argID] {
+			if src, ok, err := s.GetNode(srcID); err == nil && ok {
+				nodes = append(nodes, src)
+			}
+		}
+		out = append(out, nodes)
+	}
+	return out
+}
+
+func flagOperandMatches(spec flagOperandSpec, nodes []usg.Node) bool {
+	for _, pred := range spec.Predicates {
+		hit := false
+		for _, n := range nodes {
+			if flagPredicateMatchesNodeOnly(pred, n) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			return false
+		}
+	}
+	return true
+}
+
+func flagPredicateMatches(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) bool {
+	if pred.Subject == "scope_call" {
+		hit := false
+		probe := pred
+		probe.Negative = false
+		prefix := locFile(n.Prop("loc"))
+		ids, _ := s.NodesOfType("code.Call")
+		for _, id := range ids {
+			cand, ok, err := s.GetNode(id)
+			if err != nil || !ok || cand.ID == n.ID {
+				continue
+			}
+			if prefix != "" && locFile(cand.Prop("loc")) != prefix {
+				continue
+			}
+			if t := nodeTech(cand.Prop("loc")); !crossLang && t != "" && t != tech {
+				continue
+			}
+			if flagPredicateMatchesNodeOnly(probe, cand) {
+				hit = true
+				break
+			}
+		}
+		if pred.Negative {
+			return !hit
+		}
+		return hit
+	}
+	return flagPredicateMatchesNodeOnly(pred, n)
+}
+
+func flagPredicateMatchesNodeOnly(pred flagPredicate, n usg.Node) bool {
+	hit := flagPredicateHit(pred, n)
+	if pred.Negative {
+		return !hit
+	}
+	return hit
+}
+
+func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
+	switch pred.Property {
+	case "path":
+		path := n.Prop("callee_path")
+		for _, v := range pred.Values {
+			if pred.Exact && path == v || !pred.Exact && matchSinkPath(path, v) {
+				return true
+			}
+		}
+		return false
+	case "method":
+		return containsStr(pred.Values, n.Prop("method"))
+	case "op":
+		return valuePredicate(pred.Op, pred.Values, n.Prop("op"))
+	case "tokens":
+		return valuePredicate(pred.Op, pred.Values, n.Prop("str_args"))
+	case "identifier":
+		if n.Type != "code.Name" {
+			return false
+		}
+		return valuePredicate(pred.Op, pred.Values, n.Prop("callee_path")+"\x00"+n.Prop("method"))
+	case "key":
+		return valuePredicate(pred.Op, pred.Values, n.Prop("str_args")+"\x00"+n.Prop("callee_path"))
+	case "call":
+		if n.Type != "code.Call" {
+			return false
+		}
+		return valuePredicate(pred.Op, pred.Values, nodeSearchText(n))
+	case "any":
+		return valuePredicate(pred.Op, pred.Values, nodeSearchText(n))
+	default:
+		return valuePredicate(pred.Op, pred.Values, n.Prop(pred.Property))
+	}
+}
+
+func valuePredicate(op string, values []string, text string) bool {
+	switch op {
+	case "equals":
+		for _, v := range values {
+			if text == v {
+				return true
+			}
+		}
+		return false
+	case "equals_any":
+		return containsStr(values, text)
+	case "contains_any":
+		for _, v := range values {
+			if valContains(text, v) {
+				return true
+			}
+		}
+		return false
+	default:
+		for _, v := range values {
+			if !valContains(text, v) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func nodeSearchText(n usg.Node) string {
+	return strings.Join([]string{n.Type, n.Prop("callee_path"), n.Prop("method"), n.Prop("op"), n.Prop("str_args")}, "\x00")
+}
+
+func locFile(loc string) string {
+	if i := strings.LastIndex(loc, ":"); i >= 0 {
+		return loc[:i]
+	}
+	return loc
 }
 
 // markAdapter labels a node with a presence concept for `match`-style rules.

@@ -1,6 +1,8 @@
 import code.{WeakRandomValue}
 adapter rust {
   package "rand_os" {
-    mark method "new" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "new"
+    }
   }
 }

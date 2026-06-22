@@ -2,8 +2,12 @@ import core.{InputValidation}
 
 adapter javascript {
   package "path-to-regexp" {
-    mark method "parse" -> code.RegexCompile
-    mark method "pathToRegexp" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "parse"
+    }
+    flag code.RegexCompile on any {
+      method "pathToRegexp"
+    }
     control method "escape" -> core.InputValidation
   }
 }

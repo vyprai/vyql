@@ -2,7 +2,11 @@ import code.{RegexCompile}
 
 adapter rust {
   package "proptest" {
-    mark method "string_regex" -> code.RegexCompile
-    mark method "string_regex_parsed" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "string_regex"
+    }
+    flag code.RegexCompile on any {
+      method "string_regex_parsed"
+    }
   }
 }

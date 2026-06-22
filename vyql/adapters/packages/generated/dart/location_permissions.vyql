@@ -2,7 +2,9 @@ import code.{CommandExecution, FilePathAccess, RedirectTarget}
 
 adapter dart {
   package "location_permissions" {
-    mark method "openAppSettings" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "openAppSettings"
+    }
     control method "requestPermissions" -> core.AuthorizationCheck
   }
 }

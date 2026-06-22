@@ -88,7 +88,13 @@ adapter csharp {
   sink path "Assembly.Load" -> code.DynamicCodeLoad
   sink path "Assembly.LoadFrom" -> code.DynamicCodeLoad
   sink path "Assembly.LoadFile" -> code.DynamicCodeLoad
-  mark exact "analysis.function.context" val "function_name:GetType" val "AssemblyLoadContext.Default.LoadFromAssemblyPath" val "AppContext.BaseDirectory+splitName[1].Trim()+\".dll\"" nval "path.Contains(\"..\")" nval "path.Contains(':')" -> code.AssemblyLoadPathTraversal
+  flag code.AssemblyLoadPathTraversal in function {
+    has "function_name:GetType"
+    has "AssemblyLoadContext.Default.LoadFromAssemblyPath"
+    has "AppContext.BaseDirectory+splitName[1].Trim()+\".dll\""
+    lacks "path.Contains(\"..\")"
+    lacks "path.Contains(':')"
+  }
   sink path "ExtractToFile" -> code.ArchiveEntryWrite
 
   // SSRF
@@ -101,20 +107,38 @@ adapter csharp {
   sink method "GetUser" -> code.ObjectLookupByUserInput
   sink method "GetAccount" -> code.ObjectLookupByUserInput
   sink method "GetOrder" -> code.ObjectLookupByUserInput
-  mark "ChangePassword" -> code.AuthenticationRequiredOp
-  mark "UpdatePassword" -> code.AuthenticationRequiredOp
-  mark "ResetPassword" -> code.AuthenticationRequiredOp
-  mark "ChangeEmail" -> code.AuthenticationRequiredOp
-  mark "TransferFunds" -> code.AuthenticationRequiredOp
-  mark "DeleteAccount" -> code.AuthenticationRequiredOp
-  mark "GrantRole" -> code.AuthenticationRequiredOp
-  mark "MakeAdmin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "ChangePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "UpdatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "ResetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "ChangeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "TransferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "DeleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "GrantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "MakeAdmin"
+  }
 
   // reflected XSS — Response.Write, Razor @Html.Raw, Blazor MarkupString
   sink path "Response.Write" -> code.HtmlRender
   sink method "Raw" -> code.HtmlRender
   sink path "MarkupString" -> code.HtmlRender
-  mark method "LoadHtml" -> code.HtmlSanitizerLogicReview
+  flag code.HtmlSanitizerLogicReview on any {
+    method "LoadHtml"
+  }
   // BTCPay ConfirmModel(title, description, action): the Description (arg 1) is rendered as
   // RAW HTML in the Confirm view, so an untrusted value interpolated into it is reflected XSS.
   sink path "ConfirmModel" arg 1 -> code.HtmlRender
@@ -136,10 +160,18 @@ adapter csharp {
   sink method "LogWarning" arg all -> code.LogOutput
   sink method "LogError" arg all -> code.LogOutput
   sink method "LogDebug" arg all -> code.LogOutput
-  mark "LogInformation" -> code.LogWrite
-  mark "LogWarning" -> code.LogWrite
-  mark "LogError" -> code.LogWrite
-  mark "LogDebug" -> code.LogWrite
+  flag code.LogWrite on any {
+    path "LogInformation"
+  }
+  flag code.LogWrite on any {
+    path "LogWarning"
+  }
+  flag code.LogWrite on any {
+    path "LogError"
+  }
+  flag code.LogWrite on any {
+    path "LogDebug"
+  }
   // CSV/formula injection (CWE-1236) and ASP.NET MVC mass assignment (CWE-915).
   sink method "WriteField" arg all -> code.CsvCell
   sink method "WriteRecords" arg all -> code.CsvCell
@@ -168,51 +200,166 @@ adapter csharp {
   control method "CheckOwnership" -> core.OwnershipCheck
   control method "RequireOwner" -> core.OwnershipCheck
   control method "IsOwner" -> core.OwnershipCheck
-  mark "Monitor.Enter" -> code.LockAcquire
-  mark "lock" -> code.LockAcquire
+  flag code.LockAcquire on any {
+    path "Monitor.Enter"
+  }
+  flag code.LockAcquire on any {
+    path "lock"
+  }
   control "Monitor.Exit" -> core.LockRelease
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "Regex" -> code.RegexCompile
 
   // weak crypto (CWE-327) — broken cipher/hash constructors (presence)
-  mark "DES.Create" -> code.WeakCipher
-  mark "TripleDES.Create" -> code.WeakCipher
-  mark "RC2.Create" -> code.WeakCipher
-  mark "DESCryptoServiceProvider" -> code.WeakCipher
-  mark "TripleDESCryptoServiceProvider" -> code.WeakCipher
-  mark "RC2CryptoServiceProvider" -> code.WeakCipher
+  flag code.WeakCipher on any {
+    path "DES.Create"
+  }
+  flag code.WeakCipher on any {
+    path "TripleDES.Create"
+  }
+  flag code.WeakCipher on any {
+    path "RC2.Create"
+  }
+  flag code.WeakCipher on any {
+    path "DESCryptoServiceProvider"
+  }
+  flag code.WeakCipher on any {
+    path "TripleDESCryptoServiceProvider"
+  }
+  flag code.WeakCipher on any {
+    path "RC2CryptoServiceProvider"
+  }
   // ECB mode (CWE-327) — CipherMode.ECB assigned to a cipher's .Mode.
-  mark "CipherMode.ECB" -> code.WeakCipher
-  mark "CreateEncryptor" val "0000000000000000" -> code.StaticIv
-  mark "AesGcm" val "000000000000" -> code.StaticIv
-  mark "DangerousAcceptAnyServerCertificateValidator" -> code.CertValidationDisabled
-  mark "ServerCertificateCustomValidationCallback" val "true" -> code.CertValidationDisabled
-  mark "TokenValidationParameters" val "RequireSignedTokens=false" -> code.JwtUnverified
-  mark "TokenValidationParameters" val "ValidateIssuerSigningKey=false" -> code.JwtUnverified
-  mark exact "analysis.function.context" val "lang=csharp" val "name=VerifySignature" val "signedDocument.GetElementsByTagName" val "nodeList[0]" val "signedXml.LoadXml" val "signedXml.CheckSignature" nval "VerifyAllSignatures" nval "signatureNodes" -> code.SamlFirstSignatureOnlyBypass
-  mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
-  mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
-  mark exact "analysis.function.context" val "lang=csharp" val "ReadVarUInt32" val "(int)input.ReadVarUInt32()" nval "checked" -> code.UncheckedEncodedLengthArithmetic
-  mark exact "analysis.function.context" val "lang=csharp" val "ReadVarUInt32" val "input.ReadVarUInt32()<<1" nval "checked" -> code.UncheckedEncodedLengthArithmetic
-  mark exact "analysis.function.context" val "lang=csharp" val "input.SkipBytes(count*sizeof(" nval "checked(count*sizeof(" -> code.UncheckedEncodedLengthArithmetic
-  mark exact "analysis.function.context" val "lang=csharp" val "name=SkipBytes" val "position+=count" nval "checked(position+count)" -> code.UncheckedEncodedLengthArithmetic
-  mark exact "analysis.function.context" val "lang=csharp" val "currentLength+=count" nval "checked(stackFrame.currentLength+count)" -> code.UncheckedEncodedLengthArithmetic
-  mark exact "analysis.function.context" val "lang=csharp" val "value.Length<<1" nval "checked(value.Length*2)" -> code.UncheckedEncodedLengthArithmetic
-  mark exact "analysis.function.context" val "lang=csharp" val "name=GetOrAddNode" val "GetOrAddNode(subKey)" nval "MaxStateDepth" -> code.UnboundedStateGrowthReview
-  mark exact "analysis.function.context" val "lang=csharp" val "name=GetValidity" val "GetValidity(node.ChildNodes[i])" nval "MaxValidationDepth" -> code.UnboundedStateGrowthReview
-  mark exact "analysis.function.context" val "lang=csharp" val "BlobSasBuilder" val "ExpiresOn" val "AddHours(1)" val "GenerateSasUri" nval "AddMinutes(tokenDuration)" -> code.TimeBoundAccessTokenReview
-  mark exact "analysis.function.context" val "lang=csharp" val "name=AddParameterToEndpoint" val "ParameterBasedFrom<IToken<IUser>>" val "returnthis.AuthenticateToken(context,database);" val "returntoken.User;" val "this._tokenCache.Value=null;" -> code.RequestTokenCacheCleanupBypass
-  mark "File.Open" -> code.ResourceHandle
-  mark "File.OpenRead" -> code.ResourceHandle
-  mark "TcpClient" -> code.ResourceHandle
+  flag code.WeakCipher on any {
+    path "CipherMode.ECB"
+  }
+  flag code.StaticIv on any {
+    path "CreateEncryptor"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "AesGcm"
+    has "000000000000"
+  }
+  flag code.CertValidationDisabled on any {
+    path "DangerousAcceptAnyServerCertificateValidator"
+  }
+  flag code.CertValidationDisabled on any {
+    path "ServerCertificateCustomValidationCallback"
+    has "true"
+  }
+  flag code.JwtUnverified on any {
+    path "TokenValidationParameters"
+    has "RequireSignedTokens=false"
+  }
+  flag code.JwtUnverified on any {
+    path "TokenValidationParameters"
+    has "ValidateIssuerSigningKey=false"
+  }
+  flag code.SamlFirstSignatureOnlyBypass in function {
+    has "lang=csharp"
+    has "name=VerifySignature"
+    has "signedDocument.GetElementsByTagName"
+    has "nodeList[0]"
+    has "signedXml.LoadXml"
+    has "signedXml.CheckSignature"
+    lacks "VerifyAllSignatures"
+    lacks "signatureNodes"
+  }
+  flag code.CsrfDisabled on any {
+    path "IgnoreAntiforgeryToken"
+  }
+  flag code.InsecurePermission on any {
+    path "UnixFileMode.OtherWrite"
+  }
+  flag code.UncheckedEncodedLengthArithmetic in function {
+    has "lang=csharp"
+    has "ReadVarUInt32"
+    has "(int)input.ReadVarUInt32()"
+    lacks "checked"
+  }
+  flag code.UncheckedEncodedLengthArithmetic in function {
+    has "lang=csharp"
+    has "ReadVarUInt32"
+    has "input.ReadVarUInt32()<<1"
+    lacks "checked"
+  }
+  flag code.UncheckedEncodedLengthArithmetic in function {
+    has "lang=csharp"
+    has "input.SkipBytes(count*sizeof("
+    lacks "checked(count*sizeof("
+  }
+  flag code.UncheckedEncodedLengthArithmetic in function {
+    has "lang=csharp"
+    has "name=SkipBytes"
+    has "position+=count"
+    lacks "checked(position+count)"
+  }
+  flag code.UncheckedEncodedLengthArithmetic in function {
+    has "lang=csharp"
+    has "currentLength+=count"
+    lacks "checked(stackFrame.currentLength+count)"
+  }
+  flag code.UncheckedEncodedLengthArithmetic in function {
+    has "lang=csharp"
+    has "value.Length<<1"
+    lacks "checked(value.Length*2)"
+  }
+  flag code.UnboundedStateGrowthReview in function {
+    has "lang=csharp"
+    has "name=GetOrAddNode"
+    has "GetOrAddNode(subKey)"
+    lacks "MaxStateDepth"
+  }
+  flag code.UnboundedStateGrowthReview in function {
+    has "lang=csharp"
+    has "name=GetValidity"
+    has "GetValidity(node.ChildNodes[i])"
+    lacks "MaxValidationDepth"
+  }
+  flag code.TimeBoundAccessTokenReview in function {
+    has "lang=csharp"
+    has "BlobSasBuilder"
+    has "ExpiresOn"
+    has "AddHours(1)"
+    has "GenerateSasUri"
+    lacks "AddMinutes(tokenDuration)"
+  }
+  flag code.RequestTokenCacheCleanupBypass in function {
+    has "lang=csharp"
+    has "name=AddParameterToEndpoint"
+    has "ParameterBasedFrom<IToken<IUser>>"
+    has "returnthis.AuthenticateToken(context,database);"
+    has "returntoken.User;"
+    has "this._tokenCache.Value=null;"
+  }
+  flag code.ResourceHandle on any {
+    path "File.Open"
+  }
+  flag code.ResourceHandle on any {
+    path "File.OpenRead"
+  }
+  flag code.ResourceHandle on any {
+    path "TcpClient"
+  }
   control method "Close" -> core.ResourceRelease
   control method "Dispose" -> core.ResourceRelease
-  mark "MD5.Create" -> code.WeakHash
-  mark "SHA1.Create" -> code.WeakHash
-  mark "MD5CryptoServiceProvider" -> code.WeakHash
-  mark "SHA1CryptoServiceProvider" -> code.WeakHash
-  mark "SHA1Managed" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "MD5.Create"
+  }
+  flag code.WeakHash on any {
+    path "SHA1.Create"
+  }
+  flag code.WeakHash on any {
+    path "MD5CryptoServiceProvider"
+  }
+  flag code.WeakHash on any {
+    path "SHA1CryptoServiceProvider"
+  }
+  flag code.WeakHash on any {
+    path "SHA1Managed"
+  }
 
   // XPath injection (CWE-643) — SelectNodes/SelectSingleNode/XPathSelectElements (distinctive XML)
   sink method "SelectNodes" -> code.XpathQuery
@@ -229,13 +376,21 @@ adapter csharp {
 
   // insecure cookie (CWE-614) — HttpCookie configured insecurely (setter idiom,
   // val-matched; property-write `c.Secure = false` is not modeled as a call)
-  mark "SetSecure" val "false" -> code.InsecureCookie
-  mark "SetHttpOnly" val "false" -> code.InsecureCookie
+  flag code.InsecureCookie on any {
+    path "SetSecure"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "SetHttpOnly"
+    has "false"
+  }
 
   // insecure randomness (CWE-330) — System.Random is not cryptographically secure.
   // The secure API RandomNumberGenerator.Create() does NOT path-collide with "Random"
   // (segment "RandomNumberGenerator" != "Random").
-  mark "Random" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "Random"
+  }
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape
@@ -246,10 +401,26 @@ adapter csharp {
   control "validateRole" -> core.InputValidation
 
   // cleartext channel (CWE-319) — http:// URL to a client (loopback excluded; low sev)
-  mark "Uri" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "GetStringAsync" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "GetAsync" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "DownloadString" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "Uri"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "GetStringAsync"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "GetAsync"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "DownloadString"
+    has "http://"
+    lacks "127.0"
+  }
 
   // character-filter: Regex.Replace(input, pattern, repl) is global.
   filter path "Regex.Replace" global

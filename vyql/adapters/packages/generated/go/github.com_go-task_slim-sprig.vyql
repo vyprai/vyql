@@ -2,12 +2,26 @@ import code.{RegexCompile, WeakHash}
 
 adapter go {
   package "github.com/go-task/slim-sprig" {
-    mark method "sha1sum" -> code.WeakHash
-    mark method "adler32sum" -> code.WeakHash
-    mark method "derivePassword" -> code.WeakHash
-    mark method "regexMatch" -> code.RegexCompile
-    mark method "regexFindAll" -> code.RegexCompile
-    mark method "regexFind" -> code.RegexCompile
-    mark method "regexReplaceAll" -> code.RegexCompile
+    flag code.WeakHash on any {
+      method "sha1sum"
+    }
+    flag code.WeakHash on any {
+      method "adler32sum"
+    }
+    flag code.WeakHash on any {
+      method "derivePassword"
+    }
+    flag code.RegexCompile on any {
+      method "regexMatch"
+    }
+    flag code.RegexCompile on any {
+      method "regexFindAll"
+    }
+    flag code.RegexCompile on any {
+      method "regexFind"
+    }
+    flag code.RegexCompile on any {
+      method "regexReplaceAll"
+    }
   }
 }

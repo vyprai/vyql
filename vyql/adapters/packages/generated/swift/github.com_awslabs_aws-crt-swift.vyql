@@ -1,7 +1,11 @@
 import code.{WeakHash}
 adapter swift {
   package "github.com/awslabs/aws-crt-swift" {
-    mark method "computeMD5" -> code.WeakHash
-    mark method "computeSHA1" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "computeMD5"
+    }
+    flag code.WeakHash on any {
+      method "computeSHA1"
+    }
   }
 }

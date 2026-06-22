@@ -4,6 +4,8 @@ adapter python {
   package "cfgv" {
     source method "validate" -> core.UserControlledData
     sink method "load_from_filename" -> code.FilePathAccess
-    mark method "check_regex" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "check_regex"
+    }
   }
 }

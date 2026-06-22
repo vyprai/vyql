@@ -1,7 +1,11 @@
 import code.{WeakHash}
 adapter elixir {
   package "xxhash" {
-    mark method "xxh32" -> code.WeakHash
-    mark method "xxh64" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "xxh32"
+    }
+    flag code.WeakHash on any {
+      method "xxh64"
+    }
   }
 }

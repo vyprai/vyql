@@ -1,6 +1,8 @@
 import code.{PrivilegedOp}
 adapter dart {
   package "vibration_web" {
-    mark method "VibrationWebPlugin.registerWith" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "VibrationWebPlugin.registerWith"
+    }
   }
 }

@@ -685,10 +685,18 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		return []AdapterMapping{ctl}
 	case p.atWord("flag"):
 		p.next()
-		mk := AdapterMapping{Kind: "mark", Pattern: p.parseContextPattern(), Exact: true}
-		p.parseAdapterContextFlag(&mk)
-		p.expect(tArrow, "->")
-		mk.Concept = p.parseConceptRef()
+		mk := AdapterMapping{Kind: "flag", Concept: p.parseConceptRef(), Flag: &AdapterFlag{}}
+		switch {
+		case p.atWord("on"):
+			p.next()
+			mk.Flag.NodeKind = p.expect(tWord, "flag node kind").val
+		case p.atWord("in"):
+			p.next()
+			mk.Flag.Scope = p.expect(tWord, "flag scope").val
+		default:
+			p.fail("expected on/in after flag concept, got %q at %d", p.peek().val, p.peek().pos)
+		}
+		p.parseAdapterFlagBody(mk.Flag)
 		return []AdapterMapping{mk}
 	case p.atWord("mark"):
 		// `mark "fn" [val "x"] -> concept` labels the matching CALL node with a
@@ -771,42 +779,87 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 	}
 }
 
-func (p *parser) parseContextPattern() string {
+func (p *parser) parseAdapterFlagBody(f *AdapterFlag) {
+	p.expect(tLBrace, "{")
+	for !p.at(tRBrace) {
+		p.parseAdapterFlagItem(f)
+		p.consumeAdapterItemSep()
+	}
+	p.expect(tRBrace, "}")
+}
+
+func (p *parser) parseAdapterFlagItem(f *AdapterFlag) {
 	switch {
-	case p.atWord("function"):
+	case p.atWord("operand"):
 		p.next()
-		return "analysis.function.context"
-	case p.atWord("module"):
-		p.next()
-		return "analysis.module.context"
-	case p.atWord("class"):
-		p.next()
-		return "analysis.class.context"
+		var op AdapterFlagOperand
+		p.expect(tLBrace, "{")
+		for !p.at(tRBrace) {
+			op.Predicates = append(op.Predicates, p.parseAdapterFlagPredicate("operand"))
+			p.consumeAdapterItemSep()
+		}
+		p.expect(tRBrace, "}")
+		f.Operands = append(f.Operands, op)
 	default:
-		return p.parsePattern()
+		f.Predicates = append(f.Predicates, p.parseAdapterFlagPredicate("node"))
 	}
 }
 
-func (p *parser) parseAdapterContextFlag(m *AdapterMapping) {
-	p.expect(tLBrace, "{")
-	for !p.at(tRBrace) {
-		switch {
-		case p.atWord("all"):
+func (p *parser) parseAdapterFlagPredicate(subject string) AdapterFlagPredicate {
+	neg := false
+	if p.atWord("lacks") {
+		p.next()
+		neg = true
+		if p.atWord("call") {
 			p.next()
-			p.expect(tColon, ":")
-			m.ValMatches = append(m.ValMatches, p.parsePatternList()...)
-		case p.atWord("none"):
-			p.next()
-			p.expect(tColon, ":")
-			m.ValAbsents = append(m.ValAbsents, p.parsePatternList()...)
-		default:
-			p.fail("expected context flag field all/none, got %q at %d", p.peek().val, p.peek().pos)
+			return p.parseAdapterFlagValuePredicate("scope_call", "any", neg)
 		}
-		if p.at(tComma) || p.at(tSemi) {
-			p.next()
-		}
+		return AdapterFlagPredicate{Subject: subject, Property: "tokens", Op: "contains", Values: []string{p.parsePattern()}, Negative: true}
 	}
-	p.expect(tRBrace, "}")
+	if p.atWord("has") {
+		p.next()
+		return AdapterFlagPredicate{Subject: subject, Property: "tokens", Op: "contains", Values: []string{p.parsePattern()}}
+	}
+	key := p.expect(tWord, "flag predicate").val
+	switch key {
+	case "path":
+		exact := false
+		if p.atWord("exact") {
+			p.next()
+			exact = true
+		}
+		return AdapterFlagPredicate{Subject: subject, Property: "path", Op: "match", Values: []string{p.parsePattern()}, Exact: exact}
+	case "method":
+		return AdapterFlagPredicate{Subject: subject, Property: "method", Op: "equals", Values: []string{p.parsePattern()}}
+	case "op":
+		return p.parseAdapterFlagValuePredicate(subject, "op", false)
+	case "prop":
+		prop := p.parsePattern()
+		return p.parseAdapterFlagValuePredicate(subject, prop, false)
+	case "identifier", "key", "call":
+		return p.parseAdapterFlagValuePredicate(subject, key, false)
+	default:
+		p.fail("unknown flag predicate %q at %d", key, p.peek().pos)
+		return AdapterFlagPredicate{}
+	}
+}
+
+func (p *parser) parseAdapterFlagValuePredicate(subject, property string, neg bool) AdapterFlagPredicate {
+	op := "contains"
+	if p.atWord("contains") || p.atWord("contains_any") || p.atWord("equals") || p.atWord("any") {
+		op = p.next().val
+	}
+	values := p.parsePatternList()
+	if op == "any" {
+		op = "equals_any"
+	}
+	return AdapterFlagPredicate{Subject: subject, Property: property, Op: op, Values: values, Negative: neg}
+}
+
+func (p *parser) consumeAdapterItemSep() {
+	for p.at(tComma) || p.at(tSemi) {
+		p.next()
+	}
 }
 
 func (p *parser) parsePatternList() []string {

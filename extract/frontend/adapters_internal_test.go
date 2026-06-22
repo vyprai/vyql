@@ -423,33 +423,33 @@ func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing
 	}
 }
 
-func TestContextMarkSyntaxBuildsExactContextMark(t *testing.T) {
+func TestContextFlagSyntaxBuildsScopedFlag(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter javascript {
-  mark context function {
+  flag custom.SecretComparison in function {
     has "lang=javascript"
     has "data['x-csrf-token']===token"
     lacks "timingSafeEqual"
-  } -> custom.SecretComparison
+  }
 }
 `)
 	if err != nil {
-		t.Fatalf("parse context mark: %v", err)
+		t.Fatalf("parse context flag: %v", err)
 	}
 	ad, ok := decls[0].(*parser.AdapterDecl)
 	if !ok {
 		t.Fatalf("expected adapter decl, got %#v", decls[0])
 	}
 	spec := specFromDecl(ad)
-	if len(spec.Marks) != 1 {
-		t.Fatalf("expected one mark spec, got %#v", spec.Marks)
+	if len(spec.Flags) != 1 {
+		t.Fatalf("expected one flag spec, got %#v", spec.Flags)
 	}
-	mark := spec.Marks[0]
-	if mark.Pattern != "analysis.function.context" || !mark.Exact ||
-		len(mark.ValMatches) != 2 || mark.ValMatches[0] != "lang=javascript" ||
-		mark.ValMatches[1] != "data['x-csrf-token']===token" ||
-		len(mark.ValAbsents) != 1 || mark.ValAbsents[0] != "timingSafeEqual" {
-		t.Fatalf("unexpected context mark spec: %#v", mark)
+	flag := spec.Flags[0]
+	if flag.Scope != "function" || len(flag.Predicates) != 3 ||
+		flag.Predicates[0].Values[0] != "lang=javascript" ||
+		flag.Predicates[1].Values[0] != "data['x-csrf-token']===token" ||
+		!flag.Predicates[2].Negative {
+		t.Fatalf("unexpected context flag spec: %#v", flag)
 	}
 
 	store := usg.NewInMemStore()
@@ -459,9 +459,9 @@ adapter javascript {
 		"method":      "context",
 		"str_args":    "lang=javascript\x00name=validate\x00data['x-csrf-token']===token",
 	}})
-	got := spec.markAdapter().Apply(store)
+	got := spec.flagAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.SecretComparison" {
-		t.Fatalf("context mark did not label matching context node: %+v", got)
+		t.Fatalf("context flag did not label matching context node: %+v", got)
 	}
 
 	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
@@ -470,9 +470,56 @@ adapter javascript {
 		"method":      "context",
 		"str_args":    "lang=javascript\x00data['x-csrf-token']===token\x00timingSafeEqual",
 	}})
-	got = spec.markAdapter().Apply(store)
+	got = spec.flagAdapter().Apply(store)
 	if len(got) != 1 {
-		t.Fatalf("context mark should skip node with lacks token present, got %+v", got)
+		t.Fatalf("context flag should skip node with lacks token present, got %+v", got)
+	}
+}
+
+func TestAstFlagMatchesUnorderedBinopOperands(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.SecretComparison on binop {
+    op any ["==", "==="]
+    operand {
+      key contains_any ["csrf-token", "x-csrf-token"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key"]
+    }
+    lacks call contains_any ["scmp", "timingSafeEqual"]
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse ast flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "cmp", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.js:10", "op": "===", "callee_path": "__binop.eq", "method": "eq", "arg0": "a0", "arg1": "a1",
+	}})
+	store.AddNode(usg.Node{ID: "a0", Type: "code.Arg"})
+	store.AddNode(usg.Node{ID: "a1", Type: "code.Arg"})
+	store.AddNode(usg.Node{ID: "header", Type: "code.Subscript", Props: map[string]string{
+		"loc": "sample.js:10", "callee_path": "data.__subscript", "method": "[]", "str_args": "x-csrf-token",
+	}})
+	store.AddNode(usg.Node{ID: "candidate", Type: "code.Name", Props: map[string]string{
+		"loc": "sample.js:10", "callee_path": "providedToken", "method": "providedToken",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "header", Dst: "a0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "candidate", Dst: "a1"})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "cmp" || got[0].Concept != "custom.SecretComparison" {
+		t.Fatalf("AST flag did not label matching binop: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:20", "callee_path": "crypto.timingSafeEqual", "method": "timingSafeEqual",
+	}})
+	got = spec.flagAdapter().Apply(store)
+	if len(got) != 0 {
+		t.Fatalf("AST flag should skip file with constant-time comparison call: %+v", got)
 	}
 }
 

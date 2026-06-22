@@ -15,7 +15,11 @@ adapter php {
     control method "authenticate" -> core.AuthenticationCheck
     control method "authorize" -> core.AuthorizationCheck
 
-    mark method "setRedirectUri" -> code.RedirectTarget
-    mark method "createAuthUrl" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "setRedirectUri"
+    }
+    flag code.RedirectTarget on any {
+      method "createAuthUrl"
+    }
   }
 }

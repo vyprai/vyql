@@ -1,5 +1,7 @@
 adapter dart {
   package "vibration" {
-    mark method "vibrate" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "vibrate"
+    }
   }
 }

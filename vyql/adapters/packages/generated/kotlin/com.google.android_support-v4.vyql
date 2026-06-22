@@ -2,7 +2,11 @@ import code.{RedirectTarget}
 
 adapter kotlin {
   package "com.google.android:support-v4" {
-    mark method "startActivity" -> code.RedirectTarget
-    mark method "startActivityForResult" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "startActivity"
+    }
+    flag code.RedirectTarget on any {
+      method "startActivityForResult"
+    }
   }
 }

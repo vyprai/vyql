@@ -181,13 +181,17 @@ func TestValidateProposalRejectsBroadDefaultRelaySecretMark(t *testing.T) {
 	proposal := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "go",
 		Source: `adapter go {
-  mark exact "analysis.function.context" val "name=NewAPIC" val "apiclient.NewClient" val "dbClient.SaveAPICToken" -> code.DefaultExternalRelaySecretExposure
+  flag code.DefaultExternalRelaySecretExposure in function {
+    has "name=NewAPIC"
+    has "apiclient.NewClient"
+    has "dbClient.SaveAPICToken"
+  }
 }
 `,
 		Evidence: []string{"pkg/apiserver/apic.go"},
 	}}}
 	if err := ValidateProposal(profile, proposal, Config{}); err == nil {
-		t.Fatal("expected generic API token client mark to be rejected as broad default relay exposure")
+		t.Fatal("expected generic API token client flag to be rejected as broad default relay exposure")
 	}
 }
 
@@ -198,13 +202,20 @@ func TestValidateProposalAllowsNarrowDefaultRelaySecretMark(t *testing.T) {
 	proposal := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "typescript",
 		Source: `adapter typescript {
-  mark exact "analysis.function.context" val "name=buildRelayUrl" val "relay" val "herokuapp.com" val "encodeURIComponent(gurl)" val "token" nval "configured relay host" -> code.DefaultExternalRelaySecretExposure
+  flag code.DefaultExternalRelaySecretExposure in function {
+    has "name=buildRelayUrl"
+    has "relay"
+    has "herokuapp.com"
+    has "encodeURIComponent(gurl)"
+    has "token"
+    lacks "configured relay host"
+  }
 }
 `,
 		Evidence: []string{"src/relay.ts"},
 	}}}
 	if err := ValidateProposal(profile, proposal, Config{}); err != nil {
-		t.Fatalf("expected narrow default relay mark to validate: %v", err)
+		t.Fatalf("expected narrow default relay flag to validate: %v", err)
 	}
 }
 
@@ -550,13 +561,18 @@ func TestPrepRejectsBroadCommandWrapperSink(t *testing.T) {
 	narrow := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "php",
 		Source: `adapter php {
-  mark exact "analysis.function.context" val "name=f" val "$cmd_string" val "$this->cmd->execute($cmd)" nval "$cmd=array_merge" -> code.CommandStringWrapperExecution
+  flag code.CommandStringWrapperExecution in function {
+    has "name=f"
+    has "$cmd_string"
+    has "$this->cmd->execute($cmd)"
+    lacks "$cmd=array_merge"
+  }
 }
 `,
 		Evidence: []string{src},
 	}}}
 	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
-		t.Fatalf("expected narrow command-wrapper context mark to validate: %v", err)
+		t.Fatalf("expected narrow command-wrapper context flag to validate: %v", err)
 	}
 }
 
@@ -632,13 +648,19 @@ func RunPowershellCmd(command string, envs ...string) ([]byte, error) {
 	narrow := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "go",
 		Source: `adapter go {
-  mark exact "analysis.function.context" val "function_name:MountVolume" val "fmt.Sprintf" val "Get-Volume" val "RunPowershellCmd(cmd)" nval "$Env:" -> code.CommandStringWrapperExecution
+  flag code.CommandStringWrapperExecution in function {
+    has "function_name:MountVolume"
+    has "fmt.Sprintf"
+    has "Get-Volume"
+    has "RunPowershellCmd(cmd)"
+    lacks "$Env:"
+  }
 }
 `,
 		Evidence: []string{src},
 	}}}
 	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
-		t.Fatalf("expected narrow PowerShell command-wrapper context mark to validate: %v", err)
+		t.Fatalf("expected narrow PowerShell command-wrapper context flag to validate: %v", err)
 	}
 	contexts, err := functionContexts(profile, src, "MountVolume", "RunPowershellCmd", 5)
 	if err != nil {
@@ -657,25 +679,33 @@ func RunPowershellCmd(command string, envs ...string) ([]byte, error) {
 	badNameToken := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "go",
 		Source: `adapter go {
-  mark exact "analysis.function.context" val "name=MountVolume" val "fmt.Sprintf" -> code.CommandStringWrapperExecution
+  flag code.CommandStringWrapperExecution in function {
+    has "name=MountVolume"
+    has "fmt.Sprintf"
+  }
 }
 `,
 		Evidence: []string{src},
 	}}}
 	if err := ValidateProposal(profile, badNameToken, Config{}); err == nil || !strings.Contains(err.Error(), "function_name") {
-		t.Fatalf("expected Go name= context mark to be rejected, got %v", err)
+		t.Fatalf("expected Go name= context flag to be rejected, got %v", err)
 	}
 
 	missingHardeningNval := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "go",
 		Source: `adapter go {
-  mark exact "analysis.function.context" val "function_name:MountVolume" val "fmt.Sprintf" val "utils.RunPowershellCmd" val "Get-Volume" -> code.CommandStringWrapperExecution
+  flag code.CommandStringWrapperExecution in function {
+    has "function_name:MountVolume"
+    has "fmt.Sprintf"
+    has "utils.RunPowershellCmd"
+    has "Get-Volume"
+  }
 }
 `,
 		Evidence: []string{src},
 	}}}
 	if err := ValidateProposal(profile, missingHardeningNval, Config{}); err == nil || !strings.Contains(err.Error(), "hardening") {
-		t.Fatalf("expected command wrapper mark without nval hardening to be rejected, got %v", err)
+		t.Fatalf("expected command wrapper flag without nval hardening to be rejected, got %v", err)
 	}
 }
 
@@ -744,13 +774,19 @@ func Generate(options ...Options) func(*Context) {
 	narrow := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "go",
 		Source: `adapter go {
-  mark exact "analysis.function.context" val "ctx.SetCookie" val "GenerateToken" val "opt.CookieHttpOnly" val "false" nval "opt.Secure" -> code.InsecureCookie
+  flag code.InsecureCookie in function {
+    has "ctx.SetCookie"
+    has "GenerateToken"
+    has "opt.CookieHttpOnly"
+    has "false"
+    lacks "opt.Secure"
+  }
 }
 `,
 		Evidence: []string{src},
 	}}}
 	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
-		t.Fatalf("expected narrow secure-cookie context mark to validate: %v", err)
+		t.Fatalf("expected narrow secure-cookie context flag to validate: %v", err)
 	}
 }
 
@@ -808,13 +844,19 @@ csrf.valid = csrf.validate = function (data, token) {
 	narrow := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "javascript",
 		Source: `adapter javascript {
-  mark exact "analysis.function.context" val "lang=javascript" val "data['x-csrf-token']===token" val "deletedata['x-csrf-token']" nval "scmp" nval "timingSafeEqual" -> code.SecretComparisonReview
+  flag code.SecretComparisonReview in function {
+    has "lang=javascript"
+    has "data['x-csrf-token']===token"
+    has "deletedata['x-csrf-token']"
+    lacks "scmp"
+    lacks "timingSafeEqual"
+  }
 }
 `,
 		Evidence: []string{src},
 	}}}
 	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
-		t.Fatalf("expected narrow secret-comparison context mark to validate: %v", err)
+		t.Fatalf("expected narrow secret-comparison context flag to validate: %v", err)
 	}
 }
 
@@ -954,36 +996,47 @@ await server.connect(new StdioServerTransport());
 	broad := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "javascript",
 		Source: `adapter javascript {
-  mark exact "analysis.module.context" val "server.tool(\"which-app-on-port\"" val "port:z.number()" -> code.McpToolCommandTemplateExecution
-}
-`,
-		Evidence: []string{srcPath},
-	}}}
-	if err := ValidateProposal(profile, broad, Config{}); err == nil || !strings.Contains(err.Error(), "broad MCP tool command mark") {
-		t.Fatalf("expected broad MCP mark rejection, got %v", err)
-	}
-	narrow := Proposal{AdapterFiles: []AdapterFile{{
-		Language: "javascript",
-		Source: `adapter javascript {
-  mark exact "analysis.module.context" val "server.tool" val "exec(` + "`lsof-t-itcp:${port}`" + `" nval "execFile(" -> code.McpToolCommandTemplateExecution
-}
-`,
-		Evidence: []string{srcPath},
-	}}}
-	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
-		t.Fatalf("expected narrow MCP mark to validate: %v", err)
-	}
-	packagedExact := Proposal{AdapterFiles: []AdapterFile{{
-		Language: "javascript",
-		Source: `adapter javascript {
-  package "@modelcontextprotocol/sdk" {
-    mark exact "analysis.module.context" val "server.tool" val "exec(` + "`lsof-t-itcp:${port}`" + `" nval "execFile(" -> code.McpToolCommandTemplateExecution
+  flag code.McpToolCommandTemplateExecution in module {
+    has "server.tool(\"which-app-on-port\""
+    has "port:z.number()"
   }
 }
 `,
 		Evidence: []string{srcPath},
 	}}}
-	if err := ValidateProposal(profile, packagedExact, Config{}); err == nil || !strings.Contains(err.Error(), "package-scopes an exact context mark") {
+	if err := ValidateProposal(profile, broad, Config{}); err == nil || !strings.Contains(err.Error(), "broad MCP tool command flag") {
+		t.Fatalf("expected broad MCP flag rejection, got %v", err)
+	}
+	narrow := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  flag code.McpToolCommandTemplateExecution in module {
+    has "server.tool"
+    has "exec(` + "`lsof-t-itcp:${port}`" + `"
+    lacks "execFile("
+  }
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow MCP flag to validate: %v", err)
+	}
+	packagedExact := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  package "@modelcontextprotocol/sdk" {
+    flag code.McpToolCommandTemplateExecution in module {
+      has "server.tool"
+      has "exec(` + "`lsof-t-itcp:${port}`" + `"
+      lacks "execFile("
+    }
+  }
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, packagedExact, Config{}); err == nil || !strings.Contains(err.Error(), "package-scopes an exact context flag") {
 		t.Fatalf("expected package-scoped exact context rejection, got %v", err)
 	}
 }
@@ -1087,7 +1140,11 @@ public class SystemCredentialsProvider {
 	functionContext := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
-  mark exact "analysis.function.context" val "name=SystemCredentialsProvider" val "XmlFilexml=getConfigFile();" nval "@Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+  flag code.JenkinsCredentialsStartupLoadContextExposure in function {
+    has "name=SystemCredentialsProvider"
+    has "XmlFilexml=getConfigFile();"
+    lacks "@Initializer"
+  }
 }
 `,
 		Evidence: []string{srcPath},
@@ -1098,7 +1155,10 @@ public class SystemCredentialsProvider {
 	tooBroadClass := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
-  mark exact "analysis.class.context" val "SystemCredentialsProvider" nval "@Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+  flag code.JenkinsCredentialsStartupLoadContextExposure in class {
+    has "SystemCredentialsProvider"
+    lacks "@Initializer"
+  }
 }
 `,
 		Evidence: []string{srcPath},
@@ -1109,7 +1169,10 @@ public class SystemCredentialsProvider {
 	migrationOnlyClass := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
-  mark exact "analysis.class.context" val "domainCredentialsMap=DomainCredentials.migrateListToMap" nval "@Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+  flag code.JenkinsCredentialsStartupLoadContextExposure in class {
+    has "domainCredentialsMap=DomainCredentials.migrateListToMap"
+    lacks "@Initializer"
+  }
 }
 `,
 		Evidence: []string{srcPath},
@@ -1120,7 +1183,11 @@ public class SystemCredentialsProvider {
 	looseClassText := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
-  mark exact "analysis.class.context" val "class SystemCredentialsProvider" val "unmarshal" nval "@Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+  flag code.JenkinsCredentialsStartupLoadContextExposure in class {
+    has "class SystemCredentialsProvider"
+    has "unmarshal"
+    lacks "@Initializer"
+  }
 }
 `,
 		Evidence: []string{srcPath},
@@ -1131,7 +1198,14 @@ public class SystemCredentialsProvider {
 	noisyClassContext := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
-  mark exact "analysis.class.context" val "class_name:SystemCredentialsProvider" val "class_base:AbstractDescribableImpl" val "annotation:Extension" val "call_path:xml.unmarshal" val "call_path:DomainCredentials.migrateListToMap" nval "annotation:Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+  flag code.JenkinsCredentialsStartupLoadContextExposure in class {
+    has "class_name:SystemCredentialsProvider"
+    has "class_base:AbstractDescribableImpl"
+    has "annotation:Extension"
+    has "call_path:xml.unmarshal"
+    has "call_path:DomainCredentials.migrateListToMap"
+    lacks "annotation:Initializer"
+  }
 }
 `,
 		Evidence: []string{srcPath},
@@ -1142,13 +1216,20 @@ public class SystemCredentialsProvider {
 	classContext := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
-  mark exact "analysis.class.context" val "class_name:SystemCredentialsProvider" val "function_name:SystemCredentialsProvider" val "call_path:xml.unmarshal" val "call_path:DomainCredentials.migrateListToMap" val "function_name:getInstance" nval "annotation:Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+  flag code.JenkinsCredentialsStartupLoadContextExposure in class {
+    has "class_name:SystemCredentialsProvider"
+    has "function_name:SystemCredentialsProvider"
+    has "call_path:xml.unmarshal"
+    has "call_path:DomainCredentials.migrateListToMap"
+    has "function_name:getInstance"
+    lacks "annotation:Initializer"
+  }
 }
 `,
 		Evidence: []string{srcPath},
 	}}}
 	if err := ValidateProposal(profile, classContext, Config{}); err != nil {
-		t.Fatalf("expected Jenkins startup class-context mark to validate: %v", err)
+		t.Fatalf("expected Jenkins startup class-context flag to validate: %v", err)
 	}
 }
 
@@ -1240,13 +1321,19 @@ class CrowdSecurityRealm {
 	proposal := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
-  mark exact "analysis.function.context" val "function_name:doTestConnection" val "call:testConnection" val "call:CrowdConfigurationService" nval "annotation:POST" nval "call:checkPermission" -> code.JenkinsRemoteValidationMissingPostPermission
+  flag code.JenkinsRemoteValidationMissingPostPermission in function {
+    has "function_name:doTestConnection"
+    has "call:testConnection"
+    has "call:CrowdConfigurationService"
+    lacks "annotation:POST"
+    lacks "call:checkPermission"
+  }
 }
 `,
 		Evidence: []string{srcPath},
 	}}}
 	if err := ValidateProposal(profile, proposal, Config{}); err != nil {
-		t.Fatalf("expected Jenkins remote validation function-context mark to validate: %v", err)
+		t.Fatalf("expected Jenkins remote validation function-context flag to validate: %v", err)
 	}
 }
 
@@ -1589,7 +1676,12 @@ module.exports = Class.create({
 	broadSinkContext := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "javascript",
 		Source: `adapter javascript {
-  mark exact "analysis.function.context" val "this.storage.listFindUpdate('global/schedule'" val "job.update_event" nval "allow_event_updates_from_jobs" nval "delete job.update_event" -> code.JobOutputEventUpdateAuthorizationBypass
+  flag code.JobOutputEventUpdateAuthorizationBypass in function {
+    has "this.storage.listFindUpdate('global/schedule'"
+    has "job.update_event"
+    lacks "allow_event_updates_from_jobs"
+    lacks "delete job.update_event"
+  }
 }
 `,
 		Evidence: []string{srcPath},
@@ -1600,7 +1692,13 @@ module.exports = Class.create({
 	handlerContext := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "javascript",
 		Source: `adapter javascript {
-  mark exact "analysis.function.context" val "Got job update from child" val "update_event" val "job[key]=data[key]" nval "allow_event_updates_from_jobs" nval "delete data.update_event" -> code.JobOutputEventUpdateAuthorizationBypass
+  flag code.JobOutputEventUpdateAuthorizationBypass in function {
+    has "Got job update from child"
+    has "update_event"
+    has "job[key]=data[key]"
+    lacks "allow_event_updates_from_jobs"
+    lacks "delete data.update_event"
+  }
 }
 `,
 		Evidence: []string{srcPath},
@@ -2416,23 +2514,36 @@ func TestPrepRejectsBroadCryptoBlindingMark(t *testing.T) {
 	broad := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "cpp",
 		Source: `adapter cpp {
-  mark exact "analysis.function.context" val "InvertibleRWFunction::CalculateInverse" val "Randomize" val "MultiplicativeInverse" nval "Jacobi(r," -> code.CryptoImproperBlinding
+  flag code.CryptoImproperBlinding in function {
+    has "InvertibleRWFunction::CalculateInverse"
+    has "Randomize"
+    has "MultiplicativeInverse"
+    lacks "Jacobi(r,"
+  }
 }`,
 		Evidence: []string{"rw.cpp"},
 	}}}
 	if err := ValidateProposal(profile, broad, Config{}); err == nil {
-		t.Fatal("expected broad crypto blinding mark to be rejected")
+		t.Fatal("expected broad crypto blinding flag to be rejected")
 	}
 
 	narrow := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "cpp",
 		Source: `adapter cpp {
-  mark exact "analysis.function.context" val "lang=cpp" val "r.Randomize" val "MultiplicativeInverse(r)" val "Jacobi" val "modn.Square(r)" val "modn.Multiply(y,rInv)" nval "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)" -> code.CryptoImproperBlinding
+  flag code.CryptoImproperBlinding in function {
+    has "lang=cpp"
+    has "r.Randomize"
+    has "MultiplicativeInverse(r)"
+    has "Jacobi"
+    has "modn.Square(r)"
+    has "modn.Multiply(y,rInv)"
+    lacks "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)"
+  }
 }`,
 		Evidence: []string{"rw.cpp"},
 	}}}
 	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
-		t.Fatalf("expected narrow crypto blinding mark to validate: %v", err)
+		t.Fatalf("expected narrow crypto blinding flag to validate: %v", err)
 	}
 }
 

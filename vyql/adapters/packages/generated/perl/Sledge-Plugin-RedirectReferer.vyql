@@ -2,6 +2,8 @@ import code.{RedirectTarget, HttpInput}
 
 adapter perl {
   package "Sledge-Plugin-RedirectReferer" {
-    mark method "dispatch_index" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "dispatch_index"
+    }
   }
 }

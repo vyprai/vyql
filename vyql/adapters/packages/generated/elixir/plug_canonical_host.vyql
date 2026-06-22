@@ -2,6 +2,8 @@ import code.{RedirectTarget}
 
 adapter elixir {
   package "plug_canonical_host" {
-    mark method "redirect_location" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "redirect_location"
+    }
   }
 }

@@ -34,32 +34,74 @@ adapter groovy {
   sink path "File" -> code.FilePathAccess
   sink path "URL" -> code.UrlFetch
   sink path "URI" -> code.UrlFetch
-  mark exact "analysis.module.context" val "lang=groovy" val "checksumError" val "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient)" nval "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient,\"\",false)" -> code.ChecksumErrorLogoutRedirect
-  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "URI" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.ChecksumErrorLogoutRedirect in module {
+    has "lang=groovy"
+    has "checksumError"
+    has "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient)"
+    lacks "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient,\"\",false)"
+  }
+  flag code.CleartextChannel on any {
+    path "URL"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "URI"
+    has "http://"
+    lacks "127.0"
+  }
   sink method "extractEntry" -> code.ArchiveEntryWrite
   sink path "ZipFile.extract" arg all -> code.ArchiveEntryWrite
 
   // weak hash (CWE-328).
-  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
-  mark "DigestUtils.md5Hex" -> code.WeakHash
-  mark "DigestUtils.sha1Hex" -> code.WeakHash
-  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "MD5"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "SHA-1"
+  }
+  flag code.WeakHash on any {
+    path "DigestUtils.md5Hex"
+  }
+  flag code.WeakHash on any {
+    path "DigestUtils.sha1Hex"
+  }
+  flag code.StaticIv on any {
+    path "IvParameterSpec"
+    has "0000000000000000"
+  }
   sink path "Pattern.compile" -> code.RegexCompile
   sink method "readObject" -> code.Deserialization
   sink method "deserialize" -> code.Deserialization
   sink method "findById" -> code.ObjectLookupByUserInput
   sink method "getUser" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
-  mark "changePassword" -> code.AuthenticationRequiredOp
-  mark "updatePassword" -> code.AuthenticationRequiredOp
-  mark "resetPassword" -> code.AuthenticationRequiredOp
-  mark "changeEmail" -> code.AuthenticationRequiredOp
-  mark "transferFunds" -> code.AuthenticationRequiredOp
-  mark "deleteAccount" -> code.AuthenticationRequiredOp
-  mark "grantRole" -> code.AuthenticationRequiredOp
-  mark "makeAdmin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "changePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "updatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "resetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "changeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "deleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "makeAdmin"
+  }
   sink method "println" arg all -> code.HtmlRender
   sink method "print" arg all -> code.HtmlRender
   sink method "write" arg all -> code.HtmlRender
@@ -73,22 +115,62 @@ adapter groovy {
   sink method "setAttribute" arg all -> code.TrustBoundary
   sink method "search" arg 1 -> code.LdapQuery
   sink method "evaluate" arg 0 -> code.XpathQuery
-  mark "java.util.Random" -> code.WeakRandomValue
-  mark exact "Random" -> code.WeakRandomValue
-  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
-  mark "Cipher.getInstance" val "DES" -> code.WeakCipher
-  mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
-  mark "Algorithm.none" -> code.JwtUnverified
-  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
-  mark "csrf.disable" -> code.CsrfDisabled
-  mark "chmod" val "0777" -> code.InsecurePermission
-  mark "chmod" val "0666" -> code.InsecurePermission
-  mark "setHttpOnly" val "false" -> code.InsecureCookie
-  mark "setSecure" val "false" -> code.InsecureCookie
-  mark "Socket" -> code.ResourceHandle
-  mark "FileInputStream" -> code.ResourceHandle
-  mark "FileOutputStream" -> code.ResourceHandle
+  flag code.WeakRandomValue on any {
+    path "java.util.Random"
+  }
+  flag code.WeakRandomValue on any {
+    path exact "Random"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "MD5"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "SHA-1"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "RC4"
+  }
+  flag code.JwtUnverified on any {
+    path "Algorithm.none"
+  }
+  flag code.CertValidationDisabled on any {
+    path "NoopHostnameVerifier"
+  }
+  flag code.CsrfDisabled on any {
+    path "csrf.disable"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "0666"
+  }
+  flag code.InsecureCookie on any {
+    path "setHttpOnly"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "setSecure"
+    has "false"
+  }
+  flag code.ResourceHandle on any {
+    path "Socket"
+  }
+  flag code.ResourceHandle on any {
+    path "FileInputStream"
+  }
+  flag code.ResourceHandle on any {
+    path "FileOutputStream"
+  }
   control method "close" -> core.ResourceRelease
   source ".getParameter" -> code.HttpInput
   source ".getHeader" -> code.HttpInput

@@ -1,8 +1,14 @@
 import code.{WeakHash}
 adapter c {
   package "freetype" {
-    mark method "MD5_Init" -> code.WeakHash
-    mark method "MD5_Update" -> code.WeakHash
-    mark method "MD5_Final" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "MD5_Init"
+    }
+    flag code.WeakHash on any {
+      method "MD5_Update"
+    }
+    flag code.WeakHash on any {
+      method "MD5_Final"
+    }
   }
 }

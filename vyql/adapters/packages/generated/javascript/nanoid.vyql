@@ -1,7 +1,11 @@
 import code.{WeakRandomValue}
 adapter javascript {
   package "nanoid" {
-    mark path "non-secure.nanoid" -> code.WeakRandomValue
-    mark path "non-secure.customRandom" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      path "non-secure.nanoid"
+    }
+    flag code.WeakRandomValue on any {
+      path "non-secure.customRandom"
+    }
   }
 }

@@ -1,6 +1,8 @@
 import code.{WeakRandomValue}
 adapter php {
   package "laravel/helpers" {
-    mark method "str_random" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "str_random"
+    }
   }
 }

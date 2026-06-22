@@ -1,5 +1,7 @@
 adapter rust {
   package "fastrand" {
-    mark method "gen_u32" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "gen_u32"
+    }
   }
 }

@@ -1,5 +1,7 @@
 adapter java {
   package "com.squareup.okio:okio" {
-    mark path "com.squareup.okio.okio.hash" -> code.WeakHash
+    flag code.WeakHash on any {
+      path "com.squareup.okio.okio.hash"
+    }
   }
 }

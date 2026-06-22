@@ -1,6 +1,8 @@
 import code.{WeakRandomValue}
 adapter javascript {
   package "unique-string" {
-    mark method "uniqueString" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "uniqueString"
+    }
   }
 }

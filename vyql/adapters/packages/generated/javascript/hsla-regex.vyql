@@ -1,5 +1,7 @@
 adapter javascript {
   package "hsla-regex" {
-    mark method "module.exports" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "module.exports"
+    }
   }
 }

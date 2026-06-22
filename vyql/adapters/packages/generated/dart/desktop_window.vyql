@@ -1,11 +1,25 @@
 adapter dart {
   package "desktop_window" {
-    mark method "setWindowSize" -> code.PrivilegedOp
-    mark method "setMinWindowSize" -> code.PrivilegedOp
-    mark method "setMaxWindowSize" -> code.PrivilegedOp
-    mark method "setFullScreen" -> code.PrivilegedOp
-    mark method "toggleFullScreen" -> code.PrivilegedOp
-    mark method "setBorders" -> code.PrivilegedOp
-    mark method "toggleBorders" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "setWindowSize"
+    }
+    flag code.PrivilegedOp on any {
+      method "setMinWindowSize"
+    }
+    flag code.PrivilegedOp on any {
+      method "setMaxWindowSize"
+    }
+    flag code.PrivilegedOp on any {
+      method "setFullScreen"
+    }
+    flag code.PrivilegedOp on any {
+      method "toggleFullScreen"
+    }
+    flag code.PrivilegedOp on any {
+      method "setBorders"
+    }
+    flag code.PrivilegedOp on any {
+      method "toggleBorders"
+    }
   }
 }

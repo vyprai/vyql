@@ -5,9 +5,15 @@ adapter swift {
     sink method "update" -> code.StoredDataWrite
     sink method "move" -> code.StoredDataWrite
     source method "download" -> code.StoredDataRead
-    mark method "createSignedURL" -> code.RedirectTarget
-    mark method "getPublicURL" -> code.RedirectTarget
-    mark method "getPublicUrl" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "createSignedURL"
+    }
+    flag code.RedirectTarget on any {
+      method "getPublicURL"
+    }
+    flag code.RedirectTarget on any {
+      method "getPublicUrl"
+    }
     source method "list" -> code.StoredDataRead
     source method "listBuckets" -> code.StoredDataRead
     source method "getBucket" -> code.StoredDataRead

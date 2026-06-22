@@ -1,6 +1,8 @@
 import code.{WeakHash}
 adapter rust {
   package "cranelift-codegen-shared" {
-    mark method "simple_hash" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "simple_hash"
+    }
   }
 }

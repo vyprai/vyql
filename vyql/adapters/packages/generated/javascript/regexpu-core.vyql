@@ -2,6 +2,8 @@ import code.{RegexCompile}
 
 adapter javascript {
   package "regexpu-core" {
-    mark method "rewritePattern" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "rewritePattern"
+    }
   }
 }

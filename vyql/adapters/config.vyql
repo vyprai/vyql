@@ -118,29 +118,61 @@ adapter config {
   }
 
   // Android: android:exported="true" on an activity/service/receiver/provider
-  mark "analysis.config.android.exported_component" -> code.ExportedComponent
+  flag code.ExportedComponent on any {
+    path "analysis.config.android.exported_component"
+  }
   // Android: <application android:usesCleartextTraffic="true">
-  mark "analysis.config.android.cleartext_enabled" -> code.CleartextConfig
+  flag code.CleartextConfig on any {
+    path "analysis.config.android.cleartext_enabled"
+  }
   // Android: <application android:debuggable="true">
-  mark "analysis.config.android.debuggable_enabled" -> code.DebuggableApp
+  flag code.DebuggableApp on any {
+    path "analysis.config.android.debuggable_enabled"
+  }
   // Android: backups are enabled by default unless <application android:allowBackup="false">
-  mark "analysis.config.android.backup_allowed" -> code.BackupAllowedConfig
+  flag code.BackupAllowedConfig on any {
+    path "analysis.config.android.backup_allowed"
+  }
   // iOS Info.plist: ATS NSAllowsArbitraryLoads(/InWebContent/ForMedia) = <true/>
-  mark "analysis.config.plist.ats_arbitrary_loads" -> code.CleartextConfig
+  flag code.CleartextConfig on any {
+    path "analysis.config.plist.ats_arbitrary_loads"
+  }
 
   // IaC / container misconfig (CWE-250/653/284) — tokens from the Dockerfile / K8s YAML
   // / Terraform scanners.
-  mark "analysis.config.k8s.privileged_container" -> code.PrivilegedContainer
-  mark "analysis.config.container.root_user" -> code.PrivilegedContainer
-  mark "analysis.config.container.privileged_mode" -> code.PrivilegedContainer
-  mark "analysis.config.k8s.host_namespace" -> code.HostNamespaceShare
-  mark "analysis.config.k8s.host_path" -> code.HostNamespaceShare
-  mark "analysis.config.terraform.open_cidr" -> code.PublicNetworkExposure
-  mark "analysis.config.terraform.wildcard_iam" -> code.WildcardIamPolicy
-  mark "analysis.config.github_actions.privileged_pr_framework_execution" -> code.PrivilegedWorkflowUntrustedCodeExecution
-  mark "analysis.config.jenkins_advisor_weak_layout_permission" -> code.JenkinsAdvisorWeakLayoutPermission
-  mark "analysis.config.jenkins_computer_queue_unescaped_tooltip" -> code.JenkinsComputerQueueUnescapedTooltipXss
-  mark "analysis.config.comrak_dangerous_url_case_sensitive" -> code.ComrakDangerousUrlCaseSensitiveGrammar
+  flag code.PrivilegedContainer on any {
+    path "analysis.config.k8s.privileged_container"
+  }
+  flag code.PrivilegedContainer on any {
+    path "analysis.config.container.root_user"
+  }
+  flag code.PrivilegedContainer on any {
+    path "analysis.config.container.privileged_mode"
+  }
+  flag code.HostNamespaceShare on any {
+    path "analysis.config.k8s.host_namespace"
+  }
+  flag code.HostNamespaceShare on any {
+    path "analysis.config.k8s.host_path"
+  }
+  flag code.PublicNetworkExposure on any {
+    path "analysis.config.terraform.open_cidr"
+  }
+  flag code.WildcardIamPolicy on any {
+    path "analysis.config.terraform.wildcard_iam"
+  }
+  flag code.PrivilegedWorkflowUntrustedCodeExecution on any {
+    path "analysis.config.github_actions.privileged_pr_framework_execution"
+  }
+  flag code.JenkinsAdvisorWeakLayoutPermission on any {
+    path "analysis.config.jenkins_advisor_weak_layout_permission"
+  }
+  flag code.JenkinsComputerQueueUnescapedTooltipXss on any {
+    path "analysis.config.jenkins_computer_queue_unescaped_tooltip"
+  }
+  flag code.ComrakDangerousUrlCaseSensitiveGrammar on any {
+    path "analysis.config.comrak_dangerous_url_case_sensitive"
+  }
   // Jenkins Jelly views: template model fields such as it.name/it.description
   // rendered into HTML-bearing attributes need escaping before display.
   source "analysis.template.jelly.input" -> core.UserControlledData
@@ -156,8 +188,12 @@ adapter config {
   // Ajv/doT codegen templates: numeric schema keywords must be type-checked
   // before the template emits validator code. Missing checks can let crafted
   // schemas steer generated code/prototype behavior.
-  mark "analysis.template.dot.schema_codegen_unvalidated" -> code.SchemaCodegenValidationBypass
-  mark "analysis.config.totaljs_admin_notification_message_xss" -> code.TotalJsAdminThemeXss
+  flag code.SchemaCodegenValidationBypass on any {
+    path "analysis.template.dot.schema_codegen_unvalidated"
+  }
+  flag code.TotalJsAdminThemeXss on any {
+    path "analysis.config.totaljs_admin_notification_message_xss"
+  }
 
   // XWiki Velocity pages embedded in XML: request-driven server-side conversion
   // actions need CSRF validation before they execute.
@@ -166,11 +202,19 @@ adapter config {
   control "analysis.template.xwiki_velocity.csrf_check" -> core.CsrfProtection
   // Svelte raw HTML blocks bypass normal escaping. Stored model/entity names rendered
   // through {@html ...} should be reviewed as stored HTML writes.
-  mark "analysis.template.svelte.raw_html" -> code.StoredHtmlWrite
+  flag code.StoredHtmlWrite on any {
+    path "analysis.template.svelte.raw_html"
+  }
   // Django templates can locally disable autoescaping around model fields.
-  mark "analysis.template.django.autoescape_off" -> code.StoredHtmlWrite
+  flag code.StoredHtmlWrite on any {
+    path "analysis.template.django.autoescape_off"
+  }
   // Rails ERB raw comment rendering bypasses Rails' default output escaping.
-  mark "analysis.template.erb.raw_comment_html" -> code.StoredHtmlWrite
+  flag code.StoredHtmlWrite on any {
+    path "analysis.template.erb.raw_comment_html"
+  }
   // Rails ERB tooltip/status attributes can render stored task metadata without HTML escaping.
-  mark "analysis.template.erb.unescaped_tooltip_html" -> code.StoredHtmlWrite
+  flag code.StoredHtmlWrite on any {
+    path "analysis.template.erb.unescaped_tooltip_html"
+  }
 }

@@ -1,7 +1,11 @@
 import code.{WeakHash}
 adapter rust {
   package "fnv" {
-    mark method "fnv1a" -> code.WeakHash
-    mark method "finish" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "fnv1a"
+    }
+    flag code.WeakHash on any {
+      method "finish"
+    }
   }
 }

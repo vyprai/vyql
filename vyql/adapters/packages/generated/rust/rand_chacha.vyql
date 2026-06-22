@@ -1,7 +1,11 @@
 import code.{WeakRandomValue}
 adapter rust {
   package "rand_chacha" {
-    mark method "set_word_pos" -> code.WeakRandomValue
-    mark method "set_stream" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "set_word_pos"
+    }
+    flag code.WeakRandomValue on any {
+      method "set_stream"
+    }
   }
 }

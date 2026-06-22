@@ -4,8 +4,12 @@ adapter kotlin {
     sink method "Jpeg.<init>(java.net.URL)" -> code.UrlFetch
     sink method "Image.<init>(java.net.URL)" -> code.UrlFetch
     sink method "Image.getInstance(java.net.URL)" -> code.UrlFetch
-    mark method "Chunk.setRemoteGoto" -> code.RedirectTarget
-    mark method "Chunk.setAnchor" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "Chunk.setRemoteGoto"
+    }
+    flag code.RedirectTarget on any {
+      method "Chunk.setAnchor"
+    }
     sink method "DocWriter.write" -> code.FilePathAccess
   }
 }

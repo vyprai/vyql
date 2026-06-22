@@ -3,7 +3,9 @@ import core.{InputValidation}
 
 adapter go {
   package "github.com/gorilla/handlers" {
-    mark method "CanonicalHost" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "CanonicalHost"
+    }
     control method "ContentTypeHandler" -> core.InputValidation
   }
 }

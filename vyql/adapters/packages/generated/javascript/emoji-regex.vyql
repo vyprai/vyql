@@ -2,8 +2,14 @@ import code.{RegexCompile}
 
 adapter javascript {
   package "emoji-regex" {
-    mark method "module.exports" -> code.RegexCompile
-    mark method "default" -> code.RegexCompile
-    mark method "emojiRegex" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "module.exports"
+    }
+    flag code.RegexCompile on any {
+      method "default"
+    }
+    flag code.RegexCompile on any {
+      method "emojiRegex"
+    }
   }
 }

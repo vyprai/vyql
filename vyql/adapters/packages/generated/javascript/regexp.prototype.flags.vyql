@@ -1,5 +1,7 @@
 adapter javascript {
   package "regexp.prototype.flags" {
-    mark method "module.exports" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "module.exports"
+    }
   }
 }

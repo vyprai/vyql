@@ -8,7 +8,9 @@ adapter objc {
     source method "authorize" -> core.UserControlledData
     source method "openCheckoutWithDict" -> core.UserControlledData
     sink method "decodeURIFrom" -> code.Deserialization
-    mark method "handleRedirection" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "handleRedirection"
+    }
     sink method "viewControllerForPayload" -> code.Deserialization
     sink method "startTransaction" -> code.NetworkConnect
   }

@@ -1,5 +1,7 @@
 adapter scala {
   package "org.apache.commons:commons-lang3" {
-    mark method "random" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "random"
+    }
   }
 }

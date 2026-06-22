@@ -1,6 +1,8 @@
 import code.{WeakRandomValue}
 adapter javascript {
   package "randombytes" {
-    mark method "randomBytes" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "randomBytes"
+    }
   }
 }

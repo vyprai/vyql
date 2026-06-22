@@ -3,7 +3,9 @@ adapter objc {
   package "Siren" {
     sink method "parseForUpdate" -> code.Deserialization
     sink method "processVersionCheckResults" -> code.Deserialization
-    mark method "launchAppStore" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "launchAppStore"
+    }
     sink method "launchAppStore" -> code.NetworkConnect
   }
 }

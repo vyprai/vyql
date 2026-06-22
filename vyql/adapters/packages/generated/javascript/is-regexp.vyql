@@ -2,6 +2,8 @@ import code.{RegexCompile}
 
 adapter javascript {
   package "is-regexp" {
-    mark method "isRegexp" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "isRegexp"
+    }
   }
 }

@@ -6,7 +6,10 @@ adapter objc {
     source method "param" -> HttpInput
     source method "responseObject" -> ExternalApiResponse
     sink method "GET" -> UrlFetch
-    mark method "setAllowsAnyHTTPSCertificate" val "true" -> CertValidationDisabled
+    flag CertValidationDisabled on any {
+      method "setAllowsAnyHTTPSCertificate"
+      has "true"
+    }
   }
   package "Foundation" {
     source method "header" -> HttpInput
@@ -18,7 +21,11 @@ adapter objc {
     sink path "NSXMLDocument" -> XmlParse
     sink method "nodesForXPath" -> XpathQuery
     sink method "regularExpressionWithPattern" -> RegexCompile
-    mark "NSURL" val "http://" nval "127.0" -> CleartextChannel
+    flag CleartextChannel on any {
+      path "NSURL"
+      has "http://"
+      lacks "127.0"
+    }
     control "stringByAddingPercentEncodingWithAllowedCharacters" -> RedirectAllowlist
     control "stringByStandardizingPath" -> PathCanonicalization
     control "NSXMLDocument" val "NSXMLNodeLoadExternalEntitiesNever" -> XmlHardening
@@ -50,9 +57,16 @@ adapter objc {
     sink method "render" -> TemplateRender
   }
   package "CommonCrypto" {
-    mark "CC_MD5" -> WeakHash
-    mark "CC_SHA1" -> WeakHash
-    mark "CCCrypt" val "DES" -> WeakCipher
+    flag WeakHash on any {
+      path "CC_MD5"
+    }
+    flag WeakHash on any {
+      path "CC_SHA1"
+    }
+    flag WeakCipher on any {
+      path "CCCrypt"
+      has "DES"
+    }
   }
   package "hpple" {
     control "NSString.stringByEscapingHTML" -> HtmlEscape

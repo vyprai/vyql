@@ -10,7 +10,9 @@ adapter javascript {
     source method "req.cookies" -> code.Cookie
     source method "req.signedCookies" -> code.Cookie
 
-    mark method "res.redirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "res.redirect"
+    }
     sink method "res.send" -> code.NetworkSend
     sink method "res.json" -> code.NetworkSend
     sink method "res.jsonp" -> code.NetworkSend

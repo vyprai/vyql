@@ -8,6 +8,8 @@ adapter php {
     source method "addCookie" -> code.Cookie
     sink method "setHeaders" -> code.UrlFetch
     sink method "send" -> code.NetworkSend
-    mark method "setFileUpload" -> code.FileUpload
+    flag code.FileUpload on any {
+      method "setFileUpload"
+    }
   }
 }

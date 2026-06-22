@@ -3,6 +3,8 @@ adapter rust {
     source method "read" -> code.NetworkData
     sink method "close" -> code.NetworkSend
     source method "cookie" -> code.HttpInput
-    mark path "rustix.random" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      path "rustix.random"
+    }
   }
 }

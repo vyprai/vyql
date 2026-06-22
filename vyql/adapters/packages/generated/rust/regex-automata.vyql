@@ -1,5 +1,7 @@
 adapter rust {
   package "regex-automata" {
-    mark method "search" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "search"
+    }
   }
 }

@@ -1,8 +1,14 @@
 import code.{WeakRandomValue}
 adapter rust {
   package "rand_hc" {
-    mark method "try_next_u32" -> code.WeakRandomValue
-    mark method "try_next_u64" -> code.WeakRandomValue
-    mark method "try_fill_bytes" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "try_next_u32"
+    }
+    flag code.WeakRandomValue on any {
+      method "try_next_u64"
+    }
+    flag code.WeakRandomValue on any {
+      method "try_fill_bytes"
+    }
   }
 }

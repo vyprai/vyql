@@ -3,11 +3,21 @@ import core.{InputValidation, AuthenticationCheck}
 
 adapter php {
   package "zendframework/zend-session" {
-    mark method "sessionExists" -> code.SessionId
-    mark method "start" -> code.SessionId
-    mark method "getId" -> code.SessionId
-    mark method "regenerateId" -> code.SessionId
-    mark method "getName" -> code.SessionId
+    flag code.SessionId on any {
+      method "sessionExists"
+    }
+    flag code.SessionId on any {
+      method "start"
+    }
+    flag code.SessionId on any {
+      method "getId"
+    }
+    flag code.SessionId on any {
+      method "regenerateId"
+    }
+    flag code.SessionId on any {
+      method "getName"
+    }
     control method "session_set_save_handler" -> core.InputValidation
   }
 }

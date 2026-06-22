@@ -1,6 +1,8 @@
 adapter dart {
   package "firebase_analytics_web" {
-    mark method "getSessionId" -> code.SessionId
+    flag code.SessionId on any {
+      method "getSessionId"
+    }
     source method "getAppInstanceId" -> code.PiiValue
     control method "setAnalyticsCollectionEnabled" -> core.DataCollectionControl
   }

@@ -1,8 +1,14 @@
 import code.{PrivilegedOp}
 adapter dart {
   package "permission" {
-    mark method "requestPermissions" -> code.PrivilegedOp
-    mark method "requestSinglePermission" -> code.PrivilegedOp
-    mark method "openSettings" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "requestPermissions"
+    }
+    flag code.PrivilegedOp on any {
+      method "requestSinglePermission"
+    }
+    flag code.PrivilegedOp on any {
+      method "openSettings"
+    }
   }
 }

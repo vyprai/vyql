@@ -33,7 +33,12 @@ adapter java {
     control "PreparedStatement" -> SqlParameterization
   }
   package "neo.dbaccess" {
-    mark exact "analysis.function.context" val "function_name:execute" val "call_path:t.getConnection.prepareStatement" val "call_path:st.executeQuery" nval "call:setString" -> UnparameterizedSqlQueryParser
+    flag UnparameterizedSqlQueryParser in function {
+      has "function_name:execute"
+      has "call_path:t.getConnection.prepareStatement"
+      has "call_path:st.executeQuery"
+      lacks "call:setString"
+    }
   }
   package "hibernate-core" {
     sink method "createNativeQuery" -> SqlExecution
@@ -118,7 +123,12 @@ adapter java {
     source path "analysis.parameter.entry" val "annotation:QueryParameter" -> HttpInput
     sink path "FormValidation.errorWithMarkup" -> HtmlRender
     control "Util.escape" -> HtmlEscape
-    mark exact "analysis.function.context" val "call_path:Pattern.compile" val "call_path:FormValidation.errorWithMarkup" val "call:getMessage" nval "call_path:Util.escape" -> code.UnescapedExceptionMessageMarkup
+    flag code.UnescapedExceptionMessageMarkup in function {
+      has "call_path:Pattern.compile"
+      has "call_path:FormValidation.errorWithMarkup"
+      has "call:getMessage"
+      lacks "call_path:Util.escape"
+    }
   }
   package "commons-validator" {
     control "UrlValidator.isValid" -> RedirectAllowlist

@@ -4,9 +4,13 @@ import core.{AuthenticationCheck, AuthorizationCheck}
 adapter elixir {
   package "plug_attack" {
     source method "call" -> code.NetworkData
-    mark method "block_action" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "block_action"
+    }
     control method "allow_action" -> core.AuthenticationCheck
-    mark method "throttle" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "throttle"
+    }
     control method "fail2ban" -> core.AuthorizationCheck
   }
 }

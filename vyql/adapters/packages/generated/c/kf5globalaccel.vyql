@@ -1,6 +1,10 @@
 adapter c {
   package "kf5globalaccel" {
-    mark method "stealShortcutSystemwide" -> code.PrivilegedOp
-    mark method "setGlobalShortcut" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "stealShortcutSystemwide"
+    }
+    flag code.PrivilegedOp on any {
+      method "setGlobalShortcut"
+    }
   }
 }

@@ -5,8 +5,12 @@ adapter objc {
     sink method "overwriteConfig" -> code.CodeEval
     source method "startRecording" -> code.SecretValue
     sink method "startRecording" -> code.NetworkSend
-    mark method "requestTransaction" -> code.PrivilegedOp
-    mark method "request" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "requestTransaction"
+    }
+    flag code.PrivilegedOp on any {
+      method "request"
+    }
     source method "fromBuilder" -> core.UserControlledData
   }
 }

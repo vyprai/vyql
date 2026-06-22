@@ -1,8 +1,14 @@
 import code.{RedirectTarget, UrlFetch}
 adapter php {
   package "mcamara/laravel-localization" {
-    mark method "localizeURL" -> code.RedirectTarget
-    mark method "getLocalizedURL" -> code.RedirectTarget
-    mark method "getNonLocalizedURL" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "localizeURL"
+    }
+    flag code.RedirectTarget on any {
+      method "getLocalizedURL"
+    }
+    flag code.RedirectTarget on any {
+      method "getNonLocalizedURL"
+    }
   }
 }

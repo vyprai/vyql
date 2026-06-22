@@ -3,7 +3,11 @@ adapter go {
     sink method "Get" -> code.NosqlQuery
     sink method "SetBit" -> code.StoredDataWrite
     source method "Auth" -> code.SecretValue
-    mark method "Random" -> code.WeakRandomValue
-    mark method "Hash" -> code.WeakHash
+    flag code.WeakRandomValue on any {
+      method "Random"
+    }
+    flag code.WeakHash on any {
+      method "Hash"
+    }
   }
 }

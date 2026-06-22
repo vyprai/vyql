@@ -1,5 +1,7 @@
 adapter swift {
   package "github.com/sharplet/Regex" {
-    mark method "match" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "match"
+    }
   }
 }

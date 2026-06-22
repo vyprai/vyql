@@ -2,7 +2,9 @@ import code.{FilePathAccess, RegexCompile}
 
 adapter csharp {
   package "materialdesignextensions" {
-    mark method "ParseFilterRegularExpressions" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "ParseFilterRegularExpressions"
+    }
     sink method "CreateNewDirectory" -> code.FilePathAccess
     sink method "SelectDirectory" -> code.FilePathAccess
     sink method "SelectFile" -> code.FilePathAccess

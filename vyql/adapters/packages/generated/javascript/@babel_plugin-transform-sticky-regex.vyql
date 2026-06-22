@@ -1,5 +1,7 @@
 adapter javascript {
   package "@babel/plugin-transform-sticky-regex" {
-    mark method "RegExpLiteral" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "RegExpLiteral"
+    }
   }
 }

@@ -2,9 +2,17 @@ import code.{WeakCipher}
 
 adapter csharp {
   package "cocossharp.pcl.shared" {
-    mark method "Lidgren.Network.NetXorEncryption.Encrypt" -> code.WeakCipher
-    mark method "Lidgren.Network.NetXorEncryption.Decrypt" -> code.WeakCipher
-    mark method "Lidgren.Network.NetXtea.EncryptBlock" -> code.WeakCipher
-    mark method "Lidgren.Network.NetXtea.DecryptBlock" -> code.WeakCipher
+    flag code.WeakCipher on any {
+      method "Lidgren.Network.NetXorEncryption.Encrypt"
+    }
+    flag code.WeakCipher on any {
+      method "Lidgren.Network.NetXorEncryption.Decrypt"
+    }
+    flag code.WeakCipher on any {
+      method "Lidgren.Network.NetXtea.EncryptBlock"
+    }
+    flag code.WeakCipher on any {
+      method "Lidgren.Network.NetXtea.DecryptBlock"
+    }
   }
 }

@@ -98,12 +98,29 @@ adapter go {
     control method "Can" -> AuthorizationCheck
   }
   package "github.com/free5gc/ausf/internal/context" {
-    mark exact "analysis.function.context" val "function_name:UeAuthPostRequestProcedure" val "selector:updateAuthenticationInfo.ResynchronizationInfo" val "call:GetSupiFromSuciSupiMap" val "call:GetAusfUeContext" val "selector:ausfCurrentContext.Rand" nval "call:CheckIfSuciSupiPairExists" nval "call:CheckIfAusfUeContextExists" -> NullableDeref
+    flag NullableDeref in function {
+      has "function_name:UeAuthPostRequestProcedure"
+      has "selector:updateAuthenticationInfo.ResynchronizationInfo"
+      has "call:GetSupiFromSuciSupiMap"
+      has "call:GetAusfUeContext"
+      has "selector:ausfCurrentContext.Rand"
+      lacks "call:CheckIfSuciSupiPairExists"
+      lacks "call:CheckIfAusfUeContextExists"
+    }
   }
   package "github.com/ubuntu/authd" {
-    mark exact "analysis.function.context" val "function_name:userPreCheck" val "call_path:json.Unmarshal" val "call_path:s.userManager.GenerateUID" val "call_path:s.userManager.GenerateGID" nval "call_path:s.userManager.RegisterUserPreAuth" -> UserIdentityMappingReview
+    flag UserIdentityMappingReview in function {
+      has "function_name:userPreCheck"
+      has "call_path:json.Unmarshal"
+      has "call_path:s.userManager.GenerateUID"
+      has "call_path:s.userManager.GenerateGID"
+      lacks "call_path:s.userManager.RegisterUserPreAuth"
+    }
   }
   package "github.com/authelia/authelia" {
-    mark "ctx.Error" val "Unable to parse target URL" -> AuthFailureResponseReview
+    flag AuthFailureResponseReview on any {
+      path "ctx.Error"
+      has "Unable to parse target URL"
+    }
   }
 }

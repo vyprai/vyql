@@ -2,6 +2,8 @@ import code.{WeakRandomValue}
 
 adapter kotlin {
   package "io.github.jhipster:jhipster-framework" {
-    mark method "generateRandomAlphanumericString" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "generateRandomAlphanumericString"
+    }
   }
 }

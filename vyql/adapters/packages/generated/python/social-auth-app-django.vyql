@@ -6,6 +6,8 @@ adapter python {
     control method "authenticate" -> core.AuthenticationCheck
     source method "session" -> code.StoredDataRead
     sink method "session" -> code.StoredDataWrite
-    mark method "redirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "redirect"
+    }
   }
 }

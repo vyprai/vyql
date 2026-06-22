@@ -2,12 +2,26 @@ import code.{WeakHash, WeakCipher}
 
 adapter cpp {
   package "libxcrypt" {
-    mark method "MD5_Init" -> code.WeakHash
-    mark method "MD5_Update" -> code.WeakHash
-    mark method "MD5_Final" -> code.WeakHash
-    mark method "sha1_init_ctx" -> code.WeakHash
-    mark method "sha1_process_bytes" -> code.WeakHash
-    mark method "sha1_finish_ctx" -> code.WeakHash
-    mark method "des_crypt_block" -> code.WeakCipher
+    flag code.WeakHash on any {
+      method "MD5_Init"
+    }
+    flag code.WeakHash on any {
+      method "MD5_Update"
+    }
+    flag code.WeakHash on any {
+      method "MD5_Final"
+    }
+    flag code.WeakHash on any {
+      method "sha1_init_ctx"
+    }
+    flag code.WeakHash on any {
+      method "sha1_process_bytes"
+    }
+    flag code.WeakHash on any {
+      method "sha1_finish_ctx"
+    }
+    flag code.WeakCipher on any {
+      method "des_crypt_block"
+    }
   }
 }

@@ -2,9 +2,17 @@ import code.{WeakRandomValue}
 
 adapter rust {
   package "getrandom" {
-    mark method "fill" -> code.WeakRandomValue
-    mark method "fill_uninit" -> code.WeakRandomValue
-    mark method "u32" -> code.WeakRandomValue
-    mark method "u64" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "fill"
+    }
+    flag code.WeakRandomValue on any {
+      method "fill_uninit"
+    }
+    flag code.WeakRandomValue on any {
+      method "u32"
+    }
+    flag code.WeakRandomValue on any {
+      method "u64"
+    }
   }
 }

@@ -437,16 +437,16 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 					return fmt.Errorf("agentic prep: adapter %q references unknown concept %q", lang, m.Concept)
 				}
 				if broadCommandWrapperSink(lang, m) {
-					return fmt.Errorf("agentic prep: adapter %q maps a broad command-wrapper execute sink; use a narrow analysis.function.context mark to code.CommandStringWrapperExecution so argv-array fixes are not flagged", lang)
+					return fmt.Errorf("agentic prep: adapter %q maps a broad command-wrapper execute sink; use a narrow analysis.function.context flag to code.CommandStringWrapperExecution so argv-array fixes are not flagged", lang)
 				}
 				if invalidGoFunctionContextNameToken(lang, m) {
-					return fmt.Errorf("agentic prep: adapter %q uses name= in a Go function-context mark; use function_name:<name> from function_context suggested_vals so the overlay matches frontend context tokens", lang)
+					return fmt.Errorf("agentic prep: adapter %q uses name= in a Go function-context flag; use function_name:<name> from function_context suggested_vals so the overlay matches frontend context tokens", lang)
 				}
 				if invalidCommandStringWrapperMark(m) {
-					return fmt.Errorf("agentic prep: adapter %q maps command-string wrapper execution without fixed-form hardening evidence; use an exact analysis.function.context mark with command construction, wrapper execution, and nval hardening such as $Env:, cmdEnv, argv array, process builder, execFile, or array_merge", lang)
+					return fmt.Errorf("agentic prep: adapter %q maps command-string wrapper execution without fixed-form hardening evidence; use an exact analysis.function.context flag with command construction, wrapper execution, and nval hardening such as $Env:, cmdEnv, argv array, process builder, execFile, or array_merge", lang)
 				}
 				if broadMcpToolCommandMark(m) {
-					return fmt.Errorf("agentic prep: adapter %q maps a broad MCP tool command mark; include concrete exec command-template evidence and nval hardening such as execFile so fixed argv-array code is not flagged", lang)
+					return fmt.Errorf("agentic prep: adapter %q maps a broad MCP tool command flag; include concrete exec command-template evidence and nval hardening such as execFile so fixed argv-array code is not flagged", lang)
 				}
 				if invalidJenkinsCredentialStartupMark(m) {
 					return fmt.Errorf("agentic prep: adapter %q maps Jenkins credential startup loading too broadly; use minimal analysis.class.context vals for class_name:SystemCredentialsProvider, credential unmarshal/migration call_path evidence, function_name:getInstance, and structured @Initializer/forceLoad absence checks; do not add class_base or positive annotation vals", lang)
@@ -461,14 +461,14 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 					return fmt.Errorf("agentic prep: adapter %q maps default relay secret exposure too broadly; include concrete relay/proxy/tunnel/default-host URL evidence, embedded token/gurl/connection metadata, and an nval for trusted-host or explicit configured-host hardening", lang)
 				}
 				if localExactContextMapping(m) && len(m.Packages) > 0 {
-					return fmt.Errorf("agentic prep: adapter %q package-scopes an exact context mark; keep exact context marks unscoped and put package/dependency evidence in adapter evidence instead of a package gate", lang)
+					return fmt.Errorf("agentic prep: adapter %q package-scopes an exact context flag; keep exact context flags unscoped and put package/dependency evidence in adapter evidence instead of a package gate", lang)
 				}
 				if requirePackageScope && len(m.Packages) == 0 && !localExactContextMapping(m) {
 					return fmt.Errorf("agentic prep: adapter %q mapping %q -> %s is not package-scoped; wrap repo-local/generated mappings in package \"<dependency-or-project-package>\" { ... }", lang, m.Pattern, m.Concept)
 				}
 				for _, pkg := range m.Packages {
 					if firstPartyPackages[sca.NormalizePackageName(pkg)] {
-						return fmt.Errorf("agentic prep: adapter %q maps first-party package %q; use a generalized API mapping, exact context mark, or empty overlay instead of local package gating", lang, pkg)
+						return fmt.Errorf("agentic prep: adapter %q maps first-party package %q; use a generalized API mapping, exact context flag, or empty overlay instead of local package gating", lang, pkg)
 					}
 				}
 			}
@@ -476,7 +476,7 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				return fmt.Errorf("agentic prep: adapter %q is a broad generic mapping, not repo-specific prep", lang)
 			}
 			if sourceOnlyParamOverlay(ad) {
-				return fmt.Errorf("agentic prep: adapter %q only broadens public parameters as sources; add a concrete sink/mark/control mapping or return an empty overlay", lang)
+				return fmt.Errorf("agentic prep: adapter %q only broadens public parameters as sources; add a concrete sink/flag/control mapping or return an empty overlay", lang)
 			}
 		}
 		if !seen {
@@ -487,10 +487,11 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 }
 
 func invalidGoFunctionContextNameToken(lang string, m parser.AdapterMapping) bool {
-	if lang != "go" || m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+	scope, vals, _, ok := contextFlagParts(m)
+	if lang != "go" || !ok || scope != "function" {
 		return false
 	}
-	for _, v := range m.ValMatches {
+	for _, v := range vals {
 		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(v)), "name=") {
 			return true
 		}
@@ -502,12 +503,13 @@ func invalidCommandStringWrapperMark(m parser.AdapterMapping) bool {
 	if m.Concept != "code.CommandStringWrapperExecution" {
 		return false
 	}
-	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+	scope, vals, nvals, ok := contextFlagParts(m)
+	if !ok || scope != "function" {
 		return false
 	}
 	hasCommandConstruction := false
 	hasWrapperExecution := false
-	for _, v := range m.ValMatches {
+	for _, v := range vals {
 		lv := strings.ToLower(v)
 		if strings.Contains(lv, "sprintf") ||
 			strings.Contains(lv, "format") ||
@@ -525,7 +527,7 @@ func invalidCommandStringWrapperMark(m parser.AdapterMapping) bool {
 		}
 	}
 	hasHardeningAbsence := false
-	for _, nv := range m.ValAbsents {
+	for _, nv := range nvals {
 		lnv := strings.ToLower(nv)
 		if strings.Contains(lnv, "$env:") ||
 			strings.Contains(lnv, "env:") ||
@@ -703,11 +705,12 @@ func broadMcpToolCommandMark(m parser.AdapterMapping) bool {
 	if m.Concept != "code.McpToolCommandTemplateExecution" {
 		return false
 	}
-	if !localExactContextMapping(m) {
+	_, vals, nvals, ok := contextFlagParts(m)
+	if !ok {
 		return true
 	}
 	hasCommandTemplate := false
-	for _, v := range m.ValMatches {
+	for _, v := range vals {
 		lv := strings.ToLower(v)
 		if strings.Contains(lv, "exec(") ||
 			strings.Contains(lv, "child_process.exec") ||
@@ -719,7 +722,7 @@ func broadMcpToolCommandMark(m parser.AdapterMapping) bool {
 		}
 	}
 	hasHardeningNval := false
-	for _, nv := range m.ValAbsents {
+	for _, nv := range nvals {
 		lnv := strings.ToLower(nv)
 		if strings.Contains(lnv, "execfile") ||
 			strings.Contains(lnv, "spawn(") ||
@@ -735,14 +738,15 @@ func invalidJenkinsCredentialStartupMark(m parser.AdapterMapping) bool {
 	if m.Concept != "code.JenkinsCredentialsStartupLoadContextExposure" {
 		return false
 	}
-	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.class.context" {
+	scope, vals, nvals, ok := contextFlagParts(m)
+	if !ok || scope != "class" {
 		return true
 	}
 	hasCredentialLoad := false
 	hasSystemProviderIdentity := false
 	hasStructuredContext := false
 	hasGetInstance := false
-	for _, v := range m.ValMatches {
+	for _, v := range vals {
 		lv := strings.ToLower(v)
 		if strings.HasPrefix(lv, "class_base:") || strings.HasPrefix(lv, "annotation:") {
 			return true
@@ -769,7 +773,7 @@ func invalidJenkinsCredentialStartupMark(m parser.AdapterMapping) bool {
 		}
 	}
 	hasStartupAbsence := false
-	for _, nv := range m.ValAbsents {
+	for _, nv := range nvals {
 		lnv := strings.ToLower(nv)
 		if strings.Contains(lnv, "annotation:initializer") ||
 			strings.Contains(lnv, "call_path:initmilestone.job_loaded") ||
@@ -785,12 +789,13 @@ func invalidJobOutputEventUpdateMark(m parser.AdapterMapping) bool {
 	if m.Concept != "code.JobOutputEventUpdateAuthorizationBypass" {
 		return false
 	}
-	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+	scope, vals, nvals, ok := contextFlagParts(m)
+	if !ok || scope != "function" {
 		return true
 	}
 	hasChildOutputHandler := false
 	hasChildOutputCopy := false
-	for _, v := range m.ValMatches {
+	for _, v := range vals {
 		lv := strings.ToLower(v)
 		if strings.Contains(lv, "got job update from child") ||
 			strings.Contains(lv, "handlechildresponse") ||
@@ -804,7 +809,7 @@ func invalidJobOutputEventUpdateMark(m parser.AdapterMapping) bool {
 		}
 	}
 	hasHardeningAbsence := false
-	for _, nv := range m.ValAbsents {
+	for _, nv := range nvals {
 		lnv := strings.ToLower(nv)
 		if strings.Contains(lnv, "allow_event_updates_from_jobs") ||
 			strings.Contains(lnv, "delete data.update_event") {
@@ -819,12 +824,13 @@ func invalidDefaultRelaySecretMark(m parser.AdapterMapping) bool {
 	if m.Concept != "code.DefaultExternalRelaySecretExposure" {
 		return false
 	}
-	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+	scope, vals, nvals, ok := contextFlagParts(m)
+	if !ok || scope != "function" {
 		return true
 	}
 	hasRelayURL := false
 	hasSensitiveMetadata := false
-	for _, v := range m.ValMatches {
+	for _, v := range vals {
 		lv := strings.ToLower(v)
 		if strings.Contains(lv, "relay") ||
 			strings.Contains(lv, "proxy") ||
@@ -847,7 +853,7 @@ func invalidDefaultRelaySecretMark(m parser.AdapterMapping) bool {
 		}
 	}
 	hasHardeningAbsence := false
-	for _, nv := range m.ValAbsents {
+	for _, nv := range nvals {
 		lnv := strings.ToLower(nv)
 		if strings.Contains(lnv, "trusted") ||
 			strings.Contains(lnv, "configured") ||
@@ -866,14 +872,15 @@ func invalidCryptoImproperBlindingMark(m parser.AdapterMapping) bool {
 	if m.Concept != "code.CryptoImproperBlinding" {
 		return false
 	}
-	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+	scope, vals, nvals, ok := contextFlagParts(m)
+	if !ok || scope != "function" {
 		return true
 	}
 	hasRandomize := false
 	hasInverse := false
 	hasJacobiOrSquare := false
 	hasUnblind := false
-	for _, v := range m.ValMatches {
+	for _, v := range vals {
 		lv := strings.ToLower(v)
 		if strings.Contains(lv, "randomize") {
 			hasRandomize = true
@@ -892,7 +899,7 @@ func invalidCryptoImproperBlindingMark(m parser.AdapterMapping) bool {
 		}
 	}
 	hasHardeningAbsence := false
-	for _, nv := range m.ValAbsents {
+	for _, nv := range nvals {
 		lnv := strings.ToLower(nv)
 		if (strings.Contains(lnv, "square") && strings.Contains(lnv, "multiplicativeinverse")) ||
 			strings.Contains(lnv, "r=modn.square(r)") ||
@@ -906,14 +913,39 @@ func invalidCryptoImproperBlindingMark(m parser.AdapterMapping) bool {
 }
 
 func localExactContextMapping(m parser.AdapterMapping) bool {
-	if m.Kind != "mark" || !m.Exact {
-		return false
+	_, _, _, ok := contextFlagParts(m)
+	return ok
+}
+
+func contextFlagParts(m parser.AdapterMapping) (scope string, vals, nvals []string, ok bool) {
+	if m.Kind == "mark" && m.Exact {
+		switch m.Pattern {
+		case "analysis.function.context":
+			return "function", m.ValMatches, m.ValAbsents, true
+		case "analysis.class.context":
+			return "class", m.ValMatches, m.ValAbsents, true
+		case "analysis.module.context":
+			return "module", m.ValMatches, m.ValAbsents, true
+		}
 	}
-	switch m.Pattern {
-	case "analysis.function.context", "analysis.class.context", "analysis.module.context":
-		return true
+	if m.Kind != "flag" || m.Flag == nil {
+		return "", nil, nil, false
+	}
+	switch m.Flag.Scope {
+	case "function", "class", "module":
+		for _, pred := range m.Flag.Predicates {
+			if pred.Property != "tokens" {
+				continue
+			}
+			if pred.Negative {
+				nvals = append(nvals, pred.Values...)
+			} else {
+				vals = append(vals, pred.Values...)
+			}
+		}
+		return m.Flag.Scope, vals, nvals, true
 	default:
-		return false
+		return "", nil, nil, false
 	}
 }
 

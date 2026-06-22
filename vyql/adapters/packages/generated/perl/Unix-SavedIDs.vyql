@@ -1,7 +1,11 @@
 import code.{PrivilegedOp}
 adapter perl {
   package "Unix-SavedIDs" {
-    mark method "setresuid" -> code.PrivilegedOp
-    mark method "setresgid" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "setresuid"
+    }
+    flag code.PrivilegedOp on any {
+      method "setresgid"
+    }
   }
 }

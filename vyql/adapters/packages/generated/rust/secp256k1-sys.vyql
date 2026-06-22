@@ -1,6 +1,8 @@
 import code.{WeakRandomValue}
 adapter rust {
   package "secp256k1-sys" {
-    mark method "secp256k1_context_randomize" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "secp256k1_context_randomize"
+    }
   }
 }

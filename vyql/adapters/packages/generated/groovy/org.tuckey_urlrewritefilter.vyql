@@ -1,5 +1,7 @@
 adapter groovy {
   package "org.tuckey:urlrewritefilter" {
-    mark method "execute" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "execute"
+    }
   }
 }

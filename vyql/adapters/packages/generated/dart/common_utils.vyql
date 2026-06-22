@@ -1,5 +1,7 @@
 adapter dart {
   package "common_utils" {
-    mark method "RegExp" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "RegExp"
+    }
   }
 }

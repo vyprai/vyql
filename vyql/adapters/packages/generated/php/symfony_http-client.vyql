@@ -11,6 +11,8 @@ adapter php {
     source method "setAuthBearer" -> code.SecretValue
     control method "setCaFile" -> core.CertificateValidation
     control method "setCaPath" -> core.CertificateValidation
-    mark method "setCiphers" -> code.WeakCipher
+    flag code.WeakCipher on any {
+      method "setCiphers"
+    }
   }
 }

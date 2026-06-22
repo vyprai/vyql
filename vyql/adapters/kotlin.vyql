@@ -33,9 +33,15 @@ adapter kotlin {
   sink method "loadData" -> code.WebViewLoad
   sink method "loadDataWithBaseURL" arg 1 -> code.WebViewLoad
   sink method "evaluateJavascript" -> code.WebViewLoad
-  mark "addJavascriptInterface" -> code.WebViewJsInterface
-  mark method "moveTaskToBack" -> code.AuthFlowBypassReview
-  mark method "finishAndRemoveTask" -> code.AuthFlowBypassReview
+  flag code.WebViewJsInterface on any {
+    path "addJavascriptInterface"
+  }
+  flag code.AuthFlowBypassReview on any {
+    method "moveTaskToBack"
+  }
+  flag code.AuthFlowBypassReview on any {
+    method "finishAndRemoveTask"
+  }
 
   // SQL — JDBC + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
@@ -49,14 +55,30 @@ adapter kotlin {
   sink method "getReferenceById" -> code.ObjectLookupByUserInput
   sink method "getUser" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
-  mark "changePassword" -> code.AuthenticationRequiredOp
-  mark "updatePassword" -> code.AuthenticationRequiredOp
-  mark "resetPassword" -> code.AuthenticationRequiredOp
-  mark "changeEmail" -> code.AuthenticationRequiredOp
-  mark "transferFunds" -> code.AuthenticationRequiredOp
-  mark "deleteAccount" -> code.AuthenticationRequiredOp
-  mark "grantRole" -> code.AuthenticationRequiredOp
-  mark "makeAdmin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "changePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "updatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "resetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "changeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "deleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "makeAdmin"
+  }
 
   // path / file
   sink path "File" -> code.FilePathAccess
@@ -84,26 +106,62 @@ adapter kotlin {
   sink method "readValue" -> code.Deserialization
 
   // weak crypto (CWE-327) — JCA (same API as Java), val-matched on algorithm
-  mark "MessageDigest.getInstance" val "MD2" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "SHA1" -> code.WeakHash
-  mark "Cipher.getInstance" val "DES" -> code.WeakCipher
-  mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
-  mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
-  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "MD2"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "MD5"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "SHA-1"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "SHA1"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "Blowfish"
+  }
+  flag code.StaticIv on any {
+    path "IvParameterSpec"
+    has "0000000000000000"
+  }
 
   // XSS (CWE-79) — servlet response writers (JVM-shared with Java)
   sink method "println" arg all -> code.HtmlRender
   sink method "print" arg all -> code.HtmlRender
   sink method "write" arg all -> code.HtmlRender
   // insecure randomness (CWE-330)
-  mark "java.util.Random" -> code.WeakRandomValue
-  mark exact "Random" -> code.WeakRandomValue
-  mark "Math.random" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "java.util.Random"
+  }
+  flag code.WeakRandomValue on any {
+    path exact "Random"
+  }
+  flag code.WeakRandomValue on any {
+    path "Math.random"
+  }
   // insecure cookie (CWE-614)
-  mark "setHttpOnly" val "false" -> code.InsecureCookie
-  mark "setSecure" val "false" -> code.InsecureCookie
+  flag code.InsecureCookie on any {
+    path "setHttpOnly"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "setSecure"
+    has "false"
+  }
   // trust boundary (CWE-501) — untrusted data into the session
   sink method "setAttribute" arg all -> code.TrustBoundary
   sink method "putValue" arg all -> code.TrustBoundary
@@ -112,21 +170,47 @@ adapter kotlin {
   sink method "evaluate" arg 0 -> code.XpathQuery
   // XXE (CWE-611) — javax.xml parser construction; flagged structurally unless hardened.
   // Precise factory methods only (not bare `parse`, which also matches Date/JSON parse).
-  mark method "newSAXParser" -> code.XmlParserCreate
-  mark method "newDocumentBuilder" -> code.XmlParserCreate
-  mark method "createXMLReader" -> code.XmlParserCreate
-  mark method "createXMLStreamReader" -> code.XmlParserCreate
-  mark method "createXMLEventReader" -> code.XmlParserCreate
+  flag code.XmlParserCreate on any {
+    method "newSAXParser"
+  }
+  flag code.XmlParserCreate on any {
+    method "newDocumentBuilder"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLReader"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLStreamReader"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLEventReader"
+  }
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
   // also materialize the hardening as a node mark so the structural XXE rule's
   // guarded_by (which needs a dominating control-labelled node) can suppress it.
-  mark "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
-  mark "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
-  mark "setExpandEntityReferences" val "false" -> core.XmlHardening
-  mark "setProperty" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
-  mark "setXIncludeAware" val "false" -> core.XmlHardening
+  flag core.XmlHardening on any {
+    path "setFeature"
+    has "disallow-doctype-decl"
+  }
+  flag core.XmlHardening on any {
+    path "setFeature"
+    has "external-general-entities"
+    lacks "true"
+  }
+  flag core.XmlHardening on any {
+    path "setExpandEntityReferences"
+    has "false"
+  }
+  flag core.XmlHardening on any {
+    path "setProperty"
+    has "ACCESS_EXTERNAL_DTD"
+  }
+  flag core.XmlHardening on any {
+    path "setXIncludeAware"
+    has "false"
+  }
 
   // controls
   control "encodeForHTML" -> core.HtmlEscape
@@ -148,19 +232,53 @@ adapter kotlin {
   control method "isOwner" -> core.OwnershipCheck
 
   // csrf disabled (CWE-352) — presence marker
-  mark "csrf.disable" -> code.CsrfDisabled
-  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
-  mark "Algorithm.none" -> code.JwtUnverified
-  mark "setWritable" val "true" val "false" -> code.InsecurePermission
-  mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
-  mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
-  mark "Socket" -> code.ResourceHandle
-  mark "FileInputStream" -> code.ResourceHandle
-  mark "FileOutputStream" -> code.ResourceHandle
+  flag code.CsrfDisabled on any {
+    path "csrf.disable"
+  }
+  flag code.CertValidationDisabled on any {
+    path "NoopHostnameVerifier"
+  }
+  flag code.JwtUnverified on any {
+    path "Algorithm.none"
+  }
+  flag code.InsecurePermission on any {
+    path "setWritable"
+    has "true"
+    has "false"
+  }
+  flag code.InsecurePermission on any {
+    path "Files.setPosixFilePermissions"
+    has "OTHERS_WRITE"
+  }
+  flag code.InsecureTempFile on any {
+    path "Files.createFile"
+    has "/tmp/"
+  }
+  flag code.ResourceHandle on any {
+    path "Socket"
+  }
+  flag code.ResourceHandle on any {
+    path "FileInputStream"
+  }
+  flag code.ResourceHandle on any {
+    path "FileOutputStream"
+  }
   control method "close" -> core.ResourceRelease
-  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
-  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  flag code.CleartextChannel on any {
+    path "URL"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.PermissiveCors on any {
+    path "setHeader"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  flag code.MissingFrameProtection on any {
+    path "setHeader"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval

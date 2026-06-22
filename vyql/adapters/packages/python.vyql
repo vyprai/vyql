@@ -18,7 +18,13 @@ adapter python {
     control "csrf_protect" -> CsrfProtection
   }
   package "authentik" {
-    mark exact "analysis.function.context" val "name=__post_init_code" val "self.authorization_code.code_challenge" val "self.code_verifier" val "new_code_challenge!=self.authorization_code.code_challenge" nval "ifnotself.authorization_code.code_challengeandself.code_verifier" -> ProtocolStateReview
+    flag ProtocolStateReview in function {
+      has "name=__post_init_code"
+      has "self.authorization_code.code_challenge"
+      has "self.code_verifier"
+      has "new_code_challenge!=self.authorization_code.code_challenge"
+      lacks "ifnotself.authorization_code.code_challengeandself.code_verifier"
+    }
   }
   package "autobahn" {
     source path "self.http_request_params.__subscript" -> HttpInput
@@ -113,7 +119,12 @@ adapter python {
     control "yaml.safe_load" -> SafeDeserialization
   }
   package "pip" {
-    mark exact "analysis.function.context" val "PipScriptMaker" val "super().make" val "_raise_for_invalid_entrypoint(specification)" nval "self.target_dir" -> PackageEntryPointScriptWrite
+    flag PackageEntryPointScriptWrite in function {
+      has "PipScriptMaker"
+      has "super().make"
+      has "_raise_for_invalid_entrypoint(specification)"
+      lacks "self.target_dir"
+    }
   }
   package "pickle" {
     sink path "pickle.loads" -> Deserialization
@@ -150,7 +161,9 @@ adapter python {
     sink path "re.compile" -> RegexCompile
   }
   package "zlib" {
-    mark path "zlib.decompress" -> UnboundedResourceOperation
+    flag UnboundedResourceOperation on any {
+      path "zlib.decompress"
+    }
   }
   package "hyperlink" {
     control "to_uri.normalize.to_text" -> RedirectAllowlist

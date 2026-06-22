@@ -1,7 +1,11 @@
 import code.{PrivilegedOp}
 adapter swift {
   package "github.com/tmandry/AXSwift" {
-    mark method "setAttribute" -> code.PrivilegedOp
-    mark method "performAction" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "setAttribute"
+    }
+    flag code.PrivilegedOp on any {
+      method "performAction"
+    }
   }
 }

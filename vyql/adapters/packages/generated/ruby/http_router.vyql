@@ -4,11 +4,23 @@ adapter ruby {
     source method "add_route" -> code.HttpInput
     source method "url" -> code.HttpInput
     source method "path" -> code.HttpInput
-    mark method "process_destination_path" -> code.RedirectTarget
-    mark method "rewrite_partial_path_info" -> code.RedirectTarget
-    mark method "rewrite_path_info" -> code.RedirectTarget
-    mark method "raw_url" -> code.RedirectTarget
-    mark method "raw_path" -> code.RedirectTarget
-    mark method "raw_call" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "process_destination_path"
+    }
+    flag code.RedirectTarget on any {
+      method "rewrite_partial_path_info"
+    }
+    flag code.RedirectTarget on any {
+      method "rewrite_path_info"
+    }
+    flag code.RedirectTarget on any {
+      method "raw_url"
+    }
+    flag code.RedirectTarget on any {
+      method "raw_path"
+    }
+    flag code.RedirectTarget on any {
+      method "raw_call"
+    }
   }
 }
