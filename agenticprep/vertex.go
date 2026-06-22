@@ -215,6 +215,11 @@ Rules:
      For upload XSS CVEs, inspect upload services/helpers that derive extensions
      from client filenames or MIME types and store SVG, HTML, or XML-capable files;
      check for SVG/XML sanitizers before storeAs/move/save/write.
+     For PHP/Symfony/Pimcore repositories, treat Request parameter bags such as
+     $request->query->get/all/filter and raw query-condition builders such as
+     addConditionParam, whereRaw, havingRaw, orderByRaw, and selectRaw as high-priority
+     source/sink candidates. Prefer executable SQL fragment arguments only; bound
+     parameter value arguments should not become SQL sinks.
      For information-disclosure CVEs, inspect filesystem drivers and methods
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
@@ -1941,6 +1946,7 @@ func suggestContextVals(name string, compact string) []string {
 		"orderBy", "direction", "QUERY_ORDER_DESC", "QUERY_ORDER_ASC", "request.query_params.get(\"state\")",
 		"request.cookies.get(\"sso_state\")", "safe_load", "yaml.load", "redirect", "Location", "htmlspecialchars",
 		"prepare", "execute", "processOrderBy", "$orderBy['direction']", "$orderBy[\"direction\"]",
+		"$request->query->get", "addConditionParam", "whereRaw", "havingRaw", "orderByRaw", "selectRaw",
 	} {
 		c := compactSourceText(token)
 		if strings.Contains(compact, c) {

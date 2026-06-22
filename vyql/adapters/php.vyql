@@ -22,7 +22,16 @@ adapter php {
   source "$_SERVER" val "REMOTE_PORT" -> code.HttpInput
   source "$_SERVER" val "SERVER_SOFTWARE" -> code.HttpInput
   source path "Request.post" -> code.HttpInput
+  // Symfony/Pimcore request parameter bags. query/request/filter accessors return
+  // attacker-controlled request values even when used through object-property chains.
+  source path "$request.query.get" -> code.HttpInput
+  source path "$request.query.all" -> code.HttpInput
+  source path "$request.query.filter" -> code.HttpInput
+  source path "$request.request.get" -> code.HttpInput
   source path "$request.request.all" -> code.HttpInput
+  source path "$request.request.filter" -> code.HttpInput
+  source path "$request.headers.get" -> code.HttpHeader
+  source path "$request.cookies.get" -> code.Cookie
   source path "$this.metadata" -> code.ArchiveEntryName
   source method "getNameIndex" -> code.ArchiveEntryName
   // framework request-object accessors (Utopia/Appwrite, Symfony-style): the request URI /
@@ -177,6 +186,9 @@ adapter php {
   sink method "havingRaw" -> code.SqlExecution
   sink method "orderByRaw" -> code.SqlExecution
   sink method "selectRaw" -> code.SqlExecution
+  // Pimcore listings accept raw SQL condition fragments as arg0; bound values
+  // in later args are parameters and should not be treated as executable SQL.
+  sink method "addConditionParam" -> code.SqlExecution
   sink path "DB.statement" -> code.SqlExecution
   sink path "DB.select" -> code.SqlExecution
   sink path "DB.raw" -> code.SqlExecution
