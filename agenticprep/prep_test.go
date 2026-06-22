@@ -575,6 +575,44 @@ static PyObject *unicodeescape_string(int size) {
 	}
 }
 
+func TestPrepRequiresAssignmentInventoryForOutputEncodingProfiles(t *testing.T) {
+	dir := t.TempDir()
+	phpPath := filepath.Join(dir, "src", "services", "AuditService.php")
+	if err := os.MkdirAll(filepath.Dir(phpPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `<?php
+final class AuditService {
+    public function onSaveElement($element) {
+        $model = new AuditModel();
+        $model->title = $element->username;
+        $snapshot['title'] = Html::encode($element->username);
+    }
+}
+`
+	if err := os.WriteFile(phpPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !requiresAssignmentInventory(profile) {
+		t.Fatalf("expected output-encoding profile to require assignment inventory")
+	}
+	terms := requiredAssignmentInventoryTerms(profile)
+	if !containsString(terms, "title") || !containsString(terms, "encode") {
+		t.Fatalf("expected focused assignment terms, got %#v", terms)
+	}
+	if got := inventoryGateError(profile, nil, "read_file"); !strings.Contains(got, "assignment_inventory") {
+		t.Fatalf("expected read gate to require assignment inventory, got %q", got)
+	}
+	readyLog := []AgentStep{{ToolCalls: []AgentToolCall{{Name: "assignment_inventory", Arguments: map[string]any{"language": "php", "name_contains": "title"}}}}}
+	if got := inventoryGateError(profile, readyLog, "read_file"); got != "" {
+		t.Fatalf("expected assignment inventory gate satisfied, got %q", got)
+	}
+}
+
 func TestSymbolInventoryFindsClassesMethodsAndFunctions(t *testing.T) {
 	dir := t.TempDir()
 	phpPath := filepath.Join(dir, "src", "Controller", "CustomerTransformerController.php")
@@ -692,6 +730,53 @@ func Exec(policy Policy, c Config, verified []Signature) {
 	}
 }
 
+func TestAssignmentInventoryFindsPersistentDisplayWrites(t *testing.T) {
+	dir := t.TempDir()
+	auditPath := filepath.Join(dir, "src", "services", "AuditService.php")
+	if err := os.MkdirAll(filepath.Dir(auditPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `<?php
+final class AuditService {
+    public function onSaveElement($element) {
+        $model = new AuditModel();
+        $title = $element->username;
+        if ($title) {
+            $model->title = $title;
+            $snapshot['title'] = Html::encode($title);
+        }
+    }
+}
+`
+	if err := os.WriteFile(auditPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	assignments, err := assignmentInventory(profile, assignmentInventoryQuery{Language: "php", NameContains: "title", Max: 20})
+	if err != nil {
+		t.Fatalf("assignmentInventory: %v", err)
+	}
+	if !hasAssignment(assignments, "$model->title", "$title") {
+		t.Fatalf("expected raw model title assignment, got %#v", assignments)
+	}
+	if !hasAssignment(assignments, "$snapshot['title']", "Html::encode($title)") {
+		t.Fatalf("expected encoded snapshot assignment, got %#v", assignments)
+	}
+	for _, assignment := range assignments {
+		if assignment.Target == "$model->title" {
+			if assignment.Enclosing != "AuditService.onSaveElement" {
+				t.Fatalf("expected enclosing method, got %#v", assignment)
+			}
+			if assignment.Score <= 0 {
+				t.Fatalf("expected scored assignment, got %#v", assignment)
+			}
+		}
+	}
+}
+
 func TestRepoStructureRanksSecurityRelevantDirectories(t *testing.T) {
 	dir := t.TempDir()
 	api := filepath.Join(dir, "api", "upload.php")
@@ -757,6 +842,15 @@ func containsString(vals []string, want string) bool {
 func hasSymbol(symbols []symbolEntry, kind, name string) bool {
 	for _, sym := range symbols {
 		if sym.Kind == kind && sym.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAssignment(assignments []assignmentEntry, target string, valueContains string) bool {
+	for _, assignment := range assignments {
+		if assignment.Target == target && strings.Contains(assignment.Value, valueContains) {
 			return true
 		}
 	}

@@ -2346,6 +2346,15 @@ concept CraftAnonymousTemplateRenderActionXss : sink {
   review_assumption: "a direct action request can reach the template renderer and cause attacker-controlled template output to be served to a browser"
   review_confidence: high
 }
+concept PersistentModelTitleStoredXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "a persistent model title is stored from an element/user title while only the parallel snapshot value is HTML-encoded"
+  review_evidence: "save context {pattern} assigns the raw title to the persisted model title before saving the audit/model record"
+  review_assumption: "the stored title can be controlled by an element or user and later rendered through a raw/template-safe display path"
+  review_confidence: high
+}
 concept QuickAppsUserRealNameStoredXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

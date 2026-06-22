@@ -270,6 +270,11 @@ rule CraftAnonymousTemplateRenderActionXss {
   match code.CraftAnonymousTemplateRenderActionXss as sink
 }
 
+rule PersistentModelTitleStoredXss {
+  meta { id: "VYQL-INJ-117", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.PersistentModelTitleStoredXss as sink
+}
+
 rule QuickAppsUserRealNameStoredXss {
   meta { id: "VYQL-INJ-077", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.QuickAppsUserRealNameStoredXss as sink

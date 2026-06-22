@@ -1081,6 +1081,12 @@ review code.CraftAnonymousTemplateRenderActionXss {
   kind: "attention"
   text: "review Craft TemplatesController for a beforeAction direct-access guard before anonymous template rendering"
 }
+review code.PersistentModelTitleStoredXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review persistent model title assignment for HTML encoding before the title is stored and later rendered"
+}
 review code.QuickAppsUserRealNameStoredXss {
   category: "xss"
   kind: "attention"

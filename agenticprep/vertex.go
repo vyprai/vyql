@@ -186,8 +186,9 @@ Rules:
   correction.
 - Prefer repo_structure, symbol_inventory, call_inventory, search_context, and read_files over repeated
   single-file reads. Use symbol_inventory to map classes/functions/methods, then
-  call_inventory to find API callers before opening exact files. Use read_file
-  only when one exact file or offset is needed.
+  call_inventory and assignment_inventory to find API callers, state writes,
+  config/trust-boundary updates, and persistent display fields before opening
+  exact files. Use read_file only when one exact file or offset is needed.
 - Prefer this workflow:
   1. inspect_profile
   2. trust_model and entrypoint_inventory to understand the repo archetype,
@@ -201,11 +202,14 @@ Rules:
      database, crypto, XML, archive, or network code.
   4. repo_structure for unfamiliar repositories, then adapter_reference,
      package_reference, and concept_reference
-  5. security_relevant_files, then symbol_inventory, call_inventory, list_files,
+  5. security_relevant_files, then symbol_inventory, call_inventory,
+     assignment_inventory, list_files,
      search_context, or search_text for exact wrappers/routes/config. Use
      symbol_inventory before opening many files just to discover class, method,
      or function names; use call_inventory to find security API call sites and
-     their enclosing declarations. For PHP
+     their enclosing declarations; use assignment_inventory to find raw values
+     assigned into model/entity/config/session/permission/title/name/path/url
+     fields and to compare nearby escaping/sanitization assignments. For PHP
      and similar ecosystems, include helper
      files such as .inc/.phtml and search command sinks plus restore/import,
      upload, archive, and filename flows. For Java/C#/server frameworks,
@@ -225,6 +229,11 @@ Rules:
      For upload XSS CVEs, inspect upload services/helpers that derive extensions
      from client filenames or MIME types and store SVG, HTML, or XML-capable files;
      check for SVG/XML sanitizers before storeAs/move/save/write.
+     For stored/reflected XSS or output-encoding gaps, inspect title/name/label/html/body/content
+     assignments and rendering/snapshot paths. Use assignment_inventory with
+     name_contains values such as title, name, html, body, content, snapshot,
+     encode, escape, and sanitize; then call function_context before proposing
+     a narrow analysis.function.context mark.
      For PHP/Symfony/Pimcore repositories, treat Request parameter bags such as
      $request->query->get/all/filter and raw query-condition builders such as
      addConditionParam, whereRaw, havingRaw, orderByRaw, and selectRaw as high-priority
@@ -361,17 +370,21 @@ agentLoop:
 				}
 				needsSymbols := requiresSymbolInventory(profile)
 				requiredCallTerms := requiredCallInventoryTerms(profile)
+				needsAssignments := requiresAssignmentInventory(profile)
+				requiredAssignmentTerms := requiredAssignmentInventoryTerms(profile)
 				missingRequiredSymbols := needsSymbols && !agentLogHasTool(log, "symbol_inventory")
 				missingRequiredCalls := needsSymbols && !agentLogHasTool(log, "call_inventory")
 				missingFocusedCalls := len(requiredCallTerms) > 0 && !agentLogHasCallInventoryTerm(log, requiredCallTerms)
+				missingRequiredAssignments := needsAssignments && !agentLogHasTool(log, "assignment_inventory")
+				missingFocusedAssignments := needsAssignments && len(requiredAssignmentTerms) > 0 && !agentLogHasAssignmentInventoryTerm(log, requiredAssignmentTerms)
 				validationWarnings := []string(nil)
 				validAdapterCount := 0
-				if warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls {
+				if warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments {
 					filtered, warnings := FilterValidProposal(profile, proposal, Config{})
 					validationWarnings = warnings
 					validAdapterCount = len(filtered.AdapterFiles)
 				}
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && len(validationWarnings) == 0
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -391,6 +404,12 @@ agentLoop:
 				} else if missingFocusedCalls {
 					toolResult["error"] = "call_inventory must be focused on the repo evidence before finish_overlay; call call_inventory with one of these name_contains terms: " + strings.Join(requiredCallTerms, ", ")
 					p.debugf("step=%d finish_overlay rejected: focused call_inventory required terms=%s", step, strings.Join(requiredCallTerms, ","))
+				} else if missingRequiredAssignments {
+					toolResult["error"] = "assignment_inventory is required before finish_overlay for repositories with output-encoding, stored display, model field, or trust-boundary assignment evidence; call assignment_inventory with focused terms such as " + strings.Join(requiredAssignmentTerms, ", ")
+					p.debugf("step=%d finish_overlay rejected: assignment_inventory required", step)
+				} else if missingFocusedAssignments {
+					toolResult["error"] = "assignment_inventory must be focused on repo output/trust-boundary evidence before finish_overlay; call assignment_inventory with one of these name_contains terms: " + strings.Join(requiredAssignmentTerms, ", ")
+					p.debugf("step=%d finish_overlay rejected: focused assignment_inventory required terms=%s", step, strings.Join(requiredAssignmentTerms, ","))
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -450,18 +469,21 @@ agentLoop:
 			contents = append(contents, map[string]any{
 				"role": "user",
 				"parts": []map[string]any{{
-					"text": "Decision checkpoint: stop searching now. Your next tool call must be validate_overlay if you have concrete source plus sink/mark/control evidence, or finish_overlay with adapter_files=[] if you do not. If finish_overlay is rejected because required symbol_inventory or call_inventory is missing, call exactly those inventory tools with the requested focused terms, then call finish_overlay. Do not call search, read, repo, dependency, or reference tools after this checkpoint.",
+					"text": "Decision checkpoint: stop searching now. Your next tool call must be validate_overlay if you have concrete source plus sink/mark/control evidence, or finish_overlay with adapter_files=[] if you do not. If finish_overlay is rejected because required symbol_inventory, call_inventory, or assignment_inventory is missing, call exactly those inventory tools with the requested focused terms, then call finish_overlay. Do not call search, read, repo, dependency, or reference tools after this checkpoint.",
 				}},
 			})
 		}
 		log = append(log, entry)
-		validatorRequiredInventory := hasToolCall(calls, "symbol_inventory") || hasToolCall(calls, "call_inventory")
+		validatorRequiredInventory := hasToolCall(calls, "symbol_inventory") || hasToolCall(calls, "call_inventory") || hasToolCall(calls, "assignment_inventory")
 		if decisionCheckpointSent && validatorRequiredInventory && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") {
 			needsSymbols := requiresSymbolInventory(profile)
 			requiredCallTerms := requiredCallInventoryTerms(profile)
+			requiredAssignmentTerms := requiredAssignmentInventoryTerms(profile)
 			missingSymbols := needsSymbols && !agentLogHasTool(log, "symbol_inventory")
 			missingCalls := needsSymbols && !agentLogHasTool(log, "call_inventory")
 			missingFocused := len(requiredCallTerms) > 0 && !agentLogHasCallInventoryTerm(log, requiredCallTerms)
+			missingAssignments := requiresAssignmentInventory(profile) && !agentLogHasTool(log, "assignment_inventory")
+			missingFocusedAssignments := requiresAssignmentInventory(profile) && len(requiredAssignmentTerms) > 0 && !agentLogHasAssignmentInventoryTerm(log, requiredAssignmentTerms)
 			msg := "Required inventory is now satisfied. Next tool call must be finish_overlay with adapter_files=[] unless you have already validated a concrete adapter."
 			switch {
 			case missingSymbols:
@@ -470,6 +492,10 @@ agentLoop:
 				msg = "Checkpoint correction: call_inventory is still required before finish_overlay. Call call_inventory with focused API terms, then finish_overlay."
 			case missingFocused:
 				msg = "Checkpoint correction: call_inventory was too broad. Call call_inventory with one of these name_contains terms, then finish_overlay: " + strings.Join(requiredCallTerms, ", ")
+			case missingAssignments:
+				msg = "Checkpoint correction: assignment_inventory is still required before finish_overlay. Call assignment_inventory with focused write terms, then finish_overlay: " + strings.Join(requiredAssignmentTerms, ", ")
+			case missingFocusedAssignments:
+				msg = "Checkpoint correction: assignment_inventory was too broad. Call assignment_inventory with one of these name_contains terms, then finish_overlay: " + strings.Join(requiredAssignmentTerms, ", ")
 			}
 			p.debugf("step=%d post-inventory checkpoint correction", step)
 			contents = append(contents, map[string]any{
@@ -484,7 +510,7 @@ agentLoop:
 			contents = append(contents, map[string]any{
 				"role": "user",
 				"parts": []map[string]any{{
-					"text": "Checkpoint correction: do not call more setup/search/reference tools. Next call must be finish_overlay, unless the last finish_overlay response required symbol_inventory or call_inventory; in that case call only the required inventory tool with the requested focused terms, then finish_overlay.",
+					"text": "Checkpoint correction: do not call more setup/search/reference tools. Next call must be finish_overlay, unless the last finish_overlay response required symbol_inventory, call_inventory, or assignment_inventory; in that case call only the required inventory tool with the requested focused terms, then finish_overlay.",
 				}},
 			})
 		}
@@ -564,20 +590,46 @@ func agentLogHasCallInventoryTerm(log []AgentStep, terms []string) bool {
 	return false
 }
 
+func agentLogHasAssignmentInventoryTerm(log []AgentStep, terms []string) bool {
+	for _, step := range log {
+		for _, call := range step.ToolCalls {
+			if call.Name != "assignment_inventory" {
+				continue
+			}
+			arg := strings.ToLower(stringArg(call.Arguments, "name_contains") + " " + stringArg(call.Arguments, "value_contains"))
+			if strings.TrimSpace(arg) == "" {
+				return true
+			}
+			for _, term := range terms {
+				term = strings.ToLower(term)
+				if strings.Contains(arg, term) || strings.Contains(term, strings.TrimSpace(arg)) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func inventoryGateError(profile Profile, log []AgentStep, toolName string) string {
 	switch toolName {
 	case "search_text", "search_context", "read_file", "read_files":
 	default:
 		return ""
 	}
-	if !requiresSymbolInventory(profile) {
+	needsSymbols := requiresSymbolInventory(profile)
+	needsAssignments := requiresAssignmentInventory(profile)
+	if !needsSymbols && !needsAssignments {
 		return ""
 	}
 	requiredCallTerms := requiredCallInventoryTerms(profile)
-	missingSymbols := !agentLogHasTool(log, "symbol_inventory")
-	missingCalls := !agentLogHasTool(log, "call_inventory")
+	requiredAssignmentTerms := requiredAssignmentInventoryTerms(profile)
+	missingSymbols := needsSymbols && !agentLogHasTool(log, "symbol_inventory")
+	missingCalls := needsSymbols && !agentLogHasTool(log, "call_inventory")
 	missingFocused := len(requiredCallTerms) > 0 && !agentLogHasCallInventoryTerm(log, requiredCallTerms)
-	if !missingSymbols && !missingCalls && !missingFocused {
+	missingAssignments := needsAssignments && !agentLogHasTool(log, "assignment_inventory")
+	missingFocusedAssignments := needsAssignments && len(requiredAssignmentTerms) > 0 && !agentLogHasAssignmentInventoryTerm(log, requiredAssignmentTerms)
+	if !missingSymbols && !missingCalls && !missingFocused && !missingAssignments && !missingFocusedAssignments {
 		return ""
 	}
 	if missingSymbols && missingCalls {
@@ -588,6 +640,9 @@ func inventoryGateError(profile Profile, log []AgentStep, toolName string) strin
 	}
 	if missingCalls || missingFocused {
 		return "call call_inventory with focused terms before broad search/read tools: " + strings.Join(requiredCallTerms, ", ")
+	}
+	if missingAssignments || missingFocusedAssignments {
+		return "call assignment_inventory with focused write terms before broad search/read tools: " + strings.Join(requiredAssignmentTerms, ", ")
 	}
 	return ""
 }
@@ -649,6 +704,35 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"signature", "verify", "policy", "certificate", "rekor", "fulcio"}
 	default:
 		return nil
+	}
+}
+
+func requiresAssignmentInventory(profile Profile) bool {
+	if profile.Languages["php"] == 0 && profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 && profile.Languages["python"] == 0 && profile.Languages["ruby"] == 0 && profile.Languages["java"] == 0 && profile.Languages["go"] == 0 {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{
+		"xss", "html::encode", "htmlspecialchars", "escapehtml", "template::raw",
+		"twig\\markup", "html", "render", "title", "snapshot", "audit",
+		"permission", "role", "policy", "session", "redirect", "origin",
+		"url", "path", "filename", "token", "secret",
+	})
+}
+
+func requiredAssignmentInventoryTerms(profile Profile) []string {
+	switch {
+	case profileContainsAnyTerm(profile, []string{"xss", "html::encode", "htmlspecialchars", "escapehtml", "template::raw", "twig\\markup", "html", "render", "title", "snapshot", "audit"}):
+		return []string{"title", "html", "body", "content", "snapshot", "name", "label", "encode", "escape", "sanitize", "raw", "render"}
+	case profileContainsAnyTerm(profile, []string{"permission", "role", "policy", "admin", "authorization"}):
+		return []string{"permission", "role", "policy", "admin", "access", "allow", "deny"}
+	case profileContainsAnyTerm(profile, []string{"session", "redirect", "origin", "url", "callback"}):
+		return []string{"session", "redirect", "origin", "url", "callback", "target", "return"}
+	case profileContainsAnyTerm(profile, []string{"path", "filename", "file", "upload"}):
+		return []string{"path", "filename", "file", "upload", "name", "extension"}
+	case profileContainsAnyTerm(profile, []string{"token", "secret", "password", "key"}):
+		return []string{"token", "secret", "password", "key", "credential"}
+	default:
+		return []string{"value", "target", "name", "path", "title", "permission"}
 	}
 }
 
@@ -847,6 +931,20 @@ func vertexPrepTools() []map[string]any {
 					"name_contains": map[string]any{"type": "string"},
 					"path_contains": map[string]any{"type": "string"},
 					"max":           map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
+			"name":        "assignment_inventory",
+			"description": "Return bounded AST-style assignment/write inventory across repo source files, including target, operator, value preview, RHS calls, enclosing declaration, and snippets. Use it to find model/config/session/permission/title/path/url/html fields and compare raw writes against escaped or validated writes without opening files one-by-one.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language":       map[string]any{"type": "string"},
+					"name_contains":  map[string]any{"type": "string"},
+					"value_contains": map[string]any{"type": "string"},
+					"path_contains":  map[string]any{"type": "string"},
+					"max":            map[string]any{"type": "integer"},
 				},
 			},
 		},
@@ -1152,6 +1250,19 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 			return map[string]any{"ok": false, "error": err.Error()}
 		}
 		return map[string]any{"ok": true, "calls": calls}
+	case "assignment_inventory":
+		q := assignmentInventoryQuery{
+			Language:      stringArg(call.Arguments, "language"),
+			NameContains:  stringArg(call.Arguments, "name_contains"),
+			ValueContains: stringArg(call.Arguments, "value_contains"),
+			PathContains:  stringArg(call.Arguments, "path_contains"),
+			Max:           intArg(call.Arguments, "max", 160),
+		}
+		assignments, err := assignmentInventory(profile, q)
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "assignments": assignments}
 	case "search_text":
 		pattern, _ := call.Arguments["pattern"].(string)
 		matches, err := searchProfileText(profile, pattern, boolArg(call.Arguments, "regex"), boolArg(call.Arguments, "ignoreCase"), intArg(call.Arguments, "max", 80))
@@ -1539,6 +1650,91 @@ func callInventory(profile Profile, q callInventoryQuery) ([]callEntry, error) {
 	return out, err
 }
 
+type assignmentInventoryQuery struct {
+	Language      string
+	NameContains  string
+	ValueContains string
+	PathContains  string
+	Max           int
+}
+
+type assignmentEntry struct {
+	Path      string   `json:"path"`
+	Line      int      `json:"line"`
+	Language  string   `json:"language"`
+	Target    string   `json:"target"`
+	Operator  string   `json:"operator"`
+	Value     string   `json:"value"`
+	Enclosing string   `json:"enclosing,omitempty"`
+	RHSCalls  []string `json:"rhs_calls,omitempty"`
+	Snippet   string   `json:"snippet"`
+	Score     int      `json:"score,omitempty"`
+}
+
+func assignmentInventory(profile Profile, q assignmentInventoryQuery) ([]assignmentEntry, error) {
+	if q.Max <= 0 || q.Max > 500 {
+		q.Max = 160
+	}
+	langFilter := strings.TrimSpace(strings.ToLower(q.Language))
+	nameFilter := strings.TrimSpace(strings.ToLower(q.NameContains))
+	valueFilter := strings.TrimSpace(strings.ToLower(q.ValueContains))
+	pathFilter := strings.TrimSpace(strings.ToLower(filepath.ToSlash(q.PathContains)))
+	seen := map[string]bool{}
+	var out []assignmentEntry
+	err := walkProfileFiles(profile, func(path string) bool {
+		fileLang := languageFor(path)
+		if langFilter != "" && fileLang != langFilter {
+			return true
+		}
+		display := displayPath(profile, path)
+		if pathFilter != "" && !strings.Contains(strings.ToLower(filepath.ToSlash(display)), pathFilter) {
+			return true
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return true
+		}
+		if len(data) > 256<<10 {
+			data = data[:256<<10]
+		}
+		text := string(data)
+		symbols := extractSymbols(fileLang, text)
+		for _, assignment := range extractAssignments(fileLang, text, symbols) {
+			hayName := strings.ToLower(assignment.Target + " " + assignment.Enclosing + " " + strings.Join(assignment.RHSCalls, " ") + " " + assignment.Snippet)
+			hayValue := strings.ToLower(assignment.Value + " " + strings.Join(assignment.RHSCalls, " ") + " " + assignment.Snippet)
+			if nameFilter != "" && !strings.Contains(hayName, nameFilter) {
+				continue
+			}
+			if valueFilter != "" && !strings.Contains(hayValue, valueFilter) {
+				continue
+			}
+			assignment.Path = display
+			assignment.Language = fileLang
+			assignment.Score = securityRelevanceScore(display, assignment.Target+"\n"+assignment.Value+"\n"+assignment.Snippet) + assignmentRiskScore(assignment)
+			key := fmt.Sprintf("%s:%d:%s:%s", assignment.Path, assignment.Line, assignment.Target, assignment.Value)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, assignment)
+			if len(out) >= q.Max {
+				return false
+			}
+		}
+		return true
+	})
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].Line < out[j].Line
+	})
+	return out, err
+}
+
 func extractCalls(lang, text string, symbols []symbolEntry) []callEntry {
 	re := callPattern(lang)
 	if re == nil {
@@ -1572,6 +1768,128 @@ func extractCalls(lang, text string, symbols []symbolEntry) []callEntry {
 		}
 	}
 	return out
+}
+
+func extractAssignments(lang, text string, symbols []symbolEntry) []assignmentEntry {
+	re := assignmentPattern(lang)
+	if re == nil {
+		return nil
+	}
+	var out []assignmentEntry
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		clean := strings.TrimSpace(line)
+		if clean == "" || strings.HasPrefix(clean, "//") || strings.HasPrefix(clean, "#") || strings.HasPrefix(clean, "*") || isSymbolDeclarationLine(lang, clean) {
+			continue
+		}
+		m := re.FindStringSubmatch(clean)
+		if len(m) < 4 {
+			continue
+		}
+		target := normalizeAssignmentSide(m[1])
+		operator := strings.TrimSpace(m[2])
+		value := normalizeAssignmentValue(m[3])
+		if !validAssignmentTarget(target) || value == "" {
+			continue
+		}
+		out = append(out, assignmentEntry{
+			Line:      i + 1,
+			Target:    target,
+			Operator:  operator,
+			Value:     compactSnippet(value, 260),
+			Enclosing: enclosingDeclaration(symbols, i+1),
+			RHSCalls:  callsInExpression(lang, value),
+			Snippet:   nearbySnippet(lines, i, 1, 1, 420),
+		})
+	}
+	return out
+}
+
+func assignmentPattern(lang string) *regexp.Regexp {
+	switch lang {
+	case "php":
+		return regexp.MustCompile(`^(.+?)\s*(=|\.=|\+=|-=)\s*(.+?);?\s*(?://.*)?$`)
+	case "python":
+		return regexp.MustCompile(`^(.+?)\s*(=|\+=|-=|\*=|/=)\s*(.+?)\s*(?:#.*)?$`)
+	case "go", "javascript", "typescript", "java", "kotlin", "scala", "c", "cpp", "csharp", "rust", "ruby", "bash":
+		return regexp.MustCompile(`^(.+?)\s*(:=|=|\+=|-=|\*=|/=|\|\|=|&&=|\?\?=)\s*(.+?);?\s*(?://.*|#.*)?$`)
+	default:
+		return nil
+	}
+}
+
+func normalizeAssignmentSide(side string) string {
+	side = strings.TrimSpace(side)
+	side = strings.TrimPrefix(side, "let ")
+	side = strings.TrimPrefix(side, "const ")
+	side = strings.TrimPrefix(side, "var ")
+	return strings.Join(strings.Fields(side), "")
+}
+
+func normalizeAssignmentValue(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.TrimSuffix(value, ";")
+	if strings.HasPrefix(strings.TrimSpace(value), ">") {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+func validAssignmentTarget(target string) bool {
+	if target == "" || len(target) > 180 {
+		return false
+	}
+	lower := strings.ToLower(target)
+	for _, bad := range []string{"if(", "while(", "for(", "switch(", "return", "=>", "==", "!=", "<=", ">="} {
+		if strings.Contains(lower, bad) {
+			return false
+		}
+	}
+	return regexp.MustCompile(`[\w$\]\)]`).MatchString(target)
+}
+
+func callsInExpression(lang string, expr string) []string {
+	re := callPattern(lang)
+	if re == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, m := range re.FindAllStringSubmatch(expr, -1) {
+		if len(m) < 2 {
+			continue
+		}
+		callee := normalizeCallee(m[1])
+		name := calleeName(callee)
+		if callee == "" || name == "" || isControlSymbolName(name) || seen[callee] {
+			continue
+		}
+		seen[callee] = true
+		out = append(out, callee)
+		if len(out) >= 8 {
+			break
+		}
+	}
+	return out
+}
+
+func assignmentRiskScore(entry assignmentEntry) int {
+	hay := strings.ToLower(entry.Target + " " + entry.Value + " " + entry.Snippet + " " + strings.Join(entry.RHSCalls, " "))
+	score := 0
+	for token, weight := range map[string]int{
+		"title": 14, "name": 8, "label": 8, "html": 12, "body": 8, "content": 8,
+		"snapshot": 16, "audit": 12, "model": 8, "entity": 6, "user": 8,
+		"username": 14, "render": 10, "template": 10, "escape": 10, "encode": 10,
+		"sanitize": 12, "htmlspecialchars": 18, "html::encode": 18,
+		"permission": 12, "role": 10, "admin": 8, "policy": 8, "session": 8,
+		"path": 8, "filename": 10, "url": 8, "redirect": 12, "origin": 10,
+		"token": 8, "secret": 12, "password": 12, "key": 6,
+	} {
+		if strings.Contains(hay, token) {
+			score += weight
+		}
+	}
+	return score
 }
 
 func callPattern(lang string) *regexp.Regexp {
@@ -2712,6 +3030,8 @@ func suggestContextVals(name string, compact string) []string {
 	for _, token := range []string{
 		"orderBy", "direction", "QUERY_ORDER_DESC", "QUERY_ORDER_ASC", "request.query_params.get(\"state\")",
 		"request.cookies.get(\"sso_state\")", "safe_load", "yaml.load", "redirect", "Location", "htmlspecialchars",
+		"Html::encode", "$model->title", "$snapshot['title']", "$snapshot[\"title\"]", "$element->username",
+		"$element->title", "snapshot", "title", "username",
 		"prepare", "execute", "processOrderBy", "$orderBy['direction']", "$orderBy[\"direction\"]",
 		"$request->query->get", "addConditionParam", "whereRaw", "havingRaw", "orderByRaw", "selectRaw",
 		"AllowOrigins", "AllowOriginFunc", "AllowAllOrigins", "parseWildcardRules", "validateOrigin",
@@ -2824,6 +3144,8 @@ func securitySnippet(text string) string {
 		"UploadedFile", "FileUploader", "storeAs(", "getClientOriginalExtension",
 		"getClientMimeType", "svg", "getSvgDimensions", "svgSanitize",
 		"sanitizeSvg", "Sanitizer",
+		"Html::encode", "htmlspecialchars", "escapeHtml", "$model->title",
+		"$snapshot['title']", "$snapshot[\"title\"]", "snapshot", "audit", "xss",
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
 		"Access-Control-Allow-Origin", "AllowOrigins", "AllowOriginFunc",
 		"AllowAllOrigins", "validateOrigin", "wildcard", "HasPrefix",
