@@ -754,6 +754,70 @@ func Generate(options ...Options) func(*Context) {
 	}
 }
 
+func TestPrepRanksJavaScriptSecretComparison(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "csrf.js")
+	if err := os.WriteFile(src, []byte(`var crypto = require('crypto')
+
+function csrf(token) {
+  if (token && typeof token === 'string')
+    return token
+  return crypto.randomBytes(24).toString('base64')
+}
+
+csrf.valid = csrf.validate = function (data, token) {
+  if (!token || typeof token !== 'string')
+    return false
+
+  var valid = data['x-csrf-token'] === token
+  delete data['x-csrf-token']
+  return valid
+}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !secretComparisonProfile(profile) {
+		t.Fatal("expected secret comparison profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatal("expected secret comparison profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"validate", "token", "csrf", "equal"} {
+		if !containsString(callTerms, want) {
+			t.Fatalf("expected focused call term %q in %#v", want, callTerms)
+		}
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	for _, want := range []string{"valid", "token", "data"} {
+		if !containsString(assignmentTerms, want) {
+			t.Fatalf("expected focused assignment term %q in %#v", want, assignmentTerms)
+		}
+	}
+	contexts, err := functionContexts(profile, src, "validate", "x-csrf-token", 5)
+	if err != nil {
+		t.Fatalf("functionContexts: %v", err)
+	}
+	if len(contexts) == 0 || contexts[0].Name != "csrf.validate" || !strings.Contains(contexts[0].CompactPreview, "data['x-csrf-token']===token") {
+		t.Fatalf("expected assigned JavaScript validate context, got %#v", contexts)
+	}
+	narrow := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  mark exact "analysis.function.context" val "lang=javascript" val "data['x-csrf-token']===token" val "deletedata['x-csrf-token']" nval "scmp" nval "timingSafeEqual" -> code.SecretComparisonReview
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow secret-comparison context mark to validate: %v", err)
+	}
+}
+
 func TestPrepRanksMcpToolCommandTemplates(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"dependencies":{"@modelcontextprotocol/sdk":"^1.0.0","zod":"^3.0.0","@acme/plainlib":"1.0.0"}}`), 0o644); err != nil {
@@ -2106,6 +2170,20 @@ func TestPrepConceptReferenceIncludesInsecureCookie(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected insecure cookie scan concept in reference, got %#v", concepts)
+	}
+}
+
+func TestPrepConceptReferenceIncludesSecretComparison(t *testing.T) {
+	concepts := conceptReference("secret comparison")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.SecretComparisonReview" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected secret comparison scan concept in reference, got %#v", concepts)
 	}
 }
 

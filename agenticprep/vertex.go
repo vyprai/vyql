@@ -326,6 +326,15 @@ Rules:
      the fixed option/field such as opt.Secure, Secure: true, or setSecure(true).
      Do not finish empty merely because net/http cookies are standard library
      concepts; local/framework SetCookie wrappers often need adapter context.
+     For token, webhook secret, API key, BasicAuth, CSRF, password, or signature
+     comparison side-channel CVEs, inspect validation functions that compare an
+     attacker-supplied candidate to stored/generated secret material using ==,
+     ===, equals, or string comparison helpers. Prefer code.SecretComparisonReview
+     with nvals for constant-time helpers such as scmp, timingSafeEqual,
+     crypto.timingSafeEqual, subtle.ConstantTimeCompare, MessageDigest.isEqual,
+     or hmac.compare_digest. Use function_context for local validate/check
+     functions and do not finish empty unless core scan coverage for
+     SecretComparisonReview/VYQL-CRY-006 is explicitly applicable.
      For upload XSS CVEs, inspect upload services/helpers that derive extensions
      from client filenames or MIME types and store SVG, HTML, or XML-capable files;
      check for SVG/XML sanitizers before storeAs/move/save/write.
@@ -582,9 +591,10 @@ agentLoop:
 				emptyCommandWrapperOverlay := commandWrapperProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || (!notesMentionAny(proposal.Notes, []string{"commandstringwrapperexecution", "argv", "process builder", "processbuilder", "$env:", "env var", "environment variable"}) || notesMentionAny(proposal.Notes, []string{"interprocedural", "automatically handled", "generic command execution", "os/exec", "exec.command"})))
 				emptyCommandOptionOverlay := commandOptionProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!notesMentionAny(proposal.Notes, []string{"commandoptioninjection", "end-of-options", "--", "option injection"}) || notesMentionAny(proposal.Notes, []string{"no direct untrusted", "no untrusted entry", "no source", "map as a source"}))
 				emptySecureCookieOverlay := secureCookieProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"insecurecookie", "vyql-cfg-007", "secure cookie", "secure flag", "setcookie"}))
+				emptySecretComparisonOverlay := secretComparisonProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"secretcomparisonreview", "vyql-cry-006", "constant-time", "constant time", "timingsafeequal", "scmp"}))
 				cryptoBlindingEvidence := cryptoBlindingProfile(profile)
 				emptyCryptoBlindingOverlay := cryptoBlindingEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"cryptoimproperblinding", "vyql-cry-011", "core scan", "base scanner", "existing scanner"}))
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptySecureCookieOverlay && !emptyCryptoBlindingOverlay
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptySecureCookieOverlay && !emptySecretComparisonOverlay && !emptyCryptoBlindingOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -631,6 +641,9 @@ agentLoop:
 				} else if emptySecureCookieOverlay {
 					toolResult["error"] = "secure-cookie evidence is present; do not return an empty overlay until you have called concept_reference with topic \"secure cookie\", function_context for the cookie setter containing SetCookie plus token/session/csrf evidence, and validate_overlay with code.InsecureCookie or concrete evidence that the secure flag is passed from the configured option such as opt.Secure"
 					p.debugf("step=%d finish_overlay rejected: empty secure-cookie overlay", step)
+				} else if emptySecretComparisonOverlay {
+					toolResult["error"] = "secret/token comparison evidence is present; do not return an empty overlay until you have called concept_reference with topic \"secret comparison\", function_context for the validate/check function containing token/secret equality, and validate_overlay with code.SecretComparisonReview or concrete evidence that core VYQL-CRY-006 coverage already matches and a constant-time helper such as scmp or timingSafeEqual is used in fixed code"
+					p.debugf("step=%d finish_overlay rejected: empty secret-comparison overlay", step)
 				} else if emptyCryptoBlindingOverlay {
 					toolResult["error"] = "crypto blinding/timing evidence is present; do not return an empty overlay until you have called concept_reference with topic \"blinding\", function_context for the private-key operation containing Randomize/MultiplicativeInverse/Jacobi/Square evidence, and validate_overlay with code.CryptoImproperBlinding or concrete evidence that the randomized blinding factor is squared/subgroup-hardened before inverse/unblinding use"
 					p.debugf("step=%d finish_overlay rejected: empty crypto blinding overlay", step)
@@ -994,6 +1007,8 @@ func requiresSymbolInventory(profile Profile) bool {
 		"cors", "alloworigins", "alloworiginfunc", "allowallorigins",
 		"access-control-allow-origin", "trustedorigin", "trusted_origin",
 		"wildcard", "validateorigin", "checkorigin", "callback",
+		"x-csrf-token", "csrf.valid", "csrf.validate", "=== token",
+		"== token", "timingsafeequal", "constant-time", "constant time",
 		"setcookie", "cookiehttponly", "secure flag", "secure bool",
 		"opt.secure", "secure=false",
 		"attestation", "predicate", "signature", "provenance",
@@ -1048,6 +1063,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"testconnection", "connect", "getprojects", "buildclient", "queryparameter", "dotest", "docheck", "dofill", "checkpermission", "haspermission", "post"}
 	case commandOptionProfile(profile):
 		return []string{"escapeshellarg", "operation", "--", "setoperation", "gpg", "gnupg", "key", "fingerprint", "argument", "option"}
+	case secretComparisonProfile(profile):
+		return []string{"validate", "token", "secret", "csrf", "compare", "equal", "scmp", "timingsafeequal"}
 	case secureCookieProfile(profile):
 		return []string{"setcookie", "cookie", "secure", "httponly", "csrf", "token", "session"}
 	case cryptoBlindingProfile(profile):
@@ -1123,6 +1140,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 		return []string{"url", "applicationname", "password", "proxy", "host", "port", "credential", "permission"}
 	case commandOptionProfile(profile):
 		return []string{"operation", "argument", "args", "keyid", "fingerprint", "option", "command", "escape", "delimiter"}
+	case secretComparisonProfile(profile):
+		return []string{"valid", "token", "secret", "csrf", "data", "compare"}
 	case secureCookieProfile(profile):
 		return []string{"secure", "cookie", "httponly", "token", "session", "csrf"}
 	case commandWrapperProfile(profile):
@@ -1208,6 +1227,24 @@ func secureCookieProfile(profile Profile) bool {
 		"csrf", "xsrf", "token", "session", "auth", "credential", "secret", "cookiehttponly",
 	})
 	return hasSecureOption && hasSensitiveCookie
+}
+
+func secretComparisonProfile(profile Profile) bool {
+	hasSecretMaterial := profileContainsAnyTerm(profile, []string{
+		"x-csrf-token", "csrf.valid", "csrf.validate", "token", "secret",
+		"password", "credential", "authorization", "basicauth", "signature",
+	})
+	if !hasSecretMaterial {
+		return false
+	}
+	hasComparison := profileContainsAnyTerm(profile, []string{
+		"=== token", "== token", "!== token", "!= token", ".equals", "compare_digest",
+		"timingsafeequal", "constant-time", "constant time", "scmp",
+	})
+	hasValidationContext := profileContainsAnyTerm(profile, []string{
+		"validate", "valid", "check", "auth", "csrf", "token", "secret",
+	})
+	return hasComparison && hasValidationContext
 }
 
 func mcpToolProfile(profile Profile) bool {
@@ -2059,6 +2096,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.UnsanitizedSvgUpload", "surface": "scan", "use": "mark for upload services that accept/store SVG files without sanitizing SVG XML/script content before saving"},
 		{"concept": "code.LengthDerivedAllocation", "surface": "scan", "use": "mark for resource DoS patterns where request/protocol/body length fields drive allocation or full buffering before an explicit max-size or available-data bound"},
 		{"concept": "code.InsecureCookie", "surface": "scan", "use": "mark for session, token, CSRF, auth, or credential cookies set with Secure:false or framework SetCookie wrappers that pass a literal false secure flag instead of the configured secure option"},
+		{"concept": "code.SecretComparisonReview", "surface": "scan", "use": "mark for validation functions comparing attacker-supplied CSRF tokens, API keys, webhook secrets, BasicAuth credentials, signatures, or passwords with ordinary equality instead of constant-time comparison; include nvals for scmp, timingSafeEqual, ConstantTimeCompare, MessageDigest.isEqual, or compare_digest"},
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
@@ -3632,6 +3670,19 @@ func braceFunctionContexts(path string, content string, lang string, name string
 	if lang == "go" {
 		re := regexp.MustCompile(`(?m)^\s*func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(`)
 		for _, m := range re.FindAllStringSubmatchIndex(content, -1) {
+			if len(m) >= 4 && m[2] >= 0 {
+				matches = append(matches, fnMatch{start: m[0], headerEnd: m[1], nameStart: m[2], nameEnd: m[3]})
+			}
+		}
+	} else if lang == "javascript" || lang == "typescript" {
+		re := regexp.MustCompile(`(?m)([A-Za-z_$][A-Za-z0-9_$.]*)\s*=\s*function\s*\(`)
+		for _, m := range re.FindAllStringSubmatchIndex(content, -1) {
+			if len(m) >= 4 && m[2] >= 0 {
+				matches = append(matches, fnMatch{start: m[0], headerEnd: m[1], nameStart: m[2], nameEnd: m[3]})
+			}
+		}
+		namedRe := regexp.MustCompile(`(?m)function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(`)
+		for _, m := range namedRe.FindAllStringSubmatchIndex(content, -1) {
 			if len(m) >= 4 && m[2] >= 0 {
 				matches = append(matches, fnMatch{start: m[0], headerEnd: m[1], nameStart: m[2], nameEnd: m[3]})
 			}
