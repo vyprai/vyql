@@ -2752,6 +2752,10 @@ concept SecretFilePermissionReview : sink {
   review_assumption: "the helper may create the private key file with permissions broader than intended"
   review_confidence: possibility
 }
+concept SecretConfigFilePermissionMissing : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.InsecurePermission]
+  cwe: [CWE_276, CWE_522, CWE_732]
+}
 // Insecure (non-cryptographic) PRNG — Math.random / random.* / rand() etc. A PRESENCE
 // finding (CWE-330): security-sensitive code should use a CSPRNG (secrets / os.urandom /
 // SystemRandom / crypto.randomBytes / SecureRandom), which are deliberately NOT marked.

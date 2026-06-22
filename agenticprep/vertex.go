@@ -208,6 +208,10 @@ Rules:
      For privilege/permission CVEs, inspect static role, group, route, policy,
      and permission maps such as PermissionsByRole, roles, grants, ACLs, backup,
      restore, admin, manager, operator, or support-bundle permission lists.
+     For filesystem permission and secret-storage shapes, inspect functions
+     that write private keys, credentials, tokens, kubeconfigs, cloud-init,
+     ignition, or other boot/config artifacts and check for chmod, mode,
+     set_permissions, or setPosixFilePermissions hardening in the same context.
      For upload XSS CVEs, inspect upload services/helpers that derive extensions
      from client filenames or MIME types and store SVG, HTML, or XML-capable files;
      check for SVG/XML sanitizers before storeAs/move/save/write.

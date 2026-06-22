@@ -141,6 +141,7 @@ adapter rust {
   mark "danger_accept_invalid_certs" val "true" -> code.CertValidationDisabled
   mark method "mode" val "0o777" -> code.InsecurePermission
   mark method "mode" val "0o666" -> code.InsecurePermission
+  mark exact "analysis.function.context" val "lang=rust" val "config_dest.push(\"ignition\");" val "config_dest.push(\"config.ign\");" val "create_dir_all(&config_dest)" val "OpenOptions::new()" val ".create_new(true)" val "copy(&mutconfig_in,&mutconfig_out)" nval "set_permissions" nval "Permissions::from_mode" nval ".chmod(" nval ".set_mode(" -> code.SecretConfigFilePermissionMissing
   mark "File.create" val "/tmp/" -> code.InsecureTempFile
   mark "__subscript" -> code.IndexAccess
   mark "__unary.deref" -> code.NullableDeref
