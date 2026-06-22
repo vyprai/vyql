@@ -1,0 +1,111 @@
+# Rank 464 / CVE-2022-36895: Jenkins Compuware Topaz Utilities exposed
+# descriptor fill endpoints that enumerated host connection details and
+# credential IDs without Item/Configure or Overall/Administer checks.
+
+test "rank464: Compuware Topaz Utilities fill endpoints enumerate config without permission checks"
+  lang java
+  file JclDescriptorImpl.java
+  expect VYQL-AUTH-025
+  expect_review code.JenkinsDescriptorConfigEnumerationMissingPermission
+  code
+  ```
+  import com.cloudbees.plugins.credentials.CredentialsProvider;
+  import hudson.model.Item;
+  import hudson.security.ACL;
+  import hudson.util.ListBoxModel;
+  import hudson.util.ListBoxModel.Option;
+  import org.apache.commons.lang.StringUtils;
+  import org.kohsuke.stapler.AncestorInPath;
+  import org.kohsuke.stapler.QueryParameter;
+
+  abstract class JclDescriptorImpl {
+    public ListBoxModel doFillConnectionIdItems(@AncestorInPath Jenkins context,
+                                                @QueryParameter String connectionId,
+                                                @AncestorInPath Item project) {
+      CpwrGlobalConfiguration globalConfig = CpwrGlobalConfiguration.get();
+      HostConnection[] hostConnections = globalConfig.getHostConnections();
+      ListBoxModel model = new ListBoxModel();
+
+      for (HostConnection connection : hostConnections) {
+        model.add(new Option(connection.getDescription() + " [" + connection.getHostPort() + ']',
+          connection.getConnectionId(), false));
+      }
+
+      return model;
+    }
+
+    public ListBoxModel doFillCredentialsIdItems(@AncestorInPath Jenkins context,
+                                                 @QueryParameter String credentialsId,
+                                                 @AncestorInPath Item project) {
+      List<StandardCredentials> creds = CredentialsProvider.lookupCredentials(StandardCredentials.class,
+        project, ACL.SYSTEM, Collections.emptyList());
+
+      ListBoxModel model = new ListBoxModel();
+      for (StandardCredentials c : creds) {
+        model.add(new Option(c.getDescription(), c.getId(), false));
+      }
+
+      return model;
+    }
+  }
+  ```
+
+test "rank464: Compuware Topaz Utilities fill endpoints require configure or admin permission"
+  lang java
+  file JclDescriptorImpl.java
+  reject VYQL-AUTH-025
+  reject_review code.JenkinsDescriptorConfigEnumerationMissingPermission
+  code
+  ```
+  import com.cloudbees.plugins.credentials.CredentialsProvider;
+  import hudson.model.Item;
+  import hudson.security.ACL;
+  import hudson.util.ListBoxModel;
+  import hudson.util.ListBoxModel.Option;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.AncestorInPath;
+  import org.kohsuke.stapler.QueryParameter;
+
+  abstract class JclDescriptorImpl {
+    public ListBoxModel doFillConnectionIdItems(@AncestorInPath Jenkins context,
+                                                @QueryParameter String connectionId,
+                                                @AncestorInPath Item project) {
+      if (project == null) {
+        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      } else {
+        project.checkPermission(Item.CONFIGURE);
+      }
+
+      CpwrGlobalConfiguration globalConfig = CpwrGlobalConfiguration.get();
+      HostConnection[] hostConnections = globalConfig.getHostConnections();
+      ListBoxModel model = new ListBoxModel();
+
+      for (HostConnection connection : hostConnections) {
+        model.add(new Option(connection.getDescription() + " [" + connection.getHostPort() + ']',
+          connection.getConnectionId(), false));
+      }
+
+      return model;
+    }
+
+    public ListBoxModel doFillCredentialsIdItems(@AncestorInPath Jenkins context,
+                                                 @QueryParameter String credentialsId,
+                                                 @AncestorInPath Item project) {
+      if (project == null) {
+        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      } else {
+        project.checkPermission(Item.CONFIGURE);
+      }
+
+      List<StandardCredentials> creds = CredentialsProvider.lookupCredentials(StandardCredentials.class,
+        project, ACL.SYSTEM, Collections.emptyList());
+
+      ListBoxModel model = new ListBoxModel();
+      for (StandardCredentials c : creds) {
+        model.add(new Option(c.getDescription(), c.getId(), false));
+      }
+
+      return model;
+    }
+  }
+  ```

@@ -190,6 +190,7 @@ adapter csharp {
   mark "ServerCertificateCustomValidationCallback" val "true" -> code.CertValidationDisabled
   mark "TokenValidationParameters" val "RequireSignedTokens=false" -> code.JwtUnverified
   mark "TokenValidationParameters" val "ValidateIssuerSigningKey=false" -> code.JwtUnverified
+  mark exact "analysis.function.context" val "lang=csharp" val "name=VerifySignature" val "signedDocument.GetElementsByTagName" val "nodeList[0]" val "signedXml.LoadXml" val "signedXml.CheckSignature" nval "VerifyAllSignatures" nval "signatureNodes" -> code.SamlFirstSignatureOnlyBypass
   mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
   mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
   mark exact "analysis.function.context" val "lang=csharp" val "ReadVarUInt32" val "(int)input.ReadVarUInt32()" nval "checked" -> code.UncheckedEncodedLengthArithmetic
@@ -201,6 +202,7 @@ adapter csharp {
   mark exact "analysis.function.context" val "lang=csharp" val "name=GetOrAddNode" val "GetOrAddNode(subKey)" nval "MaxStateDepth" -> code.UnboundedStateGrowthReview
   mark exact "analysis.function.context" val "lang=csharp" val "name=GetValidity" val "GetValidity(node.ChildNodes[i])" nval "MaxValidationDepth" -> code.UnboundedStateGrowthReview
   mark exact "analysis.function.context" val "lang=csharp" val "BlobSasBuilder" val "ExpiresOn" val "AddHours(1)" val "GenerateSasUri" nval "AddMinutes(tokenDuration)" -> code.TimeBoundAccessTokenReview
+  mark exact "analysis.function.context" val "lang=csharp" val "name=AddParameterToEndpoint" val "ParameterBasedFrom<IToken<IUser>>" val "returnthis.AuthenticateToken(context,database);" val "returntoken.User;" val "this._tokenCache.Value=null;" -> code.RequestTokenCacheCleanupBypass
   mark "File.Open" -> code.ResourceHandle
   mark "File.OpenRead" -> code.ResourceHandle
   mark "TcpClient" -> code.ResourceHandle

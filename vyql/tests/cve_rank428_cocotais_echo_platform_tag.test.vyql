@@ -1,0 +1,51 @@
+# Rank 428 / CVE-2025-47948: Cocotais Bot builtin /echo repeated
+# user content verbatim, allowing QQ platform tags to execute as the bot.
+
+test "rank428: Cocotais builtin echo replies with raw user message"
+  lang javascript
+  file builtins.ts
+  expect VYQL-INJ-083
+  expect_review code.CocotaisEchoPlatformTagInjection
+  code
+  ```
+  import { CocotaisBotPlugin } from "./plugin";
+
+  export function getBuiltinPlugins(){
+      return [
+          function(){
+              const plugin = new CocotaisBotPlugin("builtin:echo","1.0.0")
+              plugin.onMounted((bot) => {
+                  plugin.command.register("/echo","repeat", (type, _msgs, event) => {
+                      let content = _msgs.join(" ")
+                      event.reply(content)
+                  })
+              })
+              return plugin
+          }()
+      ]
+  }
+  ```
+
+test "rank428: Cocotais builtin echo command removed"
+  lang javascript
+  file builtins.ts
+  reject VYQL-INJ-083
+  reject_review code.CocotaisEchoPlatformTagInjection
+  code
+  ```
+  import { CocotaisBotPlugin } from "./plugin";
+
+  export function getBuiltinPlugins(){
+      return [
+          function(){
+              const plugin = new CocotaisBotPlugin("builtin:help","1.0.0")
+              plugin.onMounted((bot) => {
+                  plugin.command.register("/help","help", (type, _msgs, event) => {
+                      event.reply("help")
+                  })
+              })
+              return plugin
+          }()
+      ]
+  }
+  ```

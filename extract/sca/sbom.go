@@ -88,6 +88,60 @@ func ParseSetupPy(content string) []Dep {
 	return out
 }
 
+// ParseSetupCfg reads static setup.cfg install_requires blocks. It handles the
+// common setuptools INI form:
+//
+// [options]
+// install_requires =
+//
+//	package>=1.0
+func ParseSetupCfg(content string) []Dep {
+	var out []Dep
+	inOptions := false
+	inRequires := false
+	for _, raw := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+			inOptions = strings.EqualFold(trimmed, "[options]")
+			inRequires = false
+			continue
+		}
+		if !inOptions {
+			continue
+		}
+		if key, value, ok := strings.Cut(trimmed, "="); ok && strings.EqualFold(strings.TrimSpace(key), "install_requires") {
+			inRequires = true
+			if strings.TrimSpace(value) != "" {
+				if name, ver, ok := splitRequirement(value); ok {
+					out = append(out, Dep{NormalizePackageName(name), ver})
+				}
+			}
+			continue
+		}
+		if strings.HasPrefix(raw, " ") || strings.HasPrefix(raw, "\t") {
+			if inRequires {
+				if name, ver, ok := splitRequirement(trimmed); ok {
+					out = append(out, Dep{NormalizePackageName(name), ver})
+				} else {
+					out = append(out, Dep{NormalizePackageName(trimmed), "*"})
+				}
+			}
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, "=")
+		inRequires = ok && strings.EqualFold(strings.TrimSpace(key), "install_requires")
+		if inRequires && strings.TrimSpace(value) != "" {
+			if name, ver, ok := splitRequirement(value); ok {
+				out = append(out, Dep{NormalizePackageName(name), ver})
+			}
+		}
+	}
+	return out
+}
+
 func identifierBoundary(s string, start, end int) bool {
 	isIdent := func(b byte) bool {
 		return b == '_' || ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || ('0' <= b && b <= '9')
@@ -183,7 +237,7 @@ func splitRequirement(line string) (name, version string, ok bool) {
 	for _, op := range []string{"==", ">=", "<=", "~=", "!=", ">", "<", "="} {
 		if i := strings.Index(line, op); i >= 0 {
 			name = strings.TrimSpace(line[:i])
-			version = strings.TrimSpace(line[i+len(op):])
+			version = op + strings.TrimSpace(line[i+len(op):])
 			return name, version, true
 		}
 	}
@@ -320,12 +374,22 @@ func BuildSBOM(g usg.Store, eco string, deps []Dep, manifest string) error {
 			Props: map[string]string{"loc": manifest + ":" + name, "name": name,
 				"version": version, "eco": eco, "package": root, "root": root,
 				"purl":        "pkg:" + eco + "/" + name + "@" + version,
+				"specifier":   normalizeSpecifier(d.Version),
 				"callee_path": scaPackageEvent, "method": "package",
 				"str_args": "kind=package"}}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func normalizeSpecifier(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	v = strings.Join(strings.Fields(v), "")
+	if v == "" {
+		return "*"
+	}
+	return v
 }
 
 // LinkReachability marks each package whose symbols are actually called (any

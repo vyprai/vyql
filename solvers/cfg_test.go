@@ -1,13 +1,17 @@
 package solvers
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/vyprai/vyql/usg"
+)
 
 // Structural dominance on the region/order encoding the lowering emits (B1.3).
 func TestDominatesRegion(t *testing.T) {
 	cases := []struct {
-		name                       string
-		gReg, gOrd, sReg, sOrd     string
-		want                       bool
+		name                   string
+		gReg, gOrd, sReg, sOrd string
+		want                   bool
 	}{
 		// straight-line: guard before sink in the same region dominates.
 		{"straightline-before", "/fn1", "3", "/fn1", "7", true},
@@ -56,18 +60,35 @@ func TestReachesRegion(t *testing.T) {
 	}
 }
 
+func TestReachesFallsBackToSameFileSourceOrderWithoutRegions(t *testing.T) {
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "first", Type: "code.Call", Loc: "app.swift:10", Order: 10, HasOrder: true})
+	s.AddNode(usg.Node{ID: "second", Type: "code.Call", Loc: "app.swift:20", Order: 20, HasOrder: true})
+	s.AddNode(usg.Node{ID: "other", Type: "code.Call", Loc: "other.swift:30", Order: 30, HasOrder: true})
+
+	if !Reaches(s, "first", "second") {
+		t.Fatalf("same-file source-order fallback should reach later node")
+	}
+	if Reaches(s, "second", "first") {
+		t.Fatalf("same-file source-order fallback must preserve ordering")
+	}
+	if Reaches(s, "first", "other") {
+		t.Fatalf("source-order fallback must not cross files without structured regions")
+	}
+}
+
 // PostDominates: release runs on every path from alloc to exit (leak = its negation).
 func TestPostDominatesRegion(t *testing.T) {
 	cases := []struct {
 		rRel, oRel, rAlloc, oAlloc string
-		want                      bool
+		want                       bool
 	}{
-		{"/fn1", "5", "/fn1", "2", true},             // release after alloc, same region
-		{"/fn1", "5", "/fn1/if3.t", "2", true},       // alloc nested, release after the branch
-		{"/fn1/if3.t", "5", "/fn1", "2", false},      // release nested → conditionally skipped → leak
-		{"/fn1/if3.e", "5", "/fn1/if3.t", "2", false},// sibling branch → leak
-		{"/fn1", "2", "/fn1", "5", false},            // release before alloc
-		{"", "1", "", "2", false},                    // no metadata
+		{"/fn1", "5", "/fn1", "2", true},              // release after alloc, same region
+		{"/fn1", "5", "/fn1/if3.t", "2", true},        // alloc nested, release after the branch
+		{"/fn1/if3.t", "5", "/fn1", "2", false},       // release nested → conditionally skipped → leak
+		{"/fn1/if3.e", "5", "/fn1/if3.t", "2", false}, // sibling branch → leak
+		{"/fn1", "2", "/fn1", "5", false},             // release before alloc
+		{"", "1", "", "2", false},                     // no metadata
 	}
 	for _, c := range cases {
 		if got := postDominatesRegion(c.rRel, c.oRel, c.rAlloc, c.oAlloc); got != c.want {

@@ -1,0 +1,58 @@
+test "rank320: WSO2 forum rating is applied without range validation"
+  lang java
+  expect VYQL-VAL-002
+  expect_review code.UnvalidatedRatingRange
+  code
+  ```
+  class RegistryForumManager {
+      interface Registry {
+          void rateResource(String path, int rating);
+          float getAverageRating(String path);
+      }
+
+      interface GenericArtifact {
+          String getPath();
+      }
+
+      Registry getRegistry(String username, String tenantDomain) { return null; }
+      GenericArtifact getTopic(String topicId) { return null; }
+
+      public float rateTopic(String topicId, int rating, String username, String tenantDomain) {
+          Registry registry = getRegistry(username, tenantDomain);
+          GenericArtifact genericArtifact = getTopic(topicId);
+          registry.rateResource(genericArtifact.getPath(), rating);
+          return registry.getAverageRating(genericArtifact.getPath());
+      }
+  }
+  ```
+
+test "rank320: WSO2 forum rating is clamped before update"
+  lang java
+  reject VYQL-VAL-002
+  reject_review code.UnvalidatedRatingRange
+  code
+  ```
+  class RegistryForumManager {
+      interface Registry {
+          void rateResource(String path, int rating);
+          float getAverageRating(String path);
+      }
+
+      interface GenericArtifact {
+          String getPath();
+      }
+
+      Registry getRegistry(String username, String tenantDomain) { return null; }
+      GenericArtifact getTopic(String topicId) { return null; }
+
+      public float rateTopic(String topicId, int rating, String username, String tenantDomain) {
+          final int MAX_RATE = 5;
+          final int MIN_RATE = 1;
+          rating = (rating > MAX_RATE) ? MAX_RATE : ((rating < MIN_RATE) ? MIN_RATE : rating);
+          Registry registry = getRegistry(username, tenantDomain);
+          GenericArtifact genericArtifact = getTopic(topicId);
+          registry.rateResource(genericArtifact.getPath(), rating);
+          return registry.getAverageRating(genericArtifact.getPath());
+      }
+  }
+  ```

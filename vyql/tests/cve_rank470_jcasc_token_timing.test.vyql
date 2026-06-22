@@ -1,0 +1,69 @@
+# Rank 470 / CVE-2022-23106: Jenkins Configuration as Code Plugin compared
+# reload authentication tokens with ordinary String.equals rather than a
+# constant-time comparison.
+
+test "rank470: JCasC reload token ordinary equals needs timing review"
+  lang java
+  file TokenReloadAction.java
+  expect VYQL-CRY-006
+  expect_review code.SecretComparisonReview
+  code
+  ```
+  import javax.servlet.http.HttpServletRequest;
+
+  class TokenReloadAction {
+      public void doIndex(HttpServletRequest request) {
+          String token = getReloadTokenProperty();
+          String requestToken = getRequestToken(request);
+
+          if (token.equals(requestToken)) {
+              reload();
+          }
+      }
+
+      private String getRequestToken(HttpServletRequest request) {
+          return request.getParameter("casc-reload-token");
+      }
+
+      private static String getReloadTokenProperty() {
+          return System.getProperty("casc.reload.token");
+      }
+
+      private void reload() {}
+  }
+  ```
+
+test "rank470: JCasC reload token constant-time comparison is clean"
+  lang java
+  file TokenReloadAction.java
+  reject VYQL-CRY-006
+  reject_review code.SecretComparisonReview
+  code
+  ```
+  import java.nio.charset.StandardCharsets;
+  import java.security.MessageDigest;
+  import javax.servlet.http.HttpServletRequest;
+
+  class TokenReloadAction {
+      public void doIndex(HttpServletRequest request) {
+          String token = getReloadTokenProperty();
+          String requestToken = getRequestToken(request);
+
+          if (requestToken != null && MessageDigest.isEqual(
+              token.getBytes(StandardCharsets.UTF_8),
+              requestToken.getBytes(StandardCharsets.UTF_8))) {
+              reload();
+          }
+      }
+
+      private String getRequestToken(HttpServletRequest request) {
+          return request.getParameter("casc-reload-token");
+      }
+
+      private static String getReloadTokenProperty() {
+          return System.getProperty("casc.reload.token");
+      }
+
+      private void reload() {}
+  }
+  ```

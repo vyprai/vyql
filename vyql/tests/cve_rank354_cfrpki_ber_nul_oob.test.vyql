@@ -1,0 +1,80 @@
+test "rank354: cfrpki BER parser reads length byte without post-tag bounds check"
+  lang go
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  package librpki
+
+  import "errors"
+
+  type asn1Object interface{}
+
+  func readObject(ber []byte, offset int) (asn1Object, int, error) {
+      tagStart := offset
+      b := ber[offset]
+      offset++
+      tag := b & 0x1F
+      if tag == 0x1F {
+          tag = 0
+          for ber[offset] >= 0x80 {
+              tag = tag*128 + ber[offset] - 0x80
+              offset++
+          }
+          tag = tag*128 + ber[offset] - 0x80
+          offset++
+      }
+      _ = tagStart
+      _ = tag
+      l := ber[offset]
+      offset++
+      length := int(l)
+      contentEnd := offset + length
+      if contentEnd > len(ber) {
+          return nil, 0, errors.New("ber2der: BER tag length is more than available data")
+      }
+      return nil, contentEnd, nil
+  }
+  ```
+
+test "rank354: cfrpki BER parser rejects NUL-only data before reading length"
+  lang go
+  reject VYQL-MEM-010
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  package librpki
+
+  import "errors"
+
+  type asn1Object interface{}
+
+  func readObject(ber []byte, offset int) (asn1Object, int, error) {
+      tagStart := offset
+      b := ber[offset]
+      offset++
+      tag := b & 0x1F
+      if tag == 0x1F {
+          tag = 0
+          for ber[offset] >= 0x80 {
+              tag = tag*128 + ber[offset] - 0x80
+              offset++
+          }
+          tag = tag*128 + ber[offset] - 0x80
+          offset++
+      }
+      _ = tagStart
+      _ = tag
+      if len(ber) <= offset {
+          return nil, 0, errors.New("ber2der: invalid BER tag length")
+      }
+      l := ber[offset]
+      offset++
+      length := int(l)
+      contentEnd := offset + length
+      if contentEnd > len(ber) {
+          return nil, 0, errors.New("ber2der: BER tag length is more than available data")
+      }
+      return nil, contentEnd, nil
+  }
+  ```

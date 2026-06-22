@@ -945,6 +945,12 @@ review code.UnvalidatedRatingRange {
   expected: [core.InputValidation]
   text: "review server-side range validation before applying user-submitted rating values"
 }
+review code.FrameworkRequestBeforeSessionValidation {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review request/session validation ordering before framework request or transport state is created"
+}
 review code.PolymorphicTypeSelectionReview {
   category: "input_validation"
   kind: "attention"

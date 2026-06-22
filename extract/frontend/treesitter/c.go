@@ -66,7 +66,8 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), lang: ccLang(ext)}
-			body := c.decls(tree.RootNode())
+			body := []nir.Stmt{c.ccModuleContext(tree.RootNode())}
+			body = append(body, c.decls(tree.RootNode())...)
 			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
@@ -82,6 +83,24 @@ func (c *ccConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *ccConv) ccModuleContext(root *tree_sitter.Node) nir.Stmt {
+	loc := c.file + ":1"
+	if root != nil {
+		loc = c.loc(root)
+	}
+	path := "analysis.module.context"
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=" + c.lang},
+			nir.Const{Loc: loc, Value: compactCExprText(string(c.src))},
+		},
+		Path:   path,
+		Method: "context",
+		Loc:    loc,
+	}}
 }
 
 var (
@@ -285,7 +304,12 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			Loc:           L,
 			ContextTokens: c.ccFunctionContext(name, field(n, "body")),
 		}}
-	case "struct_specifier", "union_specifier", "enum_specifier":
+	case "struct_specifier":
+		if c.lang == "cpp" {
+			return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}}
+		}
+		return nil
+	case "union_specifier", "enum_specifier":
 		return nil
 	case "class_implementation", "class_interface", "category_implementation", // ObjC
 		"category_interface", "protocol_declaration", "implementation_definition",

@@ -29,7 +29,8 @@ func ExtractBash(files []string, root string) (nir.Program, error) {
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &shConv{src: src, file: rel, key: moduleKey(root, abs, ".sh")}
-			return nir.Module{Key: c.key, File: rel, Body: c.block(tree.RootNode())}, true
+			body := append(c.shModuleContext(tree.RootNode()), c.block(tree.RootNode())...)
+			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
@@ -43,6 +44,25 @@ func (c *shConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *shConv) shModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=bash"},
+			nir.Const{Loc: loc, Value: text},
+			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+		},
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
 }
 
 func (c *shConv) block(n *tree_sitter.Node) []nir.Stmt {

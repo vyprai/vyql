@@ -683,6 +683,13 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.expect(tArrow, "->")
 		ctl.Concept = p.parseConceptRef()
 		return []AdapterMapping{ctl}
+	case p.atWord("flag"):
+		p.next()
+		mk := AdapterMapping{Kind: "mark", Pattern: p.parseContextPattern(), Exact: true}
+		p.parseAdapterContextFlag(&mk)
+		p.expect(tArrow, "->")
+		mk.Concept = p.parseConceptRef()
+		return []AdapterMapping{mk}
 	case p.atWord("mark"):
 		// `mark "fn" [val "x"] -> concept` labels the matching CALL node with a
 		// presence concept (for `match`-style rules — no taint flow).
@@ -762,6 +769,60 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.fail("bad adapter member %q at %d", p.peek().val, p.peek().pos)
 		return nil
 	}
+}
+
+func (p *parser) parseContextPattern() string {
+	switch {
+	case p.atWord("function"):
+		p.next()
+		return "analysis.function.context"
+	case p.atWord("module"):
+		p.next()
+		return "analysis.module.context"
+	case p.atWord("class"):
+		p.next()
+		return "analysis.class.context"
+	default:
+		return p.parsePattern()
+	}
+}
+
+func (p *parser) parseAdapterContextFlag(m *AdapterMapping) {
+	p.expect(tLBrace, "{")
+	for !p.at(tRBrace) {
+		switch {
+		case p.atWord("all"):
+			p.next()
+			p.expect(tColon, ":")
+			m.ValMatches = append(m.ValMatches, p.parsePatternList()...)
+		case p.atWord("none"):
+			p.next()
+			p.expect(tColon, ":")
+			m.ValAbsents = append(m.ValAbsents, p.parsePatternList()...)
+		default:
+			p.fail("expected context flag field all/none, got %q at %d", p.peek().val, p.peek().pos)
+		}
+		if p.at(tComma) || p.at(tSemi) {
+			p.next()
+		}
+	}
+	p.expect(tRBrace, "}")
+}
+
+func (p *parser) parsePatternList() []string {
+	if !p.at(tLBrack) {
+		return []string{p.parsePattern()}
+	}
+	p.next()
+	var out []string
+	for !p.at(tRBrack) {
+		out = append(out, p.parsePattern())
+		if p.at(tComma) || p.at(tSemi) {
+			p.next()
+		}
+	}
+	p.expect(tRBrack, "]")
+	return out
 }
 
 func (p *parser) parseAdapterPackageGroup() []AdapterMapping {

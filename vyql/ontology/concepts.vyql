@@ -633,6 +633,16 @@ concept PublicKeyHashBindingReview : sink {
   review_confidence: medium
 }
 
+concept AttestationPredicateVerificationBypass : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+  review_category: "crypto"
+  review_condition: "signature-verified attestations are emitted after predicate filtering without requiring a non-empty predicate-matched subset"
+  review_evidence: "attestation verification context {pattern} filters payloads by predicate type but prints the full verified set"
+  review_assumption: "callers rely on the requested predicate type or policy match to decide whether the printed attestation is acceptable"
+  review_confidence: high
+}
+
 concept ConstellationLuks2AttachedHeaderActivation : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]
   cwe: [CWE_347]
@@ -832,6 +842,15 @@ concept UnvalidatedRatingRange : sink {
   review_condition: "a user-controlled rating value is applied without server-side range validation"
   review_evidence: "rating update context {pattern} passes the rating directly into the backing rating operation"
   review_assumption: "callers can submit rating values outside the intended product range"
+  review_confidence: medium
+}
+concept FrameworkRequestBeforeSessionValidation : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "framework request or transport state should be created only after request session identifiers are validated"
+  review_evidence: "request handler context {pattern} builds framework request state before validating the session lookup"
+  review_assumption: "attackers can supply an invalid session identifier that should be rejected before framework request setup"
   review_confidence: medium
 }
 concept OwnerFieldClear : sink {

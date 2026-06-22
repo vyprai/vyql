@@ -1,0 +1,64 @@
+# Rank 371 / CVE-2010-5142: Chef Server API user-management actions were
+# authenticated but not admin-only until the controller added before :is_admin
+# for create, destroy, and update.
+
+test "rank371: Chef users controller mutates users without admin guard"
+  lang ruby
+  expect VYQL-AUTH-016
+  code
+  ```
+  class Users < Application
+    before :authenticate_every
+
+    def update
+      Chef::WebUIUser.cdb_load(params[:id])
+      @user = params['inflated_object']
+      @user.cdb_save
+      display(@user)
+    end
+
+    def create
+      @user = params["inflated_object"]
+      Chef::WebUIUser.cdb_load(@user.name)
+      @user.cdb_save
+      display({ :uri => absolute_url(:user, @user.name) })
+    end
+
+    def destroy
+      @user = Chef::WebUIUser.cdb_load(params[:id])
+      @user.cdb_destroy
+      display @user
+    end
+  end
+  ```
+
+test "rank371: Chef users controller requires admin for mutating actions"
+  lang ruby
+  reject VYQL-AUTH-016
+  code
+  ```
+  class Users < Application
+    before :authenticate_every
+    before :is_admin, :only => [ :create, :destroy, :update ]
+
+    def update
+      Chef::WebUIUser.cdb_load(params[:id])
+      @user = params['inflated_object']
+      @user.cdb_save
+      display(@user)
+    end
+
+    def create
+      @user = params["inflated_object"]
+      Chef::WebUIUser.cdb_load(@user.name)
+      @user.cdb_save
+      display({ :uri => absolute_url(:user, @user.name) })
+    end
+
+    def destroy
+      @user = Chef::WebUIUser.cdb_load(params[:id])
+      @user.cdb_destroy
+      display @user
+    end
+  end
+  ```

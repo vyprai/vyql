@@ -62,7 +62,20 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
 	}
 	if len(prog.Modules) == 0 {
-		return nil, stats, nil
+		g := usg.NewInMemStore()
+		applySCA(g, paths)
+		nodes, err := g.AllNodes()
+		if err != nil {
+			return nil, stats, err
+		}
+		if len(nodes) == 0 {
+			return nil, stats, nil
+		}
+		if _, _, err := adapters.Apply(g, frontend.AutoAdapters(), nil); err != nil {
+			return nil, stats, err
+		}
+		tk.mark("sca+adapters")
+		return g, stats, nil
 	}
 	// Incremental lowering when a cache is provided: reuse the lowered sub-graph of unchanged
 	// modules, re-lowering only edited ones. Equivalent to LowerTyped (the merged graph is
@@ -89,6 +102,13 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	deps := frontend.DependencyEvidence(g)
 	for _, lang := range stats.languages {
 		ads = append(ads, frontend.GeneratedPackageAdaptersFor(lang, deps)...)
+	}
+	if overlay := strings.TrimSpace(os.Getenv("VYQL_ADAPTER_OVERLAY")); overlay != "" {
+		extra, err := frontend.OverlayAdapters(overlay, stats.languages)
+		if err != nil {
+			return nil, stats, fmt.Errorf("adapter overlay: %w", err)
+		}
+		ads = append(ads, extra...)
 	}
 	tk.mark("sca+pkg")
 	// Adapter labeling: incremental (reuse unchanged modules' cached labels) when caching is

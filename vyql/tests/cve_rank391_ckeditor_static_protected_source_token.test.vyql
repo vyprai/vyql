@@ -1,0 +1,71 @@
+# Rank 391 / CVE-2022-24728: CKEditor 4's HTML processor used a static
+# cke_temp marker, so source-mode HTML containing that marker could bypass
+# protected-source wrapping and survive filtering.
+
+test "rank391: CKEditor protected-source marker is static and attacker-collidable"
+  lang javascript
+  file core/htmldataprocessor.js
+  expect VYQL-INJ-066
+  expect_review code.CkeditorStaticProtectedSourceTokenBypass
+  code
+  ```
+  function protectSource( data, editor ) {
+    var protectedHtml = [],
+      protectRegexes = editor.config.protectedSource,
+      tempRegex = /<\!--\{cke_temp(comment)?\}(\d*?)-->/g;
+
+    var regexes = [
+      /<script[\s\S]*?<\/script>/gi
+    ].concat( protectRegexes );
+
+    data = data.replace( ( /<!--[\s\S]*?-->/g ), function( match ) {
+      return '<!--{cke_tempcomment}' + ( protectedHtml.push( match ) - 1 ) + '-->';
+    } );
+
+    for ( var i = 0; i < regexes.length; i++ ) {
+      data = data.replace( regexes[ i ], function( match ) {
+        match = match.replace( tempRegex, function( $, isComment, id ) {
+          return protectedHtml[ id ];
+        } );
+
+        return ( /cke_temp(comment)?/ ).test( match ) ? match :
+          '<!--{cke_temp}' + ( protectedHtml.push( match ) - 1 ) + '-->';
+      } );
+    }
+    return data;
+  }
+  ```
+
+test "rank391: CKEditor protected-source marker includes per-conversion random value"
+  lang javascript
+  file core/htmldataprocessor.js
+  reject VYQL-INJ-066
+  reject_review code.CkeditorStaticProtectedSourceTokenBypass
+  code
+  ```
+  function protectSource( data, editor, randomNumber ) {
+    var protectedHtml = [],
+      protectRegexes = editor.config.protectedSource,
+      tempRegex = new RegExp( '<\\!--\\{cke_temp_' + randomNumber + '(comment)?\\}(\\d*?)-->', 'g' );
+
+    var regexes = [
+      /<script[\s\S]*?<\/script>/gi
+    ].concat( protectRegexes );
+
+    data = data.replace( ( /<!--[\s\S]*?-->/g ), function( match ) {
+      return '<!--{cke_temp_' + randomNumber + 'comment}' + ( protectedHtml.push( match ) - 1 ) + '-->';
+    } );
+
+    for ( var i = 0; i < regexes.length; i++ ) {
+      data = data.replace( regexes[ i ], function( match ) {
+        match = match.replace( tempRegex, function( $, isComment, id ) {
+          return protectedHtml[ id ];
+        } );
+
+        return ( tempRegex ).test( match ) ? match :
+          '<!--{cke_temp_' + randomNumber + '}' + ( protectedHtml.push( match ) - 1 ) + '-->';
+      } );
+    }
+    return data;
+  }
+  ```

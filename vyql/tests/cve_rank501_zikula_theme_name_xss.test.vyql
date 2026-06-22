@@ -1,0 +1,46 @@
+# Rank 501 / CVE-2011-3352: Zikula Theme admin accepted an
+# unsanitized themename request parameter before rendering admin templates.
+
+test "rank501: Zikula setasdefault reflects raw themename into confirmation template"
+  lang php
+  expect VYQL-INJ-113
+  expect_review code.ZikulaThemeNameReflectedXss
+  code
+  ```
+  <?php
+  class Theme_Controller_Admin extends Zikula_AbstractController
+  {
+      public function setasdefault($args)
+      {
+          $themename = FormUtil::getPassedValue('themename', isset($args['themename']) ? $args['themename'] : null, 'REQUEST');
+          $confirmation = (int) FormUtil::getPassedValue('confirmation', false, 'REQUEST');
+
+          if (empty($confirmation)) {
+              $this->view->assign('themename', $themename);
+              return $this->view->fetch('theme_admin_setasdefault.tpl');
+          }
+      }
+  }
+  ```
+
+test "rank501: Zikula setasdefault filters themename before template assignment"
+  lang php
+  reject VYQL-INJ-113
+  reject_review code.ZikulaThemeNameReflectedXss
+  code
+  ```
+  <?php
+  class Theme_Controller_Admin extends Zikula_AbstractController
+  {
+      public function setasdefault($args)
+      {
+          $themename = $this->request->getGet()->filter('themename', isset($args['themename']) ? $args['themename'] : null, FILTER_SANITIZE_STRING);
+          $confirmation = (int) FormUtil::getPassedValue('confirmation', false, 'REQUEST');
+
+          if (empty($confirmation)) {
+              $this->view->assign('themename', $themename);
+              return $this->view->fetch('theme_admin_setasdefault.tpl');
+          }
+      }
+  }
+  ```

@@ -1,0 +1,67 @@
+# Rank 305 / CVE-2026-7713: Calibre-Web-NextGen Kobo auth-token routes accepted
+# an arbitrary URL user_id and could mint or revoke another user's token.
+
+test "rank305: kobo auth token generation uses route user id without ownership guard"
+  lang python
+  expect VYQL-AUTH-002
+  code
+  ```
+  @kobo_auth.route("/generate_auth_token/<int:user_id>")
+  @user_login_required
+  def generate_auth_token(user_id):
+      auth_token = ub.session.query(ub.RemoteAuthToken).filter(
+          ub.RemoteAuthToken.user_id == user_id
+      ).filter(ub.RemoteAuthToken.token_type == 1).first()
+
+      if not auth_token:
+          auth_token = ub.RemoteAuthToken()
+          auth_token.user_id = user_id
+          auth_token.auth_token = "token"
+          auth_token.token_type = 1
+          ub.session.add(auth_token)
+          ub.session_commit()
+
+      return render_title_template("generate_kobo_auth_url.html", auth_token=auth_token.auth_token)
+  ```
+
+test "rank305: kobo auth token deletion uses route user id without ownership guard"
+  lang python
+  expect VYQL-AUTH-002
+  code
+  ```
+  @kobo_auth.route("/deleteauthtoken/<int:user_id>", methods=["POST"])
+  @user_login_required
+  def delete_auth_token(user_id):
+      ub.session.query(ub.RemoteAuthToken).filter(ub.RemoteAuthToken.user_id == user_id)\
+          .filter(ub.RemoteAuthToken.token_type == 1).delete()
+
+      return ub.session_commit()
+  ```
+
+test "rank305: kobo auth token routes require self or admin"
+  lang python
+  reject VYQL-AUTH-002
+  code
+  ```
+  @kobo_auth.route("/generate_auth_token/<int:user_id>")
+  @user_login_required
+  def generate_auth_token(user_id):
+      if current_user.id != user_id and not current_user.role_admin():
+          abort(403)
+      auth_token = ub.session.query(ub.RemoteAuthToken).filter(
+          ub.RemoteAuthToken.user_id == user_id
+      ).filter(ub.RemoteAuthToken.token_type == 1).first()
+      if not auth_token:
+          auth_token = ub.RemoteAuthToken()
+          auth_token.user_id = user_id
+      return render_title_template("generate_kobo_auth_url.html", auth_token=auth_token.auth_token)
+
+  @kobo_auth.route("/deleteauthtoken/<int:user_id>", methods=["POST"])
+  @user_login_required
+  def delete_auth_token(user_id):
+      if current_user.id != user_id and not current_user.role_admin():
+          abort(403)
+      ub.session.query(ub.RemoteAuthToken).filter(ub.RemoteAuthToken.user_id == user_id)\
+          .filter(ub.RemoteAuthToken.token_type == 1).delete()
+      return ub.session_commit()
+  ```

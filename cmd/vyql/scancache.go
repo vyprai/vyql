@@ -40,6 +40,10 @@ func scanFingerprint(salt []byte, paths []string, rulesSrc, profile string) stri
 	io.WriteString(h, profile)
 	io.WriteString(h, "\x00data\x00")
 	statWalk(h, datadir.Root())
+	if overlay := os.Getenv("VYQL_ADAPTER_OVERLAY"); overlay != "" {
+		io.WriteString(h, "\x00adapter-overlay\x00")
+		statWalk(h, overlay)
+	}
 	for _, p := range paths {
 		io.WriteString(h, "\x00src\x00")
 		statWalk(h, p)

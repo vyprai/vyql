@@ -1,0 +1,80 @@
+test "rank394: ClamAV WWPack rewrites computed structs pointer without containment"
+  lang c
+  expect VYQL-MEM-026
+  expect_review code.ClamavWwpackStructsPointerOobWrite
+  code
+  ```
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  typedef unsigned int uint32_t;
+
+  struct cli_exe_section {
+    uint32_t vsz;
+    uint32_t rva;
+  };
+
+  static uint32_t cli_readint32(uint8_t *p);
+  static void cli_writeint32(uint8_t *p, uint32_t v);
+  static void *memset(void *p, int c, unsigned long n);
+
+  int wwunpack(uint8_t *exe, uint32_t exesz, uint8_t *wwsect,
+               struct cli_exe_section *sects, uint16_t scount, uint32_t pe) {
+    uint8_t *structs = wwsect + 0x2a1;
+    uint16_t i;
+
+    structs = &exe[(0xffff & cli_readint32(&exe[pe + 0x14])) + pe + 0x18];
+    for (i = 0; i < scount; i++) {
+      cli_writeint32(structs + 8, sects[i].vsz);
+      cli_writeint32(structs + 12, sects[i].rva);
+      cli_writeint32(structs + 16, sects[i].vsz);
+      cli_writeint32(structs + 20, sects[i].rva);
+      structs += 0x28;
+    }
+    memset(structs, 0, 0x28);
+    return 0;
+  }
+  ```
+
+test "rank394: ClamAV WWPack checks structs containment before rewrites"
+  lang c
+  reject VYQL-MEM-026
+  reject_review code.ClamavWwpackStructsPointerOobWrite
+  code
+  ```
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  typedef unsigned int uint32_t;
+
+  struct cli_exe_section {
+    uint32_t vsz;
+    uint32_t rva;
+  };
+
+  static uint32_t cli_readint32(uint8_t *p);
+  static void cli_writeint32(uint8_t *p, uint32_t v);
+  static int CLI_ISCONTAINED(uint8_t *base, uint32_t size, uint8_t *ptr, uint32_t len);
+  static void *memset(void *p, int c, unsigned long n);
+
+  int wwunpack(uint8_t *exe, uint32_t exesz, uint8_t *wwsect,
+               struct cli_exe_section *sects, uint16_t scount, uint32_t pe) {
+    uint8_t *structs = wwsect + 0x2a1;
+    uint16_t i;
+
+    structs = &exe[(0xffff & cli_readint32(&exe[pe + 0x14])) + pe + 0x18];
+    for (i = 0; i < scount; i++) {
+      if (!CLI_ISCONTAINED(exe, exesz, structs, 0x28)) {
+        return 1;
+      }
+      cli_writeint32(structs + 8, sects[i].vsz);
+      cli_writeint32(structs + 12, sects[i].rva);
+      cli_writeint32(structs + 16, sects[i].vsz);
+      cli_writeint32(structs + 20, sects[i].rva);
+      structs += 0x28;
+    }
+    if (!CLI_ISCONTAINED(exe, exesz, structs, 0x28)) {
+      return 1;
+    }
+    memset(structs, 0, 0x28);
+    return 0;
+  }
+  ```

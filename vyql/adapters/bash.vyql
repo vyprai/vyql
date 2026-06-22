@@ -24,6 +24,7 @@ adapter bash {
   // code eval via language interpreters (-c/-e/-r take the script)
   sink path "python" arg 1 -> code.CodeEval
   sink path "python3" arg 1 -> code.CodeEval
+  mark exact "analysis.module.context" val "lang=bash" val "input=$(cat)" val "python3-c\"" val "json.loads('''$input''')" nval "<<'PYEOF'" nval "os.environ.get('CC_INPUT')" -> code.PythonTripleQuoteShellInterpolation
   sink path "perl" arg 1 -> code.CodeEval
   sink path "php" arg 1 -> code.CodeEval
   sink path "node" arg 1 -> code.CodeEval

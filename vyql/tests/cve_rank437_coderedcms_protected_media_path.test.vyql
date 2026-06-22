@@ -1,0 +1,102 @@
+# Rank 437 / CVE-2021-46897: CodeRed CMS served protected media by joining
+# a route path directly under CODERED_PROTECTED_MEDIA_ROOT. The published fix
+# canonicalized both paths but used a prefix-only startswith guard, which VyQL
+# deliberately keeps as attention-worthy because sibling prefixes can still pass.
+
+test "rank437: coderedcms protected media route path reaches file read"
+  lang python
+  expect VYQL-PATH-001
+  expect VYQL-PATH-022
+  expect_review code.CodeRedProtectedMediaPathTraversal
+  code
+  ```
+  import mimetypes
+  import os
+  from django.http import Http404, HttpResponse
+
+  cr_settings = {
+      'PROTECTED_MEDIA_ROOT': '/srv/site/protected',
+  }
+
+  def login_required(fn):
+      return fn
+
+  @login_required
+  def serve_protected_file(request):
+      path = request.GET['path']
+      fullpath = os.path.join(cr_settings['PROTECTED_MEDIA_ROOT'], path)
+      if os.path.isfile(fullpath):
+          mimetype, encoding = mimetypes.guess_type(fullpath)
+          with open(fullpath, 'rb') as f:
+              response = HttpResponse(f.read(), content_type=mimetype)
+          if encoding:
+              response["Content-Encoding"] = encoding
+          return response
+      raise Http404()
+  ```
+
+test "rank437: coderedcms official prefix-only guard remains path attention"
+  lang python
+  expect VYQL-PATH-001
+  reject VYQL-PATH-022
+  reject_review code.CodeRedProtectedMediaPathTraversal
+  code
+  ```
+  import mimetypes
+  import os
+  from django.http import Http404, HttpResponse
+
+  cr_settings = {
+      "PROTECTED_MEDIA_ROOT": "/srv/site/protected",
+  }
+
+  def login_required(fn):
+      return fn
+
+  @login_required
+  def serve_protected_file(request):
+      path = request.GET["path"]
+      mediapath = os.path.abspath(cr_settings["PROTECTED_MEDIA_ROOT"])
+      fullpath = os.path.abspath(os.path.join(mediapath, path))
+      if fullpath.startswith(mediapath) and os.path.isfile(fullpath):
+          mimetype, encoding = mimetypes.guess_type(fullpath)
+          with open(fullpath, "rb") as f:
+              response = HttpResponse(f.read(), content_type=mimetype)
+          if encoding:
+              response["Content-Encoding"] = encoding
+          return response
+      raise Http404()
+  ```
+
+test "rank437: separator-aware containment guard suppresses path traversal"
+  lang python
+  reject VYQL-PATH-001
+  reject VYQL-PATH-022
+  reject_review code.CodeRedProtectedMediaPathTraversal
+  code
+  ```
+  import mimetypes
+  import os
+  from django.http import Http404, HttpResponse
+
+  cr_settings = {
+      "PROTECTED_MEDIA_ROOT": "/srv/site/protected",
+  }
+
+  def login_required(fn):
+      return fn
+
+  @login_required
+  def serve_protected_file(request):
+      path = request.GET["path"]
+      mediapath = os.path.abspath(cr_settings["PROTECTED_MEDIA_ROOT"])
+      fullpath = os.path.abspath(os.path.join(mediapath, path))
+      if (fullpath == mediapath or fullpath.startswith(mediapath + os.sep)) and os.path.isfile(fullpath):
+          mimetype, encoding = mimetypes.guess_type(fullpath)
+          with open(fullpath, "rb") as f:
+              response = HttpResponse(f.read(), content_type=mimetype)
+          if encoding:
+              response["Content-Encoding"] = encoding
+          return response
+      raise Http404()
+  ```

@@ -73,6 +73,7 @@ adapter ruby {
   mark "grant_role" -> code.AuthenticationRequiredOp
   mark "make_admin" -> code.AuthenticationRequiredOp
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
+  control "protect_from_forgery" -> core.CsrfProtection
   control "verify_authenticity_token" -> core.CsrfProtection
   control "validate_csrf_token" -> core.CsrfProtection
   control "authenticate_user!" -> core.AuthenticationCheck
@@ -168,6 +169,8 @@ adapter ruby {
   sink path "content_tag" -> code.HtmlRender
   sink path "concat" -> code.HtmlRender
   sink path "safe_concat" -> code.HtmlRender
+  mark exact "analysis.function.context" val "lang=ruby" val "name=cama_comments_render_html" val "#{comment.content}" nval "sanitize comment.content" -> code.StoredHtmlWrite
+  mark exact "analysis.class.context" val "lang=ruby" val "name=Users" val "Chef::WebUIUser.cdb_load" val "@user.cdb_save" val "@user.cdb_destroy" nval "before :is_admin" -> code.ChefUserManagementWithoutAdminGuard
   sink path "ERB.new" -> code.TemplateRender
   sink path "Erubi.new" -> code.TemplateRender
   sink path "Erubis.new" -> code.TemplateRender
@@ -175,6 +178,8 @@ adapter ruby {
   sink path "Tilt.new" -> code.TemplateRender
   sink path "redirect_to" -> code.RedirectTarget
   sink path "redirect" -> code.RedirectTarget
+  mark exact "analysis.class.context" val "lang=ruby" val "name=HomeController" val "params[:job]" val "params[:enable]" val "ClockworkWeb.enable(job)" val "ClockworkWeb.disable(job)" nval "protect_from_forgery" -> code.ClockworkWebJobCsrf
+  mark exact "analysis.function.context" val "lang=ruby" val "name=initialize" val "`convert #{image_path}" val "-colors #{colors}" val "-depth #{depth}" nval "shellescape" nval "colors.to_i" nval "depth.to_i" -> code.ColorscoreImagemagickCommandInjection
   // HTTP response splitting / header injection (CWE-113).
   sink path "response.set_header" arg 1 -> code.ResponseHeaderWrite
   sink path "headers.__setitem__" arg 1 -> code.ResponseHeaderWrite
@@ -208,6 +213,7 @@ adapter ruby {
   sink path "Regexp.new" -> code.RegexCompile
   sink path "Regexp.compile" -> code.RegexCompile
   mark "__regex.match" -> code.RegexMatch
+  mark exact "analysis.function.context" val "lang=ruby" val "name=legal?" val "string.to_s" val "/^[0-9a-f]{24}$/i" -> code.RubyLineAnchorValidationBypass
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "update_attributes" -> code.MassAssign

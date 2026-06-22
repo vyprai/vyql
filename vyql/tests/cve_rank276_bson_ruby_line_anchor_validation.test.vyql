@@ -1,0 +1,38 @@
+# Rank 276 / CVE-2015-4411: BSON::ObjectId.legal? used Ruby line
+# anchors (^ and $) for whole-string ObjectId validation. A newline can make
+# the first line pass while trailing data remains, causing downstream worker
+# resource consumption in affected moped/bson integrations.
+
+test "rank276: bson ObjectId legal? uses Ruby line anchors"
+  lang ruby
+  expect VYQL-DOS-010
+  expect_review code.RubyLineAnchorValidationBypass
+  code
+  ```
+  module BSON
+    class ObjectId
+      class << self
+        def legal?(string)
+          string.to_s =~ /^[0-9a-f]{24}$/i ? true : false
+        end
+      end
+    end
+  end
+  ```
+
+test "rank276: bson ObjectId legal? uses whole-string anchors"
+  lang ruby
+  reject VYQL-DOS-010
+  reject_review code.RubyLineAnchorValidationBypass
+  code
+  ```
+  module BSON
+    class ObjectId
+      class << self
+        def legal?(string)
+          string.to_s =~ /\A[0-9a-f]{24}\z/i ? true : false
+        end
+      end
+    end
+  end
+  ```

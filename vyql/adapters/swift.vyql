@@ -74,6 +74,7 @@ adapter swift {
   mark "deleteAccount" -> code.AuthenticationRequiredOp
   mark "grantRole" -> code.AuthenticationRequiredOp
   mark "makeAdmin" -> code.AuthenticationRequiredOp
+  mark exact "analysis.module.context" val "lang=swift" val "server.applyPolicyToFilter()server.applyAllowlistToFilter()server.applyJailRulesToFilter()" val "adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})" nval "adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})server.applyPolicyToFilter()" -> code.ClearanceKitPolicyApplyBeforeAdapterStart
 
   // weak hash (CWE-328) — CryptoKit Insecure.* + CommonCrypto CC_MD5/CC_SHA1
   mark "Insecure.MD5" -> code.WeakHash

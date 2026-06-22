@@ -19,6 +19,7 @@ var manifestParsers = []struct {
 }{
 	{"requirements.txt", "pypi", sca.ParseRequirements},
 	{"setup.py", "pypi", sca.ParseSetupPy},
+	{"setup.cfg", "pypi", sca.ParseSetupCfg},
 	{"package.json", "npm", sca.ParsePackageJSON},
 }
 

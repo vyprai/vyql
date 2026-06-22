@@ -59,3 +59,23 @@ rule RequestSelectedDeserializationFormat {
   meta { id: "VYQL-DESER-010", severity: high, cwe: [CWE_502], confidence_floor: medium }
   match code.RequestSelectedDeserializationFormat as deserialization
 }
+
+rule CheckstyleExternalParameterEntitiesXxe {
+  meta { id: "VYQL-DESER-011", severity: high, cwe: [CWE_611], confidence_floor: high }
+  match code.CheckstyleExternalParameterEntitiesXxe as parser
+}
+
+rule CinderUnsafeMinidomXmlDeserializer {
+  meta { id: "VYQL-DESER-012", severity: high, cwe: [CWE_611], confidence_floor: high }
+  match code.CinderUnsafeMinidomXmlDeserializer as parser
+}
+
+rule CodeceptionRunProcessDeserializationGadget {
+  meta { id: "VYQL-DESER-013", severity: critical, cwe: [CWE_502], confidence_floor: high }
+  match code.CodeceptionRunProcessDeserializationGadget as gadget
+}
+
+rule CodeIgniterRestserverXmlEntityLoaderXxe {
+  meta { id: "VYQL-DESER-014", severity: high, cwe: [CWE_611], confidence_floor: high }
+  match code.CodeIgniterRestserverXmlEntityLoaderXxe as parser
+}

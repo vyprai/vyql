@@ -1604,7 +1604,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.region = l.curNS + "/fn" + l.nextBranch()
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
-		l.functionContextAnalysisEvent(st.Loc, st.ContextTokens)
+		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
 		l.block(st.Body, inner)
 		l.curDecorators = saveDecorators
 		l.region = saveRegion

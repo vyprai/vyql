@@ -48,6 +48,91 @@ rule LocalFileUrlNavigation {
   match code.LocalFileUrlNavigation as sink
 }
 
+rule MountStubCleanupPathEscape {
+  meta { id: "VYQL-PATH-009", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.MountStubCleanupPathEscape as sink
+}
+
+rule WindowsReservedDeviceNameBypass {
+  meta { id: "VYQL-PATH-010", severity: high, cwe: [CWE_67, CWE_184], confidence_floor: medium }
+  match code.WindowsReservedDeviceNameBypass as sink
+}
+
+rule UnvalidatedLocaleFileInclude {
+  meta { id: "VYQL-PATH-011", severity: high, cwe: [CWE_98], confidence_floor: medium }
+  match code.UnvalidatedLocaleFileInclude as sink
+}
+
+rule ArchiveMarkerSymlinkOverwrite {
+  meta { id: "VYQL-PATH-012", severity: high, cwe: [CWE_22, CWE_59], confidence_floor: medium }
+  match code.ArchiveMarkerSymlinkOverwrite as sink
+}
+
+rule UploadFilePathTraversalWrite {
+  meta { id: "VYQL-PATH-013", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.UploadFilePathTraversalWrite as sink
+}
+
+rule ManualZipEntryFileWrite {
+  meta { id: "VYQL-PATH-014", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.ManualZipEntryFileWrite as sink
+}
+
+rule CharmRouteFileStorePathAccess {
+  meta { id: "VYQL-PATH-015", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.CharmRouteFileStorePathAccess as sink
+}
+
+rule CowAgentMemoryFilenameTraversal {
+  meta { id: "VYQL-PATH-016", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.CowAgentMemoryFilenameTraversal as sink
+}
+
+rule CherryPySessionIdFilePathTraversal {
+  meta { id: "VYQL-PATH-017", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.CherryPySessionIdFilePathTraversal as sink
+}
+
+rule BrowserlessWorkspaceFilePathTraversal {
+  meta { id: "VYQL-PATH-018", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.BrowserlessWorkspaceFilePathTraversal as sink
+}
+
+rule ClaspRemoteFilePathTraversal {
+  meta { id: "VYQL-PATH-019", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.ClaspRemoteFilePathTraversal as sink
+}
+
+rule DockerCliProgramDataPluginSearchPath {
+  meta { id: "VYQL-PATH-020", severity: high, cwe: [CWE_427], confidence_floor: high }
+  match code.DockerCliProgramDataPluginSearchPath as sink
+}
+
+rule CloakserveFingerprintSeedPathTraversal {
+  meta { id: "VYQL-PATH-021", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.CloakserveFingerprintSeedPathTraversal as sink
+}
+
+rule CodeRedProtectedMediaPathTraversal {
+  meta { id: "VYQL-PATH-022", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.CodeRedProtectedMediaPathTraversal as sink
+}
+
+rule ContainersCommonFipsModeMountSymlink {
+  meta { id: "VYQL-PATH-023", severity: high, cwe: [CWE_59, CWE_22], confidence_floor: high }
+  match code.ContainersCommonFipsModeMountSymlink as sink
+}
+
+rule ConvertSvgMultiSvgSanitizerBypass {
+  meta { id: "VYQL-PATH-024", severity: high, cwe: [CWE_22, CWE_79], confidence_floor: high }
+  match code.ConvertSvgMultiSvgSanitizerBypass as sink
+}
+
+rule CopypartyCprStaticPathTraversal {
+  meta { id: "VYQL-PATH-025", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.CopypartyCprStaticPathTraversal as sink
+}
+
 rule FilesystemImageDirentTraversal {
   meta { id: "VYQL-PATH-026", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.FilesystemImageDirentTraversal as sink
@@ -56,9 +141,4 @@ rule FilesystemImageDirentTraversal {
 rule AssemblyLoadPathTraversal {
   meta { id: "VYQL-PATH-027", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.AssemblyLoadPathTraversal as sink
-}
-
-rule ManualZipEntryFileWrite {
-  meta { id: "VYQL-PATH-014", severity: high, cwe: [CWE_22], confidence_floor: medium }
-  match code.ManualZipEntryFileWrite as sink
 }

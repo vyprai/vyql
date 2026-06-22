@@ -42,6 +42,7 @@ adapter javascript {
   source "req.url" -> code.HttpInput
   source "req.path" -> code.HttpInput
   source "req.originalUrl" -> code.HttpInput
+  source "req.method" -> code.HttpInput
   source "request.body" -> code.HttpInput
   source "request.query" -> code.HttpInput
   source "request.params" -> code.HttpInput
@@ -114,8 +115,12 @@ adapter javascript {
   mark exact "analysis.function.context" val "lang=javascript" val "newTomSelect" val "directoryName" val "return`<" nval "sanitizeDirectoryName" nval "textContent" nval "innerHTML" -> code.UnescapedHtmlOptionRenderer
   mark exact "analysis.function.context" val "lang=javascript" val "getAttribute" val "data-content" val "optionContent" val "innerHTML" val "appendChild" nval "sanitizeHtml" nval "DOMPurify" nval "sanitize-html" -> code.UnescapedHtmlOptionRenderer
   mark exact "analysis.module.context" val "lang=javascript" val "onCellHtmlData" val "htmlData" val "returnhtmlData" val "tableExport" val "escape:false" nval "escape:true" nval "returncell.text" nval "returncell.text()" -> code.UnescapedTableExportHtml
+  mark exact "analysis.function.context" val "lang=javascript" val "tooltipModel.body" val "tooltipModel.labelColors" val "generateTooltipContent" val "innerHTML" nval "replaceChildren" nval "textContent" -> code.UnescapedChartTooltipHtml
   mark exact "analysis.function.context" val "Got job update from child" val "update_event" val "job[key]=data[key]" nval "allow_event_updates_from_jobs" nval "delete data.update_event" -> code.JobOutputEventUpdateAuthorizationBypass
+  mark exact "analysis.module.context" val "lang=javascript" val "COMPONENT('grid'" val "column.format" val "m.value=column.template?column.template(items[i],column):column.render?column.render(val,column,items[i]):val==null?'':(column.format?val.format(column.format):val)" val "builder.push(self.template(m,column))" nval "Thelpers.encode((column.format?val.format(column.format):val))" -> code.TotalJsAdminThemeXss
+  mark exact "analysis.module.context" val "lang=javascript" val "builtin:echo" val "\"/echo\"" val "_msgs.join(\" \")" val "event.reply(content)" -> code.CocotaisEchoPlatformTagInjection
   mark exact "analysis.module.context" val "lang=javascript" val "tar.extract" val "ignore:isSymlink" val "functionisSymlink(entry)" val "entry.type==='SymbolicLink'" nval "functionisSymlink(_,entry)" nval "entry.type==='symlink'" -> code.ArchiveSymlinkFilterBypass
+  mark exact "analysis.function.context" val "lang=javascript" val "name=preprocessParameters" val "if('user'inparameters)" val "extract(parameters,'user')" val "parameters.username" val "returnparameters;" nval "escapedParameters" nval "typeofparamValue==='string'" nval "<>{parameters[param]}</>" -> code.FlarumTranslatorRawStringParameterXss
   // Next.js App Router — searchParams (page prop / destructured) + nextUrl query
   source "searchParams" -> code.HttpInput
   source "req.nextUrl" -> code.HttpInput
@@ -182,6 +187,10 @@ adapter javascript {
   mark exact "analysis.function.context" val "lang=javascript" val "data['x-csrf-token']===token" val "deletedata['x-csrf-token']" nval "scmp" nval "timingSafeEqual" -> code.SecretComparisonReview
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
   mark exact "analysis.function.context" val "lang=javascript" val "ctx.request?.method" val "POST" val "return;" val "callbackURL" val "redirectTo" val "trustedOrigins" val "validateURL" -> code.MethodGatedRedirectValidationBypass
+  mark exact "analysis.function.context" val "lang=javascript" val "event.respondWith" val "askForAccessToken(client)" val "fetchConfig(token)" val "/_matrix/client/v1/media/download" val "/_matrix/client/v1/media/thumbnail" nval "validMediaRequest(url,session.baseUrl)" -> code.CinnyServiceWorkerMediaAuthLeak
+  mark exact "analysis.function.context" val "lang=javascript" val "name=protectSource" val "protectedHtml" val "cke_tempcomment" val "/cke_temp(comment)?/" val "'<!--{cke_temp}'" nval "randomNumber" nval "cke_temp_" -> code.CkeditorStaticProtectedSourceTokenBypass
+  mark exact "analysis.function.context" val "lang=javascript" val "name=viewToPlainText" val "viewItem.is('rawElement')" val "document.createElement('div')" val "viewItem.render(tempElement,converter)" val "domElementToPlainText(tempElement)" nval "createHTMLDocument" -> code.CkeditorRawElementLiveDocumentRenderXss
+  mark exact "analysis.function.context" val "lang=javascript" val "name=getProxyTarget" val "req.params.port" val "0.0.0.0:" val "req.originalUrl.slice(base.length)" nval "parseInt(req.params.port,10)" -> code.CodeServerPathProxyPortConfusedProxy
   mark exact "analysis.function.context" val "lang=javascript" val "URLSearchParams(window.location.search).get" val "window.location=decodeURI" nval "redirect[0]==='/'" nval "redirect[1]!=='/'" -> code.JavaScriptUrlRedirectXss
   control "isSafeRedirect" -> core.RedirectAllowlist
   control "isValidRedirect" -> core.RedirectAllowlist
@@ -189,9 +198,14 @@ adapter javascript {
   control "isUrlAllowed" -> core.AllowlistValidation
   control "isAllowedHost" -> core.AllowlistValidation
   control "validateUrl" -> core.AllowlistValidation
+  control "isUrlSafeToOpen" -> core.AllowlistValidation
   mark exact "analysis.function.context" val "name=updateDynamicPageSriHashes" val "integrityRegex.exec(attrs)" val "globalHashes[t2].set(src,sriHash)" nval "Detected reference to not explicitly allowed external resource" -> code.ExternalResourceIntegrityReview
   // Electron: shell.openExternal can launch arbitrary apps/protocols from a URL
   sink path "shell.openExternal" -> code.CommandExecution
+  // React Native CLI's development-server URL opener passed request body `url`
+  // directly to the OS browser opener before CVE-2025-11953 added protocol checks.
+  mark exact "analysis.function.context" val "lang=javascript" val "name=openURLMiddleware" val "req.body" val "awaitopen(url);" nval "newURL(url)" nval "parsedUrl.protocol" -> code.ReactNativeCliOpenUrlMiddlewareCommandExecution
+  mark exact "analysis.function.context" val "lang=javascript" val "/api/open-url" val "req.body" val "awaitopenUrl(url,undefined,this._mcpServer);" nval "isUrlSafeToOpen(url)" nval "validation.safe" -> code.CloudBaseOpenUrlSsrf
   // Electron insecure renderer config (named-value on the BrowserWindow options)
   mark "BrowserWindow" val "nodeIntegration=true" -> code.ElectronNodeIntegration
   mark "BrowserWindow" val "contextIsolation=false" -> code.ElectronNodeIntegration
@@ -233,6 +247,9 @@ adapter javascript {
   sink path "shell.exec" -> code.CommandExecution
   sink path "webpack-shell-plugin-next" -> code.CommandExecution
   sink path "WebpackShellPlugin" -> code.CommandExecution
+  mark exact "analysis.module.context" val "lang=javascript" val "functionsanitizeVar(arg)" val "arg.replace(/&/g,'')" val "args.options['gcov-root']" val "args.options['gcov-exec']" val "args.options['gcov-args']" val "execSync(gcov)" nval "execFileSync(gcov)" -> code.CodecovNodeGcovCommandInjection
+  mark exact "analysis.function.context" val "lang=javascript" val "name=_is_clamav_binary" val "version_cmds" val "${path}--version" val "cp_exec(version_cmds[scanner])" nval "cp_execfile" -> code.ClamscanBinaryPathShellCommandInjection
+  mark exact "analysis.function.context" val "lang=javascript" val "name=setupCleanupOnExit" val "exec" val "rm-r" val "cssPath" nval "fs.lstat" -> code.CompileSassCleanupShellCommandWithoutPathCheck
   mark exact "analysis.module.context" val "lang=javascript" val "server.tool" val "lsof -t -i tcp:${port}" val "ps -p ${pid} -o comm=" nval "execFile(" -> code.McpToolCommandTemplateExecution
   sink path "eval" -> code.CodeEval
   sink path "Function" -> code.CodeEval
@@ -243,6 +260,7 @@ adapter javascript {
   sink path "vm2.run" -> code.CodeEval
   mark "eval" val "ref." val "parts" -> code.RequestReferenceEval
   mark exact "analysis.function.context" val "new VM" val "sandbox.templateFilters" val "sandbox.templateGlobals" val "vm.run" nval "isolated-vm" nval "Isolate" -> code.Vm2HostCallbackBridge
+  mark exact "analysis.function.context" val "name=textToEncryptedFieldConfig" val "parseFilter(text)" nval "parseShellStringToEJSON" nval "ParseMode.Strict" -> code.CompassCsfleEjsonParserMissingStrictMode
   sink path "globalEval" -> code.CodeEval
   sink path "require" -> code.DynamicCodeLoad
   sink path "import" -> code.DynamicCodeLoad
@@ -279,6 +297,7 @@ adapter javascript {
   // attacker-controllable URL server-side -> SSRF (CVE-2026-5323, a11y-mcp).
   sink method "goto" -> code.UrlFetch
   mark exact "analysis.function.context" val "page.goto(request.url,requestOptions)" nval "request.url.trim().toLowerCase().substring(0,4)==='file'" -> code.LocalFileUrlNavigation
+  mark exact "analysis.function.context" val "lang=javascript" val "cheerio.default.html" val "this[_sanitize]" val "cheerio.load(input,null,false)('svg')" val "<body>${svg}</body>" val "this[_getPage](html)" nval "cheerio.load(input,null,false)('svg:first')" -> code.ConvertSvgMultiSvgSanitizerBypass
   sink path "request.get" -> code.UrlFetch
   sink path "request.post" -> code.UrlFetch
   sink path "needle.get" -> code.UrlFetch
@@ -313,6 +332,10 @@ adapter javascript {
   sink path "readdirSync" -> code.FilePathAccess
   sink path "unlinkSync" -> code.FilePathAccess
   sink path "mkdirSync" -> code.FilePathAccess
+  mark path "fs.lstat" -> code.FileCheck
+  mark path "fs.lstatSync" -> code.FileCheck
+  mark path "fs.chown" -> code.FileUse
+  mark path "fs.chownSync" -> code.FileUse
   sink path "fsPromises.readFile" -> code.FilePathAccess
   sink path "fsp.readFile" -> code.FilePathAccess
   sink path "fse.readFile" -> code.FilePathAccess
@@ -471,6 +494,7 @@ adapter javascript {
   control "encodeEntities" -> core.HtmlEscape
   control "escapeHTML" -> core.HtmlEscape
   control "escape-html" -> core.HtmlEscape
+  control "utils.escape" -> core.HtmlEscape
   control "he.encode" -> core.HtmlEscape
   control "validator.escape" -> core.HtmlEscape
   control "lodash.escape" -> core.HtmlEscape
@@ -521,8 +545,11 @@ adapter javascript {
   sink path "RegExp" -> code.RegexCompile
   sink receiver "replace" val "+)*m" -> code.RegexMatch
   mark "RegExp" val "d]*(?:;" -> code.CatastrophicRegex
+  mark exact "analysis.module.context" val "lang=javascript" val "constpattern=[" val "].join" val "newRegExp(pattern" val "d]*(?:;" nval "[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|" -> code.CatastrophicRegex
   mark method "match" val "^\\{(,+(?:(\\{,+\\})*),*|,*(?:(\\{,+\\})*),+)\\}" nval "^\\{((?:,|\\{,+\\})+)\\}" -> code.CatastrophicRegex
   mark exact "analysis.module.context" val "lang=javascript" val "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g" nval "[^]*?(?:\\*\\/|$)" -> code.CatastrophicRegex
+  mark method "match" val "^(\\s|\\/\\*.*?\\*\\/)*[\\[\\(\\w]" nval "([^*]|\\*(?!\\/))*?" -> code.CatastrophicRegex
+  mark exact "analysis.function.context" val "lang=javascript" val "varhwb=/^hwb\\(" val "string.match(hwb)" nval "\\d{0,3}" nval "(?:\\.\\d+)?" -> code.CatastrophicRegex
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "bulkCreate" -> code.MassAssign
@@ -537,7 +564,16 @@ adapter javascript {
   sink path "jQuery.extend" arg 2 -> code.ProtoPollute
   sink path "__js_dynamic_property_write" -> code.ProtoPollute
   control "analysis.function.context" val "curr[prop]===constructor.prototype" val "curr[prop]={}" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "Object.prototype.hasOwnProperty.call(pointer,key)" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "lang=javascript" val "name=getPaths" val "segment !== '__proto__'" val "segment !== 'constructor'" val "segment !== 'prototype'" -> core.PrototypePollutionGuard
   mark exact "analysis.function.context" val "name=separateExposeGlobals" val "Object.keys(shims).forEach" val "exposeGlobals[k]=exp" val "onlyShims[k]=val" nval "k==='__proto__'||k==='constructor'" -> code.UncheckedPrototypeConfigKey
+  mark exact "analysis.function.context" val "lang=javascript" val "name=cachedPathRelative" val "cache[from]" val "cache[from][to]" val "relative.call(path,from,to)" val "cache[from]=cache[from]||{}" nval "Object.create(null)" -> code.PrototypeKeyCachePoisoning
+  mark exact "analysis.module.context" val "lang=javascript" val "constresult:PolicyResult={}" val "directiveKey===\"__proto__\"" val "Object.defineProperty(result,directiveKey" val "value:directiveValue" nval "newMap()" nval "result.set(directiveKey,directiveValue)" -> code.CspParserProtoDirectivePollution
+  mark exact "analysis.function.context" val "lang=javascript" val "name=iterateAndMerge" val "for(varattrinobj2)" val "result[attr]=clone(obj2[attr])" val "result[attr]=iterateAndMerge(obj1[attr],obj2[attr])" nval "Object.getOwnPropertyNames(obj2)" nval "allowedAttrs.includes(attr)" -> code.ControlledMergeInheritedKeyPrototypePollution
+  mark exact "analysis.function.context" val "lang=javascript" val "name=extend" val "for(keyinsource)" val "target[key]=source[key]" val "extend(target[key],source[key])" nval "key===\"__proto__\"" -> code.ChartkickRecursiveExtendPrototypePollution
+  mark exact "analysis.module.context" val "lang=javascript" val "Collection.prototype.extend" val "forEach((el,key)=>" val "byLink" val "setVal(data,key,val)" nval "key==='__proto__'" -> code.CollectionExtendPrototypePollution
+  mark exact "analysis.module.context" val "lang=javascript" val "_core.Collection.prototype.extend" val "forEach((el,key)=>" val "_link.byLink" val "setVal(data,key,val)" nval "key==='__proto__'" -> code.CollectionExtendPrototypePollution
+  mark exact "analysis.module.context" val "lang=javascript" val "Object.keys(b).forEach(key=>" val "a[key]=b[key]" val "delegate.call(this,a[key],b[key])" nval "invalids.includes(key)" nval "'__proto__'" -> code.CookiexDeepPrototypePollution
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute
@@ -605,6 +641,9 @@ adapter javascript {
   mark exact "analysis.function.context" val "maxContentLength" val "Buffer.concat(responseBuffer).length>config.maxContentLength" val "reject(createError" nval "stream.destroy" -> code.UnstoppedLimitedStream
   mark exact "analysis.function.context" val "name=processMessage" val "protocolMsg" val "HISTORY_SYNC_NOTIFICATION" val "APP_STATE_SYNC_KEY_SHARE" val "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" nval "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe" -> code.ProtocolStateReview
   mark exact "analysis.function.context" val "_downloadFromWorkingDir" val "join(localDirPath,file.name)" val "downloadTo(localPath,file.name)" nval "basename(file.name)" -> code.RemoteListingDownloadPath
+  mark exact "analysis.function.context" val "name=<lambda>" val "req.params[0]" val "path.join(workspaceDir,file)" val "res.sendFile(filePath" nval "filePath.includes(workspaceDir)" -> code.BrowserlessWorkspaceFilePathTraversal
+  mark exact "analysis.function.context" val "name=<lambda>" val "req.params[0]" val "path.join(workspaceDir,file)" val "rimraf(filePath" nval "filePath.includes(workspaceDir)" -> code.BrowserlessWorkspaceFilePathTraversal
+  mark exact "analysis.function.context" val "name=fetchRemote" val "script.projects.getContent" val "response.data.files" val "f.name" val "path.resolve(contentDir" nval "isInside" -> code.ClaspRemoteFilePathTraversal
   mark exact "analysis.function.context" val "name=<lambda>" val "callbackData.hasOwnProperty(\"status\")" val "data.status==-1" val "callbackFun(callbackData)" nval "callbackData.status==-1" -> code.ClientAuthFailureResponseReview
   mark exact "analysis.function.context" val "prisma.accounts.update" val "where:{id}" val "passwordHash" val "originalPassword" nval "currentUserId" nval "ctx.id" -> code.IdorPolicyReview
 
@@ -618,6 +657,7 @@ adapter javascript {
   // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
   // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.
   mark "axios" val "http://" nval "127.0" -> code.CleartextChannel
+  mark exact "analysis.module.context" val "lang=javascript" val "jrePrefix" val "OpenJDK-JRE" val "http://bundled-openjdk-jre" val "download(jreUrl,jreTempFile" val "http.request" nval "https://storage.googleapis.com" -> code.InsecureExecutableDownload
   // Reconstructing a browser Request while copying headers but dropping redirect policy
   // can turn caller-specified `redirect: "error"` into the default follow behavior.
   sink method "newRequest" arg 1 collection val "headers" nval "redirect" -> code.RequestPolicyStripped

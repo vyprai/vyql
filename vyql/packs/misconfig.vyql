@@ -43,6 +43,11 @@ rule CleartextChannel {
   match code.CleartextChannel as c
 }
 
+rule InsecureExecutableDownload {
+  meta { id: "VYQL-CFG-016", severity: high, cwe: [CWE_319, CWE_494], confidence_floor: high }
+  match code.InsecureExecutableDownload as d
+}
+
 // Insecure cookie — set without the HttpOnly flag (CWE-614), value-ABSENCE presence.
 rule InsecureCookie {
   meta { id: "VYQL-CFG-007", severity: low, cwe: [CWE_614], benchmark: securecookie }

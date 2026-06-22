@@ -525,6 +525,20 @@ func (c *phConv) foreachVarNames(n *tree_sitter.Node, out *[]string) {
 	}
 }
 
+func (c *phConv) phpInterpolatedParts(n *tree_sitter.Node, out *[]nir.Expr) {
+	if n == nil {
+		return
+	}
+	switch n.Kind() {
+	case "variable_name", "member_access_expression", "subscript_expression", "dynamic_variable_name":
+		*out = append(*out, c.expr(n))
+		return
+	}
+	for _, ch := range namedChildren(n) {
+		c.phpInterpolatedParts(ch, out)
+	}
+}
+
 func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	if n == nil {
 		return nir.Const{Loc: "?:0"}
@@ -544,12 +558,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "encapsed_string", "heredoc", "string_value":
 		// interpolated string: taint-propagating over the embedded variables
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
-			if ch.Kind() == "variable_name" || ch.Kind() == "member_access_expression" ||
-				ch.Kind() == "subscript_expression" || ch.Kind() == "dynamic_variable_name" {
-				parts = append(parts, c.expr(ch))
-			}
-		}
+		c.phpInterpolatedParts(n, &parts)
 		if len(parts) > 0 {
 			parts = append([]nir.Expr{nir.Const{Loc: L, Value: c.text(n)}}, parts...)
 			return nir.Format{Parts: parts, Loc: L}

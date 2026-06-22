@@ -24,6 +24,7 @@ adapter go {
   source path "analysis.parameter.entry" val "param_type:http.Request" -> code.HttpInput
   source "os.Args" -> code.CliArgument
   source "os.Getenv" -> code.EnvVariable
+  source path "analysis.function.context" val "function_name:NewClient" val "call_path:log.Infof" val "literal:Loaded client config: %#v" val "selector:cfg.Spec" -> code.SecretValue
   source "flag.Arg" -> code.CliArgument
   source "flag.Args" -> code.CliArgument
   source ".URL.Query" -> code.HttpInput
@@ -147,6 +148,8 @@ adapter go {
   sink path "analysis.function.return" val "<html" -> code.HtmlRender
   sink path "analysis.function.return" val "<body" -> code.HtmlRender
   sink path "analysis.function.return" val "<a " -> code.HtmlRender
+  mark exact "analysis.function.context" val "function_name:PageRenderHtmlByAlias" val "param_type:http.Request" val "call_path:cms.PageFindByAlias" val "literal:Page with alias '" nval "call:ToHTML" -> code.GouniverseCmsAliasXss
+  mark exact "analysis.function.context" val "function_name:Render" val "call_path:blackfriday.Run" val "call:string" nval "call_path:bluemonday.UGCPolicy" nval "call:SanitizeBytes" -> code.DocumizeMarkdownRenderWithoutSanitizer
   // Gin/http response writer bodies. These are the last-hop render boundary for
   // raw strings/bytes assembled by handlers.
   sink path "Writer.WriteString" -> code.HtmlRender
@@ -167,6 +170,7 @@ adapter go {
   mark "DeleteAccount" -> code.AuthenticationRequiredOp
   mark "GrantRole" -> code.AuthenticationRequiredOp
   mark "MakeAdmin" -> code.AuthenticationRequiredOp
+  mark exact "analysis.function.context" val "function_name:Match" val "call_path:url.PathUnescape" val "selector:r.URL.Path" val "call_order:strings.TrimRight>path.Clean" val "call:HasSuffix" -> code.PathMatcherNormalizationOrderBypass
   mark exact "analysis.function.context" val "function_name:SolveChallenge" val "selector:challenge.tries" val "selector:s.challenges" -> code.AuthAttemptLimitReview
   mark exact "analysis.function.context" val "function_name:Verify" val "call:Get" val "binary:v==answer" nval "binary:v!=\"\"" -> code.EmptyVerifierAcceptance
   // HTTP response splitting / header injection (CWE-113).
@@ -176,6 +180,9 @@ adapter go {
   sink path "log.Print" arg all -> code.LogOutput
   sink path "log.Printf" arg all -> code.LogOutput
   sink path "log.Println" arg all -> code.LogOutput
+  mark exact "analysis.function.context" val "function_name:NewClient" val "call_path:log.Infof" val "literal:Loaded client config: %#v" val "selector:cfg.Spec" -> code.LogWrite
+  mark exact "a.logger.Info" val "fetched manifest" val "slog.F" val "manifest" -> code.CoderAgentManifestInfoLog
+  mark exact "analysis.function.context" val "function_name:toCurl" val "selector:r.RequestHeaders" val "call_path:fmt.Sprintf" val "literal:%s: %s" nval "call:maskValue" -> code.KubernetesCurlAuthorizationHeaderLogLeak
   mark "log.Print" -> code.LogWrite
   mark "log.Printf" -> code.LogWrite
   mark "log.Println" -> code.LogWrite
@@ -197,6 +204,8 @@ adapter go {
   // A path denylist that rejects parent-directory and Windows separator tokens is
   // a real traversal guard; weaker substring checks remain ordinary calls.
   control "strings.Contains" val ".." val "\\" -> core.PathAccessCheck
+  control "analysis.function.context" val "call_path:strings.Contains" val "literal:bad path" val "call_path:isSymbolLink" val "call_path:ioutil.ReadFile" -> core.PathAccessCheck
+  control "regexp.MatchString" val "^/var/lib/casaos/\\d" -> core.PathAccessCheck
   control "pathrs.Reopen" -> core.PathAccessCheck
   control "procfs.OpenProcRoot" -> core.PathAccessCheck
   control method "OpenThreadSelf" -> core.PathAccessCheck
@@ -238,6 +247,14 @@ adapter go {
   mark "rand.Perm" -> code.WeakRandomValue
   mark "rand.Shuffle" -> code.WeakRandomValue
   mark "rand.NewSource" -> code.WeakRandomValue
+  // Cloudreve's util.RandStringRunes wraps math/rand and was replaced with the
+  // crypto/rand variant for persisted/session secrets in CVE-2026-25726.
+  mark exact "util.RandStringRunes" val "32" -> code.CloudreveWeakSecretPrng
+  mark exact "util.RandStringRunes" val "64" -> code.CloudreveWeakSecretPrng
+  mark exact "util.RandStringRunes" val "128" -> code.CloudreveWeakSecretPrng
+  mark exact "util.RandStringRunes" val "256" -> code.CloudreveWeakSecretPrng
+  mark exact "analysis.function.context" val "function_name:initByDevicePath" val "call_path:cryptsetup.Init" nval "call_path:detachHeader" nval "call_path:cryptsetup.InitDataDevice" -> code.ConstellationLuks2AttachedHeaderActivation
+  mark exact "analysis.function.context" val "function_name:initByName" val "call_path:cryptsetup.InitByName" nval "call_path:detachHeader" nval "call_path:cryptsetup.InitByNameAndHeader" -> code.ConstellationLuks2AttachedHeaderActivation
 
   // weak cipher (CWE-327) — named broken ciphers
   mark "des.NewCipher" -> code.WeakCipher
@@ -257,7 +274,14 @@ adapter go {
   mark "MarshalConfig" val "false" -> code.ConfigExposureReview
   mark "instance.MarshalConfig" val "false" -> code.ConfigExposureReview
   mark exact "analysis.type.context" val "field:Repositories" val "field:Keyring" nval "method:MarshalYAML" -> code.ConfigExposureReview
+  mark exact "analysis.function.context" val "call_path:unshare.Command" val "selector:cmd.Env" val "call_path:os.Environ" val "literal:LOGLEVEL=%d" -> code.InheritedProcessEnvironmentLeak
+  mark exact "analysis.function.context" val "assign:env=imageConfig.Env" val "call_path:config.GetEnvs" val "call_path:oci.WithEnv" nval "append_copy:imageConfig.Env" -> code.ContainerdCriImageEnvAliasLeak
   mark exact "analysis.function.context" val "function_name:setupContainerUser" val "call_path:specgen.SetProcessGID" val "selector:sc.RunAsGroup" val "call_path:specgen.AddProcessAdditionalGid" nval "call_arg:specgen.AddProcessAdditionalGid:gid" -> code.ContainerPrimaryGidMissingSupplementalGroup
+  mark exact "analysis.function.context" val "call_path:os.Lstat" val "call_path:filepath.Dir" val "call_path:os.Remove" val "call_path:os.Chtimes" nval "call_path:fs.RootPath" -> code.MountStubCleanupPathEscape
+  mark "analysis.function.context" val "function_name:addFIPSModeSubscription" val "call_path:filepath.Join" val "call_path:fileutils.Exists" nval "call_path:securejoin.SecureJoin" -> code.ContainersCommonFipsModeMountSymlink
+  // Docker CLI for Windows removed the legacy ProgramData system plugin search
+  // directory because standard users can create it and plant plugin binaries.
+  mark exact "filepath.Join" val "ProgramData" val "Docker" val "cli-plugins" nval "ProgramFiles" -> code.DockerCliProgramDataPluginSearchPath
   mark "settingspkg.Settings" val "PasswordPattern" -> code.SensitiveSettingsExposureReview
   // Review-only: protocol/state handlers that stop a registration timer without
   // first checking the corresponding state can accept out-of-sequence messages.
@@ -274,21 +298,42 @@ adapter go {
   // then dispatch a resource handler need a visible request/resource scope consistency
   // check before dispatch.
   mark exact "analysis.function.context" val "function_name:ServeHTTP" val "call:RequestInfoFrom" val "call:Get" val "call:serveResource" nval "selector:apiextensions.NamespaceScoped" -> code.RequestScopePolicyReview
+  mark exact "analysis.function.context" val "function_name:newBuildPod" val "call_path:build.BuilderPodNamespace" -> code.ExternalResourceNamespaceControl
+  mark exact "analysis.function.context" val "function_name:deleteBuilderPod" val "call_path:build.BuilderPodNamespace" -> code.ExternalResourceNamespaceControl
+  mark exact "analysis.function.context" val "function_name:getBuilderPod" val "call_path:build.BuilderPodNamespace" -> code.ExternalResourceNamespaceControl
+  mark exact "analysis.function.context" val "function_name:IsCapsuleUser" val "call:NewUserGroupList" val "literal:system:serviceaccounts:kube-system" val "call:Find" nval "call:MatchingFieldsSelector" nval "literal:.status.namespaces" -> code.TenantServiceAccountAdmissionBypass
+  mark exact "analysis.function.context" val "function_name:OwnerRoleBindingsIndexFunc" val "selector:rb.Subjects" val "selector:subject.Kind" val "selector:subject.Name" val "call_path:fmt.Sprintf" nval "selector:subject.Namespace" nval "call_path:strings.Join" -> code.NamespacedSubjectKeyCollision
+  mark exact "analysis.function.context" val "function_name:impersonateHandler" val "call_path:hr.GetUserAndGroups" val "call_path:request.Header.Set" val "call_path:request.Header.Add" val "literal:Authorization" val "literal:Impersonate-User" val "literal:Impersonate-Group" nval "call_path:n.removingHopByHopHeaders" nval "call_path:httpguts.HeaderValuesContainsToken" -> code.HopByHopHeaderAuthBypass
+  mark exact "analysis.function.context" val "call_path:g.management.GetProxy" val "call_path:proxy.ServeHTTP" nval "call_path:rewriteRequestSourceIP" -> code.ProxyClientIpSpoofingBypass
+  mark exact "analysis.function.context" val "function_name:UploadFileSafe" val "call_path:uploadFile" nval "call_path:strings.Contains" -> code.UploadFilePathTraversalWrite
+  mark exact "analysis.function.context" val "call_path:policy.AttestationToPayloadJSON" val "selector:c.PredicateType" val "binary:len(payload)==0" val "call_path:PrintVerification" val "call_arg:PrintVerification:verified" nval "call_arg:PrintVerification:checked" nval "binary:len(checked)==0" -> code.AttestationPredicateVerificationBypass
   // Review-only: admission ignore helpers that skip every non-empty subresource
   // need manual review for alternate API paths that bypass the primary policy.
   mark exact "analysis.function.context" val "function_name:shouldIgnore" val "call:GetSubresource" nval "ignoredSubresources" -> code.AdmissionSubresourcePolicyReview
   mark exact "analysis.function.context" val "call:LoadOrStore" val "literal:overflow" -> code.UnboundedStateGrowthReview
   mark exact "analysis.function.context" val "function_name:MessageReceived" val "call:Wantlist" val "call:splitWantsCancels" val "call:Wants" val "call:PushTasksTruncated" nval "call:ByteLen" nval "mh.IDENTITY" -> code.UnboundedProtocolStateByIdentifier
+  mark exact "analysis.function.context" val "function_name:BtcDecode" val "call:ReadVarInt" val "selector:txin.Witness" val "const:maxWitnessItemsPerInput=500000" -> code.UnderboundedProtocolCountLimit
   mark exact "analysis.function.context" val "function_name:readBytes" val "call:ReadLong" val "call:int" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxSliceAllocSize" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxMapAllocSize" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "call:SkipNBytes" val "call:int" nval "call:SkipNBytesInt64" nval "function_name:SkipNBytesInt64" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "function_name:readBlock" val "call:ReadLong" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "function_name:Compress" val "call_path:binary.LittleEndian.PutUint32" val "call:uint32" nval "selector:math.MaxUint32" nval "literal:compressed size overflows uint32" -> code.ChGoCompressedSizeUint32Overflow
   mark exact "analysis.function.context" val "function_name:readNBytes" val "call:make" val "call:ReadByte" nval "selector:reader.data" nval "selector:reader.pos" -> code.LengthDerivedAllocation
   mark exact "analysis.function.context" val "selector:r.ContentLength" val "call:make" val "call_path:io.ReadFull" nval "call_path:io.LimitReader" nval "call_path:http.MaxBytesReader" -> code.LengthDerivedAllocation
   mark exact "analysis.function.context" val "call:ReadString" val "call:BytesNtohs" val "binary:len(buf)<=off" nval "binary:len(buf)<off+2" -> code.FieldDerivedIndexAccess
+  mark exact "analysis.function.context" val "function_name:readObject" val "index:ber:offset" val "binary:contentEnd>len(ber)" val "literal:ber2der: BER tag length is more than available data" nval "binary:len(ber)<=offset" -> code.FieldDerivedIndexAccess
+  mark exact "analysis.function.context" val "function_name:RechargePut" val "call_path:strings.Split" val "literal:rechargingInfo" val "index:ueIdRatingGroup:1" nval "call:len" nval "call_path:c.Query" -> code.Free5gcChfRechargeInfoSplitPanic
+  mark exact "analysis.function.context" val "function_name:Decode" val "call_path:zip.NewReader" val "call_path:filepath.Join" val "selector:f.Name" val "call_path:copy" nval "call_path:sanitizeArchivePath" nval "call_path:strings.HasPrefix" -> code.ManualZipEntryFileWrite
   mark exact "analysis.function.context" val "function_name:UnzipDirectory" val "call_path:zip.OpenReader" val "call_path:filepath.Join" val "selector:f.Name" val "call_path:os.OpenFile" val "call_arg:os.OpenFile:filePath" val "selector:os.O_TRUNC" nval "call_path:os.Stat" nval "call_path:GetInput" -> code.ManualZipEntryFileWrite
+  mark exact "analysis.function.context" val "function_name:getTCFilters" val "selector:bpfFilter.Name" val "call_path:strings.Contains" val "literal:cilium" nval "literal:cil_" -> code.CiliumBroadTcFilterCleanup
+  mark exact "analysis.function.context" val "function_name:generateDeployment" val "literal:etcd-init" val "field:MountPath=etcd-data-dir" val "field:Args" -> code.CiliumCliEtcdInitMountMismatch
+  mark exact "analysis.function.context" val "function_name:handlePostFile" val "call_path:pattern.Path" val "call_path:s.cfg.FileStore.Put" nval "call_path:filepath.Clean" -> code.CharmRouteFileStorePathAccess
+  mark exact "analysis.function.context" val "function_name:handleGetFile" val "call_path:pattern.Path" val "call_path:s.cfg.FileStore.Get" nval "call_path:filepath.Clean" -> code.CharmRouteFileStorePathAccess
+  mark exact "analysis.function.context" val "function_name:handleDeleteFile" val "call_path:pattern.Path" val "call_path:s.cfg.FileStore.Delete" nval "call_path:filepath.Clean" -> code.CharmRouteFileStorePathAccess
   mark exact "analysis.function.context" val "call_path:fmt.Sprintf" val "literal:%08b" val "index:capabilities:8" nval "literal:%016b" -> code.UnderwidthFormattedIndex
+  mark exact "analysis.function.context" val "function_name:BuildClient" val "literal:GO_ENABLED=1 GOOS=%s GOARCH=amd64 go build" val "selector:input.Filename" val "call:handleFilename" val "call_path:fmt.Sprintf" val "call_path:exec.Command" nval "call_path:utils.NormalizeString" nval "call_path:utils.StringIsNumber" nval "call_path:utils.IsValidIPAddress" -> code.UnsafeBuildClientCommandAssembly
+  mark exact "analysis.function.context" val "function_name:checkTopicRegister" val "selector:data.Idx" val "selector:data.Topics" val "call:int" val "call:len" val "binary:data.Idx<0" -> code.UnsignedIndexConversionGuardBypass
   sink method "BranchPageElement" val "Count" -> code.CountDerivedElementAccess
   mark "__binop.ne" val "Count" val "0" -> core.MemoryBoundsCheck
   mark exact "analysis.function.context" val "literal:SELECT 'aurora_global_db_status'::regproc" nval "pg_catalog.aurora_global_db_status" -> code.UnqualifiedDatabaseRoutineReview
@@ -311,6 +356,7 @@ adapter go {
   // TLS cert validation disabled (CWE-295) — tls.Config{InsecureSkipVerify: true}
   mark "tls.Config" val "InsecureSkipVerify=true" -> code.CertValidationDisabled
   mark "ParseUnverified" -> code.JwtUnverified
+  mark exact "analysis.function.context" val "function_name:CheckOrigin" val "param_type:http.Request" val "return:true" nval "call_path:r.Header.Get" nval "selector:r.Host" -> code.CsrfDisabled
 
   // resource lifecycle (CWE-772) — raw handles that must be closed.
   mark "net.Dial" -> code.ResourceHandle
@@ -344,8 +390,10 @@ adapter go {
   // lifecycle / locking (CWE-667)
   mark "Lock" -> code.LockAcquire
   mark "RLock" -> code.LockAcquire
+  mark exact "analysis.function.context" val "function_name:MarshalJSON" val "call_path:ps.mtx.Lock" val "call_path:cmtjson.Marshal" val "selector:ps" nval "jsonPeerState" nval "call_path:ps.Count" nval "call_path:ps.Total" -> code.RecursiveJsonMarshalUnderLock
   mark exact "analysis.global.mutation" val "field:ctx" -> code.LocklessSharedMutation
   mark exact "analysis.global.mutation" val "field:roundTripper" -> code.LocklessSharedMutation
+  mark exact "analysis.function.context" val "function_name:ReplaceIndividualSubcription" val "call:GetSubscription" val "index:bsfContext.BsfSelf.Subscriptions:subId" val "call:Status" val "selector:http.StatusNoContent" nval "selector:http.StatusNotFound" -> code.LocklessSharedMutation
   control method "Unlock" -> core.LockRelease
   control method "RUnlock" -> core.LockRelease
 

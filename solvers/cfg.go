@@ -41,7 +41,29 @@ func Reaches(store usg.Store, aID, bID string) bool {
 	if !ok1 || !ok2 {
 		return false
 	}
+	if an.Prop("region") == "" && bn.Prop("region") == "" && sameLocFile(an.Prop("loc"), bn.Prop("loc")) {
+		a, err1 := strconv.Atoi(an.Prop("order"))
+		b, err2 := strconv.Atoi(bn.Prop("order"))
+		return err1 == nil && err2 == nil && a < b
+	}
 	return reachesRegion(an.Prop("region"), an.Prop("order"), bn.Prop("region"), bn.Prop("order"))
+}
+
+func sameLocFile(aLoc, bLoc string) bool {
+	if aLoc == "" || bLoc == "" {
+		return false
+	}
+	aFile := locFile(aLoc)
+	bFile := locFile(bLoc)
+	return aFile != "" && aFile == bFile
+}
+
+func locFile(loc string) string {
+	idx := strings.LastIndex(loc, ":")
+	if idx <= 0 {
+		return ""
+	}
+	return loc[:idx]
 }
 
 // PostDominates reports whether `release` runs on EVERY path from `alloc` to function

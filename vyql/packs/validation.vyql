@@ -8,6 +8,16 @@ rule UncheckedDecodeResult {
   match code.UncheckedDecodeResult as decode
 }
 
+rule UnvalidatedRatingRange {
+  meta { id: "VYQL-VAL-002", severity: medium, cwe: [CWE_20], confidence_floor: medium }
+  match code.UnvalidatedRatingRange as rating
+}
+
+rule FrameworkRequestBeforeSessionValidation {
+  meta { id: "VYQL-VAL-003", severity: high, cwe: [CWE_20], confidence_floor: medium }
+  match code.FrameworkRequestBeforeSessionValidation as request
+}
+
 rule CommandOptionArgumentValidation {
   meta { id: "VYQL-VAL-004", severity: high, cwe: [CWE_20], confidence_floor: medium }
   match code.CommandOptionInjection as command

@@ -23,11 +23,46 @@ rule RequestHostUrlValidationBypass {
   match code.RequestHostUrlValidationBypass as guard
 }
 
+rule ChamiloUnsafeGuzzleUrlFetch {
+  meta { id: "VYQL-RF-014", severity: high, cwe: [CWE_918], confidence_floor: medium }
+  match code.ChamiloUnsafeGuzzleUrlFetch as fetch
+}
+
+rule ClockworkWebJobCsrf {
+  meta { id: "VYQL-RF-015", severity: medium, cwe: [CWE_352], confidence_floor: high }
+  match code.ClockworkWebJobCsrf as action
+}
+
+rule BestWebSoftContactFormSettingsCsrf {
+  meta { id: "VYQL-RF-021", severity: medium, cwe: [CWE_352], confidence_floor: high }
+  match code.BestWebSoftContactFormSettingsCsrf as action
+}
+
+rule CloudBaseOpenUrlSsrf {
+  meta { id: "VYQL-RF-016", severity: high, cwe: [CWE_918], confidence_floor: high }
+  match code.CloudBaseOpenUrlSsrf as action
+}
+
+rule CodeServerPathProxyPortConfusedProxy {
+  meta { id: "VYQL-RF-019", severity: high, cwe: [CWE_441, CWE_918], confidence_floor: high }
+  match code.CodeServerPathProxyPortConfusedProxy as proxy
+}
+
+rule MultiOptionUrlValidationBypass {
+  meta { id: "VYQL-RF-012", severity: medium, cwe: [CWE_601], confidence_floor: medium }
+  match code.MultiOptionUrlValidationBypass as guard
+}
+
 rule OpenRedirect {
   meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601], benchmark: redirect }
   taint core.UserControlledData -> code.RedirectTarget
   unless sanitized_by core.RedirectAllowlist
   unless guarded_by core.RedirectAllowlist
+}
+
+rule SessionStoredRedirectTarget {
+  meta { id: "VYQL-RF-013", severity: medium, cwe: [CWE_601], confidence_floor: medium }
+  match code.SessionStoredRedirectTarget as redirect
 }
 
 rule MethodGatedRedirectValidationBypass {
@@ -40,6 +75,21 @@ rule ChecksumErrorLogoutRedirect {
   match code.ChecksumErrorLogoutRedirect as redirect
 }
 
+rule PhpMyAdminSetupRedirectorOpenRedirect {
+  meta { id: "VYQL-RF-020", severity: medium, cwe: [CWE_601], confidence_floor: high }
+  match code.PhpMyAdminSetupRedirectorOpenRedirect as redirect
+}
+
+rule OwnCloudLoginRedirectUrlOpenRedirect {
+  meta { id: "VYQL-RF-022", severity: medium, cwe: [CWE_601], confidence_floor: high }
+  match code.OwnCloudLoginRedirectUrlOpenRedirect as redirect
+}
+
+rule PathMatcherNormalizationOrderBypass {
+  meta { id: "VYQL-RF-011", severity: medium, cwe: [CWE_601, CWE_22], confidence_floor: medium }
+  match code.PathMatcherNormalizationOrderBypass as matcher
+}
+
 rule IncompleteCsrfTokenValidation {
   meta { id: "VYQL-RF-006", severity: medium, cwe: [CWE_352], confidence_floor: medium }
   match code.IncompleteCsrfTokenValidation as guard
@@ -48,6 +98,16 @@ rule IncompleteCsrfTokenValidation {
 rule MissingHttpMethodAssertion {
   meta { id: "VYQL-RF-007", severity: medium, cwe: [CWE_352, CWE_749], confidence_floor: medium }
   match code.MissingHttpMethodAssertion as action
+}
+
+rule CobblerDjangoStateChangeGetCsrf {
+  meta { id: "VYQL-RF-017", severity: high, cwe: [CWE_352], confidence_floor: high }
+  match code.CobblerDjangoStateChangeGetCsrf as action
+}
+
+rule CodeDxJenkinsRemoteValidationMissingPostPermission {
+  meta { id: "VYQL-RF-018", severity: medium, cwe: [CWE_352, CWE_862, CWE_918], confidence_floor: high }
+  match code.CodeDxJenkinsRemoteValidationMissingPostPermission as endpoint
 }
 
 rule JenkinsRemoteValidationMissingPostPermission {

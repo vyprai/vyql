@@ -532,6 +532,7 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 	if name != "" {
 		add("function_name:" + name)
 	}
+	prevCall := ""
 	var walk func(*tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		if m == nil || len(out) >= 512 {
@@ -540,6 +541,10 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 		switch m.Kind() {
 		case "method_invocation":
 			if p := c.dotted(m); p != "" && p != "?" {
+				if prevCall != "" {
+					add("call_order:" + prevCall + ">" + p)
+				}
+				prevCall = p
 				add("call_path:" + p)
 			}
 			if nm := c.text(field(m, "name")); nm != "" {
@@ -547,6 +552,10 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 			}
 		case "object_creation_expression":
 			if typ := c.dotted(field(m, "type")); typ != "" && typ != "?" {
+				if prevCall != "" {
+					add("call_order:" + prevCall + ">" + typ)
+				}
+				prevCall = typ
 				add("call_path:" + typ)
 				add("call:" + lastSeg(typ))
 			}
@@ -564,6 +573,10 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 		case "string_literal":
 			if lit := javaStringToken(c.text(m)); lit != "" {
 				add("literal:" + lit)
+			}
+		case "identifier":
+			if ident := c.text(m); ident != "" {
+				add("identifier:" + ident)
 			}
 		}
 		for _, ch := range namedChildren(m) {

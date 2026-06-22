@@ -8,6 +8,7 @@ adapter groovy {
   source "params" -> code.HttpInput
   source "env" -> code.EnvVariable
   source "request.getParameter" -> code.HttpInput
+  source "cause.getDescription" -> core.UserControlledData
 
   // command execution — Jenkins sh/bat steps + Runtime.exec
   sink path "sh" -> code.CommandExecution
@@ -62,6 +63,7 @@ adapter groovy {
   sink method "println" arg all -> code.HtmlRender
   sink method "print" arg all -> code.HtmlRender
   sink method "write" arg all -> code.HtmlRender
+  sink path "raw" -> code.HtmlRender
   sink method "executeQuery" -> code.SqlExecution
   sink method "executeUpdate" -> code.SqlExecution
   sink method "execute" -> code.SqlExecution
@@ -91,6 +93,7 @@ adapter groovy {
   source ".getParameter" -> code.HttpInput
   source ".getHeader" -> code.HttpInput
   control "escapeHtml" -> core.HtmlEscape
+  control "app.markupFormatter.translate" -> core.HtmlEscape
   control "escapeShell" -> core.ShellEscape
   control "safePath" -> core.PathCanonicalization
   control "validateRole" -> core.InputValidation

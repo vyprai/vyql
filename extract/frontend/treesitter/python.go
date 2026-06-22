@@ -25,6 +25,7 @@ type pyConv struct {
 	key           string // current module key (source-root dotted)
 	moduleContext string
 	classContext  []string
+	decorators    []string
 }
 
 // ExtractPython parses Python files into one NIR Program (one module per file,
@@ -275,7 +276,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
-		body = append(body, c.pyFunctionContext(n)...)
+		body = append(body, c.pyFunctionContext(n, c.decorators)...)
 		var entries []nir.ParamEntry
 		if strings.HasPrefix(name, "resolve_") {
 			entries = append(entries, c.pyParamEntries(name, params, nil)...)
@@ -295,7 +296,10 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return nil
 		}
 		decorators := c.pyDecoratorTokens(n)
+		prevDecorators := c.decorators
+		c.decorators = decorators
 		out := c.stmt(def)
+		c.decorators = prevDecorators
 		for i, st := range out {
 			if fn, ok := st.(nir.FuncDef); ok {
 				fn.Decorators = decorators
@@ -493,7 +497,7 @@ func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 	return els
 }
 
-func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
+func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
@@ -508,6 +512,9 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		nir.Const{Loc: loc, Value: c.moduleContext},
 	}
 	for _, tok := range c.classContext {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	for _, tok := range decorators {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	contextPath := "analysis.function.context"

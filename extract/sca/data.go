@@ -16,6 +16,7 @@ type advisoryEntry struct {
 	Version string   `json:"version"`
 	ID      string   `json:"id"`
 	CWE     []string `json:"cwe,omitempty"`
+	MaxSafe string   `json:"max_safe,omitempty"`
 }
 
 // scaData is the merged, parsed reference set, keyed by ecosystem ("pypi"/"npm").

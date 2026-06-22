@@ -23,9 +23,44 @@ rule PotentialRawMemoryCopySize {
   match code.RawMemoryCopySize as c
 }
 
+rule MissingPostCopyBoundsCheck {
+  meta { id: "VYQL-MEM-020", severity: high, cwe: [CWE_787], confidence_floor: medium }
+  match code.MissingPostCopyBoundsCheck as c
+}
+
+rule UnderallocatedFormattedAddressList {
+  meta { id: "VYQL-MEM-021", severity: high, cwe: [CWE_787], confidence_floor: medium }
+  match code.UnderallocatedFormattedAddressList as c
+}
+
 rule PythonUnicodeEscapeWideUnderallocation {
   meta { id: "VYQL-MEM-030", severity: high, cwe: [CWE_787], confidence_floor: high }
   match code.PythonUnicodeEscapeWideUnderallocation as c
+}
+
+rule ContikiSicslowpanFragmentOffsetOobWrite {
+  meta { id: "VYQL-MEM-028", severity: high, cwe: [CWE_787], confidence_floor: high }
+  match code.ContikiSicslowpanFragmentOffsetOobWrite as c
+}
+
+rule LibreOfficeEnhwmfDibHeaderSizeUnderflow {
+  meta { id: "VYQL-MEM-029", severity: high, cwe: [CWE_190, CWE_787], confidence_floor: high }
+  match code.LibreOfficeEnhwmfDibHeaderSizeUnderflow as c
+}
+
+rule BinarySearchTableIndexGuardBypass {
+  meta { id: "VYQL-MEM-022", severity: medium, cwe: [CWE_125, CWE_129], confidence_floor: medium }
+  match code.BinarySearchTableIndexGuardBypass as idx
+}
+
+rule CompressedBlockSizeCapacityMismatch {
+  meta { id: "VYQL-MEM-023", severity: high, cwe: [CWE_787], confidence_floor: medium }
+  match code.CompressedBlockSizeCapacityMismatch as c
+}
+
+rule ChakraScopeSlotArrayUncheckedIndex {
+  meta { id: "VYQL-MEM-024", severity: high, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: medium }
+  match code.ChakraScopeSlotArrayUncheckedIndex as idx
 }
 
 rule StackAllocationSmell {
@@ -97,6 +132,21 @@ rule PotentialZeroSizeReallocation {
 rule EscapedTerminatorWrite {
   meta { id: "VYQL-MEM-013", severity: medium, cwe: [CWE_119, CWE_125, CWE_787], confidence_floor: medium }
   match code.EscapedTerminatorWrite as w
+}
+
+rule CjsonTrailingBackslashStringOverread {
+  meta { id: "VYQL-MEM-025", severity: high, cwe: [CWE_125], confidence_floor: high }
+  match code.CjsonTrailingBackslashStringOverread as read
+}
+
+rule ClamavWwpackStructsPointerOobWrite {
+  meta { id: "VYQL-MEM-026", severity: high, cwe: [CWE_787], confidence_floor: high }
+  match code.ClamavWwpackStructsPointerOobWrite as write
+}
+
+rule ClaxonResidualPartitionBufferExposure {
+  meta { id: "VYQL-MEM-027", severity: high, cwe: [CWE_908], confidence_floor: high }
+  match code.ClaxonResidualPartitionBufferExposure as exposure
 }
 
 rule CountDerivedElementAccess {

@@ -253,7 +253,7 @@ func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
 	}
 }
 
-func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
+func TestExplicitPackageBlockSinkRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -271,7 +271,7 @@ func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
 	if got := adapter.Apply(withoutPkg); len(got) != 0 {
-		t.Fatalf("package-gated sink fired without evidence: %+v", got)
+		t.Fatalf("explicit package-block sink fired without evidence: %+v", got)
 	}
 
 	withImport := usg.NewInMemStore()
@@ -283,7 +283,7 @@ func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
 	if got := adapter.Apply(withImport); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
-		t.Fatalf("package-gated sink did not fire with import evidence: %+v", got)
+		t.Fatalf("explicit package-block sink did not fire with import evidence: %+v", got)
 	}
 
 	withSBOM := usg.NewInMemStore()
@@ -295,7 +295,41 @@ func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
 	if got := adapter.Apply(withSBOM); len(got) != 1 || got[0].NodeID != "arg" {
-		t.Fatalf("package-gated sink did not fire with SBOM evidence: %+v", got)
+		t.Fatalf("explicit package-block sink did not fire with SBOM evidence: %+v", got)
+	}
+}
+
+func TestExplicitPackageBlockParamSourceRequiresPackageEvidence(t *testing.T) {
+	defer SetActiveSources(nil)
+	SetActiveSources(map[string]bool{"custom.ParamSource": true})
+
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		ParamSources: []paramSourceSpec{{
+			Concept:  "custom.ParamSource",
+			Packages: []string{"samplepkg"},
+		}},
+	}
+	adapter := spec.paramSourceAdapter()
+
+	withoutPkg := usg.NewInMemStore()
+	withoutPkg.AddNode(usg.Node{ID: "param", Type: "code.Param", Props: map[string]string{
+		"loc": "sample.x:2", "exported": "true",
+	}})
+	if got := adapter.Apply(withoutPkg); len(got) != 0 {
+		t.Fatalf("explicit package-block param source fired without evidence: %+v", got)
+	}
+
+	withPkg := usg.NewInMemStore()
+	withPkg.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
+		"loc": "sample.x:1", "module": "samplepkg", "package": "samplepkg",
+	}})
+	withPkg.AddNode(usg.Node{ID: "param", Type: "code.Param", Props: map[string]string{
+		"loc": "sample.x:2", "exported": "true",
+	}})
+	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "param" || got[0].Concept != "custom.ParamSource" || got[0].Specificity != 3 {
+		t.Fatalf("explicit package-block param source did not fire with evidence: %+v", got)
 	}
 }
 
@@ -386,6 +420,59 @@ func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing
 	got := spec.sinkAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg0" || got[0].Concept != "custom.Target" {
 		t.Fatalf("value-matched sink did not use upstream tokens when call had no direct strings: %+v", got)
+	}
+}
+
+func TestContextMarkSyntaxBuildsExactContextMark(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  mark context function {
+    has "lang=javascript"
+    has "data['x-csrf-token']===token"
+    lacks "timingSafeEqual"
+  } -> custom.SecretComparison
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context mark: %v", err)
+	}
+	ad, ok := decls[0].(*parser.AdapterDecl)
+	if !ok {
+		t.Fatalf("expected adapter decl, got %#v", decls[0])
+	}
+	spec := specFromDecl(ad)
+	if len(spec.Marks) != 1 {
+		t.Fatalf("expected one mark spec, got %#v", spec.Marks)
+	}
+	mark := spec.Marks[0]
+	if mark.Pattern != "analysis.function.context" || !mark.Exact ||
+		len(mark.ValMatches) != 2 || mark.ValMatches[0] != "lang=javascript" ||
+		mark.ValMatches[1] != "data['x-csrf-token']===token" ||
+		len(mark.ValAbsents) != 1 || mark.ValAbsents[0] != "timingSafeEqual" {
+		t.Fatalf("unexpected context mark spec: %#v", mark)
+	}
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.js:1",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=javascript\x00name=validate\x00data['x-csrf-token']===token",
+	}})
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.SecretComparison" {
+		t.Fatalf("context mark did not label matching context node: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.js:2",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=javascript\x00data['x-csrf-token']===token\x00timingSafeEqual",
+	}})
+	got = spec.markAdapter().Apply(store)
+	if len(got) != 1 {
+		t.Fatalf("context mark should skip node with lacks token present, got %+v", got)
 	}
 }
 
@@ -518,7 +605,7 @@ func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
 	}
 }
 
-func TestPackageGatedSourceRequiresPackageEvidence(t *testing.T) {
+func TestExplicitPackageBlockSourceRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -536,7 +623,7 @@ func TestPackageGatedSourceRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.source.value", "method": "value",
 	}})
 	if got := adapter.Apply(withoutPkg); len(got) != 0 {
-		t.Fatalf("package-gated source fired without evidence: %+v", got)
+		t.Fatalf("explicit package-block source fired without evidence: %+v", got)
 	}
 
 	withPkg := usg.NewInMemStore()
@@ -547,11 +634,11 @@ func TestPackageGatedSourceRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.source.value", "method": "value",
 	}})
 	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
-		t.Fatalf("package-gated source did not fire with package evidence: %+v", got)
+		t.Fatalf("explicit package-block source did not fire with package evidence: %+v", got)
 	}
 }
 
-func TestPackageGatedReceiverSourceUsesResolvedType(t *testing.T) {
+func TestExplicitPackageBlockReceiverSourceUsesResolvedType(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -588,7 +675,7 @@ func TestPackageGatedReceiverSourceUsesResolvedType(t *testing.T) {
 	}
 }
 
-func TestPackageGatedControlRequiresPackageEvidence(t *testing.T) {
+func TestExplicitPackageBlockControlRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -606,7 +693,7 @@ func TestPackageGatedControlRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
 	if got := adapter.Apply(withoutPkg); len(got) != 0 {
-		t.Fatalf("package-gated control fired without evidence: %+v", got)
+		t.Fatalf("explicit package-block control fired without evidence: %+v", got)
 	}
 
 	withPkg := usg.NewInMemStore()
@@ -617,7 +704,7 @@ func TestPackageGatedControlRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
 	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
-		t.Fatalf("package-gated control did not fire with package evidence: %+v", got)
+		t.Fatalf("explicit package-block control did not fire with package evidence: %+v", got)
 	}
 }
 

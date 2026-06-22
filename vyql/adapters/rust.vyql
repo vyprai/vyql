@@ -21,13 +21,25 @@ adapter rust {
   sink path "Command.new" -> code.CommandExecution
   sink method "arg" -> code.CommandExecution
   sink method "args" -> code.CommandExecution
+  mark exact "analysis.function.context" val "lang=rust" val "installScript" val "final_script" nval "spawn_installer_container" -> code.TemplateInstallScriptHostExecution
   mark exact "analysis.function.context" val "lang=rust" val "&mut" val "as *const" val "as *mut" -> code.UnsafeMutableAlias
   mark exact "analysis.rust.enum" val "kind:enum" val "repr:C" -> code.FfiEnumLayoutRisk
   mark exact "analysis.rust.unsafe_impl" val "trait:Send" nval "bound:Send" -> code.UnsafeAutoTraitImpl
-  mark exact "analysis.rust.unsafe_impl" val "trait:Sync" nval "bound:Sync" -> code.UnsafeAutoTraitImpl
+  mark exact "analysis.rust.unsafe_impl" val "trait:Sync" nval "bound:Sync" nval "bound:Send" -> code.UnsafeAutoTraitImpl
+  mark exact "analysis.function.context" val "lang=rust" val "avail_in=input.len()asc_uint" val "avail_out=output.len()asc_uint" val "BZ2_bz" nval ".min(c_uint::MAXasusize)asc_uint" -> code.UncheckedFfiLengthNarrowing
   mark exact "analysis.function.context" val "lang=rust" val "with_capacity" val "as_mut_ptr" val "from_raw_parts_mut" val "read_exact" val "set_len" -> code.UninitializedBufferExposure
+  mark exact "analysis.function.context" val "lang=rust" val "Vec::with_capacity" val "set_len" val "read_exact(&mut" nval "resize" -> code.UninitializedBufferExposure
   mark exact "analysis.function.context" val "lang=rust" val "as_mut_ptr" val "from_raw_parts_mut" val ".read(" val "set_len" -> code.UninitializedBufferExposure
+  mark exact "analysis.rust.uninitialized" -> code.UninitializedBufferExposure
+  mark exact "analysis.function.context" val "lang=rust" val "name=decode_residual" val "letn_partitions=1u32<<order;" val "letn_samples=block_size>>order;" val "letmutlen=n_samples-n_warm_up;" val "buffer[start..start+lenasusize]" val "decode_rice_partition(input,slice)" val "decode_rice2_partition(input,slice)" nval "block_size&(n_partitions-1)asu16!=0" nval "n_samples_per_partition" -> code.ClaxonResidualPartitionBufferExposure
   mark exact "analysis.function.context" val "lang=rust" val ".next().await" nval "timeout" -> code.UnboundedResourceOperation
+  mark exact "analysis.function.context" val "lang=rust" val "name=blocking_handler" val "request.into_parts()" val "hyper::body::to_bytes(body).await?" val "Request::from_parts(parts, full_body)" nval "check_content_length" nval "size_hint" -> code.ConduitHyperUnboundedBodyToBytes
+  mark exact "analysis.function.context" val "lang=rust" val "name=parse_inner" val "\"max-age\",Some(v)" val "v.parse()" val "Duration::seconds(val)" nval "Duration::max_value().num_seconds()" nval "cmp::min" -> code.CookieMaxAgeDurationSecondsPanic
+  mark exact "analysis.function.context" val "lang=rust" val "name=poll" val "letstate_ptr=Weak::into_raw(Arc::downgrade(&self_ref.state));letmutstate=self_ref.state.write().unwrap();" val "state.waker.is_none()" val "ic0::call_new" -> code.CallFutureRawWeakStateRef
+  mark exact "analysis.function.context" val "lang=rust" val "path.file_stem()" val "stemstr.to_uppercase().as_str()" val "\"COM0\"" val "\"COM9\"" val "manually::open" nval "\"COM¹\"" -> code.WindowsReservedDeviceNameBypass
+  mark exact "analysis.function.context" val "lang=rust" val "path.file_stem()" val "stemstr.to_uppercase().as_str()" val "\"LPT0\"" val "\"LPT9\"" val "manually::open" nval "\"LPT¹\"" -> code.WindowsReservedDeviceNameBypass
+  mark exact "analysis.function.context" val "lang=rust" val "PACKAGE_SOURCE_LOCK" val "entry.unpack_in(parent)" val "OpenOptions::new().create(true)" val "write!(ok,\"ok\")" nval "entry_path.file_name()" nval "create_new(true)" -> code.ArchiveMarkerSymlinkOverwrite
+  mark exact "analysis.function.context" val "lang=rust" val "name=apply_smart_op_tx" val "self.ensure_smart_account_at_round(&tx.from,current_round);" val "self.debit(&tx.from,tx.fee)?;" val "self.increment_nonce(&tx.from);" val "SmartOpType::Stake{amount}=>{" val "returnErr(CoinError::ValidationError(\"belowminimumstake\".into()))" val "ok_or_else(||CoinError::ValidationError(\"nostaketounstake\".into()))?" nval "tx.fee.saturating_add(*amount)" -> code.StateMutationBeforeOperationPreconditions
   mark exact "analysis.function.context" val "lang=rust" val "name=poll" val "DiscoveryMessage::Handshake" val "self.peer_list_limit = Some(limit);" val "self.peer_list_limit.unwrap() as usize - 1" val "self.get_peer_contacts(" nval ".saturating_sub(1)" nval ".min(self.config.update_limit)" -> code.PeerLimitUnderflow
 
   // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
@@ -84,6 +96,7 @@ adapter rust {
   // insecure cookie (CWE-614) — Cookie configured insecurely
   mark "set_secure" val "false" -> code.InsecureCookie
   mark "set_http_only" val "false" -> code.InsecureCookie
+  mark exact "CorsLayer.new.allow_origin.allow_methods.allow_headers" val "Any" -> code.PermissiveCors
 
   // insecure randomness (CWE-330) — non-CSPRNG. `OsRng` is the secure form and
   // its path does NOT start with these tokens, so the safe case carries no mark.
@@ -142,6 +155,9 @@ adapter rust {
   mark "danger_accept_invalid_certs" val "true" -> code.CertValidationDisabled
   mark method "mode" val "0o777" -> code.InsecurePermission
   mark method "mode" val "0o666" -> code.InsecurePermission
+  mark "Permissions.from_mode" val "0o777" -> code.InsecurePermission
+  mark "Permissions.from_mode" val "0o666" -> code.InsecurePermission
+  mark "platform_lib.mode_t.from" val "S_IRWXO" -> code.InsecurePermission
   mark exact "analysis.function.context" val "lang=rust" val "config_dest.push(\"ignition\");" val "config_dest.push(\"config.ign\");" val "create_dir_all(&config_dest)" val "OpenOptions::new()" val ".create_new(true)" val "copy(&mutconfig_in,&mutconfig_out)" nval "set_permissions" nval "Permissions::from_mode" nval ".chmod(" nval ".set_mode(" -> code.SecretConfigFilePermissionMissing
   mark "File.create" val "/tmp/" -> code.InsecureTempFile
   mark "__subscript" -> code.IndexAccess

@@ -33,6 +33,36 @@ rule PointerOffsetBoundsCheck {
   match code.PointerOffsetBoundsCheck as bounds
 }
 
+rule UnsignedIndexConversionGuardBypass {
+  meta { id: "VYQL-NUM-007", severity: medium, cwe: [CWE_190, CWE_129], confidence_floor: medium }
+  match code.UnsignedIndexConversionGuardBypass as idx
+}
+
+rule UncheckedFfiLengthNarrowing {
+  meta { id: "VYQL-NUM-008", severity: medium, cwe: [CWE_190], confidence_floor: medium }
+  match code.UncheckedFfiLengthNarrowing as narrowing
+}
+
+rule RubyCgiEscapeHtmlLengthOverflow {
+  meta { id: "VYQL-NUM-009", severity: high, cwe: [CWE_190, CWE_787], confidence_floor: high }
+  match code.RubyCgiEscapeHtmlLengthOverflow as overflow
+}
+
+rule CgifAddframeSignedFrameCountOverflow {
+  meta { id: "VYQL-NUM-010", severity: medium, cwe: [CWE_190], confidence_floor: high }
+  match code.CgifAddframeSignedFrameCountOverflow as overflow
+}
+
+rule ChGoCompressedSizeUint32Overflow {
+  meta { id: "VYQL-NUM-011", severity: medium, cwe: [CWE_190, CWE_444], confidence_floor: high }
+  match code.ChGoCompressedSizeUint32Overflow as overflow
+}
+
+rule CimgPnmDimensionProductOverflow {
+  meta { id: "VYQL-NUM-012", severity: high, cwe: [CWE_190, CWE_787], confidence_floor: high }
+  match code.CimgPnmDimensionProductOverflow as overflow
+}
+
 rule PeerLimitUnderflow {
   meta { id: "VYQL-NUM-013", severity: medium, cwe: [CWE_191], confidence_floor: high }
   match code.PeerLimitUnderflow as underflow

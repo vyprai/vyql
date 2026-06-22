@@ -156,8 +156,31 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	case "block":
 		return c.block(n)
 	}
+	if meta := c.rsUninitializedMetadata(n); meta != nil {
+		return append(meta, nir.ExprStmt{Value: c.expr(n)})
+	}
 	// a bare tail expression (block value) still matters for taint
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *rsConv) rsUninitializedMetadata(n *tree_sitter.Node) []nir.Stmt {
+	text := c.text(n)
+	compact := rustCompactText(text)
+	if !strings.Contains(compact, "mem::uninitialized") {
+		return nil
+	}
+	loc := c.loc(n)
+	path := "analysis.rust.uninitialized"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=rust"},
+			nir.Const{Loc: loc, Value: "mem::uninitialized"},
+		},
+		Path:   path,
+		Method: "uninitialized",
+		Loc:    loc,
+	}}}
 }
 
 func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
@@ -203,8 +226,10 @@ func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 	}
 	loc := c.loc(n)
 	tokens := []string{"lang=rust", "kind:unsafe_impl", "trait:" + trait}
-	if strings.Contains(compact, "+"+trait) || strings.Contains(compact, ":"+trait) {
-		tokens = append(tokens, "bound:"+trait)
+	for _, bound := range []string{"Send", "Sync"} {
+		if strings.Contains(compact, "+"+bound) || strings.Contains(compact, ":"+bound) {
+			tokens = append(tokens, "bound:"+bound)
+		}
 	}
 	args := make([]nir.Expr, 0, len(tokens))
 	for _, tok := range tokens {

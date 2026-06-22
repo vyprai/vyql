@@ -48,3 +48,58 @@ rule ZeroStepSequenceExpansion {
   meta { id: "VYQL-DOS-009", severity: high, cwe: [CWE_400], confidence_floor: high }
   match code.ZeroStepSequenceExpansion as loop
 }
+
+rule RubyLineAnchorValidationBypass {
+  meta { id: "VYQL-DOS-010", severity: medium, cwe: [CWE_400], confidence_floor: low }
+  match code.RubyLineAnchorValidationBypass as validator
+}
+
+rule UnderboundedProtocolCountLimit {
+  meta { id: "VYQL-DOS-011", severity: high, cwe: [CWE_20, CWE_400], confidence_floor: medium }
+  match code.UnderboundedProtocolCountLimit as limit
+}
+
+rule ProtocolListAmplification {
+  meta { id: "VYQL-DOS-012", severity: high, cwe: [CWE_400], confidence_floor: medium }
+  match code.ProtocolListAmplification as list
+}
+
+rule UncheckedPythonCapiHashError {
+  meta { id: "VYQL-DOS-013", severity: medium, cwe: [CWE_252, CWE_400], confidence_floor: medium }
+  match code.UncheckedPythonCapiHashError as h
+}
+
+rule ChatterBotSqlalchemySessionPoolExhaustion {
+  meta { id: "VYQL-DOS-014", severity: high, cwe: [CWE_400], confidence_floor: medium }
+  match code.ChatterBotSqlalchemySessionPoolExhaustion as s
+}
+
+rule Free5gcChfRechargeInfoSplitPanic {
+  meta { id: "VYQL-DOS-015", severity: high, cwe: [CWE_129, CWE_400], confidence_floor: high }
+  match code.Free5gcChfRechargeInfoSplitPanic as s
+}
+
+rule GsonObjectTypeAdapterRecursiveRead {
+  meta { id: "VYQL-DOS-016", severity: high, cwe: [CWE_502, CWE_400], confidence_floor: high }
+  match code.GsonObjectTypeAdapterRecursiveRead as s
+}
+
+rule CommonsCompressBzip2FallbackSortMissing {
+  meta { id: "VYQL-DOS-017", severity: medium, cwe: [CWE_400], confidence_floor: high }
+  match code.CommonsCompressBzip2FallbackSortMissing as s
+}
+
+rule ConduitHyperUnboundedBodyToBytes {
+  meta { id: "VYQL-DOS-018", severity: high, cwe: [CWE_400, CWE_770], confidence_floor: high }
+  match code.ConduitHyperUnboundedBodyToBytes as s
+}
+
+rule CookieMaxAgeDurationSecondsPanic {
+  meta { id: "VYQL-DOS-019", severity: high, cwe: [CWE_20, CWE_400], confidence_floor: high }
+  match code.CookieMaxAgeDurationSecondsPanic as s
+}
+
+rule EmmettUnhandledCookieParseException {
+  meta { id: "VYQL-DOS-020", severity: high, cwe: [CWE_248, CWE_400], confidence_floor: high }
+  match code.EmmettUnhandledCookieParseException as s
+}

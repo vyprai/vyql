@@ -1,0 +1,62 @@
+# Rank 431 / CVE-2020-15123: codecov-node upload sanitized only "&"
+# before building gcov shell command strings and executing them with execSync.
+
+test "rank431: Codecov Node gcov options reach execSync after ampersand-only sanitization"
+  lang javascript
+  file codecov.js
+  expect VYQL-INJ-084
+  expect_review code.CodecovNodeGcovCommandInjection
+  code
+  ```
+  var execSync = require('child_process').execSync
+
+  function upload(args) {
+    var root = '.'
+    var gcg = args.options['gcov-glob'] || ''
+    var gcov =
+      'find ' +
+      (sanitizeVar(args.options['gcov-root']) || root) +
+      " -type f -name '*.gcno' " +
+      gcg +
+      ' -exec ' +
+      (sanitizeVar(args.options['gcov-exec']) || 'gcov') +
+      ' ' +
+      (sanitizeVar(args.options['gcov-args']) || '') +
+      ' {} +'
+    execSync(gcov)
+  }
+
+  function sanitizeVar(arg) {
+    return arg.replace(/&/g, '')
+  }
+  ```
+
+test "rank431: Codecov Node gcov command uses execFileSync boundary"
+  lang javascript
+  file codecov.js
+  reject VYQL-INJ-084
+  reject_review code.CodecovNodeGcovCommandInjection
+  code
+  ```
+  var execFileSync = require('child_process').execFileSync
+
+  function upload(args) {
+    var root = '.'
+    var gcg = args.options['gcov-glob'] || ''
+    var gcov =
+      'find ' +
+      (sanitizeVar(args.options['gcov-root']) || root) +
+      " -type f -name '*.gcno' " +
+      gcg +
+      ' -exec ' +
+      (sanitizeVar(args.options['gcov-exec']) || 'gcov') +
+      ' ' +
+      (sanitizeVar(args.options['gcov-args']) || '') +
+      ' {} +'
+    execFileSync(gcov)
+  }
+
+  function sanitizeVar(arg) {
+    return arg.replace(/&/g, '')
+  }
+  ```

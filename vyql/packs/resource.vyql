@@ -13,3 +13,13 @@ rule OwnerFieldClearedBeforeFree {
   match code.OwnerFieldClear as clear
   where dominates(clear, code.OwnerFree)
 }
+
+rule RequestTokenCacheCleanupBypass {
+  meta { id: "VYQL-RES-003", severity: high, cwe: [CWE_772] }
+  match code.RequestTokenCacheCleanupBypass as cache
+}
+
+rule CallFutureWeakStateLeak {
+  meta { id: "VYQL-RES-004", severity: high, cwe: [CWE_401, CWE_400] }
+  match code.CallFutureRawWeakStateRef as raw
+}

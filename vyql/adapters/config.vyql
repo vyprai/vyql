@@ -4,6 +4,7 @@
 adapter config {
   meta {
     fidelity: resolved,
+    cross_language: true,
     config_xml_true_attrs: [
       "activity|exported|analysis.config.android.exported_component",
       "activity-alias|exported|analysis.config.android.exported_component",
@@ -29,7 +30,10 @@ adapter config {
     ],
     config_line_contains_events: [
       "dockerfile|--privileged|analysis.config.container.privileged_mode",
-      "terraform|0.0.0.0/0|analysis.config.terraform.open_cidr"
+      "terraform|0.0.0.0/0|analysis.config.terraform.open_cidr",
+      "jelly|permission=\"${it.ADMINISTRATOR}\"|analysis.config.jenkins_advisor_weak_layout_permission",
+      "jelly|tooltip=\"${item.why}${h.escape(item.params)}|analysis.config.jenkins_computer_queue_unescaped_tooltip",
+      "pest|dangerous_url = { \"data:\" ~ !(\"image/\"|analysis.config.comrak_dangerous_url_case_sensitive"
     ],
     config_file_contains_all_events: [
       "yaml|analysis.config.github_actions.privileged_pr_framework_execution|pull_request_target;;git show \"$PR_SHA:$file\" > \"$file\";;python manage.py makemigrations"
@@ -50,9 +54,9 @@ adapter config {
     ],
     config_template_expr_start: "${",
     config_template_expr_end: "}",
-    config_template_scopes: ["jelly", "jsp"],
-    config_template_input_pattern_jelly: "\\bit\\.(name|description|value|defaultValue)\\b",
-    config_template_skip_contains_jelly: ["<j:set", "<j:when", "<j:if", " test="],
+    config_template_scopes: ["jelly", "jsp", "jsp_scriptlet"],
+    config_template_input_pattern_jelly: "\\b(it\\.(name|description|value|defaultValue)|parameter\\.(name|description)|cause\\.description)\\b",
+    config_template_skip_contains_jelly: ["<j:set", "<j:when", "<j:if", " test=", "markupFormatter.translate", "<f:password", "<f:checkbox", "<f:textarea", "<f:textbox", "<select"],
     config_template_input_event_jelly: "analysis.template.jelly.input",
     config_template_render_event_jelly: "analysis.template.jelly.render",
     config_template_escape_prefix_jelly: "h.escape(",
@@ -63,14 +67,24 @@ adapter config {
     config_template_skip_contains_jsp: ["<%@", "<c:out", "<c:forEach", "<c:if", " items=", " test="],
     config_template_input_event_jsp: "analysis.template.jsp.input",
     config_template_render_event_jsp: "analysis.template.jsp.render",
+    config_template_expr_start_jsp_scriptlet: "<%=",
+    config_template_expr_end_jsp_scriptlet: "%>",
+    config_template_input_pattern_jsp_scriptlet: "\\b(leftPropertyValue|rightPropertyValue|mediaType|leftOp|rightOp)\\b",
+    config_template_skip_contains_jsp_scriptlet: ["<%@", "<%--", "Encode.forHtml"],
+    config_template_input_event_jsp_scriptlet: "analysis.template.jsp.input",
+    config_template_render_event_jsp_scriptlet: "analysis.template.jsp.render",
+    config_template_escape_event_jsp_scriptlet: "analysis.template.jsp.escape",
+    config_template_escape_active_contains_jsp_scriptlet: ["leftPropertyValue = Encode.forHtml(leftPropertyValue)"],
+    config_template_escape_line_contains_jsp_scriptlet: ["<%=leftPropertyValue%>", "<%=rightPropertyValue%>", "<%=mediaType%>", "<%=filterMediaType%>", "<%=leftOp%>", "<%=rightOp%>"],
     config_dot_template_rules: [
       "_limit.jst|must be number|maximum;exclusiveMaximum;$schemaExcl|$schemaExcl|analysis.template.dot.schema_codegen_unvalidated",
       "_limititems.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
       "_limitlength.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
       "_limitproperties.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
-      "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated"
+      "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated",
+      "index.html|Thelpers.encode(item.message)|common.notifications.template;item.message;refresh_notifications|msg = t.format('@(Navigation has been saved)', item.message)|analysis.config.totaljs_admin_notification_message_xss"
     ],
-    config_text_template_scopes: ["xwiki_velocity"],
+    config_text_template_scopes: ["xwiki_velocity", "svelte", "django", "erb"],
     config_text_template_extensions_xwiki_velocity: [".xml"],
     config_text_template_required_contains_xwiki_velocity: ["<content", "$request.", "#"],
     config_text_template_line_events_xwiki_velocity: [
@@ -82,6 +96,24 @@ adapter config {
     config_text_template_flow_events_xwiki_velocity: [
       "#ckeditor_convert|\\$!?request\\.[A-Za-z0-9_]+\\b|analysis.template.xwiki_velocity.input|analysis.template.xwiki_velocity.state_change",
       "#ckeditor_convert|\\$text\\b|analysis.template.xwiki_velocity.input|analysis.template.xwiki_velocity.state_change"
+    ],
+    config_text_template_extensions_svelte: [".svelte"],
+    config_text_template_required_contains_svelte: ["{@html"],
+    config_text_template_line_events_svelte: [
+      "{@html|analysis.template.svelte.raw_html"
+    ],
+    config_text_template_extensions_django: [".html"],
+    config_text_template_required_contains_django: ["{% autoescape off %}"],
+    config_text_template_line_events_django: [
+      "{% autoescape off %}|analysis.template.django.autoescape_off"
+    ],
+    config_text_template_extensions_erb: [".erb"],
+    config_text_template_required_contains_erb: ["<%="],
+    config_text_template_line_events_erb: [
+      "raw comment.content|analysis.template.erb.raw_comment_html",
+      "vect[\"note\"]%>|analysis.template.erb.unescaped_tooltip_html",
+      "value[:description] %>|analysis.template.erb.unescaped_tooltip_html",
+      "\"_last_status_message\").to_s if|analysis.template.erb.unescaped_tooltip_html"
     ]
   }
 
@@ -106,7 +138,9 @@ adapter config {
   mark "analysis.config.terraform.open_cidr" -> code.PublicNetworkExposure
   mark "analysis.config.terraform.wildcard_iam" -> code.WildcardIamPolicy
   mark "analysis.config.github_actions.privileged_pr_framework_execution" -> code.PrivilegedWorkflowUntrustedCodeExecution
-
+  mark "analysis.config.jenkins_advisor_weak_layout_permission" -> code.JenkinsAdvisorWeakLayoutPermission
+  mark "analysis.config.jenkins_computer_queue_unescaped_tooltip" -> code.JenkinsComputerQueueUnescapedTooltipXss
+  mark "analysis.config.comrak_dangerous_url_case_sensitive" -> code.ComrakDangerousUrlCaseSensitiveGrammar
   // Jenkins Jelly views: template model fields such as it.name/it.description
   // rendered into HTML-bearing attributes need escaping before display.
   source "analysis.template.jelly.input" -> core.UserControlledData
@@ -117,15 +151,26 @@ adapter config {
   // rendered output; <c:out> is skipped by the frontend as an escaped render.
   source "analysis.template.jsp.input" -> core.UserControlledData
   sink   "analysis.template.jsp.render" -> code.HtmlRender
+  control "analysis.template.jsp.escape" -> core.HtmlEscape
 
   // Ajv/doT codegen templates: numeric schema keywords must be type-checked
   // before the template emits validator code. Missing checks can let crafted
   // schemas steer generated code/prototype behavior.
   mark "analysis.template.dot.schema_codegen_unvalidated" -> code.SchemaCodegenValidationBypass
+  mark "analysis.config.totaljs_admin_notification_message_xss" -> code.TotalJsAdminThemeXss
 
   // XWiki Velocity pages embedded in XML: request-driven server-side conversion
   // actions need CSRF validation before they execute.
   source "analysis.template.xwiki_velocity.input" -> core.UserControlledData
   sink   "analysis.template.xwiki_velocity.state_change" -> code.StateChangingOp
   control "analysis.template.xwiki_velocity.csrf_check" -> core.CsrfProtection
+  // Svelte raw HTML blocks bypass normal escaping. Stored model/entity names rendered
+  // through {@html ...} should be reviewed as stored HTML writes.
+  mark "analysis.template.svelte.raw_html" -> code.StoredHtmlWrite
+  // Django templates can locally disable autoescaping around model fields.
+  mark "analysis.template.django.autoescape_off" -> code.StoredHtmlWrite
+  // Rails ERB raw comment rendering bypasses Rails' default output escaping.
+  mark "analysis.template.erb.raw_comment_html" -> code.StoredHtmlWrite
+  // Rails ERB tooltip/status attributes can render stored task metadata without HTML escaping.
+  mark "analysis.template.erb.unescaped_tooltip_html" -> code.StoredHtmlWrite
 }

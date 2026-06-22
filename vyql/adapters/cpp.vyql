@@ -80,10 +80,15 @@ adapter cpp {
   mark exact "analysis.function.context" val "lang=cpp" val "unescapeChar(*readPtr++);}*writePtr++=c;" -> code.EscapedTerminatorWrite
   mark exact "analysis.function.context" val "lang=cpp" val "count_vertices+=*itf;" val "newaiVector3D[count_vertices]" nval "AI_MAX_FACE_INDICES" nval "count_vertices>vertices.size()" -> code.UnboundedAllocationReview
   mark exact "analysis.function.context" val "lang=cpp" val "start+len+1>end" val "start+=len" nval "buff_size" nval "end-start-1" -> code.PointerOffsetBoundsCheck
+  mark exact "analysis.function.context" val "lang=cpp" val "inlineCompositeListElementCount" val "wordsPerElement" val "ListReader" nval "amplifiedRead" -> code.ProtocolListAmplification
+  mark exact "analysis.function.context" val "lang=cpp" val "elementSize" val "ElementSize::VOID" val "ListReader" nval "amplifiedRead" -> code.ProtocolListAmplification
+  mark exact "analysis.function.context" val "lang=cpp" val "propertyIdsForScopeSlotArray[sym->GetScopeSlot()]=sym->EnsurePosition(funcInfo)" val "propertyIdsForScopeSlotArray[funcInfo->thisScopeSlot]=Js::PropertyIds::_lexicalThisSlotSymbol" val "propertyIdsForScopeSlotArray[funcInfo->superCtorScopeSlot]=Js::PropertyIds::_superCtorReferenceSymbol" nval "setPropertyIdForScopeSlotArray(sym->GetScopeSlot(),sym->EnsurePosition(funcInfo))" nval "slot<0||(uint)slot>=scopeSlotCount" nval "Js::Throw::FatalInternalError()" -> code.ChakraScopeSlotArrayUncheckedIndex
   mark exact "analysis.function.context" val "lang=cpp" val "visitBrOn(&curr)" val "validateTypeAnnotation(in,curr.ref)" val "curr.desc" nval "curr.ref->type.isRef" nval "curr.desc->type.isRef" -> code.ReachableAssertionReview
   mark exact "analysis.function.context" val "lang=cpp" val "Record_Type::ApplicationData" val "callbacks().tls_record_received" nval "can_decrypt_application_traffic" -> code.ProtocolStateReview
   mark exact "analysis.function.context" val "lang=cpp" val "name=HTTPAuthorized" val "strUserPass==strRPCUserColonPass" nval "nResult|=" -> code.SecretComparisonReview
   mark exact "analysis.function.context" val "lang=cpp" val "r.Randomize" val "MultiplicativeInverse(r)" val "Jacobi" val "modn.Square(r)" val "modn.Multiply(y,rInv)" nval "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)" -> code.CryptoImproperBlinding
+  mark exact "analysis.function.context" val "lang=cpp" val "cimg::fsize(filename)" val "W*H*D>siz" nval "(cimg_int64)W*H*D>siz" -> code.CimgPnmDimensionProductOverflow
+  mark exact "analysis.function.context" val "lang=cpp" val "EMR_ALPHABLEND" val "getDIBV5HeaderSize" val "cbBmiSrc" val "nDeltaToDIB5HeaderSize" val "nTargetSize" val "newchar" val "ReadBytes" nval "cbBmiSrc>nHeaderSize" nval "bSafeRead=false" -> code.LibreOfficeEnhwmfDibHeaderSizeUnderflow
   mark "analysis.field.clear_null" -> code.OwnerFieldClear
   mark "xmlFreeDoc" -> code.OwnerFree
   mark "__deref" -> code.PointerUse

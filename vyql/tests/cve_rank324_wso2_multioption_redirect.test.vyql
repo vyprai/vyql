@@ -1,0 +1,79 @@
+# Rank 324 / CVE-2024-1440: WSO2 authentication endpoint multi-option URL
+# validation accepted absolute callback URLs without host allowlisting.
+
+test "rank324: URL syntax validation without callback host allowlist is open redirect review"
+  lang java
+  expect VYQL-RF-012
+  expect_review code.MultiOptionUrlValidationBypass
+  code
+  ```
+  import java.net.URI;
+  import java.net.URL;
+
+  class AuthenticationEndpointUtil {
+    static boolean isValidURL(String urlString) throws Exception {
+      if (isURLRelative(urlString)) {
+        urlString = buildAbsoluteURL(urlString);
+      }
+      new URL(urlString).toURI();
+      return true;
+    }
+
+    static boolean isURLRelative(String uriString) throws Exception {
+      return !new URI(uriString).isAbsolute();
+    }
+
+    static String buildAbsoluteURL(String contextPath) {
+      return "https://id.example" + contextPath;
+    }
+  }
+  ```
+
+test "rank324: callback host allowlist suppresses multi-option URL finding"
+  lang java
+  reject VYQL-RF-012
+  reject_review code.MultiOptionUrlValidationBypass
+  code
+  ```
+  import java.net.URI;
+  import java.net.URL;
+
+  class AuthenticationEndpointUtil {
+    static boolean isValidURL(String urlString) throws Exception {
+      return validateURL(urlString);
+    }
+
+    static boolean isValidMultiOptionURI(String urlString) throws Exception {
+      if (validateURL(urlString)) {
+        return validateCallbackURL(urlString);
+      }
+      return false;
+    }
+
+    static boolean validateURL(String urlString) throws Exception {
+      if (isURLRelative(urlString)) {
+        urlString = buildAbsoluteURL(urlString);
+      }
+      new URL(urlString).toURI();
+      return true;
+    }
+
+    static boolean validateCallbackURL(String callbackURL) throws Exception {
+      String multiOptionURIHostAndPort = getHostAndPort(callbackURL);
+      return multiOptionURIHostAndPort.equals(getHostAndPort(buildAbsoluteURL("/")));
+    }
+
+    static String getHostAndPort(String urlString) throws Exception {
+      URL url = new URL(urlString);
+      return url.getHost();
+    }
+
+    static boolean isURLRelative(String uriString) throws Exception {
+      return !new URI(uriString).isAbsolute();
+    }
+
+    static String buildAbsoluteURL(String contextPath) {
+      return "https://id.example" + contextPath;
+    }
+  }
+  ```

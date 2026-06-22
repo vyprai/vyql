@@ -1,0 +1,35 @@
+# Rank 405 / CVE-2022-42966: Cleo table style-tag regex permitted arbitrary
+# attribute names in nested optional groups, enabling catastrophic backtracking.
+
+test "rank405: cleo table style regex has nested arbitrary attributes"
+  lang python
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  import re
+
+  def render_cell(cell):
+      return re.match(
+          r"^<(\w+|(\w+=[\w,]+;?)*)>.+</(\w+|(\w+=\w+;?)*)?>$",
+          str(cell),
+      )
+  ```
+
+test "rank405: cleo table style regex restricts supported attributes"
+  lang python
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  import re
+
+  def render_cell(cell):
+      return re.match(
+          (
+              r"^<(\w+|((?:fg|bg|options)=[\w,]+;?)+)>"
+              r".+<\/(\w+|((?:fg|bg|options)=[\w,]+;?)+)?>$"
+          ),
+          str(cell),
+      )
+  ```

@@ -1,0 +1,119 @@
+# Rank 495 / CVE-2024-42354: Shopware Store API Criteria processing
+# skipped ManyToMany target definitions when applying ApiAware protections.
+
+test "rank495: Shopware Store API criteria traversal skips ManyToMany target definitions"
+  lang php
+  file SalesChannelRepository.php
+  expect VYQL-AUTH-026
+  expect_review code.ShopwareStoreApiManyToManyCriteriaBypass
+  code
+  ```
+  <?php
+  class SalesChannelRepository {
+      private $definition;
+      private $eventDispatcher;
+
+      private function processCriteria(Criteria $topCriteria, SalesChannelContext $salesChannelContext): void
+      {
+          if (!$this->definition instanceof SalesChannelDefinitionInterface) {
+              return;
+          }
+
+          $queue = [
+              ['definition' => $this->definition, 'criteria' => $topCriteria],
+          ];
+
+          $processed = [];
+
+          while (!empty($queue)) {
+              $cur = array_shift($queue);
+              $definition = $cur['definition'];
+              $criteria = $cur['criteria'];
+
+              if (isset($processed[$definition::class])) {
+                  continue;
+              }
+
+              if ($definition instanceof SalesChannelDefinitionInterface) {
+                  $definition->processCriteria($criteria, $salesChannelContext);
+              }
+
+              $processed[$definition::class] = true;
+
+              foreach ($criteria->getAssociations() as $associationName => $associationCriteria) {
+                  $field = $definition->getField($associationName);
+                  if (!$field instanceof AssociationField) {
+                      continue;
+                  }
+
+                  $referenceDefinition = $field->getReferenceDefinition();
+                  $queue[] = ['definition' => $referenceDefinition, 'criteria' => $associationCriteria];
+              }
+          }
+      }
+  }
+  ```
+
+test "rank495: Shopware Store API criteria traversal includes ManyToMany targets with path keys"
+  lang php
+  file SalesChannelRepository.php
+  reject VYQL-AUTH-026
+  reject_review code.ShopwareStoreApiManyToManyCriteriaBypass
+  code
+  ```
+  <?php
+  use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationField;
+
+  class SalesChannelRepository {
+      private $definition;
+      private $eventDispatcher;
+
+      private function processCriteria(Criteria $topCriteria, SalesChannelContext $salesChannelContext): void
+      {
+          if (!$this->definition instanceof SalesChannelDefinitionInterface) {
+              return;
+          }
+
+          $queue = [
+              ['definition' => $this->definition, 'criteria' => $topCriteria, 'path' => ''],
+          ];
+
+          $processed = [];
+
+          while (!empty($queue)) {
+              $cur = array_shift($queue);
+              $definition = $cur['definition'];
+              $criteria = $cur['criteria'];
+              $path = $cur['path'];
+              $processedKey = $path . $definition::class;
+
+              if (isset($processed[$processedKey])) {
+                  continue;
+              }
+
+              if ($definition instanceof SalesChannelDefinitionInterface) {
+                  $definition->processCriteria($criteria, $salesChannelContext);
+              }
+
+              $processed[$processedKey] = true;
+
+              foreach ($criteria->getAssociations() as $associationName => $associationCriteria) {
+                  $field = $definition->getField($associationName);
+                  if (!$field instanceof AssociationField) {
+                      continue;
+                  }
+
+                  $referenceDefinition = $field->getReferenceDefinition();
+                  $queue[] = ['definition' => $referenceDefinition, 'criteria' => $associationCriteria, 'path' => $path . '.' . $associationName];
+
+                  if (!$field instanceof ManyToManyAssociationField) {
+                      continue;
+                  }
+
+                  $referenceDefinition = $field->getToManyReferenceDefinition();
+                  $queue[] = ['definition' => $referenceDefinition, 'criteria' => $associationCriteria, 'path' => $path . '.' . $associationName];
+              }
+          }
+      }
+  }
+  ```

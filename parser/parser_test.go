@@ -275,6 +275,11 @@ adapter neutral {
   control receiver method "checked" -> custom.Transform
   mark method "setMode" val "true" -> custom.Marker
   mark exact "Widget" -> custom.Marker
+  mark context function {
+    has "lang=javascript"
+    has "name=validate"
+    lacks "timingSafeEqual"
+  } -> custom.Marker
 }
 `
 	decls, err := Parse(src)
@@ -294,7 +299,7 @@ adapter neutral {
 	if th == nil || th.QualifiedName() != "sample.Condition" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "neutral" || len(ad.Mappings) != 14 {
+	if ad == nil || ad.Name != "neutral" || len(ad.Mappings) != 15 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "custom.Source" {
@@ -337,6 +342,13 @@ adapter neutral {
 	if ad.Mappings[13].Kind != "mark" || !ad.Mappings[13].Exact {
 		t.Fatalf("exact mark wrong: %+v", ad.Mappings[13])
 	}
+	if ad.Mappings[14].Kind != "mark" || !ad.Mappings[14].Exact ||
+		ad.Mappings[14].Pattern != "analysis.function.context" ||
+		len(ad.Mappings[14].ValMatches) != 2 || ad.Mappings[14].ValMatches[0] != "lang=javascript" ||
+		ad.Mappings[14].ValMatches[1] != "name=validate" ||
+		len(ad.Mappings[14].ValAbsents) != 1 || ad.Mappings[14].ValAbsents[0] != "timingSafeEqual" {
+		t.Fatalf("context mark wrong: %+v", ad.Mappings[14])
+	}
 }
 
 func TestConceptImportsResolveInRulesAndAdapters(t *testing.T) {
@@ -377,7 +389,7 @@ rule ContainerRule {
 		t.Fatalf("sink import = %q", got)
 	}
 	if got := ad.Mappings[2].Packages; len(got) != 1 || got[0] != "pkg" {
-		t.Fatalf("package gate = %#v", got)
+		t.Fatalf("package block = %#v", got)
 	}
 	if got := ad.Mappings[3].Concept; got != "core.Transform" {
 		t.Fatalf("alias import = %q", got)

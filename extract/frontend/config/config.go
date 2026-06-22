@@ -35,6 +35,7 @@ func Extract(files []string, root string) (nir.Program, error) {
 				k = "texttemplate:" + scope
 			}
 		}
+		fileSignatureBody := scanDotTemplate(src, rel)
 		switch {
 		case k == "android":
 			body = scanAndroidManifest(src, rel)
@@ -46,14 +47,23 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanYaml(src, rel)
 		case k == "terraform":
 			body = scanTerraform(src, rel)
+		case k == "setupcfg":
+			body = scanSetupCfg(src, rel)
+		case k == "pest":
+			body = scanPest(src, rel)
+		case k == "concretephp":
+			body = scanConcretePHP(src, rel)
 		case k == "jelly":
 			body = scanJelly(src, rel)
 		case k == "jsp":
 			body = scanJSP(src, rel)
 		case k == "dottemplate":
-			body = scanDotTemplate(src, rel)
+			body = fileSignatureBody
 		case strings.HasPrefix(k, "texttemplate:"):
 			body = scanTextTemplate(src, rel, strings.TrimPrefix(k, "texttemplate:"))
+		}
+		if k != "dottemplate" && len(fileSignatureBody) > 0 {
+			body = append(body, fileSignatureBody...)
 		}
 		if len(body) == 0 {
 			continue
@@ -72,6 +82,9 @@ func kind(path string, src []byte) string {
 	if base == "androidmanifest.xml" {
 		return "android"
 	}
+	if base == "plugin.xml" && bytes.Contains(src, []byte("AndroidManifest.xml")) {
+		return "android"
+	}
 	if ext == ".plist" {
 		return "plist"
 	}
@@ -80,6 +93,9 @@ func kind(path string, src []byte) string {
 	}
 	if ext == ".tf" {
 		return "terraform"
+	}
+	if base == "setup.cfg" {
+		return "setupcfg"
 	}
 	if ext == ".jelly" {
 		return "jelly"
@@ -92,6 +108,15 @@ func kind(path string, src []byte) string {
 	}
 	if ext == ".yaml" || ext == ".yml" {
 		return "yaml"
+	}
+	if ext == ".pest" {
+		return "pest"
+	}
+	if ext == ".php" {
+		slashPath := filepath.ToSlash(strings.ToLower(path))
+		if strings.HasSuffix(slashPath, "concrete/config/concrete.php") {
+			return "concretephp"
+		}
 	}
 	// fall back to the root element for unconventionally-named files.
 	dec := xml.NewDecoder(bytes.NewReader(src))
@@ -119,11 +144,51 @@ var (
 )
 
 func scanJelly(src []byte, file string) []nir.Stmt {
-	return scanTemplateExpressions(src, file, "jelly")
+	cfg := loadProfile()
+	out := scanTemplateExpressions(src, file, "jelly")
+	text := string(src)
+	out = append(out, scopedFileContainsAllEvents(cfg, "jelly", text, file)...)
+	for i, raw := range strings.Split(text, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "jelly", line, file, i+1)...)
+	}
+	return out
+}
+
+func scanPest(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "pest", line, file, i+1)...)
+	}
+	return out
+}
+
+func scanConcretePHP(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "concretephp", line, file, i+1)...)
+	}
+	return out
 }
 
 func scanJSP(src []byte, file string) []nir.Stmt {
-	return scanTemplateExpressions(src, file, "jsp")
+	var out []nir.Stmt
+	out = append(out, scanTemplateExpressions(src, file, "jsp")...)
+	out = append(out, scanTemplateExpressions(src, file, "jsp_scriptlet")...)
+	return out
 }
 
 func scanDotTemplate(src []byte, file string) []nir.Stmt {
@@ -473,8 +538,8 @@ func loadProfile() configProfile {
 				Event:     parts[4],
 			})
 		}
-		exprStart := firstNonEmpty(metaString(meta, "config_template_expr_start"), defaultExprStart)
-		exprEnd := firstNonEmpty(metaString(meta, "config_template_expr_end"), defaultExprEnd)
+		globalExprStart := firstNonEmpty(metaString(meta, "config_template_expr_start"), defaultExprStart)
+		globalExprEnd := firstNonEmpty(metaString(meta, "config_template_expr_end"), defaultExprEnd)
 		for _, scope := range metaList(meta, "config_template_scopes") {
 			pattern := metaString(meta, "config_template_input_pattern_"+scope)
 			inputEvent := metaString(meta, "config_template_input_event_"+scope)
@@ -483,8 +548,8 @@ func loadProfile() configProfile {
 				panic("config: malformed config template profile " + scope)
 			}
 			configProfileData.Templates[scope] = templateProfile{
-				ExprStart:            exprStart,
-				ExprEnd:              exprEnd,
+				ExprStart:            firstNonEmpty(metaString(meta, "config_template_expr_start_"+scope), globalExprStart),
+				ExprEnd:              firstNonEmpty(metaString(meta, "config_template_expr_end_"+scope), globalExprEnd),
 				InputPattern:         regexp.MustCompile(pattern),
 				SkipContains:         metaList(meta, "config_template_skip_contains_"+scope),
 				InputEvent:           inputEvent,
@@ -696,6 +761,19 @@ func scanTerraform(src []byte, file string) []nir.Stmt {
 		}
 		out = append(out, scopedContainsEvents(cfg, "terraform", line, file, i+1)...)
 		out = append(out, quotedStarFieldEvents(cfg, "terraform", line, file, i+1)...)
+	}
+	return out
+}
+
+func scanSetupCfg(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "setupcfg", line, file, i+1)...)
 	}
 	return out
 }

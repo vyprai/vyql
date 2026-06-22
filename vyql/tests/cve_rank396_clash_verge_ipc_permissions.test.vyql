@@ -1,0 +1,66 @@
+test "rank396: Clash Verge service IPC endpoint is world reachable"
+  lang rust
+  expect VYQL-CFG-008
+  expect_review code.InsecurePermission
+  code
+  ```
+  use kode_bridge::{IpcHttpServer, Result};
+  use std::fs::Permissions;
+  use std::os::unix::fs::PermissionsExt;
+  use std::path::Path;
+  use tokio::fs;
+
+  const IPC_PATH: &str = "/var/run/clash-verge/service.sock";
+
+  async fn make_ipc_dir() -> Result<()> {
+      if let Some(dir_path) = Path::new(IPC_PATH).parent() {
+          if !dir_path.exists() {
+              fs::create_dir_all(dir_path).await?;
+          }
+          fs::set_permissions(dir_path, Permissions::from_mode(0o777)).await?;
+      }
+      Ok(())
+  }
+
+  fn create_ipc_server() -> Result<IpcHttpServer> {
+      let server = IpcHttpServer::new(IPC_PATH)?;
+      use platform_lib::{S_IRWXG, S_IRWXO, S_IRWXU, mode_t};
+      let mode: mode_t = platform_lib::mode_t::from(S_IRWXU | S_IRWXG | S_IRWXO);
+      Ok(server.with_listener_mode(mode))
+  }
+  ```
+
+test "rank396: Clash Verge service IPC endpoint is admin-group restricted"
+  lang rust
+  reject VYQL-CFG-008
+  reject_review code.InsecurePermission
+  code
+  ```
+  use kode_bridge::{IpcHttpServer, Result};
+  use std::fs::Permissions;
+  use std::os::unix::fs::PermissionsExt;
+  use std::path::Path;
+  use tokio::fs;
+
+  const IPC_PATH: &str = "/var/run/clash-verge/service.sock";
+
+  async fn make_ipc_dir() -> Result<()> {
+      let Some(dir_path) = Path::new(IPC_PATH).parent() else {
+          return Ok(());
+      };
+
+      if !dir_path.exists() {
+          fs::create_dir_all(dir_path).await?;
+      }
+
+      fs::set_permissions(dir_path, Permissions::from_mode(0o750)).await?;
+      Ok(())
+  }
+
+  fn create_ipc_server() -> Result<IpcHttpServer> {
+      let server = IpcHttpServer::new(IPC_PATH)?;
+      use platform_lib::{S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR, mode_t};
+      let mode: mode_t = platform_lib::mode_t::from(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+      Ok(server.with_listener_mode(mode))
+  }
+  ```

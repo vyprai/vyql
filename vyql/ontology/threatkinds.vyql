@@ -98,6 +98,7 @@ threat FileInclusion { cwe: [CWE_98], desc: "Untrusted data controlling an inclu
 threat LinkFollowing { cwe: [CWE_59], desc: "Improper link resolution before file access" }
 threat PathTraversal { cwe: [CWE_22], desc: "Untrusted data in a filesystem path" }
 threat InsecureTempFile { cwe: [CWE_377], desc: "Insecure temporary file (predictable name / race)" }
+threat UncontrolledSearchPath { cwe: [CWE_427], desc: "Executable or plugin discovery includes a lower-trust search path" }
 
 module request_forgery;
 threat Csrf { cwe: [CWE_352], desc: "Cross-site request forgery" }

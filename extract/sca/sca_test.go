@@ -49,6 +49,49 @@ setup(
 	}
 }
 
+func TestParseSetupCfgInstallRequires(t *testing.T) {
+	got := ParseSetupCfg(`[metadata]
+name = httpie
+
+[options]
+packages = find:
+install_requires =
+    requests[socks] >=2.22.0, <=2.31.0
+    Pygments>=2.5.2
+
+[options.extras_require]
+dev =
+    pytest
+`)
+	want := []Dep{{"requests", ">=2.22.0, <=2.31.0"}, {"pygments", ">=2.5.2"}}
+	if len(got) != len(want) {
+		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestPackageMatchesRepositorySlugInImportPath(t *testing.T) {
+	cases := []struct {
+		observed string
+		want     string
+		match    bool
+	}{
+		{"github.com/cloudreve/Cloudreve/v4/pkg/util", "cloudreve", true},
+		{"github.com/capnproto/capnproto/c++/src", "capnproto", true},
+		{"github.com/cloudreve/Cloudreve/v4/pkg/util", "reve", false},
+		{"github.com/example/not-cloudreve/pkg", "cloudreve", false},
+	}
+	for _, tc := range cases {
+		if got := PackageMatches(tc.observed, tc.want); got != tc.match {
+			t.Errorf("PackageMatches(%q, %q)=%v want %v", tc.observed, tc.want, got, tc.match)
+		}
+	}
+}
+
 func TestSCARuntimeDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {

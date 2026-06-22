@@ -1,0 +1,85 @@
+# Rank 452 / CVE-2012-2098: Commons Compress bzip2 compression retried
+# the original block sorter after excessive comparison work. The fix routes
+# small or over-work-limit blocks through the libbzip2 fallback sorter.
+
+test "rank452: Commons Compress blockSort randomizes and retries mainSort without fallback"
+  lang java
+  expect VYQL-DOS-017
+  expect_review code.CommonsCompressBzip2FallbackSortMissing
+  code
+  ```
+  class BlockSort {
+      private static final int WORK_FACTOR = 30;
+      private int workDone;
+      private int workLimit;
+      private boolean firstAttempt;
+      private boolean blockRandomised;
+
+      static class Data {
+          int origPtr;
+          int[] fmap = new int[100];
+      }
+
+      boolean blockSort(final Data data, final int last) {
+          this.workLimit = WORK_FACTOR * last;
+          this.workDone = 0;
+          this.blockRandomised = false;
+          this.firstAttempt = true;
+          mainSort(data, last);
+
+          if (this.firstAttempt && (this.workDone > this.workLimit)) {
+              randomiseBlock(data, last);
+              this.workLimit = this.workDone = 0;
+              this.firstAttempt = false;
+              mainSort(data, last);
+          }
+
+          data.origPtr = -1;
+          return blockRandomised;
+      }
+
+      private void mainSort(final Data data, final int last) {}
+      private void randomiseBlock(final Data data, final int last) {}
+  }
+  ```
+
+test "rank452: Commons Compress blockSort switches to fallback sort"
+  lang java
+  reject VYQL-DOS-017
+  reject_review code.CommonsCompressBzip2FallbackSortMissing
+  code
+  ```
+  class BlockSort {
+      private static final int WORK_FACTOR = 30;
+      private int workDone;
+      private int workLimit;
+      private boolean firstAttempt;
+
+      static class Data {
+          int origPtr;
+          int[] fmap = new int[100];
+      }
+
+      boolean blockSort(final Data data, final int last) {
+          this.workLimit = WORK_FACTOR * last;
+          this.workDone = 0;
+          this.firstAttempt = true;
+
+          if (last + 1 < 10000) {
+              fallbackSort(data, last);
+          } else {
+              mainSort(data, last);
+
+              if (this.firstAttempt && (this.workDone > this.workLimit)) {
+                  fallbackSort(data, last);
+              }
+          }
+
+          data.origPtr = -1;
+          return false;
+      }
+
+      private void mainSort(final Data data, final int last) {}
+      private void fallbackSort(final Data data, final int last) {}
+  }
+  ```

@@ -39,9 +39,24 @@ rule SecretComparisonObservableDiscrepancy {
   match code.SecretComparisonReview as cmp
 }
 
+rule CloudreveWeakSecretPrng {
+  meta { id: "VYQL-CRY-007", severity: high, cwe: [CWE_338, CWE_330], confidence_floor: high }
+  match code.CloudreveWeakSecretPrng as r
+}
+
+rule ConstellationLuks2AttachedHeaderActivation {
+  meta { id: "VYQL-CRY-008", severity: high, cwe: [CWE_347], confidence_floor: high }
+  match code.ConstellationLuks2AttachedHeaderActivation as c
+}
+
 rule CipherWithoutIntegrityHash {
   meta { id: "VYQL-CRY-009", severity: high, cwe: [CWE_665], confidence_floor: high }
   match code.CipherWithoutIntegrityHash as c
+}
+
+rule AttestationPredicateVerificationBypass {
+  meta { id: "VYQL-CRY-010", severity: high, cwe: [CWE_347], confidence_floor: high }
+  match code.AttestationPredicateVerificationBypass as a
 }
 
 rule CryptoImproperBlinding {

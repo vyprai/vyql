@@ -137,12 +137,12 @@ Rules:
     }
   }
 - Keep mappings conservative and selector-backed.
-- Do not wrap exact analysis.function.context, analysis.module.context, or
-  analysis.class.context marks in package blocks. Those marks are already
+- Do not wrap context marks in package blocks. `mark context function`,
+  `mark context module`, and `mark context class` are already
   localized by exact repo evidence; put dependency evidence in the adapter file
   evidence list instead of creating a package gate.
 - For first-party/local project APIs, prefer generalized API mappings already
-  meaningful across projects, narrow analysis.function.context marks, or an
+  meaningful across projects, narrow context marks, or an
   empty overlay with notes. Empty-overlay notes must explicitly say whether a
   core scan concept/rule already covers the relevant surface, or whether no
   validated adapter target exists. Do not create adapters whose only locality
@@ -164,9 +164,18 @@ Rules:
   call finish_overlay with no adapter files and explain the missing concrete
   security mapping.
 - For repo-local anti-patterns that need context instead of taint, use an
-  exact analysis mark with existing review concepts:
-  mark exact "analysis.function.context" val "name=orderBy" val "$direction" val "processOrderBy" nval "QUERY_ORDER_DESC" -> code.UnparameterizedSqlQueryParser
-  mark exact "analysis.function.context" val "name=verify_and_process" val "request.query_params.get(\"state\")" nval "request.cookies.get(\"sso_state\")" -> code.ProtocolStateReview
+  exact context mark with existing review concepts:
+  mark context function {
+    has "name=orderBy"
+    has "$direction"
+    has "processOrderBy"
+    lacks "QUERY_ORDER_DESC"
+  } -> code.UnparameterizedSqlQueryParser
+  mark context function {
+    has "name=verify_and_process"
+    has "request.query_params.get(\"state\")"
+    lacks "request.cookies.get(\"sso_state\")"
+  } -> code.ProtocolStateReview
 - Invalid syntax examples: sink arg 2 "do_cmd" -> ...,
   sink "do_cmd" -> concept:, sink path "do_cmd" concept: ...
 - Do not put JSON/YAML/object fields such as concept:, confidence:, evidence:,
@@ -178,24 +187,25 @@ Rules:
   project/framework-specific meaning that shipped adapters cannot know.
 - Prefer repo-specific wrappers, public API boundaries, and narrow context
   marks over broad generic mappings. If a CVE shape is visible in one function
-  and existing concepts already describe it, a narrow mark exact overlay is
+  and existing concepts already describe it, a narrow `mark context function`
+  overlay is
   usually better than trying to invent a source/sink flow.
 - Do not broaden an entire package just because it handles requests, protocols,
   plugins, controllers, or model objects. Generated adapters should identify a
   specific framework API, wrapper, sink, sanitizer/control, or narrow context
   mark. Broad source-only overlays tend to increase noise without improving
   scan precision.
-- Before writing mark exact "analysis.function.context", call function_context
-  for the target function and choose val/nval substrings from that returned
+- Before writing `mark context function`, call function_context
+  for the target function and choose has/lacks substrings from that returned
   single function context. Do not combine vals from different functions. For Go
   function contexts, use the returned suggested_vals token
   function_name:<Name>; do not use name=<Name>, which is not emitted by the Go
   frontend and will not match.
-- Before writing mark exact "analysis.module.context", call module_context
-  for the target file and choose val/nval substrings from one returned top-level
+- Before writing `mark context module`, call module_context
+  for the target file and choose has/lacks substrings from one returned top-level
   declaration context. Use this for static role, permission, route, or policy maps.
-- Before writing mark exact "analysis.class.context", call class_context
-  for the target class and choose val/nval tokens from one returned class
+- Before writing `mark context class`, call class_context
+  for the target class and choose has/lacks tokens from one returned class
   context. Prefer structured tokens such as class_name:, class_base:,
   function_name:, call_path:, and annotation: over loose source-text substrings.
 - For scan catch-rate work, prefer concepts with surface=scan from

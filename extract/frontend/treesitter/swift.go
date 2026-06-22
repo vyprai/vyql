@@ -27,7 +27,8 @@ func ExtractSwift(files []string, root string) (nir.Program, error) {
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &swConv{src: src, file: rel, key: moduleKey(root, abs, ".swift")}
-			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+			body := append(c.swModuleContext(tree.RootNode()), c.decls(tree.RootNode())...)
+			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
@@ -41,6 +42,25 @@ func (c *swConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *swConv) swModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=swift"},
+			nir.Const{Loc: loc, Value: text},
+			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+		},
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
 }
 
 func (c *swConv) decls(n *tree_sitter.Node) []nir.Stmt {

@@ -1,0 +1,96 @@
+# Rank 429 / CVE-2021-23420: Codeception RunProcess could be used as
+# a PHP object-injection gadget before serialization rejection hooks.
+
+test "rank429: Codeception RunProcess lacks serialization blockers"
+  lang php
+  file RunProcess.php
+  expect VYQL-DESER-013
+  expect_review code.CodeceptionRunProcessDeserializationGadget
+  code
+  ```
+  <?php
+  namespace Codeception\Extension;
+
+  use Symfony\Component\Process\Process;
+
+  class RunProcess extends Extension
+  {
+      protected $config = ['sleep' => 0];
+      private $processes = [];
+
+      public function runProcess()
+      {
+          foreach ($this->config as $key => $command) {
+              if (method_exists(Process::class, 'fromShellCommandline')) {
+                  $process = Process::fromShellCommandline($command, $this->getRootDir(), null, null, null);
+              } else {
+                  $process = new Process($command, $this->getRootDir(), null, null, null);
+              }
+              $process->start();
+              $this->processes[] = $process;
+          }
+      }
+
+      public function __destruct()
+      {
+          $this->stopProcess();
+      }
+
+      public function stopProcess()
+      {
+          foreach (array_reverse($this->processes) as $process) {
+              $process->stop();
+          }
+      }
+  }
+  ```
+
+test "rank429: Codeception RunProcess rejects serialization"
+  lang php
+  file RunProcess.php
+  reject VYQL-DESER-013
+  reject_review code.CodeceptionRunProcessDeserializationGadget
+  code
+  ```
+  <?php
+  namespace Codeception\Extension;
+
+  use Symfony\Component\Process\Process;
+
+  class RunProcess extends Extension
+  {
+      protected $config = ['sleep' => 0];
+      private $processes = [];
+
+      public function runProcess()
+      {
+          foreach ($this->config as $key => $command) {
+              $process = Process::fromShellCommandline($command, $this->getRootDir(), null, null, null);
+              $process->start();
+              $this->processes[] = $process;
+          }
+      }
+
+      public function __destruct()
+      {
+          $this->stopProcess();
+      }
+
+      public function stopProcess()
+      {
+          foreach (array_reverse($this->processes) as $process) {
+              $process->stop();
+          }
+      }
+
+      public function __sleep()
+      {
+          throw new \BadMethodCallException('Cannot serialize ' . __CLASS__);
+      }
+
+      public function __wakeup()
+      {
+          throw new \BadMethodCallException('Cannot unserialize ' . __CLASS__);
+      }
+  }
+  ```

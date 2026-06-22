@@ -133,6 +133,53 @@ class RequestScopedCache {
 	t.Fatalf("beginRequest context did not include expected tokens: %#v", contexts)
 }
 
+func TestJavaFunctionContextIncludesCallOrderTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Push.java")
+	src := []byte(`class Push {
+  void doFilter(Request req, Response resp) {
+    Meteor.build(req);
+    String id = req.getParameter("pushSessionId");
+    Session session = manager.getPushSession(id);
+    if (session == null) {
+      resp.sendError(400);
+      return;
+    }
+    new RequestImpl(session).suspend();
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var contexts []string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		contexts = append(contexts, args)
+		if strings.Contains(args, "function_name:doFilter") &&
+			strings.Contains(args, "call_order:Meteor.build>req.getParameter") &&
+			strings.Contains(args, "call_order:manager.getPushSession>resp.sendError") &&
+			strings.Contains(args, "call_order:resp.sendError>RequestImpl") {
+			return
+		}
+	}
+	t.Fatalf("doFilter context did not include expected call order tokens: %#v", contexts)
+}
+
 func TestJavaEnhancedForBindsElementToIterable(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "C.java")

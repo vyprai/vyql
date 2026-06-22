@@ -1,0 +1,51 @@
+# Rank 307 / CVE-2021-25969: Camaleon CMS rendered stored comment content
+# through Rails raw output in ERB partials and unsanitized interpolation in a
+# Ruby helper.
+
+test "rank307: camaleon ERB raw comment content is stored XSS"
+  lang config
+  file _comments_list.html.erb
+  expect VYQL-INJ-028
+  code
+  ```
+  <div class="panel-body">
+    <%= raw comment.content %>
+  </div>
+  ```
+
+test "rank307: camaleon ERB escaped comment content is clean"
+  lang config
+  file _comments_list.html.erb
+  reject VYQL-INJ-028
+  code
+  ```
+  <div class="panel-body">
+    <%= comment.content %>
+  </div>
+  ```
+
+test "rank307: camaleon helper interpolates stored comment content without sanitizer"
+  lang ruby
+  expect VYQL-INJ-028
+  code
+  ```
+  def cama_comments_render_html(comments)
+    comments.each do |comment|
+      html = "<div class='comment_content'>#{comment.content}</div>"
+      html
+    end
+  end
+  ```
+
+test "rank307: camaleon helper sanitizes stored comment content"
+  lang ruby
+  reject VYQL-INJ-028
+  code
+  ```
+  def cama_comments_render_html(comments)
+    comments.each do |comment|
+      html = "<div class='comment_content'>#{sanitize comment.content}</div>"
+      html
+    end
+  end
+  ```

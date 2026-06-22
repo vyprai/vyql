@@ -1,0 +1,56 @@
+# Rank 433 / CVE-2015-5725: CodeIgniter Active Record offset() stored
+# caller-supplied offset values without integer casting before SQL compilation.
+
+test "rank433: CodeIgniter Active Record offset stores raw offset"
+  lang php
+  file DB_active_rec.php
+  expect VYQL-INJ-085
+  expect_review code.CodeIgniterActiveRecordOffsetSqlInjection
+  code
+  ```
+  <?php
+  class CI_DB_active_record extends CI_DB_driver {
+      public function limit($value, $offset = '')
+      {
+          $this->ar_limit = (int) $value;
+          if ($offset != '')
+          {
+              $this->ar_offset = (int) $offset;
+          }
+          return $this;
+      }
+
+      public function offset($offset)
+      {
+          $this->ar_offset = $offset;
+          return $this;
+      }
+  }
+  ```
+
+test "rank433: CodeIgniter Active Record offset casts offset to integer"
+  lang php
+  file DB_active_rec.php
+  reject VYQL-INJ-085
+  reject_review code.CodeIgniterActiveRecordOffsetSqlInjection
+  code
+  ```
+  <?php
+  class CI_DB_active_record extends CI_DB_driver {
+      public function limit($value, $offset = '')
+      {
+          $this->ar_limit = (int) $value;
+          if ($offset != '')
+          {
+              $this->ar_offset = (int) $offset;
+          }
+          return $this;
+      }
+
+      public function offset($offset)
+      {
+          $this->ar_offset = (int) $offset;
+          return $this;
+      }
+  }
+  ```

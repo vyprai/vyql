@@ -92,7 +92,9 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		})
 		return out
 	case "class", "module":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
+		out := c.rubyClassContext(n)
+		out = append(out, nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L})
+		return out
 	case "singleton_class":
 		return c.body(field(n, "body"))
 	case "assignment":
@@ -194,6 +196,28 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		Callee: nir.Name{ID: "analysis.function.context", Loc: loc},
 		Args:   args,
 		Path:   "analysis.function.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func (c *rbConv) rubyClassContext(cls *tree_sitter.Node) []nir.Stmt {
+	body := field(cls, "body")
+	if body == nil {
+		return nil
+	}
+	name := c.text(field(cls, "name"))
+	loc := c.loc(cls)
+	text := c.text(body)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.class.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.class.context",
 		Method: "context",
 		Loc:    loc,
 	}}}

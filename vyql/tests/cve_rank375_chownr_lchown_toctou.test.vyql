@@ -1,0 +1,79 @@
+# Rank 375 / CVE-2017-18869: chownr checked symlinks with lstat but then
+# applied chown, which follows symlinks, leaving a TOCTOU window during
+# recursive ownership changes.
+
+test "rank375: chownr lstat check followed by chown is TOCTOU"
+  lang javascript
+  expect VYQL-RACE-001
+  code
+  ```
+  const fs = require('fs')
+  const path = require('path')
+
+  const chownr = (p, uid, gid, cb) => {
+    fs.readdir(p, (er, children) => {
+      if (er || !children.length) return fs.chown(p, uid, gid, cb)
+      let len = children.length
+      const then = er => {
+        if (er) return cb(er)
+        if (--len === 0) return fs.chown(p, uid, gid, cb)
+      }
+      children.forEach(child => {
+        const pathChild = path.resolve(p, child)
+        fs.lstat(pathChild, (er, stats) => {
+          if (er) return cb(er)
+          if (!stats.isSymbolicLink()) chownr(pathChild, uid, gid, then)
+          else then()
+        })
+      })
+    })
+  }
+
+  const chownrSync = (p, uid, gid) => {
+    const children = fs.readdirSync(p)
+    children.forEach(child => {
+      const pathChild = path.resolve(p, child)
+      const stats = fs.lstatSync(pathChild)
+      if (!stats.isSymbolicLink()) chownrSync(pathChild, uid, gid)
+    })
+    return fs.chownSync(p, uid, gid)
+  }
+  ```
+
+test "rank375: chownr lstat check followed by lchown is clean"
+  lang javascript
+  reject VYQL-RACE-001
+  code
+  ```
+  const fs = require('fs')
+  const path = require('path')
+
+  const chownr = (p, uid, gid, cb) => {
+    fs.readdir(p, (er, children) => {
+      if (er || !children.length) return fs.lchown(p, uid, gid, cb)
+      let len = children.length
+      const then = er => {
+        if (er) return cb(er)
+        if (--len === 0) return fs.lchown(p, uid, gid, cb)
+      }
+      children.forEach(child => {
+        const pathChild = path.resolve(p, child)
+        fs.lstat(pathChild, (er, stats) => {
+          if (er) return cb(er)
+          if (!stats.isSymbolicLink()) chownr(pathChild, uid, gid, then)
+          else then()
+        })
+      })
+    })
+  }
+
+  const chownrSync = (p, uid, gid) => {
+    const children = fs.readdirSync(p)
+    children.forEach(child => {
+      const pathChild = path.resolve(p, child)
+      const stats = fs.lstatSync(pathChild)
+      if (!stats.isSymbolicLink()) chownrSync(pathChild, uid, gid)
+    })
+    return fs.lchownSync(p, uid, gid)
+  }
+  ```
