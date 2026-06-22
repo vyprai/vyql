@@ -132,8 +132,10 @@ Rules:
 - Keep mappings conservative and selector-backed.
 - For first-party/local project APIs, prefer generalized API mappings already
   meaningful across projects, narrow analysis.function.context marks, or an
-  empty overlay with notes. Do not create adapters whose only locality is a
-  local command, binary, crate, module, controller, or utility package name.
+  empty overlay with notes. Empty-overlay notes must explicitly say whether a
+  core scan concept/rule already covers the relevant surface, or whether no
+  validated adapter target exists. Do not create adapters whose only locality
+  is a local command, binary, crate, module, controller, or utility package name.
 - Adapter source must be valid VyQL DSL, for example:
   adapter python {
     source "request.args" -> code.HttpInput
@@ -226,6 +228,14 @@ Rules:
      that write private keys, credentials, tokens, kubeconfigs, cloud-init,
      ignition, or other boot/config artifacts and check for chmod, mode,
      set_permissions, or setPosixFilePermissions hardening in the same context.
+     For archive or filesystem-image extraction CVEs, inspect directory entry
+     names read from image/archive buffers before mkdir, open, write, recursive
+     expand, or extraction calls. In C, prioritize functions and calls named
+     do_directory, expand_fs, romfs_read, namelen, dirent, readdir, extract,
+     unpack, mkdir, open, and memcpy into path buffers. Check for explicit
+     rejection of ".", "..", path separators, absolute paths, and traversal
+     components before recursive extraction or filesystem writes. Prefer a
+     narrow function_context mark for local parser/extractor ordering bugs.
      For upload XSS CVEs, inspect upload services/helpers that derive extensions
      from client filenames or MIME types and store SVG, HTML, or XML-capable files;
      check for SVG/XML sanitizers before storeAs/move/save/write.
@@ -665,6 +675,9 @@ func requiresSymbolInventory(profile Profile) bool {
 	terms := []string{
 		"asmodelsuccess", "modelname", "getacceptsjson", "response.data",
 		"toarray", "extrafields", "serialize",
+		"memcpy(newpath + pathlen", "child->namelen", "do_directory",
+		"expand_fs", "romfs_read", "namelen", "dirent",
+		"bad filename", "strchr(name", "strcmp(name", "extract", "unpack",
 		"cors", "alloworigins", "alloworiginfunc", "allowallorigins",
 		"access-control-allow-origin", "trustedorigin", "trusted_origin",
 		"wildcard", "validateorigin", "checkorigin", "callback",
@@ -710,6 +723,8 @@ func requiresSymbolInventory(profile Profile) bool {
 
 func requiredCallInventoryTerms(profile Profile) []string {
 	switch {
+	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
+		return []string{"expand", "extract", "directory", "dirent", "name", "path", "romfs", "read", "mkdir", "open"}
 	case nativeMemoryProfile(profile):
 		return []string{"alloc", "malloc", "calloc", "realloc", "memcpy", "copy", "size", "length", "capacity", "offset", "escape", "unicode"}
 	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
@@ -1411,7 +1426,7 @@ code.UnboundedCopy, code.RawMemoryCopySize, code.SizeComputation,
 code.UnparameterizedSqlQueryParser, code.ProtocolStateReview,
 code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
 code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
-code.OverbroadRolePermissionGrant.
+code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal.
 `)
 }
 
@@ -1436,6 +1451,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
+		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "mark for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
 		{"concept": "core.PathAccessCheck", "surface": "control", "use": "control concept for containment, normalization, allowlist, or traversal guard"},
 	}
@@ -1924,6 +1940,8 @@ func assignmentRiskScore(entry assignmentEntry) int {
 		"snapshot": 16, "audit": 12, "model": 8, "entity": 6, "user": 8,
 		"username": 14, "render": 10, "template": 10, "escape": 10, "encode": 10,
 		"sanitize": 12, "htmlspecialchars": 18, "html::encode": 18,
+		"do_directory": 28, "expand_fs": 34, "romfs_read": 22, "namelen": 16,
+		"dirent": 16, "bad filename": 18, "strchr(name": 24, "strcmp(name": 20,
 		"absoluteurlwithprotocol": 30, "safecanonicalurl": 26, "canonicalurl": 18,
 		"getpathinfo": 16, "sanitizeurl": 20, "sanitizeuserinput": 18,
 		"x-forwarded-host": 24, "twig": 18, "ssti": 24, "host": 8,
@@ -3083,6 +3101,9 @@ func suggestContextVals(name string, compact string) []string {
 		"asModelSuccess", "modelName: 'user'", "modelName:\"user\"",
 		"$this->request->getAcceptsJson()", "return$this->asModelSuccess($user,modelName:'user',data:$return)",
 		"return$this->asSuccess(data:$return)", "$response->data", "toArray", "fields", "extraFields",
+		"do_directory", "expand_fs", "romfs_read", "child->namelen",
+		"memcpy(newpath+pathlen,romfs_read(offset),newlen)",
+		"strchr(name,'/')", "strcmp(name,\"..\")",
 		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
 		"returnUrlHelper::absoluteUrlWithProtocol($url)",
 		"returnDynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))",
@@ -3202,6 +3223,9 @@ func securitySnippet(text string) string {
 		"$snapshot['title']", "$snapshot[\"title\"]", "snapshot", "audit", "xss",
 		"asModelSuccess", "modelName", "getAcceptsJson", "$response->data",
 		"toArray", "extraFields", "serialize", "secret", "token", "credential",
+		"memcpy(newpath + pathlen", "child->namelen", "do_directory",
+		"expand_fs", "romfs_read", "namelen", "dirent",
+		"bad filename", "strchr(name", "strcmp(name",
 		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
 		"sanitizeUserInput", "X-Forwarded-Host", "host header", "Twig", "SSTI",
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
@@ -3396,6 +3420,9 @@ func proposalFromToolArgs(args map[string]any) (Proposal, string) {
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return Proposal{}, err.Error()
+	}
+	if len(raw.AdapterFiles) == 0 && len(raw.Notes) == 0 {
+		return Proposal{AdapterFiles: raw.AdapterFiles, Notes: raw.Notes}, "empty overlay must include notes explaining core coverage or why no validated adapter target exists"
 	}
 	return Proposal{AdapterFiles: raw.AdapterFiles, Notes: raw.Notes}, ""
 }

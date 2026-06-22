@@ -736,6 +736,121 @@ final class VerifyController {
 	}
 }
 
+func TestPrepRanksFilesystemImageDirentTraversalProfiles(t *testing.T) {
+	dir := t.TempDir()
+	checkPath := filepath.Join(dir, "cramfsck.c")
+	src := `#include <string.h>
+#include <stdlib.h>
+
+struct cramfs_inode {
+    int namelen;
+    int size;
+    unsigned long offset;
+};
+
+void *romfs_read(unsigned long offset);
+struct cramfs_inode *iget(unsigned long offset);
+void expand_fs(char *path, struct cramfs_inode *i);
+
+void do_directory(char *path, struct cramfs_inode *i)
+{
+    int pathlen = strlen(path);
+    int count = i->size;
+    unsigned long offset = i->offset << 2;
+    char *newpath = malloc(pathlen + 256);
+    memcpy(newpath, path, pathlen);
+    while (count > 0) {
+        struct cramfs_inode *child = iget(offset);
+        int newlen = child->namelen << 2;
+        offset += sizeof(struct cramfs_inode);
+        memcpy(newpath + pathlen, romfs_read(offset), newlen);
+        newpath[pathlen + newlen] = 0;
+        expand_fs(newpath, child);
+        count -= sizeof(struct cramfs_inode) + newlen;
+    }
+}
+`
+	if err := os.WriteFile(checkPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mkPath := filepath.Join(dir, "mkcramfs.c")
+	noise := `/*
+Device table entries require absolute paths, but this builder only writes
+configured metadata. Keep this file noisy so extraction code must rank first.
+*/
+void write_table(void) {}
+`
+	if err := os.WriteFile(mkPath, []byte(noise), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "c", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != checkPath {
+		t.Fatalf("expected cramfsck.c first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "expand_fs") || !strings.Contains(files[0].Snippet, "romfs_read") {
+		t.Fatalf("expected filesystem image extraction snippet, got %q", files[0].Snippet)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected filesystem image profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	if !containsString(callTerms, "expand") || !containsString(callTerms, "romfs") {
+		t.Fatalf("expected focused filesystem image call terms, got %#v", callTerms)
+	}
+	broadLog := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "symbol_inventory", Arguments: map[string]any{"language": "c", "name_contains": "directory"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"language": "c"}}}},
+	}
+	if got := inventoryGateError(profile, broadLog, "read_file"); !strings.Contains(got, "call_inventory") {
+		t.Fatalf("expected broad inventory to be rejected, got %q", got)
+	}
+	readyLog := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "symbol_inventory", Arguments: map[string]any{"language": "c", "name_contains": "directory"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"language": "c", "name_contains": "expand"}}}},
+	}
+	if got := inventoryGateError(profile, readyLog, "read_file"); got != "" {
+		t.Fatalf("expected inventory gate satisfied, got %q", got)
+	}
+}
+
+func TestPrepConceptReferenceIncludesFilesystemImageDirentTraversal(t *testing.T) {
+	concepts := conceptReference("filesystem image")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.FilesystemImageDirentTraversal" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected filesystem image dirent traversal scan concept in reference, got %#v", concepts)
+	}
+}
+
+func TestFinishOverlayRequiresNotesForEmptyOverlay(t *testing.T) {
+	proposal, warn := proposalFromToolArgs(map[string]any{"adapter_files": []any{}})
+	if warn == "" {
+		t.Fatalf("expected warning for empty overlay without notes, got proposal %#v", proposal)
+	}
+	if !strings.Contains(warn, "empty overlay") {
+		t.Fatalf("expected empty overlay warning, got %q", warn)
+	}
+	_, warn = proposalFromToolArgs(map[string]any{
+		"adapter_files": []any{},
+		"notes":         []any{"No unmodeled dependency API was found; core scan concepts cover the observed parser surface."},
+	})
+	if warn != "" {
+		t.Fatalf("expected empty overlay with notes to pass, got %q", warn)
+	}
+}
+
 func TestSymbolInventoryFindsClassesMethodsAndFunctions(t *testing.T) {
 	dir := t.TempDir()
 	phpPath := filepath.Join(dir, "src", "Controller", "CustomerTransformerController.php")

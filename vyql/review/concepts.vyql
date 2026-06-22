@@ -934,6 +934,12 @@ review code.ManualZipEntryFileWrite {
   expected: [core.PathAccessCheck]
   text: "review manual zip extraction paths for destination-root containment before creating files"
 }
+review code.FilesystemImageDirentTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "reject filesystem image entry names containing '.', '..', absolute paths, or separators before recursive extraction"
+}
 review code.ArchiveSymlinkFilterBypass {
   category: "path"
   kind: "attention"

@@ -47,3 +47,8 @@ rule LocalFileUrlNavigation {
   meta { id: "VYQL-PATH-008", severity: high, cwe: [CWE_22], confidence_floor: medium }
   match code.LocalFileUrlNavigation as sink
 }
+
+rule FilesystemImageDirentTraversal {
+  meta { id: "VYQL-PATH-026", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.FilesystemImageDirentTraversal as sink
+}
