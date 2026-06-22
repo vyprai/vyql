@@ -301,6 +301,9 @@ func securityRelevanceScore(path string, text string) int {
 		"move_uploaded_file": 18, "rename(": 14, "copy(": 12, "unlink(": 12, "touch(": 10,
 		"getabsolutepath": 22, "absolutepath": 14, "absolute path": 14, "e_warning": 18,
 		"runtimeexception": 10, "fileoperationerrorexception": 10,
+		"uploadedfile": 18, "fileuploader": 18, "storeas(": 18, "getclientoriginalextension": 20,
+		"getclientmimetype": 10, "svg": 16, "getsvgdimensions": 18, "svgsanitize": 28,
+		"sanitizesvg": 28, "sanitizer": 18,
 		"redirect": 10, "header(": 8, "location": 8, "render": 8, "html": 6,
 		"select ": 8, "insert ": 8, "update ": 8, "delete ": 8, "query(": 8,
 		"request": 8, "$_get": 12, "$_post": 12, "$_files": 12, "$_request": 12,
@@ -322,7 +325,7 @@ func securityRelevanceScore(path string, text string) int {
 	}
 	for token, weight := range map[string]int{
 		"/www/": 6, "/controllers/": 6, "/api/": 6, "/routes/": 6, "/handlers/": 6,
-		"backup": 8, "restore": 8, "import": 6, "upload": 8, "archive": 6,
+		"backup": 8, "restore": 8, "import": 6, "upload": 8, "uploader": 10, "archive": 6,
 		"auth": 5, "login": 5, "admin": 4, "config": 4, "driver": 4, "localdriver": 10,
 		"authorization": 16, "permission": 14, "role": 10, "middleware": 8,
 		"context": 6, "cache": 6, "lifecycle": 6, "servlet": 5,

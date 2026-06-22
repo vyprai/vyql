@@ -166,6 +166,9 @@ Rules:
      For privilege/permission CVEs, inspect static role, group, route, policy,
      and permission maps such as PermissionsByRole, roles, grants, ACLs, backup,
      restore, admin, manager, operator, or support-bundle permission lists.
+     For upload XSS CVEs, inspect upload services/helpers that derive extensions
+     from client filenames or MIME types and store SVG, HTML, or XML-capable files;
+     check for SVG/XML sanitizers before storeAs/move/save/write.
      For information-disclosure CVEs, inspect filesystem drivers and methods
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
@@ -590,6 +593,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.Deserialization", "surface": "scan", "use": "taint sink for unsafe object deserialization such as yaml.load, pickle, unserialize"},
 		{"concept": "core.SafeDeserialization", "surface": "control", "use": "control concept for safe deserialization APIs such as safe_load or explicit safe loaders"},
 		{"concept": "code.HtmlRender", "surface": "scan", "use": "taint sink for raw HTML/template rendering or unescaped response content"},
+		{"concept": "code.UnsanitizedSvgUpload", "surface": "scan", "use": "mark for upload services that accept/store SVG files without sanitizing SVG XML/script content before saving"},
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
@@ -1134,6 +1138,9 @@ func securitySnippet(text string) string {
 		"move_uploaded_file", "rename(", "copy(", "unlink(", "touch(",
 		"getAbsolutePath", "absolutePath", "absolute path", "E_WARNING",
 		"RuntimeException", "FileOperationErrorException",
+		"UploadedFile", "FileUploader", "storeAs(", "getClientOriginalExtension",
+		"getClientMimeType", "svg", "getSvgDimensions", "svgSanitize",
+		"sanitizeSvg", "Sanitizer",
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
 		"restore", "import", "backup", "archive", "extract", "filename", "rrdtool",
 		"ThreadLocal", "beginRequest", "endRequest", "activate(", "deactivate(",

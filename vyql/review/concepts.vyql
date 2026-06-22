@@ -538,6 +538,12 @@ review code.InsecurePermission {
   kind: "target"
   text: "review broad permission assignment and surrounding privilege checks"
 }
+review code.UnsanitizedSvgUpload {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "review uploaded SVG handling for XML/script sanitization before storing or serving"
+}
 review code.OverbroadRolePermissionGrant {
   category: "auth"
   kind: "target"

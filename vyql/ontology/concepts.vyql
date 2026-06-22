@@ -2205,6 +2205,15 @@ concept StoredHtmlWrite : sink {
   review_assumption: "the stored value is later rendered as HTML in the application UI"
   review_confidence: medium
 }
+concept UnsanitizedSvgUpload : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "uploaded SVG content is accepted and stored without an observed SVG sanitizer"
+  review_evidence: "file upload context {pattern} detects or handles SVG uploads and stores the file before sanitizing its XML content"
+  review_assumption: "stored SVG files can be served back to users and scriptable SVG content can execute in a browser"
+  review_confidence: high
+}
 concept CordysRequestParamXssFilterDisabled : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

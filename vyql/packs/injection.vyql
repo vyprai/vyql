@@ -215,6 +215,11 @@ rule ZikulaThemeNameReflectedXss {
   match code.ZikulaThemeNameReflectedXss as sink
 }
 
+rule UnsanitizedSvgUpload {
+  meta { id: "VYQL-INJ-115", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnsanitizedSvgUpload as sink
+}
+
 rule ComrakDangerousUrlCaseSensitiveGrammar {
   meta { id: "VYQL-INJ-098", severity: high, cwe: [CWE_79, CWE_178], confidence_floor: high }
   match code.ComrakDangerousUrlCaseSensitiveGrammar as grammar
