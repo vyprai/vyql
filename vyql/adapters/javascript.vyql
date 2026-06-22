@@ -180,6 +180,7 @@ adapter javascript {
   mark exact "analysis.function.context" val "lang=javascript" val "user==username&&pass==password" nval "timingSafeCompare" nval "tsscmp" -> code.SecretComparisonReview
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
   mark exact "analysis.function.context" val "lang=javascript" val "ctx.request?.method" val "POST" val "return;" val "callbackURL" val "redirectTo" val "trustedOrigins" val "validateURL" -> code.MethodGatedRedirectValidationBypass
+  mark exact "analysis.function.context" val "lang=javascript" val "URLSearchParams(window.location.search).get" val "window.location=decodeURI" nval "redirect[0]==='/'" nval "redirect[1]!=='/'" -> code.JavaScriptUrlRedirectXss
   control "isSafeRedirect" -> core.RedirectAllowlist
   control "isValidRedirect" -> core.RedirectAllowlist
   control "isAllowedRedirect" -> core.RedirectAllowlist

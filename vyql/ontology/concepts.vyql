@@ -2355,6 +2355,15 @@ concept CodeSnippetsSafeModeQueryXss : sink {
   review_assumption: "generated admin URLs are later rendered into HTML attributes, matching the reported reflected snippets-safe-mode XSS"
   review_confidence: high
 }
+concept JavaScriptUrlRedirectXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "browser redirect parameter can be a javascript: URL assigned to window.location"
+  review_evidence: "URLSearchParams redirect context {pattern} decodes a query value into window.location without a relative-path guard"
+  review_assumption: "a victim can be induced to visit the login or redirect URL and complete the action that triggers navigation"
+  review_confidence: high
+}
 concept CollectiveContactWidgetTitleXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

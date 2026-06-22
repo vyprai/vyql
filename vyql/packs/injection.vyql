@@ -190,6 +190,11 @@ rule UnsafeEmbeddableAllowlist {
   match code.UnsafeEmbeddableAllowlist as sink
 }
 
+rule JavaScriptUrlRedirectXss {
+  meta { id: "VYQL-INJ-116", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.JavaScriptUrlRedirectXss as sink
+}
+
 rule JenkinsComputerQueueUnescapedTooltipXss {
   meta { id: "VYQL-INJ-097", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.JenkinsComputerQueueUnescapedTooltipXss as sink
