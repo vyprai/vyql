@@ -1318,6 +1318,12 @@ review code.CopypartyCprStaticPathTraversal {
   expected: [core.PathAccessCheck]
   text: "review copyparty /.cpr static file serving for canonical containment under the embedded web directory"
 }
+review code.AssemblyLoadPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "reject traversal and drive-qualified assembly path components before dynamic assembly loading"
+}
 review code.AmbiguousQueryParameterSeparator {
   category: "request"
   kind: "attention"

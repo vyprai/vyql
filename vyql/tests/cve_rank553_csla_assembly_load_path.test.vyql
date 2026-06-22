@@ -1,0 +1,59 @@
+# Rank 553 / CVE-2024-28698: CSLA built a dynamic assembly path from a
+# caller-provided type-name component and loaded it from AppContext.BaseDirectory.
+# The fix rejects traversal and drive-qualified path components.
+
+test "rank553: dynamic assembly load path rejects traversal components"
+  lang csharp
+  expect VYQL-PATH-027
+  expect_review code.AssemblyLoadPathTraversal
+  code
+  ```
+  using System;
+  using System.Runtime.Loader;
+
+  public static class MethodCaller {
+    public static Type GetType(string typeName, bool throwOnError, bool ignoreCase) {
+      try {
+        return Type.GetType(typeName, throwOnError, ignoreCase);
+      } catch {
+  #if NET5_0_OR_GREATER
+        string[] splitName = typeName.Split(',');
+        var asm = AssemblyLoadContext.Default.LoadFromAssemblyPath(AppContext.BaseDirectory + splitName[1].Trim() + ".dll");
+        return asm.GetType(splitName[0].Trim());
+  #else
+        throw;
+  #endif
+      }
+    }
+  }
+  ```
+
+test "rank553: guarded dynamic assembly load path is rejected"
+  lang csharp
+  reject VYQL-PATH-027
+  reject_review code.AssemblyLoadPathTraversal
+  code
+  ```
+  using System;
+  using System.Runtime.Loader;
+
+  public static class MethodCaller {
+    public static Type GetType(string typeName, bool throwOnError, bool ignoreCase) {
+      try {
+        return Type.GetType(typeName, throwOnError, ignoreCase);
+      } catch {
+  #if NET5_0_OR_GREATER
+        string[] splitName = typeName.Split(',');
+        var path = AppContext.BaseDirectory + splitName[1].Trim() + ".dll";
+        if (path.Contains("..") || path.Contains(':'))
+          throw new TypeLoadException(path);
+
+        var asm = AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+        return asm.GetType(splitName[0].Trim());
+  #else
+        throw;
+  #endif
+      }
+    }
+  }
+  ```

@@ -2104,6 +2104,67 @@ func TestPrepConceptReferenceIncludesCryptoImproperBlinding(t *testing.T) {
 	}
 }
 
+func TestPrepRanksCSharpDynamicAssemblyLoadPath(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "MethodCaller.cs")
+	if err := os.WriteFile(src, []byte(`using System;
+using System.Runtime.Loader;
+
+public static class MethodCaller {
+  public static Type GetType(string typeName, bool throwOnError, bool ignoreCase) {
+    try {
+      return Type.GetType(typeName, throwOnError, ignoreCase);
+    } catch {
+#if NET5_0_OR_GREATER
+      string[] splitName = typeName.Split(',');
+      var asm = AssemblyLoadContext.Default.LoadFromAssemblyPath(AppContext.BaseDirectory + splitName[1].Trim() + ".dll");
+      return asm.GetType(splitName[0].Trim());
+#else
+      throw;
+#endif
+    }
+  }
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if cryptoBlindingProfile(profile) {
+		t.Fatal("C# dynamic assembly-load path repo should not trigger crypto blinding profile")
+	}
+	if !dynamicAssemblyLoadPathProfile(profile) {
+		t.Fatal("expected dynamic assembly-load path profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatal("expected dynamic assembly-load path profile to require symbol inventory")
+	}
+	for _, want := range []string{"loadfromassemblypath", "basedirectory", "split"} {
+		if !containsString(requiredCallInventoryTerms(profile), want) {
+			t.Fatalf("expected focused call term %q in %#v", want, requiredCallInventoryTerms(profile))
+		}
+	}
+	files, err := securityRelevantFiles(profile, "csharp", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || !strings.HasSuffix(filepath.ToSlash(files[0].Path), "/MethodCaller.cs") {
+		t.Fatalf("expected MethodCaller.cs to rank as security relevant, got %#v", files)
+	}
+	concepts := conceptReference("assembly load")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.AssemblyLoadPathTraversal" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected assembly-load path concept in reference, got %#v", concepts)
+	}
+}
+
 func TestPrepRejectsBroadCryptoBlindingMark(t *testing.T) {
 	profile := Profile{Languages: map[string]int{"cpp": 1}}
 	broad := Proposal{AdapterFiles: []AdapterFile{{

@@ -81,6 +81,9 @@ func (c *csConv) decls(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
+	if csPreprocContainer(n.Kind()) {
+		return c.csPreprocStmts(n)
+	}
 	switch n.Kind() {
 	case "namespace_declaration", "file_scoped_namespace_declaration", "declaration_list":
 		return c.decls(n) // flatten namespace / declaration-list bodies
@@ -420,7 +423,9 @@ func (c *csConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 			case "block":
 				out = append(out, c.block(ch)...)
 			case "else_clause", "catch_clause", "catch_declaration", "finally_clause", "accessor_list",
-				"accessor_declaration", "switch_body", "switch_section", "if_statement", "declaration_list":
+				"accessor_declaration", "switch_body", "switch_section", "if_statement", "declaration_list",
+				"preproc_if", "preproc_elif", "preproc_else", "preproc_if_in_top_level",
+				"preproc_elif_in_top_level", "preproc_else_in_top_level":
 				walk(ch)
 			case "local_declaration_statement", "expression_statement", "return_statement":
 				out = append(out, c.stmt(ch)...)
@@ -440,6 +445,24 @@ func (c *csConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 		return c.block(n)
 	}
 	walk(n)
+	return out
+}
+
+func csPreprocContainer(kind string) bool {
+	switch kind {
+	case "preproc_if", "preproc_elif", "preproc_else",
+		"preproc_if_in_top_level", "preproc_elif_in_top_level", "preproc_else_in_top_level":
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *csConv) csPreprocStmts(n *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	for _, ch := range namedChildren(n) {
+		out = append(out, c.stmt(ch)...)
+	}
 	return out
 }
 

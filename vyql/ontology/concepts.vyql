@@ -2299,6 +2299,15 @@ concept CopypartyCprStaticPathTraversal : sink {
   review_assumption: "unauthenticated clients can request /.cpr paths containing traversal components"
   review_confidence: high
 }
+concept AssemblyLoadPathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "a dynamic assembly-load path is built from a caller-controlled assembly/type-name component without rejecting traversal or drive-qualified paths"
+  review_evidence: "assembly load context {pattern} joins AppContext.BaseDirectory with a split type-name component and loads it via LoadFromAssemblyPath"
+  review_assumption: "library callers can pass type names containing assembly components such as '../payload' or drive-qualified paths"
+  review_confidence: high
+}
 concept LocalFileUrlNavigation : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]

@@ -425,6 +425,13 @@ Rules:
      MultiplicativeInverse. Do not finish empty merely because the repository is
      a standard cryptography library; these are semantic side-channel marks, not
      framework dependency adapters.
+     For .NET/C# dynamic assembly loading, inspect calls such as
+     AssemblyLoadContext.Default.LoadFromAssemblyPath, Assembly.LoadFrom, and
+     Assembly.LoadFile. If a caller-controlled type or assembly name is split or
+     concatenated with AppContext.BaseDirectory and a .dll suffix before dynamic
+     loading, use code.AssemblyLoadPathTraversal or rely on shipped coverage; the
+     fixed form rejects traversal and drive-qualified path components such as
+     ".." and ":" before loading.
      For information-disclosure CVEs, inspect filesystem drivers and methods
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
@@ -564,7 +571,7 @@ agentLoop:
 				emptyDefaultRelayOverlay := defaultRelaySecretProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyCommandWrapperOverlay := commandWrapperProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || (!notesMentionAny(proposal.Notes, []string{"commandstringwrapperexecution", "argv", "process builder", "processbuilder", "$env:", "env var", "environment variable"}) || notesMentionAny(proposal.Notes, []string{"interprocedural", "automatically handled", "generic command execution", "os/exec", "exec.command"})))
 				emptyCommandOptionOverlay := commandOptionProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!notesMentionAny(proposal.Notes, []string{"commandoptioninjection", "end-of-options", "--", "option injection"}) || notesMentionAny(proposal.Notes, []string{"no direct untrusted", "no untrusted entry", "no source", "map as a source"}))
-				cryptoBlindingEvidence := cryptoBlindingProfile(profile) || agentLogResultHasAnyTerm(log, []string{"calculateinverse", "multiplicativeinverse", "jacobi", "modn.square", "modularsquareroot", "unblind"})
+				cryptoBlindingEvidence := cryptoBlindingProfile(profile)
 				emptyCryptoBlindingOverlay := cryptoBlindingEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"cryptoimproperblinding", "vyql-cry-011", "core scan", "base scanner", "existing scanner"}))
 				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptyCryptoBlindingOverlay
 				toolResult := map[string]any{
@@ -953,6 +960,8 @@ func requiresSymbolInventory(profile Profile) bool {
 		"runpowershellcmd", "powershell", "-command", "fmt.sprintf",
 		"$env:", "get-volume", "get-item", "add-partitionaccesspath",
 		"remove-partitionaccesspath",
+		"loadfromassemblypath", "assemblyloadcontext", "appcontext.basedirectory",
+		"splitname[1]", "typename.split",
 		"runquery", "querydb", "dbquery", "executequery", "$ssql",
 		"legacyfilterinputarr", "where di_",
 		"escapeshellarg", "shlex.quote", "shellwords.escape", "setoperation",
@@ -1025,6 +1034,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"escapeshellarg", "operation", "--", "setoperation", "gpg", "gnupg", "key", "fingerprint", "argument", "option"}
 	case cryptoBlindingProfile(profile):
 		return []string{"calculateinverse", "randomize", "multiplicativeinverse", "jacobi", "square", "modularsquareroot", "blind", "unblind", "rabin"}
+	case dynamicAssemblyLoadPathProfile(profile):
+		return []string{"loadfromassemblypath", "assemblyloadcontext", "basedirectory", "split", "path", "contains"}
 	case phpSqlWrapperProfile(profile):
 		return []string{"runquery", "querydb", "sql", "where", "legacyfilterinputarr", "get", "post"}
 	case jobOutputEventUpdateProfile(profile):
@@ -1096,6 +1107,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 		return []string{"operation", "argument", "args", "keyid", "fingerprint", "option", "command", "escape", "delimiter"}
 	case commandWrapperProfile(profile):
 		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process", "volumeid", "mountpath", "linkpath", "drivepath", "env"}
+	case dynamicAssemblyLoadPathProfile(profile):
+		return []string{"path", "typename", "splitname", "assembly", "basedirectory", "dll"}
 	case jobOutputEventUpdateProfile(profile):
 		return []string{"update_event", "job", "data", "schedule", "config", "allow_event_updates_from_jobs"}
 	case defaultRelaySecretProfile(profile):
@@ -1259,6 +1272,19 @@ func cryptoBlindingProfile(profile Profile) bool {
 		"blind", "unblind",
 	})
 	return hasPrivateKeyOperation && hasBlindingMath
+}
+
+func dynamicAssemblyLoadPathProfile(profile Profile) bool {
+	if profile.Languages["csharp"] == 0 {
+		return false
+	}
+	hasAssemblyLoad := profileContainsAnyTerm(profile, []string{
+		"loadfromassemblypath", "assemblyloadcontext", "assembly.loadfrom", "assembly.loadfile",
+	})
+	hasPathAssembly := profileContainsAnyTerm(profile, []string{
+		"appcontext.basedirectory", "splitname", "typename.split", ".dll",
+	})
+	return hasAssemblyLoad && hasPathAssembly
 }
 
 func profileContainsAnyTerm(profile Profile, terms []string) bool {
@@ -2002,6 +2028,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.JenkinsCredentialsStartupLoadContextExposure", "surface": "scan", "use": "mark for Jenkins SystemCredentialsProvider-style classes that unmarshal or migrate persisted credentials without an @Initializer after InitMilestone.JOB_LOADED force-loading getInstance during startup"},
 		{"concept": "code.JenkinsRemoteValidationMissingPostPermission", "surface": "scan", "use": "mark for Jenkins descriptor doTest/doCheck/doFill form-validation methods that accept @QueryParameter URL or credential values and perform outbound test/connect calls without @POST and checkPermission/hasPermission guards"},
 		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "mark for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
+		{"concept": "code.AssemblyLoadPathTraversal", "surface": "scan", "use": "mark for C#/.NET dynamic assembly loading paths built from caller-controlled type or assembly-name components plus AppContext.BaseDirectory without rejecting traversal or drive-qualified path components"},
 		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "mark for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
 		{"concept": "code.CommandOptionInjection", "surface": "scan", "use": "mark for command builders that pass escaped user-controlled positional arguments to option-taking CLIs without inserting an end-of-options delimiter such as -- or enforcing an option allowlist"},
 		{"concept": "code.McpToolCommandTemplateExecution", "surface": "scan", "use": "mark for MCP server.tool handlers whose externally supplied tool callback parameters are interpolated into child_process.exec shell command templates instead of execFile argv arrays; include command-template vals and nval execFile/spawn hardening; use analysis.module.context when the server.tool registration wraps the handler body"},

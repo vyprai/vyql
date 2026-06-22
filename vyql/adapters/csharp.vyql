@@ -88,6 +88,7 @@ adapter csharp {
   sink path "Assembly.Load" -> code.DynamicCodeLoad
   sink path "Assembly.LoadFrom" -> code.DynamicCodeLoad
   sink path "Assembly.LoadFile" -> code.DynamicCodeLoad
+  mark exact "analysis.function.context" val "function_name:GetType" val "AssemblyLoadContext.Default.LoadFromAssemblyPath" val "AppContext.BaseDirectory+splitName[1].Trim()+\".dll\"" nval "path.Contains(\"..\")" nval "path.Contains(':')" -> code.AssemblyLoadPathTraversal
   sink path "ExtractToFile" -> code.ArchiveEntryWrite
 
   // SSRF
