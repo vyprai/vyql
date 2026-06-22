@@ -307,6 +307,8 @@ func securityRelevanceScore(path string, text string) int {
 		"threadlocal": 60, ".set(": 6, ".remove(": 6, "beginrequest": 26, "endrequest": 26,
 		"activate(": 8, "deactivate(": 8, "associate(": 8, "dissociate(": 8,
 		"requestscoped": 24, "sessionholder": 10, "nestedinvocationguard": 10,
+		"isfieldenabled": 36, "getrelatableresourcetypes": 36, "resourcetyperelationship": 30,
+		"relationship": 12, "field enabled": 16, "access check": 16,
 	} {
 		if strings.Contains(lowerText, token) {
 			score += weight

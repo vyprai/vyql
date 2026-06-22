@@ -9,6 +9,81 @@ rule MissingAuthentication {
   unless guarded_by core.AuthenticationCheck
 }
 
+rule JmxRmiRegistryExposure {
+  meta { id: "VYQL-AUTH-013", severity: high, cwe: [CWE_306, CWE_94], confidence_floor: medium }
+  match code.JmxRmiRegistryExposure as exposure
+}
+
+rule NodetoolArchiveCommandPrivilegeEscalation {
+  meta { id: "VYQL-AUTH-014", severity: high, cwe: [CWE_269, CWE_78], confidence_floor: medium }
+  match code.NodetoolArchiveCommandPrivilegeEscalation as archive
+}
+
+rule EffectiveUidRootCheckBypass {
+  meta { id: "VYQL-AUTH-015", severity: medium, cwe: [CWE_269], confidence_floor: medium }
+  match code.EffectiveUidRootCheckBypass as check
+}
+
+rule ChefUserManagementWithoutAdminGuard {
+  meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
+  match code.ChefUserManagementWithoutAdminGuard as controller
+}
+
+rule SamlFirstSignatureOnlyBypass {
+  meta { id: "VYQL-AUTH-017", severity: critical, cwe: [CWE_287, CWE_347], confidence_floor: high }
+  match code.SamlFirstSignatureOnlyBypass as verifier
+}
+
+rule CiliumCliEtcdInitMountMismatch {
+  meta { id: "VYQL-AUTH-018", severity: medium, cwe: [CWE_280, CWE_755], confidence_floor: high }
+  match code.CiliumCliEtcdInitMountMismatch as mount
+}
+
+rule NextcloudCircleMemberAddMissingCircleCheck {
+  meta { id: "VYQL-AUTH-019", severity: low, cwe: [CWE_639], confidence_floor: high }
+  match code.NextcloudCircleMemberAddMissingCircleCheck as controller
+}
+
+rule ClearanceKitPolicyApplyBeforeAdapterStart {
+  meta { id: "VYQL-AUTH-020", severity: medium, cwe: [CWE_269], confidence_floor: high }
+  match code.ClearanceKitPolicyApplyBeforeAdapterStart as startup
+}
+
+rule JenkinsAdvisorWeakLayoutPermission {
+  meta { id: "VYQL-AUTH-021", severity: medium, cwe: [CWE_862], confidence_floor: high }
+  match code.JenkinsAdvisorWeakLayoutPermission as page
+}
+
+rule CockpitLimeRedirectStopContinuation {
+  meta { id: "VYQL-AUTH-022", severity: critical, cwe: [CWE_613], confidence_floor: high }
+  match code.CockpitLimeRedirectStopContinuation as stop
+}
+
+rule CodeCheckerGuidelineRulesMissingViewCheck {
+  meta { id: "VYQL-AUTH-023", severity: critical, cwe: [CWE_290, CWE_863], confidence_floor: high }
+  match code.CodeCheckerGuidelineRulesMissingViewCheck as handler
+}
+
+rule CollectivesPublicTrashMissingEditPermission {
+  meta { id: "VYQL-AUTH-024", severity: medium, cwe: [CWE_284], confidence_floor: high }
+  match code.CollectivesPublicTrashMissingEditPermission as endpoint
+}
+
+rule JenkinsDescriptorConfigEnumerationMissingPermission {
+  meta { id: "VYQL-AUTH-025", severity: medium, cwe: [CWE_200, CWE_862], confidence_floor: high }
+  match code.JenkinsDescriptorConfigEnumerationMissingPermission as endpoint
+}
+
+rule ShopwareStoreApiManyToManyCriteriaBypass {
+  meta { id: "VYQL-AUTH-026", severity: medium, cwe: [CWE_284], confidence_floor: high }
+  match code.ShopwareStoreApiManyToManyCriteriaBypass as criteria
+}
+
+rule DisabledRelationshipMetadataExposure {
+  meta { id: "VYQL-AUTH-027", severity: medium, cwe: [CWE_284, CWE_863], confidence_floor: high }
+  match code.DisabledRelationshipMetadataExposure as metadata
+}
+
 rule InsecureDirectObjectReference {
   meta { id: "VYQL-AUTH-002", severity: high, cwe: [CWE_639] }
   taint core.UserControlledData -> code.ObjectLookupByUserInput
@@ -33,4 +108,34 @@ rule AutoActiveSignupAccount {
 rule EmptyVerifierAcceptance {
   meta { id: "VYQL-AUTH-006", severity: medium, cwe: [CWE_345, CWE_670], confidence_floor: medium }
   match code.EmptyVerifierAcceptance as verifier
+}
+
+rule MissingGuestFallbackForWebAuth {
+  meta { id: "VYQL-AUTH-007", severity: high, cwe: [CWE_287], confidence_floor: medium }
+  match code.MissingGuestFallbackForWebAuth as fallback
+}
+
+rule ExternalResourceNamespaceControl {
+  meta { id: "VYQL-AUTH-008", severity: high, cwe: [CWE_610, CWE_639], confidence_floor: medium }
+  match code.ExternalResourceNamespaceControl as namespace
+}
+
+rule TenantServiceAccountAdmissionBypass {
+  meta { id: "VYQL-AUTH-009", severity: high, cwe: [CWE_863], confidence_floor: medium }
+  match code.TenantServiceAccountAdmissionBypass as admission
+}
+
+rule NamespacedSubjectKeyCollision {
+  meta { id: "VYQL-AUTH-010", severity: medium, cwe: [CWE_200, CWE_863], confidence_floor: medium }
+  match code.NamespacedSubjectKeyCollision as subject
+}
+
+rule HopByHopHeaderAuthBypass {
+  meta { id: "VYQL-AUTH-011", severity: high, cwe: [CWE_287], confidence_floor: medium }
+  match code.HopByHopHeaderAuthBypass as proxy
+}
+
+rule ProxyClientIpSpoofingBypass {
+  meta { id: "VYQL-AUTH-012", severity: high, cwe: [CWE_287, CWE_348], confidence_floor: medium }
+  match code.ProxyClientIpSpoofingBypass as proxy
 }

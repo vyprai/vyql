@@ -368,6 +368,12 @@ review code.AccessPolicyReview {
   expected: [core.AuthorizationCheck]
   text: "review role or group policy configuration for overly broad access"
 }
+review code.DisabledRelationshipMetadataExposure {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck, core.InputValidation]
+  text: "verify relationship/resource metadata helpers exclude disabled, inaccessible, or invisible fields before returning relatable targets"
+}
 review code.ChefUserManagementWithoutAdminGuard {
   category: "auth"
   kind: "attention"

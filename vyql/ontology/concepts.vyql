@@ -1418,6 +1418,15 @@ concept AccessPolicyReview : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_863]
 }
+concept DisabledRelationshipMetadataExposure : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization, access_control.MissingAuthorization]
+  cwe: [CWE_284, CWE_863]
+  review_category: "auth"
+  review_condition: "relationship or resource metadata exposes disabled or inaccessible fields without an enabled/access check"
+  review_evidence: "metadata helper context {pattern} returns relatable resource types for relationship fields before checking field visibility"
+  review_assumption: "the exposed relationship metadata can be requested by a principal that should not see disabled fields"
+  review_confidence: high
+}
 concept ChefUserManagementWithoutAdminGuard : sink {
   vulnerable_to: [access_control.MissingAuthorization]
   cwe: [CWE_862]

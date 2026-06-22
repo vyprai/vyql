@@ -157,6 +157,9 @@ Rules:
      inspect lifecycle/concurrency files containing ThreadLocal, request/session
      context, begin/end, activate/deactivate, associate/dissociate, cache set,
      or cleanup/remove before chasing unrelated example SQL/deserialization code.
+     For authz/data-model CVEs, inspect public methods returning relationship,
+     resource, field, permission, or metadata lists and look for missing enabled,
+     access, ownership, or visibility checks before returns.
   4. read_file on exact evidence
   5. function_context before any exact context mark
   6. validate_overlay if producing any non-empty adapter
@@ -541,6 +544,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "core.SqlParameterization", "surface": "control", "use": "control concept for parameterization or escaping that neutralizes SQL taint"},
 		{"concept": "code.ProtocolStateReview", "surface": "review_only", "use": "review mark for OAuth, protocol, auth, callback, or message state transitions missing required state/cookie/session/order validation"},
 		{"concept": "code.ThreadLocalScopeOverwriteWithoutCleanup", "surface": "scan", "use": "mark for request/session/scope lifecycle methods that overwrite ThreadLocal state or per-thread caches without ending/removing the previous scope first"},
+		{"concept": "code.DisabledRelationshipMetadataExposure", "surface": "scan", "use": "mark for public relationship/resource metadata helpers that return relationship targets for disabled fields or invisible resources without checking enabled/access/visibility"},
 		{"concept": "code.MethodGatedRedirectValidationBypass", "surface": "scan", "use": "mark for URL validation skipped for some HTTP methods before redirect/callback handling"},
 		{"concept": "code.SessionStoredRedirectTarget", "surface": "scan", "use": "mark for redirects using session-stored or request-influenced targets without relative/same-origin validation"},
 		{"concept": "code.RedirectTarget", "surface": "scan", "use": "taint sink for redirect APIs or methods returning redirect destinations"},
@@ -976,6 +980,7 @@ func securitySnippet(text string) string {
 		"restore", "import", "backup", "archive", "extract", "filename", "rrdtool",
 		"ThreadLocal", "beginRequest", "endRequest", "activate(", "deactivate(",
 		"associate(", "dissociate(", "RequestScoped",
+		"isFieldEnabled", "getRelatableResourceTypes", "ResourceTypeRelationship",
 	} {
 		if idx := strings.Index(strings.ToLower(text), strings.ToLower(token)); idx >= 0 {
 			start := idx - 120
