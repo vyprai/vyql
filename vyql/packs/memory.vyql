@@ -43,6 +43,11 @@ rule PotentialNullDeref {
   match code.NullableDeref as d
 }
 
+rule SignedMessageLengthUnderflowCopy {
+  meta { id: "VYQL-MEM-031", severity: high, cwe: [CWE_121, CWE_122, CWE_191], confidence_floor: high }
+  match code.SignedMessageLengthUnderflowCopy as c
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse

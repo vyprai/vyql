@@ -1487,6 +1487,12 @@ review code.LibreOfficeEnhwmfDibHeaderSizeUnderflow {
   expected: [core.MemoryBoundsCheck, core.IntegerOverflowGuard]
   text: "review LibreOffice EMF alpha-blend bitmap header size validation before DIBV5 delta allocation and copy"
 }
+review code.SignedMessageLengthUnderflowCopy {
+  category: "memory"
+  kind: "attention"
+  expected: [core.MemoryBoundsCheck]
+  text: "review signed-message length subtraction before memcpy; require a minimum signed-message length guard before deriving message length"
+}
 review code.CompressedBlockSizeCapacityMismatch {
   category: "memory"
   kind: "attention"

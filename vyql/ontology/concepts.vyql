@@ -944,6 +944,15 @@ concept LibreOfficeEnhwmfDibHeaderSizeUnderflow : sink {
   review_assumption: "crafted EMF records can choose cbBmiSrc while forcing the alpha-reading path"
   review_confidence: high
 }
+concept SignedMessageLengthUnderflowCopy : sink {
+  vulnerable_to: [memory.OobWrite, memory.IntegerOverflow]
+  cwe: [CWE_121, CWE_122, CWE_191]
+  review_category: "memory"
+  review_condition: "signed-message open logic subtracts signature size from the supplied signed-message length before checking that the signed message is at least that long"
+  review_evidence: "signature-open context {pattern} computes message length from signed length minus signature size and then copies that derived length"
+  review_assumption: "callers can supply a short signed message length, causing unsigned underflow and an oversized copy"
+  review_confidence: high
+}
 concept PeerLimitUnderflow : sink {
   vulnerable_to: [memory.IntegerOverflow]
   cwe: [CWE_191]

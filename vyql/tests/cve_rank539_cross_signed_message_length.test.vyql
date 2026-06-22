@@ -1,0 +1,63 @@
+# Rank 539 / CVE-2026-41509: CROSS crypto_sign_open subtracted the
+# signature size from smlen before checking that smlen was at least that size.
+
+test "rank539: CROSS signed message length underflows before memcpy"
+  lang c
+  expect VYQL-MEM-031
+  expect_review code.SignedMessageLengthUnderflowCopy
+  code
+  ```
+  typedef unsigned long size_t;
+  typedef unsigned long long uint64_t;
+  typedef struct CROSS_sig_t CROSS_sig_t;
+  typedef struct pk_t pk_t;
+  int CROSS_verify(const pk_t *pk, const char *m, uint64_t mlen, const CROSS_sig_t *sig);
+  void *memcpy(void *dest, const void *src, unsigned long n);
+
+  int crypto_sign_open(unsigned char *m,
+                       unsigned long long *mlen,
+                       const unsigned char *sm,
+                       unsigned long long smlen,
+                       const unsigned char *pk)
+  {
+     *mlen = smlen - (unsigned long long) sizeof(CROSS_sig_t);
+     memcpy((unsigned char *) m, (const unsigned char *) sm, (size_t) *mlen);
+     int ok = CROSS_verify((const pk_t *const) pk,
+                           (const char *const) m,
+                           (const uint64_t) *mlen,
+                           (const CROSS_sig_t * const) (sm + *mlen));
+     return ok - 1;
+  }
+  ```
+
+test "rank539: CROSS signed message length guard prevents underflow copy"
+  lang c
+  reject VYQL-MEM-031
+  reject_review code.SignedMessageLengthUnderflowCopy
+  code
+  ```
+  typedef unsigned long size_t;
+  typedef unsigned long long uint64_t;
+  typedef struct CROSS_sig_t CROSS_sig_t;
+  typedef struct pk_t pk_t;
+  int CROSS_verify(const pk_t *pk, const char *m, uint64_t mlen, const CROSS_sig_t *sig);
+  void *memcpy(void *dest, const void *src, unsigned long n);
+
+  int crypto_sign_open(unsigned char *m,
+                       unsigned long long *mlen,
+                       const unsigned char *sm,
+                       unsigned long long smlen,
+                       const unsigned char *pk)
+  {
+     if (smlen < (size_t) sizeof(CROSS_sig_t)) {
+        return -1;
+     }
+     *mlen = smlen - (unsigned long long) sizeof(CROSS_sig_t);
+     memcpy((unsigned char *) m, (const unsigned char *) sm, (size_t) *mlen);
+     int ok = CROSS_verify((const pk_t *const) pk,
+                           (const char *const) m,
+                           (const uint64_t) *mlen,
+                           (const CROSS_sig_t * const) (sm + *mlen));
+     return ok - 1;
+  }
+  ```
