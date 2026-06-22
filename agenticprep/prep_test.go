@@ -818,6 +818,29 @@ csrf.valid = csrf.validate = function (data, token) {
 	}
 }
 
+func TestPrepDoesNotTreatParserTokenEqualsAsSecretComparison(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "Parser.java")
+	if err := os.WriteFile(src, []byte(`final class Parser {
+  boolean parse(Token token, String ident) {
+    if ("stylesheet".equals(ident)) {
+      return true;
+    }
+    return token.kind.equals("IDENT") || token.compareTo(Token.EOF) == 0;
+  }
+}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if secretComparisonProfile(profile) {
+		t.Fatal("parser token equality should not trigger secret comparison prep profile")
+	}
+}
+
 func TestPrepRanksJavaScriptStaticRegexReDoS(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "index.ts")
@@ -847,34 +870,77 @@ export const parse = (css: string): string[] => {
 	if err != nil {
 		t.Fatalf("Analyze: %v", err)
 	}
-	if !staticRegexProfile(profile) {
-		t.Fatal("expected static regex profile")
+	if len(profile.ProgrammaticFindings) != 1 {
+		t.Fatalf("expected one programmatic finding, got %#v", profile.ProgrammaticFindings)
 	}
-	if !requiresSymbolInventory(profile) {
-		t.Fatal("expected static regex profile to require symbol inventory")
+	finding := profile.ProgrammaticFindings[0]
+	if finding.Kind != "javascript.static_comment_regex_redos" || finding.Concept != "code.CatastrophicRegex" || finding.Path != src {
+		t.Fatalf("unexpected programmatic finding: %#v", finding)
 	}
-	callTerms := requiredCallInventoryTerms(profile)
-	for _, want := range []string{"regex", "replace", "match", "parse", "commentre"} {
-		if !containsString(callTerms, want) {
-			t.Fatalf("expected focused call term %q in %#v", want, callTerms)
+	proposal := deterministicProposal([]string{dir}, Config{})
+	if len(proposal.AdapterFiles) != 1 {
+		t.Fatalf("expected one deterministic static-regex adapter, got %#v", proposal.AdapterFiles)
+	}
+	adapter := proposal.AdapterFiles[0]
+	if adapter.Language != "javascript" || !strings.Contains(adapter.Source, "code.CatastrophicRegex") {
+		t.Fatalf("expected JavaScript CatastrophicRegex adapter, got %#v", adapter)
+	}
+	if len(adapter.Evidence) != 1 || adapter.Evidence[0] != src {
+		t.Fatalf("expected source evidence path, got %#v", adapter.Evidence)
+	}
+	if err := ValidateProposal(profile, proposal, Config{}); err != nil {
+		t.Fatalf("expected deterministic static-regex overlay to validate: %v\n%s", err, adapter.Source)
+	}
+
+	fixedDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(fixedDir, "index.ts"), []byte(`const commentre = /\/\*[^]*?(?:\*\/|$)/g;
+
+export const parse = (css: string): string[] => {
+  return css.replace(commentre, '').split(',');
+};
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fixedProposal := deterministicProposal([]string{fixedDir}, Config{})
+	for _, f := range fixedProposal.AdapterFiles {
+		if strings.Contains(f.Source, "code.CatastrophicRegex") {
+			t.Fatalf("fixed bounded comment regex should not emit CatastrophicRegex overlay: %#v", fixedProposal)
 		}
 	}
-	assignmentTerms := requiredAssignmentInventoryTerms(profile)
-	for _, want := range []string{"regex", "pattern", "commentre", "selector"} {
-		if !containsString(assignmentTerms, want) {
-			t.Fatalf("expected focused assignment term %q in %#v", want, assignmentTerms)
-		}
-	}
-	narrow := Proposal{AdapterFiles: []AdapterFile{{
+}
+
+func TestPrepDropsLLMAdaptersCoveredByProgrammaticFindings(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "index.ts")
+	findings := []ProgrammaticFinding{{
+		Kind:     "javascript.static_comment_regex_redos",
 		Language: "javascript",
-		Source: `adapter javascript {
+		Concept:  "code.CatastrophicRegex",
+		Path:     src,
+	}}
+	adapters := []AdapterFile{
+		{
+			Language: "javascript",
+			Source: `adapter javascript {
   mark exact "analysis.module.context" val "lang=javascript" val "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g" nval "[^]*?(?:\\*\\/|$)" -> code.CatastrophicRegex
 }
 `,
-		Evidence: []string{src},
-	}}}
-	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
-		t.Fatalf("expected narrow static-regex context mark to validate: %v", err)
+			Evidence: []string{src},
+		},
+		{
+			Language: "javascript",
+			Source: `adapter javascript {
+  sink path "customRender" arg 0 -> code.HtmlRender
+}
+`,
+			Evidence: []string{src},
+		},
+	}
+	filtered, notes := removeProgrammaticCoveredAdapters(findings, adapters, nil)
+	if len(filtered) != 1 || !strings.Contains(filtered[0].Source, "code.HtmlRender") {
+		t.Fatalf("expected only non-programmatic adapter to remain, got %#v", filtered)
+	}
+	if len(notes) != 1 || !strings.Contains(notes[0], "already covered by programmatic prep") {
+		t.Fatalf("expected programmatic skip note, got %#v", notes)
 	}
 }
 
