@@ -316,6 +316,16 @@ Rules:
      actions. If the vulnerable shape is generic stdlib behavior already
      represented by code.LengthDerivedAllocation, prefer noting the base
      scanner concept over emitting a repo-local overlay.
+     For secure-cookie CVEs, inspect functions and methods that call SetCookie,
+     http.SetCookie, response cookie helpers, or framework cookie wrappers while
+     a Secure option/field/flag exists nearby. If a token, session, CSRF, auth,
+     or credential cookie is set with a literal false secure argument, or a
+     cookie object has Secure:false, prefer code.InsecureCookie. Use
+     function_context and a narrow analysis.function.context mark when the
+     insecure value is positional in a framework wrapper; include an nval for
+     the fixed option/field such as opt.Secure, Secure: true, or setSecure(true).
+     Do not finish empty merely because net/http cookies are standard library
+     concepts; local/framework SetCookie wrappers often need adapter context.
      For upload XSS CVEs, inspect upload services/helpers that derive extensions
      from client filenames or MIME types and store SVG, HTML, or XML-capable files;
      check for SVG/XML sanitizers before storeAs/move/save/write.
@@ -571,9 +581,10 @@ agentLoop:
 				emptyDefaultRelayOverlay := defaultRelaySecretProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyCommandWrapperOverlay := commandWrapperProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || (!notesMentionAny(proposal.Notes, []string{"commandstringwrapperexecution", "argv", "process builder", "processbuilder", "$env:", "env var", "environment variable"}) || notesMentionAny(proposal.Notes, []string{"interprocedural", "automatically handled", "generic command execution", "os/exec", "exec.command"})))
 				emptyCommandOptionOverlay := commandOptionProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!notesMentionAny(proposal.Notes, []string{"commandoptioninjection", "end-of-options", "--", "option injection"}) || notesMentionAny(proposal.Notes, []string{"no direct untrusted", "no untrusted entry", "no source", "map as a source"}))
+				emptySecureCookieOverlay := secureCookieProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"insecurecookie", "vyql-cfg-007", "secure cookie", "secure flag", "setcookie"}))
 				cryptoBlindingEvidence := cryptoBlindingProfile(profile)
 				emptyCryptoBlindingOverlay := cryptoBlindingEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"cryptoimproperblinding", "vyql-cry-011", "core scan", "base scanner", "existing scanner"}))
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptyCryptoBlindingOverlay
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptySecureCookieOverlay && !emptyCryptoBlindingOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -617,6 +628,9 @@ agentLoop:
 				} else if emptyCommandOptionOverlay {
 					toolResult["error"] = "command option-injection evidence is present; empty-overlay notes must explicitly address code.CommandOptionInjection or end-of-options delimiter hardening such as --, and must not reject the mark merely because the library has no direct untrusted source. Shell escaping alone is not sufficient evidence for option-taking CLI arguments."
 					p.debugf("step=%d finish_overlay rejected: empty command option overlay without specific rationale", step)
+				} else if emptySecureCookieOverlay {
+					toolResult["error"] = "secure-cookie evidence is present; do not return an empty overlay until you have called concept_reference with topic \"secure cookie\", function_context for the cookie setter containing SetCookie plus token/session/csrf evidence, and validate_overlay with code.InsecureCookie or concrete evidence that the secure flag is passed from the configured option such as opt.Secure"
+					p.debugf("step=%d finish_overlay rejected: empty secure-cookie overlay", step)
 				} else if emptyCryptoBlindingOverlay {
 					toolResult["error"] = "crypto blinding/timing evidence is present; do not return an empty overlay until you have called concept_reference with topic \"blinding\", function_context for the private-key operation containing Randomize/MultiplicativeInverse/Jacobi/Square evidence, and validate_overlay with code.CryptoImproperBlinding or concrete evidence that the randomized blinding factor is squared/subgroup-hardened before inverse/unblinding use"
 					p.debugf("step=%d finish_overlay rejected: empty crypto blinding overlay", step)
@@ -980,6 +994,8 @@ func requiresSymbolInventory(profile Profile) bool {
 		"cors", "alloworigins", "alloworiginfunc", "allowallorigins",
 		"access-control-allow-origin", "trustedorigin", "trusted_origin",
 		"wildcard", "validateorigin", "checkorigin", "callback",
+		"setcookie", "cookiehttponly", "secure flag", "secure bool",
+		"opt.secure", "secure=false",
 		"attestation", "predicate", "signature", "provenance",
 		"transparencylog", "fulcio", "rekor",
 		"calculateinverse", "multiplicativeinverse", "randomize", "jacobi",
@@ -1032,6 +1048,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"testconnection", "connect", "getprojects", "buildclient", "queryparameter", "dotest", "docheck", "dofill", "checkpermission", "haspermission", "post"}
 	case commandOptionProfile(profile):
 		return []string{"escapeshellarg", "operation", "--", "setoperation", "gpg", "gnupg", "key", "fingerprint", "argument", "option"}
+	case secureCookieProfile(profile):
+		return []string{"setcookie", "cookie", "secure", "httponly", "csrf", "token", "session"}
 	case cryptoBlindingProfile(profile):
 		return []string{"calculateinverse", "randomize", "multiplicativeinverse", "jacobi", "square", "modularsquareroot", "blind", "unblind", "rabin"}
 	case dynamicAssemblyLoadPathProfile(profile):
@@ -1105,6 +1123,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 		return []string{"url", "applicationname", "password", "proxy", "host", "port", "credential", "permission"}
 	case commandOptionProfile(profile):
 		return []string{"operation", "argument", "args", "keyid", "fingerprint", "option", "command", "escape", "delimiter"}
+	case secureCookieProfile(profile):
+		return []string{"secure", "cookie", "httponly", "token", "session", "csrf"}
 	case commandWrapperProfile(profile):
 		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process", "volumeid", "mountpath", "linkpath", "drivepath", "env"}
 	case dynamicAssemblyLoadPathProfile(profile):
@@ -1172,6 +1192,22 @@ func commandOptionProfile(profile Profile) bool {
 		"end-of-options", " -- ", "option injection",
 	})
 	return hasEscapedCommandArg && hasOptionCommand
+}
+
+func secureCookieProfile(profile Profile) bool {
+	hasCookieSetter := profileContainsAnyTerm(profile, []string{
+		"setcookie", "http.setcookie", "set-cookie", "cookiehttponly", "secure=false",
+	})
+	if !hasCookieSetter {
+		return false
+	}
+	hasSecureOption := profileContainsAnyTerm(profile, []string{
+		"secure bool", "secure flag", "opt.secure", "setsecure", "cookie secure", "secure:",
+	})
+	hasSensitiveCookie := profileContainsAnyTerm(profile, []string{
+		"csrf", "xsrf", "token", "session", "auth", "credential", "secret", "cookiehttponly",
+	})
+	return hasSecureOption && hasSensitiveCookie
 }
 
 func mcpToolProfile(profile Profile) bool {
@@ -2022,6 +2058,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.HtmlRender", "surface": "scan", "use": "taint sink for raw HTML/template rendering or unescaped response content"},
 		{"concept": "code.UnsanitizedSvgUpload", "surface": "scan", "use": "mark for upload services that accept/store SVG files without sanitizing SVG XML/script content before saving"},
 		{"concept": "code.LengthDerivedAllocation", "surface": "scan", "use": "mark for resource DoS patterns where request/protocol/body length fields drive allocation or full buffering before an explicit max-size or available-data bound"},
+		{"concept": "code.InsecureCookie", "surface": "scan", "use": "mark for session, token, CSRF, auth, or credential cookies set with Secure:false or framework SetCookie wrappers that pass a literal false secure flag instead of the configured secure option"},
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},

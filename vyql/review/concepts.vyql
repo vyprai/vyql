@@ -555,6 +555,12 @@ review code.InsecurePermission {
   kind: "target"
   text: "review broad permission assignment and surrounding privilege checks"
 }
+review code.InsecureCookie {
+  category: "cookie"
+  kind: "target"
+  expected: [core.CookieSecureFlag]
+  text: "ensure sensitive cookies are set with the Secure flag from configuration or an explicit true value"
+}
 review code.UnsanitizedSvgUpload {
   category: "xss"
   kind: "target"

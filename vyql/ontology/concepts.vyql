@@ -3386,6 +3386,11 @@ concept SafeResponseContentType : control {
   cwe: [CWE_79]
   applies: endpoint
 }
+concept CookieSecureFlag : control {
+  neutralizes: [session.InsecureCookie]
+  cwe: [CWE_614]
+  applies: endpoint
+}
 concept PdfScanCheck : control {
   neutralizes: [injection.Xss]
   cwe: [CWE_79]

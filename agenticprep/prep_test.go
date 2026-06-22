@@ -679,6 +679,81 @@ func RunPowershellCmd(command string, envs ...string) ([]byte, error) {
 	}
 }
 
+func TestPrepRanksGoSecureCookieWrapper(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "csrf.go")
+	if err := os.WriteFile(src, []byte(`package csrf
+
+import "time"
+
+type Context struct{}
+func (c *Context) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool, expires time.Time) {}
+
+type Options struct {
+	Cookie string
+	CookiePath string
+	CookieHttpOnly bool
+	SetCookie bool
+	// Set the Secure flag to true on the cookie.
+	Secure bool
+}
+
+func GenerateToken(secret, id, method string) string { return secret + id + method }
+
+func Generate(options ...Options) func(*Context) {
+	opt := options[0]
+	return func(ctx *Context) {
+		xToken := GenerateToken("secret", "0", "POST")
+		if opt.SetCookie {
+			ctx.SetCookie(opt.Cookie, xToken, 0, opt.CookiePath, "", false, opt.CookieHttpOnly, time.Now().AddDate(0, 0, 1))
+		}
+	}
+}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !secureCookieProfile(profile) {
+		t.Fatal("expected secure cookie profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatal("expected secure cookie profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"setcookie", "secure", "csrf", "token"} {
+		if !containsString(callTerms, want) {
+			t.Fatalf("expected focused call term %q in %#v", want, callTerms)
+		}
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	for _, want := range []string{"secure", "cookie", "token"} {
+		if !containsString(assignmentTerms, want) {
+			t.Fatalf("expected focused assignment term %q in %#v", want, assignmentTerms)
+		}
+	}
+	contexts, err := functionContexts(profile, src, "Generate", "SetCookie", 5)
+	if err != nil {
+		t.Fatalf("functionContexts: %v", err)
+	}
+	if len(contexts) == 0 || !strings.Contains(contexts[0].CompactPreview, "ctx.SetCookie") {
+		t.Fatalf("expected SetCookie function context, got %#v", contexts)
+	}
+	narrow := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "go",
+		Source: `adapter go {
+  mark exact "analysis.function.context" val "ctx.SetCookie" val "GenerateToken" val "opt.CookieHttpOnly" val "false" nval "opt.Secure" -> code.InsecureCookie
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow secure-cookie context mark to validate: %v", err)
+	}
+}
+
 func TestPrepRanksMcpToolCommandTemplates(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"dependencies":{"@modelcontextprotocol/sdk":"^1.0.0","zod":"^3.0.0","@acme/plainlib":"1.0.0"}}`), 0o644); err != nil {
@@ -2017,6 +2092,20 @@ func TestPrepConceptReferenceIncludesMcpToolCommandTemplate(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected MCP tool command template scan concept in reference, got %#v", concepts)
+	}
+}
+
+func TestPrepConceptReferenceIncludesInsecureCookie(t *testing.T) {
+	concepts := conceptReference("secure cookie")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.InsecureCookie" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected insecure cookie scan concept in reference, got %#v", concepts)
 	}
 }
 

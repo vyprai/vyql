@@ -334,6 +334,7 @@ adapter go {
   // insecure cookie (CWE-614) — http.Cookie{HttpOnly: false} / {Secure: false} explicit
   mark "http.Cookie" val "HttpOnly=false" -> code.InsecureCookie
   mark "http.Cookie" val "Secure=false" -> code.InsecureCookie
+  mark exact "analysis.function.context" val "ctx.SetCookie" val "GenerateToken" val "opt.CookieHttpOnly" val "false" nval "opt.Secure" -> code.InsecureCookie
 
   // cleartext channel (CWE-319) — http:// URL to net/http (loopback excluded; low sev)
   mark "http.Get" val "http://" nval "127.0" -> code.CleartextChannel

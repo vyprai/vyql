@@ -1,0 +1,70 @@
+# Rank 554 / CVE-2018-25060: go-macaron/csrf exposed a Secure option but
+# ignored it when setting the generated CSRF cookie.
+
+test "rank554: csrf cookie ignores configured secure flag"
+  lang go
+  expect VYQL-CFG-007
+  expect_review code.InsecureCookie
+  code
+  ```
+  package csrf
+
+  import "time"
+
+  type Context struct{}
+  func (c *Context) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool, expires time.Time) {}
+
+  type Options struct {
+    Cookie string
+    CookiePath string
+    CookieHttpOnly bool
+    SetCookie bool
+    Secure bool
+  }
+
+  func GenerateToken(secret, id, method string) string { return secret + id + method }
+
+  func Generate(options ...Options) func(*Context) {
+    opt := options[0]
+    return func(ctx *Context) {
+      xToken := GenerateToken("secret", "0", "POST")
+      if opt.SetCookie {
+        ctx.SetCookie(opt.Cookie, xToken, 0, opt.CookiePath, "", false, opt.CookieHttpOnly, time.Now().AddDate(0, 0, 1))
+      }
+    }
+  }
+  ```
+
+test "rank554: csrf cookie uses configured secure flag"
+  lang go
+  reject VYQL-CFG-007
+  reject_review code.InsecureCookie
+  code
+  ```
+  package csrf
+
+  import "time"
+
+  type Context struct{}
+  func (c *Context) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool, expires time.Time) {}
+
+  type Options struct {
+    Cookie string
+    CookiePath string
+    CookieHttpOnly bool
+    SetCookie bool
+    Secure bool
+  }
+
+  func GenerateToken(secret, id, method string) string { return secret + id + method }
+
+  func Generate(options ...Options) func(*Context) {
+    opt := options[0]
+    return func(ctx *Context) {
+      xToken := GenerateToken("secret", "0", "POST")
+      if opt.SetCookie {
+        ctx.SetCookie(opt.Cookie, xToken, 0, opt.CookiePath, "", opt.Secure, opt.CookieHttpOnly, time.Now().AddDate(0, 0, 1))
+      }
+    }
+  }
+  ```
