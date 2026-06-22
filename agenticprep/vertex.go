@@ -271,6 +271,10 @@ agentLoop:
 		}
 		if err != nil {
 			p.debugf("step=%d error=%v", step, err)
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				notes = append(notes, "agent stopped after Vertex deadline without finish_overlay")
+				return Proposal{AgentLog: log, Notes: notes}, nil
+			}
 			return Proposal{AgentLog: log, Notes: notes}, err
 		}
 		p.debugf("step=%d finish=%s text_bytes=%d tool_calls=%s", step, finish, len(text), toolCallNames(calls))

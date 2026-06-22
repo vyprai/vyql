@@ -897,6 +897,10 @@ concept LibreOfficeEnhwmfDibHeaderSizeUnderflow : sink {
   review_assumption: "crafted EMF records can choose cbBmiSrc while forcing the alpha-reading path"
   review_confidence: high
 }
+concept PeerLimitUnderflow : sink {
+  vulnerable_to: [memory.IntegerOverflow]
+  cwe: [CWE_191]
+}
 concept CompressedBlockSizeCapacityMismatch : sink {
   vulnerable_to: [memory.OobWrite]
   cwe: [CWE_787]

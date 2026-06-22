@@ -32,3 +32,8 @@ rule PointerOffsetBoundsCheck {
   meta { id: "VYQL-NUM-006", severity: medium, cwe: [CWE_20, CWE_125, CWE_190], confidence_floor: medium }
   match code.PointerOffsetBoundsCheck as bounds
 }
+
+rule PeerLimitUnderflow {
+  meta { id: "VYQL-NUM-013", severity: medium, cwe: [CWE_191], confidence_floor: high }
+  match code.PeerLimitUnderflow as underflow
+}
