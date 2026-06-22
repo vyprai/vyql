@@ -264,6 +264,11 @@ adapter go {
   // Review-only: protocol handlers that compare an incoming previous-state pointer
   // against the last stored state need manual review for stale or forked-chain cases.
   mark exact "analysis.function.context" val "PrevATXID" val "call:GetLastIDByNodeID" -> code.ProtocolStateReview
+  // Review-only: protocol response loops that abort on malformed frame parse
+  // errors before checking request/response identifiers can let spoofed packets
+  // block the valid upstream response. A fixed implementation distinguishes
+  // UDP parse errors from network errors and continues waiting.
+  mark exact "analysis.function.context" val "call_path:pc.c.WriteMsg" val "call_path:pc.c.ReadMsg" val "call_path:pc.c.Close" val "selector:state.Req.Id" val "selector:ret.Id" nval "selector:net.Error" nval "binary:proto==\"udp\"" -> code.ProtocolStateReview
   // Review-only: request handlers that derive request metadata, load resource metadata,
   // then dispatch a resource handler need a visible request/resource scope consistency
   // check before dispatch.
