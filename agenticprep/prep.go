@@ -398,6 +398,7 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 		return fmt.Errorf("agentic prep: proposal has %d adapter files, max %d", len(proposal.AdapterFiles), cfg.MaxAdapters)
 	}
 	requirePackageScope := len(profilePackageCandidates(profile)) > 0
+	firstPartyPackages := firstPartyManifestPackages(profile)
 	for _, f := range proposal.AdapterFiles {
 		lang := strings.TrimSpace(f.Language)
 		if lang == "" {
@@ -437,6 +438,11 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				if requirePackageScope && len(m.Packages) == 0 {
 					return fmt.Errorf("agentic prep: adapter %q mapping %q -> %s is not package-scoped; wrap repo-local/generated mappings in package \"<dependency-or-project-package>\" { ... }", lang, m.Pattern, m.Concept)
 				}
+				for _, pkg := range m.Packages {
+					if firstPartyPackages[sca.NormalizePackageName(pkg)] {
+						return fmt.Errorf("agentic prep: adapter %q maps first-party package %q; use a generalized API mapping, exact context mark, or empty overlay instead of local package gating", lang, pkg)
+					}
+				}
 			}
 			if broadGenericOverlay(lang, ad) {
 				return fmt.Errorf("agentic prep: adapter %q is a broad generic mapping, not repo-specific prep", lang)
@@ -450,6 +456,106 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 		}
 	}
 	return nil
+}
+
+func firstPartyManifestPackages(profile Profile) map[string]bool {
+	out := map[string]bool{}
+	for _, pkg := range profile.LocalPkgs {
+		if norm := sca.NormalizePackageName(pkg); norm != "" {
+			out[norm] = true
+		}
+	}
+	for _, man := range profile.Manifests {
+		for _, pkg := range manifestDeclaredPackageNames(man.Path, man.Kind) {
+			if norm := sca.NormalizePackageName(pkg); norm != "" {
+				out[norm] = true
+			}
+		}
+	}
+	return out
+}
+
+func manifestDeclaredPackageNames(path string, kind string) []string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	text := string(b)
+	switch strings.ToLower(kind) {
+	case "cargo.toml":
+		if name := tomlPackageName(text); name != "" {
+			return []string{name}
+		}
+	case "package.json", "composer.json":
+		var m map[string]any
+		if json.Unmarshal(b, &m) == nil {
+			if name, _ := m["name"].(string); strings.TrimSpace(name) != "" {
+				return []string{name}
+			}
+		}
+	case "go.mod":
+		for _, line := range strings.Split(text, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "module ") {
+				return []string{strings.TrimSpace(strings.TrimPrefix(line, "module "))}
+			}
+		}
+	case "pyproject.toml":
+		if name := tomlProjectName(text); name != "" {
+			return []string{name}
+		}
+	}
+	return nil
+}
+
+func tomlPackageName(text string) string {
+	inPackage := false
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(strings.Split(line, "#")[0])
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			inPackage = line == "[package]"
+			continue
+		}
+		if inPackage && strings.HasPrefix(line, "name") {
+			if name := quotedAssignmentValue(line); name != "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+func tomlProjectName(text string) string {
+	inProject := false
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(strings.Split(line, "#")[0])
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			inProject = line == "[project]" || line == "[tool.poetry]"
+			continue
+		}
+		if inProject && strings.HasPrefix(line, "name") {
+			if name := quotedAssignmentValue(line); name != "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+func quotedAssignmentValue(line string) string {
+	parts := strings.SplitN(line, "=", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	val := strings.TrimSpace(parts[1])
+	val = strings.Trim(val, `"'`)
+	return strings.TrimSpace(val)
 }
 
 func sourceOnlyParamOverlay(ad *parser.AdapterDecl) bool {

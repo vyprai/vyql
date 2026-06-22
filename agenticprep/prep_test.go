@@ -143,6 +143,37 @@ func TestValidateProposalAllowsParamSourceWithConcreteSink(t *testing.T) {
 	}
 }
 
+func TestValidateProposalRejectsFirstPartyManifestPackageGate(t *testing.T) {
+	dir := t.TempDir()
+	cargo := filepath.Join(dir, "Cargo.toml")
+	if err := os.WriteFile(cargo, []byte("[package]\nname = \"split\"\nversion = \"0.1.0\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile := Profile{
+		Roots:     []string{dir},
+		Languages: map[string]int{"rust": 1},
+		Packages:  []string{"split"},
+		Manifests: []ManifestEvidence{{
+			Path:     cargo,
+			Kind:     "cargo.toml",
+			Packages: []string{"split"},
+		}},
+	}
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "rust",
+		Source: `adapter rust {
+  package "split" {
+    sink path "FilterWriter::new" arg 0 -> code.CommandExecution
+  }
+}
+`,
+		Evidence: []string{"src/uu/split/src/platform/unix.rs"},
+	}}}
+	if err := ValidateProposal(profile, proposal, Config{}); err == nil {
+		t.Fatal("expected first-party manifest package overlay to be rejected")
+	}
+}
+
 func TestAnalyzePrioritizesSecurityRelevantSamplesAndPHPInc(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "a.php"), []byte("<?php echo 'boring';\n"), 0o644); err != nil {

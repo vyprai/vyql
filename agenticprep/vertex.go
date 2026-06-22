@@ -118,10 +118,11 @@ Use tools to inspect bounded repo evidence, then call finish_overlay.
 
 Rules:
 - Generate only adapter declarations for languages present in the profile.
-- Use explicit package-scoped adapter blocks when package/import/manifest
-  evidence exists. This is locality for the proposed mapping, not a
-  concept-level package gate. The validator rejects package-less mappings in
-  that case. Example:
+- Use explicit package-scoped adapter blocks only for third-party dependency
+  APIs with import/manifest evidence. This is locality for the proposed
+  mapping, not a concept-level package gate. Do not package-gate first-party
+  workspace crates/modules/binaries from local manifests such as Cargo.toml
+  [package] names. Example:
   adapter python {
     package "fastapi-sso" {
       source param -> code.ExternalEntryInput
@@ -129,6 +130,10 @@ Rules:
     }
   }
 - Keep mappings conservative and selector-backed.
+- For first-party/local project APIs, prefer generalized API mappings already
+  meaningful across projects, narrow analysis.function.context marks, or an
+  empty overlay with notes. Do not create adapters whose only locality is a
+  local command, binary, crate, module, controller, or utility package name.
 - Adapter source must be valid VyQL DSL, for example:
   adapter python {
     source "request.args" -> code.HttpInput
@@ -887,7 +892,7 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 			return map[string]any{"ok": false, "error": warn}
 		}
 		filtered, warnings := FilterValidProposal(profile, proposal, Config{})
-		hints := overlayHints(proposal)
+		hints := overlayHints(profile, proposal)
 		return map[string]any{"ok": len(warnings) == 0, "valid_adapter_count": len(filtered.AdapterFiles), "warnings": warnings, "hints": hints}
 	default:
 		return map[string]any{"ok": false, "error": "unknown tool"}
@@ -933,7 +938,8 @@ adapter <language> {
   }
 }
 
-When package_reference returns packages, wrap generated mappings in package blocks.
+When package_reference returns third-party packages, wrap generated mappings in package blocks.
+Do not package-wrap first-party workspace package names from local manifests.
 Use path/method/receiver only before the quoted pattern. Put arg after the pattern.
 Use source param only when the same overlay also adds a concrete sink, mark, or
 control for the package. Do not emit source-only source param overlays.
@@ -1370,8 +1376,9 @@ func dependencyProbeTerms(gap DependencyGap) []string {
 	return out
 }
 
-func overlayHints(proposal Proposal) []string {
+func overlayHints(profile Profile, proposal Proposal) []string {
 	var hints []string
+	firstPartyPackages := firstPartyManifestPackages(profile)
 	for _, f := range proposal.AdapterFiles {
 		src := f.Source
 		if strings.Contains(src, "SqlExecution") && !strings.Contains(src, "source ") && !strings.Contains(src, "UnparameterizedSqlQueryParser") {
@@ -1387,7 +1394,13 @@ func overlayHints(proposal Proposal) []string {
 			hints = append(hints, "source param without a concrete sink, mark, or control is broad source-only expansion; return an empty overlay instead of widening public parameters.")
 		}
 		if !strings.Contains(src, "package \"") {
-			hints = append(hints, "When package_reference returns candidates, wrap mappings in package \"name\" { ... } so the overlay is dependency-gated.")
+			hints = append(hints, "When package_reference returns third-party candidates, wrap mappings in package \"name\" { ... }; for first-party local packages prefer generalized mappings or empty overlay.")
+		}
+		for pkg := range firstPartyPackages {
+			if strings.Contains(src, `package "`+pkg+`"`) {
+				hints = append(hints, "Do not package-gate first-party workspace package "+pkg+"; use a generalized API mapping, exact context mark, or empty overlay.")
+				break
+			}
 		}
 		if strings.Contains(src, "mark exact") && !strings.Contains(src, "analysis.function.context") {
 			hints = append(hints, "Prefer mark exact \"analysis.function.context\" for function-local anti-patterns so frontend context matching can apply.")
