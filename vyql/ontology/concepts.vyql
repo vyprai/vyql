@@ -1418,6 +1418,15 @@ concept AccessPolicyReview : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_863]
 }
+concept UnvalidatedModelSelection : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization, validation.ImproperInputValidation]
+  cwe: [CWE_20, CWE_863]
+  review_category: "auth"
+  review_condition: "request-selected model or classifier names are used before membership/existence validation"
+  review_evidence: "model-selection context {pattern} reads a request classifier and uses it in model lookup/output before the validated model binding"
+  review_assumption: "remote callers can request unavailable or unauthorized model names and trigger an unauthorized or exceptional path"
+  review_confidence: high
+}
 concept OverbroadRolePermissionGrant : sink {
   vulnerable_to: [access_control.PrivilegeEscalation, access_control.IncorrectAuthorization]
   cwe: [CWE_269, CWE_863]

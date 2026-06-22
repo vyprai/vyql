@@ -360,11 +360,18 @@ agentLoop:
 			contents = append(contents, map[string]any{
 				"role": "user",
 				"parts": []map[string]any{{
-					"text": "Decision checkpoint: you have enough deterministic repo setup evidence. Do not keep searching. If you have a concrete adapter with source plus sink/mark/control evidence, call validate_overlay now. If not, call finish_overlay with adapter_files=[] and concise notes about scan_config/trust_model and missing concrete adapter evidence.",
+					"text": "Decision checkpoint: stop searching now. Your next tool call must be validate_overlay if you have concrete source plus sink/mark/control evidence, or finish_overlay with adapter_files=[] if you do not. Do not call search, read, repo, dependency, or reference tools after this checkpoint.",
 				}},
 			})
 		}
 		log = append(log, entry)
+		if decisionCheckpointSent && step >= 16 && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") {
+			p.debugf("step=%d stopping after ignored decision checkpoint", step)
+			return Proposal{
+				AgentLog: log,
+				Notes:    append(notes, "agent stopped after decision checkpoint without finish_overlay"),
+			}, nil
+		}
 	}
 	if len(lastValid.AdapterFiles) > 0 {
 		lastValid.AgentLog = log
