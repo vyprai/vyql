@@ -100,6 +100,8 @@ type lowerer struct {
 	// parseCache, when set (incremental path), lets bodyOf decode a stub module's full NIR on
 	// demand from the parse cache. nil on the full path.
 	parseCache DeltaCache
+
+	tryExceptionTargets []string
 }
 
 type containerInfo struct {
@@ -1857,8 +1859,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.mergeBindings(sc, before, branches)
 	case nir.Try:
 		b := l.nextBranch()
+		exn := l.node("Exception", st.Loc, map[string]string{"callee_path": "analysis.exception", "method": "exception"})
+		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
+		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
 		for i, h := range st.Handlers {
+			if i < len(st.HandlerParams) {
+				if name := strings.TrimSpace(st.HandlerParams[i]); name != "" {
+					sc.node[name] = exn
+					delete(sc.cnst, name)
+				}
+			}
 			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
 		}
 		l.inRegion("try"+b+".f", func() { l.block(st.Finally, sc) })
@@ -2708,6 +2719,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(a, result)
 		}
 	}
+	l.captureTryExceptionTaint(result, args, recvNode)
 	// wrapper-object taint: `new T(taintedArg)` builds an object that CONTAINS its args, so the
 	// constructed object (result) carries each arg's taint — even when the ctor body is resolved
 	// (args mapped to params). Lets a tainted value wrapped in an object propagate through it
@@ -2719,6 +2731,23 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	l.applyCallEffects(call, argVals, result, sc)
 	return result
+}
+
+func (l *lowerer) captureTryExceptionTaint(result string, args []string, recvNode string) {
+	if len(l.tryExceptionTargets) == 0 {
+		return
+	}
+	for _, exn := range l.tryExceptionTargets {
+		if recvNode != "" {
+			l.flow(recvNode, exn)
+		}
+		for _, arg := range args {
+			l.flow(arg, exn)
+		}
+		if result != "" {
+			l.flow(result, exn)
+		}
+	}
 }
 
 func (l *lowerer) applyTargetArgsCallback(call nir.Call, argVals []string, sc *scope) {

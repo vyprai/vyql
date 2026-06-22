@@ -1164,6 +1164,82 @@ final class AuditService {
 	}
 }
 
+func TestPrepAllowsExactReadAfterFocusedInventory(t *testing.T) {
+	profile := Profile{
+		Languages: map[string]int{"java": 1},
+		Packages:  []string{"com.example.PredicateValidator"},
+		Samples: []FileSample{{
+			Path:     "src/main/java/com/example/CronValidator.java",
+			Language: "java",
+			Preview:  "class CronValidator { boolean isValid(String value) { return value != null; } }",
+		}},
+	}
+	log := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "symbol_inventory", Arguments: map[string]any{"language": "java", "name_contains": "Validator"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"language": "java", "name_contains": "isValid"}}}},
+	}
+	call := vertexToolCall{
+		Name:      "read_file",
+		Arguments: map[string]any{"path": "src/main/java/com/example/CronValidator.java"},
+	}
+	if !allowExactReadAfterFocusedInventory(profile, log, call) {
+		t.Fatal("expected exact read_file to be allowed after focused symbol/call inventory")
+	}
+	broadCall := vertexToolCall{Name: "read_file", Arguments: map[string]any{"path": "src/main/java/com/example/CronValidator.java"}}
+	broadLog := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "symbol_inventory", Arguments: map[string]any{"language": "java", "name_contains": "Validator"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"language": "java"}}}},
+	}
+	if allowExactReadAfterFocusedInventory(profile, broadLog, broadCall) {
+		t.Fatal("broad call inventory should not unlock exact reads early")
+	}
+}
+
+func TestSecurityRelevantFilesRanksBeanValidationTemplateSink(t *testing.T) {
+	dir := t.TempDir()
+	validatorPath := filepath.Join(dir, "src", "main", "java", "com", "example", "validation", "CronValidator.java")
+	if err := os.MkdirAll(filepath.Dir(validatorPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	validatorSrc := `package com.example.validation;
+import javax.validation.ConstraintValidator;
+import javax.validation.ConstraintValidatorContext;
+class CronValidator implements ConstraintValidator<Cron, String> {
+  public boolean isValid(String value, ConstraintValidatorContext context) {
+    try { parser.parse(value).validate(); return true; }
+    catch (IllegalArgumentException e) {
+      context.buildConstraintViolationWithTemplate(e.getMessage()).addConstraintViolation();
+      return false;
+    }
+  }
+}
+`
+	if err := os.WriteFile(validatorPath, []byte(validatorSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	predicatePath := filepath.Join(dir, "src", "main", "java", "com", "example", "utils", "Predicates.java")
+	if err := os.MkdirAll(filepath.Dir(predicatePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(predicatePath, []byte("package com.example.utils; import java.util.function.Predicate; class Predicates { static <T> Predicate<T> not(Predicate<T> p) { return p.negate(); } }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "java", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != validatorPath {
+		t.Fatalf("expected Bean Validation sink first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "buildConstraintViolationWithTemplate") {
+		t.Fatalf("expected violation template snippet, got %q", files[0].Snippet)
+	}
+}
+
 func TestPrepRanksHostExpandedUrlSanitizerOrderProfiles(t *testing.T) {
 	dir := t.TempDir()
 	helperPath := filepath.Join(dir, "src", "services", "Helper.php")

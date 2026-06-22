@@ -311,6 +311,12 @@ Rules:
      accessors. Check sanitizer ordering: sanitizing a path before absolute URL
      or host expansion can reintroduce attacker-controlled host text. Prefer
      function_context over broad source/sink mappings for local ordering bugs.
+     For Java Bean Validation, inspect ConstraintValidator implementations and
+     ConstraintValidatorContext.buildConstraintViolationWithTemplate call sites.
+     That method is already a code.ExpressionEval sink in the Java adapter; do
+     not finish empty solely because javax.validation is a standard framework.
+     If the sink is present but scan misses, suspect source/flow/reviewer
+     mechanics before adding a duplicate overlay.
      For PHP/Symfony/Pimcore repositories, treat Request parameter bags such as
      $request->query->get/all/filter and raw query-condition builders such as
      addConditionParam, whereRaw, havingRaw, orderByRaw, and selectRaw as high-priority
@@ -538,7 +544,7 @@ agentLoop:
 				return proposal, nil
 			}
 			result := map[string]any(nil)
-			if gateErr := inventoryGateError(profile, log, call.Name); gateErr != "" {
+			if gateErr := inventoryGateError(profile, log, call.Name); gateErr != "" && !allowExactReadAfterFocusedInventory(profile, log, call) {
 				result = map[string]any{"ok": false, "error": gateErr}
 				p.debugf("step=%d tool=%s rejected by inventory gate", step, call.Name)
 			} else {
@@ -748,6 +754,26 @@ func inventoryGateError(profile Profile, log []AgentStep, toolName string) strin
 		return "call assignment_inventory with focused write terms before broad search/read tools: " + strings.Join(requiredAssignmentTerms, ", ")
 	}
 	return ""
+}
+
+func allowExactReadAfterFocusedInventory(profile Profile, log []AgentStep, call vertexToolCall) bool {
+	if call.Name != "read_file" || strings.TrimSpace(stringArg(call.Arguments, "path")) == "" {
+		return false
+	}
+	if !requiresSymbolInventory(profile) {
+		return false
+	}
+	if !agentLogHasTool(log, "symbol_inventory") {
+		return false
+	}
+	for _, step := range log {
+		for _, seen := range step.ToolCalls {
+			if seen.Name == "call_inventory" && strings.TrimSpace(stringArg(seen.Arguments, "name_contains")) != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func requiresSymbolInventory(profile Profile) bool {
@@ -1660,6 +1686,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "core.RedirectAllowlist", "surface": "control", "use": "control concept for same-origin, relative URL, or allowlist redirect validation"},
 		{"concept": "code.Deserialization", "surface": "scan", "use": "taint sink for unsafe object deserialization such as yaml.load, pickle, unserialize"},
 		{"concept": "core.SafeDeserialization", "surface": "control", "use": "control concept for safe deserialization APIs such as safe_load or explicit safe loaders"},
+		{"concept": "code.ExpressionEval", "surface": "scan", "use": "taint sink for expression-language or template-message evaluation such as SpEL, MVEL, OGNL, XPath, and Bean Validation buildConstraintViolationWithTemplate"},
 		{"concept": "code.HtmlRender", "surface": "scan", "use": "taint sink for raw HTML/template rendering or unescaped response content"},
 		{"concept": "code.UnsanitizedSvgUpload", "surface": "scan", "use": "mark for upload services that accept/store SVG files without sanitizing SVG XML/script content before saving"},
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
@@ -3640,6 +3667,9 @@ func securitySnippet(text string) string {
 	for _, token := range []string{
 		"exec(", "system(", "shell_exec", "passthru", "proc_open", "popen(",
 		"eval(", "unserialize", "yaml.load", "pickle.load", "file_put_contents",
+		"buildConstraintViolationWithTemplate", "addConstraintViolation",
+		"ConstraintValidator", "ConstraintValidatorContext",
+		"IllegalArgumentException", "getMessage()",
 		"move_uploaded_file", "rename(", "copy(", "unlink(", "touch(",
 		"getAbsolutePath", "absolutePath", "absolute path", "E_WARNING",
 		"RuntimeException", "FileOperationErrorException",

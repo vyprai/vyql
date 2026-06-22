@@ -195,7 +195,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.Loop{Body: body}}
 	case "try_statement", "try_with_resources_statement":
-		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
+		return []nir.Stmt{c.tryStmt(n)}
 	case "switch_expression":
 		// each `case` group is a separate Switch branch so the join-merge keeps a value
 		// tainted on one arm even when another arm overwrites it (`case 'A': bar = src();`
@@ -328,6 +328,55 @@ func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	}
 	walk(n)
 	return out
+}
+
+func (c *jvConv) tryStmt(n *tree_sitter.Node) nir.Try {
+	var body []nir.Stmt
+	var handlers [][]nir.Stmt
+	var handlerParams []string
+	var finally []nir.Stmt
+	bodySeen := false
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "resource_specification":
+			body = append(body, c.collectBlocks(ch)...)
+		case "block":
+			if !bodySeen {
+				body = append(body, c.block(ch)...)
+				bodySeen = true
+			}
+		case "catch_clause":
+			handlerParams = append(handlerParams, c.catchParam(ch))
+			handlers = append(handlers, c.collectBlocks(ch))
+		case "finally_clause":
+			finally = append(finally, c.collectBlocks(ch)...)
+		}
+	}
+	if !bodySeen && len(body) == 0 {
+		body = c.collectBlocks(n)
+	}
+	return nir.Try{Body: body, Handlers: handlers, HandlerParams: handlerParams, Finally: finally, Loc: c.loc(n)}
+}
+
+func (c *jvConv) catchParam(n *tree_sitter.Node) string {
+	var found string
+	var walk func(*tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil || found != "" {
+			return
+		}
+		if m.Kind() == "formal_parameter" || m.Kind() == "catch_formal_parameter" {
+			if nm := field(m, "name"); nm != nil {
+				found = c.text(nm)
+				return
+			}
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return found
 }
 
 func (c *jvConv) block(block *tree_sitter.Node) []nir.Stmt {

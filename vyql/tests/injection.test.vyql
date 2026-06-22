@@ -219,6 +219,50 @@ test "java: a constant expression is clean"
   }
   ```
 
+test "java: Bean Validation exception message template is EL injection"
+  lang java
+  expect VYQL-INJ-016
+  code
+  ```
+  import javax.validation.ConstraintValidator;
+  import javax.validation.ConstraintValidatorContext;
+
+  class CronValidator implements ConstraintValidator<Cron, String> {
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+      try {
+        cronParser.parse(value).validate();
+        return true;
+      } catch (IllegalArgumentException e) {
+        context.disableDefaultConstraintViolation();
+        context.buildConstraintViolationWithTemplate(e.getMessage()).addConstraintViolation();
+        return false;
+      }
+    }
+  }
+  ```
+
+test "java: Bean Validation constant violation template is clean"
+  lang java
+  reject VYQL-INJ-016
+  code
+  ```
+  import javax.validation.ConstraintValidator;
+  import javax.validation.ConstraintValidatorContext;
+
+  class CronValidator implements ConstraintValidator<Cron, String> {
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+      try {
+        cronParser.parse(value).validate();
+        return true;
+      } catch (IllegalArgumentException e) {
+        context.disableDefaultConstraintViolation();
+        context.buildConstraintViolationWithTemplate("Error parsing the Cron expression").addConstraintViolation();
+        return false;
+      }
+    }
+  }
+  ```
+
 # --- Email-header injection (VYQL-INJ-017) ---
 test "php: tainted mail() headers arg is email-header injection"
   lang php

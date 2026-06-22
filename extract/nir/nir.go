@@ -282,10 +282,11 @@ type Switch struct {
 
 // Try models exception control flow: Body, zero+ Handlers (catch/except bodies), Finally.
 type Try struct {
-	Body     []Stmt
-	Handlers [][]Stmt
-	Finally  []Stmt
-	Loc      string
+	Body          []Stmt
+	Handlers      [][]Stmt
+	HandlerParams []string
+	Finally       []Stmt
+	Loc           string
 }
 
 func (Assign) isStmt()    {}

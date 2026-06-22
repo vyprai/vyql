@@ -353,6 +353,9 @@ func securityRelevanceScore(path string, text string) int {
 		"@modelcontextprotocol": 42, "mcpserver": 36, "server.tool": 42,
 		"child_process": 20, "execfile": 10, "z.number": 8,
 		"eval(": 16, "unserialize": 16, "pickle.load": 16, "yaml.load": 16,
+		"constraintvalidator": 34, "constraintvalidatorcontext": 28,
+		"buildconstraintviolationwithtemplate": 48, "addconstraintviolation": 20,
+		"illegalargumentexception": 12, "getmessage()": 20,
 		"file_put_contents": 12, "fopen(": 10, "open(": 10, "writefile": 10, "sendfile": 10,
 		"move_uploaded_file": 18, "rename(": 14, "copy(": 12, "unlink(": 12, "touch(": 10,
 		"getabsolutepath": 22, "absolutepath": 14, "absolute path": 14, "e_warning": 18,
@@ -417,6 +420,7 @@ func securityRelevanceScore(path string, text string) int {
 		"authorization": 16, "permission": 14, "role": 10, "middleware": 8,
 		"cors": 18, "origin": 12, "wildcard": 10,
 		"attestation": 18, "predicate": 14, "signature": 10, "verify": 8,
+		"/validation/": 20, "validator": 16,
 		"context": 6, "cache": 6, "lifecycle": 6, "servlet": 5,
 	} {
 		if strings.Contains(lowerPath, token) {
