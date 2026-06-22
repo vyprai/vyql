@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 )
@@ -53,6 +55,8 @@ type Profile struct {
 	Packages  []string            `json:"packages,omitempty"`
 	Manifests []ManifestEvidence  `json:"manifests,omitempty"`
 	Imports   map[string][]string `json:"imports,omitempty"`
+	LocalPkgs []string            `json:"local_packages,omitempty"`
+	DepGaps   []DependencyGap     `json:"dependency_gaps,omitempty"`
 	Samples   []FileSample        `json:"samples,omitempty"`
 }
 
@@ -60,6 +64,14 @@ type ManifestEvidence struct {
 	Path     string   `json:"path"`
 	Kind     string   `json:"kind"`
 	Packages []string `json:"packages,omitempty"`
+}
+
+type DependencyGap struct {
+	Language string   `json:"language,omitempty"`
+	Package  string   `json:"package"`
+	Source   string   `json:"source"`
+	Score    int      `json:"score,omitempty"`
+	Imports  []string `json:"imports,omitempty"`
 }
 
 type FileSample struct {
@@ -140,6 +152,7 @@ func Analyze(paths []string, cfg Config) (Profile, error) {
 		Imports:   map[string][]string{},
 	}
 	seenImports := map[string]map[string]bool{}
+	seenLocalPkgs := map[string]bool{}
 	filesSeen := 0
 	var samples []scoredSample
 	for _, root := range paths {
@@ -160,7 +173,7 @@ func Analyze(paths []string, cfg Config) (Profile, error) {
 			if lang != "" {
 				filesSeen++
 				prof.Languages[lang]++
-				sample, imports := sampleFile(path, lang, cfg.MaxFileBytes)
+				sample, imports, localPkgs := sampleFile(path, lang, cfg.MaxFileBytes)
 				if sample.Path != "" {
 					samples = append(samples, scoredSample{
 						Sample: sample,
@@ -175,6 +188,9 @@ func Analyze(paths []string, cfg Config) (Profile, error) {
 					for _, imp := range imports {
 						seenImports[lang][imp] = true
 					}
+				}
+				for _, pkg := range localPkgs {
+					seenLocalPkgs[pkg] = true
 				}
 			}
 			if man, ok := manifestEvidence(path, cfg.MaxFileBytes); ok {
@@ -197,19 +213,38 @@ func Analyze(paths []string, cfg Config) (Profile, error) {
 		}
 		prof.Samples = append(prof.Samples, sample.Sample)
 	}
+	fullImports := map[string][]string{}
 	for lang, set := range seenImports {
 		var vals []string
 		for v := range set {
 			vals = append(vals, v)
 		}
 		sort.Strings(vals)
-		if len(vals) > 80 {
-			vals = vals[:80]
+		fullImports[lang] = vals
+		if len(vals) > 240 {
+			vals = vals[:240]
 		}
 		prof.Imports[lang] = vals
 	}
 	sort.Slice(prof.Manifests, func(i, j int) bool { return prof.Manifests[i].Path < prof.Manifests[j].Path })
+	for pkg := range seenLocalPkgs {
+		prof.LocalPkgs = append(prof.LocalPkgs, pkg)
+	}
+	sort.Strings(prof.LocalPkgs)
+	if len(prof.LocalPkgs) > 120 {
+		prof.LocalPkgs = prof.LocalPkgs[:120]
+	}
 	prof.Packages = profilePackageCandidates(prof)
+	depProfile := prof
+	if len(seenLocalPkgs) > 120 {
+		depProfile.LocalPkgs = make([]string, 0, len(seenLocalPkgs))
+		for pkg := range seenLocalPkgs {
+			depProfile.LocalPkgs = append(depProfile.LocalPkgs, pkg)
+		}
+		sort.Strings(depProfile.LocalPkgs)
+	}
+	depProfile.Imports = fullImports
+	prof.DepGaps = dependencyGaps(depProfile)
 	return prof, nil
 }
 
@@ -566,10 +601,10 @@ var importPatterns = map[string]*regexp.Regexp{
 	"php":        regexp.MustCompile(`(?m)^\s*(?:use|include|require|include_once|require_once)\s+['"]?([^;'"()]+)`),
 }
 
-func sampleFile(path, lang string, maxBytes int) (FileSample, []string) {
+func sampleFile(path, lang string, maxBytes int) (FileSample, []string, []string) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return FileSample{}, nil
+		return FileSample{}, nil, nil
 	}
 	sum := sha256.Sum256(b)
 	if len(b) > maxBytes {
@@ -588,7 +623,7 @@ func sampleFile(path, lang string, maxBytes int) (FileSample, []string) {
 			}
 		}
 	}
-	return sample, imports
+	return sample, imports, localPackageCandidates(lang, text)
 }
 
 func manifestEvidence(path string, maxBytes int) (ManifestEvidence, bool) {
@@ -735,4 +770,353 @@ func profilePackageCandidates(profile Profile) []string {
 		return out[:80]
 	}
 	return out
+}
+
+type dependencyCandidate struct {
+	Language string
+	Package  string
+	Source   string
+	Imports  map[string]bool
+}
+
+func dependencyGaps(profile Profile) []DependencyGap {
+	candidates := dependencyCandidates(profile)
+	defs := adapterPackageDefinitions()
+	var out []DependencyGap
+	for _, cand := range candidates {
+		if dependencyHasDefinition(cand, defs) {
+			continue
+		}
+		imports := make([]string, 0, len(cand.Imports))
+		for imp := range cand.Imports {
+			imports = append(imports, imp)
+		}
+		sort.Strings(imports)
+		out = append(out, DependencyGap{
+			Language: cand.Language,
+			Package:  cand.Package,
+			Source:   cand.Source,
+			Score:    dependencyGapScore(cand),
+			Imports:  imports,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		if out[i].Language != out[j].Language {
+			return out[i].Language < out[j].Language
+		}
+		return out[i].Package < out[j].Package
+	})
+	if len(out) > 120 {
+		out = out[:120]
+	}
+	return out
+}
+
+func dependencyGapScore(c dependencyCandidate) int {
+	text := strings.ToLower(c.Package)
+	for imp := range c.Imports {
+		text += " " + strings.ToLower(imp)
+	}
+	score := 0
+	for token, weight := range map[string]int{
+		"meteor": 80, "push": 60, "session": 45, "servlet": 40, "filter": 30,
+		"request": 40, "response": 30, "websocket": 35, "socket": 20, "http": 20,
+		"auth": 45, "permission": 35, "role": 25, "redirect": 45, "callback": 35,
+		"sql": 45, "jdbc": 35, "database": 30, "query": 25,
+		"template": 35, "html": 25, "xml": 35, "el": 20, "faces": 18,
+		"upload": 45, "file": 25, "path": 25, "archive": 35, "zip": 30,
+		"crypto": 30, "cipher": 30, "jms": 18, "message": 18,
+		"deserialize": 40, "objectmessage": 35, "cache": 10,
+	} {
+		if strings.Contains(text, token) {
+			score += weight
+		}
+	}
+	if strings.HasPrefix(c.Source, "manifest:") {
+		score += 8
+	}
+	return score
+}
+
+func dependencyCandidates(profile Profile) []dependencyCandidate {
+	seen := map[string]*dependencyCandidate{}
+	add := func(lang, pkg, source, imp string) {
+		lang = strings.TrimSpace(lang)
+		pkg = sca.NormalizePackageName(pkg)
+		if pkg == "" || isLikelyStdOrLocalPackage(lang, pkg) {
+			return
+		}
+		if strings.HasPrefix(source, "import:") && isLocalPackageCandidate(pkg, profile.LocalPkgs) {
+			return
+		}
+		key := lang + "\x00" + pkg
+		cand := seen[key]
+		if cand == nil {
+			cand = &dependencyCandidate{Language: lang, Package: pkg, Source: source, Imports: map[string]bool{}}
+			seen[key] = cand
+		}
+		if cand.Source == "" || strings.HasPrefix(source, "manifest:") {
+			cand.Source = source
+		}
+		if imp != "" {
+			cand.Imports[imp] = true
+		}
+	}
+	for _, man := range profile.Manifests {
+		langs := manifestLanguages(man.Kind)
+		for _, pkg := range man.Packages {
+			for _, lang := range langs {
+				add(lang, pkg, "manifest:"+man.Kind+":"+man.Path, "")
+			}
+		}
+	}
+	for lang, imports := range profile.Imports {
+		for _, imp := range imports {
+			for _, pkg := range importDependencyCandidates(lang, imp) {
+				add(lang, pkg, "import:"+lang, imp)
+			}
+		}
+	}
+	out := make([]dependencyCandidate, 0, len(seen))
+	for _, cand := range seen {
+		out = append(out, *cand)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Language != out[j].Language {
+			return out[i].Language < out[j].Language
+		}
+		return out[i].Package < out[j].Package
+	})
+	return out
+}
+
+func localPackageCandidates(lang, text string) []string {
+	var out []string
+	addJvm := func(pkg string) {
+		parts := strings.Split(pkg, ".")
+		if len(parts) >= 2 {
+			out = append(out, parts[0]+"."+parts[1])
+		}
+		if len(parts) >= 3 {
+			out = append(out, parts[0]+"."+parts[1]+"."+parts[2])
+		}
+	}
+	switch lang {
+	case "java", "kotlin", "scala", "groovy":
+		re := regexp.MustCompile(`(?m)^\s*package\s+([A-Za-z0-9_.]+)\s*;?`)
+		for _, m := range re.FindAllStringSubmatch(text, -1) {
+			addJvm(sca.NormalizePackageName(m[1]))
+		}
+	case "go":
+		re := regexp.MustCompile(`(?m)^\s*module\s+([A-Za-z0-9_.\-/]+)`)
+		for _, m := range re.FindAllStringSubmatch(text, -1) {
+			out = append(out, sca.NormalizePackageName(m[1]))
+		}
+	case "php":
+		re := regexp.MustCompile(`(?m)^\s*namespace\s+([A-Za-z0-9_\\]+)\s*;`)
+		for _, m := range re.FindAllStringSubmatch(text, -1) {
+			parts := strings.FieldsFunc(m[1], func(r rune) bool { return r == '\\' || r == '/' })
+			if len(parts) > 0 {
+				out = append(out, sca.NormalizePackageName(parts[0]))
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	deduped := out[:0]
+	for _, pkg := range out {
+		if pkg == "" || seen[pkg] {
+			continue
+		}
+		seen[pkg] = true
+		deduped = append(deduped, pkg)
+	}
+	return deduped
+}
+
+func isLocalPackageCandidate(pkg string, locals []string) bool {
+	for _, local := range locals {
+		if sca.PackageMatches(pkg, local) {
+			return true
+		}
+	}
+	return false
+}
+
+func manifestLanguages(kind string) []string {
+	switch strings.ToLower(kind) {
+	case "package.json":
+		return []string{"javascript"}
+	case "composer.json":
+		return []string{"php"}
+	case "go.mod":
+		return []string{"go"}
+	case "requirements.txt", "pyproject.toml":
+		return []string{"python"}
+	case "cargo.toml":
+		return []string{"rust"}
+	case "pom.xml":
+		return []string{"java"}
+	case "build.gradle":
+		return []string{"java", "groovy", "kotlin"}
+	default:
+		return nil
+	}
+}
+
+func importDependencyCandidates(lang, imp string) []string {
+	imp = strings.TrimSpace(strings.Trim(imp, `"'`))
+	if imp == "" || strings.HasPrefix(imp, ".") {
+		return nil
+	}
+	if strings.ContainsAny(imp, " \t\r\n()+;") {
+		return nil
+	}
+	switch lang {
+	case "javascript":
+		if strings.HasPrefix(imp, "@") {
+			parts := strings.Split(imp, "/")
+			if len(parts) >= 2 {
+				return []string{parts[0] + "/" + parts[1]}
+			}
+		}
+		return []string{sca.PackageRoot(imp)}
+	case "python":
+		root := strings.Split(imp, ".")[0]
+		out := []string{root}
+		out = append(out, sca.ImportAliases(root)...)
+		return out
+	case "go":
+		return []string{imp, goModuleRoot(imp)}
+	case "java", "kotlin", "scala", "groovy":
+		parts := strings.Split(imp, ".")
+		if len(parts) > 0 && startsUpper(parts[len(parts)-1]) {
+			parts = parts[:len(parts)-1]
+		}
+		var out []string
+		if len(parts) >= 2 {
+			out = append(out, parts[0]+"."+parts[1])
+		}
+		if len(parts) >= 3 {
+			out = append(out, parts[0]+"."+parts[1]+"."+parts[2])
+		}
+		return out
+	case "php":
+		parts := strings.FieldsFunc(imp, func(r rune) bool { return r == '\\' || r == '/' })
+		if len(parts) > 0 {
+			return []string{parts[0]}
+		}
+	case "ruby":
+		return []string{strings.Split(imp, "/")[0]}
+	}
+	return []string{sca.PackageRoot(imp)}
+}
+
+func startsUpper(s string) bool {
+	if s == "" {
+		return false
+	}
+	r := rune(s[0])
+	return r >= 'A' && r <= 'Z'
+}
+
+func goModuleRoot(imp string) string {
+	parts := strings.Split(imp, "/")
+	if len(parts) >= 3 && strings.Contains(parts[0], ".") {
+		return strings.Join(parts[:3], "/")
+	}
+	return sca.PackageRoot(imp)
+}
+
+func isLikelyStdOrLocalPackage(lang, pkg string) bool {
+	if pkg == "" || pkg == "." || strings.HasPrefix(pkg, "./") || strings.HasPrefix(pkg, "../") {
+		return true
+	}
+	switch lang {
+	case "go":
+		return !strings.Contains(strings.Split(pkg, "/")[0], ".")
+	case "java", "kotlin", "scala", "groovy":
+		return pkg == "java" || strings.HasPrefix(pkg, "java.")
+	case "javascript":
+		switch pkg {
+		case "assert", "buffer", "child_process", "crypto", "events", "fs", "http", "https", "net", "os", "path", "stream", "url", "util", "zlib":
+			return true
+		}
+	case "python":
+		switch pkg {
+		case "__future__", "argparse", "asyncio", "base64", "collections", "contextlib", "datetime", "functools", "hashlib", "http", "io", "itertools", "json", "logging", "math", "os", "pathlib", "re", "shutil", "socket", "sqlite3", "ssl", "subprocess", "sys", "tempfile", "time", "typing", "unittest", "urllib", "uuid":
+			return true
+		}
+	case "ruby":
+		switch pkg {
+		case "base64", "cgi", "date", "digest", "erb", "fileutils", "json", "logger", "net", "openssl", "pathname", "securerandom", "set", "time", "uri", "yaml":
+			return true
+		}
+	}
+	return false
+}
+
+func dependencyHasDefinition(c dependencyCandidate, defs map[string]map[string]bool) bool {
+	if len(defs) == 0 {
+		return false
+	}
+	langs := []string{c.Language, ""}
+	for _, lang := range langs {
+		for want := range defs[lang] {
+			if sca.PackageMatches(c.Package, want) {
+				return true
+			}
+			for imp := range c.Imports {
+				if sca.PackageMatches(imp, want) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func adapterPackageDefinitions() map[string]map[string]bool {
+	root := filepath.Join(datadir.Root(), "adapters")
+	defs := map[string]map[string]bool{}
+	add := func(lang, pkg string) {
+		pkg = sca.NormalizePackageName(pkg)
+		if pkg == "" {
+			return
+		}
+		if defs[lang] == nil {
+			defs[lang] = map[string]bool{}
+		}
+		defs[lang][pkg] = true
+	}
+	pkgRe := regexp.MustCompile(`package\s+"([^"]+)"`)
+	adapterRe := regexp.MustCompile(`(?m)\badapter\s+([A-Za-z0-9_]+)\s*\{`)
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".vyql") {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		lang := ""
+		if m := adapterRe.FindSubmatch(b); len(m) == 2 {
+			lang = string(m[1])
+		} else if rel, err := filepath.Rel(root, path); err == nil {
+			parts := strings.Split(filepath.ToSlash(rel), "/")
+			if len(parts) >= 4 && parts[0] == "packages" && parts[1] == "generated" {
+				lang = parts[2]
+			}
+		}
+		for _, m := range pkgRe.FindAllSubmatch(b, -1) {
+			add(lang, string(m[1]))
+		}
+		return nil
+	})
+	return defs
 }

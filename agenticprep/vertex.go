@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vyprai/vyql/extract/sca"
 	"golang.org/x/oauth2/google"
 )
 
@@ -152,8 +153,14 @@ Rules:
   correction.
 - Prefer this workflow:
   1. inspect_profile
-  2. adapter_reference, package_reference, and concept_reference
-  3. security_relevant_files, then list_files or search_text for exact
+  2. dependency_gaps. The returned gaps are ranked by deterministic security
+     score and may include recommended_probe. If any gap is returned, call
+     probe_dependency on recommended_probe before security_relevant_files,
+     search_text, or read_file. Prefer dependencies that appear in request handling,
+     parsing, upload, auth/session, redirect, command, filesystem, template,
+     database, crypto, XML, archive, or network code.
+  3. adapter_reference, package_reference, and concept_reference
+  4. security_relevant_files, then list_files or search_text for exact
      wrappers/routes/config. For PHP and similar ecosystems, include helper
      files such as .inc/.phtml and search command sinks plus restore/import,
      upload, archive, and filename flows. For Java/C#/server frameworks,
@@ -173,11 +180,11 @@ Rules:
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
      check for warning suppression, sanitized error handling, or path removal.
-  4. read_file on exact evidence
-  5. function_context before any exact context mark
+  5. read_file on exact evidence
+  6. function_context before any exact context mark
      or module_context before exact marks for top-level policy/config maps
-  6. validate_overlay if producing any non-empty adapter
-  7. finish_overlay only after validation is clean, or empty if no useful
+  7. validate_overlay if producing any non-empty adapter
+  8. finish_overlay only after validation is clean, or empty if no useful
      repo-local adapter can improve scan.
 
 Repo profile:
@@ -188,7 +195,7 @@ Repo profile:
 	}}
 	var log []AgentStep
 	var lastValid Proposal
-	const maxAgentSteps = 10
+	const maxAgentSteps = 14
 agentLoop:
 	for step := 1; step <= maxAgentSteps; step++ {
 		text, calls, modelParts, finish, err := p.generateAgentStep(ctx, contents)
@@ -327,6 +334,30 @@ func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[s
 				},
 			},
 			{
+				"name":        "dependency_gaps",
+				"description": "Return manifest/import dependencies observed in the repository that do not have an existing VyQL package definition.",
+				"parameters": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"language": map[string]any{"type": "string"},
+						"max":      map[string]any{"type": "integer"},
+					},
+				},
+			},
+			{
+				"name":        "probe_dependency",
+				"description": "Probe source usage of one uncovered dependency: import evidence, nearby usage lines, and files likely needing a repo-local adapter.",
+				"parameters": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"language": map[string]any{"type": "string"},
+						"package":  map[string]any{"type": "string"},
+						"max":      map[string]any{"type": "integer"},
+					},
+					"required": []string{"package"},
+				},
+			},
+			{
 				"name":        "list_files",
 				"description": "List bounded source/config files under scan roots, optionally filtered by extension or substring.",
 				"parameters": map[string]any{
@@ -453,6 +484,23 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 	case "package_reference":
 		lang, _ := call.Arguments["language"].(string)
 		return map[string]any{"ok": true, "packages": packageReference(profile, lang), "syntax": `adapter <language> { package "<package>" { ...mappings... } }`}
+	case "dependency_gaps":
+		lang, _ := call.Arguments["language"].(string)
+		gaps := filteredDependencyGaps(profile, lang, intArg(call.Arguments, "max", 80))
+		out := map[string]any{"ok": true, "gaps": gaps}
+		if len(gaps) > 0 {
+			out["recommended_probe"] = map[string]any{"language": gaps[0].Language, "package": gaps[0].Package}
+			out["instruction"] = "Call probe_dependency with recommended_probe before generic file search."
+		}
+		return out
+	case "probe_dependency":
+		lang, _ := call.Arguments["language"].(string)
+		pkg, _ := call.Arguments["package"].(string)
+		probe, err := probeDependency(profile, lang, pkg, intArg(call.Arguments, "max", 40))
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "probe": probe}
 	case "list_files":
 		contains, _ := call.Arguments["contains"].(string)
 		ext, _ := call.Arguments["extension"].(string)
@@ -663,6 +711,165 @@ func packageReference(profile Profile, lang string) []map[string]any {
 	}
 	if len(out) > 80 {
 		return out[:80]
+	}
+	return out
+}
+
+func filteredDependencyGaps(profile Profile, lang string, max int) []DependencyGap {
+	if max <= 0 || max > 200 {
+		max = 80
+	}
+	lang = strings.TrimSpace(lang)
+	var out []DependencyGap
+	for _, gap := range profile.DepGaps {
+		if lang != "" && gap.Language != lang {
+			continue
+		}
+		out = append(out, gap)
+		if len(out) >= max {
+			break
+		}
+	}
+	return out
+}
+
+type dependencyProbe struct {
+	Gap     DependencyGap `json:"gap"`
+	Terms   []string      `json:"terms"`
+	Files   []rankedFile  `json:"files,omitempty"`
+	Matches []textMatch   `json:"matches,omitempty"`
+}
+
+func probeDependency(profile Profile, lang string, pkg string, max int) (dependencyProbe, error) {
+	if max <= 0 || max > 100 {
+		max = 40
+	}
+	lang = strings.TrimSpace(lang)
+	pkg = strings.TrimSpace(pkg)
+	var gap DependencyGap
+	for _, g := range profile.DepGaps {
+		if lang != "" && g.Language != lang {
+			continue
+		}
+		if sca.PackageMatches(pkg, g.Package) || sca.PackageMatches(g.Package, pkg) {
+			gap = g
+			break
+		}
+		for _, imp := range g.Imports {
+			if sca.PackageMatches(pkg, imp) || strings.EqualFold(pkg, imp) {
+				gap = g
+				break
+			}
+		}
+		if gap.Package != "" {
+			break
+		}
+	}
+	if gap.Package == "" {
+		gap = DependencyGap{Language: lang, Package: pkg, Source: "argument"}
+	}
+	terms := dependencyProbeTerms(gap)
+	termSet := map[string]bool{}
+	for _, term := range terms {
+		termSet[strings.ToLower(term)] = true
+	}
+	var matches []textMatch
+	fileScores := map[string]*rankedFile{}
+	err := walkProfileFiles(profile, func(path string) bool {
+		fileLang := languageFor(path)
+		if gap.Language != "" && fileLang != gap.Language {
+			return true
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return true
+		}
+		if len(data) > 256<<10 {
+			data = data[:256<<10]
+		}
+		text := string(data)
+		lowerText := strings.ToLower(text)
+		hit := false
+		for term := range termSet {
+			if term != "" && strings.Contains(lowerText, term) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			return true
+		}
+		score := securityRelevanceScore(path, text)
+		rf := &rankedFile{Path: path, Language: fileLang, Score: score, Snippet: securitySnippet(text)}
+		fileScores[path] = rf
+		for i, line := range strings.Split(text, "\n") {
+			lowerLine := strings.ToLower(line)
+			for _, term := range terms {
+				if term != "" && strings.Contains(lowerLine, strings.ToLower(term)) {
+					matches = append(matches, textMatch{Path: path, Line: i + 1, Snippet: compactSnippet(line, 240)})
+					break
+				}
+			}
+			if len(matches) >= max {
+				return false
+			}
+		}
+		return true
+	})
+	files := make([]rankedFile, 0, len(fileScores))
+	for _, rf := range fileScores {
+		files = append(files, *rf)
+	}
+	sort.SliceStable(files, func(i, j int) bool {
+		if files[i].Score != files[j].Score {
+			return files[i].Score > files[j].Score
+		}
+		return files[i].Path < files[j].Path
+	})
+	if len(files) > 12 {
+		files = files[:12]
+	}
+	return dependencyProbe{Gap: gap, Terms: terms, Files: files, Matches: matches}, err
+}
+
+func dependencyProbeTerms(gap DependencyGap) []string {
+	set := map[string]bool{}
+	add := func(term string) {
+		term = strings.TrimSpace(strings.Trim(term, `"'`))
+		if term == "" || len(term) < 2 {
+			return
+		}
+		set[term] = true
+	}
+	add(gap.Package)
+	add(sca.PackageRoot(gap.Package))
+	for _, sep := range []string{"/", ".", "-", "_", ":"} {
+		parts := strings.Split(gap.Package, sep)
+		if len(parts) > 0 {
+			add(parts[len(parts)-1])
+		}
+	}
+	for _, imp := range gap.Imports {
+		add(imp)
+		for _, sep := range []string{".", "/", "\\", ":"} {
+			parts := strings.Split(imp, sep)
+			if len(parts) > 0 {
+				add(parts[len(parts)-1])
+			}
+		}
+	}
+	out := make([]string, 0, len(set))
+	for term := range set {
+		out = append(out, term)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if len(out[i]) != len(out[j]) {
+			return len(out[i]) > len(out[j])
+		}
+		return out[i] < out[j]
+	})
+	if len(out) > 16 {
+		out = out[:16]
 	}
 	return out
 }

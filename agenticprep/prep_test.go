@@ -157,6 +157,54 @@ func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	}
 }
 
+func TestAnalyzeReportsDependencyGapsWithoutDefinitions(t *testing.T) {
+	dir := t.TempDir()
+	pkgJSON := `{"name":"demo-app","dependencies":{"@acme/no-vyql-def":"1.0.0","express":"^4.0.0"}}`
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkgJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "server.js")
+	if err := os.WriteFile(src, []byte("const acme = require('@acme/no-vyql-def');\napp.post('/x', (req, res) => acme.render(req.body.html));\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !hasDependencyGap(profile.DepGaps, "javascript", "@acme/no-vyql-def") {
+		t.Fatalf("expected dependency gap for unknown package, got %#v", profile.DepGaps)
+	}
+	if hasDependencyGap(profile.DepGaps, "javascript", "fs") {
+		t.Fatalf("stdlib package should not be reported as a gap: %#v", profile.DepGaps)
+	}
+}
+
+func TestProbeDependencyFindsUncoveredUsage(t *testing.T) {
+	dir := t.TempDir()
+	pkgJSON := `{"dependencies":{"@acme/no-vyql-def":"1.0.0"}}`
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkgJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "server.js")
+	if err := os.WriteFile(src, []byte("const acme = require('@acme/no-vyql-def');\nfunction handle(req){ return acme.render(req.body.html); }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	probe, err := probeDependency(profile, "javascript", "@acme/no-vyql-def", 10)
+	if err != nil {
+		t.Fatalf("probeDependency: %v", err)
+	}
+	if probe.Gap.Package != "@acme/no-vyql-def" {
+		t.Fatalf("wrong probe gap: %#v", probe.Gap)
+	}
+	if len(probe.Matches) == 0 || probe.Matches[0].Path != src {
+		t.Fatalf("expected source usage match, got %#v", probe.Matches)
+	}
+}
+
 func TestValidateProposalRejectsAbsentLanguage(t *testing.T) {
 	profile := Profile{Languages: map[string]int{"python": 1}}
 	proposal := Proposal{AdapterFiles: []AdapterFile{{
@@ -167,6 +215,15 @@ func TestValidateProposalRejectsAbsentLanguage(t *testing.T) {
 	if err := ValidateProposal(profile, proposal, Config{}); err == nil {
 		t.Fatal("expected absent-language proposal to be rejected")
 	}
+}
+
+func hasDependencyGap(gaps []DependencyGap, lang, pkg string) bool {
+	for _, gap := range gaps {
+		if gap.Language == lang && gap.Package == pkg {
+			return true
+		}
+	}
+	return false
 }
 
 func containsString(vals []string, want string) bool {
