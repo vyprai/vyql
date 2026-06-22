@@ -74,7 +74,7 @@ func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, error) {
 		}
 		out = abs
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 
 	var provider agenticprep.Provider

@@ -151,6 +151,8 @@ Rules:
 - Once validate_overlay returns ok=true with at least one valid adapter, call
   finish_overlay immediately unless a specific validation warning requires a
   correction.
+- Prefer repo_structure, search_context, and read_files over repeated
+  single-file reads. Use read_file only when one exact file or offset is needed.
 - Prefer this workflow:
   1. inspect_profile
   2. dependency_gaps. The returned gaps are ranked by deterministic security
@@ -159,8 +161,10 @@ Rules:
      search_text, or read_file. Prefer dependencies that appear in request handling,
      parsing, upload, auth/session, redirect, command, filesystem, template,
      database, crypto, XML, archive, or network code.
-  3. adapter_reference, package_reference, and concept_reference
-  4. security_relevant_files, then list_files or search_text for exact
+  3. repo_structure for unfamiliar repositories, then adapter_reference,
+     package_reference, and concept_reference
+  4. security_relevant_files, then list_files, search_context, or search_text
+     for exact
      wrappers/routes/config. For PHP and similar ecosystems, include helper
      files such as .inc/.phtml and search command sinks plus restore/import,
      upload, archive, and filename flows. For Java/C#/server frameworks,
@@ -180,7 +184,7 @@ Rules:
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
      check for warning suppression, sanitized error handling, or path removal.
-  5. read_file on exact evidence
+  5. read_files or read_file on exact evidence
   6. function_context before any exact context mark
      or module_context before exact marks for top-level policy/config maps
   7. validate_overlay if producing any non-empty adapter
@@ -195,7 +199,7 @@ Repo profile:
 	}}
 	var log []AgentStep
 	var lastValid Proposal
-	const maxAgentSteps = 14
+	const maxAgentSteps = 24
 agentLoop:
 	for step := 1; step <= maxAgentSteps; step++ {
 		text, calls, modelParts, finish, err := p.generateAgentStep(ctx, contents)
@@ -370,6 +374,16 @@ func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[s
 				},
 			},
 			{
+				"name":        "repo_structure",
+				"description": "Return a ranked directory summary with language counts, security scores, and representative files for repo orientation.",
+				"parameters": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"max": map[string]any{"type": "integer"},
+					},
+				},
+			},
+			{
 				"name":        "security_relevant_files",
 				"description": "Return source files ranked by deterministic security relevance: command/code execution, SQL, deserialization, redirects, file/path/archive/restore/import/upload flows, and user-controlled inputs.",
 				"parameters": map[string]any{
@@ -395,6 +409,22 @@ func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[s
 				},
 			},
 			{
+				"name":        "search_context",
+				"description": "Search source/config files and return bounded surrounding context lines around each match.",
+				"parameters": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"pattern":    map[string]any{"type": "string"},
+						"regex":      map[string]any{"type": "boolean"},
+						"ignoreCase": map[string]any{"type": "boolean"},
+						"before":     map[string]any{"type": "integer"},
+						"after":      map[string]any{"type": "integer"},
+						"max":        map[string]any{"type": "integer"},
+					},
+					"required": []string{"pattern"},
+				},
+			},
+			{
 				"name":        "read_file",
 				"description": "Read bounded bytes from a source file under the scanned repository. Supports relative paths and byte offsets.",
 				"parameters": map[string]any{
@@ -405,6 +435,18 @@ func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[s
 						"max_bytes": map[string]any{"type": "integer"},
 					},
 					"required": []string{"path"},
+				},
+			},
+			{
+				"name":        "read_files",
+				"description": "Read multiple bounded source files under the scanned repository in one tool call.",
+				"parameters": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"paths":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+						"max_bytes": map[string]any{"type": "integer"},
+					},
+					"required": []string{"paths"},
 				},
 			},
 			{
@@ -454,22 +496,53 @@ func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[s
 	if err != nil {
 		return "", nil, nil, "", err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint(), bytes.NewReader(b))
+	data, status, err := p.doGenerateContent(ctx, token, b)
 	if err != nil {
 		return "", nil, nil, "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-	res, err := p.http.Do(req)
-	if err != nil {
-		return "", nil, nil, "", err
-	}
-	defer res.Body.Close()
-	data, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return "", nil, nil, "", fmt.Errorf("agentic prep: vertex HTTP %d: %s", res.StatusCode, string(data))
+	if status < 200 || status >= 300 {
+		return "", nil, nil, "", fmt.Errorf("agentic prep: vertex HTTP %d: %s", status, string(data))
 	}
 	return vertexResponseParts(data)
+}
+
+func (p *VertexProvider) doGenerateContent(ctx context.Context, token string, body []byte) ([]byte, int, error) {
+	var lastData []byte
+	var lastStatus int
+	for attempt := 0; attempt < 4; attempt++ {
+		if attempt > 0 {
+			delay := time.Duration(1<<uint(attempt)) * time.Second
+			select {
+			case <-ctx.Done():
+				return lastData, lastStatus, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint(), bytes.NewReader(body))
+		if err != nil {
+			return nil, 0, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := p.http.Do(req)
+		if err != nil {
+			if attempt < 3 {
+				continue
+			}
+			return nil, 0, err
+		}
+		data, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+		_ = res.Body.Close()
+		lastData, lastStatus = data, res.StatusCode
+		if !retryableVertexStatus(res.StatusCode) {
+			return data, res.StatusCode, nil
+		}
+	}
+	return lastData, lastStatus, nil
+}
+
+func retryableVertexStatus(status int) bool {
+	return status == http.StatusTooManyRequests || status == http.StatusInternalServerError || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout
 }
 
 func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) map[string]any {
@@ -509,6 +582,12 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 			return map[string]any{"ok": false, "error": err.Error()}
 		}
 		return map[string]any{"ok": true, "files": files}
+	case "repo_structure":
+		dirs, err := repoStructure(profile, intArg(call.Arguments, "max", 40))
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "directories": dirs}
 	case "security_relevant_files":
 		lang, _ := call.Arguments["language"].(string)
 		files, err := securityRelevantFiles(profile, lang, intArg(call.Arguments, "max", 40))
@@ -519,6 +598,13 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 	case "search_text":
 		pattern, _ := call.Arguments["pattern"].(string)
 		matches, err := searchProfileText(profile, pattern, boolArg(call.Arguments, "regex"), boolArg(call.Arguments, "ignoreCase"), intArg(call.Arguments, "max", 80))
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "matches": matches}
+	case "search_context":
+		pattern, _ := call.Arguments["pattern"].(string)
+		matches, err := searchProfileContext(profile, pattern, boolArg(call.Arguments, "regex"), boolArg(call.Arguments, "ignoreCase"), intArg(call.Arguments, "before", 2), intArg(call.Arguments, "after", 2), intArg(call.Arguments, "max", 30))
 		if err != nil {
 			return map[string]any{"ok": false, "error": err.Error()}
 		}
@@ -534,6 +620,13 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 			return map[string]any{"ok": false, "error": err.Error()}
 		}
 		return map[string]any{"ok": ok, "path": path, "content": content, "truncated": len(content) >= limit}
+	case "read_files":
+		paths := stringSliceArg(call.Arguments, "paths")
+		files, err := readProfileFiles(profile, paths, intArg(call.Arguments, "max_bytes", 8000))
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "files": files}
 	case "function_context":
 		path, _ := call.Arguments["path"].(string)
 		name, _ := call.Arguments["name"].(string)
@@ -895,6 +988,208 @@ func overlayHints(proposal Proposal) []string {
 		}
 	}
 	return hints
+}
+
+type dirSummary struct {
+	Path      string         `json:"path"`
+	Files     int            `json:"files"`
+	Score     int            `json:"score,omitempty"`
+	Languages map[string]int `json:"languages,omitempty"`
+	Examples  []string       `json:"examples,omitempty"`
+}
+
+func repoStructure(profile Profile, max int) ([]dirSummary, error) {
+	if max <= 0 || max > 100 {
+		max = 40
+	}
+	byDir := map[string]*dirSummary{}
+	err := walkProfileFiles(profile, func(path string) bool {
+		rel := displayPath(profile, path)
+		dir := filepath.ToSlash(filepath.Dir(rel))
+		if dir == "." {
+			dir = ""
+		}
+		lang := languageFor(path)
+		data, _ := os.ReadFile(path)
+		if len(data) > 64<<10 {
+			data = data[:64<<10]
+		}
+		sum := byDir[dir]
+		if sum == nil {
+			sum = &dirSummary{Path: dir, Languages: map[string]int{}}
+			byDir[dir] = sum
+		}
+		sum.Files++
+		if lang != "" {
+			sum.Languages[lang]++
+		}
+		sum.Score += securityRelevanceScore(path, string(data))
+		if len(sum.Examples) < 4 {
+			sum.Examples = append(sum.Examples, rel)
+		}
+		return true
+	})
+	out := make([]dirSummary, 0, len(byDir))
+	for _, sum := range byDir {
+		out = append(out, *sum)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		if out[i].Files != out[j].Files {
+			return out[i].Files > out[j].Files
+		}
+		return out[i].Path < out[j].Path
+	})
+	if len(out) > max {
+		out = out[:max]
+	}
+	return out, err
+}
+
+type textContextMatch struct {
+	Path    string `json:"path"`
+	Line    int    `json:"line"`
+	Snippet string `json:"snippet"`
+	Context string `json:"context"`
+}
+
+func searchProfileContext(profile Profile, pattern string, useRegex bool, ignoreCase bool, before int, after int, max int) ([]textContextMatch, error) {
+	if max <= 0 || max > 100 {
+		max = 30
+	}
+	if before < 0 || before > 8 {
+		before = 2
+	}
+	if after < 0 || after > 8 {
+		after = 2
+	}
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return nil, nil
+	}
+	var re *regexp.Regexp
+	var err error
+	needle := pattern
+	if ignoreCase {
+		needle = strings.ToLower(needle)
+	}
+	if useRegex {
+		expr := pattern
+		if ignoreCase {
+			expr = "(?i)" + expr
+		}
+		re, err = regexp.Compile(expr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var matches []textContextMatch
+	err = walkProfileFiles(profile, func(path string) bool {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return true
+		}
+		if len(data) > 256<<10 {
+			data = data[:256<<10]
+		}
+		lines := strings.Split(string(data), "\n")
+		for i, line := range lines {
+			hay := line
+			if ignoreCase {
+				hay = strings.ToLower(hay)
+			}
+			ok := false
+			if re != nil {
+				ok = re.MatchString(line)
+			} else {
+				ok = strings.Contains(hay, needle)
+			}
+			if !ok {
+				continue
+			}
+			start := i - before
+			if start < 0 {
+				start = 0
+			}
+			end := i + after + 1
+			if end > len(lines) {
+				end = len(lines)
+			}
+			var ctx []string
+			for n := start; n < end; n++ {
+				ctx = append(ctx, fmt.Sprintf("%d: %s", n+1, compactSnippet(lines[n], 280)))
+			}
+			matches = append(matches, textContextMatch{
+				Path:    displayPath(profile, path),
+				Line:    i + 1,
+				Snippet: compactSnippet(line, 240),
+				Context: compactSnippet(strings.Join(ctx, "\n"), 1600),
+			})
+			if len(matches) >= max {
+				return false
+			}
+		}
+		return true
+	})
+	return matches, err
+}
+
+type fileRead struct {
+	Path      string `json:"path"`
+	Content   string `json:"content,omitempty"`
+	OK        bool   `json:"ok"`
+	Truncated bool   `json:"truncated,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+func readProfileFiles(profile Profile, paths []string, limit int) ([]fileRead, error) {
+	if limit <= 0 || limit > 20000 {
+		limit = 8000
+	}
+	if len(paths) > 8 {
+		paths = paths[:8]
+	}
+	var out []fileRead
+	total := 0
+	for _, path := range paths {
+		if total >= 48000 {
+			break
+		}
+		remaining := 48000 - total
+		oneLimit := limit
+		if oneLimit > remaining {
+			oneLimit = remaining
+		}
+		content, ok, err := readProfileFile(profile, path, 0, oneLimit)
+		row := fileRead{Path: path, OK: ok, Truncated: len(content) >= oneLimit}
+		if err != nil {
+			row.Error = err.Error()
+		} else {
+			row.Content = content
+		}
+		total += len(content)
+		out = append(out, row)
+	}
+	return out, nil
+}
+
+func displayPath(profile Profile, path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.ToSlash(path)
+	}
+	for _, root := range profile.Roots {
+		rabs, err := filepath.Abs(root)
+		if err != nil {
+			continue
+		}
+		if rel, err := filepath.Rel(rabs, abs); err == nil && !strings.HasPrefix(rel, "..") {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return filepath.ToSlash(path)
 }
 
 func readProfileFile(profile Profile, path string, offset int, limit int) (string, bool, error) {
@@ -1495,6 +1790,29 @@ func intArg(args map[string]any, key string, fallback int) int {
 func boolArg(args map[string]any, key string) bool {
 	v, _ := args[key].(bool)
 	return v
+}
+
+func stringSliceArg(args map[string]any, key string) []string {
+	raw, ok := args[key]
+	if !ok {
+		return nil
+	}
+	switch vals := raw.(type) {
+	case []string:
+		return vals
+	case []any:
+		out := make([]string, 0, len(vals))
+		for _, v := range vals {
+			s, _ := v.(string)
+			s = strings.TrimSpace(s)
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 func proposalFromToolArgs(args map[string]any) (Proposal, string) {

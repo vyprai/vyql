@@ -205,6 +205,71 @@ func TestProbeDependencyFindsUncoveredUsage(t *testing.T) {
 	}
 }
 
+func TestSearchContextAndReadFilesSupportRepoExploration(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "src", "handler.js")
+	if err := os.MkdirAll(filepath.Dir(a), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(a, []byte("function handle(req) {\n  const id = req.query.id;\n  return service.loadSession(id);\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b := filepath.Join(dir, "src", "safe.js")
+	if err := os.WriteFile(b, []byte("export function ok() { return 1; }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	matches, err := searchProfileContext(profile, "loadSession", false, false, 1, 1, 5)
+	if err != nil {
+		t.Fatalf("searchProfileContext: %v", err)
+	}
+	if len(matches) != 1 || !strings.Contains(matches[0].Context, "req.query.id") {
+		t.Fatalf("expected surrounding context for loadSession, got %#v", matches)
+	}
+	files, err := readProfileFiles(profile, []string{"src/handler.js", "src/safe.js"}, 2000)
+	if err != nil {
+		t.Fatalf("readProfileFiles: %v", err)
+	}
+	if len(files) != 2 || !files[0].OK || !strings.Contains(files[0].Content, "loadSession") {
+		t.Fatalf("expected batch file contents, got %#v", files)
+	}
+}
+
+func TestRepoStructureRanksSecurityRelevantDirectories(t *testing.T) {
+	dir := t.TempDir()
+	api := filepath.Join(dir, "api", "upload.php")
+	if err := os.MkdirAll(filepath.Dir(api), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(api, []byte("<?php move_uploaded_file($_FILES['f']['tmp_name'], $path);"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	docs := filepath.Join(dir, "docs", "readme.js")
+	if err := os.MkdirAll(filepath.Dir(docs), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(docs, []byte("console.log('docs');"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	dirs, err := repoStructure(profile, 5)
+	if err != nil {
+		t.Fatalf("repoStructure: %v", err)
+	}
+	if len(dirs) == 0 || dirs[0].Path != "api" {
+		t.Fatalf("expected api directory first, got %#v", dirs)
+	}
+	if dirs[0].Languages["php"] != 1 {
+		t.Fatalf("expected php language count, got %#v", dirs[0])
+	}
+}
+
 func TestValidateProposalRejectsAbsentLanguage(t *testing.T) {
 	profile := Profile{Languages: map[string]int{"python": 1}}
 	proposal := Proposal{AdapterFiles: []AdapterFile{{
