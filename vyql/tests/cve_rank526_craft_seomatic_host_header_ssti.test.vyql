@@ -1,0 +1,56 @@
+test "rank526: SEOmatic sanitizes canonical path before host-expanded URL"
+  lang php
+  file Helper.php
+  expect VYQL-INJ-118
+  expect_review code.HostExpandedUrlSanitizedBeforeExpansionSsti
+  code
+  ```
+  <?php
+  use Craft;
+  use craft\helpers\UrlHelper;
+  use nystudio107\seomatic\helpers\DynamicMeta as DynamicMetaHelper;
+
+  class Helper
+  {
+      public static function safeCanonicalUrl(): string
+      {
+          $url = '';
+          try {
+              $url = Craft::$app->getRequest()->getPathInfo();
+          } catch (InvalidConfigException $e) {
+              Craft::error($e->getMessage(), __METHOD__);
+          }
+          $url = DynamicMetaHelper::sanitizeUrl($url);
+
+          return UrlHelper::absoluteUrlWithProtocol($url);
+      }
+  }
+  ```
+
+test "rank526: SEOmatic sanitizes canonical URL after host expansion"
+  lang php
+  file Helper.php
+  reject VYQL-INJ-118
+  reject_review code.HostExpandedUrlSanitizedBeforeExpansionSsti
+  code
+  ```
+  <?php
+  use Craft;
+  use craft\helpers\UrlHelper;
+  use nystudio107\seomatic\helpers\DynamicMeta as DynamicMetaHelper;
+
+  class Helper
+  {
+      public static function safeCanonicalUrl(): string
+      {
+          $url = '';
+          try {
+              $url = Craft::$app->getRequest()->getPathInfo();
+          } catch (InvalidConfigException $e) {
+              Craft::error($e->getMessage(), __METHOD__);
+          }
+
+          return DynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url));
+      }
+  }
+  ```

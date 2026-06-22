@@ -613,6 +613,58 @@ final class AuditService {
 	}
 }
 
+func TestPrepRanksHostExpandedUrlSanitizerOrderProfiles(t *testing.T) {
+	dir := t.TempDir()
+	helperPath := filepath.Join(dir, "src", "services", "Helper.php")
+	if err := os.MkdirAll(filepath.Dir(helperPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `<?php
+final class Helper {
+    public static function safeCanonicalUrl(): string {
+        $url = Craft::$app->getRequest()->getPathInfo();
+        $url = DynamicMetaHelper::sanitizeUrl($url);
+        return UrlHelper::absoluteUrlWithProtocol($url);
+    }
+}
+`
+	if err := os.WriteFile(helperPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	noisePath := filepath.Join(dir, "src", "translations", "en", "seomatic.php")
+	if err := os.MkdirAll(filepath.Dir(noisePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(noisePath, []byte("<?php return ['title' => 'SEOmatic Twig canonical URL helper'];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "php", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != helperPath {
+		t.Fatalf("expected Helper.php first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "absoluteUrlWithProtocol") || !strings.Contains(files[0].Snippet, "sanitizeUrl") {
+		t.Fatalf("expected sanitizer-order snippet, got %q", files[0].Snippet)
+	}
+	if !requiresAssignmentInventory(profile) {
+		t.Fatalf("expected host-expanded URL profile to require assignment inventory")
+	}
+	terms := requiredAssignmentInventoryTerms(profile)
+	if !containsString(terms, "canonical") || !containsString(terms, "sanitize") || !containsString(terms, "host") {
+		t.Fatalf("expected focused canonical URL assignment terms, got %#v", terms)
+	}
+	readyLog := []AgentStep{{ToolCalls: []AgentToolCall{{Name: "assignment_inventory", Arguments: map[string]any{"language": "php", "name_contains": "canonical"}}}}}
+	if got := inventoryGateError(profile, readyLog, "read_file"); got != "" {
+		t.Fatalf("expected assignment inventory gate satisfied, got %q", got)
+	}
+}
+
 func TestSymbolInventoryFindsClassesMethodsAndFunctions(t *testing.T) {
 	dir := t.TempDir()
 	phpPath := filepath.Join(dir, "src", "Controller", "CustomerTransformerController.php")

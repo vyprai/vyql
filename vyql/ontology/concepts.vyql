@@ -174,6 +174,15 @@ concept TemplateInstallScriptHostExecution : sink {
   review_assumption: "a lower-privileged template author can define or update install scripts that run on cluster nodes"
   review_confidence: medium
 }
+concept HostExpandedUrlSanitizedBeforeExpansionSsti : sink {
+  vulnerable_to: [injection.CodeInjection, injection.TemplateInjection]
+  cwe: [CWE_94, CWE_1336]
+  review_category: "code_execution"
+  review_condition: "a request-derived URL is sanitized before host/protocol expansion, allowing attacker-controlled Host metadata to be reintroduced into a template-rendered URL"
+  review_evidence: "canonical URL context {pattern} sanitizes the path before building an absolute URL from request host metadata"
+  review_assumption: "the resulting absolute URL is rendered through a server-side template or metadata renderer that evaluates template syntax"
+  review_confidence: high
+}
 concept PartiallyEscapedSshCommand : sink {
   vulnerable_to: [injection.CommandInjection]
   cwe: [CWE_77]

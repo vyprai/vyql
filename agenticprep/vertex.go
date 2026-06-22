@@ -234,6 +234,13 @@ Rules:
      name_contains values such as title, name, html, body, content, snapshot,
      encode, escape, and sanitize; then call function_context before proposing
      a narrow analysis.function.context mark.
+     For server-side template injection, host-header poisoning, canonical URL,
+     or request URL helper shapes, inspect helpers that call absolute URL
+     builders such as absoluteUrlWithProtocol, siteUrl, urlFor, canonicalUrl,
+     currentUrl, getHostInfo, getPathInfo, and request Host/X-Forwarded-Host
+     accessors. Check sanitizer ordering: sanitizing a path before absolute URL
+     or host expansion can reintroduce attacker-controlled host text. Prefer
+     function_context over broad source/sink mappings for local ordering bugs.
      For PHP/Symfony/Pimcore repositories, treat Request parameter bags such as
      $request->query->get/all/filter and raw query-condition builders such as
      addConditionParam, whereRaw, havingRaw, orderByRaw, and selectRaw as high-priority
@@ -714,6 +721,9 @@ func requiresAssignmentInventory(profile Profile) bool {
 	return profileContainsAnyTerm(profile, []string{
 		"xss", "html::encode", "htmlspecialchars", "escapehtml", "template::raw",
 		"twig\\markup", "html", "render", "title", "snapshot", "audit",
+		"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl",
+		"safecanonicalurl", "x-forwarded-host", "host header", "getpathinfo",
+		"sanitizeurl",
 		"permission", "role", "policy", "session", "redirect", "origin",
 		"url", "path", "filename", "token", "secret",
 	})
@@ -721,6 +731,8 @@ func requiresAssignmentInventory(profile Profile) bool {
 
 func requiredAssignmentInventoryTerms(profile Profile) []string {
 	switch {
+	case profileContainsAnyTerm(profile, []string{"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl", "safecanonicalurl", "x-forwarded-host", "host header", "getpathinfo", "sanitizeurl"}):
+		return []string{"url", "host", "canonical", "sanitize", "absolute", "path", "twig", "template", "x-forwarded-host"}
 	case profileContainsAnyTerm(profile, []string{"xss", "html::encode", "htmlspecialchars", "escapehtml", "template::raw", "twig\\markup", "html", "render", "title", "snapshot", "audit"}):
 		return []string{"title", "html", "body", "content", "snapshot", "name", "label", "encode", "escape", "sanitize", "raw", "render"}
 	case profileContainsAnyTerm(profile, []string{"permission", "role", "policy", "admin", "authorization"}):
@@ -1881,6 +1893,9 @@ func assignmentRiskScore(entry assignmentEntry) int {
 		"snapshot": 16, "audit": 12, "model": 8, "entity": 6, "user": 8,
 		"username": 14, "render": 10, "template": 10, "escape": 10, "encode": 10,
 		"sanitize": 12, "htmlspecialchars": 18, "html::encode": 18,
+		"absoluteurlwithprotocol": 30, "safecanonicalurl": 26, "canonicalurl": 18,
+		"getpathinfo": 16, "sanitizeurl": 20, "sanitizeuserinput": 18,
+		"x-forwarded-host": 24, "twig": 18, "ssti": 24, "host": 8,
 		"permission": 12, "role": 10, "admin": 8, "policy": 8, "session": 8,
 		"path": 8, "filename": 10, "url": 8, "redirect": 12, "origin": 10,
 		"token": 8, "secret": 12, "password": 12, "key": 6,
@@ -3032,6 +3047,9 @@ func suggestContextVals(name string, compact string) []string {
 		"request.cookies.get(\"sso_state\")", "safe_load", "yaml.load", "redirect", "Location", "htmlspecialchars",
 		"Html::encode", "$model->title", "$snapshot['title']", "$snapshot[\"title\"]", "$element->username",
 		"$element->title", "snapshot", "title", "username",
+		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
+		"returnUrlHelper::absoluteUrlWithProtocol($url)",
+		"returnDynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))",
 		"prepare", "execute", "processOrderBy", "$orderBy['direction']", "$orderBy[\"direction\"]",
 		"$request->query->get", "addConditionParam", "whereRaw", "havingRaw", "orderByRaw", "selectRaw",
 		"AllowOrigins", "AllowOriginFunc", "AllowAllOrigins", "parseWildcardRules", "validateOrigin",
@@ -3146,6 +3164,8 @@ func securitySnippet(text string) string {
 		"sanitizeSvg", "Sanitizer",
 		"Html::encode", "htmlspecialchars", "escapeHtml", "$model->title",
 		"$snapshot['title']", "$snapshot[\"title\"]", "snapshot", "audit", "xss",
+		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
+		"sanitizeUserInput", "X-Forwarded-Host", "host header", "Twig", "SSTI",
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
 		"Access-Control-Allow-Origin", "AllowOrigins", "AllowOriginFunc",
 		"AllowAllOrigins", "validateOrigin", "wildcard", "HasPrefix",

@@ -688,6 +688,12 @@ review code.TemplateInstallScriptHostExecution {
   expected: [core.AuthorizationCheck]
   text: "review template install execution for container or sandbox isolation before running author-controlled scripts"
 }
+review code.HostExpandedUrlSanitizedBeforeExpansionSsti {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review canonical URL helpers for sanitizing the full host-expanded URL after request Host or protocol metadata is added"
+}
 review code.UnparameterizedSqlQueryParser {
   category: "sql"
   kind: "attention"

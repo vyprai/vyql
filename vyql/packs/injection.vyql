@@ -82,6 +82,11 @@ rule TemplateInstallScriptHostExecution {
   match code.TemplateInstallScriptHostExecution as sink
 }
 
+rule HostExpandedUrlSanitizedBeforeExpansionSsti {
+  meta { id: "VYQL-INJ-118", severity: critical, cwe: [CWE_94, CWE_1336], confidence_floor: high }
+  match code.HostExpandedUrlSanitizedBeforeExpansionSsti as sink
+}
+
 rule PartiallyEscapedSshCommand {
   meta { id: "VYQL-INJ-052", severity: critical, cwe: [CWE_77], confidence_floor: medium }
   match code.PartiallyEscapedSshCommand as sink
