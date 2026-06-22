@@ -304,6 +304,15 @@ Rules:
      and function_name:getInstance. Do not add class_base:* or positive
      annotation:* vals. Use structured nvals such as annotation:Initializer or
      function_name:forceLoadDuringStartup for the hardening absence check.
+     For Jenkins descriptor form-validation endpoints, inspect methods named
+     doTest*, doCheck*, or doFill* that accept @QueryParameter values and then
+     build a remote client/configuration or call testConnection, getProjects,
+     connect, request, openConnection, or similar outbound test APIs. These
+     endpoints should normally require @POST and an admin/item permission check
+     such as checkPermission or hasPermission before connecting. Prefer a narrow
+     function_context mark to code.JenkinsRemoteValidationMissingPostPermission
+     with nvals for annotation:POST and checkPermission/hasPermission hardening;
+     do not finish empty just because the remote client class is first-party.
      For server-side template injection, host-header poisoning, canonical URL,
      or request URL helper shapes, inspect helpers that call absolute URL
      builders such as absoluteUrlWithProtocol, siteUrl, urlFor, canonicalUrl,
@@ -494,9 +503,10 @@ agentLoop:
 					validAdapterCount = len(filtered.AdapterFiles)
 				}
 				emptyJenkinsStartupOverlay := jenkinsCredentialStartupProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0
+				emptyJenkinsRemoteValidationOverlay := jenkinsRemoteValidationProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyJobOutputEventOverlay := jobOutputEventUpdateProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyDefaultRelayOverlay := defaultRelaySecretProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -525,6 +535,9 @@ agentLoop:
 				} else if emptyJenkinsStartupOverlay {
 					toolResult["error"] = "Jenkins credentials startup-load evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins credentials startup\", class/function context for SystemCredentialsProvider, and validate_overlay with an analysis.class.context mark to code.JenkinsCredentialsStartupLoadContextExposure or concrete evidence that @Initializer after InitMilestone.JOB_LOADED already force-loads getInstance"
 					p.debugf("step=%d finish_overlay rejected: empty Jenkins credentials startup overlay", step)
+				} else if emptyJenkinsRemoteValidationOverlay {
+					toolResult["error"] = "Jenkins remote validation endpoint evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins remote validation\", function_context for the doTest/doCheck/doFill method containing QueryParameter plus outbound test/connect calls, and validate_overlay with an analysis.function.context mark to code.JenkinsRemoteValidationMissingPostPermission or concrete evidence that @POST and checkPermission/hasPermission already gate the connection"
+					p.debugf("step=%d finish_overlay rejected: empty Jenkins remote validation overlay", step)
 				} else if emptyJobOutputEventOverlay {
 					toolResult["error"] = "job output event-update evidence is present; do not return an empty overlay until you have called concept_reference with topic \"job output event update\", function_context for the child-output handler containing update_event, and validate_overlay with an analysis.function.context mark to code.JobOutputEventUpdateAuthorizationBypass or concrete evidence that update_event is deleted or gated by allow_event_updates_from_jobs before copying child output into job state"
 					p.debugf("step=%d finish_overlay rejected: empty job output event-update overlay", step)
@@ -792,6 +805,8 @@ func requiresSymbolInventory(profile Profile) bool {
 	terms := []string{
 		"asmodelsuccess", "modelname", "getacceptsjson", "response.data",
 		"toarray", "extrafields", "serialize",
+		"formvalidation", "queryparameter", "dotest", "docheck", "dofill",
+		"testconnection", "checkpermission", "haspermission", "jenkins.administer",
 		"systemcredentialsprovider", "domaincredentials.migratelisttomap",
 		"xml.unmarshal", "credentials.xml", "initmilestone.job_loaded",
 		"initializer", "forceloadduringstartup",
@@ -858,6 +873,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"tool", "server.tool", "mcpserver", "exec", "execfile", "child_process", "z.number", "port"}
 	case jenkinsCredentialStartupProfile(profile):
 		return []string{"unmarshal", "migratelisttomap", "getinstance", "initializer", "job_loaded", "credentials"}
+	case jenkinsRemoteValidationProfile(profile):
+		return []string{"testconnection", "connect", "getprojects", "buildclient", "queryparameter", "dotest", "docheck", "dofill", "checkpermission", "haspermission", "post"}
 	case phpSqlWrapperProfile(profile):
 		return []string{"runquery", "querydb", "sql", "where", "legacyfilterinputarr", "get", "post"}
 	case jobOutputEventUpdateProfile(profile):
@@ -913,6 +930,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 		return []string{"port", "args", "command", "pid", "exec", "tool", "schema"}
 	case jenkinsCredentialStartupProfile(profile):
 		return []string{"credentials", "domaincredentialsmap", "initializer", "authentication", "system", "startup"}
+	case jenkinsRemoteValidationProfile(profile):
+		return []string{"url", "applicationname", "password", "proxy", "host", "port", "credential", "permission"}
 	case commandWrapperProfile(profile):
 		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process"}
 	case jobOutputEventUpdateProfile(profile):
@@ -971,6 +990,26 @@ func jenkinsCredentialStartupProfile(profile Profile) bool {
 		"xml.unmarshal", "credentials.xml", "initmilestone.job_loaded",
 		"initializer", "forceloadduringstartup",
 	})
+}
+
+func jenkinsRemoteValidationProfile(profile Profile) bool {
+	if profile.Languages["java"] == 0 {
+		return false
+	}
+	hasJenkinsEndpoint := profileContainsAnyTerm(profile, []string{
+		"formvalidation", "queryparameter", "hudson.util.formvalidation",
+		"org.kohsuke.stapler.queryparameter", "dotest", "docheck", "dofill",
+	})
+	hasOutboundTest := profileContainsAnyTerm(profile, []string{
+		"testconnection", "buildclient", "getprojects", "openconnection",
+		"newrequest", "restcrowdclientfactory", "crowdconfigurationservice",
+		"clientpropertiesimpl", "httpclient", "url",
+	})
+	hasJenkinsAuthContext := profileContainsAnyTerm(profile, []string{
+		"jenkins.model.jenkins", "jenkins.administer", "checkpermission",
+		"haspermission", "@post", "requirepost", "jenkins", "hudson",
+	})
+	return hasJenkinsEndpoint && hasOutboundTest && hasJenkinsAuthContext
 }
 
 func phpSqlWrapperProfile(profile Profile) bool {
@@ -1691,6 +1730,7 @@ code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
 code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal,
 code.CommandStringWrapperExecution, code.McpToolCommandTemplateExecution,
 code.JenkinsCredentialsStartupLoadContextExposure,
+code.JenkinsRemoteValidationMissingPostPermission,
 code.JobOutputEventUpdateAuthorizationBypass,
 code.DefaultExternalRelaySecretExposure.
 `)
@@ -1721,6 +1761,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
 		{"concept": "code.JenkinsCredentialsStartupLoadContextExposure", "surface": "scan", "use": "mark for Jenkins SystemCredentialsProvider-style classes that unmarshal or migrate persisted credentials without an @Initializer after InitMilestone.JOB_LOADED force-loading getInstance during startup"},
+		{"concept": "code.JenkinsRemoteValidationMissingPostPermission", "surface": "scan", "use": "mark for Jenkins descriptor doTest/doCheck/doFill form-validation methods that accept @QueryParameter URL or credential values and perform outbound test/connect calls without @POST and checkPermission/hasPermission guards"},
 		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "mark for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
 		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "mark for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
 		{"concept": "code.McpToolCommandTemplateExecution", "surface": "scan", "use": "mark for MCP server.tool handlers whose externally supplied tool callback parameters are interpolated into child_process.exec shell command templates instead of execFile argv arrays; include command-template vals and nval execFile/spawn hardening; use analysis.module.context when the server.tool registration wraps the handler body"},
@@ -3582,6 +3623,9 @@ func suggestContextVals(name string, compact string) []string {
 		"asModelSuccess", "modelName: 'user'", "modelName:\"user\"",
 		"$this->request->getAcceptsJson()", "return$this->asModelSuccess($user,modelName:'user',data:$return)",
 		"return$this->asSuccess(data:$return)", "$response->data", "toArray", "fields", "extraFields",
+		"testConnection", "doTestConnection", "CrowdConfigurationService",
+		"Jenkins.ADMINISTER", "checkPermission", "FormValidation", "QueryParameter",
+		"hasPermission", "@POST",
 		"CmdExecuteService", "$cmd_string", "X-Islandora-Args",
 		"generateDerivativeResponse", "$this->cmd->execute",
 		"Process::fromShellCommandline", "array_merge", "HeaderBag",
@@ -3709,7 +3753,10 @@ func securitySnippet(text string) string {
 		"Html::encode", "htmlspecialchars", "escapeHtml", "$model->title",
 		"$snapshot['title']", "$snapshot[\"title\"]", "snapshot", "audit", "xss",
 		"asModelSuccess", "modelName", "getAcceptsJson", "$response->data",
-		"toArray", "extraFields", "serialize", "secret", "token", "credential",
+		"toArray", "extraFields", "serialize",
+		"testConnection", "doTestConnection", "CrowdConfigurationService",
+		"Jenkins.ADMINISTER", "checkPermission", "FormValidation", "QueryParameter",
+		"secret", "token", "credential",
 		"CmdExecuteService", "$cmd_string", "X-Islandora-Args",
 		"generateDerivativeResponse", "$this->cmd->execute",
 		"Process::fromShellCommandline", "command string",

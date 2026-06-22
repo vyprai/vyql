@@ -383,6 +383,9 @@ func securityRelevanceScore(path string, text string) int {
 		"systemcredentialsprovider": 52, "domaincredentials.migratelisttomap": 46,
 		"xml.unmarshal": 34, "credentials.xml": 28, "initmilestone.job_loaded": 42,
 		"@initializer": 26, "forceloadduringstartup": 24,
+		"formvalidation": 38, "queryparameter": 34, "testconnection": 44,
+		"dotest": 28, "docheck": 24, "dofill": 18, "jenkins.administer": 28,
+		"checkpermission": 22, "haspermission": 18, "crowdconfigurationservice": 30,
 		"cmdexecuteservice": 52, "$cmd_string": 42, "x-islandora-args": 36,
 		"generateDerivativeResponse": 32, "$this->cmd->execute": 34,
 		"command string": 24, "array_merge": 14, "headerbag": 14,
@@ -424,6 +427,7 @@ func securityRelevanceScore(path string, text string) int {
 		"attestation": 18, "predicate": 14, "signature": 10, "verify": 8,
 		"/validation/": 20, "validator": 16,
 		"context": 6, "cache": 6, "lifecycle": 6, "servlet": 5,
+		"jenkins": 10, "descriptor": 8,
 	} {
 		if strings.Contains(lowerPath, token) {
 			score += weight
@@ -1180,13 +1184,15 @@ func dependencyGapScore(c dependencyCandidate) int {
 		"request": 40, "response": 30, "websocket": 35, "socket": 20, "http": 20,
 		"cors": 55, "origin": 45, "wildcard": 25,
 		"auth": 45, "permission": 35, "role": 25, "redirect": 45, "callback": 35,
-		"sql": 45, "jdbc": 35, "database": 30, "query": 25,
+		"jenkins": 50, "hudson": 35, "stapler": 45, "queryparameter": 35,
+		"formvalidation": 35,
+		"sql":            45, "jdbc": 35, "database": 30, "query": 25,
 		"template": 35, "html": 25, "xml": 35, "el": 20, "faces": 18,
 		"upload": 45, "file": 25, "path": 25, "archive": 35, "zip": 30,
 		"crypto": 30, "cipher": 30, "signature": 35, "attestation": 40,
 		"predicate": 30, "sigstore": 28, "jms": 18, "message": 18,
 		"deserialize": 40, "objectmessage": 35, "cache": 10,
-		"jenkins": 25, "credentials": 25, "credentials-plugin": 35,
+		"credentials": 25, "credentials-plugin": 35,
 		"modelcontextprotocol": 55, "mcp": 24, "stdio": 10,
 	} {
 		if strings.Contains(text, token) {

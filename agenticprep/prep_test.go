@@ -795,6 +795,104 @@ public class SystemCredentialsProvider {
 	}
 }
 
+func TestPrepRanksJenkinsRemoteValidationEndpoint(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "src", "main", "java", "example", "CrowdSecurityRealm.java")
+	if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `package example;
+import hudson.util.FormValidation;
+import jenkins.model.Jenkins;
+import org.kohsuke.stapler.QueryParameter;
+
+class CrowdSecurityRealm {
+  public static final class DescriptorImpl {
+    public FormValidation doTestConnection(@QueryParameter String url,
+                                           @QueryParameter String applicationName,
+                                           @QueryParameter String password) {
+      CrowdConfigurationService tConfiguration =
+        new CrowdConfigurationService(url, applicationName, password);
+      try {
+        tConfiguration.testConnection();
+        return FormValidation.ok("OK");
+      } finally {
+        tConfiguration.shutdown();
+      }
+    }
+  }
+}
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	noisePath := filepath.Join(dir, "src", "main", "java", "example", "JsonModel.java")
+	if err := os.WriteFile(noisePath, []byte("class JsonModel { Object serialize() { return response.data; } }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !jenkinsRemoteValidationProfile(profile) {
+		t.Fatalf("expected Jenkins remote validation profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected Jenkins remote validation profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"testconnection", "queryparameter", "dotest", "checkpermission"} {
+		if !containsString(callTerms, want) {
+			t.Fatalf("expected call inventory term %q in %#v", want, callTerms)
+		}
+	}
+	files, err := securityRelevantFiles(profile, "java", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != srcPath {
+		t.Fatalf("expected Jenkins validation file first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "doTestConnection") || !strings.Contains(files[0].Snippet, "CrowdConfi") {
+		t.Fatalf("expected Jenkins remote validation snippet, got %q", files[0].Snippet)
+	}
+	concepts := conceptReference("jenkins remote validation")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.JenkinsRemoteValidationMissingPostPermission" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected Jenkins remote validation scan concept in reference, got %#v", concepts)
+	}
+	ctxs, err := functionContexts(profile, srcPath, "doTestConnection", "testConnection", 2)
+	if err != nil {
+		t.Fatalf("functionContexts: %v", err)
+	}
+	if len(ctxs) != 1 {
+		t.Fatalf("expected one doTestConnection context, got %#v", ctxs)
+	}
+	suggested := strings.Join(ctxs[0].SuggestedVals, "\n")
+	for _, want := range []string{"doTestConnection", "testConnection", "CrowdConfigurationService"} {
+		if !strings.Contains(suggested, want) {
+			t.Fatalf("function context missing %q in:\n%s", want, suggested)
+		}
+	}
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "java",
+		Source: `adapter java {
+  mark exact "analysis.function.context" val "function_name:doTestConnection" val "call:testConnection" val "call:CrowdConfigurationService" nval "annotation:POST" nval "call:checkPermission" -> code.JenkinsRemoteValidationMissingPostPermission
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, proposal, Config{}); err != nil {
+		t.Fatalf("expected Jenkins remote validation function-context mark to validate: %v", err)
+	}
+}
+
 func TestPrepRanksPhpSqlWrapperProfile(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "src", "FundRaiserEditor.php")

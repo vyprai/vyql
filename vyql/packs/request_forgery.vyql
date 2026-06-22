@@ -50,6 +50,11 @@ rule MissingHttpMethodAssertion {
   match code.MissingHttpMethodAssertion as action
 }
 
+rule JenkinsRemoteValidationMissingPostPermission {
+  meta { id: "VYQL-RF-023", severity: medium, cwe: [CWE_352, CWE_862, CWE_918], confidence_floor: high }
+  match code.JenkinsRemoteValidationMissingPostPermission as endpoint
+}
+
 rule Csrf {
   meta { id: "VYQL-RF-003", severity: medium, cwe: [CWE_352] }
   taint core.UserControlledData -> code.StateChangingOp

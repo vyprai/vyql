@@ -1710,6 +1710,15 @@ concept CodeDxJenkinsRemoteValidationMissingPostPermission : sink {
   review_assumption: "a user with Overall/Read or a browser-backed request can reach the descriptor endpoint with attacker-controlled URL parameters"
   review_confidence: high
 }
+concept JenkinsRemoteValidationMissingPostPermission : sink {
+  vulnerable_to: [request_forgery.Csrf, access_control.MissingAuthorization, request_forgery.Ssrf]
+  cwe: [CWE_352, CWE_862, CWE_918]
+  review_category: "request_forgery"
+  review_condition: "Jenkins descriptor form-validation endpoint connects to a supplied remote URL without POST and administrator permission checks"
+  review_evidence: "Jenkins descriptor endpoint context {pattern} accepts QueryParameter values, builds a remote client or configuration, and performs a test connection before observed @POST and checkPermission/hasPermission gates"
+  review_assumption: "a user with Overall/Read or a browser-backed request can invoke descriptor validation endpoints with attacker-controlled URL or proxy parameters"
+  review_confidence: high
+}
 // Server/port validation that attempts to block privileged or out-of-range
 // outbound connections but can be bypassed by PHP string-to-number coercion.
 concept IncompleteServerPortValidation : sink {
