@@ -41,6 +41,7 @@ threat MissingEncryption { cwe: [CWE_311], desc: "Missing encryption of sensitiv
 threat WeakCrypto { cwe: [CWE_327], desc: "Use of a broken/risky cryptographic algorithm" }
 threat ImproperCertValidation { cwe: [CWE_295], desc: "Improper certificate validation (verification disabled)" }
 threat ImproperSignatureCheck { cwe: [CWE_347], desc: "Improper verification of cryptographic signature (e.g. JWT alg none)" }
+threat MissingIntegrityProtection { cwe: [CWE_665], desc: "Cryptographic configuration omits required integrity/authentication initialization" }
 threat IncompleteSecurityIdentifier { cwe: [CWE_358], desc: "Security-sensitive identity check uses a shortened or ambiguous identifier" }
 threat ObservableDiscrepancy { cwe: [CWE_203, CWE_208], desc: "Secret-dependent comparison may expose observable or timing differences" }
 

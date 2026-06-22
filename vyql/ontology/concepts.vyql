@@ -495,6 +495,16 @@ concept AuthenticatedDecryptionTagReview : sink {
   review_confidence: medium
 }
 
+concept CipherWithoutIntegrityHash : sink {
+  vulnerable_to: [crypto.MissingIntegrityProtection]
+  cwe: [CWE_665]
+  review_category: "crypto"
+  review_condition: "encrypted transport configuration can enable a cipher while disabling the integrity hash or HMAC"
+  review_evidence: "crypto config context {pattern} accepts a non-none cipher and a none hash without rejecting that combination"
+  review_assumption: "remote packets are decrypted or processed before an integrity check rejects forged input"
+  review_confidence: high
+}
+
 concept SessionId : sink {
   vulnerable_to: [session.SessionFixation]
   enabled_by: [taint.UntrustedData]

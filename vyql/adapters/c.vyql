@@ -172,6 +172,10 @@ adapter c {
   mark "BF_set_key" -> code.WeakCipher
   mark "EVP_EncryptInit_ex" val "0000000000000000" -> code.StaticIv
   mark "EVP_DecryptInit_ex" val "0000000000000000" -> code.StaticIv
+  // Encrypted transport config must not allow an enabled cipher with HMAC/hash
+  // disabled. Corosync CVE-2013-0250 is this shape: crypto_cipher can be aes*
+  // while crypto_hash is none unless the config reader rejects the combination.
+  mark exact "analysis.function.context" val "lang=c" val "crypto_cipher" val "crypto_hash" val "tmp_cipher" val "tmp_hash" val "strcmp(str,\"none\")==0" nval "strcmp(tmp_cipher,\"none\")!=0" nval "strcmp(tmp_hash,\"none\")==0" -> code.CipherWithoutIntegrityHash
 
   // insecure randomness (CWE-330) — rand()/random() (presence); getrandom()/RAND_bytes safe
   mark "rand" -> code.WeakRandomValue

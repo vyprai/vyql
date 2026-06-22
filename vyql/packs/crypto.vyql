@@ -38,3 +38,8 @@ rule SecretComparisonObservableDiscrepancy {
   meta { id: "VYQL-CRY-006", severity: medium, cwe: [CWE_203, CWE_208], confidence_floor: medium }
   match code.SecretComparisonReview as cmp
 }
+
+rule CipherWithoutIntegrityHash {
+  meta { id: "VYQL-CRY-009", severity: high, cwe: [CWE_665], confidence_floor: high }
+  match code.CipherWithoutIntegrityHash as c
+}
