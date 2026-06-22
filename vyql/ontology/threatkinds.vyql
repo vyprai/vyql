@@ -3,6 +3,7 @@
 
 module access_control;
 threat PermissiveCors { cwe: [CWE_942], desc: "Permissive CORS — Access-Control-Allow-Origin set to '*'" }
+threat OriginValidationError { cwe: [CWE_346], desc: "Improper origin validation for cross-origin or cross-protocol trust decisions" }
 threat CsrfDisabled { cwe: [CWE_352], desc: "CSRF protection explicitly disabled / exempted" }
 threat BrokenAccess { cwe: [CWE_284], desc: "Improper access control" }
 threat Idor { cwe: [CWE_639], desc: "Insecure direct object reference" }

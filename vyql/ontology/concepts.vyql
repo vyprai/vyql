@@ -547,6 +547,16 @@ concept PermissiveCors : sink {
   cwe: [CWE_942]
 }
 
+concept CorsWildcardPrefixTruncation : sink {
+  vulnerable_to: [access_control.OriginValidationError]
+  cwe: [CWE_346]
+  review_category: "access_control"
+  review_condition: "CORS wildcard origin parsing truncates the trusted prefix before prefix matching request origins"
+  review_evidence: "CORS wildcard parser context {pattern} stores a prefix slice ending before the wildcard index"
+  review_assumption: "the parsed wildcard prefix is later used with prefix matching to accept Origin header values"
+  review_confidence: high
+}
+
 concept MailHeaderWrite : sink {
   vulnerable_to: [injection.CrlfInjection]
   enabled_by: [taint.UntrustedData]

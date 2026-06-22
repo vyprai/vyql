@@ -320,6 +320,9 @@ adapter go {
   // permissive CORS (CWE-942) — w.Header().Set("Access-Control-Allow-Origin", "*")
   mark "Header.Set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
   mark "Header.Add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  // CORS wildcard origin parsers must keep the whole prefix before a trailing *.
+  // Slicing to i-1 before prefix matching weakens origin validation by one byte.
+  mark exact "analysis.function.context" val "function_name:parseWildcardRules" val "selector:c.AllowOrigins" val "selector:c.AllowWildcard" val "call_path:strings.Index" val "call_path:append" val "slice:o::i-1" -> code.CorsWildcardPrefixTruncation
 
   // clickjacking (CWE-1021) — X-Frame-Options EXPLICITLY set to ALLOWALL (omission not flagged)
   mark "Header.Set" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
