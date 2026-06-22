@@ -2827,6 +2827,15 @@ concept CoderAgentManifestInfoLog : sink {
   review_assumption: "workspace agent manifests may contain sensitive environment variables and operator logs are accessible to lower-trust readers"
   review_confidence: high
 }
+concept DefaultExternalRelaySecretExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200]
+  review_category: "secret"
+  review_condition: "a public library builds a relay/proxy/websocket URL using a hardcoded fallback host while embedding a token, credential, or caller URL in the outbound path"
+  review_evidence: "relay URL builder context {pattern} selects a default host and places sensitive connection metadata into the URL sent to that host"
+  review_assumption: "the fallback host may be outside the product trust boundary or operational owner for the supplied connection metadata"
+  review_confidence: medium
+}
 concept AnsibleSnmpFactsCredentialsNoLogMissing : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]

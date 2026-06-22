@@ -356,6 +356,8 @@ func securityRelevanceScore(path string, text string) int {
 		"constraintvalidator": 34, "constraintvalidatorcontext": 28,
 		"buildconstraintviolationwithtemplate": 48, "addconstraintviolation": 20,
 		"illegalargumentexception": 12, "getmessage()": 20,
+		"pollinghost": 28, "connectionmetadata": 24, "gurl": 18,
+		"encodeuricomponent": 18, "wsv2": 18, "herokuapp.com": 26,
 		"file_put_contents": 12, "fopen(": 10, "open(": 10, "writefile": 10, "sendfile": 10,
 		"move_uploaded_file": 18, "rename(": 14, "copy(": 12, "unlink(": 12, "touch(": 10,
 		"getabsolutepath": 22, "absolutepath": 14, "absolute path": 14, "e_warning": 18,

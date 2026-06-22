@@ -1292,6 +1292,71 @@ final class Helper {
 	}
 }
 
+func TestPrepRanksDefaultRelaySecretExposureProfiles(t *testing.T) {
+	dir := t.TempDir()
+	helperPath := filepath.Join(dir, "src", "util", "helpers.ts")
+	if err := os.MkdirAll(filepath.Dir(helperPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := "import * as urllib from 'url';\n\n" +
+		"export function getConnectionStr(connectionMetadata, isPolling, pollingHost) {\n" +
+		"  const gurl = urllib.parse(connectionMetadata.gurl);\n" +
+		"  if (isPolling) {\n" +
+		"    const host = pollingHost ?? 'gp-v2.herokuapp.com';\n" +
+		"    gurl.hostname = host;\n" +
+		"    gurl.host = host;\n" +
+		"    gurl.pathname = `/wsv2/${connectionMetadata.token}/${encodeURIComponent(\n" +
+		"      connectionMetadata.gurl,\n" +
+		"    )}`;\n" +
+		"  } else {\n" +
+		"    gurl.pathname = `/wsv2/${connectionMetadata.token}`;\n" +
+		"  }\n" +
+		"  return urllib.format(gurl);\n" +
+		"}\n"
+	if err := os.WriteFile(helperPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	noisePath := filepath.Join(dir, "debug", "server.js")
+	if err := os.MkdirAll(filepath.Dir(noisePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(noisePath, []byte("const express = require('express'); app.get('/token', (req, res) => res.json({ token: 'debug' }));\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !defaultRelaySecretProfile(profile) {
+		t.Fatalf("expected default relay secret profile")
+	}
+	files, err := securityRelevantFiles(profile, "javascript", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != helperPath {
+		t.Fatalf("expected relay helper first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "connectionMetadata") || !strings.Contains(files[0].Snippet, "encodeURIComponent") {
+		t.Fatalf("expected relay metadata snippet, got %q", files[0].Snippet)
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	if !containsString(callTerms, "host") || !containsString(callTerms, "gurl") {
+		t.Fatalf("expected focused relay call terms, got %#v", callTerms)
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	if !containsString(assignmentTerms, "host") || !containsString(assignmentTerms, "token") || !containsString(assignmentTerms, "gurl") {
+		t.Fatalf("expected focused relay assignment terms, got %#v", assignmentTerms)
+	}
+	readyLog := []AgentStep{{ToolCalls: []AgentToolCall{
+		{Name: "call_inventory", Arguments: map[string]any{"language": "javascript", "name_contains": "host"}},
+		{Name: "assignment_inventory", Arguments: map[string]any{"language": "javascript", "name_contains": "gurl"}},
+	}}}
+	if got := inventoryGateError(profile, readyLog, "read_file"); got != "" {
+		t.Fatalf("expected relay inventory gate satisfied, got %q", got)
+	}
+}
+
 func TestPrepRanksSensitiveModelJsonSerializationProfiles(t *testing.T) {
 	dir := t.TempDir()
 	controllerPath := filepath.Join(dir, "src", "controllers", "VerifyController.php")

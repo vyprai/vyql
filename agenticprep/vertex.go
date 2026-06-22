@@ -311,6 +311,14 @@ Rules:
      accessors. Check sanitizer ordering: sanitizing a path before absolute URL
      or host expansion can reintroduce attacker-controlled host text. Prefer
      function_context over broad source/sink mappings for local ordering bugs.
+     For relay, websocket, proxy, tunneling, or polling helpers, inspect default
+     host fallback logic that builds URLs containing tokens, credentials,
+     connection metadata, or encoded upstream URLs. If a helper uses a hardcoded
+     third-party/default host while embedding token/gurl/conman/original URL
+     metadata, call function_context and prefer a narrow
+     DefaultExternalRelaySecretExposure exact mark with an nval for trusted-host
+     hardening. Do not finish empty merely because URL parsing or websocket
+     libraries are standard.
      For Java Bean Validation, inspect ConstraintValidator implementations and
      ConstraintValidatorContext.buildConstraintViolationWithTemplate call sites.
      That method is already a code.ExpressionEval sink in the Java adapter; do
@@ -487,7 +495,8 @@ agentLoop:
 				}
 				emptyJenkinsStartupOverlay := jenkinsCredentialStartupProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0
 				emptyJobOutputEventOverlay := jobOutputEventUpdateProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJobOutputEventOverlay
+				emptyDefaultRelayOverlay := defaultRelaySecretProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -519,6 +528,9 @@ agentLoop:
 				} else if emptyJobOutputEventOverlay {
 					toolResult["error"] = "job output event-update evidence is present; do not return an empty overlay until you have called concept_reference with topic \"job output event update\", function_context for the child-output handler containing update_event, and validate_overlay with an analysis.function.context mark to code.JobOutputEventUpdateAuthorizationBypass or concrete evidence that update_event is deleted or gated by allow_event_updates_from_jobs before copying child output into job state"
 					p.debugf("step=%d finish_overlay rejected: empty job output event-update overlay", step)
+				} else if emptyDefaultRelayOverlay {
+					toolResult["error"] = "default relay URL evidence is present; do not return an empty overlay until you have called concept_reference with topic \"default relay host\", function_context for the URL builder containing host/token/encoded upstream URL assignments, and validate_overlay with an analysis.function.context mark to code.DefaultExternalRelaySecretExposure or concrete evidence that the default host is product-owned/trusted"
+					p.debugf("step=%d finish_overlay rejected: empty default relay overlay", step)
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -850,6 +862,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"runquery", "querydb", "sql", "where", "legacyfilterinputarr", "get", "post"}
 	case jobOutputEventUpdateProfile(profile):
 		return []string{"update_event", "handlechildresponse", "listfindupdate", "schedule", "config", "delete"}
+	case defaultRelaySecretProfile(profile):
+		return []string{"host", "polling", "connect", "websocket", "url", "token", "gurl"}
 	case commandWrapperProfile(profile):
 		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
@@ -903,6 +917,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process"}
 	case jobOutputEventUpdateProfile(profile):
 		return []string{"update_event", "job", "data", "schedule", "config", "allow_event_updates_from_jobs"}
+	case defaultRelaySecretProfile(profile):
+		return []string{"host", "polling", "url", "token", "gurl", "connection", "encode"}
 	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
 		return []string{"user", "model", "data", "response", "json", "secret", "token", "password", "credential", "fields"}
 	case profileContainsAnyTerm(profile, []string{"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl", "safecanonicalurl", "x-forwarded-host", "host header", "getpathinfo", "sanitizeurl"}):
@@ -1031,6 +1047,16 @@ func profileContainsAnyTerm(profile Profile, terms []string) bool {
 		}
 	}
 	return false
+}
+
+func defaultRelaySecretProfile(profile Profile) bool {
+	if profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 && profile.Languages["python"] == 0 && profile.Languages["go"] == 0 && profile.Languages["java"] == 0 {
+		return false
+	}
+	hasURLHost := profileContainsAnyTerm(profile, []string{"pollinghost", "websocket", "relay", "proxy", "tunnel", "gurl", "conmanurl", "connectionstr", "connectionmetadata", "host"})
+	hasSensitive := profileContainsAnyTerm(profile, []string{"token", "credential", "secret", "authorization", "connectionmetadata", "gurl", "conmanurl"})
+	hasOutbound := profileContainsAnyTerm(profile, []string{"encodeuricomponent", "url.format", "urllib.format", "urlparse", "wsv2", "ws://", "wss://", "http://", "https://", "herokuapp.com"})
+	return hasURLHost && hasSensitive && hasOutbound
 }
 
 func vertexPrepTools() []map[string]any {
@@ -1665,7 +1691,8 @@ code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
 code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal,
 code.CommandStringWrapperExecution, code.McpToolCommandTemplateExecution,
 code.JenkinsCredentialsStartupLoadContextExposure,
-code.JobOutputEventUpdateAuthorizationBypass.
+code.JobOutputEventUpdateAuthorizationBypass,
+code.DefaultExternalRelaySecretExposure.
 `)
 }
 
@@ -1680,6 +1707,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.DisabledRelationshipMetadataExposure", "surface": "scan", "use": "mark for public relationship/resource metadata helpers that return relationship targets for disabled fields or invisible resources without checking enabled/access/visibility"},
 		{"concept": "code.OverbroadRolePermissionGrant", "surface": "scan", "use": "mark for static role/group/permission tables that assign backup, restore, admin, or similarly privileged operations to non-admin roles"},
 		{"concept": "code.JobOutputEventUpdateAuthorizationBypass", "surface": "scan", "use": "mark for scheduler/plugin child-output handlers that copy update_event from child JSON into job state and later persist it to schedule/event configuration without a config or authorization gate; include nval allow_event_updates_from_jobs or delete data.update_event"},
+		{"concept": "code.DefaultExternalRelaySecretExposure", "surface": "scan", "use": "mark for relay/proxy/websocket URL builders that select a hardcoded fallback host while embedding tokens, credentials, connection metadata, or encoded upstream URLs"},
 		{"concept": "code.MethodGatedRedirectValidationBypass", "surface": "scan", "use": "mark for URL validation skipped for some HTTP methods before redirect/callback handling"},
 		{"concept": "code.SessionStoredRedirectTarget", "surface": "scan", "use": "mark for redirects using session-stored or request-influenced targets without relative/same-origin validation"},
 		{"concept": "code.RedirectTarget", "surface": "scan", "use": "taint sink for redirect APIs or methods returning redirect destinations"},
@@ -2189,6 +2217,8 @@ func assignmentRiskScore(entry assignmentEntry) int {
 		"command string": 22, "array_merge": 12, "headerbag": 12,
 		"do_directory": 28, "expand_fs": 34, "romfs_read": 22, "namelen": 16,
 		"dirent": 16, "bad filename": 18, "strchr(name": 24, "strcmp(name": 20,
+		"pollinghost": 30, "connectionmetadata": 26, "gurl": 20,
+		"encodeuricomponent": 18, "herokuapp.com": 26, "wsv2": 18,
 		"absoluteurlwithprotocol": 30, "safecanonicalurl": 26, "canonicalurl": 18,
 		"getpathinfo": 16, "sanitizeurl": 20, "sanitizeuserinput": 18,
 		"x-forwarded-host": 24, "twig": 18, "ssti": 24, "host": 8,
@@ -3688,6 +3718,8 @@ func securitySnippet(text string) string {
 		"bad filename", "strchr(name", "strcmp(name",
 		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
 		"sanitizeUserInput", "X-Forwarded-Host", "host header", "Twig", "SSTI",
+		"pollingHost", "connectionMetadata", "gurl", "encodeURIComponent",
+		"herokuapp.com", "wsv2",
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
 		"Access-Control-Allow-Origin", "AllowOrigins", "AllowOriginFunc",
 		"AllowAllOrigins", "validateOrigin", "wildcard", "HasPrefix",

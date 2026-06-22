@@ -1340,6 +1340,12 @@ review code.JenkinsCredentialsStartupLoadContextExposure {
   expected: [core.AuthorizationCheck]
   text: "review Jenkins credentials providers for SYSTEM-context startup loading before persisted credential migration"
 }
+review code.DefaultExternalRelaySecretExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review default relay/proxy/websocket hosts for product-owned trust boundaries before embedding tokens or upstream URLs"
+}
 review code.CinnyServiceWorkerMediaAuthLeak {
   category: "secret"
   kind: "attention"
