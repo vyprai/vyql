@@ -19,6 +19,7 @@ import (
 	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
+	profpkg "github.com/vyprai/vyql/profile"
 )
 
 const (
@@ -43,10 +44,16 @@ type Provider interface {
 }
 
 type Result struct {
-	Profile  Profile  `json:"profile"`
-	Proposal Proposal `json:"proposal,omitempty"`
-	OutDir   string   `json:"out_dir"`
-	Warnings []string `json:"warnings,omitempty"`
+	Profile    Profile    `json:"profile"`
+	ScanConfig ScanConfig `json:"scan_config,omitempty"`
+	Proposal   Proposal   `json:"proposal,omitempty"`
+	OutDir     string     `json:"out_dir"`
+	Warnings   []string   `json:"warnings,omitempty"`
+}
+
+type ScanConfig struct {
+	Profile string `json:"profile,omitempty"`
+	Reason  string `json:"reason,omitempty"`
 }
 
 type Profile struct {
@@ -126,7 +133,7 @@ func Prepare(ctx context.Context, paths []string, cfg Config) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Profile: profile, OutDir: cfg.OutDir}
+	res := Result{Profile: profile, ScanConfig: detectScanConfig(paths), OutDir: cfg.OutDir}
 	res.Proposal = deterministicProposal(paths, cfg)
 	if cfg.Provider != nil {
 		proposal, err := cfg.Provider.ProposeOverlay(ctx, profile)
@@ -142,6 +149,18 @@ func Prepare(ctx context.Context, paths []string, cfg Config) (Result, error) {
 		return res, err
 	}
 	return res, nil
+}
+
+func detectScanConfig(paths []string) ScanConfig {
+	profiles, err := profpkg.Load()
+	if err != nil {
+		return ScanConfig{}
+	}
+	p := profpkg.Detect(paths, profiles)
+	if strings.TrimSpace(p.Name) == "" {
+		return ScanConfig{}
+	}
+	return ScanConfig{Profile: p.Name, Reason: "deterministic repo profile detection"}
 }
 
 func Analyze(paths []string, cfg Config) (Profile, error) {
@@ -421,12 +440,28 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 			if broadGenericOverlay(lang, ad) {
 				return fmt.Errorf("agentic prep: adapter %q is a broad generic mapping, not repo-specific prep", lang)
 			}
+			if sourceOnlyParamOverlay(ad) {
+				return fmt.Errorf("agentic prep: adapter %q only broadens public parameters as sources; add a concrete sink/mark/control mapping or return an empty overlay", lang)
+			}
 		}
 		if !seen {
 			return fmt.Errorf("agentic prep: adapter %q contains no adapter declaration", lang)
 		}
 	}
 	return nil
+}
+
+func sourceOnlyParamOverlay(ad *parser.AdapterDecl) bool {
+	hasSourceParam := false
+	for _, m := range ad.Mappings {
+		if !strings.HasPrefix(m.Kind, "source") {
+			return false
+		}
+		if m.Kind == "source_param" {
+			hasSourceParam = true
+		}
+	}
+	return hasSourceParam
 }
 
 func broadGenericOverlay(lang string, ad *parser.AdapterDecl) bool {
@@ -487,6 +522,15 @@ func WriteResult(res Result, outDir string) error {
 		name := safeAdapterFilename(f)
 		path := filepath.Join(outDir, "adapters", name)
 		if err := os.WriteFile(path, []byte(f.Source), 0o644); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(res.ScanConfig.Profile) != "" {
+		b, err := json.MarshalIndent(res.ScanConfig, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(outDir, "scan_config.json"), append(b, '\n'), 0o644); err != nil {
 			return err
 		}
 	}

@@ -21,6 +21,7 @@ type prepCLIConfig struct {
 	Model        string
 	Creds        string
 	ContextCache bool
+	Debug        bool
 }
 
 func cmdPrep(args []string) error {
@@ -32,13 +33,14 @@ func cmdPrep(args []string) error {
 	creds := fs.String("vertex-credentials", defaultVertexCredentials(), "Vertex service-account JSON file; uses ADC when empty")
 	model := fs.String("model", envDefault("VYQL_VERTEX_MODEL", "gemini-3.5-flash"), "Vertex model")
 	contextCache := fs.Bool("vertex-context-cache", envBoolDefault("VYQL_VERTEX_CONTEXT_CACHE", true), "enable Vertex explicit context caching for repeated agentic prep prompt tokens")
+	debug := fs.Bool("debug", envBool("VYQL_AGENTIC_PREP_DEBUG"), "print agentic prep debug logs to stderr")
 	format := fs.String("format", "text", "output format: text | json")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
 		return fmt.Errorf("usage: vyql prep [-provider off|vertex] [-out DIR] <path>...")
 	}
-	out, err := runAgenticPrepForScan(paths, prepCLIConfig{
+	out, _, err := runAgenticPrepForScan(paths, prepCLIConfig{
 		OutDir:       *outDir,
 		Provider:     *provider,
 		Project:      *project,
@@ -46,6 +48,7 @@ func cmdPrep(args []string) error {
 		Model:        *model,
 		Creds:        *creds,
 		ContextCache: *contextCache,
+		Debug:        *debug,
 	})
 	if err != nil {
 		return err
@@ -62,23 +65,26 @@ func cmdPrep(args []string) error {
 	return nil
 }
 
-func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, error) {
+func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, agenticprep.ScanConfig, error) {
 	out := strings.TrimSpace(cfg.OutDir)
 	if out == "" {
 		dir, err := os.MkdirTemp("", "vyql-agentic-prep-")
 		if err != nil {
-			return "", err
+			return "", agenticprep.ScanConfig{}, err
 		}
 		out = dir
 	} else if !filepath.IsAbs(out) {
 		abs, err := filepath.Abs(out)
 		if err != nil {
-			return "", err
+			return "", agenticprep.ScanConfig{}, err
 		}
 		out = abs
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
+	if cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[agentic-prep] start provider=%s out=%s paths=%s\n", cfg.Provider, out, strings.Join(paths, ","))
+	}
 
 	var provider agenticprep.Provider
 	switch strings.ToLower(strings.TrimSpace(cfg.Provider)) {
@@ -90,13 +96,14 @@ func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, error) {
 			Model:           cfg.Model,
 			CredentialsFile: cfg.Creds,
 			ContextCache:    cfg.ContextCache,
+			Debug:           cfg.Debug,
 		})
 		if err != nil {
-			return "", err
+			return "", agenticprep.ScanConfig{}, err
 		}
 		provider = p
 	default:
-		return "", fmt.Errorf("unknown agentic prep provider %q", cfg.Provider)
+		return "", agenticprep.ScanConfig{}, fmt.Errorf("unknown agentic prep provider %q", cfg.Provider)
 	}
 	res, err := agenticprep.Prepare(ctx, paths, agenticprep.Config{
 		OutDir:   out,
@@ -104,14 +111,17 @@ func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, error) {
 		Model:    cfg.Model,
 	})
 	if err != nil {
-		return "", err
+		return "", res.ScanConfig, err
 	}
-	fmt.Fprintf(os.Stderr, "[agentic-prep] wrote %s (manifest=%s languages=%d adapters=%d agent_steps=%d)\n",
-		res.OutDir, filepath.Join(res.OutDir, "manifest.json"), len(res.Profile.Languages), len(res.Proposal.AdapterFiles), len(res.Proposal.AgentLog))
+	fmt.Fprintf(os.Stderr, "[agentic-prep] wrote %s (manifest=%s scan_config=%s languages=%d adapters=%d agent_steps=%d)\n",
+		res.OutDir, filepath.Join(res.OutDir, "manifest.json"), filepath.Join(res.OutDir, "scan_config.json"), len(res.Profile.Languages), len(res.Proposal.AdapterFiles), len(res.Proposal.AgentLog))
+	if strings.TrimSpace(res.ScanConfig.Profile) != "" {
+		fmt.Fprintf(os.Stderr, "[agentic-prep] scan profile: %s (%s)\n", res.ScanConfig.Profile, res.ScanConfig.Reason)
+	}
 	for _, warning := range res.Warnings {
 		fmt.Fprintf(os.Stderr, "[agentic-prep] warning: %s\n", warning)
 	}
-	return out, nil
+	return out, res.ScanConfig, nil
 }
 
 func envDefault(key, fallback string) string {

@@ -26,8 +26,10 @@ type VertexConfig struct {
 	CredentialsFile string
 	Temperature     float64
 	Timeout         time.Duration
+	StepTimeout     time.Duration
 	ContextCache    bool
 	ContextCacheTTL time.Duration
+	Debug           bool
 }
 
 type VertexProvider struct {
@@ -35,8 +37,10 @@ type VertexProvider struct {
 	location        string
 	model           string
 	temperature     float64
+	stepTimeout     time.Duration
 	contextCache    bool
 	contextCacheTTL time.Duration
+	debug           bool
 	http            *http.Client
 	token           func(context.Context) (string, error)
 }
@@ -50,6 +54,9 @@ func NewVertexProvider(ctx context.Context, cfg VertexConfig) (*VertexProvider, 
 	}
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 90 * time.Second
+	}
+	if cfg.StepTimeout == 0 {
+		cfg.StepTimeout = 75 * time.Second
 	}
 	if cfg.ContextCacheTTL == 0 {
 		cfg.ContextCacheTTL = time.Hour
@@ -84,8 +91,10 @@ func NewVertexProvider(ctx context.Context, cfg VertexConfig) (*VertexProvider, 
 		location:        cfg.Location,
 		model:           cfg.Model,
 		temperature:     cfg.Temperature,
+		stepTimeout:     cfg.StepTimeout,
 		contextCache:    cfg.ContextCache,
 		contextCacheTTL: cfg.ContextCacheTTL,
+		debug:           cfg.Debug,
 		http:            &http.Client{Timeout: cfg.Timeout},
 		token: func(ctx context.Context) (string, error) {
 			tok, err := ts.Token()
@@ -102,6 +111,7 @@ func (p *VertexProvider) ProposeOverlay(ctx context.Context, profile Profile) (P
 	if err != nil {
 		return Proposal{}, err
 	}
+	p.debugf("start languages=%v packages=%d dep_gaps=%d samples=%d", profile.Languages, len(profile.Packages), len(profile.DepGaps), len(profile.Samples))
 	prompt := `You are a repo-local VyQL adapter preparation agent.
 
 Use tools to inspect bounded repo evidence, then call finish_overlay.
@@ -128,9 +138,13 @@ Rules:
   sink path "do_cmd" arg 2 -> code.CommandExecution
   sink path "do_local_cmd" arg 0 -> code.CommandExecution
   sink path "run" arg all -> code.CommandExecution
-- For libraries/frameworks, public API parameters can be marked as external
-  entry input when the repository code itself is the package being scanned:
-  source param -> code.ExternalEntryInput
+- For libraries/frameworks, public API parameters may be marked as external
+  entry input only when the same overlay also adds a concrete sink, mark, or
+  control that gives those parameters security meaning. Do not submit a
+  source-only source param overlay; the validator rejects broad entry-point
+  expansion. If source-only parameter expansion is the best available idea,
+  call finish_overlay with no adapter files and explain the missing concrete
+  security mapping.
 - For repo-local anti-patterns that need context instead of taint, use an
   exact analysis mark with existing review concepts:
   mark exact "analysis.function.context" val "name=orderBy" val "$direction" val "processOrderBy" nval "QUERY_ORDER_DESC" -> code.UnparameterizedSqlQueryParser
@@ -148,6 +162,11 @@ Rules:
   marks over broad generic mappings. If a CVE shape is visible in one function
   and existing concepts already describe it, a narrow mark exact overlay is
   usually better than trying to invent a source/sink flow.
+- Do not broaden an entire package just because it handles requests, protocols,
+  plugins, controllers, or model objects. Generated adapters should identify a
+  specific framework API, wrapper, sink, sanitizer/control, or narrow context
+  mark. Broad source-only overlays tend to increase noise without improving
+  scan precision.
 - Before writing mark exact "analysis.function.context", call function_context
   for the target function and choose val/nval substrings from that returned
   single function context. Do not combine vals from different functions.
@@ -164,15 +183,18 @@ Rules:
   single-file reads. Use read_file only when one exact file or offset is needed.
 - Prefer this workflow:
   1. inspect_profile
-  2. dependency_gaps. The returned gaps are ranked by deterministic security
+  2. trust_model and entrypoint_inventory to understand the repo archetype,
+     active trust boundary, request/API/CLI/config surfaces, and whether prep
+     should mostly adjust scan configuration rather than adapters.
+  3. adapter_coverage, then dependency_gaps. The returned gaps are ranked by deterministic security
      score and may include recommended_probe. If any gap is returned, call
      probe_dependency on recommended_probe before security_relevant_files,
      search_text, or read_file. Prefer dependencies that appear in request handling,
      parsing, upload, auth/session, redirect, command, filesystem, template,
      database, crypto, XML, archive, or network code.
-  3. repo_structure for unfamiliar repositories, then adapter_reference,
+  4. repo_structure for unfamiliar repositories, then adapter_reference,
      package_reference, and concept_reference
-  4. security_relevant_files, then list_files, search_context, or search_text
+  5. security_relevant_files, then list_files, search_context, or search_text
      for exact
      wrappers/routes/config. For PHP and similar ecosystems, include helper
      files such as .inc/.phtml and search command sinks plus restore/import,
@@ -193,11 +215,11 @@ Rules:
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
      check for warning suppression, sanitized error handling, or path removal.
-  5. read_files or read_file on exact evidence
-  6. function_context before any exact context mark
+  6. read_files or read_file on exact evidence
+  7. function_context before any exact context mark
      or module_context before exact marks for top-level policy/config maps
-  7. validate_overlay if producing any non-empty adapter
-  8. finish_overlay only after validation is clean, or empty if no useful
+  8. validate_overlay if producing any non-empty adapter
+  9. finish_overlay only after validation is clean, or empty if no useful
      repo-local adapter can improve scan.
 
 Repo profile:
@@ -211,14 +233,18 @@ Repo profile:
 	var log []AgentStep
 	var lastValid Proposal
 	var notes []string
+	decisionCheckpointSent := false
 	if p.contextCache {
+		p.debugf("creating vertex context cache ttl=%s", p.contextCacheTTL)
 		var err error
 		cacheName, err = p.createContextCache(ctx, fullPromptContents)
 		if err != nil {
 			notes = append(notes, "vertex context cache unavailable: "+err.Error()+"; using uncached prompt")
+			p.debugf("context cache unavailable: %v", err)
 			cacheName = ""
 		} else {
 			notes = append(notes, "vertex context cache enabled: "+cacheName)
+			p.debugf("context cache enabled name=%s", cacheName)
 			contents = []map[string]any{{
 				"role":  "user",
 				"parts": []map[string]any{{"text": "Begin the repo-local VyQL prep workflow now."}},
@@ -228,18 +254,22 @@ Repo profile:
 	const maxAgentSteps = 24
 agentLoop:
 	for step := 1; step <= maxAgentSteps; step++ {
+		p.debugf("step=%d request cached=%t turns=%d", step, cacheName != "", len(contents))
 		text, calls, modelParts, finish, err := p.generateAgentStep(ctx, contents, cacheName)
 		if err != nil {
 			if cacheName != "" {
 				notes = append(notes, "vertex context cache generate failed: "+err.Error()+"; retrying uncached")
+				p.debugf("step=%d cached generate failed: %v; retrying uncached", step, err)
 				cacheName = ""
 				contents = fullPromptContents
 				text, calls, modelParts, finish, err = p.generateAgentStep(ctx, contents, cacheName)
 			}
 		}
 		if err != nil {
+			p.debugf("step=%d error=%v", step, err)
 			return Proposal{AgentLog: log, Notes: notes}, err
 		}
+		p.debugf("step=%d finish=%s text_bytes=%d tool_calls=%s", step, finish, len(text), toolCallNames(calls))
 		entry := AgentStep{Index: step, Text: text, Finish: finish}
 		for _, call := range calls {
 			entry.ToolCalls = append(entry.ToolCalls, AgentToolCall{ID: call.ID, Name: call.Name, Arguments: call.Arguments})
@@ -281,6 +311,7 @@ agentLoop:
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
 					proposal.Notes = append(proposal.Notes, "agent overlay validation warnings: "+strings.Join(validationWarnings, "; "))
+					p.debugf("step=%d finish_overlay validation warnings=%s", step, strings.Join(validationWarnings, " | "))
 				}
 				entry.ToolResults = append(entry.ToolResults, AgentToolResult{
 					ID:     call.ID,
@@ -301,6 +332,12 @@ agentLoop:
 				return proposal, nil
 			}
 			result := p.executePrepTool(profile, call)
+			if call.Name == "validate_overlay" {
+				if warnings, ok := result["warnings"].([]string); ok && len(warnings) > 0 {
+					p.debugf("step=%d validate_overlay warnings=%s", step, strings.Join(warnings, " | "))
+				}
+				p.debugf("step=%d validate_overlay ok=%v valid_adapter_count=%v", step, result["ok"], result["valid_adapter_count"])
+			}
 			entry.ToolResults = append(entry.ToolResults, AgentToolResult{ID: call.ID, Name: call.Name, Result: result})
 			if call.Name == "validate_overlay" {
 				if ok, _ := result["ok"].(bool); ok {
@@ -317,14 +354,26 @@ agentLoop:
 		}
 		contents = append(contents, map[string]any{"role": "model", "parts": modelParts})
 		contents = append(contents, map[string]any{"role": "user", "parts": resultParts})
+		if step >= 12 && !decisionCheckpointSent && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") {
+			decisionCheckpointSent = true
+			p.debugf("step=%d injecting decision checkpoint", step)
+			contents = append(contents, map[string]any{
+				"role": "user",
+				"parts": []map[string]any{{
+					"text": "Decision checkpoint: you have enough deterministic repo setup evidence. Do not keep searching. If you have a concrete adapter with source plus sink/mark/control evidence, call validate_overlay now. If not, call finish_overlay with adapter_files=[] and concise notes about scan_config/trust_model and missing concrete adapter evidence.",
+				}},
+			})
+		}
 		log = append(log, entry)
 	}
 	if len(lastValid.AdapterFiles) > 0 {
 		lastValid.AgentLog = log
 		lastValid.Notes = append(notes, lastValid.Notes...)
 		lastValid.Notes = append(lastValid.Notes, "agent reached max_steps after validating overlay; using last valid proposal")
+		p.debugf("max_steps using last valid adapters=%d", len(lastValid.AdapterFiles))
 		return lastValid, nil
 	}
+	p.debugf("max_steps no valid overlay")
 	return Proposal{AgentLog: log, Notes: append(notes, "agent reached max_steps without finish_overlay")}, nil
 }
 
@@ -332,6 +381,33 @@ type vertexToolCall struct {
 	ID        string
 	Name      string
 	Arguments map[string]any
+}
+
+func (p *VertexProvider) debugf(format string, args ...any) {
+	if !p.debug {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "[agentic-prep:vertex] "+format+"\n", args...)
+}
+
+func toolCallNames(calls []vertexToolCall) string {
+	if len(calls) == 0 {
+		return "-"
+	}
+	names := make([]string, 0, len(calls))
+	for _, call := range calls {
+		names = append(names, call.Name)
+	}
+	return strings.Join(names, ",")
+}
+
+func hasToolCall(calls []vertexToolCall, name string) bool {
+	for _, call := range calls {
+		if call.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func vertexPrepTools() []map[string]any {
@@ -350,6 +426,36 @@ func vertexPrepTools() []map[string]any {
 			"parameters": map[string]any{
 				"type":       "object",
 				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "trust_model",
+			"description": "Return deterministic repo scan-configuration and trust-boundary evidence: selected profile, active source model, languages, manifests, and packages.",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "entrypoint_inventory",
+			"description": "Return deterministic API/route/handler/CLI/config entrypoint candidates found in repo files so prep can configure trust model and target adapters.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language": map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
+			"name":        "adapter_coverage",
+			"description": "Return repo dependency/import coverage by existing VyQL package definitions, uncovered security-relevant gaps, and recommended package probes.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language": map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
 			},
 		},
 		{
@@ -525,6 +631,11 @@ func vertexPrepTools() []map[string]any {
 }
 
 func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[string]any, cachedContent string) (string, []vertexToolCall, []map[string]any, string, error) {
+	if p.stepTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, p.stepTimeout)
+		defer cancel()
+	}
 	body := p.generateAgentStepBody(contents, cachedContent)
 	b, _ := json.Marshal(body)
 	token, err := p.token(ctx)
@@ -645,6 +756,18 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 		return map[string]any{"ok": true, "profile": profile}
 	case "adapter_reference":
 		return map[string]any{"ok": true, "reference": adapterReferenceText()}
+	case "trust_model":
+		return map[string]any{"ok": true, "trust_model": trustModelSummary(profile)}
+	case "entrypoint_inventory":
+		lang, _ := call.Arguments["language"].(string)
+		entries, err := entrypointInventory(profile, lang, intArg(call.Arguments, "max", 60))
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "entrypoints": entries}
+	case "adapter_coverage":
+		lang, _ := call.Arguments["language"].(string)
+		return map[string]any{"ok": true, "coverage": adapterCoverage(profile, lang, intArg(call.Arguments, "max", 80))}
 	case "concept_reference":
 		topic, _ := call.Arguments["topic"].(string)
 		return map[string]any{"ok": true, "concepts": conceptReference(topic)}
@@ -792,7 +915,8 @@ adapter <language> {
 
 When package_reference returns packages, wrap generated mappings in package blocks.
 Use path/method/receiver only before the quoted pattern. Put arg after the pattern.
-Use source param for library/package code whose public function parameters are caller-controlled.
+Use source param only when the same overlay also adds a concrete sink, mark, or
+control for the package. Do not emit source-only source param overlays.
 Use mark exact analysis.function.context for narrow local patterns already visible in the scanned function.
 Use mark exact analysis.module.context for top-level role, route, permission, ACL, or policy maps.
 Call function_context before exact marks and copy short returned substrings from one context only.
@@ -846,6 +970,171 @@ func conceptReference(topic string) []map[string]string {
 	}
 	if len(out) == 0 {
 		return all
+	}
+	return out
+}
+
+func trustModelSummary(profile Profile) map[string]any {
+	cfg := detectScanConfig(profile.Roots)
+	out := map[string]any{
+		"scan_config":    cfg,
+		"languages":      profile.Languages,
+		"packages":       cappedStrings(profile.Packages, 80),
+		"local_packages": cappedStrings(profile.LocalPkgs, 40),
+		"instructions": []string{
+			"Use this deterministic profile/trust-boundary setup as repo configuration.",
+			"Do not encode profile selection as adapter source mappings.",
+			"Only generate adapters for concrete framework/package APIs not already modeled.",
+		},
+	}
+	if len(profile.Manifests) > 0 {
+		manifests := profile.Manifests
+		if len(manifests) > 20 {
+			manifests = manifests[:20]
+		}
+		out["manifests"] = manifests
+	}
+	return out
+}
+
+type entrypointCandidate struct {
+	Path     string `json:"path"`
+	Line     int    `json:"line"`
+	Language string `json:"language,omitempty"`
+	Kind     string `json:"kind"`
+	Snippet  string `json:"snippet"`
+}
+
+func entrypointInventory(profile Profile, lang string, max int) ([]entrypointCandidate, error) {
+	if max <= 0 || max > 200 {
+		max = 60
+	}
+	lang = strings.TrimSpace(lang)
+	var out []entrypointCandidate
+	err := walkProfileFiles(profile, func(path string) bool {
+		fileLang := languageFor(path)
+		if lang != "" && fileLang != lang {
+			return true
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return true
+		}
+		if len(data) > 192<<10 {
+			data = data[:192<<10]
+		}
+		lines := strings.Split(string(data), "\n")
+		for i, line := range lines {
+			if kind := entrypointKind(fileLang, line); kind != "" {
+				out = append(out, entrypointCandidate{
+					Path:     displayPath(profile, path),
+					Line:     i + 1,
+					Language: fileLang,
+					Kind:     kind,
+					Snippet:  compactSnippet(line, 260),
+				})
+				if len(out) >= max {
+					return false
+				}
+			}
+		}
+		return true
+	})
+	return out, err
+}
+
+func entrypointKind(lang, line string) string {
+	lower := strings.ToLower(line)
+	switch lang {
+	case "go":
+		switch {
+		case strings.Contains(line, "http.HandleFunc") || strings.Contains(line, ".HandleFunc(") || strings.Contains(line, ".Handle("):
+			return "http_route"
+		case strings.Contains(line, "ServeHTTP("):
+			return "http_handler"
+		case strings.Contains(line, "grpc.NewServer") || strings.Contains(line, "Register") && strings.Contains(line, "Server"):
+			return "grpc_server"
+		case strings.Contains(line, "cobra.Command") || strings.Contains(line, "Use:"):
+			return "cli_command"
+		}
+	case "javascript", "typescript":
+		switch {
+		case regexp.MustCompile(`\b(app|router)\.(get|post|put|patch|delete|use)\s*\(`).MatchString(line):
+			return "http_route"
+		case strings.Contains(lower, "createhandler") || strings.Contains(lower, "create server"):
+			return "http_handler"
+		case strings.Contains(lower, "commander") || strings.Contains(lower, ".command("):
+			return "cli_command"
+		}
+	case "python":
+		switch {
+		case strings.Contains(line, "@app.route") || strings.Contains(line, "@router.") || strings.Contains(line, "add_url_rule"):
+			return "http_route"
+		case strings.Contains(line, "FastAPI(") || strings.Contains(line, "APIRouter("):
+			return "http_framework"
+		case strings.Contains(line, "argparse.") || strings.Contains(line, "click.command"):
+			return "cli_command"
+		}
+	case "java", "kotlin", "scala":
+		switch {
+		case strings.Contains(line, "@RequestMapping") || strings.Contains(line, "@GetMapping") || strings.Contains(line, "@PostMapping"):
+			return "http_route"
+		case strings.Contains(line, "extends HttpServlet") || strings.Contains(line, "doGet(") || strings.Contains(line, "doPost("):
+			return "http_handler"
+		}
+	case "php":
+		switch {
+		case strings.Contains(lower, "$_get") || strings.Contains(lower, "$_post") || strings.Contains(lower, "$_request"):
+			return "http_global"
+		case strings.Contains(lower, "route::") || strings.Contains(lower, "->get(") || strings.Contains(lower, "->post("):
+			return "http_route"
+		}
+	case "ruby":
+		switch {
+		case regexp.MustCompile(`^\s*(get|post|put|patch|delete)\s+['"]`).MatchString(line):
+			return "http_route"
+		case strings.Contains(line, "Rails.application.routes.draw"):
+			return "http_routes"
+		}
+	}
+	switch {
+	case strings.Contains(lower, "openapi") || strings.Contains(lower, "swagger"):
+		return "api_spec"
+	case strings.Contains(lower, "webhook"):
+		return "webhook"
+	case strings.Contains(lower, "config") && (strings.Contains(lower, "load") || strings.Contains(lower, "parse")):
+		return "config_load"
+	default:
+		return ""
+	}
+}
+
+func adapterCoverage(profile Profile, lang string, max int) map[string]any {
+	if max <= 0 || max > 200 {
+		max = 80
+	}
+	gaps := filteredDependencyGaps(profile, lang, max)
+	covered := packageReference(profile, lang)
+	if len(covered) > max {
+		covered = covered[:max]
+	}
+	out := map[string]any{
+		"covered_or_observed_packages": covered,
+		"uncovered_gaps":               gaps,
+		"gap_count":                    len(gaps),
+	}
+	if len(gaps) > 0 {
+		out["recommended_probe"] = map[string]any{"language": gaps[0].Language, "package": gaps[0].Package}
+		out["instruction"] = "Probe high-scoring uncovered dependencies, but only emit adapters for concrete security APIs with sources plus sinks/marks/controls."
+	}
+	return out
+}
+
+func cappedStrings(vals []string, max int) []string {
+	out := append([]string(nil), vals...)
+	sort.Strings(out)
+	if max > 0 && len(out) > max {
+		return out[:max]
 	}
 	return out
 }
@@ -1073,6 +1362,9 @@ func overlayHints(proposal Proposal) []string {
 		}
 		if strings.Contains(src, "ProtocolStateReview") {
 			hints = append(hints, "code.ProtocolStateReview is review_only in the current rule packs; it can support review/ATTENTION but will not improve vyql scan caught rate by itself.")
+		}
+		if strings.Contains(src, "source param") && !strings.Contains(src, "sink ") && !strings.Contains(src, "mark ") && !strings.Contains(src, "control ") {
+			hints = append(hints, "source param without a concrete sink, mark, or control is broad source-only expansion; return an empty overlay instead of widening public parameters.")
 		}
 		if !strings.Contains(src, "package \"") {
 			hints = append(hints, "When package_reference returns candidates, wrap mappings in package \"name\" { ... } so the overlay is dependency-gated.")

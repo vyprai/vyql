@@ -1,6 +1,7 @@
 package agenticprep
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,55 @@ func TestAnalyzeAndValidateProposal(t *testing.T) {
 	}
 }
 
+func TestPrepareWritesScanConfig(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/api\nrequire github.com/gin-gonic/gin v1.9.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "prep")
+	res, err := Prepare(context.Background(), []string{dir}, Config{OutDir: out})
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if res.ScanConfig.Profile != "api" {
+		t.Fatalf("expected api profile, got %#v", res.ScanConfig)
+	}
+	data, err := os.ReadFile(filepath.Join(out, "scan_config.json"))
+	if err != nil {
+		t.Fatalf("scan_config.json: %v", err)
+	}
+	if !strings.Contains(string(data), `"profile": "api"`) {
+		t.Fatalf("scan_config.json missing profile: %s", data)
+	}
+}
+
+func TestTrustModelAndEntrypointInventory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/api\nrequire github.com/gin-gonic/gin v1.9.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mainFile := filepath.Join(dir, "main.go")
+	if err := os.WriteFile(mainFile, []byte("package main\nimport \"net/http\"\nfunc main(){ http.HandleFunc(\"/v1/items\", handler) }\nfunc handler(w http.ResponseWriter, r *http.Request){}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	model := trustModelSummary(profile)
+	scanConfig, ok := model["scan_config"].(ScanConfig)
+	if !ok || scanConfig.Profile != "api" {
+		t.Fatalf("expected api trust model, got %#v", model["scan_config"])
+	}
+	entries, err := entrypointInventory(profile, "go", 10)
+	if err != nil {
+		t.Fatalf("entrypointInventory: %v", err)
+	}
+	if len(entries) == 0 || entries[0].Kind != "http_route" {
+		t.Fatalf("expected http route entrypoint, got %#v", entries)
+	}
+}
+
 func TestValidateProposalRequiresPackageScopeWhenPackageEvidenceExists(t *testing.T) {
 	profile := Profile{
 		Languages: map[string]int{"python": 1},
@@ -46,6 +96,50 @@ func TestValidateProposalRequiresPackageScopeWhenPackageEvidenceExists(t *testin
 	}}}
 	if err := ValidateProposal(profile, proposal, Config{}); err == nil {
 		t.Fatal("expected package-less mapping to be rejected when package evidence exists")
+	}
+}
+
+func TestValidateProposalRejectsSourceOnlyParamOverlay(t *testing.T) {
+	profile := Profile{
+		Languages: map[string]int{"go": 1},
+		Imports:   map[string][]string{"go": {"github.com/example/project/request"}},
+		Packages:  []string{"github.com/example/project/request"},
+	}
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "go",
+		Source: `adapter go {
+  package "github.com/example/project/request" {
+    source param -> code.ExternalEntryInput
+    source "Request.Name" -> code.ExternalEntryInput
+  }
+}
+`,
+		Evidence: []string{"request/request.go"},
+	}}}
+	if err := ValidateProposal(profile, proposal, Config{}); err == nil {
+		t.Fatal("expected source-only source param overlay to be rejected")
+	}
+}
+
+func TestValidateProposalAllowsParamSourceWithConcreteSink(t *testing.T) {
+	profile := Profile{
+		Languages: map[string]int{"python": 1},
+		Imports:   map[string][]string{"python": {"acme_runner"}},
+		Packages:  []string{"acme_runner"},
+	}
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "python",
+		Source: `adapter python {
+  package "acme_runner" {
+    source param -> code.ExternalEntryInput
+    sink path "run_script" arg 0 -> code.CommandExecution
+  }
+}
+`,
+		Evidence: []string{"acme_runner/__init__.py"},
+	}}}
+	if err := ValidateProposal(profile, proposal, Config{}); err != nil {
+		t.Fatalf("source param should be allowed when paired with a concrete sink: %v", err)
 	}
 }
 
