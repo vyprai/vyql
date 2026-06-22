@@ -350,6 +350,8 @@ func securityRelevanceScore(path string, text string) int {
 	score := 0
 	for token, weight := range map[string]int{
 		"exec(": 18, "system(": 18, "shell_exec": 18, "passthru": 18, "proc_open": 18, "popen(": 18,
+		"@modelcontextprotocol": 42, "mcpserver": 36, "server.tool": 42,
+		"child_process": 20, "execfile": 10, "z.number": 8,
 		"eval(": 16, "unserialize": 16, "pickle.load": 16, "yaml.load": 16,
 		"file_put_contents": 12, "fopen(": 10, "open(": 10, "writefile": 10, "sendfile": 10,
 		"move_uploaded_file": 18, "rename(": 14, "copy(": 12, "unlink(": 12, "touch(": 10,
@@ -460,6 +462,12 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				}
 				if broadCommandWrapperSink(lang, m) {
 					return fmt.Errorf("agentic prep: adapter %q maps a broad command-wrapper execute sink; use a narrow analysis.function.context mark to code.CommandStringWrapperExecution so argv-array fixes are not flagged", lang)
+				}
+				if broadMcpToolCommandMark(m) {
+					return fmt.Errorf("agentic prep: adapter %q maps a broad MCP tool command mark; include concrete exec command-template evidence and nval hardening such as execFile so fixed argv-array code is not flagged", lang)
+				}
+				if localExactContextMapping(m) && len(m.Packages) > 0 {
+					return fmt.Errorf("agentic prep: adapter %q package-scopes an exact context mark; keep exact context marks unscoped and put package/dependency evidence in adapter evidence instead of a package gate", lang)
 				}
 				if requirePackageScope && len(m.Packages) == 0 && !localExactContextMapping(m) {
 					return fmt.Errorf("agentic prep: adapter %q mapping %q -> %s is not package-scoped; wrap repo-local/generated mappings in package \"<dependency-or-project-package>\" { ... }", lang, m.Pattern, m.Concept)
@@ -639,6 +647,38 @@ func broadCommandWrapperSink(lang string, m parser.AdapterMapping) bool {
 		return true
 	}
 	return false
+}
+
+func broadMcpToolCommandMark(m parser.AdapterMapping) bool {
+	if m.Concept != "code.McpToolCommandTemplateExecution" {
+		return false
+	}
+	if !localExactContextMapping(m) {
+		return true
+	}
+	hasCommandTemplate := false
+	for _, v := range m.ValMatches {
+		lv := strings.ToLower(v)
+		if strings.Contains(lv, "exec(") ||
+			strings.Contains(lv, "child_process.exec") ||
+			strings.Contains(lv, "lsof") ||
+			strings.Contains(lv, "ps -p") ||
+			strings.Contains(lv, "`") {
+			hasCommandTemplate = true
+			break
+		}
+	}
+	hasHardeningNval := false
+	for _, nv := range m.ValAbsents {
+		lnv := strings.ToLower(nv)
+		if strings.Contains(lnv, "execfile") ||
+			strings.Contains(lnv, "spawn(") ||
+			strings.Contains(lnv, "spawnfile") {
+			hasHardeningNval = true
+			break
+		}
+	}
+	return !hasCommandTemplate || !hasHardeningNval
 }
 
 func localExactContextMapping(m parser.AdapterMapping) bool {
@@ -1041,6 +1081,7 @@ func dependencyGapScore(c dependencyCandidate) int {
 		"crypto": 30, "cipher": 30, "signature": 35, "attestation": 40,
 		"predicate": 30, "sigstore": 28, "jms": 18, "message": 18,
 		"deserialize": 40, "objectmessage": 35, "cache": 10,
+		"modelcontextprotocol": 55, "mcp": 24, "stdio": 10,
 	} {
 		if strings.Contains(text, token) {
 			score += weight

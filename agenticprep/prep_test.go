@@ -526,6 +526,111 @@ func TestPrepRejectsBroadCommandWrapperSink(t *testing.T) {
 	}
 }
 
+func TestPrepRanksMcpToolCommandTemplates(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"dependencies":{"@modelcontextprotocol/sdk":"^1.0.0","zod":"^3.0.0","@acme/plainlib":"1.0.0"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srcPath := filepath.Join(dir, "src", "index.ts")
+	if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { exec } from "child_process";
+
+const server = new McpServer({ name: "Demo", version: "1.0.0" });
+server.tool("which-app-on-port", { port: z.number() }, async ({ port }) => {
+  exec(` + "`lsof -t -i tcp:${port}`" + `, (error, pidStdout) => {
+    const pid = pidStdout.trim();
+    exec(` + "`ps -p ${pid} -o comm=`" + `, () => {});
+  });
+});
+await server.connect(new StdioServerTransport());
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	noisePath := filepath.Join(dir, "src", "predicate.ts")
+	noise := `export function filterPredicate(items, predicate) {
+  return items.filter(item => item.predicate === predicate);
+}
+`
+	if err := os.WriteFile(noisePath, []byte(noise), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "javascript", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != srcPath {
+		t.Fatalf("expected MCP tool index.ts first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "server.tool") || !strings.Contains(files[0].Snippet, "exec(`lsof") {
+		t.Fatalf("expected MCP command snippet, got %q", files[0].Snippet)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected MCP tool profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	if !containsString(callTerms, "tool") || !containsString(callTerms, "exec") {
+		t.Fatalf("expected focused MCP tool call terms, got %#v", callTerms)
+	}
+	if containsString(callTerms, "predicate") || containsString(callTerms, "provenance") {
+		t.Fatalf("MCP tool profile should outrank predicate/provenance terms, got %#v", callTerms)
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	if !containsString(assignmentTerms, "port") || !containsString(assignmentTerms, "exec") {
+		t.Fatalf("expected MCP assignment terms, got %#v", assignmentTerms)
+	}
+	mcpScore := dependencyGapScoreForTest(profile.DepGaps, "@modelcontextprotocol/sdk")
+	plainScore := dependencyGapScoreForTest(profile.DepGaps, "@acme/plainlib")
+	if mcpScore <= plainScore {
+		t.Fatalf("expected MCP dependency score above plain dependency, mcp=%d plain=%d gaps=%#v", mcpScore, plainScore, profile.DepGaps)
+	}
+
+	broad := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  mark exact "analysis.module.context" val "server.tool(\"which-app-on-port\"" val "port:z.number()" -> code.McpToolCommandTemplateExecution
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, broad, Config{}); err == nil || !strings.Contains(err.Error(), "broad MCP tool command mark") {
+		t.Fatalf("expected broad MCP mark rejection, got %v", err)
+	}
+	narrow := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  mark exact "analysis.module.context" val "server.tool" val "exec(` + "`lsof-t-itcp:${port}`" + `" nval "execFile(" -> code.McpToolCommandTemplateExecution
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow MCP mark to validate: %v", err)
+	}
+	packagedExact := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  package "@modelcontextprotocol/sdk" {
+    mark exact "analysis.module.context" val "server.tool" val "exec(` + "`lsof-t-itcp:${port}`" + `" nval "execFile(" -> code.McpToolCommandTemplateExecution
+  }
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, packagedExact, Config{}); err == nil || !strings.Contains(err.Error(), "package-scopes an exact context mark") {
+		t.Fatalf("expected package-scoped exact context rejection, got %v", err)
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)
@@ -948,6 +1053,20 @@ func TestPrepConceptReferenceIncludesFilesystemImageDirentTraversal(t *testing.T
 	}
 	if !found {
 		t.Fatalf("expected filesystem image dirent traversal scan concept in reference, got %#v", concepts)
+	}
+}
+
+func TestPrepConceptReferenceIncludesMcpToolCommandTemplate(t *testing.T) {
+	concepts := conceptReference("mcp")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.McpToolCommandTemplateExecution" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected MCP tool command template scan concept in reference, got %#v", concepts)
 	}
 }
 

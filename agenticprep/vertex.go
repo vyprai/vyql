@@ -130,6 +130,10 @@ Rules:
     }
   }
 - Keep mappings conservative and selector-backed.
+- Do not wrap exact analysis.function.context, analysis.module.context, or
+  analysis.class.context marks in package blocks. Those marks are already
+  localized by exact repo evidence; put dependency evidence in the adapter file
+  evidence list instead of creating a package gate.
 - For first-party/local project APIs, prefer generalized API mappings already
   meaningful across projects, narrow analysis.function.context marks, or an
   empty overlay with notes. Empty-overlay notes must explicitly say whether a
@@ -237,6 +241,20 @@ Rules:
      a narrow command-string wrapper mark. Do not model generic execute wrappers
      as code.CommandExecution sinks when the safe form is an argv array; that
      catches fixed code. Prefer code.CommandStringWrapperExecution exact context.
+     For MCP server repositories, treat server.tool callback parameters as
+     externally supplied tool input. Inspect @modelcontextprotocol/sdk imports,
+     McpServer construction, server.tool schemas such as z.number/string/object,
+     and child_process exec/execFile calls inside tool handlers. If a tool
+     handler interpolates callback parameters into shell command templates,
+     prefer a narrow function_context mark to code.McpToolCommandTemplateExecution
+     with execFile or argv-array calls as hardening evidence. If the
+     framework call that establishes the tool boundary is outside the handler
+     body, call module_context and use a narrow analysis.module.context mark
+     containing both server.tool and the command templates. MCP command marks
+     must include concrete exec command-template vals and an nval for fixed
+     hardening such as execFile or argv arrays; schema-only marks like
+     server.tool plus z.number are too broad and will catch fixed code. Do not
+     finish empty merely because child_process.exec is already a core command sink.
      For archive or filesystem-image extraction CVEs, inspect directory entry
      names read from image/archive buffers before mkdir, open, write, recursive
      expand, or extraction calls. In C, prioritize functions and calls named
@@ -687,6 +705,8 @@ func requiresSymbolInventory(profile Profile) bool {
 		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
 		"generatederivativeresponse", "$this->cmd->execute",
 		"process::fromshellcommandline", "processbuilder", "command string",
+		"@modelcontextprotocol", "mcpserver", "server.tool",
+		"stdioservertransport", "child_process", "execfile", "z.number",
 		"memcpy(newpath + pathlen", "child->namelen", "do_directory",
 		"expand_fs", "romfs_read", "namelen", "dirent",
 		"bad filename", "strchr(name", "strcmp(name", "extract", "unpack",
@@ -735,6 +755,8 @@ func requiresSymbolInventory(profile Profile) bool {
 
 func requiredCallInventoryTerms(profile Profile) []string {
 	switch {
+	case mcpToolProfile(profile):
+		return []string{"tool", "server.tool", "mcpserver", "exec", "execfile", "child_process", "z.number", "port"}
 	case commandWrapperProfile(profile):
 		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
@@ -775,6 +797,8 @@ func requiresAssignmentInventory(profile Profile) bool {
 
 func requiredAssignmentInventoryTerms(profile Profile) []string {
 	switch {
+	case mcpToolProfile(profile):
+		return []string{"port", "args", "command", "pid", "exec", "tool", "schema"}
 	case commandWrapperProfile(profile):
 		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process"}
 	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
@@ -804,6 +828,16 @@ func commandWrapperProfile(profile Profile) bool {
 		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
 		"generatederivativeresponse", "$this->cmd->execute",
 		"process::fromshellcommandline", "processbuilder", "command string",
+	})
+}
+
+func mcpToolProfile(profile Profile) bool {
+	if profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{
+		"@modelcontextprotocol", "mcpserver", "server.tool",
+		"stdioservertransport", "child_process", "z.number",
 	})
 }
 
@@ -1435,7 +1469,9 @@ adapter <language> {
   }
 }
 
-When package_reference returns third-party packages, wrap generated mappings in package blocks.
+When package_reference returns third-party packages, wrap generated API source,
+sink, and control mappings in package blocks.
+Do not package-wrap exact analysis.*.context marks.
 Do not package-wrap first-party workspace package names from local manifests.
 Use path/method/receiver only before the quoted pattern. Put arg after the pattern.
 Use source param only when the same overlay also adds a concrete sink, mark, or
@@ -1456,7 +1492,7 @@ code.UnparameterizedSqlQueryParser, code.ProtocolStateReview,
 code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
 code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
 code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal,
-code.CommandStringWrapperExecution.
+code.CommandStringWrapperExecution, code.McpToolCommandTemplateExecution.
 `)
 }
 
@@ -1483,6 +1519,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
 		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "mark for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
 		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "mark for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
+		{"concept": "code.McpToolCommandTemplateExecution", "surface": "scan", "use": "mark for MCP server.tool handlers whose externally supplied tool callback parameters are interpolated into child_process.exec shell command templates instead of execFile argv arrays; include command-template vals and nval execFile/spawn hardening; use analysis.module.context when the server.tool registration wraps the handler body"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
 		{"concept": "core.PathAccessCheck", "surface": "control", "use": "control concept for containment, normalization, allowlist, or traversal guard"},
 	}
@@ -2566,7 +2603,7 @@ func overlayHints(profile Profile, proposal Proposal) []string {
 			hints = append(hints, "source param without a concrete sink, mark, or control is broad source-only expansion; return an empty overlay instead of widening public parameters.")
 		}
 		if !strings.Contains(src, "package \"") {
-			hints = append(hints, "When package_reference returns third-party candidates, wrap mappings in package \"name\" { ... }; for first-party local packages prefer generalized mappings or empty overlay.")
+			hints = append(hints, "When package_reference returns third-party candidates, wrap generated API source/sink/control mappings in package \"name\" { ... }; keep exact analysis.*.context marks unscoped.")
 		}
 		for pkg := range firstPartyPackages {
 			if strings.Contains(src, `package "`+pkg+`"`) {

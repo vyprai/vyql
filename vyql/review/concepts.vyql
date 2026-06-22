@@ -641,6 +641,12 @@ review code.CommandStringWrapperExecution {
   expected: [core.ShellEscape]
   text: "review command wrapper calls for argv-array execution instead of formatted shell command strings"
 }
+review code.McpToolCommandTemplateExecution {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review MCP tool handlers for execFile or argv-array execution instead of shell command templates"
+}
 review code.ConnectCmsCodestudiesPluginCodeExecution {
   category: "code_execution"
   kind: "attention"

@@ -273,6 +273,15 @@ concept CommandStringWrapperExecution : sink {
   review_assumption: "request-controlled command fragments can contain shell or argument delimiter characters interpreted by the wrapper"
   review_confidence: high
 }
+concept McpToolCommandTemplateExecution : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_77, CWE_78]
+  review_category: "command"
+  review_condition: "MCP tool handler parameters are interpolated into child_process.exec command templates"
+  review_evidence: "MCP tool handler context {pattern} formats a tool argument into a shell command template"
+  review_assumption: "MCP tool callers can provide argument values that reach the handler"
+  review_confidence: high
+}
 concept ConnectCmsCodestudiesPluginCodeExecution : sink {
   vulnerable_to: [injection.CodeInjection, injection.CommandInjection]
   cwe: [CWE_94, CWE_78]

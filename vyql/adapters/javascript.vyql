@@ -231,6 +231,7 @@ adapter javascript {
   sink path "shell.exec" -> code.CommandExecution
   sink path "webpack-shell-plugin-next" -> code.CommandExecution
   sink path "WebpackShellPlugin" -> code.CommandExecution
+  mark exact "analysis.module.context" val "lang=javascript" val "server.tool" val "lsof -t -i tcp:${port}" val "ps -p ${pid} -o comm=" nval "execFile(" -> code.McpToolCommandTemplateExecution
   sink path "eval" -> code.CodeEval
   sink path "Function" -> code.CodeEval
   sink path "vm.runInNewContext" -> code.CodeEval

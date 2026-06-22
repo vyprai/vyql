@@ -137,6 +137,11 @@ rule CommandStringWrapperExecution {
   match code.CommandStringWrapperExecution as sink
 }
 
+rule McpToolCommandTemplateExecution {
+  meta { id: "VYQL-INJ-120", severity: critical, cwe: [CWE_77, CWE_78], confidence_floor: high }
+  match code.McpToolCommandTemplateExecution as sink
+}
+
 rule ConnectCmsCodestudiesPluginCodeExecution {
   meta { id: "VYQL-INJ-100", severity: critical, cwe: [CWE_94, CWE_78], confidence_floor: high }
   match code.ConnectCmsCodestudiesPluginCodeExecution as sink
