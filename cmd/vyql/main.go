@@ -114,6 +114,7 @@ func cmdScan(args []string) error {
 	agenticPrepLocation := fs.String("agentic-prep-location", envDefault("VYQL_VERTEX_LOCATION", "global"), "Vertex location for agentic prep")
 	agenticPrepCredentials := fs.String("agentic-prep-credentials", defaultVertexCredentials(), "Vertex service-account JSON file for agentic prep")
 	agenticPrepModel := fs.String("agentic-prep-model", envDefault("VYQL_VERTEX_MODEL", "gemini-3.5-flash"), "Vertex model for agentic prep")
+	agenticPrepContextCache := fs.Bool("agentic-prep-context-cache", envBoolDefault("VYQL_VERTEX_CONTEXT_CACHE", true), "enable Vertex explicit context caching for repeated agentic prep prompt tokens")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -124,12 +125,13 @@ func cmdScan(args []string) error {
 	defer cleanup()
 	if *agenticPrep {
 		out, err := runAgenticPrepForScan(paths, prepCLIConfig{
-			OutDir:   *agenticPrepOut,
-			Provider: *agenticPrepProvider,
-			Project:  *agenticPrepProject,
-			Location: *agenticPrepLocation,
-			Model:    *agenticPrepModel,
-			Creds:    *agenticPrepCredentials,
+			OutDir:       *agenticPrepOut,
+			Provider:     *agenticPrepProvider,
+			Project:      *agenticPrepProject,
+			Location:     *agenticPrepLocation,
+			Model:        *agenticPrepModel,
+			Creds:        *agenticPrepCredentials,
+			ContextCache: *agenticPrepContextCache,
 		})
 		if err != nil {
 			return err

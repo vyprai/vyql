@@ -14,12 +14,13 @@ import (
 )
 
 type prepCLIConfig struct {
-	OutDir   string
-	Provider string
-	Project  string
-	Location string
-	Model    string
-	Creds    string
+	OutDir       string
+	Provider     string
+	Project      string
+	Location     string
+	Model        string
+	Creds        string
+	ContextCache bool
 }
 
 func cmdPrep(args []string) error {
@@ -30,6 +31,7 @@ func cmdPrep(args []string) error {
 	location := fs.String("vertex-location", envDefault("VYQL_VERTEX_LOCATION", "global"), "Vertex location")
 	creds := fs.String("vertex-credentials", defaultVertexCredentials(), "Vertex service-account JSON file; uses ADC when empty")
 	model := fs.String("model", envDefault("VYQL_VERTEX_MODEL", "gemini-3.5-flash"), "Vertex model")
+	contextCache := fs.Bool("vertex-context-cache", envBoolDefault("VYQL_VERTEX_CONTEXT_CACHE", true), "enable Vertex explicit context caching for repeated agentic prep prompt tokens")
 	format := fs.String("format", "text", "output format: text | json")
 	_ = fs.Parse(args)
 	paths := fs.Args()
@@ -37,12 +39,13 @@ func cmdPrep(args []string) error {
 		return fmt.Errorf("usage: vyql prep [-provider off|vertex] [-out DIR] <path>...")
 	}
 	out, err := runAgenticPrepForScan(paths, prepCLIConfig{
-		OutDir:   *outDir,
-		Provider: *provider,
-		Project:  *project,
-		Location: *location,
-		Model:    *model,
-		Creds:    *creds,
+		OutDir:       *outDir,
+		Provider:     *provider,
+		Project:      *project,
+		Location:     *location,
+		Model:        *model,
+		Creds:        *creds,
+		ContextCache: *contextCache,
 	})
 	if err != nil {
 		return err
@@ -86,6 +89,7 @@ func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, error) {
 			Location:        cfg.Location,
 			Model:           cfg.Model,
 			CredentialsFile: cfg.Creds,
+			ContextCache:    cfg.ContextCache,
 		})
 		if err != nil {
 			return "", err
@@ -123,6 +127,20 @@ func envBool(key string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func envBoolDefault(key string, fallback bool) bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	case "":
+		return fallback
+	default:
+		return fallback
 	}
 }
 

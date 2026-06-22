@@ -26,15 +26,19 @@ type VertexConfig struct {
 	CredentialsFile string
 	Temperature     float64
 	Timeout         time.Duration
+	ContextCache    bool
+	ContextCacheTTL time.Duration
 }
 
 type VertexProvider struct {
-	project     string
-	location    string
-	model       string
-	temperature float64
-	http        *http.Client
-	token       func(context.Context) (string, error)
+	project         string
+	location        string
+	model           string
+	temperature     float64
+	contextCache    bool
+	contextCacheTTL time.Duration
+	http            *http.Client
+	token           func(context.Context) (string, error)
 }
 
 func NewVertexProvider(ctx context.Context, cfg VertexConfig) (*VertexProvider, error) {
@@ -46,6 +50,9 @@ func NewVertexProvider(ctx context.Context, cfg VertexConfig) (*VertexProvider, 
 	}
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 90 * time.Second
+	}
+	if cfg.ContextCacheTTL == 0 {
+		cfg.ContextCacheTTL = time.Hour
 	}
 	const scope = "https://www.googleapis.com/auth/cloud-platform"
 	var creds *google.Credentials
@@ -73,11 +80,13 @@ func NewVertexProvider(ctx context.Context, cfg VertexConfig) (*VertexProvider, 
 	}
 	ts := creds.TokenSource
 	return &VertexProvider{
-		project:     cfg.Project,
-		location:    cfg.Location,
-		model:       cfg.Model,
-		temperature: cfg.Temperature,
-		http:        &http.Client{Timeout: cfg.Timeout},
+		project:         cfg.Project,
+		location:        cfg.Location,
+		model:           cfg.Model,
+		temperature:     cfg.Temperature,
+		contextCache:    cfg.ContextCache,
+		contextCacheTTL: cfg.ContextCacheTTL,
+		http:            &http.Client{Timeout: cfg.Timeout},
 		token: func(ctx context.Context) (string, error) {
 			tok, err := ts.Token()
 			if err != nil {
@@ -193,28 +202,54 @@ Rules:
 
 Repo profile:
 ` + string(payload)
-	contents := []map[string]any{{
+	fullPromptContents := []map[string]any{{
 		"role":  "user",
 		"parts": []map[string]any{{"text": prompt}},
 	}}
+	contents := fullPromptContents
+	var cacheName string
 	var log []AgentStep
 	var lastValid Proposal
+	var notes []string
+	if p.contextCache {
+		var err error
+		cacheName, err = p.createContextCache(ctx, fullPromptContents)
+		if err != nil {
+			notes = append(notes, "vertex context cache unavailable: "+err.Error()+"; using uncached prompt")
+			cacheName = ""
+		} else {
+			notes = append(notes, "vertex context cache enabled: "+cacheName)
+			contents = []map[string]any{{
+				"role":  "user",
+				"parts": []map[string]any{{"text": "Begin the repo-local VyQL prep workflow now."}},
+			}}
+		}
+	}
 	const maxAgentSteps = 24
 agentLoop:
 	for step := 1; step <= maxAgentSteps; step++ {
-		text, calls, modelParts, finish, err := p.generateAgentStep(ctx, contents)
+		text, calls, modelParts, finish, err := p.generateAgentStep(ctx, contents, cacheName)
 		if err != nil {
-			return Proposal{AgentLog: log}, err
+			if cacheName != "" {
+				notes = append(notes, "vertex context cache generate failed: "+err.Error()+"; retrying uncached")
+				cacheName = ""
+				contents = fullPromptContents
+				text, calls, modelParts, finish, err = p.generateAgentStep(ctx, contents, cacheName)
+			}
+		}
+		if err != nil {
+			return Proposal{AgentLog: log, Notes: notes}, err
 		}
 		entry := AgentStep{Index: step, Text: text, Finish: finish}
 		for _, call := range calls {
 			entry.ToolCalls = append(entry.ToolCalls, AgentToolCall{ID: call.ID, Name: call.Name, Arguments: call.Arguments})
 		}
 		if len(calls) == 0 {
-			proposal := Proposal{AgentLog: append(log, entry)}
+			proposal := Proposal{AgentLog: append(log, entry), Notes: append([]string{}, notes...)}
 			if strings.TrimSpace(text) != "" {
 				if err := json.Unmarshal([]byte(text), &proposal); err == nil {
 					proposal.AgentLog = append(log, entry)
+					proposal.Notes = append(notes, proposal.Notes...)
 				} else {
 					proposal.Notes = append(proposal.Notes, "agent returned text without finish_overlay tool call")
 				}
@@ -262,6 +297,7 @@ agentLoop:
 					continue agentLoop
 				}
 				proposal.AgentLog = append(log, entry)
+				proposal.Notes = append(notes, proposal.Notes...)
 				return proposal, nil
 			}
 			result := p.executePrepTool(profile, call)
@@ -285,10 +321,11 @@ agentLoop:
 	}
 	if len(lastValid.AdapterFiles) > 0 {
 		lastValid.AgentLog = log
+		lastValid.Notes = append(notes, lastValid.Notes...)
 		lastValid.Notes = append(lastValid.Notes, "agent reached max_steps after validating overlay; using last valid proposal")
 		return lastValid, nil
 	}
-	return Proposal{AgentLog: log, Notes: []string{"agent reached max_steps without finish_overlay"}}, nil
+	return Proposal{AgentLog: log, Notes: append(notes, "agent reached max_steps without finish_overlay")}, nil
 }
 
 type vertexToolCall struct {
@@ -297,200 +334,198 @@ type vertexToolCall struct {
 	Arguments map[string]any
 }
 
-func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[string]any) (string, []vertexToolCall, []map[string]any, string, error) {
-	body := map[string]any{
-		"contents": contents,
-		"tools": []map[string]any{{"functionDeclarations": []map[string]any{
-			{
-				"name":        "inspect_profile",
-				"description": "Return the bounded deterministic repository profile.",
-				"parameters": map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
-				},
+func vertexPrepTools() []map[string]any {
+	return []map[string]any{{"functionDeclarations": []map[string]any{
+		{
+			"name":        "inspect_profile",
+			"description": "Return the bounded deterministic repository profile.",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
 			},
-			{
-				"name":        "adapter_reference",
-				"description": "Return concise VyQL adapter syntax examples and supported concept families.",
-				"parameters": map[string]any{
-					"type":       "object",
-					"properties": map[string]any{},
-				},
-			},
-			{
-				"name":        "concept_reference",
-				"description": "Return existing VyQL concepts useful for repo-local prep marks and sinks.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"topic": map[string]any{"type": "string"},
-					},
-				},
-			},
-			{
-				"name":        "package_reference",
-				"description": "Return package/import/manifest candidates that should be used for explicit package-scoped adapter blocks.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"language": map[string]any{"type": "string"},
-					},
-				},
-			},
-			{
-				"name":        "dependency_gaps",
-				"description": "Return manifest/import dependencies observed in the repository that do not have an existing VyQL package definition.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"language": map[string]any{"type": "string"},
-						"max":      map[string]any{"type": "integer"},
-					},
-				},
-			},
-			{
-				"name":        "probe_dependency",
-				"description": "Probe source usage of one uncovered dependency: import evidence, nearby usage lines, and files likely needing a repo-local adapter.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"language": map[string]any{"type": "string"},
-						"package":  map[string]any{"type": "string"},
-						"max":      map[string]any{"type": "integer"},
-					},
-					"required": []string{"package"},
-				},
-			},
-			{
-				"name":        "list_files",
-				"description": "List bounded source/config files under scan roots, optionally filtered by extension or substring.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"contains":  map[string]any{"type": "string"},
-						"extension": map[string]any{"type": "string"},
-						"max":       map[string]any{"type": "integer"},
-					},
-				},
-			},
-			{
-				"name":        "repo_structure",
-				"description": "Return a ranked directory summary with language counts, security scores, and representative files for repo orientation.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"max": map[string]any{"type": "integer"},
-					},
-				},
-			},
-			{
-				"name":        "security_relevant_files",
-				"description": "Return source files ranked by deterministic security relevance: command/code execution, SQL, deserialization, redirects, file/path/archive/restore/import/upload flows, and user-controlled inputs.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"language": map[string]any{"type": "string"},
-						"max":      map[string]any{"type": "integer"},
-					},
-				},
-			},
-			{
-				"name":        "search_text",
-				"description": "Search source/config files under scan roots with a Go regular expression or literal substring.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"pattern":    map[string]any{"type": "string"},
-						"regex":      map[string]any{"type": "boolean"},
-						"ignoreCase": map[string]any{"type": "boolean"},
-						"max":        map[string]any{"type": "integer"},
-					},
-					"required": []string{"pattern"},
-				},
-			},
-			{
-				"name":        "search_context",
-				"description": "Search source/config files and return bounded surrounding context lines around each match.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"pattern":    map[string]any{"type": "string"},
-						"regex":      map[string]any{"type": "boolean"},
-						"ignoreCase": map[string]any{"type": "boolean"},
-						"before":     map[string]any{"type": "integer"},
-						"after":      map[string]any{"type": "integer"},
-						"max":        map[string]any{"type": "integer"},
-					},
-					"required": []string{"pattern"},
-				},
-			},
-			{
-				"name":        "read_file",
-				"description": "Read bounded bytes from a source file under the scanned repository. Supports relative paths and byte offsets.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"path":      map[string]any{"type": "string"},
-						"offset":    map[string]any{"type": "integer"},
-						"max_bytes": map[string]any{"type": "integer"},
-					},
-					"required": []string{"path"},
-				},
-			},
-			{
-				"name":        "read_files",
-				"description": "Read multiple bounded source files under the scanned repository in one tool call.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"paths":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-						"max_bytes": map[string]any{"type": "integer"},
-					},
-					"required": []string{"paths"},
-				},
-			},
-			{
-				"name":        "function_context",
-				"description": "Return matchable function context previews for exact analysis.function.context marks. Use before writing mark exact overlays.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"path":     map[string]any{"type": "string"},
-						"name":     map[string]any{"type": "string"},
-						"contains": map[string]any{"type": "string"},
-						"max":      map[string]any{"type": "integer"},
-					},
-					"required": []string{"path"},
-				},
-			},
-			{
-				"name":        "module_context",
-				"description": "Return matchable top-level declaration previews for exact analysis.module.context marks. Use for static role, route, permission, ACL, or policy maps.",
-				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"path":     map[string]any{"type": "string"},
-						"contains": map[string]any{"type": "string"},
-						"max":      map[string]any{"type": "integer"},
-					},
-					"required": []string{"path"},
-				},
-			},
-			{
-				"name":        "validate_overlay",
-				"description": "Validate proposed VyQL adapter overlay JSON before finalizing.",
-				"parameters":  finishOverlayParameters(),
-			},
-			{
-				"name":        "finish_overlay",
-				"description": "Finish with repo-local VyQL adapter overlay files.",
-				"parameters":  finishOverlayParameters(),
-			},
-		}}},
-		"generationConfig": map[string]any{
-			"temperature": p.temperature,
 		},
-	}
+		{
+			"name":        "adapter_reference",
+			"description": "Return concise VyQL adapter syntax examples and supported concept families.",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "concept_reference",
+			"description": "Return existing VyQL concepts useful for repo-local prep marks and sinks.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"topic": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			"name":        "package_reference",
+			"description": "Return package/import/manifest candidates that should be used for explicit package-scoped adapter blocks.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language": map[string]any{"type": "string"},
+				},
+			},
+		},
+		{
+			"name":        "dependency_gaps",
+			"description": "Return manifest/import dependencies observed in the repository that do not have an existing VyQL package definition.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language": map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
+			"name":        "probe_dependency",
+			"description": "Probe source usage of one uncovered dependency: import evidence, nearby usage lines, and files likely needing a repo-local adapter.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language": map[string]any{"type": "string"},
+					"package":  map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
+				"required": []string{"package"},
+			},
+		},
+		{
+			"name":        "list_files",
+			"description": "List bounded source/config files under scan roots, optionally filtered by extension or substring.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"contains":  map[string]any{"type": "string"},
+					"extension": map[string]any{"type": "string"},
+					"max":       map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
+			"name":        "repo_structure",
+			"description": "Return a ranked directory summary with language counts, security scores, and representative files for repo orientation.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"max": map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
+			"name":        "security_relevant_files",
+			"description": "Return source files ranked by deterministic security relevance: command/code execution, SQL, deserialization, redirects, file/path/archive/restore/import/upload flows, and user-controlled inputs.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language": map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
+			"name":        "search_text",
+			"description": "Search source/config files under scan roots with a Go regular expression or literal substring.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"pattern":    map[string]any{"type": "string"},
+					"regex":      map[string]any{"type": "boolean"},
+					"ignoreCase": map[string]any{"type": "boolean"},
+					"max":        map[string]any{"type": "integer"},
+				},
+				"required": []string{"pattern"},
+			},
+		},
+		{
+			"name":        "search_context",
+			"description": "Search source/config files and return bounded surrounding context lines around each match.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"pattern":    map[string]any{"type": "string"},
+					"regex":      map[string]any{"type": "boolean"},
+					"ignoreCase": map[string]any{"type": "boolean"},
+					"before":     map[string]any{"type": "integer"},
+					"after":      map[string]any{"type": "integer"},
+					"max":        map[string]any{"type": "integer"},
+				},
+				"required": []string{"pattern"},
+			},
+		},
+		{
+			"name":        "read_file",
+			"description": "Read bounded bytes from a source file under the scanned repository. Supports relative paths and byte offsets.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path":      map[string]any{"type": "string"},
+					"offset":    map[string]any{"type": "integer"},
+					"max_bytes": map[string]any{"type": "integer"},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			"name":        "read_files",
+			"description": "Read multiple bounded source files under the scanned repository in one tool call.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"paths":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+					"max_bytes": map[string]any{"type": "integer"},
+				},
+				"required": []string{"paths"},
+			},
+		},
+		{
+			"name":        "function_context",
+			"description": "Return matchable function context previews for exact analysis.function.context marks. Use before writing mark exact overlays.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path":     map[string]any{"type": "string"},
+					"name":     map[string]any{"type": "string"},
+					"contains": map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			"name":        "module_context",
+			"description": "Return matchable top-level declaration previews for exact analysis.module.context marks. Use for static role, route, permission, ACL, or policy maps.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path":     map[string]any{"type": "string"},
+					"contains": map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			"name":        "validate_overlay",
+			"description": "Validate proposed VyQL adapter overlay JSON before finalizing.",
+			"parameters":  finishOverlayParameters(),
+		},
+		{
+			"name":        "finish_overlay",
+			"description": "Finish with repo-local VyQL adapter overlay files.",
+			"parameters":  finishOverlayParameters(),
+		},
+	}}}
+}
+
+func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[string]any, cachedContent string) (string, []vertexToolCall, []map[string]any, string, error) {
+	body := p.generateAgentStepBody(contents, cachedContent)
 	b, _ := json.Marshal(body)
 	token, err := p.token(ctx)
 	if err != nil {
@@ -506,7 +541,66 @@ func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[s
 	return vertexResponseParts(data)
 }
 
+func (p *VertexProvider) generateAgentStepBody(contents []map[string]any, cachedContent string) map[string]any {
+	body := map[string]any{
+		"contents": contents,
+		"tools":    vertexPrepTools(),
+		"generationConfig": map[string]any{
+			"temperature": p.temperature,
+		},
+	}
+	if cachedContent != "" {
+		body["cachedContent"] = cachedContent
+		delete(body, "tools")
+	}
+	return body
+}
+
+func (p *VertexProvider) createContextCache(ctx context.Context, contents []map[string]any) (string, error) {
+	token, err := p.token(ctx)
+	if err != nil {
+		return "", err
+	}
+	ttl := p.contextCacheTTL
+	if ttl <= 0 {
+		ttl = time.Hour
+	}
+	body := map[string]any{
+		"displayName": fmt.Sprintf("vyql-agentic-prep-%d", time.Now().Unix()),
+		"model":       p.modelResource(),
+		"contents":    contents,
+		"tools":       vertexPrepTools(),
+		"ttl":         fmt.Sprintf("%ds", int(ttl.Seconds())),
+	}
+	b, _ := json.Marshal(body)
+	data, status, err := p.doVertexPost(ctx, token, p.cachedContentsEndpoint(), b)
+	if err != nil {
+		return "", err
+	}
+	if status < 200 || status >= 300 {
+		return "", fmt.Errorf("vertex HTTP %d: %s", status, compactSnippet(string(data), 500))
+	}
+	var raw struct {
+		Name          string `json:"name"`
+		ExpireTime    string `json:"expireTime"`
+		UsageMetadata struct {
+			TotalTokenCount int `json:"totalTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return "", err
+	}
+	if raw.Name == "" {
+		return "", errors.New("vertex cache response missing name")
+	}
+	return raw.Name, nil
+}
+
 func (p *VertexProvider) doGenerateContent(ctx context.Context, token string, body []byte) ([]byte, int, error) {
+	return p.doVertexPost(ctx, token, p.endpoint(), body)
+}
+
+func (p *VertexProvider) doVertexPost(ctx context.Context, token string, endpoint string, body []byte) ([]byte, int, error) {
 	var lastData []byte
 	var lastStatus int
 	for attempt := 0; attempt < 4; attempt++ {
@@ -518,7 +612,7 @@ func (p *VertexProvider) doGenerateContent(ctx context.Context, token string, bo
 			case <-time.After(delay):
 			}
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint(), bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 		if err != nil {
 			return nil, 0, err
 		}
@@ -1869,10 +1963,24 @@ func vertexResponseParts(data []byte) (string, []vertexToolCall, []map[string]an
 }
 
 func (p *VertexProvider) endpoint() string {
+	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
+		p.vertexHost(), p.project, p.location, p.model)
+}
+
+func (p *VertexProvider) cachedContentsEndpoint() string {
+	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/cachedContents",
+		p.vertexHost(), p.project, p.location)
+}
+
+func (p *VertexProvider) modelResource() string {
+	return fmt.Sprintf("projects/%s/locations/%s/publishers/google/models/%s",
+		p.project, p.location, p.model)
+}
+
+func (p *VertexProvider) vertexHost() string {
 	host := "aiplatform.googleapis.com"
 	if p.location != "global" {
 		host = p.location + "-aiplatform.googleapis.com"
 	}
-	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
-		host, p.project, p.location, p.model)
+	return host
 }

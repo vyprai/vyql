@@ -205,6 +205,25 @@ func TestProbeDependencyFindsUncoveredUsage(t *testing.T) {
 	}
 }
 
+func TestVertexCachedGenerateBodyOmitsTools(t *testing.T) {
+	p := &VertexProvider{temperature: 0.2}
+	contents := []map[string]any{{
+		"role":  "user",
+		"parts": []map[string]any{{"text": "continue"}},
+	}}
+	uncached := p.generateAgentStepBody(contents, "")
+	if _, ok := uncached["tools"]; !ok {
+		t.Fatal("uncached generate body should include tool declarations")
+	}
+	cached := p.generateAgentStepBody(contents, "projects/p/locations/global/cachedContents/1")
+	if got, _ := cached["cachedContent"].(string); got == "" {
+		t.Fatalf("cached generate body missing cachedContent: %#v", cached)
+	}
+	if _, ok := cached["tools"]; ok {
+		t.Fatalf("cached generate body must omit tools: %#v", cached)
+	}
+}
+
 func TestSearchContextAndReadFilesSupportRepoExploration(t *testing.T) {
 	dir := t.TempDir()
 	a := filepath.Join(dir, "src", "handler.js")
