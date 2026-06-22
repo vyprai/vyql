@@ -53,6 +53,25 @@ func TestExtractAllSupportsVueSingleFileComponents(t *testing.T) {
 	}
 }
 
+func TestExtractAllSupportsPHPIncludes(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "helpers.inc")
+	if err := os.WriteFile(src, []byte("<?php function helper($p) { exec($p); }\n"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	prog, _, _, stats, err := extractAll([]string{src})
+	if err != nil {
+		t.Fatalf("extractAll .inc: %v", err)
+	}
+	if got := stats.files["php"]; got != 1 {
+		t.Fatalf(".inc should route through php frontend, got count %d stats=%v", got, stats.files)
+	}
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
+		t.Fatalf(".inc should extract php statements, got modules=%d body=%d", len(prog.Modules), len(prog.Modules[0].Body))
+	}
+}
+
 // The full default rule library (vyql/packs/*.vyql) must parse and type-check
 // against the ontology with zero errors.
 func TestDefaultPacksCompile(t *testing.T) {

@@ -70,11 +70,24 @@ adapter java {
   // operation consumes the range. The patched idiom checks `offset > len - length`.
   mark exact "analysis.function.context" val "expr:offset+length>b.length" val "call_path:write" nval "expr:offset>b.length-length" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "function_name:crypt_raw" val "expr:1<<log_rounds" nval "call:roundsForLogRounds" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "function_name:rateTopic" val "call_path:registry.rateResource" val "call_path:genericArtifact.getPath" nval "MAX_RATE" nval "MIN_RATE" -> code.UnvalidatedRatingRange
   mark "__binop.shl" val "log_rounds" val "1" nval "1L" -> code.IntegerSizeArithmetic
   mark exact "analysis.function.context" val "function_name:safeDecryptPreMasterSecret" val "call:doFinal" val "call:createSecret" val "M[0]" nval "expr:m.length==48" -> code.PremasterSecretLengthReview
   mark exact "analysis.function.context" val "call:getServerName" val "call:getHost" val "call:equals" nval "call:contains" -> code.RequestHostUrlValidationBypass
+  mark exact "analysis.function.context" val "function_name:isValidURL" val "call_path:isURLRelative" val "call_path:buildAbsoluteURL" nval "call_path:validateCallbackURL" -> code.MultiOptionUrlValidationBypass
   mark exact "analysis.function.context" val "call:setAuthentication" val "call:getSession" nval "call:invalidate" -> code.MissingSessionRotationAfterAuthentication
   mark exact "analysis.function.context" val "function_name:correctlySpends" val "call:fromPublicOnly" val "call:verify" val "hashFor" nval "call:sha256hash160" -> code.PublicKeyHashBindingReview
+  mark exact "analysis.function.context" val "function_name:prepareConnectionFactory" val "call_path:ConnectionConfig.copy" val "call_path:cc.setLdapUrl" val "call:DefaultConnectionFactory" nval "call_path:cc.setConnectionInitializers" -> code.LdapCrlCredentialReuse
+  mark exact "analysis.function.context" val "function_name:determineTargetUrl" val "SimpleUrlAuthenticationSuccessHandler" val "session.getAttribute" val "targetUrlSessionAttribute" val "targetUrl.substring" nval "Util.isSafeToRedirectTo" -> code.SessionStoredRedirectTarget
+  mark exact "analysis.function.context" val "function_name:createJMXServer" val "RMIExporter.EXPORTER_ATTRIBUTE" val "configureRMIRegistry" val "JMXConnectorServerFactory.newJMXConnectorServer" nval "LocateRegistry.createRegistry" nval "RMIJRMPServerImpl" -> code.JmxRmiRegistryExposure
+  mark exact "analysis.function.context" val "function_name:enableFullQueryLogger" val "archiveCommand" val "fqlOptions.archive_command" val "FullQueryLogger.instance.enableWithoutClean" nval "allow_nodetool_archive_command" -> code.NodetoolArchiveCommandPrivilegeEscalation
+  mark exact "analysis.function.context" val "function_name:blockSort" val "call:mainSort" val "call:randomiseBlock" val "expr:this.workDone>this.workLimit" nval "call:fallbackSort" -> code.CommonsCompressBzip2FallbackSortMissing
+  mark exact "analysis.function.context" val "function_name:jackson2ObjectMapperBuilderCustomizer" val "call_path:jacksonObjectMapperBuilder.deserializerByType" val "call_path:StringUtils.trim" val "call_path:jsonParser.getValueAsString" val "call_path:HtmlUtils.htmlEscape" val "identifier:escape" nval "call:shouldEscapeXss" nval "identifier:xssFilterUrlList" -> code.CordysRequestParamXssFilterDisabled
+  mark exact "analysis.function.context" val "function_name:sanitizeParameter" val "call_path:StringEscapeUtils.escapeSql" val "identifier:EVIL_SQL_WORDS" val "call:isValidSQLCharacter" nval "call:sanitizeSQL" nval "identifier:EVIL_SQL_CONDITION_WORDS" -> code.DotcmsSqlUtilBlacklistBypass
+  mark exact "analysis.function.context" val "class_name:ViewFormHandlerAction" val "function_name:_loadStructures" val "call_path:req.getParameter" val "call_path:StructureFactory.getStructuresByUser" nval "call_path:SQLUtil.sanitizeSortBy" -> code.DotcmsFormsOrderBySqlInjection
+  mark exact "DirectoryBrowserSupport" val "Compare Html Report" val "graph.gif" -> code.JenkinsPluginForkedDirectoryBrowserWithoutCsp
+  sink path "analysis.function.return" val "function_name:determineTargetUrl" val "SimpleUrlAuthenticationSuccessHandler" -> code.RedirectTarget
+  control "Util.isSafeToRedirectTo" -> core.RedirectAllowlist
 
   // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
@@ -134,6 +147,8 @@ adapter java {
   sink path "yaml.load" -> code.Deserialization
   sink path "Yaml.load" -> code.Deserialization
   mark exact "analysis.class.context" val "class_base:InvocationHandler" val "call:getMethod" val "call:invokeMethod" nval "function_name:readResolve" nval "function_name:readObject" nval "call:NotSerializableException" -> code.DeserializableInvocationHandler
+  mark exact "analysis.function.context" val "selector:ObjectTypeAdapter.FACTORY" val "identifier:read" val "call:read" val "call_path:list.add" val "call_path:map.put" nval "call:tryBeginNesting" nval "call:readTerminal" -> code.GsonObjectTypeAdapterRecursiveRead
+  mark exact "analysis.function.context" val "function_name:createXStream" val "call_path:XStream" val "call:registerConverter" nval "call:addDefaultPermissions" nval "call:addPermissions" nval "call:addPermission" nval "call:denyPermission" -> code.UnrestrictedRequestParamDeserialization
   package "org.yaml.snakeyaml" {
     mark exact "analysis.class.context" val "class_base:Constructor" -> code.UnsafeYamlConstructor
     mark exact "org.yaml.snakeyaml.constructor.Constructor" -> code.UnsafeYamlConstructor
@@ -148,6 +163,9 @@ adapter java {
   mark method "createXMLReader" -> code.XmlParserCreate
   mark method "createXMLStreamReader" -> code.XmlParserCreate
   mark method "createXMLEventReader" -> code.XmlParserCreate
+  mark method "newTransformer" -> code.XmlParserCreate
+  mark exact "analysis.function.context" val "call_path:getTaskUnmarshaller.unmarshal" nval "call_path:getXMLStreamReader" -> code.XmlParserCreate
+  mark exact "analysis.function.context" val "function_name:setFeaturesBySystemProperty" val "class_name:LoadExternalDtdFeatureProvider" val "call_path:factory.setFeature" val "identifier:LOAD_EXTERNAL_DTD" val "identifier:EXTERNAL_GENERAL_ENTITIES" nval "identifier:EXTERNAL_PARAMETER_ENTITIES" -> code.CheckstyleExternalParameterEntitiesXxe
 
   // Path / file. `new File(parent, child)` puts the tainted child path at arg 1, and
   // Paths.get(first, …more) / Files.write(path, …) likewise vary the path position — arg all.
@@ -232,9 +250,17 @@ adapter java {
   mark exact "analysis.function.context" val "function_name:doTest" val "call:setCredentialsId" val "call:accurevLoginFromGlobalConfig" nval "call:hasPermission" nval "call:checkPermission" -> code.CredentialedEndpointReview
   mark exact "analysis.function.context" val "function_name:doFill" val "call:getBzmUtils" nval "call:checkPermission" -> code.CredentialedEndpointReview
   mark exact "analysis.function.context" val "function_name:doFillCredentialsIdItems" val "call:lookupCredentials" nval "call:hasPermission" nval "call:checkPermission" -> code.CredentialedEndpointReview
+  mark exact "analysis.function.context" val "function_name:doFillConnectionIdItems" val "call:getHostConnections" nval "call:hasPermission" nval "call:checkPermission" -> code.JenkinsDescriptorConfigEnumerationMissingPermission
+  mark exact "analysis.function.context" val "function_name:doFillCredentialsIdItems" val "call:lookupCredentials" nval "call:hasPermission" nval "call:checkPermission" -> code.JenkinsDescriptorConfigEnumerationMissingPermission
+  mark exact "analysis.function.context" val "function_name:doCheckUrl" val "call:buildClient" val "call:getProjects" nval "annotation:POST" nval "call:checkPermissionForRemoteRequests" -> code.CodeDxJenkinsRemoteValidationMissingPostPermission
+  mark exact "analysis.function.context" val "function_name:doCheckSelfSignedCertificateFingerprint" val "call:buildClient" val "call:getProjects" nval "annotation:POST" nval "call:checkPermissionForRemoteRequests" -> code.CodeDxJenkinsRemoteValidationMissingPostPermission
+  mark exact "analysis.function.context" val "function_name:doFillProjectIdItems" val "call:buildClient" val "call:getProjects" nval "annotation:POST" nval "call:checkPermissionForRemoteRequests" -> code.CodeDxJenkinsRemoteValidationMissingPostPermission
+  mark exact "analysis.class.context" val "class_base:Callable" val "function_name:call" val "function_name:checkRoles" val "call_path:System.getProperties" nval "class_base:MasterToSlaveCallable" nval "call:Roles.SLAVE" -> code.JenkinsRemotingCallableSystemPropertiesLeak
   mark exact "analysis.parameter.entry" val "param_name:awsSecretKey" val "param_type:Secret" -> code.SecretDatabindingReview
   mark exact "analysis.function.context" val "function_name:setAkid" nval "call:fromString" -> code.SecretDatabindingReview
   mark exact "analysis.function.context" val "function_name:setSkid" nval "call:fromString" -> code.SecretDatabindingReview
+  mark exact "analysis.parameter.entry" val "annotation:DataBoundConstructor" val "param_name:apilogin" val "param_type:String" nval "param_type:Secret" -> code.JenkinsPlaintextDataboundCredential
+  mark exact "analysis.parameter.entry" val "annotation:DataBoundConstructor" val "param_name:apitoken" val "param_type:String" nval "param_type:Secret" -> code.JenkinsPlaintextDataboundCredential
   mark exact "analysis.function.context" val "function_name:doConfigure" val "call:configure" val "call:save" nval "call:checkPermission" -> code.SensitiveOperation
   mark exact "analysis.function.context" val "function_name:doAttachPublicIP" val "call:getNode" val "call:attachPublicIP" nval "call:checkPermission" -> code.SensitiveOperation
   mark exact "analysis.function.context" val "function_name:doFill" nval "call:checkPermission" nval "annotation:POST" nval "annotation:RequirePOST" -> code.StateChangingOp
@@ -256,17 +282,29 @@ adapter java {
   // dominating the parse (value-matched feature flag).
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
+  control "setFeature" val "FEATURE_SECURE_PROCESSING" val "true" -> core.XmlHardening
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
+  control method "getSecuredDocumentBuilder" -> core.XmlHardening
+  control method "getSecureDocumentBuilderFactory" -> core.XmlHardening
+  control method "setFeaturesBySystemProperty" -> core.XmlHardening
   control "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
   control "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
   control "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
+  control "setProperty" val "IS_SUPPORTING_EXTERNAL_ENTITIES" nval "true" -> core.XmlHardening
+  control "setProperty" val "SUPPORT_DTD" nval "true" -> core.XmlHardening
   // materialize hardening as a node mark for the structural XXE rule's guarded_by
   mark "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   mark "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
+  mark "setFeature" val "FEATURE_SECURE_PROCESSING" val "true" -> core.XmlHardening
   mark "setExpandEntityReferences" val "false" -> core.XmlHardening
+  mark method "getSecuredDocumentBuilder" -> core.XmlHardening
+  mark method "getSecureDocumentBuilderFactory" -> core.XmlHardening
+  mark method "setFeaturesBySystemProperty" -> core.XmlHardening
   mark "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
   mark "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
   mark "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
+  mark "setProperty" val "IS_SUPPORTING_EXTERNAL_ENTITIES" nval "true" -> core.XmlHardening
+  mark "setProperty" val "SUPPORT_DTD" nval "true" -> core.XmlHardening
   mark "setProperty" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
   mark "setXIncludeAware" val "false" -> core.XmlHardening
   // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
@@ -323,6 +361,7 @@ adapter java {
   mark "setWritable" val "true" val "false" -> code.InsecurePermission
   mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
   mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
+  mark exact "analysis.function.context" val "class_name:RequestScopedCache" val "function_name:beginRequest" val "call_path:CACHE.set" nval "call:endRequest" nval "call_path:CACHE.remove" -> code.ThreadLocalScopeOverwriteWithoutCleanup
   mark exact "analysis.function.context" val "call:setContent" val "call:toJson" val "call:saveDocument" nval "call:setHidden" -> code.InternalContentExposureReview
   mark exact "analysis.function.context" val "call:getType" val "selector:FEDERATION_DOWNSTREAM_CONNECT" val "call:deploy" nval "call:getSubject" -> code.ProtocolStateReview
   mark "Socket" -> code.ResourceHandle
@@ -383,6 +422,7 @@ adapter java {
   mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
   mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
   mark "MessageDigest.getInstance" val "SHA1" -> code.WeakHash
+  mark exact "analysis.function.context" val "function_name:doIndex" val "call:getReloadTokenProperty" val "call:getRequestToken" val "call_path:token.equals" nval "call_path:MessageDigest.isEqual" -> code.SecretComparisonReview
 
   // server-side template injection (CWE-1336) — unambiguous engine entrypoints that
   // evaluate a STRING template (not load-by-name): Velocity static evaluate, Pebble

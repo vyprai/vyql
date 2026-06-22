@@ -64,6 +64,8 @@ func main() {
 	switch cmd {
 	case "scan":
 		err = cmdScan(args)
+	case "prep":
+		err = cmdPrep(args)
 	case "review":
 		err = cmdReview(args)
 	case "trace":
@@ -104,6 +106,14 @@ func cmdScan(args []string) error {
 	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
+	adapterOverlay := fs.String("adapter-overlay", os.Getenv("VYQL_ADAPTER_OVERLAY"), "optional repo-local adapter overlay directory")
+	agenticPrep := fs.Bool("agentic-prep", envBool("VYQL_AGENTIC_PREP"), "run optional agentic pre-scan adapter preparation")
+	agenticPrepOut := fs.String("agentic-prep-out", os.Getenv("VYQL_AGENTIC_PREP_OUT"), "directory for agentic prep manifest and adapter overlay")
+	agenticPrepProvider := fs.String("agentic-prep-provider", envDefault("VYQL_AGENTIC_PREP_PROVIDER", "vertex"), "agentic prep provider: vertex | off")
+	agenticPrepProject := fs.String("agentic-prep-project", os.Getenv("VYQL_VERTEX_PROJECT"), "Vertex project for --agentic-prep-provider vertex")
+	agenticPrepLocation := fs.String("agentic-prep-location", envDefault("VYQL_VERTEX_LOCATION", "global"), "Vertex location for agentic prep")
+	agenticPrepCredentials := fs.String("agentic-prep-credentials", defaultVertexCredentials(), "Vertex service-account JSON file for agentic prep")
+	agenticPrepModel := fs.String("agentic-prep-model", envDefault("VYQL_VERTEX_MODEL", "gemini-3.5-flash"), "Vertex model for agentic prep")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -112,6 +122,22 @@ func cmdScan(args []string) error {
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
+	if *agenticPrep {
+		out, err := runAgenticPrepForScan(paths, prepCLIConfig{
+			OutDir:   *agenticPrepOut,
+			Provider: *agenticPrepProvider,
+			Project:  *agenticPrepProject,
+			Location: *agenticPrepLocation,
+			Model:    *agenticPrepModel,
+			Creds:    *agenticPrepCredentials,
+		})
+		if err != nil {
+			return err
+		}
+		*adapterOverlay = out
+	}
+	restore := setOptionalEnv("VYQL_ADAPTER_OVERLAY", *adapterOverlay)
+	defer restore()
 	return run(paths, *rulesPath, *format, *profileName, *stats)
 }
 
@@ -398,6 +424,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
 	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats]")
+	fmt.Fprintln(os.Stderr, "  prep       build an optional repo-local adapter overlay for scan   [-provider off|vertex -out DIR]")
 	fmt.Fprintln(os.Stderr, "  review     list non-finding review targets and supporting checks for AI/manual review   [-format text|json]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")

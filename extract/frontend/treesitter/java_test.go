@@ -88,6 +88,51 @@ func TestJavaFunctionContextIncludesClassBases(t *testing.T) {
 	t.Fatalf("function context did not include enclosing class base; nodes=%#v", nodes)
 }
 
+func TestJavaThreadLocalLifecycleContextTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "RequestScopedCache.java")
+	src := []byte(`import java.util.LinkedList;
+import java.util.List;
+class RequestScopedCache {
+  private static final ThreadLocal<List<RequestScopedItem>> CACHE = new ThreadLocal<List<RequestScopedItem>>();
+  public static void beginRequest() {
+    CACHE.set(new LinkedList<RequestScopedItem>());
+  }
+  public static void endRequest() {
+    CACHE.remove();
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var contexts []string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		contexts = append(contexts, args)
+		if strings.Contains(args, "class_name:RequestScopedCache") &&
+			strings.Contains(args, "function_name:beginRequest") &&
+			strings.Contains(args, "call_path:CACHE.set") {
+			return
+		}
+	}
+	t.Fatalf("beginRequest context did not include expected tokens: %#v", contexts)
+}
+
 func TestJavaEnhancedForBindsElementToIterable(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "C.java")

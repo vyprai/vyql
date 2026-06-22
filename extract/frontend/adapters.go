@@ -6,6 +6,7 @@
 package frontend
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -175,29 +176,34 @@ func valCondsForSink(s usg.Store, idx *flowTokenIndex, call usg.Node, sk sinkSpe
 	if len(sk.ValMatches) == 0 && len(sk.ValAbsents) == 0 {
 		return true
 	}
-	if valCondsForNode(s, idx, call, sk.ValMatches, sk.ValAbsents) {
-		return true
-	}
-	checkArg := func(arg string) bool {
+
+	tokens := []string{call.Prop("str_args")}
+	addArg := func(arg string) {
 		if arg == "" {
-			return false
+			return
 		}
-		n, ok, err := s.GetNode(arg)
-		return err == nil && ok && valCondsForNode(s, idx, n, sk.ValMatches, sk.ValAbsents)
+		if n, ok, err := s.GetNode(arg); err == nil && ok {
+			tokens = append(tokens, n.Prop("str_args"))
+			if len(sk.ValMatches) > 0 {
+				tokens = append(tokens, flowingStringTokens(s, idx, n.ID, n.Prop("str_args")))
+			}
+		}
 	}
 	if sk.ArgIndex >= 0 {
-		return checkArg(call.Prop("arg" + strconv.Itoa(sk.ArgIndex)))
-	}
-	for ai := 0; ; ai++ {
-		arg := call.Prop("arg" + strconv.Itoa(ai))
-		if arg == "" {
-			break
+		addArg(call.Prop("arg" + strconv.Itoa(sk.ArgIndex)))
+	} else {
+		for ai := 0; ; ai++ {
+			arg := call.Prop("arg" + strconv.Itoa(ai))
+			if arg == "" {
+				break
+			}
+			addArg(arg)
 		}
-		if checkArg(arg) {
-			return true
-		}
 	}
-	return false
+	if len(sk.ValMatches) > 0 {
+		tokens = append(tokens, flowingStringTokens(s, idx, call.ID, call.Prop("str_args")))
+	}
+	return valConds(strings.Join(tokens, "\x00"), sk.ValMatches, sk.ValAbsents)
 }
 
 var callablePropTypes = []string{
@@ -469,6 +475,11 @@ type assumeSpec struct {
 	Packages   []string
 }
 
+type paramSourceSpec struct {
+	Concept  string
+	Packages []string
+}
+
 type adapterSpec struct {
 	Name          string
 	Technology    string
@@ -480,13 +491,65 @@ type adapterSpec struct {
 	Marks         []controlSpec // presence markers (label the call node with a concept)
 	Filters       []filterSpec
 	Assumes       []assumeSpec
-	ParamSources  []string // `source param -> X`: concepts to label parameter nodes with
+	ParamSources  []paramSourceSpec // `source param -> X`: concepts to label parameter nodes with
 }
 
 // AdaptersFor loads the framework adapters for a technology from
 // vyql/adapters/<tech>.vyql and builds the input + sink + control adapters.
 func AdaptersFor(tech string) []adapters.Adapter {
 	return adaptersFromSpec(loadSpec(tech))
+}
+
+// OverlayAdapters loads repo-local adapter overlays from root. Files may live
+// directly under root or under root/adapters. The overlay is intentionally
+// explicit and opt-in; parse errors are returned so a bad generated file does
+// not silently change scan behavior.
+func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, nil
+	}
+	allowed := map[string]bool{}
+	for _, tech := range techs {
+		allowed[tech] = true
+	}
+	var files []string
+	for _, dir := range []string{root, filepath.Join(root, "adapters")} {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".vyql") {
+				continue
+			}
+			files = append(files, filepath.Join(dir, e.Name()))
+		}
+	}
+	sort.Strings(files)
+	var out []adapters.Adapter
+	for _, file := range files {
+		b, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		decls, err := parser.Parse(string(b))
+		if err != nil {
+			return nil, err
+		}
+		for _, d := range decls {
+			ad, ok := d.(*parser.AdapterDecl)
+			if !ok {
+				continue
+			}
+			if len(allowed) > 0 && !allowed[ad.Name] {
+				return nil, fmt.Errorf("overlay adapter %s declares %q, which is not present in this scan", file, ad.Name)
+			}
+			spec := specFromDecl(ad)
+			spec.Name = "agentic." + spec.Name
+			out = append(out, adaptersFromSpec(spec)...)
+		}
+	}
+	return out, nil
 }
 
 // adaptersFromSpec turns a built adapterSpec into the concrete adapter set (one adapter
@@ -712,7 +775,7 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 			}
 			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
 		case "source_param":
-			s.ParamSources = append(s.ParamSources, mp.Concept)
+			s.ParamSources = append(s.ParamSources, paramSourceSpec{Concept: mp.Concept, Packages: mp.Packages})
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
@@ -905,7 +968,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if !ok || best != i {
 						continue
 					}
-					// tiering: a package-gated sink is the most specific match (tier 3) and
+					// tiering: a package-scoped sink is the most specific match (tier 3) and
 					// supersedes native path (resolved) and general method (syntactic) matches.
 					pkgSpec := 0
 					if len(sk.Packages) > 0 {
@@ -1045,10 +1108,10 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 var extTech = map[string]string{
 	".go": "go", ".py": "python",
 	".js": "javascript", ".jsx": "javascript", ".ts": "javascript", ".tsx": "javascript", ".vue": "javascript",
-	".rb": "ruby", ".java": "java", ".php": "php", ".phtml": "php", ".cs": "csharp",
+	".rb": "ruby", ".java": "java", ".php": "php", ".phtml": "php", ".inc": "php", ".cs": "csharp",
 	".c": "c", ".h": "c", ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
 	".rs": "rust", ".sh": "bash", ".bash": "bash", ".scala": "scala", ".sc": "scala", ".lua": "lua", ".kt": "kotlin", ".kts": "kotlin", ".ps1": "powershell", ".psm1": "powershell", ".swift": "swift", ".pl": "perl", ".pm": "perl", ".cgi": "perl", ".sol": "solidity", ".m": "objc",
-	".xml": "config", ".plist": "config", ".jelly": "config", ".jsp": "config", ".tag": "config",
+	".xml": "config", ".plist": "config", ".jelly": "config", ".jsp": "config", ".tag": "config", ".html": "config", ".pest": "config",
 	".ex": "elixir", ".exs": "elixir",
 	".dart":   "dart",
 	".groovy": "groovy", ".gradle": "groovy",
@@ -1092,7 +1155,7 @@ func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 		if root := sca.PackageRoot(v); root != "" {
 			out[root] = true
 		}
-		// expand import→distribution aliases so package-gated
+		// expand import→distribution aliases so package-scoped
 		// adapters keyed by the distribution name activate from imports, not just manifests.
 		for _, a := range sca.ImportAliases(v) {
 			out[a] = true
@@ -1409,7 +1472,7 @@ func AutoAdapters() []adapters.Adapter {
 // no-profile default, never taint parameters. Low confidence (syntactic): a finding
 // surfaces only if a param actually reaches a sink.
 func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
-	concepts := spec.ParamSources
+	sources := spec.ParamSources
 	return adapters.Adapter{
 		Name: spec.Name + ".param-source", Technology: spec.Technology, Specificity: 0,
 		Fidelity: "syntactic", Origin: "human",
@@ -1417,10 +1480,11 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 			if activeSources == nil {
 				return nil // no active source set -> parameters are not sources
 			}
-			active := make([]string, 0, len(concepts))
-			for _, c := range concepts {
-				if activeSources[c] {
-					active = append(active, c)
+			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			active := make([]paramSourceSpec, 0, len(sources))
+			for _, src := range sources {
+				if activeSources[src.Concept] && packageAllowed(src.Packages, pkgs) {
+					active = append(active, src)
 				}
 			}
 			if len(active) == 0 {
@@ -1434,8 +1498,12 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 					continue // only PUBLIC-API params are entry points; internal helpers are
 					// reached by ordinary interprocedural propagation (precision).
 				}
-				for _, c := range active {
-					out = append(out, adapters.Mapping{NodeID: id, Concept: c, Specificity: 0})
+				for _, src := range active {
+					spec := 0
+					if len(src.Packages) > 0 {
+						spec = 3
+					}
+					out = append(out, adapters.Mapping{NodeID: id, Concept: src.Concept, Specificity: spec})
 				}
 			}
 			return out

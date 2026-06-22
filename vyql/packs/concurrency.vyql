@@ -16,3 +16,8 @@ rule UnsafeAutoTraitImplementation {
   meta { id: "VYQL-RACE-003", severity: medium, cwe: [CWE_362, CWE_119], confidence_floor: medium }
   match code.UnsafeAutoTraitImpl as m
 }
+
+rule ThreadLocalScopeOverwriteWithoutCleanup {
+  meta { id: "VYQL-RACE-004", severity: high, cwe: [CWE_362], confidence_floor: high }
+  match code.ThreadLocalScopeOverwriteWithoutCleanup as m
+}

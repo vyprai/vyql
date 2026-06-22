@@ -12,7 +12,15 @@ adapter php {
   source "$_REQUEST" -> code.HttpInput
   source "$_COOKIE" -> code.HttpInput
   source "$_FILES" -> code.HttpInput
-  source "$_SERVER" -> code.HttpInput
+  source "$_SERVER" val "HTTP_" -> code.HttpInput
+  source "$_SERVER" val "REQUEST_URI" -> code.HttpInput
+  source "$_SERVER" val "QUERY_STRING" -> code.HttpInput
+  source "$_SERVER" val "PATH_INFO" -> code.HttpInput
+  source "$_SERVER" val "PHP_SELF" -> code.HttpInput
+  source "$_SERVER" val "REQUEST_METHOD" -> code.HttpInput
+  source "$_SERVER" val "REMOTE_ADDR" -> code.HttpInput
+  source "$_SERVER" val "REMOTE_PORT" -> code.HttpInput
+  source "$_SERVER" val "SERVER_SOFTWARE" -> code.HttpInput
   source path "Request.post" -> code.HttpInput
   source path "$request.request.all" -> code.HttpInput
   source path "$this.metadata" -> code.ArchiveEntryName
@@ -34,6 +42,7 @@ adapter php {
   source "getenv" val "PATH_INFO" -> code.HttpInput
   mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "$port<1024" -> code.IncompleteServerPortValidation
   mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "1024>$port" -> code.IncompleteServerPortValidation
+  mark exact "analysis.class.context" val "lang=php" val "getMessageParam('iid'" val "item_id=$this->iid" val "db_query(" nval "is_numeric($this->iid)" -> code.UnvalidatedNumericSqlInterpolation
   mark exact "analysis.module.context" val "lang=php" val "param('params'" val "unserialize($params" nval "substr" nval "a:" -> code.UnrestrictedRequestParamDeserialization
   mark exact "analysis.module.context" val "lang=php" val "CHttpRequest::get_Value('period')" val "DateTimeUtil::getLastDaysIntervals($period)" val "getStoredBytes" val "getStoredFiles" nval "array_key_exists" nval "filter_var($period" -> code.UnboundedReportPeriod
   mark exact "analysis.function.context" val "lang=php" val "Tar" val "extract(" val "manifest" val "file_get_contents" val "unserialize" nval "allowed_classes" -> code.ArchiveManifestDeserialization
@@ -44,6 +53,32 @@ adapter php {
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION['flash']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
   mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"flash\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
   mark exact "analysis.module.context" val "lang=php" val "$GLOBALS[" val "$_GET[" val "$this->_tplVars=$this->_globalVar" nval "htmlspecialchars($_GET" nval "htmlentities($_GET" nval "esc_html($_GET" nval "strip_tags($_GET" -> code.UnescapedRequestGlobalTemplateVar
+  mark exact "analysis.module.context" val "lang=php" val "RowMenu_name" val "RowMenu_desc" val "contact_name" val "contact_alias" val "html_entity_decode" nval "ESCAPE_ILLEGAL_CHARS" -> code.CentreonMyAccountContactXss
+  mark exact "analysis.module.context" val "lang=php" val "escape_command" val "preg_replace" val "/(\\\\\\$|`)/" val "popen" val "ns_id" -> code.IncompleteCommandEscapeRegex
+  mark exact "analysis.module.context" val "lang=php" val "foreach($global_menuas$idx=>$item)" val "$icon=img(asset_url('assets/images/ui/'.$item['icon']),FALSE" val "align='top'alt='{$item['label']}'" -> code.ClassroomBookingsDisplayNameAltXss
+  mark exact "analysis.function.context" val "lang=php" val "name=process" val "$this->no_script" val "preg_match" val "php|php5|php4|php3|phtml|pl|py|cgi|asp|js" val "$this->file_src_name" val "$file_src_name_ext='txt'" nval "phar" -> code.IncompleteDangerousUploadExtensionBlocklist
+  mark exact "analysis.module.context" val "lang=php" val "'extensions_blacklist'=>'*.php;*.php2;*.php3;*.php4;*.php5;*.php7;*.phtml'" nval "*.phar" -> code.ConcreteCmsIncompleteUploadExtensionBlacklist
+  mark exact "analysis.function.context" val "lang=php" val "name=extraRules" val "$field->fieldtype()->handle()==='assets'" val "$field->handle().'.*'=>'file'" nval "getClientOriginalExtension" nval "php3" nval "phtml" -> code.StatamicAssetUploadPhpExtensionValidationBypass
+  mark exact "analysis.class.context" val "lang=php" val "name=TemplatesController" val "public$allowAnonymous=true" val "functionactionRender($template,array$variables=array())" val "doesTemplateExist($template)" val "$this->renderTemplate($template,$variables)" nval "getActionSegments" nval "HttpException(403)" -> code.CraftAnonymousTemplateRenderActionXss
+  mark exact "analysis.class.context" val "lang=php" val "name=User" val "StaticCacheTrait" val "TableRegistry::get('User.Users')->updateToken($this)" val "ROLE_ID_ADMINISTRATOR" val "Security::hash($password,'md5',true)" nval "returnh($name)" -> code.QuickAppsUserRealNameStoredXss
+  mark exact "analysis.class.context" val "lang=php" val "name=User" val "username" val "attributeLabels" val "beforeSave($insert)" val "setPassword($this->password)" nval "$this->username=Html::encode($this->username)" -> code.FeehiUsernameStoredXss
+  mark exact "analysis.class.context" val "lang=php" val "name=Filemanager" val "$this->query=$get['query']" val "$this->search_string=$post['search_string']" val "$this->search_file_type=$post['search_file_type']" val "shell_exec" val "find -L" nval "$this->query=escapeshellarg($get['query'])" nval "$this->search_string=escapeshellarg($post['search_string'])" nval "$this->search_file_type=escapeshellarg($post['search_file_type'])" -> code.CodiadFilemanagerSearchCommandInjection
+  mark exact "analysis.class.context" val "lang=php" val "name=CodestudiesPlugin" val "$functions['post']" val "run" val "role_reporter" val "$codestudies.code_text" val "Storage.put" val "$this.runCheck" val "exec" val "php " val "javac -encoding UTF-8" val "java -Dfile.encoding=UTF-8" -> code.ConnectCmsCodestudiesPluginCodeExecution
+  mark exact "analysis.function.context" val "lang=php" val "name=add_safe_mode_query_var" val "add_query_arg('snippets-safe-mode',$_REQUEST['snippets-safe-mode'],$url)" nval "(bool)$_REQUEST['snippets-safe-mode']" nval "esc_attr" nval "htmlspecialchars" -> code.CodeSnippetsSafeModeQueryXss
+  mark exact "analysis.function.context" val "lang=php" val "name=sendMessage" val "Tools::nl2br" val "Tools::stripslashes" val "Mail::Send" nval "htmlentitiesUTF8" -> code.PrestaShopContactformMessageEmailXss
+  mark exact "analysis.function.context" val "lang=php" val "name=ajaxHandler" val "$final[$i]['actions']" val "group='.$_REQUEST['group'].'" nval "(int)$_REQUEST['group']" -> code.FreePbxContactManagerGroupLinkXss
+  mark exact "analysis.function.context" val "lang=php" val "name=blockAction" val "System::loadLanguageFile('tl_cookiebar',$locale)" val "$objTemplate->language=$locale" val "return$objTemplate->getResponse();" nval "Validator::isLocale($locale)" -> code.OveleonCookiebarLocaleReflectedXss
+  mark exact "analysis.function.context" val "lang=php" val "name=setasdefault" val "FormUtil::getPassedValue('themename'" val "$this->view->assign('themename',$themename)" val "theme_admin_setasdefault.tpl" nval "FILTER_SANITIZE_STRING" -> code.ZikulaThemeNameReflectedXss
+  mark exact "analysis.function.context" val "lang=php" val "name=render" val "RegexHelper::isLinkPotentiallyUnsafe($inline->getUrl())" val "Xml::escape($inline->getUrl(),true)" nval "Xml::escape($inline->getUrl())" -> code.CommonMarkPreserveEntitiesUrlAttributeXss
+  mark exact "analysis.function.context" val "lang=php" val "name=save" val "$html=post('html')" val "$html=$this->_filter_html($html)" val "Comment_model::updateOrCreate" val "'html'=>$html" nval "ParseMarkdown" nval "setSafeMode(true)" -> code.StoredHtmlWrite
+  mark exact "analysis.function.context" val "lang=php" val "name=check" val "$this->param('auth')" val "$this->module('cockpit')->authenticate($data)" nval "is_string($data['user'])" nval "is_string($data['password'])" -> code.CockpitAuthArrayNosqlInjection
+  mark exact "analysis.function.context" val "lang=php" val "name=stop" val "$this->request->stopped=true" nval "app:request:stop" -> code.CockpitLimeRedirectStopContinuation
+  mark exact "analysis.class.context" val "lang=php" val "name=RunProcess" val "Process::fromShellCommandline($command" val "function__destruct()" val "$this->stopProcess()" nval "function__sleep()" nval "function__wakeup()" -> code.CodeceptionRunProcessDeserializationGadget
+  mark exact "analysis.function.context" val "lang=php" val "name=__construct" val "_detect_input_format" val "$this->format->factory" val "->to_array" nval "libxml_disable_entity_loader" -> code.CodeIgniterRestserverXmlEntityLoaderXxe
+  mark exact "analysis.function.context" val "lang=php" val "name=PMA_linkURL" val "url.php" val "PMA_generate_common_url" val "$params['url']=$url" val "defined('PMA_SETUP')" val "'../'.$goto" nval "defined('PMA_SETUP')){return$url" -> code.PhpMyAdminSetupRedirectorOpenRedirect
+  mark exact "analysis.function.context" val "lang=php" val "name=getUnpushedChanges" val "gitdiff--name-status%s...%s--" val "$remoteBranch" val "$branch" val "$this->process->execute($command" nval "$command=['git','diff','--name-status'" -> code.ComposerGitBranchDiffCommandInjection
+  mark exact "analysis.class.context" val "lang=php" val "name=CodestudiesPlugin" val "$functions['post']=['savecode','run','deletecode']" val "$role_ckeck_table[\"run\"]=array('role_reporter')" val "$codestudies->code_text=$request->code_text" val "Storage::put('codestudy/'" val "$codestudy->code_text" val "exec(\"$cmd2>&1\",$result)" -> code.ConnectCmsCodestudiesPluginCodeExecution
+  mark exact "analysis.function.context" val "lang=php" val "name=rrd_import" val "$rrd_file=\"/var/db/rrd/{$rrd['filename']}\"" val "file_put_contents($xml_file,gzinflate(base64_decode($rrd['xmldata'])))" val "exec(\"/usr/local/bin/rrdtoolrestore-f'{$xml_file}''{$rrd_file}'\"" nval "basename($rrd['filename'])" nval "shell_safe" -> code.OpnSenseRrdRestoreFilenameCommandInjection
   mark exact "analysis.function.context" val "lang=php" val "$this->last_headers" val "$log.=$this->last_headers" val "$result['log']=$log" nval "$log.=htmlentities($this->last_headers" -> code.UnescapedDiagnosticHtml
   // Review-only access-policy config: nested PHP arrays such as
   // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]
@@ -72,6 +107,14 @@ adapter php {
   // role allowlist validation before saving.
   mark exact "analysis.function.context" val "lang=php" val "groupblog_edit_settings" val "groupblog-blogid" val "groupblog_edit_base_settings" nval "groups_is_user_admin" nval "current_user_can_for_blog" -> code.AccessPolicyReview
   mark exact "analysis.function.context" val "lang=php" val "bp_groupblog_create_screen_save" val "default-administrator" val "default-moderator" val "default-member" val "groupblog_edit_base_settings" nval "bp_groupblog_is_role_allowed" nval "current_user_can_for_blog" -> code.AccessPolicyReview
+  // Review-only BuddyPress Docs save policy: a direct doc save POST protected only
+  // by a nonce still needs per-doc edit or create capability checks before save().
+  mark exact "analysis.function.context" val "lang=php" val "name=catch_page_load" val "$_POST['doc-edit-submit']" val "check_admin_referer('bp_docs_save')" val "BP_Docs_Query" val "save()" nval "$doc=bp_docs_get_current_doc();if($doc&&!current_user_can('bp_docs_edit',$doc->ID))" nval "elseif(!$doc&&!current_user_can('bp_docs_create'))" -> code.AccessPolicyReview
+  mark exact "analysis.function.context" val "lang=php" val "name=memberAdd" val "generateFederatedUser($userId,$type)" val "addMember($circleId,$federatedUser)" nval "Member::TYPE_CIRCLE" nval "circleService->getCircle($userId)" -> code.NextcloudCircleMemberAddMissingCircleCheck
+  mark exact "analysis.function.context" val "lang=php" val "name=membersAdd" val "generateFederatedUser($this->get('id',$member),$this->getInt('type',$member))" val "addMembers($circleId,$federatedUsers)" nval "Member::TYPE_CIRCLE" nval "circleService->getCircle($userId)" -> code.NextcloudCircleMemberAddMissingCircleCheck
+  mark exact "analysis.function.context" val "lang=php" val "name=index" val "$this->handleErrorResponse(function():array{" val "$this->getCollectiveShare()->getOwner()" val "$this->service->findAllTrash($collectiveId,$owner)" val "$pageInfo->setShareToken($this->getToken())" nval "$this->checkEditPermissions()" -> code.CollectivesPublicTrashMissingEditPermission
+  mark exact "analysis.function.context" val "lang=php" val "name=processCriteria" val "SalesChannelDefinitionInterface" val "$definition->processCriteria" val "$criteria->getAssociations" val "$definition->getField" val "AssociationField" val "$field->getReferenceDefinition" val "$processed[$definition::class]" nval "ManyToManyAssociationField" nval "$field->getToManyReferenceDefinition" nval "getToManyReferenceDefinition" nval "$processedKey" -> code.ShopwareStoreApiManyToManyCriteriaBypass
+  mark exact "analysis.function.context" val "lang=php" val "toggleSubpalette" val "$this->Database->prepare(\"UPDATE\"" val "\"SET\".$this->Input->post('field')" val "WHEREid=?" nval "__selector__" nval "hasAccess($dc->table.'::'.$this->Input->post('field'),'alexf')" -> code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection
   // Review-only credentialed cloud-resource endpoint: posted credentials used to enumerate
   // buckets should have an admin/authorization gate before returning JSON.
   mark exact "analysis.function.context" val "lang=php" val "getRequiredBodyParam" val "loadBucketList" val "asJson" nval "requireAdmin" -> code.CredentialedEndpointReview
@@ -85,12 +128,24 @@ adapter php {
   // Review-only installer/config entry point: rewriting a live PHP configuration file from
   // request data should have an install-state or authorization gate before the write.
   mark exact "analysis.module.context" val "lang=php" val "$_POST['systemRootPath']" val "videos/configuration.php" val "fopen" nval "../videos/configuration.php" -> code.PrivilegedEntryPointReview
+  mark exact "analysis.module.context" val "lang=php" val "WebBasicAuth" val "db_fetch_row_prepared('SELECT * FROM user_auth WHERE username = ? AND realm = 2'" val "read_config_option('user_template')=='0'" val "read_config_option('guest_user')!='0'" nval "read_config_option('user_template')=='0'&&read_config_option('guest_user')=='0'" -> code.MissingGuestFallbackForWebAuth
   // SSRF review: public thumbnail helpers that pass a request URL to ffmpeg (`-i`) need
   // host parsing plus private/internal address rejection, not only URL syntax checks.
   mark exact "analysis.module.context" val "lang=php" val "base64Url" val "get_ffmpeg()" val "-i" nval "parse_url($url)" nval "ip_is_private" -> code.IncompleteIpDenylist
+  mark exact "analysis.function.context" val "lang=php" val "name=verifyUrl" val "$client->request('GET',$uri" nval "self::isUrlSafe($uri)" nval "FILTER_FLAG_NO_PRIV_RANGE" nval "FILTER_FLAG_NO_RES_RANGE" -> code.ChamiloUnsafeGuzzleUrlFetch
+  mark exact "analysis.function.context" val "lang=php" val "name=redirectToDefaultPage" val "isset($_REQUEST['redirect_url'])" val "header('Location:/'.htmlentities($_REQUEST['redirect_url']))" nval "substr($_REQUEST['redirect_url'],0,strlen(OC::$WEBROOT))==OC::$WEBROOT" -> code.OwnCloudLoginRedirectUrlOpenRedirect
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   mark exact "analysis.function.context" val "lang=php" val "toLegacyOrderBy" val "toLegacyOrderWay" val "orderBy" nval "isOrderBy" nval "isOrderWay" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.context" val "lang=php" val "name=offset" val "$this->ar_offset=$offset" nval "$this->ar_offset=(int)$offset" -> code.CodeIgniterActiveRecordOffsetSqlInjection
+  mark exact "analysis.function.context" val "lang=php" val "name=actionPurchasablesTable" val "$sort=$this->request->getParam('sort')" val "[$column,$direction]=explode('|',$sort)" val "$sqlQuery->orderBy([$column=>$direction=='asc'?SORT_ASC:SORT_DESC])" nval "$column=null" -> code.CraftCommercePurchasablesSortSqlInjection
+  mark exact "analysis.function.context" val "lang=php" val "name=compile" val "$strWhere=(!$this->list_where?\"WHERE\":\"AND\").\\Input::get('search').\"LIKE?\"" val "$strQuery.=$strWhere" val "\\Input::get('order_by')" val "\\Input::get('sort')" val "$this->Database->prepare($strQuery)" nval "!in_array($strSearch,$arrSearchFields,true)" nval "!in_array($order_by,$arrFields,true)" -> code.ContaoListingModuleSqlIdentifierInjection
+  mark exact "analysis.function.context" val "lang=php" val "name=get" val "$where_conditions['exclude']=\"a.idNOTIN({$exclude})\"" val "$where_sql='WHERE'.join" val "$wpdb->get_results" nval "array_map('absint',$exclude)" nval "wp_parse_id_list($exclude)" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.context" val "lang=php" val "name=scopeSearch" val "array_intersect(array_keys($search),$this->searchable)" val "return$query->where($search);" nval "array_intersect_key($search,array_flip($this->searchable))" nval "where($allowed_search)" -> code.UnfilteredSearchWhereColumns
+  mark exact "analysis.function.context" val "lang=php" val "name=integer" val "is_int($value)" val "is_numeric($value)&&preg_match" nval "!is_numeric($value)" -> code.CiviCrmScientificNotationNumericValidationBypass
+  mark exact "analysis.function.context" val "lang=php" val "name=positiveInteger" val "is_int($value)" val "is_numeric($value)&&preg_match" nval "!is_numeric($value)" -> code.CiviCrmScientificNotationNumericValidationBypass
+  mark exact "analysis.function.context" val "lang=php" val "name=numeric" val "returnpreg_match" nval "!is_numeric($value)" -> code.CiviCrmScientificNotationNumericValidationBypass
+  mark exact "analysis.function.context" val "lang=php" val "name=resetMessages" val "include" val "sprintf('%s/%s.php'" val "$locale" val "$this->getDirectories()" nval "$this->assertValidLocale($locale)" -> code.UnvalidatedLocaleFileInclude
   sink path "mysqli_query" arg 1 -> code.SqlExecution
   sink path "mysqli_real_query" arg 1 -> code.SqlExecution
   sink path "mysqli_multi_query" arg 1 -> code.SqlExecution
@@ -175,6 +230,7 @@ adapter php {
   // Stored CMS/page HTML writes. Aimeos text reference items are later rendered as page
   // content, so writing editor-controlled HTML through the ref item must be sanitized.
   mark "$refItem.fromArray" -> code.StoredHtmlWrite
+  mark exact "self.codes" val ".redactor({" val "autoresize: false" -> code.GleezRedactorEditorStoredXss
 
   // server-side template injection (CWE-1336) — Twig compiles a STRING template
   sink method "createTemplate" -> code.TemplateRender
@@ -201,12 +257,16 @@ adapter php {
   mark exact "analysis.function.context" val "ResetPassword" val "createToken" val "account:login-token" val "absolute: true" val "$email->text" nval "buildBaseUrl" nval "resolveUri" -> code.PasswordRecoveryLinkHostControl
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
+  control "Tools.htmlentitiesUTF8" -> core.HtmlEscape
+  control "html_escape" -> core.HtmlEscape
   control "esc_html" -> core.HtmlEscape
   control "esc_attr" -> core.HtmlEscape
   control "esc_url" -> core.HtmlEscape
   control "wp_kses" -> core.HtmlEscape
   control "wp_kses_post" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape
+  control "esc_csv" -> core.CsvEscape
+  control method "esc_csv" -> core.CsvEscape
   control method "purify" -> core.HtmlEscape
   control "escapeshellarg" -> core.ShellEscape
   control "escapeshellcmd" -> core.ShellEscape
@@ -228,6 +288,7 @@ adapter php {
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "fill" -> code.MassAssign
   sink method "forceFill" -> code.MassAssign
+  mark exact "analysis.module.context" val "lang=php" val "functionadd(" val "$patchEntityParams=['associated'=>[],'accessibleFields'=>$data->getAccessibleFieldForNew(),];" val "unset($params['id']);" val "$input=$this->__massageInput($params);" val "$data=$this->Table->patchEntity($data,$input,$patchEntityParams);" nval "unset($input['id']);" -> code.IncompleteMassAssignmentIdUnset
   // Review-only: model bulk hydration/update helpers as sensitive because they may bind
   // security-critical account fields depending on the object type and allowed field list.
   mark method "fromArray" -> code.SensitiveOperation
@@ -260,6 +321,7 @@ adapter php {
   mark exact "analysis.class.context" val "Action" val "PasswordReset::class" val "->initiateReset" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
   mark exact "analysis.class.context" val "Action" val "$this->backendUserSessionRepository->terminateSessionByIdentifier" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
   mark exact "analysis.function.context" val "lang=php" val "name=restart" val "delete_option" val "$wpdb->query" val "DELETE FROM" nval "check_admin_referer" nval "wp_verify_nonce" -> code.IncompleteCsrfTokenValidation
+  mark exact "analysis.function.context" val "lang=php" val "name=cntctfrm_settings_page" val "cntctfrm_form_submit" val "$cntctfrm_options_submit" val "update_option" nval "check_admin_referer" nval "wp_nonce_field" -> code.BestWebSoftContactFormSettingsCsrf
   sink path "queryDB" val "insert into" -> code.StateChangingOp
   sink path "queryDB" val "replace into" -> code.StateChangingOp
   sink path "queryDB" val "update " val " set " -> code.StateChangingOp

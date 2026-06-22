@@ -62,6 +62,15 @@ concept RequestReferenceEval : sink {
   review_assumption: "an attacker can submit batch request paths containing reference expressions"
   review_confidence: high
 }
+concept WerkzeugDebugConsoleExposure : sink {
+  vulnerable_to: [injection.CodeInjection, injection.CommandInjection]
+  cwe: [CWE_94, CWE_77]
+  review_category: "code_execution"
+  review_condition: "Flask/Werkzeug debug mode is bound to an externally reachable interface with the eval console enabled"
+  review_evidence: "application run context {pattern} enables debug=True on 0.0.0.0 without disabling evalex"
+  review_assumption: "the development server can be reached by an unauthenticated network client"
+  review_confidence: high
+}
 concept DynamicCodeLoad : sink {
   vulnerable_to: [injection.UnsafeDynamicLoading]
   enabled_by: [taint.UntrustedData]
@@ -147,7 +156,123 @@ concept CommandLineAssemblyReview : sink {
   review_assumption: "the appended value can be influenced through a document, URI, desktop action, or caller-controlled parameter"
   review_confidence: medium
 }
-
+concept UnsafeBuildClientCommandAssembly : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "client build command text includes caller-controlled build fields before shell execution"
+  review_evidence: "build-client command context {pattern} formats input fields into a shell command"
+  review_assumption: "the build request can control filename, server address, or server port values"
+  review_confidence: high
+}
+concept TemplateInstallScriptHostExecution : sink {
+  vulnerable_to: [injection.CommandInjection, access_control.PrivilegeEscalation]
+  cwe: [CWE_78, CWE_269]
+  review_category: "command"
+  review_condition: "template-defined install scripts execute on the host shell instead of an isolated runtime"
+  review_evidence: "template install context {pattern} forwards the install script to host bash -c"
+  review_assumption: "a lower-privileged template author can define or update install scripts that run on cluster nodes"
+  review_confidence: medium
+}
+concept PartiallyEscapedSshCommand : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_77]
+  review_category: "command"
+  review_condition: "an SSH command string escapes only some attacker-controlled fields before shell execution"
+  review_evidence: "SSH command assembly context {pattern} quotes password/remote command but interpolates username, host, or port directly"
+  review_assumption: "an agent, upstream target, or caller can influence SSH connection fields"
+  review_confidence: medium
+}
+concept IncompleteCommandEscapeRegex : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_77]
+  review_category: "command"
+  review_condition: "command sanitizer regex omits intended shell metacharacters because alternation is used instead of a character class"
+  review_evidence: "command escape helper {pattern} feeds a shell command execution site"
+  review_assumption: "attacker-controlled command fragments can include shell metacharacters that survive the sanitizer"
+  review_confidence: high
+}
+concept ClamscanBinaryPathShellCommandInjection : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "Clamscan verifies a configured scanner binary path by interpolating it into a shell command"
+  review_evidence: "binary verification context {pattern} builds a --version command string from the configured scanner path and executes it through a shell"
+  review_assumption: "library callers can configure the scanner path and an attacker can arrange a matching filesystem entry so shell metacharacters survive the access check"
+  review_confidence: high
+}
+concept PythonTripleQuoteShellInterpolation : sink {
+  vulnerable_to: [injection.CodeInjection, injection.CommandInjection]
+  cwe: [CWE_94, CWE_77]
+  review_category: "code_execution"
+  review_condition: "shell-captured hook input is interpolated into Python source inside a triple-quoted string literal"
+  review_evidence: "shell interpreter context {pattern} passes a python3 -c program that embeds $input in json.loads('''...''')"
+  review_assumption: "the hook JSON can contain user-controlled path fields with apostrophe sequences that close the Python literal"
+  review_confidence: high
+}
+concept ReactNativeCliOpenUrlMiddlewareCommandExecution : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "React Native CLI opens a request-supplied URL in the system browser without an http/https protocol allowlist"
+  review_evidence: "openURLMiddleware context {pattern} extracts url from req.body and passes it to open(url) before validating the URL protocol"
+  review_assumption: "an attacker can reach the development server endpoint and choose a URL scheme that the OS open handler interprets as command execution"
+  review_confidence: high
+}
+concept CloudStackBaremetalMacCommandInjection : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78, CWE_20]
+  review_category: "command"
+  review_condition: "CloudStack baremetal provision-done route forwards an unvalidated MAC path parameter into a shell curl command"
+  review_evidence: "baremetal-vr route context {pattern} accepts /baremetal/provisiondone/<mac> and calls server.notify_provisioning_done(mac) before a MAC-format allowlist"
+  review_assumption: "the baremetal virtual router endpoint is reachable and shell metacharacters in the mac path segment can break out of the quoted curl URL"
+  review_confidence: high
+}
+concept CodecovNodeGcovCommandInjection : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "Codecov Node upload builds a gcov shell command from upload options after stripping only ampersands"
+  review_evidence: "Codecov upload context {pattern} combines gcov-root, gcov-exec, or gcov-args into a command string passed to execSync"
+  review_assumption: "library callers can supply upload options containing shell metacharacters such as backticks that survive sanitizeVar"
+  review_confidence: high
+}
+concept CompileSassCleanupShellCommandWithoutPathCheck : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "compile-sass cleanup runs a caller-controlled CSS path through a shell rm command without a filesystem preflight check"
+  review_evidence: "compile-sass cleanup context {pattern} formats cssPath into rm -r before child_process.exec"
+  review_assumption: "library callers can provide cssPath values containing shell metacharacters"
+  review_confidence: high
+}
+concept ComposerGitBranchDiffCommandInjection : sink {
+  vulnerable_to: [injection.CommandInjection, injection.ArgumentInjection]
+  cwe: [CWE_78, CWE_88]
+  review_category: "command"
+  review_condition: "Composer formats Git branch names into a git diff shell command instead of passing argv"
+  review_evidence: "getUnpushedChanges context {pattern} builds git diff --name-status from remoteBranch and branch before ProcessExecutor::execute"
+  review_assumption: "a dependency installed from source can contain specially crafted local or remote Git branch names"
+  review_confidence: high
+}
+concept ConnectCmsCodestudiesPluginCodeExecution : sink {
+  vulnerable_to: [injection.CodeInjection, injection.CommandInjection]
+  cwe: [CWE_94, CWE_78]
+  review_category: "code-injection"
+  review_condition: "Connect-CMS Code Study plugin saves user-submitted code and executes the saved PHP or Java program on the server"
+  review_evidence: "CodestudiesPlugin class context {pattern} persists request code_text, writes it under storage, and invokes php/javac/java with exec"
+  review_assumption: "authenticated users with the plugin's reporter role can submit code_text and trigger the run action"
+  review_confidence: high
+}
+concept OpnSenseRrdRestoreFilenameCommandInjection : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78, CWE_20]
+  review_category: "command"
+  review_condition: "OPNsense RRD backup restore interpolates a backup-supplied filename into an rrdtool restore shell command"
+  review_evidence: "rrd_import context {pattern} builds rrd_file from rrddata filename and passes it to exec before basename/shell_safe hardening"
+  review_assumption: "an authenticated administrator can upload a crafted configuration backup containing attacker-controlled RRD filename entries"
+  review_confidence: high
+}
 concept FormatString : sink {
   vulnerable_to: [injection.FormatString]
   enabled_by: [taint.UntrustedData]
@@ -176,10 +301,29 @@ concept CatastrophicRegex : sink {
   review_confidence: medium
 }
 
+concept RubyLineAnchorValidationBypass : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "Ruby line anchors are used for whole-string validation"
+  review_evidence: "validator context {pattern} uses ^...$ anchors instead of \\A...\\z"
+  review_assumption: "attacker-controlled input can include a newline plus trailing data"
+  review_confidence: low
+}
+
 concept MassAssign : sink {
   vulnerable_to: [injection.MassAssignment]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_915]
+}
+concept IncompleteMassAssignmentIdUnset : sink {
+  vulnerable_to: [injection.MassAssignment]
+  cwe: [CWE_915]
+  review_category: "mass_assignment"
+  review_condition: "server-controlled identifier fields are removed before request normalization instead of from the normalized input"
+  review_evidence: "generic add path {pattern} unsets params id before massaging input and then patching the entity"
+  review_assumption: "request normalization can reintroduce or preserve an attacker-supplied id field"
+  review_confidence: high
 }
 
 concept ProtoPollute : sink {
@@ -196,6 +340,60 @@ concept UncheckedPrototypeConfigKey : sink {
   review_evidence: "prototype-sensitive config-key copy context {pattern} writes dynamic keys into output objects"
   review_assumption: "a package, project, or build configuration can supply keys such as __proto__ or constructor"
   review_confidence: medium
+}
+concept PrototypeKeyCachePoisoning : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "caller-controlled cache keys are stored in plain objects that inherit prototype properties"
+  review_evidence: "prototype-sensitive cache context {pattern} writes dynamic keys into ordinary object buckets"
+  review_assumption: "a caller can supply keys such as __proto__ or constructor"
+  review_confidence: medium
+}
+concept CspParserProtoDirectivePollution : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "content-security-policy-parser stores a __proto__ directive on a plain object result"
+  review_evidence: "CSP parser context {pattern} creates a normal object result and uses Object.defineProperty to preserve a __proto__ directive value"
+  review_assumption: "an attacker can supply a Content-Security-Policy header or string containing a __proto__ directive"
+  review_confidence: high
+}
+concept ControlledMergeInheritedKeyPrototypePollution : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "controlled-merge copies inherited source keys into result object properties during recursive merge"
+  review_evidence: "iterateAndMerge context {pattern} iterates for-in over obj2 and writes result[attr] from obj2[attr] without limiting attr to own properties"
+  review_assumption: "an attacker can supply an object whose inherited keys include prototype-mutating names such as __proto__"
+  review_confidence: high
+}
+concept ChartkickRecursiveExtendPrototypePollution : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "Chartkick recursively copies source object keys into target objects without skipping prototype-mutating keys"
+  review_evidence: "Chartkick extend helper {pattern} recursively writes target[key] from source[key]"
+  review_assumption: "chart data or options loaded from a URL can contain keys such as __proto__"
+  review_confidence: high
+}
+concept CollectionExtendPrototypePollution : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "Collection.js extend recursively copies source object keys into target objects without skipping prototype-mutating keys"
+  review_evidence: "Collection.js extend context {pattern} iterates object keys, resolves target slots with byLink, recurses into nested values, and writes setVal(data, key, val)"
+  review_assumption: "a caller can pass attacker-controlled objects containing __proto__ keys to collection.extend"
+  review_confidence: high
+}
+concept CookiexDeepPrototypePollution : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "cookiex-deep recursively writes source object keys into target objects without rejecting prototype-mutating names"
+  review_evidence: "cookiex-deep assigner context {pattern} iterates Object.keys(b) and writes a[key] from b[key] or recursive delegate output without filtering __proto__/constructor/prototype"
+  review_assumption: "a caller can pass attacker-controlled objects containing __proto__, constructor, or prototype keys to the deep assignment API"
+  review_confidence: high
 }
 concept SchemaCodegenValidationBypass : sink {
   vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
@@ -237,6 +435,33 @@ concept IncompleteFileExtensionValidation : sink {
 concept UncheckedUploadedImageProcessing : sink {
   vulnerable_to: [injection.UnrestrictedUpload]
   cwe: [CWE_434]
+}
+concept IncompleteDangerousUploadExtensionBlocklist : sink {
+  vulnerable_to: [injection.UnrestrictedUpload]
+  cwe: [CWE_434]
+  review_category: "upload"
+  review_condition: "dangerous upload extension blocklist omits an executable extension handled by common PHP deployments"
+  review_evidence: "upload processing context {pattern} renames dangerous extensions to .txt but the regex lacks a PHAR extension case"
+  review_assumption: "an attacker can upload a valid image payload with a .phar filename that remains executable on affected PHP/web-server configurations"
+  review_confidence: high
+}
+concept ConcreteCmsIncompleteUploadExtensionBlacklist : sink {
+  vulnerable_to: [injection.UnrestrictedUpload]
+  cwe: [CWE_434]
+  review_category: "upload"
+  review_condition: "Concrete CMS upload extension blacklist omits executable extensions such as phar, php8, pht, shtml, cgi, and htaccess"
+  review_evidence: "Concrete upload config context {pattern} uses the older extensions_blacklist with only php/php2/php3/php4/php5/php7/phtml"
+  review_assumption: "an authenticated administrator can allow uploads that later execute under common PHP or web-server configurations"
+  review_confidence: high
+}
+concept StatamicAssetUploadPhpExtensionValidationBypass : sink {
+  vulnerable_to: [injection.UnrestrictedUpload]
+  cwe: [CWE_434]
+  review_category: "upload"
+  review_condition: "Statamic front-end form asset uploads use only Laravel's file rule without rejecting PHP executable extensions"
+  review_evidence: "FormController extraRules context {pattern} applies the generic file rule to asset fields without a client-original-extension PHP denylist"
+  review_assumption: "a front-end Statamic Forms asset field is exposed and uploaded files can later be served or executed by the deployment"
+  review_confidence: high
 }
 
 concept ExpressionEval : sink {
@@ -284,6 +509,26 @@ concept MissingSessionRotationAfterAuthentication : sink {
   review_evidence: "authentication context {pattern} sets the authenticated security context while reusing session state"
   review_assumption: "the pre-authentication session identifier can be fixed or known before login"
   review_confidence: medium
+}
+
+concept CockpitLimeRedirectStopContinuation : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_613]
+  review_category: "auth"
+  review_condition: "Cockpit Lime redirects mark the request stopped but do not terminate response execution"
+  review_evidence: "Lime App::stop context {pattern} sets request->stopped without the app:request:stop termination path"
+  review_assumption: "protected controller initialization can reroute unauthenticated or expired sessions before state-changing code continues"
+  review_confidence: high
+}
+
+concept CodeCheckerGuidelineRulesMissingViewCheck : sink {
+  vulnerable_to: [authentication.AuthenticationBypass, access_control.MissingAuthorization]
+  cwe: [CWE_290, CWE_863]
+  review_category: "auth"
+  review_condition: "CodeChecker report-server guideline rule lookup is reachable without the expected VIEW permission gate"
+  review_evidence: "Thrift handler context {pattern} expands guideline rules and checker labels without calling __require_view"
+  review_assumption: "the API method is externally reachable through the report server and should require product VIEW permission like neighboring report methods"
+  review_confidence: high
 }
 
 concept PermissiveCors : sink {
@@ -341,6 +586,16 @@ concept PublicKeyHashBindingReview : sink {
   review_confidence: medium
 }
 
+concept ConstellationLuks2AttachedHeaderActivation : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+  review_category: "crypto"
+  review_condition: "Constellation opens an existing LUKS2 device through an attached, host-provided header without detached-header validation"
+  review_evidence: "cryptsetup initialization context {pattern} initializes the data device directly without extracting and verifying the LUKS2 header metadata"
+  review_assumption: "the encrypted persistent-storage device is supplied by an untrusted host to the confidential guest"
+  review_confidence: high
+}
+
 concept ShortSecurityIdentifier : source {
   taint: [taint.WeakSecurityIdentifier]
   cwe: [CWE_358]
@@ -384,6 +639,15 @@ concept PremasterSecretLengthReview : sink {
 concept CleartextChannel : sink {
   vulnerable_to: [crypto.CleartextTransmission]
   cwe: [CWE_319]
+}
+concept InsecureExecutableDownload : sink {
+  vulnerable_to: [crypto.CleartextTransmission, injection.CommandInjection]
+  cwe: [CWE_319, CWE_494]
+  review_category: "supply_chain"
+  review_condition: "installer downloads an executable or runtime archive over cleartext HTTP before unpacking or executing it"
+  review_evidence: "download script context {pattern} constructs an OpenJDK/JRE archive URL with http:// and passes it to the downloader"
+  review_assumption: "an attacker in a privileged network position can replace the downloaded runtime archive before local use"
+  review_confidence: high
 }
 
 concept InsecureCookie : sink {
@@ -469,6 +733,24 @@ concept ResourceHandle : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_772]
 }
+concept RequestTokenCacheCleanupBypass : sink {
+  vulnerable_to: [resource.ResourceLeak]
+  cwe: [CWE_772]
+  review_category: "resource"
+  review_condition: "request-scoped cached authentication state should be cleared on every request completion path"
+  review_evidence: "token cache cleanup pattern {pattern} can be bypassed by an early parameter binding return"
+  review_assumption: "cached tokens reference request- or database-scoped objects whose lifetime ends after the request"
+  review_confidence: medium
+}
+concept CallFutureRawWeakStateRef : sink {
+  vulnerable_to: [resource.ResourceLeak, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_401, CWE_400]
+  review_category: "resource"
+  review_condition: "a raw weak reference to call future state should only be created when the IC call callback is registered"
+  review_evidence: "call future polling creates raw weak state reference {pattern}"
+  review_assumption: "repeated polling before completion can allocate additional weak references that no callback consumes"
+  review_confidence: medium
+}
 concept StructuredInputDecode : sink {
   vulnerable_to: [validation.ImproperInputValidation]
   cwe: [CWE_20]
@@ -485,6 +767,15 @@ concept UncheckedDecodeResult : sink {
   review_condition: "structured decoding errors should be returned or rejected before decoded data is trusted"
   review_evidence: "decode operation {pattern} unwraps or expects a successful result"
   review_assumption: "malformed attacker-controlled encoded input can reach this decoder"
+  review_confidence: medium
+}
+concept UnvalidatedRatingRange : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "a user-controlled rating value is applied without server-side range validation"
+  review_evidence: "rating update context {pattern} passes the rating directly into the backing rating operation"
+  review_assumption: "callers can submit rating values outside the intended product range"
   review_confidence: medium
 }
 concept OwnerFieldClear : sink {
@@ -514,6 +805,33 @@ concept LockAcquire : sink {
   review_assumption: "an unreleased lock can be triggered to deadlock or starve concurrent work"
   review_confidence: medium
 }
+concept RecursiveJsonMarshalUnderLock : sink {
+  vulnerable_to: [concurrency.Deadlock, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_667, CWE_400]
+  review_category: "concurrency"
+  review_condition: "a JSON marshaler holds a receiver lock while marshaling the same receiver"
+  review_evidence: "MarshalJSON context {pattern} locks the receiver and passes it back to the JSON marshaler"
+  review_assumption: "the marshaler dispatches to MarshalJSON on the receiver type and the lock is not reentrant"
+  review_confidence: high
+}
+concept CiliumBroadTcFilterCleanup : sink {
+  vulnerable_to: [access_control.BrokenAccess, business_logic.BusinessLogic]
+  cwe: [CWE_755, CWE_284]
+  review_category: "lifecycle"
+  review_condition: "Cilium cleanup selects TC BPF filters with an overly broad name match that can detach endpoint datapath programs during restart"
+  review_evidence: "TC filter cleanup context {pattern} matches bpfFilter.Name against the generic cilium substring"
+  review_assumption: "agent startup or cleanup can run while endpoint or host-network policy enforcement depends on attached TC BPF programs"
+  review_confidence: high
+}
+concept StateMutationBeforeOperationPreconditions : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization, business_logic.BusinessLogic]
+  cwe: [CWE_696, CWE_460]
+  review_category: "lifecycle"
+  review_condition: "state-changing operation handling mutates durable state before all operation-specific preconditions are known to pass"
+  review_evidence: "operation application context {pattern} mutates fee, nonce, balance, or lifecycle state before later fallible authorization or validation checks"
+  review_assumption: "an attacker-controlled operation can pass transaction-level checks but fail a later operation-specific authorization or validation check"
+  review_confidence: high
+}
 concept UnboundedCopy : sink {
   vulnerable_to: [memory.OobWrite]
   enabled_by: [taint.UntrustedData]
@@ -542,6 +860,69 @@ concept RawMemoryCopySize : sink {
   review_evidence: "copy-size argument to {pattern} is computed or externally influenced"
   review_assumption: "the size or source offset can exceed the destination/source object bounds"
   review_confidence: medium
+}
+concept MissingPostCopyBoundsCheck : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_787]
+  review_category: "memory"
+  review_condition: "a later raw copy uses an advanced destination offset without a matching length bound"
+  review_evidence: "post-copy memory context {pattern} copies another block after advancing the destination offset"
+  review_assumption: "the second block length can make the advanced destination offset exceed the allocation"
+  review_confidence: medium
+}
+concept UnderallocatedFormattedAddressList : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_787]
+  review_category: "memory"
+  review_condition: "a formatted address-list buffer allocation is smaller than the bytes subsequently written"
+  review_evidence: "address-list formatting context {pattern} allocates from a count-derived formula and writes fixed-width entries plus separators"
+  review_assumption: "the address count can be influenced by a malformed network option"
+  review_confidence: medium
+}
+concept ContikiSicslowpanFragmentOffsetOobWrite : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_787]
+  review_category: "memory"
+  review_condition: "Contiki-NG 6LoWPAN reassembly copies a stored fragment into uip_buf using an unchecked forged fragment offset"
+  review_evidence: "copy_frags2uip context {pattern} shifts frag_buf[i].offset into the UIP_IP_BUF destination pointer and copies frag_buf[i].len without checking offset + length against uip_buf"
+  review_assumption: "an attacker can send forged 6LoWPAN fragments that control the reassembly offset and fragment length metadata"
+  review_confidence: high
+}
+concept LibreOfficeEnhwmfDibHeaderSizeUnderflow : sink {
+  vulnerable_to: [memory.IntegerOverflow, memory.OobWrite]
+  cwe: [CWE_190, CWE_787]
+  review_category: "memory"
+  review_condition: "LibreOffice EMF alpha-blend import subtracts an attacker-controlled bitmap header size from the DIBV5 header size before sizing and copying a heap buffer"
+  review_evidence: "EnhWMFReader::ReadEnhWMF context {pattern} computes getDIBV5HeaderSize() - cbBmiSrc and then uses the delta in nTargetSize and ReadBytes before the patched cbBmiSrc > nHeaderSize guard"
+  review_assumption: "crafted EMF records can choose cbBmiSrc while forcing the alpha-reading path"
+  review_confidence: high
+}
+concept CompressedBlockSizeCapacityMismatch : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_787]
+  review_category: "memory"
+  review_condition: "compressed block output accounting compares against a caller capacity that may not be the real destination size"
+  review_evidence: "compressed block writer {pattern} writes size metadata and copies block data using mismatched capacity checks"
+  review_assumption: "a malformed compressed block or destination-size edge case can exhaust the output buffer before metadata or block bytes are written"
+  review_confidence: medium
+}
+concept ClamavWwpackStructsPointerOobWrite : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_787]
+  review_category: "memory"
+  review_condition: "WWPack section headers are rewritten through a computed structs pointer without checking it remains inside the executable buffer"
+  review_evidence: "WWPack unpacker context {pattern} derives structs from PE header data, writes section records, advances by 0x28, and zeroes the next record"
+  review_assumption: "a malformed packed executable can make the derived section-table pointer or section count exceed the rewritten executable buffer"
+  review_confidence: high
+}
+concept ClaxonResidualPartitionBufferExposure : sink {
+  vulnerable_to: [memory.UninitializedUse]
+  cwe: [CWE_908]
+  review_category: "memory"
+  review_condition: "residual partition decoding slices the sample buffer by a bitstream-derived partition count without first proving the block size divides evenly"
+  review_evidence: "Claxon residual decoder context {pattern} derives n_partitions and n_samples, slices buffer[start..start + len], and calls both Rice partition decoders without a partition-order guard"
+  review_assumption: "a malformed FLAC bitstream can choose a partition order that leaves part of the decoded output buffer uninitialized"
+  review_confidence: high
 }
 concept UnsafeMutableAlias : sink {
   vulnerable_to: [memory.OobWrite, memory.UseAfterFree]
@@ -631,6 +1012,15 @@ concept LocklessSharedMutation : sink {
   review_assumption: "multiple attacker-triggerable executions can interleave on the same state"
   review_confidence: low
 }
+concept ThreadLocalScopeOverwriteWithoutCleanup : sink {
+  vulnerable_to: [concurrency.RaceCondition, resource.ResourceLeak]
+  cwe: [CWE_362]
+  review_category: "race"
+  review_condition: "a request or scope lifecycle begins by overwriting ThreadLocal state without first ending or clearing the previous scope"
+  review_evidence: "lifecycle context {pattern} writes a new ThreadLocal-scoped value before an observed cleanup call"
+  review_assumption: "the same worker thread can process another request or scope after an unmatched previous lifecycle callback"
+  review_confidence: high
+}
 concept IndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   enabled_by: [taint.UntrustedData]
@@ -644,6 +1034,24 @@ concept IndexAccess : sink {
 concept FieldDerivedIndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   cwe: [CWE_129, CWE_125, CWE_787]
+}
+concept ChakraScopeSlotArrayUncheckedIndex : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_129, CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "scope-slot identifiers are written into a property-id array without checking the slot against the array size"
+  review_evidence: "Chakra scope-slot array context {pattern} indexes propertyIdsForScopeSlotArray with symbol-derived or special scope slots"
+  review_assumption: "a malformed let/const binding can leave a symbol without a valid scope-slot location before bytecode emission"
+  review_confidence: medium
+}
+concept BinarySearchTableIndexGuardBypass : sink {
+  vulnerable_to: [memory.OobRead]
+  cwe: [CWE_125, CWE_129]
+  review_category: "memory"
+  review_condition: "a binary-search index can be recomputed after the search interval becomes invalid"
+  review_evidence: "binary-search table context {pattern} subscripts a sorted table by mid and updates mid after changing first/last"
+  review_assumption: "a malformed or attacker-selected lookup id can fall outside the table's covered range"
+  review_confidence: medium
 }
 concept CountDerivedElementAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
@@ -674,6 +1082,24 @@ concept IntegerSizeArithmetic : sink {
   review_assumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
   review_confidence: low
 }
+concept RubyCgiEscapeHtmlLengthOverflow : sink {
+  vulnerable_to: [memory.IntegerOverflow, memory.OobWrite]
+  cwe: [CWE_190, CWE_787]
+  review_category: "numeric"
+  review_condition: "Ruby CGI HTML escaping allocates from string length multiplied by maximum expansion before allocator overflow checks"
+  review_evidence: "CGI escape context {pattern} allocates ALLOCV_N(char, ..., RSTRING_LEN(str) * HTML_ESCAPE_MAX_LEN)"
+  review_assumption: "a very large string on platforms with narrower long arithmetic can wrap the allocation size before copy expansion"
+  review_confidence: high
+}
+concept CgifAddframeSignedFrameCountOverflow : sink {
+  vulnerable_to: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_190]
+  review_category: "numeric"
+  review_condition: "CGIF frame comparison multiplies 16-bit width and height in a signed loop bound"
+  review_evidence: "cgif_addframe context {pattern} compares i against width * height before indexing frame image data"
+  review_assumption: "large width and height values can overflow the promoted signed int product and skip or truncate frame comparison"
+  review_confidence: high
+}
 concept UncheckedEncodedLengthArithmetic : sink {
   vulnerable_to: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
   cwe: [CWE_190, CWE_835]
@@ -682,6 +1108,24 @@ concept UncheckedEncodedLengthArithmetic : sink {
   review_evidence: "protocol length context {pattern} narrows or scales serialized lengths without checked arithmetic"
   review_assumption: "a malformed serialized payload can supply oversized container or string lengths"
   review_confidence: medium
+}
+concept ChGoCompressedSizeUint32Overflow : sink {
+  vulnerable_to: [memory.IntegerOverflow, validation.ImproperInputValidation]
+  cwe: [CWE_190, CWE_444]
+  review_category: "numeric"
+  review_condition: "compressed packet size is narrowed to uint32 without checking for overflow before framing the stream"
+  review_evidence: "ch-go compression context {pattern} writes n + compressHeaderSize as a uint32 packet length"
+  review_assumption: "attacker-controlled external data can produce a large uncompressed or compressed block that wraps the advertised packet length and desynchronizes subsequent query packets"
+  review_confidence: high
+}
+concept CimgPnmDimensionProductOverflow : sink {
+  vulnerable_to: [memory.IntegerOverflow, memory.OobWrite]
+  cwe: [CWE_190, CWE_787]
+  review_category: "numeric"
+  review_condition: "CImg PNM loading compares width-height-depth product to file size before widening the multiplication"
+  review_evidence: "get_load_pnm context {pattern} checks W * H * D against the file size"
+  review_assumption: "a crafted PNM header can provide large dimensions that wrap the product before allocation and pixel loading"
+  review_confidence: high
 }
 concept PointerOffsetBoundsCheck : sink {
   vulnerable_to: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
@@ -693,12 +1137,30 @@ concept PointerOffsetBoundsCheck : sink {
   review_confidence: medium
 }
 concept UnderwidthFormattedIndex : sink {
-  vulnerable_to: [memory.BoundsError]
+  vulnerable_to: [memory.OobRead]
   cwe: [CWE_192, CWE_125]
   review_category: "numeric"
   review_condition: "formatted numeric output may be shorter than a later fixed index expects"
   review_evidence: "format/index context {pattern} indexes a formatted value beyond the requested minimum width"
   review_assumption: "the formatted numeric value can be small enough to produce the minimum-width string"
+  review_confidence: medium
+}
+concept UnsignedIndexConversionGuardBypass : sink {
+  vulnerable_to: [memory.OobRead, memory.IntegerOverflow]
+  cwe: [CWE_190, CWE_129]
+  review_category: "numeric"
+  review_condition: "an unsigned index is range-checked before the signed conversion used for indexing or dispatch"
+  review_evidence: "index guard context {pattern} compares an unsigned field against zero and later converts it with int()"
+  review_assumption: "a malformed input can supply a value whose signed conversion becomes negative"
+  review_confidence: medium
+}
+concept UncheckedFfiLengthNarrowing : sink {
+  vulnerable_to: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_190]
+  review_category: "numeric"
+  review_condition: "a host slice length is narrowed into an FFI length field without clamping to the C field width"
+  review_evidence: "FFI length context {pattern} casts len() directly into a narrower C integer type"
+  review_assumption: "attacker-controlled or file-derived input can make the slice length exceed the C integer maximum"
   review_confidence: medium
 }
 concept ZeroSizeReallocation : sink {
@@ -756,6 +1218,15 @@ concept EscapedTerminatorWrite : sink {
   review_assumption: "attacker-controlled input can end with an escape marker followed by a terminator"
   review_confidence: medium
 }
+concept CjsonTrailingBackslashStringOverread : sink {
+  vulnerable_to: [memory.OobRead]
+  cwe: [CWE_125]
+  review_category: "memory"
+  review_condition: "cJSON parse_string skips an escaped byte without checking whether the backslash is the final input byte"
+  review_evidence: "parse_string context {pattern} advances end_ptr after a backslash before validating the next byte"
+  review_assumption: "attacker-controlled JSON can end a string with a trailing backslash before the parser scans for the closing quote"
+  review_confidence: high
+}
 concept AuthenticationRequiredOp : sink {
   vulnerable_to: [authentication.MissingAuthentication]
   cwe: [CWE_306]
@@ -765,12 +1236,66 @@ concept AuthenticationRequiredOp : sink {
   review_assumption: "the enclosing endpoint or entry point can be reached by an unauthenticated actor"
   review_confidence: low
 }
+concept JmxRmiRegistryExposure : sink {
+  vulnerable_to: [authentication.MissingAuthentication, injection.CodeInjection]
+  cwe: [CWE_306, CWE_94]
+  review_category: "auth"
+  review_condition: "a JMX/RMI server is registered through a custom RMI exporter path that can expose unauthenticated remote management"
+  review_evidence: "JMX server setup context {pattern} uses the custom RMI exporter/registry binding path instead of creating the registry with the configured socket factories"
+  review_assumption: "default authentication may be disabled and the registry may bind beyond loopback, exposing remote JMX/RMI code execution"
+  review_confidence: medium
+}
+concept NodetoolArchiveCommandPrivilegeEscalation : sink {
+  vulnerable_to: [access_control.PrivilegeEscalation, injection.CommandInjection]
+  cwe: [CWE_269, CWE_78]
+  review_category: "auth"
+  review_condition: "JMX/nodetool users can supply a local archive command that runs as the Cassandra process user"
+  review_evidence: "full query logging context {pattern} forwards the archive command without requiring the nodetool archive-command opt-in"
+  review_assumption: "a lower-privileged operator with JMX/nodetool access can invoke the logging endpoint with an archive command"
+  review_confidence: medium
+}
+concept EffectiveUidRootCheckBypass : sink {
+  vulnerable_to: [access_control.PrivilegeEscalation]
+  cwe: [CWE_269]
+  review_category: "auth"
+  review_condition: "root/superuser privilege checks should inspect the real UID when only effective IDs may have been dropped"
+  review_evidence: "privilege warning context {pattern} checks os.geteuid() instead of os.getuid()"
+  review_assumption: "daemon startup may change effective privileges before worker code executes while the real UID remains privileged"
+  review_confidence: medium
+}
+concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
+  vulnerable_to: [access_control.PrivilegeEscalation]
+  cwe: [CWE_269]
+  review_category: "auth"
+  review_condition: "file-access policy rules are applied before the EndpointSecurity adapter has created its client"
+  review_evidence: "ClearanceKit startup ordering {pattern} applies policy, allowlist, or jail rules before adapter.start(initialRules:...)"
+  review_assumption: "managed or user-defined rules can be absent from the active interactor until a later XPC policy mutation"
+  review_confidence: high
+}
+concept JenkinsAdvisorWeakLayoutPermission : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+  review_category: "access_control"
+  review_condition: "Jenkins Advisor administrative configuration view uses the weaker it.ADMINISTRATOR layout permission"
+  review_evidence: "Jelly layout event {pattern} gates the management page with permission=\"${it.ADMINISTRATOR}\" instead of app.ADMINISTER"
+  review_assumption: "the view is reachable through the ManagementLink URL and should require Overall/Administer"
+  review_confidence: high
+}
 // Review-only: UI/navigation exit paths from an authentication or lock flow. This is not
 // a confirmed vulnerability by itself; it gives the review/AI pass the code locations where
 // alternate platform exits may bypass the expected authentication state.
 concept AuthFlowBypassReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]
+}
+concept MissingGuestFallbackForWebAuth : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+  review_category: "auth"
+  review_condition: "web-server authenticated users missing from the local database can exit before the configured guest fallback is considered"
+  review_evidence: "web basic authentication context {pattern} checks the template user before the later guest-user fallback"
+  review_assumption: "guest-user fallback is configured to constrain unknown web-authenticated users to guest permissions"
+  review_confidence: medium
 }
 concept MfaRedirectBypass : sink {
   vulnerable_to: [authentication.AuthenticationBypass]
@@ -809,6 +1334,24 @@ concept IgnoredAuthorizationResult : sink {
 concept CredentialedEndpointReview : sink {
   vulnerable_to: [access_control.MissingAuthorization, secrets.SecretLeak]
   cwe: [CWE_200, CWE_862]
+}
+concept JenkinsDescriptorConfigEnumerationMissingPermission : sink {
+  vulnerable_to: [access_control.MissingAuthorization, secrets.SecretLeak]
+  cwe: [CWE_200, CWE_862]
+  review_category: "auth"
+  review_condition: "Jenkins descriptor fill endpoint enumerates global configuration or credential identifiers without an observed permission check"
+  review_evidence: "descriptor endpoint context {pattern} reads host connection or credential configuration before calling checkPermission or hasPermission"
+  review_assumption: "the doFill endpoint is reachable from users with less privilege than Item/Configure or Overall/Administer"
+  review_confidence: high
+}
+concept ShopwareStoreApiManyToManyCriteriaBypass : sink {
+  vulnerable_to: [access_control.BrokenAccess]
+  cwe: [CWE_284]
+  review_category: "access_control"
+  review_condition: "Shopware Store API criteria processing walks requested associations without applying ApiAware protections to ManyToMany target definitions"
+  review_evidence: "SalesChannelRepository processCriteria context {pattern} queues only getReferenceDefinition() and de-duplicates by definition class before the patched ManyToManyAssociationField/getToManyReferenceDefinition path-aware traversal"
+  review_assumption: "extensions can define ManyToMany associations whose target entity exposes non-ApiAware fields through Store API criteria"
+  review_confidence: high
 }
 concept TimeBoundAccessTokenReview : sink {
   vulnerable_to: [access_control.BrokenAccess]
@@ -875,6 +1418,15 @@ concept AccessPolicyReview : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_863]
 }
+concept ChefUserManagementWithoutAdminGuard : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+  review_category: "auth"
+  review_condition: "Chef user-management API actions create, update, or destroy users without an admin-only controller guard"
+  review_evidence: "Users controller context {pattern} saves or destroys Chef::WebUIUser records without before :is_admin"
+  review_assumption: "authenticated non-admin API users can reach the /users create, update, or destroy routes"
+  review_confidence: high
+}
 // Review-only: a handler resolves request metadata and resource metadata but does
 // not show a consistency check between request scope and resource scope. Used for
 // authz CVEs where the policy boundary is the request/resource scope contract.
@@ -886,6 +1438,87 @@ concept RequestScopePolicyReview : sink {
   review_evidence: "handler context {pattern} resolves request and resource metadata without a scope comparison"
   review_assumption: "the request may be authorized or dispatched under the wrong resource scope"
   review_confidence: possibility
+}
+concept ExternalResourceNamespaceControl : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_610, CWE_639]
+  review_category: "auth"
+  review_condition: "a user-controlled Kubernetes resource field selects the namespace for a privileged object operation"
+  review_evidence: "Kubernetes object context {pattern} uses a custom resource namespace selector instead of the reconciled resource namespace"
+  review_assumption: "the custom resource can be created or updated by a lower-privileged tenant in a namespace watched by the controller"
+  review_confidence: medium
+}
+concept TenantServiceAccountAdmissionBypass : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_863]
+  review_category: "auth"
+  review_condition: "tenant namespace service accounts are not recognized by the admission-user predicate"
+  review_evidence: "admission user helper {pattern} checks configured groups but lacks a tenant namespace service-account lookup"
+  review_assumption: "tenant namespace service accounts can be granted namespace update or patch permissions and reach namespace admission webhooks"
+  review_confidence: medium
+}
+concept NamespacedSubjectKeyCollision : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization, secrets.SecretLeak]
+  cwe: [CWE_200, CWE_863]
+  review_category: "auth"
+  review_condition: "namespaced Kubernetes ServiceAccount subjects are indexed without namespace in authorization or cache keys"
+  review_evidence: "role binding reflector context {pattern} builds subject lookup keys from subject kind and name but omits namespace"
+  review_assumption: "tenant owners are ServiceAccounts with colliding names in different namespaces and the reflector cache is enabled"
+  review_confidence: medium
+}
+concept HopByHopHeaderAuthBypass : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, access_control.IncorrectAuthorization]
+  cwe: [CWE_287]
+  review_category: "auth"
+  review_condition: "a reverse proxy sets privileged backend authentication or impersonation headers without first removing client-controlled hop-by-hop header tokens"
+  review_evidence: "proxy impersonation context {pattern} writes Authorization or Impersonate-* headers but lacks Connection-header stripping"
+  review_assumption: "the backend or reverse proxy path honors the Connection header by dropping named forwarded headers"
+  review_confidence: medium
+}
+concept ProxyClientIpSpoofingBypass : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, access_control.IncorrectAuthorization]
+  cwe: [CWE_287, CWE_348]
+  review_category: "auth"
+  review_condition: "gateway proxying forwards client-controlled source-IP headers to backend authorization logic without normalizing them against the direct peer"
+  review_evidence: "gateway route context {pattern} selects a backend proxy and forwards the request without observed source-IP header rewriting"
+  review_assumption: "backend services trust X-Forwarded-For or X-Real-IP to distinguish local or trusted requests"
+  review_confidence: medium
+}
+concept SamlFirstSignatureOnlyBypass : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+  cwe: [CWE_287, CWE_347]
+  review_category: "auth"
+  review_condition: "SAML response verification checks only the first XML signature instead of all signatures on the response"
+  review_evidence: "SAML signature verification context {pattern} loads nodeList[0] before CheckSignature"
+  review_assumption: "an attacker can submit a SAML response containing an attacker-chosen signed element before unsigned or differently signed assertion data"
+  review_confidence: high
+}
+concept CiliumCliEtcdInitMountMismatch : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_280, CWE_755]
+  review_category: "auth"
+  review_condition: "Cilium CLI cluster-mesh etcd init container enables etcd auth against a data directory that is not the mounted etcd data volume"
+  review_evidence: "cluster-mesh deployment context {pattern} configures etcd auth initialization with a mismatched init-container mount path"
+  review_assumption: "the main etcd container later starts from the shared /var/run/etcd volume and overwrites or ignores auth state initialized elsewhere"
+  review_confidence: high
+}
+concept NextcloudCircleMemberAddMissingCircleCheck : sink {
+  vulnerable_to: [access_control.Idor, access_control.IncorrectAuthorization]
+  cwe: [CWE_639]
+  review_category: "auth"
+  review_condition: "Nextcloud Circles API converts a caller-supplied circle member id into a federated member without first resolving the referenced circle"
+  review_evidence: "LocalController member-add context {pattern} calls generateFederatedUser for circle members before circleService->getCircle validates visibility"
+  review_assumption: "a caller who learns a private circle id can submit it as a member id to track or add that circle through the API"
+  review_confidence: high
+}
+concept CollectivesPublicTrashMissingEditPermission : sink {
+  vulnerable_to: [access_control.BrokenAccess]
+  cwe: [CWE_284]
+  review_category: "access_control"
+  review_condition: "Nextcloud Collectives public trash listing exposes deleted pages for a shared collective without requiring edit permission"
+  review_evidence: "PublicPageTrashController index context {pattern} calls findAllTrash for the shared collective and returns page share tokens before the patched checkEditPermissions call"
+  review_assumption: "view-only public collective shares can reach the public page trash index endpoint"
+  review_confidence: high
 }
 // Review-only: external identity data is converted into local user/group ids
 // without an observed registration or uniqueness boundary. Used for identity
@@ -936,6 +1569,42 @@ concept IncompleteIpDenylist : sink {
   vulnerable_to: [request_forgery.Ssrf]
   cwe: [CWE_918]
 }
+concept ChamiloUnsafeGuzzleUrlFetch : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  cwe: [CWE_918]
+  review_category: "request_forgery"
+  review_condition: "user-influenced social profile or wall URLs are fetched server-side without private/reserved IP rejection"
+  review_evidence: "Chamilo URL verification context {pattern} performs a Guzzle GET before applying the fixed isUrlSafe guard"
+  review_assumption: "the URL argument can originate from social-wall or profile form input and can target internal services"
+  review_confidence: medium
+}
+concept CloudBaseOpenUrlSsrf : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  cwe: [CWE_918]
+  review_category: "request_forgery"
+  review_condition: "CloudBase MCP open-url endpoint accepts a request-body URL before SSRF validation"
+  review_evidence: "interactive-server route context {pattern} reads req.body.url and calls openUrl without the fixed isUrlSafeToOpen validation"
+  review_assumption: "the interactive open-url endpoint is reachable by a remote or browser-backed attacker"
+  review_confidence: high
+}
+concept CodeServerPathProxyPortConfusedProxy : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  cwe: [CWE_441, CWE_918]
+  review_category: "request_forgery"
+  review_condition: "code-server path proxy builds a proxy target from the path port parameter before numeric validation"
+  review_evidence: "path proxy target context {pattern} interpolates req.params.port into the upstream target URL before the fixed parseInt port normalization"
+  review_assumption: "a user can be lured to a crafted /proxy/:port URL on a code-server instance with the built-in proxy enabled"
+  review_confidence: high
+}
+concept CodeDxJenkinsRemoteValidationMissingPostPermission : sink {
+  vulnerable_to: [request_forgery.Csrf, access_control.MissingAuthorization, request_forgery.Ssrf]
+  cwe: [CWE_352, CWE_862, CWE_918]
+  review_category: "request_forgery"
+  review_condition: "Jenkins Code Dx form endpoint can connect to a supplied Code Dx URL without POST and item/admin permission checks"
+  review_evidence: "Code Dx descriptor endpoint context {pattern} builds a CodeDxClient from query parameters and fetches projects before the patched @POST and checkPermissionForRemoteRequests gate"
+  review_assumption: "a user with Overall/Read or a browser-backed request can reach the descriptor endpoint with attacker-controlled URL parameters"
+  review_confidence: high
+}
 // Server/port validation that attempts to block privileged or out-of-range
 // outbound connections but can be bypassed by PHP string-to-number coercion.
 concept IncompleteServerPortValidation : sink {
@@ -954,6 +1623,15 @@ concept RequestHostUrlValidationBypass : sink {
   review_assumption: "the request Host header or equivalent server-name metadata can be attacker-controlled"
   review_confidence: medium
 }
+concept MultiOptionUrlValidationBypass : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "multi-option authentication URL validation accepts absolute URLs without host allowlisting"
+  review_evidence: "URL validation context {pattern} checks URL syntax but does not validate the callback host"
+  review_assumption: "the validated URL is later used as an authentication callback or redirect target"
+  review_confidence: medium
+}
 // A resource-acquiring / potentially-unbounded operation (open file/socket/connection,
 // spawn thread, allocate, read-all). POSSIBILITY-tier review concept for the resource/DoS
 // bucket: "verify this resource is bounded and released". Inert for confirmed rules.
@@ -964,6 +1642,69 @@ concept ResourceReview : sink {
 concept UnboundedResourceOperation : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_772]
+}
+concept ChatterBotSqlalchemySessionPoolExhaustion : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "SQLAlchemy session and connection-pool management lacks bounded pool defaults and guaranteed session cleanup"
+  review_evidence: "SQL storage adapter context {pattern} constructs sessions and yields query results without the patched scoped-session/pool-timeout/finally cleanup pattern"
+  review_assumption: "concurrent get_response calls can partially consume generator results or hit exceptional paths that hold database sessions long enough to exhaust the pool"
+  review_confidence: medium
+}
+concept Free5gcChfRechargeInfoSplitPanic : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_129, CWE_400]
+  review_category: "resource"
+  review_condition: "recharge route input is split and indexed for rating-group data without proving the split result length"
+  review_evidence: "free5GC CHF recharge context {pattern} indexes the result of strings.Split on route input"
+  review_assumption: "a valid authenticated caller can supply a recharge route value without the underscore delimiter and repeatedly trigger panic recovery"
+  review_confidence: high
+}
+concept CookieMaxAgeDurationSecondsPanic : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_20, CWE_400]
+  review_category: "resource"
+  review_condition: "cookie Max-Age parser passes unbounded parsed seconds directly to Duration::seconds"
+  review_evidence: "cookie parser context {pattern} parses the Max-Age attribute and constructs Duration::seconds(val) without clamping to Duration::max_value().num_seconds()"
+  review_assumption: "a remote peer can supply a very large Max-Age value that triggers a panic in the time crate duration constructor"
+  review_confidence: high
+}
+concept EmmettUnhandledCookieParseException : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_248, CWE_400]
+  review_category: "resource"
+  review_condition: "Emmett request cookie parsing lets malformed Cookie headers raise an unhandled exception"
+  review_evidence: "IngressWrapper.cookies context {pattern} loads each Cookie header fragment into SimpleCookie without catching parser exceptions"
+  review_assumption: "an unauthenticated remote client can send malformed Cookie headers and trigger the request cookies property"
+  review_confidence: high
+}
+concept GsonObjectTypeAdapterRecursiveRead : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_502, CWE_400]
+  review_category: "resource"
+  review_condition: "Gson ObjectTypeAdapter replacement recursively parses nested JSON containers without a depth limit or explicit stack"
+  review_evidence: "Gson adapter context {pattern} calls read(in) from array/object parsing branches"
+  review_assumption: "untrusted JSON input can contain deeply nested arrays or objects and reach this Object adapter"
+  review_confidence: high
+}
+concept CommonsCompressBzip2FallbackSortMissing : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "bzip2 block sorting retries the original main sorter after excessive comparison work instead of switching to the bounded fallback sorter"
+  review_evidence: "Commons Compress bzip2 block sort context {pattern} calls mainSort and randomiseBlock when workDone exceeds workLimit without an observed fallbackSort call"
+  review_assumption: "attacker-controlled or remote file content can contain highly repetitive bytes and reach BZip2CompressorOutputStream compression"
+  review_confidence: high
+}
+concept ConduitHyperUnboundedBodyToBytes : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770]
+  review_category: "resource"
+  review_condition: "HTTP request bodies are fully collected with hyper::body::to_bytes before a request-size limit is enforced"
+  review_evidence: "conduit-hyper blocking handler context {pattern} converts the full Hyper body into bytes without the patched content-length or size-hint guard"
+  review_assumption: "a remote client can send an oversized Content-Length or body stream that reaches the Hyper service handler"
+  review_confidence: high
 }
 concept ZeroStepSequenceExpansion : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
@@ -989,6 +1730,24 @@ concept UnboundedProtocolStateByIdentifier : sink {
   review_condition: "protocol message identifiers are stored in peer state or queued before per-identifier size/type limits are enforced"
   review_evidence: "protocol state context {pattern} accepts remote message entries into state and task queues without an observed identifier size/type rejection"
   review_assumption: "the identifier bytes can be supplied by a remote peer and can be large enough or numerous enough to amplify memory/CPU"
+  review_confidence: medium
+}
+concept UnderboundedProtocolCountLimit : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_20, CWE_400]
+  review_category: "resource"
+  review_condition: "protocol parser count validation is below the consensus or message-format upper bound"
+  review_evidence: "wire parser context {pattern} rejects count-derived input using an under-sized limit"
+  review_assumption: "a remote peer or block can legally contain more items than the parser limit accepts"
+  review_confidence: medium
+}
+concept ProtocolListAmplification : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "protocol list readers accept zero-sized element counts without charging an equivalent traversal budget"
+  review_evidence: "protocol list context {pattern} builds a list reader from attacker-controlled element counts without an observed amplification charge"
+  review_assumption: "a remote peer can send zero-sized list metadata with a very large element count and force per-element iteration"
   review_confidence: medium
 }
 concept UnboundedAllocationReview : sink {
@@ -1022,6 +1781,15 @@ concept ReachableAssertionReview : sink {
   review_assumption: "the validated fields can be supplied across a process or trust boundary"
   review_confidence: possibility
 }
+concept UncheckedPythonCapiHashError : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_252, CWE_400]
+  review_category: "resource"
+  review_condition: "a Python C API hash error return is not checked before later cleanup continues"
+  review_evidence: "C extension hash context {pattern} calls PyObject_Hash and then mutates cleanup state without first exiting on -1"
+  review_assumption: "attacker-controlled recursive or erroring values can make the hash callback fail and leave the extension in an inconsistent error state"
+  review_confidence: medium
+}
 // Configuration or diagnostic serialization that may include inline secrets unless redacted.
 // Review-only: static analysis cannot know which config fields are sensitive in every
 // project, so the AI/manual pass should verify redaction before exposure through APIs,
@@ -1043,6 +1811,33 @@ concept SecretDatabindingReview : sink {
   review_evidence: "secret parameter {pattern} is accepted at a configuration boundary"
   review_assumption: "the configuration framework may persist or display the value unless it is converted to protected secret storage"
   review_confidence: possibility
+}
+concept JenkinsPlaintextDataboundCredential : sink {
+  vulnerable_to: [secrets.SecretLeak, crypto.CleartextStorage]
+  cwe: [CWE_312, CWE_522]
+  review_category: "secret"
+  review_condition: "Jenkins plugin databinds credential-like configuration fields as plain strings"
+  review_evidence: "Jenkins databound constructor context {pattern} accepts API login/token configuration as String values instead of protected Secret storage"
+  review_assumption: "Jenkins persists job configuration fields in config.xml where users with Extended Read or filesystem access may read them"
+  review_confidence: high
+}
+concept CinnyServiceWorkerMediaAuthLeak : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_20, CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "service-worker media fetch authorization is selected by substring path checks before a bearer token is attached"
+  review_evidence: "service-worker fetch context {pattern} obtains an access token from the client and uses Matrix media path includes checks before fetchConfig(token)"
+  review_assumption: "an attacker-controlled media URL can contain Matrix media path fragments while targeting a non-homeserver origin"
+  review_confidence: high
+}
+concept CkanSolrConnectionErrorDisclosure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_209, CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "CKAN package_search can return Solr connection errors containing internal Solr URLs or embedded credentials"
+  review_evidence: "search error context {pattern} catches pysolr.SolrError and wraps raw exception details in a SearchError before API serialization"
+  review_assumption: "Solr connection failures can include the configured Solr URL, including inline credentials, in the exception text"
+  review_confidence: high
 }
 // Review-only: API settings responses that include password policy, token, or
 // similar security-setting fields should be gated by authentication.
@@ -1070,6 +1865,11 @@ concept InternalContentExposureReview : sink {
 concept AbsolutePathDisclosure : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_200]
+  review_category: "secret"
+  review_condition: "an absolute local path is included in externally visible or reusable output"
+  review_evidence: "absolute path disclosure pattern {pattern} preserves resolved filesystem location information"
+  review_assumption: "the output may be observable outside the host boundary or persisted for later comparison"
+  review_confidence: possibility
 }
 concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
@@ -1081,14 +1881,54 @@ concept ArchiveEntryWrite : sink {
   review_assumption: "the entry name is not normalized, confined, or symlink-safe before writing"
   review_confidence: medium
 }
+concept ManualZipEntryFileWrite : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "zip entry names are joined into filesystem paths before writes without a containment check"
+  review_evidence: "manual zip extraction context {pattern} joins an archive member name into the destination path"
+  review_assumption: "archive member names can include parent-directory components or absolute path forms"
+  review_confidence: medium
+}
+concept CharmRouteFileStorePathAccess : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "route wildcard paths are used as file-store object paths without canonicalization"
+  review_evidence: "Charm file handler context {pattern} forwards a route path to file-store get, put, or delete"
+  review_assumption: "the route wildcard can include traversal components that alter the user's data-directory path"
+  review_confidence: medium
+}
 concept ArchiveSymlinkFilterBypass : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   cwe: [CWE_22, CWE_59]
   review_category: "path"
-  review_condition: "archive extraction symlink filter appears wired to the wrong entry metadata shape"
-  review_evidence: "archive extraction context {pattern} uses a symlink ignore callback that checks stale or unreachable entry metadata"
+  review_condition: "archive extraction can miss or misapply symlink and hard-link target validation"
+  review_evidence: "archive extraction context {pattern} extracts archive entries without proving link targets remain inside the destination root"
   review_assumption: "archive entries may contain symlinks that redirect later writes outside the intended extraction directory"
   review_confidence: medium
+}
+concept ArchiveMarkerSymlinkOverwrite : sink {
+  vulnerable_to: [path.PathTraversal, path.LinkFollowing]
+  cwe: [CWE_22, CWE_59]
+  review_category: "path"
+  review_condition: "archive extraction writes a post-extraction marker path that an archive entry could replace with a symlink"
+  review_evidence: "archive extraction context {pattern} unpacks entries and opens the marker with create instead of create_new"
+  review_assumption: "archive entries may include symlinks and the marker path is inside the extraction root"
+  review_confidence: medium
+}
+concept MountStubCleanupPathEscape : sink {
+  vulnerable_to: [path.PathTraversal, path.LinkFollowing]
+  cwe: [CWE_22]
+}
+concept ContainersCommonFipsModeMountSymlink : sink {
+  vulnerable_to: [path.LinkFollowing, path.PathTraversal]
+  cwe: [CWE_59, CWE_22]
+  review_category: "path"
+  review_condition: "containers/common FIPS subscription mount resolves a container-image path with filepath.Join before bind-mounting it from the host"
+  review_evidence: "addFIPSModeSubscription context {pattern} joins mountPoint with the FIPS backend path, checks existence, and uses the result as an rspec.Mount source before securejoin hardening"
+  review_assumption: "a container image can place symlinks under the mounted root so ordinary path joins can resolve outside the intended container filesystem"
+  review_confidence: high
 }
 concept ArchiveEntryName : source {
   taint: [taint.UntrustedData]
@@ -1101,6 +1941,15 @@ concept PackageEntryPointScriptWrite : sink {
   review_condition: "package entry point script names are generated without confinement to the scripts directory"
   review_evidence: "entry point script generation context {pattern} lacks a scripts-directory containment check"
   review_assumption: "a package can provide an entry point name with path separators or parent-directory components"
+  review_confidence: medium
+}
+concept UploadFilePathTraversalWrite : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "file upload storage accepts caller-controlled object paths without rejecting traversal segments"
+  review_evidence: "upload helper context {pattern} forwards the full file path to storage without an observed traversal guard"
+  review_assumption: "the upload endpoint exposes the full file path or object key to clients"
   review_confidence: medium
 }
 concept RemoteListingDownloadPath : sink {
@@ -1147,6 +1996,15 @@ concept DeserializableInvocationHandler : sink {
   review_evidence: "invocation handler class context {pattern} lacks readResolve/readObject rejection"
   review_assumption: "attacker-controlled serialized data can include or reach the proxy handler object graph"
   review_confidence: medium
+}
+concept CodeceptionRunProcessDeserializationGadget : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse, injection.CommandInjection]
+  cwe: [CWE_502]
+  review_category: "deserialization"
+  review_condition: "Codeception RunProcess can be deserialized as a process-control gadget without serialization rejection hooks"
+  review_evidence: "RunProcess class context {pattern} starts shell commands and calls stopProcess from __destruct before __sleep/__wakeup blockers were added"
+  review_assumption: "attacker-controlled serialized data can instantiate or hydrate the RunProcess object graph"
+  review_confidence: high
 }
 concept UnsafeYamlConstructor : sink {
   vulnerable_to: [deserialization.DeserializationAbuse]
@@ -1195,11 +2053,92 @@ concept FileInclude : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_98]
 }
+concept UnvalidatedLocaleFileInclude : sink {
+  vulnerable_to: [path.FileInclusion]
+  cwe: [CWE_98]
+  review_category: "path"
+  review_condition: "a locale parameter is interpolated into a PHP include path before locale validation"
+  review_evidence: "locale include context {pattern} builds a language file path from the locale value"
+  review_assumption: "an application can pass user-controlled locale names to the translator or setLocale API"
+  review_confidence: medium
+}
 concept FilePathAccess : sink {
   vulnerable_to: [path.PathTraversal]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_22]
   excluded_chars: "/\\"
+}
+concept CowAgentMemoryFilenameTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "memory content filenames are joined under workspace directories without canonical containment"
+  review_evidence: "memory path resolver context {pattern} returns os.path.join(..., filename) without realpath containment"
+  review_assumption: "the memory content API can pass remote filename payload values to this resolver"
+  review_confidence: high
+}
+concept CherryPySessionIdFilePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "cookie-controlled CherryPy session ids are joined into filesystem paths without canonical containment"
+  review_evidence: "CherryPy FileSession path context {pattern} joins self.id under the session storage path"
+  review_assumption: "the session id can be supplied by the request cookie and reused for session file reads, writes, or deletes"
+  review_confidence: high
+}
+concept BrowserlessWorkspaceFilePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "browserless workspace route paths are joined under the workspace directory without a containment check"
+  review_evidence: "workspace route context {pattern} joins req.params path data into workspaceDir before reading or deleting files"
+  review_assumption: "the workspace route is remotely reachable and route parameters can contain traversal components"
+  review_confidence: high
+}
+concept ClaspRemoteFilePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "remote Apps Script filenames are resolved into local project paths without a containment check"
+  review_evidence: "clasp remote file sync context {pattern} resolves a Google Apps Script filename under the content directory before returning it for local writes"
+  review_assumption: "a malicious or compromised Apps Script project can provide filenames containing traversal components"
+  review_confidence: high
+}
+concept DockerCliProgramDataPluginSearchPath : sink {
+  vulnerable_to: [path.UncontrolledSearchPath, access_control.PrivilegeEscalation]
+  cwe: [CWE_427]
+  review_category: "path"
+  review_condition: "Docker CLI for Windows searches the writable ProgramData plugin directory before trusted system plugin locations"
+  review_evidence: "Docker CLI plugin-manager default directory list {pattern} includes %ProgramData%\\Docker\\cli-plugins"
+  review_assumption: "a lower-privileged Windows user can create the ProgramData plugin directory and place a plugin binary that a privileged Docker CLI process later executes"
+  review_confidence: high
+}
+concept CloakserveFingerprintSeedPathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "cloakserve uses a request-supplied fingerprint seed as a Chrome profile directory component before validating it"
+  review_evidence: "ChromePool.get_or_launch context {pattern} joins seed_key under data_dir, creates the profile directory, and cleans it with rmtree without the patched SAFE_SEED_RE and _safe_rmtree guards"
+  review_assumption: "an unauthenticated caller can reach the cloakserve fingerprint route and choose the seed path segment"
+  review_confidence: high
+}
+concept CodeRedProtectedMediaPathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "CodeRed protected-media route joins a request path under PROTECTED_MEDIA_ROOT without canonical containment"
+  review_evidence: "serve_protected_file context {pattern} joins the route path, checks isfile, and opens the resulting path before the patched abspath/startswith containment"
+  review_assumption: "logged-in users can supply protected media path segments containing encoded traversal components"
+  review_confidence: high
+}
+concept CopypartyCprStaticPathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "copyparty /.cpr static paths are joined from the request vpath before file reads without canonical containment"
+  review_evidence: "copyparty handle_get context {pattern} joins self.vpath[5:] into the embedded web directory and serves it with tx_file"
+  review_assumption: "unauthenticated clients can request /.cpr paths containing traversal components"
+  review_confidence: high
 }
 concept LocalFileUrlNavigation : sink {
   vulnerable_to: [path.PathTraversal]
@@ -1208,6 +2147,24 @@ concept LocalFileUrlNavigation : sink {
   review_condition: "caller-controlled file URLs can be navigated by a headless browser and expose local file contents"
   review_evidence: "headless-browser navigation context {pattern} passes a request URL to page navigation without an observed file-protocol branch"
   review_assumption: "the request URL can use the file:// protocol and the rendered output is returned to the caller"
+  review_confidence: medium
+}
+concept ConvertSvgMultiSvgSanitizerBypass : sink {
+  vulnerable_to: [path.PathTraversal, injection.Xss]
+  cwe: [CWE_22, CWE_79]
+  review_category: "path"
+  review_condition: "convert-svg sanitizes a multi-SVG selection before embedding all selected SVG elements in a headless-browser page"
+  review_evidence: "convert-svg conversion context {pattern} sanitizes cheerio's broad svg selection, serializes it into the page body, and navigates the generated HTML through Puppeteer"
+  review_assumption: "an attacker can provide SVG input where an early benign SVG lets a later SVG execute markup that loads local file URLs"
+  review_confidence: high
+}
+concept WindowsReservedDeviceNameBypass : sink {
+  vulnerable_to: [validation.ImproperInputValidation, path.PathTraversal]
+  cwe: [CWE_67, CWE_184]
+  review_category: "path"
+  review_condition: "Windows reserved device-name filtering omits alternate device-name spellings"
+  review_evidence: "reserved device-name validation context {pattern} blocks ordinary COM/LPT names but misses superscript digit variants"
+  review_assumption: "an untrusted or sandboxed caller can supply Windows path components that resolve to reserved devices"
   review_confidence: medium
 }
 concept FileUpload : source {
@@ -1224,6 +2181,191 @@ concept HtmlRender : sink {
 concept StoredHtmlWrite : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "stored HTML is written without a proven sanitizer before later rendering"
+  review_evidence: "stored HTML write context {pattern} persists attacker-controlled markup"
+  review_assumption: "the stored value is later rendered as HTML in the application UI"
+  review_confidence: medium
+}
+concept CordysRequestParamXssFilterDisabled : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "CordysCRM request string deserialization trims user strings but leaves XSS escaping disabled by default"
+  review_evidence: "RequestParamTrimConfig context {pattern} returns trimmed JSON string values when the global escape flag is false"
+  review_assumption: "stored request fields such as announcements or follow-up content can later be rendered to another user"
+  review_confidence: high
+}
+concept FlarumTranslatorRawStringParameterXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Flarum translator parameters return raw string values that rich ICU rendering can convert into HTML DOM nodes"
+  review_evidence: "Translator preprocessParameters context {pattern} returns parameters directly before the patched escapedParameters JSX text-node wrapping"
+  review_assumption: "translation parameters include user-controlled UI strings such as the forum search query"
+  review_confidence: high
+}
+concept DotcmsSqlUtilBlacklistBypass : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "dotCMS SQLUtil relies on a single SQL keyword blacklist after quote escaping for dynamic SQL fragments"
+  review_evidence: "sanitizeParameter context {pattern} escapes quotes and rejects EVIL_SQL_WORDS tokens with character-boundary checks instead of using context-specific allowlists or parameterization"
+  review_assumption: "callers may use the sanitized value in ORDER BY, condition, or direction SQL fragments such as the Forms and Content Types admin screens"
+  review_confidence: high
+}
+concept DotcmsFormsOrderBySqlInjection : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "dotCMS Forms admin action forwards request-controlled orderBy into structure lookup SQL without an order-by allowlist"
+  review_evidence: "ViewFormHandlerAction._loadStructures context {pattern} reads request parameters and calls StructureFactory.getStructuresByUser without SQLUtil.sanitizeSortBy"
+  review_assumption: "authenticated administrators can reach the Marketing > Forms screen and control the _EXT_FORM_HANDLER_orderBy request parameter"
+  review_confidence: high
+}
+concept ComrakDangerousUrlCaseSensitiveGrammar : sink {
+  vulnerable_to: [injection.Xss, validation.ImproperInputValidation]
+  cwe: [CWE_79, CWE_178]
+  review_category: "xss"
+  review_condition: "Comrak dangerous URL scheme grammar matches unsafe schemes case-sensitively"
+  review_evidence: "Pest grammar context {pattern} defines dangerous_url with literal data/javascript/vbscript/file prefixes instead of case-insensitive matches"
+  review_assumption: "rendered Markdown links can carry mixed-case unsafe schemes such as Data: or Javascript: into HTML output"
+  review_confidence: high
+}
+concept JenkinsPluginForkedDirectoryBrowserWithoutCsp : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Jenkins plugin serves HTML reports through a plugin-local DirectoryBrowserSupport fork instead of Jenkins core's CSP-aware browser"
+  review_evidence: "report action context {pattern} constructs DirectoryBrowserSupport for Compare Html Report without resolving hudson.model.DirectoryBrowserSupport"
+  review_assumption: "attackers with Item/Configure or report-content control can place active HTML or JavaScript in served report files"
+  review_confidence: high
+}
+concept CkeditorStaticProtectedSourceTokenBypass : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "CKEditor protected-source sanitization uses a static cke_temp marker that attacker-supplied HTML can collide with"
+  review_evidence: "HTML data processor context {pattern} skips source protection when matched HTML already contains the static cke_temp token"
+  review_assumption: "attacker-controlled source-mode HTML can include the reserved marker string alongside elements excluded from filtering"
+  review_confidence: high
+}
+concept CkeditorRawElementLiveDocumentRenderXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "CKEditor clipboard plain-text conversion renders a RawElement into the live document before reading text"
+  review_evidence: "clipboard conversion context {pattern} creates a live document element, renders a view RawElement into it, and reads DOM text"
+  review_assumption: "attacker-controlled RawElement content can include active markup such as image onerror handlers in affected editor configurations"
+  review_confidence: high
+}
+concept ClassroomBookingsDisplayNameAltXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "classroombookings renders a user display name into an image alt attribute string without attribute escaping"
+  review_evidence: "layout template context {pattern} builds a CodeIgniter img() attribute string from the global menu label"
+  review_assumption: "the global menu label can contain an attacker-controlled stored display name"
+  review_confidence: high
+}
+concept CraftAnonymousTemplateRenderActionXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Craft CMS exposes the anonymous TemplatesController render action without rejecting direct /templates action access"
+  review_evidence: "TemplatesController context {pattern} allows anonymous actionRender() to render a requested template"
+  review_assumption: "a direct action request can reach the template renderer and cause attacker-controlled template output to be served to a browser"
+  review_confidence: high
+}
+concept QuickAppsUserRealNameStoredXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "QuickApps CMS exposes a stored user real-name property without the escaping Cake entity accessor"
+  review_evidence: "QuickApps user entity context {pattern} lacks an h()-escaped _getName accessor"
+  review_assumption: "the stored name field can be controlled by a user and rendered in admin or comment templates"
+  review_confidence: high
+}
+concept CodeSnippetsSafeModeQueryXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Code Snippets safe-mode URL helper reuses a request parameter in generated admin URLs without narrowing or escaping"
+  review_evidence: "add_safe_mode_query_var context {pattern} passes $_REQUEST['snippets-safe-mode'] directly to add_query_arg before the patched boolean cast"
+  review_assumption: "generated admin URLs are later rendered into HTML attributes, matching the reported reflected snippets-safe-mode XSS"
+  review_confidence: high
+}
+concept CollectiveContactWidgetTitleXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "collective.contact.widget term-contact viewlet renders contact titles into a hidden HTML input without escaping"
+  review_evidence: "TermViewlet context {pattern} derives title from context get_full_title or Title and includes self.title in the objpath input value"
+  review_assumption: "contact titles can contain attacker-controlled stored content rendered in the Plone term-contact viewlet"
+  review_confidence: high
+}
+concept CodiadFilemanagerSearchCommandInjection : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command-injection"
+  review_condition: "Codiad Filemanager stores raw search parameters before building shell find/grep commands"
+  review_evidence: "Filemanager class context {pattern} assigns query, search_string, and search_file_type without escapeshellarg before shell_exec"
+  review_assumption: "filemanager actions can receive attacker-controlled search parameters"
+  review_confidence: high
+}
+concept ColorscoreImagemagickCommandInjection : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command-injection"
+  review_condition: "colorscore interpolates image path and quantization options directly into an ImageMagick shell command"
+  review_evidence: "Histogram initialize context {pattern} builds a backtick convert command with image_path, colors, and depth before shellescape/to_i hardening"
+  review_assumption: "library callers can pass attacker-controlled image_path, colors, or depth values containing shell metacharacters"
+  review_confidence: high
+}
+concept TotalJsAdminThemeXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Total.js CMS admin theme renders formatted grid values or notification messages without Thelpers.encode"
+  review_evidence: "Total.js admin theme context {pattern} writes formatted values/messages into HTML output"
+  review_assumption: "grid column values or notification message text can contain attacker-controlled content shown to an administrator"
+  review_confidence: high
+}
+concept GouniverseCmsAliasXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Gouniverse CMS renders the requested page alias in an HTML error response without an escaping builder"
+  review_evidence: "PageRenderHtmlByAlias context {pattern} returns alias-bearing error HTML before hb.Text escaping was introduced"
+  review_assumption: "the page alias argument can be attacker-controlled through CMS routing"
+  review_confidence: high
+}
+concept GleezRedactorEditorStoredXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Gleez CMS enables the Redactor source editor for stored HTML content without server-side sanitization"
+  review_evidence: "editor bootstrap {pattern} initializes Redactor on CMS textareas before the security patch disabled it"
+  review_assumption: "authors can save HTML-mode content that is later opened by an administrator in the editor"
+  review_confidence: high
+}
+concept FeehiUsernameStoredXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Feehi CMS frontend users expose stored usernames without the afterFind HTML-encoding hook"
+  review_evidence: "frontend user model context {pattern} contains username validation and labels but lacks Html::encode on username after load"
+  review_assumption: "stored usernames can be controlled by a user and rendered when posts are browsed"
+  review_confidence: high
+}
+concept CocotaisEchoPlatformTagInjection : sink {
+  vulnerable_to: [injection.ArgumentInjection, access_control.PrivilegeEscalation]
+  cwe: [CWE_74]
+  review_category: "injection"
+  review_condition: "Cocotais builtin echo replies with user-controlled platform tags using bot privileges"
+  review_evidence: "builtin echo context {pattern} joins command arguments and passes them directly to event.reply"
+  review_assumption: "QQ platform tags such as qqbot-at-everyone are interpreted in bot replies with privileges unavailable to ordinary users"
+  review_confidence: high
 }
 concept UnsafeEmbeddableAllowlist : sink {
   vulnerable_to: [injection.Xss]
@@ -1246,6 +2388,15 @@ concept UnescapedRequestGlobalTemplateVar : sink {
   review_assumption: "the template variables are later rendered into HTML or script context"
   review_confidence: medium
 }
+concept CentreonMyAccountContactXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Centreon contact name or alias is rendered into my-account/contact list markup without the illegal-character escape mode"
+  review_evidence: "contact row renderer {pattern} decodes stored contact name or alias before display"
+  review_assumption: "contact name and alias can be attacker-controlled through the my-account form"
+  review_confidence: high
+}
 concept UnescapedHtmlOptionRenderer : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
@@ -1255,6 +2406,42 @@ concept UnescapedHtmlOptionRenderer : sink {
   review_assumption: "the rendered option label can contain stored or attacker-provided text"
   review_confidence: medium
 }
+concept JenkinsComputerQueueUnescapedTooltipXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Computer Queue Plugin renders queue item agent/cause text in a tooltip without HTML escaping"
+  review_evidence: "Jelly tooltip context {pattern} starts with item.why before escaped queue parameters"
+  review_assumption: "attackers with Agent/Configure permission can influence the agent/cause text displayed in the queue tooltip"
+  review_confidence: high
+}
+concept PrestaShopContactformMessageEmailXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "PrestaShop contactform inserts the submitted message into email template variables without HTML escaping"
+  review_evidence: "contactform sendMessage context {pattern} applies nl2br and stripslashes to the message before Mail::Send without htmlentitiesUTF8"
+  review_assumption: "the contact form message field is attacker-controlled and rendered in HTML email clients or back-office mail views"
+  review_confidence: high
+}
+concept FreePbxContactManagerGroupLinkXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "FreePBX Contactmanager renders the request group parameter into generated action links without narrowing it first"
+  review_evidence: "Contactmanager ajaxHandler context {pattern} concatenates $_REQUEST['group'] into contactmanager action URLs before the patched integer cast"
+  review_assumption: "the ajax grid request can include attacker-controlled group markup that is reflected in HTML action links"
+  review_confidence: high
+}
+concept OveleonCookiebarLocaleReflectedXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Oveleon Cookiebar renders the route locale into a frontend template response without locale validation"
+  review_evidence: "CookiebarController::blockAction context {pattern} loads language data with $locale, assigns it to the frontend template, and returns getResponse before the patched Validator::isLocale guard"
+  review_assumption: "the cookiebar block route locale segment is attacker-controlled and may be included in the rendered backend response path"
+  review_confidence: high
+}
 concept UnescapedTableExportHtml : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
@@ -1263,6 +2450,24 @@ concept UnescapedTableExportHtml : sink {
   review_evidence: "table export callback {pattern} returns raw cell HTML"
   review_assumption: "exported table cells may contain attacker-controlled markup"
   review_confidence: medium
+}
+concept UnescapedChartTooltipHtml : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "chart tooltip model data is interpolated into HTML and assigned with innerHTML"
+  review_evidence: "chart tooltip renderer {pattern} builds HTML from tooltip title/body lines"
+  review_assumption: "tooltip labels or legends can contain stored project data controlled by an editor"
+  review_confidence: high
+}
+concept CheckmkPendingChangeTextUnescapeXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "pending-change text is HTML-unescaped before being returned to a frontend popout that renders it as HTML"
+  review_evidence: "activation popout context {pattern} assigns html.unescape(change[\"text\"]) to the pending-change text field"
+  review_assumption: "pending change text can include folder or change attributes controlled by an operator/admin and is inserted with innerHTML"
+  review_confidence: high
 }
 concept UnescapedExceptionMessageMarkup : sink {
   vulnerable_to: [injection.Xss]
@@ -1276,6 +2481,51 @@ concept UnescapedDiagnosticHtml : sink {
   review_evidence: "diagnostic assembly context {pattern} appends unescaped data into an HTML-rendered log field"
   review_assumption: "the diagnostic log is visible in a browser context"
   review_confidence: medium
+}
+concept UnescapedDocsOpenapiUrl : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "request query data is interpolated into an OpenAPI docs URL that is embedded in generated HTML"
+  review_evidence: "docs renderer context {pattern} passes an openapi_url containing a raw query parameter to the docs HTML helper"
+  review_assumption: "the docs helper inserts openapi_url into a script-string or markup context"
+  review_confidence: medium
+}
+concept UnsafeWatchUrlProtocol : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "stored watch URLs are returned for browser links without validating the protocol scheme"
+  review_evidence: "watch link property {pattern} returns a stored URL before checking allowed schemes"
+  review_assumption: "watch URLs can be created by an attacker and are later rendered as clickable links"
+  review_confidence: high
+}
+concept CommonMarkPreserveEntitiesUrlAttributeXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "league/commonmark preserves HTML entities while escaping rendered URL attributes"
+  review_evidence: "CommonMark renderer context {pattern} writes href or src values with Xml::escape(..., true), allowing double-encoded entities such as javascript&amp;colon; to survive as browser-interpreted URL syntax"
+  review_assumption: "applications may render attacker-controlled Markdown output in a browser context"
+  review_confidence: high
+}
+concept DocumizeMarkdownRenderWithoutSanitizer : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Documize Markdown rendering converts untrusted Markdown to HTML without sanitizing the generated HTML"
+  review_evidence: "Documize Markdown Render context {pattern} returns blackfriday-rendered HTML without an observed bluemonday sanitizer"
+  review_assumption: "Markdown section content can be authored by a lower-trust user and later rendered in another user's browser"
+  review_confidence: high
+}
+concept CompassCsfleEjsonParserMissingStrictMode : sink {
+  vulnerable_to: [injection.CodeInjection, validation.ImproperInputValidation]
+  cwe: [CWE_94, CWE_20]
+  review_category: "injection"
+  review_condition: "MongoDB Compass CSFLE connection handling parses user-supplied EJSON with the shell/query parser instead of strict EJSON mode"
+  review_evidence: "Compass CSFLE parser context {pattern} calls parseFilter(text) without parseShellStringToEJSON and ParseMode.Strict"
+  review_assumption: "connection form encrypted field configuration text can be supplied by a user or imported connection data and reaches the parser"
+  review_confidence: high
 }
 concept PdfJsEvalSupported : source {
   taint: [taint.UntrustedData]
@@ -1375,6 +2625,85 @@ concept HardcodedSecret : sink {
   vulnerable_to: [secrets.HardcodedCredentials]
   cwe: [CWE_798]
 }
+// Forwarding the full parent process environment into a sandbox/intermediate child
+// can expose CI credentials or registry tokens to commands that should only receive a
+// curated environment.
+concept InheritedProcessEnvironmentLeak : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_212]
+}
+concept ContainerdCriImageEnvAliasLeak : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_668]
+  review_category: "secret"
+  review_condition: "containerd CRI derives per-container environment variables from a shared image-config slice without copying it first"
+  review_evidence: "CRI containerSpec context {pattern} assigns imageConfig.Env directly, appends container config envs, and passes the result to oci.WithEnv"
+  review_assumption: "multiple CRI containers can be created from the same image config with different environment variables"
+  review_confidence: high
+}
+concept SensitiveConfigInfoLog : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_532]
+  review_category: "secret"
+  review_condition: "parsed configuration content that may include credentials is logged above debug level"
+  review_evidence: "configuration load context {pattern} parses a config file and writes the parsed object to an info log"
+  review_assumption: "operator configuration files may contain inline credentials or target resource secrets"
+  review_confidence: medium
+}
+concept KubernetesCurlAuthorizationHeaderLogLeak : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_532]
+  review_category: "secret"
+  review_condition: "Kubernetes client-go curl debug logging formats request authorization headers without redaction"
+  review_evidence: "requestInfo.toCurl context {pattern} iterates RequestHeaders and formats key/value header pairs before a maskValue call"
+  review_assumption: "debugCurlCommand logging is enabled at high verbosity and request headers may contain bearer or authorization tokens"
+  review_confidence: high
+}
+concept CoderAgentManifestInfoLog : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_532]
+  review_category: "secret"
+  review_condition: "Coder workspace-agent manifest protobuf is logged at info level without redaction"
+  review_evidence: "agent manifest fetch log {pattern} writes slog field \"manifest\" with the raw manifest protobuf"
+  review_assumption: "workspace agent manifests may contain sensitive environment variables and operator logs are accessible to lower-trust readers"
+  review_confidence: high
+}
+concept AnsibleSnmpFactsCredentialsNoLogMissing : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_532]
+  review_category: "secret"
+  review_condition: "Ansible snmp_facts declares SNMPv3 authkey and privkey module options without no_log redaction"
+  review_evidence: "snmp_facts module context {pattern} defines authkey/privkey options and uses them in UsmUserData without no_log=True"
+  review_assumption: "Ansible module argument values are echoed in console output or failure diagnostics unless no_log marks them sensitive"
+  review_confidence: high
+}
+concept JenkinsRemotingCallableSystemPropertiesLeak : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.MissingAuthorization]
+  cwe: [CWE_200, CWE_862]
+  review_category: "secret"
+  review_condition: "Jenkins remoting Callable exposes controller Java system properties without restricting execution to agents"
+  review_evidence: "remoting callable context {pattern} returns System.getProperties() while using raw Callable/checkRoles instead of MasterToSlaveCallable"
+  review_assumption: "an attacker able to control an agent process can send the callable to the controller on affected Jenkins versions"
+  review_confidence: high
+}
+concept CloudreveWeakSecretPrng : sink {
+  vulnerable_to: [crypto.InsufficientEntropy]
+  cwe: [CWE_338, CWE_330]
+  review_category: "crypto"
+  review_condition: "Cloudreve generates persisted or session secrets with util.RandStringRunes instead of crypto/rand"
+  review_evidence: "Cloudreve secret-generation call {pattern} uses the math/rand-backed utility for security-sensitive token or key material"
+  review_assumption: "the generated value is used as a persisted signing secret, salt, session secret, OAuth secret, callback secret, viewer token, or reset secret"
+  review_confidence: high
+}
+concept LdapCrlCredentialReuse : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "LDAP CRL fetching reuses configured LDAP bind credentials for certificate-controlled LDAP URLs"
+  review_evidence: "LDAP CRL connection context {pattern} copies an authenticated connection config, replaces the LDAP URL, and opens a connection without clearing bind initializers"
+  review_assumption: "the CRL Distribution Point URL can be supplied through a client certificate and can point to an attacker-controlled LDAP endpoint"
+  review_confidence: medium
+}
 // Secret/key material is generated or written in a function without an observed
 // restrictive permission hardening call. Review-only because default file modes
 // depend on framework helpers and process umask.
@@ -1427,6 +2756,15 @@ concept NosqlQuery : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_943]
 }
+concept CockpitAuthArrayNosqlInjection : sink {
+  vulnerable_to: [injection.NosqlInjection]
+  cwe: [CWE_943]
+  review_category: "nosql"
+  review_condition: "Cockpit Auth check passes request auth array fields into authentication before scalar type validation"
+  review_evidence: "Cockpit Auth::check context {pattern} reads auth data and calls authenticate($data) without is_string guards on user/password"
+  review_assumption: "the Cockpit authentication backend builds a MongoLite query from the supplied auth fields"
+  review_confidence: high
+}
 concept NetworkBind : sink {
   vulnerable_to: [iac.PublicNetworkExposure]
   cwe: [CWE_200]
@@ -1454,6 +2792,15 @@ concept RedirectTarget : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_601]
 }
+concept SessionStoredRedirectTarget : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "login success handling returns a session-stored redirect URL without a same-origin or relative-URL check"
+  review_evidence: "authentication success handler context {pattern} reads a target URL from the session and returns it as the redirect destination"
+  review_assumption: "the pre-authentication session redirect value can be influenced by an attacker-controlled request flow"
+  review_confidence: medium
+}
 concept MethodGatedRedirectValidationBypass : sink {
   vulnerable_to: [request_forgery.OpenRedirect]
   cwe: [CWE_601]
@@ -1470,6 +2817,33 @@ concept ChecksumErrorLogoutRedirect : sink {
   review_condition: "checksum-error handling can redirect to a request-supplied logout URL"
   review_evidence: "checksum error context {pattern} calls the generic invalid redirect path without disabling logoutURL"
   review_assumption: "the API redirects validation failures and exposes logoutURL as a request parameter"
+  review_confidence: medium
+}
+concept PhpMyAdminSetupRedirectorOpenRedirect : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "phpMyAdmin setup-mode links route external URLs through the url.php redirector"
+  review_evidence: "PMA_linkURL context {pattern} returns ../url.php with the caller-supplied url parameter while PMA_SETUP is defined"
+  review_assumption: "setup pages do not have the normal token protection for redirector requests"
+  review_confidence: high
+}
+concept OwnCloudLoginRedirectUrlOpenRedirect : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "ownCloud login success redirects to a request-supplied redirect_url without a same-webroot or relative-target guard"
+  review_evidence: "redirectToDefaultPage context {pattern} builds a Location header from $_REQUEST['redirect_url'] before checking it against OC::$WEBROOT"
+  review_assumption: "an attacker can place an absolute or scheme-relative URL in redirect_url and induce a victim to complete the login flow"
+  review_confidence: high
+}
+concept PathMatcherNormalizationOrderBypass : sink {
+  vulnerable_to: [request_forgery.OpenRedirect, path.PathTraversal]
+  cwe: [CWE_601, CWE_22]
+  review_category: "request_forgery"
+  review_condition: "security path matching trims platform-ignored suffixes before canonical path cleaning"
+  review_evidence: "path matcher context {pattern} applies suffix trimming before path.Clean canonicalization"
+  review_assumption: "a crafted request path can use dot segments or trailing platform-ignored characters to bypass routing or redirect matchers"
   review_confidence: medium
 }
 concept ReflectionInvoke : sink {
@@ -1505,6 +2879,78 @@ concept UnparameterizedSqlQueryParser : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]
 }
+concept UnfilteredSearchWhereColumns : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89, CWE_287]
+  review_category: "sql"
+  review_condition: "request-derived search keys are only partially checked before the full search array reaches a query where()"
+  review_evidence: "search scope context {pattern} intersects keys with an allowlist but passes the original search array into where()"
+  review_assumption: "unauthenticated API callers can include both allowed and disallowed search keys"
+  review_confidence: medium
+}
+concept UnvalidatedNumericSqlInterpolation : sink {
+  vulnerable_to: [injection.SqlInjection, validation.ImproperInputValidation]
+  cwe: [CWE_89, CWE_20]
+  review_category: "sql"
+  review_condition: "request-derived numeric identifier is interpolated into SQL without a numeric validation guard"
+  review_evidence: "PHP action context {pattern} assigns a message parameter to an identifier field and interpolates it into an item_id predicate before an is_numeric guard"
+  review_assumption: "attackers can choose the action message parameter used as the numeric identifier"
+  review_confidence: high
+}
+concept CodeIgniterActiveRecordOffsetSqlInjection : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "CodeIgniter Active Record stores the offset argument without forcing it to an integer"
+  review_evidence: "Active Record offset context {pattern} assigns $offset directly into ar_offset before query compilation"
+  review_assumption: "application code can pass attacker-controlled offset values into the query builder"
+  review_confidence: high
+}
+concept CraftCommercePurchasablesSortSqlInjection : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "Craft Commerce purchasables table sorting passes a request-selected column name into Yii orderBy array keys without a column allowlist"
+  review_evidence: "actionPurchasablesTable context {pattern} splits the sort request parameter and uses the column as an orderBy array key before the patched description/sku/price allowlist"
+  review_assumption: "authenticated Commerce users can reach the purchasables table endpoint and control the sort parameter"
+  review_confidence: high
+}
+concept ContaoListingModuleSqlIdentifierInjection : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "Contao listing module concatenates request-selected search, order, or sort identifiers into SQL without checking them against configured field allowlists"
+  review_evidence: "ModuleListing::compile context {pattern} uses Input::get search/order_by/sort values while building strWhere/ORDER BY and preparing strQuery"
+  review_assumption: "front-end visitors can reach a configured listing module and control the query parameters"
+  review_confidence: high
+}
+concept ContaoAjaxToggleSubpaletteSqlIdentifierInjection : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "Contao backend Ajax toggleSubpalette concatenates a posted field name into an UPDATE statement without verifying the field is an allowed selector"
+  review_evidence: "Ajax::executePostActions context {pattern} uses Input->post('field') in the UPDATE SET identifier before the patched __selector__ and alexf permission checks"
+  review_assumption: "authenticated backend users can submit toggleSubpalette Ajax requests with a crafted field parameter"
+  review_confidence: high
+}
+concept ZikulaThemeNameReflectedXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Zikula Theme admin reflects a request-supplied theme name into the set-default confirmation template without request filtering"
+  review_evidence: "Theme admin setasdefault context {pattern} reads themename with FormUtil::getPassedValue and assigns it to the template before rendering theme_admin_setasdefault.tpl"
+  review_assumption: "an authenticated administrator can be induced to open a crafted Theme admin URL containing HTML or script in the themename parameter"
+  review_confidence: high
+}
+concept CiviCrmScientificNotationNumericValidationBypass : sink {
+  vulnerable_to: [injection.SqlInjection, validation.ImproperInputValidation]
+  cwe: [CWE_89, CWE_20]
+  review_category: "sql"
+  review_condition: "CiviCRM numeric validation accepts exponent-form numeric strings before downstream SQL integer use"
+  review_evidence: "CRM_Utils_Rule numeric validator context {pattern} combines is_numeric with regex checks without the fail-closed !is_numeric gate added by CRM-13460"
+  review_assumption: "request parameters validated as Int or Positive can later be interpolated into SQL fragments such as the AJAX location lookups"
+  review_confidence: high
+}
 concept UnboundedReportPeriod : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
@@ -1513,6 +2959,24 @@ concept StateChangingOp : sink {
   vulnerable_to: [request_forgery.Csrf]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_352]
+}
+concept ClockworkWebJobCsrf : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352]
+  review_category: "csrf"
+  review_condition: "Clockwork Web job enable/disable action lacks a Rails forgery-protection guard"
+  review_evidence: "Ruby controller context {pattern} reads params[:job]/params[:enable] and calls ClockworkWeb.enable/disable without protect_from_forgery"
+  review_assumption: "the job action is reachable through the mounted Rails engine POST route"
+  review_confidence: high
+}
+concept BestWebSoftContactFormSettingsCsrf : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352]
+  review_category: "csrf"
+  review_condition: "BestWebSoft Contact Form settings can be saved from request parameters without a WordPress nonce check"
+  review_evidence: "cntctfrm_settings_page context {pattern} handles cntctfrm_form_submit and calls update_option without check_admin_referer"
+  review_assumption: "an authenticated administrator can be induced to submit the plugin settings form cross-site"
+  review_confidence: high
 }
 concept IncompleteCsrfTokenValidation : sink {
   vulnerable_to: [request_forgery.Csrf]
@@ -1526,6 +2990,15 @@ concept MissingHttpMethodAssertion : sink {
   review_evidence: "action/controller context {pattern} performs state change without method assertion"
   review_assumption: "the action is reachable through a browser-backed route"
   review_confidence: medium
+}
+concept CobblerDjangoStateChangeGetCsrf : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352]
+  review_category: "csrf"
+  review_condition: "Cobbler Django web actions can be triggered by GET without the require_POST CSRF hardening"
+  review_evidence: "Cobbler web view context {pattern} starts a background or destructive action without @require_POST"
+  review_assumption: "the Django view is reachable through the browser-backed Cobbler web interface"
+  review_confidence: high
 }
 concept StoredDataWrite : sink {
   vulnerable_to: [crypto.CleartextStorage]
@@ -1568,6 +3041,24 @@ concept XmlParse : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_611]
 }
+concept CinderUnsafeMinidomXmlDeserializer : sink {
+  vulnerable_to: [deserialization.Xxe]
+  cwe: [CWE_611]
+  review_category: "xml"
+  review_condition: "OpenStack Cinder XML extension deserializer parses request XML with raw minidom.parseString"
+  review_evidence: "Cinder XML deserializer context {pattern} passes the request XML string to minidom.parseString"
+  review_assumption: "the extension deserializer receives unauthenticated API request bodies that may contain entity-expansion payloads"
+  review_confidence: high
+}
+concept CodeIgniterRestserverXmlEntityLoaderXxe : sink {
+  vulnerable_to: [deserialization.Xxe]
+  cwe: [CWE_611]
+  review_category: "xml"
+  review_condition: "CodeIgniter Rest Server parses XML request bodies without disabling external entity loading"
+  review_evidence: "REST_Controller constructor context {pattern} accepts application/xml and sends the request body through the Format XML parser before libxml_disable_entity_loader(true)"
+  review_assumption: "the bundled Format library parses XML bodies with simplexml_load_string and request clients can submit XML payloads"
+  review_confidence: high
+}
 // Construction of an XML parser/factory (newSAXParser / newDocumentBuilder /
 // createXMLReader …). Distinct from XmlParse (the .parse call) so the structural
 // XXE rule can flag an unhardened parser precisely without matching bare `.parse`
@@ -1575,6 +3066,15 @@ concept XmlParse : sink {
 concept XmlParserCreate : sink {
   vulnerable_to: [deserialization.XxeUnhardened]
   cwe: [CWE_611]
+}
+concept CheckstyleExternalParameterEntitiesXxe : sink {
+  vulnerable_to: [deserialization.Xxe]
+  cwe: [CWE_611]
+  review_category: "xml"
+  review_condition: "Checkstyle SAX parser hardening disables external DTD and general entities but omits external parameter entities"
+  review_evidence: "LoadExternalDtdFeatureProvider context {pattern} configures external DTD/general entity features without external-parameter-entities"
+  review_assumption: "the XML configuration input may include attacker-controlled external parameter entity declarations"
+  review_confidence: high
 }
 concept XpathQuery : sink {
   vulnerable_to: [injection.XpathInjection]
@@ -1692,6 +3192,11 @@ concept MfaRequirement : control {
 concept OutputEncoding : control {
   neutralizes: [injection.Xss]
   cwe: [CWE_116]
+  applies: path
+}
+concept CsvEscape : control {
+  neutralizes: [injection.CsvInjection]
+  cwe: [CWE_1236]
   applies: path
 }
 concept OwnershipCheck : control {
