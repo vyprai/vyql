@@ -247,6 +247,11 @@ Rules:
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
      check for warning suppression, sanitized error handling, or path removal.
+     For native memory-safety repositories in C, C++, Rust, or Swift, call
+     symbol_inventory and call_inventory before broad text search or file reads.
+     Focus call_inventory on allocation/copy/size terms such as alloc, malloc,
+     calloc, realloc, memcpy, copy, size, length, capacity, offset, escape, and
+     unicode; then open only the enclosing functions returned by inventory.
   6. read_files or read_file on exact evidence
   7. function_context before any exact context mark
      or module_context before exact marks for top-level policy/config maps
@@ -266,6 +271,7 @@ Repo profile:
 	var lastValid Proposal
 	var notes []string
 	decisionCheckpointSent := false
+	noToolCorrectionSent := false
 	if p.contextCache {
 		p.debugf("creating vertex context cache ttl=%s", p.contextCacheTTL)
 		var err error
@@ -311,6 +317,28 @@ agentLoop:
 			entry.ToolCalls = append(entry.ToolCalls, AgentToolCall{ID: call.ID, Name: call.Name, Arguments: call.Arguments})
 		}
 		if len(calls) == 0 {
+			if !noToolCorrectionSent && step < maxAgentSteps {
+				noToolCorrectionSent = true
+				entry.ToolResults = append(entry.ToolResults, AgentToolResult{
+					Name: "agent_control",
+					Result: map[string]any{
+						"ok":    false,
+						"error": "no tool call returned; continue with the required inventory workflow or call finish_overlay explicitly",
+					},
+				})
+				if len(modelParts) > 0 {
+					contents = append(contents, map[string]any{"role": "model", "parts": modelParts})
+				}
+				contents = append(contents, map[string]any{
+					"role": "user",
+					"parts": []map[string]any{{
+						"text": "No tool call was returned. Continue by calling the next required inventory tool, validate_overlay, or finish_overlay explicitly. Do not end the workflow with plain text.",
+					}},
+				})
+				log = append(log, entry)
+				p.debugf("step=%d no tool call; sent corrective prompt", step)
+				continue agentLoop
+			}
 			proposal := Proposal{AgentLog: append(log, entry), Notes: append([]string{}, notes...)}
 			if strings.TrimSpace(text) != "" {
 				if err := json.Unmarshal([]byte(text), &proposal); err == nil {
@@ -319,6 +347,8 @@ agentLoop:
 				} else {
 					proposal.Notes = append(proposal.Notes, "agent returned text without finish_overlay tool call")
 				}
+			} else {
+				proposal.Notes = append(proposal.Notes, "agent returned no tool calls without finish_overlay")
 			}
 			return proposal, nil
 		}
@@ -350,13 +380,13 @@ agentLoop:
 					toolResult["error"] = warn
 				}
 				if missingRequiredSymbols && missingRequiredCalls {
-					toolResult["error"] = "symbol_inventory and call_inventory are required before finish_overlay for repositories with CORS/origin/wildcard/callback or signature/attestation/predicate verification evidence; call symbol_inventory to map declarations, then call_inventory with focused API terms such as validate, origin, attestation, predicate, verify, print, or policy"
+					toolResult["error"] = "symbol_inventory and call_inventory are required before finish_overlay for repositories with security-relevant framework, verification, or native memory evidence; call symbol_inventory to map declarations, then call_inventory with focused API terms such as validate, origin, attestation, predicate, verify, print, policy, alloc, copy, size, capacity, escape, or unicode"
 					p.debugf("step=%d finish_overlay rejected: symbol_inventory and call_inventory required", step)
 				} else if missingRequiredSymbols {
-					toolResult["error"] = "symbol_inventory is required before finish_overlay for repositories with CORS/origin/wildcard/callback or signature/attestation/predicate verification evidence; call symbol_inventory with focused name_contains terms before finish_overlay"
+					toolResult["error"] = "symbol_inventory is required before finish_overlay for repositories with security-relevant framework, verification, or native memory evidence; call symbol_inventory with focused name_contains terms before finish_overlay"
 					p.debugf("step=%d finish_overlay rejected: symbol_inventory required", step)
 				} else if missingRequiredCalls {
-					toolResult["error"] = "call_inventory is required before finish_overlay for repositories with CORS/origin/wildcard/callback or signature/attestation/predicate verification evidence; call call_inventory with focused API terms such as validate, origin, attestation, predicate, verify, print, policy, then finish_overlay"
+					toolResult["error"] = "call_inventory is required before finish_overlay for repositories with security-relevant framework, verification, or native memory evidence; call call_inventory with focused API terms such as validate, origin, attestation, predicate, verify, print, policy, alloc, copy, size, capacity, escape, or unicode, then finish_overlay"
 					p.debugf("step=%d finish_overlay rejected: call_inventory required", step)
 				} else if missingFocusedCalls {
 					toolResult["error"] = "call_inventory must be focused on the repo evidence before finish_overlay; call call_inventory with one of these name_contains terms: " + strings.Join(requiredCallTerms, ", ")
@@ -385,7 +415,13 @@ agentLoop:
 				proposal.Notes = append(notes, proposal.Notes...)
 				return proposal, nil
 			}
-			result := p.executePrepTool(profile, call)
+			result := map[string]any(nil)
+			if gateErr := inventoryGateError(profile, log, call.Name); gateErr != "" {
+				result = map[string]any{"ok": false, "error": gateErr}
+				p.debugf("step=%d tool=%s rejected by inventory gate", step, call.Name)
+			} else {
+				result = p.executePrepTool(profile, call)
+			}
 			if call.Name == "validate_overlay" {
 				if warnings, ok := result["warnings"].([]string); ok && len(warnings) > 0 {
 					p.debugf("step=%d validate_overlay warnings=%s", step, strings.Join(warnings, " | "))
@@ -528,6 +564,34 @@ func agentLogHasCallInventoryTerm(log []AgentStep, terms []string) bool {
 	return false
 }
 
+func inventoryGateError(profile Profile, log []AgentStep, toolName string) string {
+	switch toolName {
+	case "search_text", "search_context", "read_file", "read_files":
+	default:
+		return ""
+	}
+	if !requiresSymbolInventory(profile) {
+		return ""
+	}
+	requiredCallTerms := requiredCallInventoryTerms(profile)
+	missingSymbols := !agentLogHasTool(log, "symbol_inventory")
+	missingCalls := !agentLogHasTool(log, "call_inventory")
+	missingFocused := len(requiredCallTerms) > 0 && !agentLogHasCallInventoryTerm(log, requiredCallTerms)
+	if !missingSymbols && !missingCalls && !missingFocused {
+		return ""
+	}
+	if missingSymbols && missingCalls {
+		return "call symbol_inventory and call_inventory before broad search/read tools for this repository; use focused terms such as " + strings.Join(requiredCallTerms, ", ")
+	}
+	if missingSymbols {
+		return "call symbol_inventory before broad search/read tools for this repository"
+	}
+	if missingCalls || missingFocused {
+		return "call call_inventory with focused terms before broad search/read tools: " + strings.Join(requiredCallTerms, ", ")
+	}
+	return ""
+}
+
 func requiresSymbolInventory(profile Profile) bool {
 	terms := []string{
 		"cors", "alloworigins", "alloworiginfunc", "allowallorigins",
@@ -535,6 +599,9 @@ func requiresSymbolInventory(profile Profile) bool {
 		"wildcard", "validateorigin", "checkorigin", "callback",
 		"attestation", "predicate", "signature", "provenance",
 		"transparencylog", "fulcio", "rekor",
+		"malloc", "calloc", "realloc", "alloc", "memcpy", "memmove",
+		"strcpy", "copy", "size", "length", "capacity", "offset",
+		"bounds", "unicode", "escape",
 	}
 	hasTerm := func(s string) bool {
 		s = strings.ToLower(s)
@@ -572,6 +639,8 @@ func requiresSymbolInventory(profile Profile) bool {
 
 func requiredCallInventoryTerms(profile Profile) []string {
 	switch {
+	case nativeMemoryProfile(profile):
+		return []string{"alloc", "malloc", "calloc", "realloc", "memcpy", "copy", "size", "length", "capacity", "offset", "escape", "unicode"}
 	case profileContainsAnyTerm(profile, []string{"attestation", "predicate", "provenance"}):
 		return []string{"attestation", "predicate", "policy", "printverification", "provenance"}
 	case profileContainsAnyTerm(profile, []string{"cors", "alloworigins", "alloworiginfunc", "allowallorigins", "access-control-allow-origin", "origin", "wildcard", "callback"}):
@@ -581,6 +650,17 @@ func requiredCallInventoryTerms(profile Profile) []string {
 	default:
 		return nil
 	}
+}
+
+func nativeMemoryProfile(profile Profile) bool {
+	if profile.Languages["c"] == 0 && profile.Languages["cpp"] == 0 && profile.Languages["rust"] == 0 && profile.Languages["swift"] == 0 {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{
+		"malloc", "calloc", "realloc", "alloc", "memcpy", "memmove",
+		"strcpy", "copy", "size", "length", "capacity", "offset",
+		"bounds", "unicode", "escape",
+	})
 }
 
 func profileContainsAnyTerm(profile Profile, terms []string) bool {
@@ -2638,6 +2718,9 @@ func suggestContextVals(name string, compact string) []string {
 		"Access-Control-Allow-Origin", "HasPrefix", "HasSuffix", "o[:i-1]", "o[:i]",
 		"AttestationToPayloadJSON", "PredicateType", "VerifyImageAttestations",
 		"VerifyLocalImageAttestations", "PrintVerification", "checked", "verified",
+		"malloc", "calloc", "realloc", "PyString_FromStringAndSize", "ALLOCV_N",
+		"memcpy", "memmove", "strcpy", "size", "len", "length", "capacity",
+		"offset", "count", "ch>=0x10000", "10*size", "6*size",
 	} {
 		c := compactSourceText(token)
 		if strings.Contains(compact, c) {

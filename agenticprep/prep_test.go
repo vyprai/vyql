@@ -526,6 +526,55 @@ func TestSearchContextAndReadFilesSupportRepoExploration(t *testing.T) {
 	}
 }
 
+func TestPrepRequiresNativeMemoryInventoryTerms(t *testing.T) {
+	dir := t.TempDir()
+	cPath := filepath.Join(dir, "Objects", "unicodeobject.c")
+	if err := os.MkdirAll(filepath.Dir(cPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `
+typedef void PyObject;
+PyObject *PyString_FromStringAndSize(char *s, int size);
+
+static PyObject *unicodeescape_string(int size) {
+    PyObject *repr = PyString_FromStringAndSize(0, 2 + 6*size + 1);
+    if (size > 0) {
+        char *p = 0;
+        *p++ = 'U';
+    }
+    return repr;
+}
+`
+	if err := os.WriteFile(cPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected native memory profile to require symbol inventory")
+	}
+	terms := requiredCallInventoryTerms(profile)
+	if !containsString(terms, "alloc") || !containsString(terms, "size") || !containsString(terms, "escape") {
+		t.Fatalf("expected focused native memory call inventory terms, got %#v", terms)
+	}
+	focusedLog := []AgentStep{{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"name_contains": "PyString_FromStringAndSize"}}}}}
+	if !agentLogHasCallInventoryTerm(focusedLog, terms) {
+		t.Fatalf("allocator call inventory should satisfy native memory terms")
+	}
+	if got := inventoryGateError(profile, nil, "search_text"); !strings.Contains(got, "symbol_inventory") || !strings.Contains(got, "call_inventory") {
+		t.Fatalf("expected search gate to require inventories, got %q", got)
+	}
+	readyLog := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "symbol_inventory", Arguments: map[string]any{"language": "c", "name_contains": "escape"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"language": "c", "name_contains": "PyString_FromStringAndSize"}}}},
+	}
+	if got := inventoryGateError(profile, readyLog, "search_text"); got != "" {
+		t.Fatalf("expected inventory gate satisfied, got %q", got)
+	}
+}
+
 func TestSymbolInventoryFindsClassesMethodsAndFunctions(t *testing.T) {
 	dir := t.TempDir()
 	phpPath := filepath.Join(dir, "src", "Controller", "CustomerTransformerController.php")

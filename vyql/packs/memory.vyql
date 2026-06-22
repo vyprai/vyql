@@ -23,6 +23,11 @@ rule PotentialRawMemoryCopySize {
   match code.RawMemoryCopySize as c
 }
 
+rule PythonUnicodeEscapeWideUnderallocation {
+  meta { id: "VYQL-MEM-030", severity: high, cwe: [CWE_787], confidence_floor: high }
+  match code.PythonUnicodeEscapeWideUnderallocation as c
+}
+
 rule StackAllocationSmell {
   meta { id: "VYQL-MEM-004", severity: low, cwe: [CWE_400], confidence_floor: low }
   match code.StackAllocationSmell as a

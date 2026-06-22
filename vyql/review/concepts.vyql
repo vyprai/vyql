@@ -1513,6 +1513,11 @@ review code.RubyCgiEscapeHtmlLengthOverflow {
   kind: "attention"
   text: "review Ruby CGI escape_html allocation for checked multiplication before maximum HTML expansion"
 }
+review code.PythonUnicodeEscapeWideUnderallocation {
+  category: "memory"
+  kind: "attention"
+  text: "review Python unicode escape allocation for wide-build maximum escape expansion before writing \\U00xxxxxx sequences"
+}
 review code.CgifAddframeSignedFrameCountOverflow {
   category: "numeric"
   kind: "attention"

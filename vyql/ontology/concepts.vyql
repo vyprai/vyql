@@ -1115,6 +1115,15 @@ concept RubyCgiEscapeHtmlLengthOverflow : sink {
   review_assumption: "a very large string on platforms with narrower long arithmetic can wrap the allocation size before copy expansion"
   review_confidence: high
 }
+concept PythonUnicodeEscapeWideUnderallocation : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_787]
+  review_category: "memory"
+  review_condition: "Python unicodeescape_string allocates six bytes per code point while wide Unicode escape output can write ten bytes per code point"
+  review_evidence: "unicodeescape_string context {pattern} allocates 2 + 6*size + 1 before writing \\U00xxxxxx escapes for ch >= 0x10000"
+  review_assumption: "a wide Unicode build can process attacker-influenced non-BMP code points and overflow the initially allocated representation buffer"
+  review_confidence: high
+}
 concept CgifAddframeSignedFrameCountOverflow : sink {
   vulnerable_to: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
   cwe: [CWE_190]
