@@ -382,6 +382,66 @@ func TestSearchContextAndReadFilesSupportRepoExploration(t *testing.T) {
 	}
 }
 
+func TestSymbolInventoryFindsClassesMethodsAndFunctions(t *testing.T) {
+	dir := t.TempDir()
+	phpPath := filepath.Join(dir, "src", "Controller", "CustomerTransformerController.php")
+	if err := os.MkdirAll(filepath.Dir(phpPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	php := `<?php
+final class CustomerTransformerController {
+    public function checkForNameDuplicatesAction(Request $request) {
+        return $request->query->get('name');
+    }
+}
+`
+	if err := os.WriteFile(phpPath, []byte(php), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cPath := filepath.Join(dir, "exec", "totemconfig.c")
+	if err := os.MkdirAll(filepath.Dir(cPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cSrc := `#include "totemconfig.h"
+static int totem_get_crypto(struct totem_config *totem_config)
+{
+    return 0;
+}
+`
+	if err := os.WriteFile(cPath, []byte(cSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+
+	phpSyms, err := symbolInventory(profile, symbolInventoryQuery{Language: "php", NameContains: "customer", Max: 10})
+	if err != nil {
+		t.Fatalf("symbolInventory php: %v", err)
+	}
+	if !hasSymbol(phpSyms, "class", "CustomerTransformerController") {
+		t.Fatalf("expected PHP controller class, got %#v", phpSyms)
+	}
+	methods, err := symbolInventory(profile, symbolInventoryQuery{Language: "php", Kind: "function", NameContains: "duplicates", Max: 10})
+	if err != nil {
+		t.Fatalf("symbolInventory php method: %v", err)
+	}
+	if !hasSymbol(methods, "function", "checkForNameDuplicatesAction") {
+		t.Fatalf("expected PHP action method, got %#v", methods)
+	}
+	cSyms, err := symbolInventory(profile, symbolInventoryQuery{Language: "c", Kind: "function", NameContains: "crypto", Max: 10})
+	if err != nil {
+		t.Fatalf("symbolInventory c: %v", err)
+	}
+	if !hasSymbol(cSyms, "function", "totem_get_crypto") {
+		t.Fatalf("expected C function, got %#v", cSyms)
+	}
+	if cSyms[0].Path != "exec/totemconfig.c" {
+		t.Fatalf("expected display path relative to repo, got %#v", cSyms[0])
+	}
+}
+
 func TestRepoStructureRanksSecurityRelevantDirectories(t *testing.T) {
 	dir := t.TempDir()
 	api := filepath.Join(dir, "api", "upload.php")
@@ -438,6 +498,15 @@ func hasDependencyGap(gaps []DependencyGap, lang, pkg string) bool {
 func containsString(vals []string, want string) bool {
 	for _, v := range vals {
 		if v == want {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSymbol(symbols []symbolEntry, kind, name string) bool {
+	for _, sym := range symbols {
+		if sym.Kind == kind && sym.Name == name {
 			return true
 		}
 	}

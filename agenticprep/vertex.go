@@ -184,7 +184,7 @@ Rules:
 - Once validate_overlay returns ok=true with at least one valid adapter, call
   finish_overlay immediately unless a specific validation warning requires a
   correction.
-- Prefer repo_structure, search_context, and read_files over repeated
+- Prefer repo_structure, symbol_inventory, search_context, and read_files over repeated
   single-file reads. Use read_file only when one exact file or offset is needed.
 - Prefer this workflow:
   1. inspect_profile
@@ -199,9 +199,10 @@ Rules:
      database, crypto, XML, archive, or network code.
   4. repo_structure for unfamiliar repositories, then adapter_reference,
      package_reference, and concept_reference
-  5. security_relevant_files, then list_files, search_context, or search_text
-     for exact
-     wrappers/routes/config. For PHP and similar ecosystems, include helper
+  5. security_relevant_files, then symbol_inventory, list_files, search_context,
+     or search_text for exact wrappers/routes/config. Use symbol_inventory before
+     opening many files just to discover class, method, or function names. For PHP
+     and similar ecosystems, include helper
      files such as .inc/.phtml and search command sinks plus restore/import,
      upload, archive, and filename flows. For Java/C#/server frameworks,
      inspect lifecycle/concurrency files containing ThreadLocal, request/session
@@ -561,6 +562,20 @@ func vertexPrepTools() []map[string]any {
 			},
 		},
 		{
+			"name":        "symbol_inventory",
+			"description": "Return bounded AST-style class, method, function, type, and module declarations across repo source files so prep can target files without opening them one-by-one.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language":      map[string]any{"type": "string"},
+					"kind":          map[string]any{"type": "string"},
+					"name_contains": map[string]any{"type": "string"},
+					"path_contains": map[string]any{"type": "string"},
+					"max":           map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
 			"name":        "search_text",
 			"description": "Search source/config files under scan roots with a Go regular expression or literal substring.",
 			"parameters": map[string]any{
@@ -837,6 +852,19 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 			return map[string]any{"ok": false, "error": err.Error()}
 		}
 		return map[string]any{"ok": true, "files": files}
+	case "symbol_inventory":
+		q := symbolInventoryQuery{
+			Language:     stringArg(call.Arguments, "language"),
+			Kind:         stringArg(call.Arguments, "kind"),
+			NameContains: stringArg(call.Arguments, "name_contains"),
+			PathContains: stringArg(call.Arguments, "path_contains"),
+			Max:          intArg(call.Arguments, "max", 120),
+		}
+		symbols, err := symbolInventory(profile, q)
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "symbols": symbols}
 	case "search_text":
 		pattern, _ := call.Arguments["pattern"].(string)
 		matches, err := searchProfileText(profile, pattern, boolArg(call.Arguments, "regex"), boolArg(call.Arguments, "ignoreCase"), intArg(call.Arguments, "max", 80))
@@ -1067,6 +1095,201 @@ func entrypointInventory(profile Profile, lang string, max int) ([]entrypointCan
 		return true
 	})
 	return out, err
+}
+
+type symbolInventoryQuery struct {
+	Language     string
+	Kind         string
+	NameContains string
+	PathContains string
+	Max          int
+}
+
+type symbolEntry struct {
+	Path      string `json:"path"`
+	Line      int    `json:"line"`
+	Language  string `json:"language"`
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	Signature string `json:"signature"`
+}
+
+type symbolPattern struct {
+	Kind      string
+	Expr      *regexp.Regexp
+	NameGroup int
+}
+
+func symbolInventory(profile Profile, q symbolInventoryQuery) ([]symbolEntry, error) {
+	if q.Max <= 0 || q.Max > 500 {
+		q.Max = 120
+	}
+	langFilter := strings.TrimSpace(strings.ToLower(q.Language))
+	kindFilter := strings.TrimSpace(strings.ToLower(q.Kind))
+	nameFilter := strings.TrimSpace(strings.ToLower(q.NameContains))
+	pathFilter := strings.TrimSpace(strings.ToLower(filepath.ToSlash(q.PathContains)))
+	seen := map[string]bool{}
+	var out []symbolEntry
+	err := walkProfileFiles(profile, func(path string) bool {
+		fileLang := languageFor(path)
+		if langFilter != "" && fileLang != langFilter {
+			return true
+		}
+		display := displayPath(profile, path)
+		if pathFilter != "" && !strings.Contains(strings.ToLower(filepath.ToSlash(display)), pathFilter) {
+			return true
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return true
+		}
+		if len(data) > 256<<10 {
+			data = data[:256<<10]
+		}
+		for _, sym := range extractSymbols(fileLang, string(data)) {
+			if kindFilter != "" && sym.Kind != kindFilter {
+				continue
+			}
+			if nameFilter != "" && !strings.Contains(strings.ToLower(sym.Name), nameFilter) {
+				continue
+			}
+			sym.Path = display
+			sym.Language = fileLang
+			key := fmt.Sprintf("%s:%d:%s:%s", sym.Path, sym.Line, sym.Kind, sym.Name)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, sym)
+			if len(out) >= q.Max {
+				return false
+			}
+		}
+		return true
+	})
+	return out, err
+}
+
+func extractSymbols(lang, text string) []symbolEntry {
+	patterns := symbolPatterns(lang)
+	if len(patterns) == 0 {
+		return nil
+	}
+	var out []symbolEntry
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		clean := strings.TrimSpace(line)
+		if clean == "" || strings.HasPrefix(clean, "//") || strings.HasPrefix(clean, "#") || strings.HasPrefix(clean, "*") {
+			continue
+		}
+		for _, pat := range patterns {
+			m := pat.Expr.FindStringSubmatch(line)
+			if len(m) <= pat.NameGroup {
+				continue
+			}
+			name := strings.TrimSpace(m[pat.NameGroup])
+			if name == "" || isControlSymbolName(name) {
+				continue
+			}
+			out = append(out, symbolEntry{
+				Line:      i + 1,
+				Kind:      pat.Kind,
+				Name:      name,
+				Signature: compactSnippet(clean, 240),
+			})
+			break
+		}
+	}
+	return out
+}
+
+func symbolPatterns(lang string) []symbolPattern {
+	pat := func(kind, expr string, nameGroup int) symbolPattern {
+		return symbolPattern{Kind: kind, Expr: regexp.MustCompile(expr), NameGroup: nameGroup}
+	}
+	switch lang {
+	case "go":
+		return []symbolPattern{
+			pat("method", `^\s*func\s+\([^)]*\)\s*([A-Za-z_]\w*)\s*\(`, 1),
+			pat("function", `^\s*func\s+([A-Za-z_]\w*)\s*\(`, 1),
+			pat("class", `^\s*type\s+([A-Za-z_]\w*)\s+struct\b`, 1),
+			pat("interface", `^\s*type\s+([A-Za-z_]\w*)\s+interface\b`, 1),
+			pat("type", `^\s*type\s+([A-Za-z_]\w*)\b`, 1),
+		}
+	case "python":
+		return []symbolPattern{
+			pat("class", `^\s*class\s+([A-Za-z_]\w*)\b`, 1),
+			pat("function", `^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(`, 1),
+		}
+	case "php":
+		return []symbolPattern{
+			pat("class", `^\s*(?:abstract\s+|final\s+)?class\s+([A-Za-z_]\w*)\b`, 1),
+			pat("interface", `^\s*interface\s+([A-Za-z_]\w*)\b`, 1),
+			pat("trait", `^\s*trait\s+([A-Za-z_]\w*)\b`, 1),
+			pat("function", `^\s*(?:(?:public|protected|private|static|final|abstract)\s+)*function\s+&?\s*([A-Za-z_]\w*)\s*\(`, 1),
+		}
+	case "javascript":
+		return []symbolPattern{
+			pat("class", `^\s*(?:export\s+default\s+|export\s+)?class\s+([A-Za-z_$][\w$]*)\b`, 1),
+			pat("function", `^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(`, 1),
+			pat("function", `^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>`, 1),
+			pat("method", `^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{?\s*$`, 1),
+		}
+	case "java", "scala":
+		return []symbolPattern{
+			pat("class", `^\s*(?:(?:public|protected|private|abstract|final|sealed|static)\s+)*(?:class|record)\s+([A-Za-z_]\w*)\b`, 1),
+			pat("interface", `^\s*(?:(?:public|protected|private|abstract|static)\s+)*interface\s+([A-Za-z_]\w*)\b`, 1),
+			pat("enum", `^\s*(?:(?:public|protected|private|static)\s+)*enum\s+([A-Za-z_]\w*)\b`, 1),
+			pat("method", `^\s*(?:(?:public|protected|private|static|final|abstract|synchronized|native|override)\s+)*[A-Za-z_$][\w$<>\[\].?,\s]*\s+([A-Za-z_$]\w*)\s*\([^;]*\)\s*(?:throws\b.*)?\{?\s*$`, 1),
+		}
+	case "kotlin":
+		return []symbolPattern{
+			pat("class", `^\s*(?:(?:data|sealed|open|abstract|public|private|internal)\s+)*class\s+([A-Za-z_]\w*)\b`, 1),
+			pat("interface", `^\s*(?:(?:public|private|internal)\s+)*interface\s+([A-Za-z_]\w*)\b`, 1),
+			pat("function", `^\s*(?:(?:public|private|protected|internal|override|suspend|inline|operator)\s+)*fun\s+(?:<[^>]+>\s*)?([A-Za-z_]\w*)\s*\(`, 1),
+		}
+	case "c", "cpp":
+		return []symbolPattern{
+			pat("class", `^\s*(?:class|struct)\s+([A-Za-z_]\w*)\b`, 1),
+			pat("enum", `^\s*(?:typedef\s+)?enum\s+([A-Za-z_]\w*)\b`, 1),
+			pat("function", `^\s*(?:(?:static|extern|inline|const|volatile|unsigned|signed|long|short|struct\s+\w+|enum\s+\w+|[A-Za-z_]\w*|\*)\s+)+\*?([A-Za-z_]\w*)\s*\([^;]*\)\s*(?:\{|$)`, 1),
+		}
+	case "csharp":
+		return []symbolPattern{
+			pat("class", `^\s*(?:(?:public|protected|private|internal|abstract|sealed|static|partial)\s+)*class\s+([A-Za-z_]\w*)\b`, 1),
+			pat("interface", `^\s*(?:(?:public|protected|private|internal|partial)\s+)*interface\s+([A-Za-z_]\w*)\b`, 1),
+			pat("method", `^\s*(?:(?:public|protected|private|internal|static|virtual|override|async|sealed|partial)\s+)*[A-Za-z_][\w<>\[\].?,\s]*\s+([A-Za-z_]\w*)\s*\([^;]*\)\s*\{?\s*$`, 1),
+		}
+	case "rust":
+		return []symbolPattern{
+			pat("function", `^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+([A-Za-z_]\w*)\s*(?:<[^>]+>)?\s*\(`, 1),
+			pat("class", `^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)\b`, 1),
+			pat("enum", `^\s*(?:pub\s+)?enum\s+([A-Za-z_]\w*)\b`, 1),
+			pat("trait", `^\s*(?:pub\s+)?trait\s+([A-Za-z_]\w*)\b`, 1),
+			pat("impl", `^\s*impl(?:<[^>]+>)?\s+([A-Za-z_]\w*)\b`, 1),
+		}
+	case "ruby":
+		return []symbolPattern{
+			pat("class", `^\s*class\s+([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)\b`, 1),
+			pat("module", `^\s*module\s+([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)\b`, 1),
+			pat("function", `^\s*def\s+(?:self\.)?([A-Za-z_]\w*[!?=]?)\b`, 1),
+		}
+	case "bash":
+		return []symbolPattern{
+			pat("function", `^\s*(?:function\s+)?([A-Za-z_][\w.-]*)\s*(?:\(\))?\s*\{`, 1),
+		}
+	default:
+		return nil
+	}
+}
+
+func isControlSymbolName(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "if", "for", "while", "switch", "catch", "else", "do", "return", "sizeof", "typeof", "with", "function", "class":
+		return true
+	default:
+		return false
+	}
 }
 
 func entrypointKind(lang, line string) string {
@@ -2210,6 +2433,11 @@ func intArg(args map[string]any, key string, fallback int) int {
 func boolArg(args map[string]any, key string) bool {
 	v, _ := args[key].(bool)
 	return v
+}
+
+func stringArg(args map[string]any, key string) string {
+	v, _ := args[key].(string)
+	return strings.TrimSpace(v)
 }
 
 func stringSliceArg(args map[string]any, key string) []string {
