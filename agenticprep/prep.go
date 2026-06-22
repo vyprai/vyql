@@ -369,6 +369,9 @@ func securityRelevanceScore(path string, text string) int {
 		"asmodelsuccess": 38, "modelname": 18, "getacceptsjson": 18,
 		"getcsrftoken": 10, "json": 8, "secret": 12, "token": 10,
 		"credential": 12, "password": 12,
+		"cmdexecuteservice": 52, "$cmd_string": 42, "x-islandora-args": 36,
+		"generateDerivativeResponse": 32, "$this->cmd->execute": 34,
+		"command string": 24, "array_merge": 14, "headerbag": 14,
 		"cors": 24, "alloworigins": 34, "alloworiginfunc": 24, "allowallorigins": 22,
 		"access-control-allow-origin": 30, "origin": 14, "wildcard": 18,
 		"hasprefix": 18, "hassuffix": 12,
@@ -455,7 +458,10 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				if m.Concept != "" && !onto.Exists(m.Concept) {
 					return fmt.Errorf("agentic prep: adapter %q references unknown concept %q", lang, m.Concept)
 				}
-				if requirePackageScope && len(m.Packages) == 0 {
+				if broadCommandWrapperSink(lang, m) {
+					return fmt.Errorf("agentic prep: adapter %q maps a broad command-wrapper execute sink; use a narrow analysis.function.context mark to code.CommandStringWrapperExecution so argv-array fixes are not flagged", lang)
+				}
+				if requirePackageScope && len(m.Packages) == 0 && !localExactContextMapping(m) {
 					return fmt.Errorf("agentic prep: adapter %q mapping %q -> %s is not package-scoped; wrap repo-local/generated mappings in package \"<dependency-or-project-package>\" { ... }", lang, m.Pattern, m.Concept)
 				}
 				for _, pkg := range m.Packages {
@@ -609,6 +615,38 @@ func genericOverlayMapping(lang string, m parser.AdapterMapping) bool {
 	}
 	switch m.Pattern {
 	case "open", "print":
+		return true
+	default:
+		return false
+	}
+}
+
+func broadCommandWrapperSink(lang string, m parser.AdapterMapping) bool {
+	if m.Concept != "code.CommandExecution" && m.Concept != "CommandExecution" {
+		return false
+	}
+	if m.Kind != "sink_path" && m.Kind != "sink_method" {
+		return false
+	}
+	pattern := strings.ToLower(m.Pattern)
+	if strings.Contains(pattern, "cmdexecuteservice") || strings.Contains(pattern, "process::fromshellcommandline") {
+		return true
+	}
+	if pattern == "execute" || strings.HasSuffix(pattern, ".execute") {
+		return true
+	}
+	if lang == "php" && strings.Contains(pattern, "execute") && strings.Contains(pattern, "command") {
+		return true
+	}
+	return false
+}
+
+func localExactContextMapping(m parser.AdapterMapping) bool {
+	if m.Kind != "mark" || !m.Exact {
+		return false
+	}
+	switch m.Pattern {
+	case "analysis.function.context", "analysis.class.context", "analysis.module.context":
 		return true
 	default:
 		return false

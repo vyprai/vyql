@@ -409,6 +409,123 @@ func Exec(predicateType string, verified []any) {
 	}
 }
 
+func TestPrepRanksCommandWrapperBeforePredicateNoise(t *testing.T) {
+	dir := t.TempDir()
+	controllerPath := filepath.Join(dir, "Homarus", "src", "Controller", "HomarusController.php")
+	if err := os.MkdirAll(filepath.Dir(controllerPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	controller := `<?php
+use Islandora\Crayfish\Commons\CmdExecuteService;
+use Symfony\Component\HttpFoundation\Request;
+
+final class HomarusController {
+    private $cmd;
+    private $executable;
+    private $tempDirectory;
+
+    public function convert(Request $request) {
+        $source = $request->headers->get('Apix-Ldp-Resource');
+        $args = $request->headers->get('X-Islandora-Args');
+        $token = $request->headers->get('Authorization');
+        $headers = "'Authorization:  $token'";
+        $cmd_string = "$this->executable -headers $headers -i $source $args -f mp4 /tmp/out.mp4";
+        return $this->generateDerivativeResponse($cmd_string, $source, '/tmp/out.mp4', 'video/mp4');
+    }
+
+    public function generateDerivativeResponse(string $cmd_string, string $source, string $path, string $content_type) {
+        return $this->cmd->execute($cmd_string, $source);
+    }
+}
+`
+	if err := os.WriteFile(controllerPath, []byte(controller), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	noisePath := filepath.Join(dir, "Milliner", "src", "Service", "MillinerService.php")
+	if err := os.MkdirAll(filepath.Dir(noisePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	noise := `<?php
+final class MillinerService {
+    public function findPredicateForObject($predicate, $object) {
+        return $this->repository->getFirstPredicate($predicate, $object);
+    }
+}
+`
+	if err := os.WriteFile(noisePath, []byte(noise), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "php", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != controllerPath {
+		t.Fatalf("expected HomarusController.php first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "$cmd_string") || !strings.Contains(files[0].Snippet, "X-Islandora-Args") {
+		t.Fatalf("expected command-wrapper snippet, got %q", files[0].Snippet)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected command-wrapper profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	if !containsString(callTerms, "execute") || !containsString(callTerms, "command") {
+		t.Fatalf("expected focused command-wrapper call terms, got %#v", callTerms)
+	}
+	if containsString(callTerms, "predicate") || containsString(callTerms, "provenance") {
+		t.Fatalf("command-wrapper profile should outrank predicate/provenance terms, got %#v", callTerms)
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	if !containsString(assignmentTerms, "cmd") || !containsString(assignmentTerms, "args") {
+		t.Fatalf("expected focused command-wrapper assignment terms, got %#v", assignmentTerms)
+	}
+}
+
+func TestPrepRejectsBroadCommandWrapperSink(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "Controller.php")
+	if err := os.WriteFile(src, []byte("<?php use Islandora\\Crayfish\\Commons\\CmdExecuteService; final class C { function f($cmd) { return $this->cmd->execute($cmd); } }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	composer := filepath.Join(dir, "composer.json")
+	if err := os.WriteFile(composer, []byte(`{"require":{"islandora/crayfish-commons":"^4.1"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "php",
+		Source: `adapter php {
+  package "islandora/crayfish-commons" {
+    sink path "Islandora\\Crayfish\\Commons\\CmdExecuteService" arg 0 -> code.CommandExecution
+  }
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, proposal, Config{}); err == nil || !strings.Contains(err.Error(), "CommandStringWrapperExecution") {
+		t.Fatalf("expected broad command-wrapper sink rejection, got %v", err)
+	}
+
+	narrow := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "php",
+		Source: `adapter php {
+  mark exact "analysis.function.context" val "name=f" val "$this->cmd->execute($cmd)" nval "$cmd=array_merge" -> code.CommandStringWrapperExecution
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow command-wrapper context mark to validate: %v", err)
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)

@@ -228,6 +228,15 @@ Rules:
      that write private keys, credentials, tokens, kubeconfigs, cloud-init,
      ignition, or other boot/config artifacts and check for chmod, mode,
      set_permissions, or setPosixFilePermissions hardening in the same context.
+     For command-wrapper CVEs, inspect wrappers and services named execute,
+     run, process, command, shell, CmdExecuteService, ProcessExecutor, or
+     generateDerivativeResponse. Check whether request headers, query/body
+     values, paths, or args are interpolated into one command string before a
+     wrapper execute call. Prefer argv arrays, process builders, or explicit
+     shell escaping as hardening evidence; use function_context before proposing
+     a narrow command-string wrapper mark. Do not model generic execute wrappers
+     as code.CommandExecution sinks when the safe form is an argv array; that
+     catches fixed code. Prefer code.CommandStringWrapperExecution exact context.
      For archive or filesystem-image extraction CVEs, inspect directory entry
      names read from image/archive buffers before mkdir, open, write, recursive
      expand, or extraction calls. In C, prioritize functions and calls named
@@ -675,6 +684,9 @@ func requiresSymbolInventory(profile Profile) bool {
 	terms := []string{
 		"asmodelsuccess", "modelname", "getacceptsjson", "response.data",
 		"toarray", "extrafields", "serialize",
+		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
+		"generatederivativeresponse", "$this->cmd->execute",
+		"process::fromshellcommandline", "processbuilder", "command string",
 		"memcpy(newpath + pathlen", "child->namelen", "do_directory",
 		"expand_fs", "romfs_read", "namelen", "dirent",
 		"bad filename", "strchr(name", "strcmp(name", "extract", "unpack",
@@ -723,6 +735,8 @@ func requiresSymbolInventory(profile Profile) bool {
 
 func requiredCallInventoryTerms(profile Profile) []string {
 	switch {
+	case commandWrapperProfile(profile):
+		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
 		return []string{"expand", "extract", "directory", "dirent", "name", "path", "romfs", "read", "mkdir", "open"}
 	case nativeMemoryProfile(profile):
@@ -747,6 +761,8 @@ func requiresAssignmentInventory(profile Profile) bool {
 	return profileContainsAnyTerm(profile, []string{
 		"xss", "html::encode", "htmlspecialchars", "escapehtml", "template::raw",
 		"twig\\markup", "html", "render", "title", "snapshot", "audit",
+		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
+		"generatederivativeresponse", "$this->cmd->execute",
 		"asmodelsuccess", "modelname", "getacceptsjson", "response.data",
 		"toarray", "extrafields", "serialize",
 		"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl",
@@ -759,6 +775,8 @@ func requiresAssignmentInventory(profile Profile) bool {
 
 func requiredAssignmentInventoryTerms(profile Profile) []string {
 	switch {
+	case commandWrapperProfile(profile):
+		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process"}
 	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
 		return []string{"user", "model", "data", "response", "json", "secret", "token", "password", "credential", "fields"}
 	case profileContainsAnyTerm(profile, []string{"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl", "safecanonicalurl", "x-forwarded-host", "host header", "getpathinfo", "sanitizeurl"}):
@@ -776,6 +794,17 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 	default:
 		return []string{"value", "target", "name", "path", "title", "permission"}
 	}
+}
+
+func commandWrapperProfile(profile Profile) bool {
+	if profile.Languages["php"] == 0 && profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 && profile.Languages["python"] == 0 && profile.Languages["ruby"] == 0 && profile.Languages["java"] == 0 && profile.Languages["go"] == 0 {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{
+		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
+		"generatederivativeresponse", "$this->cmd->execute",
+		"process::fromshellcommandline", "processbuilder", "command string",
+	})
 }
 
 func nativeMemoryProfile(profile Profile) bool {
@@ -1426,7 +1455,8 @@ code.UnboundedCopy, code.RawMemoryCopySize, code.SizeComputation,
 code.UnparameterizedSqlQueryParser, code.ProtocolStateReview,
 code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
 code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
-code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal.
+code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal,
+code.CommandStringWrapperExecution.
 `)
 }
 
@@ -1452,6 +1482,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
 		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "mark for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
+		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "mark for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
 		{"concept": "core.PathAccessCheck", "surface": "control", "use": "control concept for containment, normalization, allowlist, or traversal guard"},
 	}
@@ -1940,6 +1971,9 @@ func assignmentRiskScore(entry assignmentEntry) int {
 		"snapshot": 16, "audit": 12, "model": 8, "entity": 6, "user": 8,
 		"username": 14, "render": 10, "template": 10, "escape": 10, "encode": 10,
 		"sanitize": 12, "htmlspecialchars": 18, "html::encode": 18,
+		"cmdexecuteservice": 42, "$cmd_string": 36, "x-islandora-args": 30,
+		"generatederivativeresponse": 28, "$this->cmd->execute": 32,
+		"command string": 22, "array_merge": 12, "headerbag": 12,
 		"do_directory": 28, "expand_fs": 34, "romfs_read": 22, "namelen": 16,
 		"dirent": 16, "bad filename": 18, "strchr(name": 24, "strcmp(name": 20,
 		"absoluteurlwithprotocol": 30, "safecanonicalurl": 26, "canonicalurl": 18,
@@ -3101,6 +3135,9 @@ func suggestContextVals(name string, compact string) []string {
 		"asModelSuccess", "modelName: 'user'", "modelName:\"user\"",
 		"$this->request->getAcceptsJson()", "return$this->asModelSuccess($user,modelName:'user',data:$return)",
 		"return$this->asSuccess(data:$return)", "$response->data", "toArray", "fields", "extraFields",
+		"CmdExecuteService", "$cmd_string", "X-Islandora-Args",
+		"generateDerivativeResponse", "$this->cmd->execute",
+		"Process::fromShellCommandline", "array_merge", "HeaderBag",
 		"do_directory", "expand_fs", "romfs_read", "child->namelen",
 		"memcpy(newpath+pathlen,romfs_read(offset),newlen)",
 		"strchr(name,'/')", "strcmp(name,\"..\")",
@@ -3223,6 +3260,9 @@ func securitySnippet(text string) string {
 		"$snapshot['title']", "$snapshot[\"title\"]", "snapshot", "audit", "xss",
 		"asModelSuccess", "modelName", "getAcceptsJson", "$response->data",
 		"toArray", "extraFields", "serialize", "secret", "token", "credential",
+		"CmdExecuteService", "$cmd_string", "X-Islandora-Args",
+		"generateDerivativeResponse", "$this->cmd->execute",
+		"Process::fromShellCommandline", "command string",
 		"memcpy(newpath + pathlen", "child->namelen", "do_directory",
 		"expand_fs", "romfs_read", "namelen", "dirent",
 		"bad filename", "strchr(name", "strcmp(name",

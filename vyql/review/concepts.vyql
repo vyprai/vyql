@@ -635,6 +635,12 @@ review code.ComposerGitBranchDiffCommandInjection {
   expected: [core.ShellEscape]
   text: "review Composer git diff command construction for argv-array execution instead of branch-name string formatting"
 }
+review code.CommandStringWrapperExecution {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review command wrapper calls for argv-array execution instead of formatted shell command strings"
+}
 review code.ConnectCmsCodestudiesPluginCodeExecution {
   category: "code_execution"
   kind: "attention"
