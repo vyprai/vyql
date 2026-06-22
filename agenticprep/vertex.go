@@ -226,6 +226,14 @@ Rules:
      addConditionParam, whereRaw, havingRaw, orderByRaw, and selectRaw as high-priority
      source/sink candidates. Prefer executable SQL fragment arguments only; bound
      parameter value arguments should not become SQL sinks.
+     For CORS, Origin, callback, trusted-origin, or wildcard host validators,
+     call symbol_inventory with name_contains values such as origin, wildcard,
+     cors, validate, and match before opening files. Inspect parsers that split,
+     slice, or wildcard-match trusted origins and validators that use HasPrefix,
+     startsWith, HasSuffix, regex, or glob matching before accepting request
+     Origin/callback/redirect values. If the repo profile, packages, samples, or
+     security_relevant_files mention these terms, finish_overlay will be rejected
+     until symbol_inventory has been called.
      For information-disclosure CVEs, inspect filesystem drivers and methods
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
@@ -312,20 +320,26 @@ agentLoop:
 				if warn != "" {
 					proposal.Notes = append(proposal.Notes, warn)
 				}
+				needsSymbols := requiresSymbolInventory(profile)
+				missingRequiredSymbols := needsSymbols && !agentLogHasTool(log, "symbol_inventory")
 				validationWarnings := []string(nil)
 				validAdapterCount := 0
-				if warn == "" {
+				if warn == "" && !missingRequiredSymbols {
 					filtered, warnings := FilterValidProposal(profile, proposal, Config{})
 					validationWarnings = warnings
 					validAdapterCount = len(filtered.AdapterFiles)
 				}
-				ok := warn == "" && len(validationWarnings) == 0
+				ok := warn == "" && !missingRequiredSymbols && len(validationWarnings) == 0
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
 				}
 				if warn != "" {
 					toolResult["error"] = warn
+				}
+				if missingRequiredSymbols {
+					toolResult["error"] = "symbol_inventory is required before finish_overlay for repositories with CORS/origin/wildcard/callback validator evidence; call symbol_inventory with name_contains origin, wildcard, cors, validate, or match, then finish_overlay"
+					p.debugf("step=%d finish_overlay rejected: symbol_inventory required", step)
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -430,6 +444,57 @@ func toolCallNames(calls []vertexToolCall) string {
 func hasToolCall(calls []vertexToolCall, name string) bool {
 	for _, call := range calls {
 		if call.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func agentLogHasTool(log []AgentStep, name string) bool {
+	for _, step := range log {
+		for _, call := range step.ToolCalls {
+			if call.Name == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func requiresSymbolInventory(profile Profile) bool {
+	terms := []string{
+		"cors", "alloworigins", "alloworiginfunc", "allowallorigins",
+		"access-control-allow-origin", "trustedorigin", "trusted_origin",
+		"wildcard", "validateorigin", "checkorigin", "callback",
+	}
+	hasTerm := func(s string) bool {
+		s = strings.ToLower(s)
+		for _, term := range terms {
+			if strings.Contains(s, term) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, pkg := range profile.Packages {
+		if hasTerm(pkg) {
+			return true
+		}
+	}
+	for _, pkg := range profile.LocalPkgs {
+		if hasTerm(pkg) {
+			return true
+		}
+	}
+	for _, imports := range profile.Imports {
+		for _, imp := range imports {
+			if hasTerm(imp) {
+				return true
+			}
+		}
+	}
+	for _, sample := range profile.Samples {
+		if hasTerm(sample.Path) || hasTerm(sample.Preview) {
 			return true
 		}
 	}
@@ -2183,6 +2248,8 @@ func suggestContextVals(name string, compact string) []string {
 		"request.cookies.get(\"sso_state\")", "safe_load", "yaml.load", "redirect", "Location", "htmlspecialchars",
 		"prepare", "execute", "processOrderBy", "$orderBy['direction']", "$orderBy[\"direction\"]",
 		"$request->query->get", "addConditionParam", "whereRaw", "havingRaw", "orderByRaw", "selectRaw",
+		"AllowOrigins", "AllowOriginFunc", "AllowAllOrigins", "parseWildcardRules", "validateOrigin",
+		"Access-Control-Allow-Origin", "HasPrefix", "HasSuffix", "o[:i-1]", "o[:i]",
 	} {
 		c := compactSourceText(token)
 		if strings.Contains(compact, c) {
@@ -2287,6 +2354,8 @@ func securitySnippet(text string) string {
 		"getClientMimeType", "svg", "getSvgDimensions", "svgSanitize",
 		"sanitizeSvg", "Sanitizer",
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
+		"Access-Control-Allow-Origin", "AllowOrigins", "AllowOriginFunc",
+		"AllowAllOrigins", "validateOrigin", "wildcard", "HasPrefix",
 		"restore", "import", "backup", "archive", "extract", "filename", "rrdtool",
 		"ThreadLocal", "beginRequest", "endRequest", "activate(", "deactivate(",
 		"associate(", "dissociate(", "RequestScoped",

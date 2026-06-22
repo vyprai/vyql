@@ -265,6 +265,80 @@ func TestSecurityRelevantFilesRanksRolePermissionTables(t *testing.T) {
 	}
 }
 
+func TestPrepRanksCorsOriginValidationFilesAndDependencies(t *testing.T) {
+	dir := t.TempDir()
+	goMod := `module example.com/app
+
+require (
+    github.com/example/corsguard v1.0.0
+    github.com/example/plainlib v1.0.0
+)
+`
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	corsFile := filepath.Join(dir, "cors.go")
+	corsSrc := `package app
+
+import "strings"
+
+type Config struct {
+    AllowOrigins []string
+    AllowWildcard bool
+}
+
+func (c Config) parseWildcardRules() [][]string {
+    var rules [][]string
+    if !c.AllowWildcard {
+        return rules
+    }
+    for _, origin := range c.AllowOrigins {
+        i := strings.Index(origin, "*")
+        if strings.HasPrefix(origin, "https://") {
+            rules = append(rules, []string{origin[:i], "*"})
+        }
+    }
+    return rules
+}
+`
+	if err := os.WriteFile(corsFile, []byte(corsSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plainFile := filepath.Join(dir, "plain.go")
+	if err := os.WriteFile(plainFile, []byte("package app\nfunc add(a, b int) int { return a + b }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected CORS/origin profile to require symbol inventory")
+	}
+	files, err := securityRelevantFiles(profile, "go", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != corsFile {
+		t.Fatalf("expected CORS origin parser first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "AllowOrigins") && !strings.Contains(files[0].Snippet, "wildcard") {
+		t.Fatalf("expected CORS/origin snippet, got %q", files[0].Snippet)
+	}
+	symbols, err := symbolInventory(profile, symbolInventoryQuery{Language: "go", NameContains: "wildcard", Max: 10})
+	if err != nil {
+		t.Fatalf("symbolInventory: %v", err)
+	}
+	if !hasSymbol(symbols, "method", "parseWildcardRules") {
+		t.Fatalf("expected wildcard parser symbol, got %#v", symbols)
+	}
+	corsScore := dependencyGapScoreForTest(profile.DepGaps, "github.com/example/corsguard")
+	plainScore := dependencyGapScoreForTest(profile.DepGaps, "github.com/example/plainlib")
+	if corsScore <= plainScore {
+		t.Fatalf("expected CORS dependency score above plain dependency, cors=%d plain=%d gaps=%#v", corsScore, plainScore, profile.DepGaps)
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)
@@ -511,4 +585,13 @@ func hasSymbol(symbols []symbolEntry, kind, name string) bool {
 		}
 	}
 	return false
+}
+
+func dependencyGapScoreForTest(gaps []DependencyGap, pkg string) int {
+	for _, gap := range gaps {
+		if gap.Package == pkg {
+			return gap.Score
+		}
+	}
+	return -1
 }

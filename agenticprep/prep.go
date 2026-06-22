@@ -359,6 +359,9 @@ func securityRelevanceScore(path string, text string) int {
 		"getclientmimetype": 10, "svg": 16, "getsvgdimensions": 18, "svgsanitize": 28,
 		"sanitizesvg": 28, "sanitizer": 18,
 		"redirect": 10, "header(": 8, "location": 8, "render": 8, "html": 6,
+		"cors": 24, "alloworigins": 34, "alloworiginfunc": 24, "allowallorigins": 22,
+		"access-control-allow-origin": 30, "origin": 14, "wildcard": 18,
+		"hasprefix": 18, "hassuffix": 12,
 		"select ": 8, "insert ": 8, "update ": 8, "delete ": 8, "query(": 8,
 		"addconditionparam": 24, "whereraw": 18, "havingraw": 18, "orderbyraw": 18,
 		"request": 8, "request->query": 18, "$request->query": 18, "$_get": 12, "$_post": 12, "$_files": 12, "$_request": 12,
@@ -383,6 +386,7 @@ func securityRelevanceScore(path string, text string) int {
 		"backup": 8, "restore": 8, "import": 6, "upload": 8, "uploader": 10, "archive": 6,
 		"auth": 5, "login": 5, "admin": 4, "config": 4, "driver": 4, "localdriver": 10,
 		"authorization": 16, "permission": 14, "role": 10, "middleware": 8,
+		"cors": 18, "origin": 12, "wildcard": 10,
 		"context": 6, "cache": 6, "lifecycle": 6, "servlet": 5,
 	} {
 		if strings.Contains(lowerPath, token) {
@@ -975,6 +979,7 @@ func dependencyGapScore(c dependencyCandidate) int {
 	for token, weight := range map[string]int{
 		"meteor": 80, "push": 60, "session": 45, "servlet": 40, "filter": 30,
 		"request": 40, "response": 30, "websocket": 35, "socket": 20, "http": 20,
+		"cors": 55, "origin": 45, "wildcard": 25,
 		"auth": 45, "permission": 35, "role": 25, "redirect": 45, "callback": 35,
 		"sql": 45, "jdbc": 35, "database": 30, "query": 25,
 		"template": 35, "html": 25, "xml": 35, "el": 20, "faces": 18,
