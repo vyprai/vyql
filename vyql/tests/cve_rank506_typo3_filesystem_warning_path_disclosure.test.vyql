@@ -1,0 +1,53 @@
+test "rank506: TYPO3 local driver filesystem warning can disclose absolute path"
+  lang php
+  expect VYQL-SEC-004
+  expect_review code.AbsolutePathDisclosure
+  code
+  ```
+  <?php
+  class LocalDriver {
+      public function addFile($localFilePath, $targetFolderIdentifier, $newFileName) {
+          $targetPath = $this->getAbsolutePath($targetFolderIdentifier . '/' . $newFileName);
+          $result = rename($localFilePath, $targetPath);
+          if ($result === false) {
+              throw new \RuntimeException('Adding file failed.');
+          }
+          return $targetPath;
+      }
+
+      public function deleteFile($fileIdentifier) {
+          $filePath = $this->getAbsolutePath($fileIdentifier);
+          $result = unlink($filePath);
+          if ($result === false) {
+              throw new \RuntimeException('Deleting file failed.');
+          }
+      }
+  }
+  ```
+
+test "rank506: TYPO3 local driver suppresses filesystem warnings before exception handling"
+  lang php
+  reject VYQL-SEC-004
+  reject_review code.AbsolutePathDisclosure
+  code
+  ```
+  <?php
+  class LocalDriver {
+      public function addFile($localFilePath, $targetFolderIdentifier, $newFileName) {
+          $targetPath = $this->getAbsolutePath($targetFolderIdentifier . '/' . $newFileName);
+          $result = @rename($localFilePath, $targetPath);
+          if ($result === false) {
+              throw new \RuntimeException('Adding file failed.');
+          }
+          return $targetPath;
+      }
+
+      public function deleteFile($fileIdentifier) {
+          $filePath = $this->getAbsolutePath($fileIdentifier);
+          $result = @unlink($filePath);
+          if ($result === false) {
+              throw new \RuntimeException('Deleting file failed.');
+          }
+      }
+  }
+  ```

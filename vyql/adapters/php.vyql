@@ -339,6 +339,11 @@ adapter php {
 
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
   mark exact "analysis.function.context" val "lang=php" val "imagecopyresampled" val "$imgt($new_image,$thumb_path)" val "$imgt($old_image,$source_path)" val "returntrue" nval "===false" nval "return$imgt" -> code.UncheckedUploadedImageProcessing
+  mark exact "analysis.function.context" val "lang=php" val "getAbsolutePath" val "move_uploaded_file(" nval "@move_uploaded_file(" -> code.AbsolutePathDisclosure
+  mark exact "analysis.function.context" val "lang=php" val "getAbsolutePath" val "rename(" nval "@rename(" -> code.AbsolutePathDisclosure
+  mark exact "analysis.function.context" val "lang=php" val "getAbsolutePath" val "copy(" nval "@copy(" -> code.AbsolutePathDisclosure
+  mark exact "analysis.function.context" val "lang=php" val "getAbsolutePath" val "touch(" nval "@touch(" -> code.AbsolutePathDisclosure
+  mark exact "analysis.function.context" val "lang=php" val "getAbsolutePath" val "unlink(" nval "@unlink(" -> code.AbsolutePathDisclosure
   sink path "fputcsv" arg 1 collection -> code.CsvCell
   sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
   sink path "FileSystem.write" -> code.UnsafeUpload

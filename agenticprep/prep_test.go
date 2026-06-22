@@ -3,6 +3,7 @@ package agenticprep
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -89,6 +90,31 @@ func TestSecurityRelevantFilesRanksDangerousHelpers(t *testing.T) {
 	}
 	if len(files) == 0 || files[0].Path != helper {
 		t.Fatalf("expected restore helper first, got %#v", files)
+	}
+}
+
+func TestSecurityRelevantFilesRanksFilesystemWarningDisclosureContexts(t *testing.T) {
+	dir := t.TempDir()
+	driver := filepath.Join(dir, "LocalDriver.php")
+	if err := os.WriteFile(driver, []byte("<?php class LocalDriver { function deleteFile($id) { $filePath = $this->getAbsolutePath($id); $result = unlink($filePath); if ($result === false) { throw new \\RuntimeException('failed'); } } }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "Registry.php"), []byte("<?php function load($v) { return unserialize($v); }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "php", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != driver {
+		t.Fatalf("expected filesystem warning disclosure context first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "getAbsolutePath") || !strings.Contains(files[0].Snippet, "unlink") {
+		t.Fatalf("snippet should show filesystem disclosure evidence, got %q", files[0].Snippet)
 	}
 }
 

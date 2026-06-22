@@ -160,6 +160,10 @@ Rules:
      For authz/data-model CVEs, inspect public methods returning relationship,
      resource, field, permission, or metadata lists and look for missing enabled,
      access, ownership, or visibility checks before returns.
+     For information-disclosure CVEs, inspect filesystem drivers and methods
+     using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
+     paths, especially when failures become exceptions or framework warnings;
+     check for warning suppression, sanitized error handling, or path removal.
   4. read_file on exact evidence
   5. function_context before any exact context mark
   6. validate_overlay if producing any non-empty adapter
@@ -532,7 +536,8 @@ code.ResponseHeaderWrite, code.LogOutput, code.RegexCompile, code.XmlParse,
 code.DynamicCodeLoad, code.UnsafeUpload, code.ArchiveEntryWrite,
 code.UnboundedCopy, code.RawMemoryCopySize, code.SizeComputation,
 code.UnparameterizedSqlQueryParser, code.ProtocolStateReview,
-code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget.
+code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
+code.AbsolutePathDisclosure.
 `)
 }
 
@@ -553,6 +558,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "core.SafeDeserialization", "surface": "control", "use": "control concept for safe deserialization APIs such as safe_load or explicit safe loaders"},
 		{"concept": "code.HtmlRender", "surface": "scan", "use": "taint sink for raw HTML/template rendering or unescaped response content"},
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
+		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
 		{"concept": "core.PathAccessCheck", "surface": "control", "use": "control concept for containment, normalization, allowlist, or traversal guard"},
 	}
@@ -976,6 +982,9 @@ func securitySnippet(text string) string {
 	for _, token := range []string{
 		"exec(", "system(", "shell_exec", "passthru", "proc_open", "popen(",
 		"eval(", "unserialize", "yaml.load", "pickle.load", "file_put_contents",
+		"move_uploaded_file", "rename(", "copy(", "unlink(", "touch(",
+		"getAbsolutePath", "absolutePath", "absolute path", "E_WARNING",
+		"RuntimeException", "FileOperationErrorException",
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
 		"restore", "import", "backup", "archive", "extract", "filename", "rrdtool",
 		"ThreadLocal", "beginRequest", "endRequest", "activate(", "deactivate(",
