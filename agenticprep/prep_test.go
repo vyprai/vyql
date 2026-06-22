@@ -339,6 +339,76 @@ func (c Config) parseWildcardRules() [][]string {
 	}
 }
 
+func TestPrepRanksAttestationPredicateVerificationFiles(t *testing.T) {
+	dir := t.TempDir()
+	goMod := `module example.com/verifier
+
+require github.com/example/sigstore-helper v1.0.0
+`
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	verifyFile := filepath.Join(dir, "verify_attestation.go")
+	verifySrc := `package verify
+
+import _ "github.com/example/sigstore-helper"
+
+func VerifyImageAttestations() {}
+func AttestationToPayloadJSON(predicateType string, vp any) []byte { return nil }
+func PrintVerification(verified []any) {}
+
+func Exec(predicateType string, verified []any) {
+    for _, vp := range verified {
+        payload := AttestationToPayloadJSON(predicateType, vp)
+        if len(payload) == 0 {
+            continue
+        }
+    }
+    PrintVerification(verified)
+}
+`
+	if err := os.WriteFile(verifyFile, []byte(verifySrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plain.go"), []byte("package verify\nfunc add(a, b int) int { return a + b }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected attestation/predicate profile to require symbol inventory")
+	}
+	terms := requiredCallInventoryTerms(profile)
+	if !containsString(terms, "attestation") || !containsString(terms, "predicate") {
+		t.Fatalf("expected focused attestation/predicate call inventory terms, got %#v", terms)
+	}
+	broadLog := []AgentStep{{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"name_contains": "VerifyImageSignatures"}}}}}
+	if agentLogHasCallInventoryTerm(broadLog, terms) {
+		t.Fatalf("broad signature call inventory should not satisfy attestation/predicate focus")
+	}
+	focusedLog := []AgentStep{{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"name_contains": "AttestationToPayloadJSON"}}}}}
+	if !agentLogHasCallInventoryTerm(focusedLog, terms) {
+		t.Fatalf("focused attestation call inventory should satisfy required terms")
+	}
+	files, err := securityRelevantFiles(profile, "go", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != verifyFile {
+		t.Fatalf("expected attestation verifier first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "AttestationToPayloadJSON") && !strings.Contains(files[0].Snippet, "Predicate") {
+		t.Fatalf("expected attestation/predicate snippet, got %q", files[0].Snippet)
+	}
+	helperScore := dependencyGapScore(dependencyCandidate{Language: "go", Package: "github.com/example/sigstore-attestation-helper"})
+	plainScore := dependencyGapScore(dependencyCandidate{Language: "go", Package: "github.com/example/plainlib"})
+	if helperScore <= plainScore {
+		t.Fatalf("expected sigstore attestation helper score above plain dependency, helper=%d plain=%d", helperScore, plainScore)
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)
@@ -504,6 +574,12 @@ static int totem_get_crypto(struct totem_config *totem_config)
 	if !hasSymbol(methods, "function", "checkForNameDuplicatesAction") {
 		t.Fatalf("expected PHP action method, got %#v", methods)
 	}
+	if got := methods[0].Container; got != "CustomerTransformerController" {
+		t.Fatalf("expected method container, got %q in %#v", got, methods[0])
+	}
+	if !strings.Contains(methods[0].Snippet, "$request->query->get") {
+		t.Fatalf("expected method snippet to include body context, got %#v", methods[0])
+	}
 	cSyms, err := symbolInventory(profile, symbolInventoryQuery{Language: "c", Kind: "function", NameContains: "crypto", Max: 10})
 	if err != nil {
 		t.Fatalf("symbolInventory c: %v", err)
@@ -513,6 +589,57 @@ static int totem_get_crypto(struct totem_config *totem_config)
 	}
 	if cSyms[0].Path != "exec/totemconfig.c" {
 		t.Fatalf("expected display path relative to repo, got %#v", cSyms[0])
+	}
+}
+
+func TestCallInventoryFindsCallersWithoutReadingFilesOneByOne(t *testing.T) {
+	dir := t.TempDir()
+	verifyPath := filepath.Join(dir, "cmd", "verify_attestation.go")
+	if err := os.MkdirAll(filepath.Dir(verifyPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `package verify
+
+func Exec(policy Policy, c Config, verified []Signature) {
+    for _, vp := range verified {
+        payload := policy.AttestationToPayloadJSON(c.PredicateType, vp)
+        if len(payload) == 0 {
+            continue
+        }
+    }
+    PrintVerification(verified)
+}
+`
+	if err := os.WriteFile(verifyPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plain.go"), []byte("package verify\nfunc helper() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	calls, err := callInventory(profile, callInventoryQuery{Language: "go", NameContains: "attestation", Max: 10})
+	if err != nil {
+		t.Fatalf("callInventory: %v", err)
+	}
+	if len(calls) == 0 {
+		t.Fatalf("expected attestation call inventory")
+	}
+	call := calls[0]
+	if call.Callee != "policy.AttestationToPayloadJSON" || call.Receiver != "policy" || call.Enclosing != "Exec" {
+		t.Fatalf("unexpected attestation call entry: %#v", call)
+	}
+	if !strings.Contains(call.Snippet, "PredicateType") {
+		t.Fatalf("expected call snippet to include predicate argument, got %#v", call)
+	}
+	prints, err := callInventory(profile, callInventoryQuery{Language: "go", NameContains: "printverification", Max: 10})
+	if err != nil {
+		t.Fatalf("callInventory print: %v", err)
+	}
+	if len(prints) == 0 || prints[0].Callee != "PrintVerification" {
+		t.Fatalf("expected PrintVerification call, got %#v", prints)
 	}
 }
 

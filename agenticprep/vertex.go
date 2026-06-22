@@ -184,8 +184,10 @@ Rules:
 - Once validate_overlay returns ok=true with at least one valid adapter, call
   finish_overlay immediately unless a specific validation warning requires a
   correction.
-- Prefer repo_structure, symbol_inventory, search_context, and read_files over repeated
-  single-file reads. Use read_file only when one exact file or offset is needed.
+- Prefer repo_structure, symbol_inventory, call_inventory, search_context, and read_files over repeated
+  single-file reads. Use symbol_inventory to map classes/functions/methods, then
+  call_inventory to find API callers before opening exact files. Use read_file
+  only when one exact file or offset is needed.
 - Prefer this workflow:
   1. inspect_profile
   2. trust_model and entrypoint_inventory to understand the repo archetype,
@@ -199,9 +201,11 @@ Rules:
      database, crypto, XML, archive, or network code.
   4. repo_structure for unfamiliar repositories, then adapter_reference,
      package_reference, and concept_reference
-  5. security_relevant_files, then symbol_inventory, list_files, search_context,
-     or search_text for exact wrappers/routes/config. Use symbol_inventory before
-     opening many files just to discover class, method, or function names. For PHP
+  5. security_relevant_files, then symbol_inventory, call_inventory, list_files,
+     search_context, or search_text for exact wrappers/routes/config. Use
+     symbol_inventory before opening many files just to discover class, method,
+     or function names; use call_inventory to find security API call sites and
+     their enclosing declarations. For PHP
      and similar ecosystems, include helper
      files such as .inc/.phtml and search command sinks plus restore/import,
      upload, archive, and filename flows. For Java/C#/server frameworks,
@@ -234,6 +238,11 @@ Rules:
      Origin/callback/redirect values. If the repo profile, packages, samples, or
      security_relevant_files mention these terms, finish_overlay will be rejected
      until symbol_inventory has been called.
+     For signature, attestation, certificate, policy, predicate, transparency-log,
+     or provenance verification, inspect the full flow from verification result to
+     accepted output. Check that filtered or policy-matched subsets are non-empty
+     before output/trust, and that code emits only the checked subset rather than
+     the original verified collection.
      For information-disclosure CVEs, inspect filesystem drivers and methods
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
@@ -321,15 +330,18 @@ agentLoop:
 					proposal.Notes = append(proposal.Notes, warn)
 				}
 				needsSymbols := requiresSymbolInventory(profile)
+				requiredCallTerms := requiredCallInventoryTerms(profile)
 				missingRequiredSymbols := needsSymbols && !agentLogHasTool(log, "symbol_inventory")
+				missingRequiredCalls := needsSymbols && !agentLogHasTool(log, "call_inventory")
+				missingFocusedCalls := len(requiredCallTerms) > 0 && !agentLogHasCallInventoryTerm(log, requiredCallTerms)
 				validationWarnings := []string(nil)
 				validAdapterCount := 0
-				if warn == "" && !missingRequiredSymbols {
+				if warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls {
 					filtered, warnings := FilterValidProposal(profile, proposal, Config{})
 					validationWarnings = warnings
 					validAdapterCount = len(filtered.AdapterFiles)
 				}
-				ok := warn == "" && !missingRequiredSymbols && len(validationWarnings) == 0
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && len(validationWarnings) == 0
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -337,9 +349,18 @@ agentLoop:
 				if warn != "" {
 					toolResult["error"] = warn
 				}
-				if missingRequiredSymbols {
-					toolResult["error"] = "symbol_inventory is required before finish_overlay for repositories with CORS/origin/wildcard/callback validator evidence; call symbol_inventory with name_contains origin, wildcard, cors, validate, or match, then finish_overlay"
+				if missingRequiredSymbols && missingRequiredCalls {
+					toolResult["error"] = "symbol_inventory and call_inventory are required before finish_overlay for repositories with CORS/origin/wildcard/callback or signature/attestation/predicate verification evidence; call symbol_inventory to map declarations, then call_inventory with focused API terms such as validate, origin, attestation, predicate, verify, print, or policy"
+					p.debugf("step=%d finish_overlay rejected: symbol_inventory and call_inventory required", step)
+				} else if missingRequiredSymbols {
+					toolResult["error"] = "symbol_inventory is required before finish_overlay for repositories with CORS/origin/wildcard/callback or signature/attestation/predicate verification evidence; call symbol_inventory with focused name_contains terms before finish_overlay"
 					p.debugf("step=%d finish_overlay rejected: symbol_inventory required", step)
+				} else if missingRequiredCalls {
+					toolResult["error"] = "call_inventory is required before finish_overlay for repositories with CORS/origin/wildcard/callback or signature/attestation/predicate verification evidence; call call_inventory with focused API terms such as validate, origin, attestation, predicate, verify, print, policy, then finish_overlay"
+					p.debugf("step=%d finish_overlay rejected: call_inventory required", step)
+				} else if missingFocusedCalls {
+					toolResult["error"] = "call_inventory must be focused on the repo evidence before finish_overlay; call call_inventory with one of these name_contains terms: " + strings.Join(requiredCallTerms, ", ")
+					p.debugf("step=%d finish_overlay rejected: focused call_inventory required terms=%s", step, strings.Join(requiredCallTerms, ","))
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -393,17 +414,43 @@ agentLoop:
 			contents = append(contents, map[string]any{
 				"role": "user",
 				"parts": []map[string]any{{
-					"text": "Decision checkpoint: stop searching now. Your next tool call must be validate_overlay if you have concrete source plus sink/mark/control evidence, or finish_overlay with adapter_files=[] if you do not. Do not call search, read, repo, dependency, or reference tools after this checkpoint.",
+					"text": "Decision checkpoint: stop searching now. Your next tool call must be validate_overlay if you have concrete source plus sink/mark/control evidence, or finish_overlay with adapter_files=[] if you do not. If finish_overlay is rejected because required symbol_inventory or call_inventory is missing, call exactly those inventory tools with the requested focused terms, then call finish_overlay. Do not call search, read, repo, dependency, or reference tools after this checkpoint.",
 				}},
 			})
 		}
 		log = append(log, entry)
-		if decisionCheckpointSent && step >= 16 && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") {
-			p.debugf("step=%d stopping after ignored decision checkpoint", step)
-			return Proposal{
-				AgentLog: log,
-				Notes:    append(notes, "agent stopped after decision checkpoint without finish_overlay"),
-			}, nil
+		validatorRequiredInventory := hasToolCall(calls, "symbol_inventory") || hasToolCall(calls, "call_inventory")
+		if decisionCheckpointSent && validatorRequiredInventory && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") {
+			needsSymbols := requiresSymbolInventory(profile)
+			requiredCallTerms := requiredCallInventoryTerms(profile)
+			missingSymbols := needsSymbols && !agentLogHasTool(log, "symbol_inventory")
+			missingCalls := needsSymbols && !agentLogHasTool(log, "call_inventory")
+			missingFocused := len(requiredCallTerms) > 0 && !agentLogHasCallInventoryTerm(log, requiredCallTerms)
+			msg := "Required inventory is now satisfied. Next tool call must be finish_overlay with adapter_files=[] unless you have already validated a concrete adapter."
+			switch {
+			case missingSymbols:
+				msg = "Checkpoint correction: symbol_inventory is still required before finish_overlay. Call symbol_inventory with focused declaration terms, then finish_overlay."
+			case missingCalls:
+				msg = "Checkpoint correction: call_inventory is still required before finish_overlay. Call call_inventory with focused API terms, then finish_overlay."
+			case missingFocused:
+				msg = "Checkpoint correction: call_inventory was too broad. Call call_inventory with one of these name_contains terms, then finish_overlay: " + strings.Join(requiredCallTerms, ", ")
+			}
+			p.debugf("step=%d post-inventory checkpoint correction", step)
+			contents = append(contents, map[string]any{
+				"role": "user",
+				"parts": []map[string]any{{
+					"text": msg,
+				}},
+			})
+		}
+		if decisionCheckpointSent && step >= 16 && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") && !validatorRequiredInventory {
+			p.debugf("step=%d corrective checkpoint after unrelated tool calls", step)
+			contents = append(contents, map[string]any{
+				"role": "user",
+				"parts": []map[string]any{{
+					"text": "Checkpoint correction: do not call more setup/search/reference tools. Next call must be finish_overlay, unless the last finish_overlay response required symbol_inventory or call_inventory; in that case call only the required inventory tool with the requested focused terms, then finish_overlay.",
+				}},
+			})
 		}
 	}
 	if len(lastValid.AdapterFiles) > 0 {
@@ -461,16 +508,86 @@ func agentLogHasTool(log []AgentStep, name string) bool {
 	return false
 }
 
+func agentLogHasCallInventoryTerm(log []AgentStep, terms []string) bool {
+	for _, step := range log {
+		for _, call := range step.ToolCalls {
+			if call.Name != "call_inventory" {
+				continue
+			}
+			arg := strings.ToLower(stringArg(call.Arguments, "name_contains"))
+			if arg == "" {
+				return true
+			}
+			for _, term := range terms {
+				if strings.Contains(arg, strings.ToLower(term)) || strings.Contains(strings.ToLower(term), arg) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func requiresSymbolInventory(profile Profile) bool {
 	terms := []string{
 		"cors", "alloworigins", "alloworiginfunc", "allowallorigins",
 		"access-control-allow-origin", "trustedorigin", "trusted_origin",
 		"wildcard", "validateorigin", "checkorigin", "callback",
+		"attestation", "predicate", "signature", "provenance",
+		"transparencylog", "fulcio", "rekor",
 	}
 	hasTerm := func(s string) bool {
 		s = strings.ToLower(s)
 		for _, term := range terms {
 			if strings.Contains(s, term) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, pkg := range profile.Packages {
+		if hasTerm(pkg) {
+			return true
+		}
+	}
+	for _, pkg := range profile.LocalPkgs {
+		if hasTerm(pkg) {
+			return true
+		}
+	}
+	for _, imports := range profile.Imports {
+		for _, imp := range imports {
+			if hasTerm(imp) {
+				return true
+			}
+		}
+	}
+	for _, sample := range profile.Samples {
+		if hasTerm(sample.Path) || hasTerm(sample.Preview) {
+			return true
+		}
+	}
+	return false
+}
+
+func requiredCallInventoryTerms(profile Profile) []string {
+	switch {
+	case profileContainsAnyTerm(profile, []string{"attestation", "predicate", "provenance"}):
+		return []string{"attestation", "predicate", "policy", "printverification", "provenance"}
+	case profileContainsAnyTerm(profile, []string{"cors", "alloworigins", "alloworiginfunc", "allowallorigins", "access-control-allow-origin", "origin", "wildcard", "callback"}):
+		return []string{"origin", "cors", "validate", "wildcard", "match", "callback"}
+	case profileContainsAnyTerm(profile, []string{"signature", "fulcio", "rekor", "transparencylog"}):
+		return []string{"signature", "verify", "policy", "certificate", "rekor", "fulcio"}
+	default:
+		return nil
+	}
+}
+
+func profileContainsAnyTerm(profile Profile, terms []string) bool {
+	hasTerm := func(s string) bool {
+		s = strings.ToLower(s)
+		for _, term := range terms {
+			if strings.Contains(s, strings.ToLower(term)) {
 				return true
 			}
 		}
@@ -628,12 +745,25 @@ func vertexPrepTools() []map[string]any {
 		},
 		{
 			"name":        "symbol_inventory",
-			"description": "Return bounded AST-style class, method, function, type, and module declarations across repo source files so prep can target files without opening them one-by-one.",
+			"description": "Return bounded AST-style class, method, function, type, and module declarations with signatures, enclosing class/module, and security snippets so prep can target files without opening them one-by-one.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"language":      map[string]any{"type": "string"},
 					"kind":          map[string]any{"type": "string"},
+					"name_contains": map[string]any{"type": "string"},
+					"path_contains": map[string]any{"type": "string"},
+					"max":           map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
+			"name":        "call_inventory",
+			"description": "Return bounded call-site inventory across repo source files, including callee, receiver, enclosing declaration, and snippets. Use after symbol_inventory to find where framework/security APIs are invoked.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"language":      map[string]any{"type": "string"},
 					"name_contains": map[string]any{"type": "string"},
 					"path_contains": map[string]any{"type": "string"},
 					"max":           map[string]any{"type": "integer"},
@@ -930,6 +1060,18 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 			return map[string]any{"ok": false, "error": err.Error()}
 		}
 		return map[string]any{"ok": true, "symbols": symbols}
+	case "call_inventory":
+		q := callInventoryQuery{
+			Language:     stringArg(call.Arguments, "language"),
+			NameContains: stringArg(call.Arguments, "name_contains"),
+			PathContains: stringArg(call.Arguments, "path_contains"),
+			Max:          intArg(call.Arguments, "max", 160),
+		}
+		calls, err := callInventory(profile, q)
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "calls": calls}
 	case "search_text":
 		pattern, _ := call.Arguments["pattern"].(string)
 		matches, err := searchProfileText(profile, pattern, boolArg(call.Arguments, "regex"), boolArg(call.Arguments, "ignoreCase"), intArg(call.Arguments, "max", 80))
@@ -1177,6 +1319,10 @@ type symbolEntry struct {
 	Kind      string `json:"kind"`
 	Name      string `json:"name"`
 	Signature string `json:"signature"`
+	Receiver  string `json:"receiver,omitempty"`
+	Container string `json:"container,omitempty"`
+	Snippet   string `json:"snippet,omitempty"`
+	Score     int    `json:"score,omitempty"`
 }
 
 type symbolPattern struct {
@@ -1220,6 +1366,7 @@ func symbolInventory(profile Profile, q symbolInventoryQuery) ([]symbolEntry, er
 			}
 			sym.Path = display
 			sym.Language = fileLang
+			sym.Score = securityRelevanceScore(display, sym.Signature+"\n"+sym.Snippet)
 			key := fmt.Sprintf("%s:%d:%s:%s", sym.Path, sym.Line, sym.Kind, sym.Name)
 			if seen[key] {
 				continue
@@ -1235,6 +1382,188 @@ func symbolInventory(profile Profile, q symbolInventoryQuery) ([]symbolEntry, er
 	return out, err
 }
 
+type callInventoryQuery struct {
+	Language     string
+	NameContains string
+	PathContains string
+	Max          int
+}
+
+type callEntry struct {
+	Path      string `json:"path"`
+	Line      int    `json:"line"`
+	Language  string `json:"language"`
+	Callee    string `json:"callee"`
+	Name      string `json:"name"`
+	Receiver  string `json:"receiver,omitempty"`
+	Enclosing string `json:"enclosing,omitempty"`
+	Snippet   string `json:"snippet"`
+	Score     int    `json:"score,omitempty"`
+}
+
+func callInventory(profile Profile, q callInventoryQuery) ([]callEntry, error) {
+	if q.Max <= 0 || q.Max > 500 {
+		q.Max = 160
+	}
+	langFilter := strings.TrimSpace(strings.ToLower(q.Language))
+	nameFilter := strings.TrimSpace(strings.ToLower(q.NameContains))
+	pathFilter := strings.TrimSpace(strings.ToLower(filepath.ToSlash(q.PathContains)))
+	seen := map[string]bool{}
+	var out []callEntry
+	err := walkProfileFiles(profile, func(path string) bool {
+		fileLang := languageFor(path)
+		if langFilter != "" && fileLang != langFilter {
+			return true
+		}
+		display := displayPath(profile, path)
+		if pathFilter != "" && !strings.Contains(strings.ToLower(filepath.ToSlash(display)), pathFilter) {
+			return true
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return true
+		}
+		if len(data) > 256<<10 {
+			data = data[:256<<10]
+		}
+		text := string(data)
+		symbols := extractSymbols(fileLang, text)
+		for _, call := range extractCalls(fileLang, text, symbols) {
+			if nameFilter != "" && !strings.Contains(strings.ToLower(call.Callee+" "+call.Name+" "+call.Receiver+" "+call.Enclosing), nameFilter) {
+				continue
+			}
+			call.Path = display
+			call.Language = fileLang
+			call.Score = securityRelevanceScore(display, call.Snippet)
+			key := fmt.Sprintf("%s:%d:%s", call.Path, call.Line, call.Callee)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, call)
+			if len(out) >= q.Max {
+				return false
+			}
+		}
+		return true
+	})
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].Line < out[j].Line
+	})
+	return out, err
+}
+
+func extractCalls(lang, text string, symbols []symbolEntry) []callEntry {
+	re := callPattern(lang)
+	if re == nil {
+		return nil
+	}
+	var out []callEntry
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		clean := strings.TrimSpace(line)
+		if clean == "" || strings.HasPrefix(clean, "//") || strings.HasPrefix(clean, "#") || isSymbolDeclarationLine(lang, clean) {
+			continue
+		}
+		matches := re.FindAllStringSubmatch(line, -1)
+		for _, m := range matches {
+			if len(m) < 2 {
+				continue
+			}
+			callee := normalizeCallee(m[1])
+			name := calleeName(callee)
+			if callee == "" || name == "" || isControlSymbolName(name) {
+				continue
+			}
+			out = append(out, callEntry{
+				Line:      i + 1,
+				Callee:    callee,
+				Name:      name,
+				Receiver:  calleeReceiver(callee),
+				Enclosing: enclosingDeclaration(symbols, i+1),
+				Snippet:   nearbySnippet(lines, i, 1, 1, 360),
+			})
+		}
+	}
+	return out
+}
+
+func callPattern(lang string) *regexp.Regexp {
+	switch lang {
+	case "php":
+		return regexp.MustCompile(`((?:\$?[A-Za-z_]\w*|[A-Za-z_]\w*)\s*(?:->|::)\s*[A-Za-z_]\w*|[A-Za-z_]\w*)\s*\(`)
+	case "ruby":
+		return regexp.MustCompile(`([A-Za-z_]\w*(?:\.[A-Za-z_]\w*[!?=]?|::[A-Za-z_]\w*)?|[A-Za-z_]\w*[!?=]?)\s*\(`)
+	case "python", "go", "javascript", "typescript", "java", "kotlin", "scala", "c", "cpp", "csharp", "rust", "bash":
+		return regexp.MustCompile(`([A-Za-z_$][\w$]*(?:(?:\.|::|->)[A-Za-z_$][\w$]*)*)\s*\(`)
+	default:
+		return nil
+	}
+}
+
+func normalizeCallee(callee string) string {
+	callee = strings.Join(strings.Fields(callee), "")
+	callee = strings.Trim(callee, ".")
+	return callee
+}
+
+func calleeName(callee string) string {
+	callee = strings.TrimSpace(callee)
+	for _, sep := range []string{"->", "::", "."} {
+		if idx := strings.LastIndex(callee, sep); idx >= 0 {
+			return strings.TrimSpace(callee[idx+len(sep):])
+		}
+	}
+	return callee
+}
+
+func calleeReceiver(callee string) string {
+	callee = strings.TrimSpace(callee)
+	for _, sep := range []string{"->", "::", "."} {
+		if idx := strings.LastIndex(callee, sep); idx >= 0 {
+			return strings.TrimSpace(callee[:idx])
+		}
+	}
+	return ""
+}
+
+func enclosingDeclaration(symbols []symbolEntry, line int) string {
+	var best symbolEntry
+	for _, sym := range symbols {
+		if sym.Line > line {
+			continue
+		}
+		if sym.Kind != "function" && sym.Kind != "method" {
+			continue
+		}
+		if best.Line == 0 || sym.Line > best.Line {
+			best = sym
+		}
+	}
+	if best.Name == "" {
+		return ""
+	}
+	if best.Container != "" {
+		return best.Container + "." + best.Name
+	}
+	return best.Name
+}
+
+func isSymbolDeclarationLine(lang string, line string) bool {
+	for _, pat := range symbolPatterns(lang) {
+		if pat.Expr.MatchString(line) {
+			return true
+		}
+	}
+	return false
+}
+
 func extractSymbols(lang, text string) []symbolEntry {
 	patterns := symbolPatterns(lang)
 	if len(patterns) == 0 {
@@ -1242,6 +1571,7 @@ func extractSymbols(lang, text string) []symbolEntry {
 	}
 	var out []symbolEntry
 	lines := strings.Split(text, "\n")
+	container := ""
 	for i, line := range lines {
 		clean := strings.TrimSpace(line)
 		if clean == "" || strings.HasPrefix(clean, "//") || strings.HasPrefix(clean, "#") || strings.HasPrefix(clean, "*") {
@@ -1256,16 +1586,72 @@ func extractSymbols(lang, text string) []symbolEntry {
 			if name == "" || isControlSymbolName(name) {
 				continue
 			}
+			receiver := ""
+			if lang == "go" && pat.Kind == "method" {
+				receiver = goReceiverName(clean)
+				if receiver != "" {
+					container = receiver
+				}
+			}
+			entryContainer := ""
+			if pat.Kind == "method" || pat.Kind == "function" {
+				entryContainer = container
+			}
 			out = append(out, symbolEntry{
 				Line:      i + 1,
 				Kind:      pat.Kind,
 				Name:      name,
 				Signature: compactSnippet(clean, 240),
+				Receiver:  receiver,
+				Container: entryContainer,
+				Snippet:   nearbySnippet(lines, i, 1, 2, 420),
 			})
+			if isContainerKind(pat.Kind) {
+				container = name
+			}
 			break
 		}
 	}
 	return out
+}
+
+func isContainerKind(kind string) bool {
+	switch kind {
+	case "class", "interface", "trait", "module", "impl", "struct":
+		return true
+	default:
+		return false
+	}
+}
+
+func goReceiverName(signature string) string {
+	m := regexp.MustCompile(`^\s*func\s+\(\s*(?:[A-Za-z_]\w*\s+)?\*?([A-Za-z_]\w*)`).FindStringSubmatch(signature)
+	if len(m) > 1 {
+		return m[1]
+	}
+	return ""
+}
+
+func nearbySnippet(lines []string, idx int, before int, after int, max int) string {
+	if idx < 0 || idx >= len(lines) {
+		return ""
+	}
+	start := idx - before
+	if start < 0 {
+		start = 0
+	}
+	end := idx + after + 1
+	if end > len(lines) {
+		end = len(lines)
+	}
+	var parts []string
+	for _, line := range lines[start:end] {
+		clean := strings.TrimSpace(line)
+		if clean != "" {
+			parts = append(parts, clean)
+		}
+	}
+	return compactSnippet(strings.Join(parts, " "), max)
 }
 
 func symbolPatterns(lang string) []symbolPattern {
@@ -2250,6 +2636,8 @@ func suggestContextVals(name string, compact string) []string {
 		"$request->query->get", "addConditionParam", "whereRaw", "havingRaw", "orderByRaw", "selectRaw",
 		"AllowOrigins", "AllowOriginFunc", "AllowAllOrigins", "parseWildcardRules", "validateOrigin",
 		"Access-Control-Allow-Origin", "HasPrefix", "HasSuffix", "o[:i-1]", "o[:i]",
+		"AttestationToPayloadJSON", "PredicateType", "VerifyImageAttestations",
+		"VerifyLocalImageAttestations", "PrintVerification", "checked", "verified",
 	} {
 		c := compactSourceText(token)
 		if strings.Contains(compact, c) {
@@ -2356,6 +2744,8 @@ func securitySnippet(text string) string {
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
 		"Access-Control-Allow-Origin", "AllowOrigins", "AllowOriginFunc",
 		"AllowAllOrigins", "validateOrigin", "wildcard", "HasPrefix",
+		"AttestationToPayloadJSON", "PredicateType", "VerifyImageAttestations",
+		"VerifyLocalImageAttestations", "PrintVerification", "attestation",
 		"restore", "import", "backup", "archive", "extract", "filename", "rrdtool",
 		"ThreadLocal", "beginRequest", "endRequest", "activate(", "deactivate(",
 		"associate(", "dissociate(", "RequestScoped",

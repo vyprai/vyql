@@ -362,6 +362,9 @@ func securityRelevanceScore(path string, text string) int {
 		"cors": 24, "alloworigins": 34, "alloworiginfunc": 24, "allowallorigins": 22,
 		"access-control-allow-origin": 30, "origin": 14, "wildcard": 18,
 		"hasprefix": 18, "hassuffix": 12,
+		"attestation": 28, "predicate": 24, "signature": 18, "verifyimageattestations": 36,
+		"verifylocalimageattestations": 36, "attestationtopayloadjson": 38,
+		"printverification": 34, "policy": 12,
 		"select ": 8, "insert ": 8, "update ": 8, "delete ": 8, "query(": 8,
 		"addconditionparam": 24, "whereraw": 18, "havingraw": 18, "orderbyraw": 18,
 		"request": 8, "request->query": 18, "$request->query": 18, "$_get": 12, "$_post": 12, "$_files": 12, "$_request": 12,
@@ -387,6 +390,7 @@ func securityRelevanceScore(path string, text string) int {
 		"auth": 5, "login": 5, "admin": 4, "config": 4, "driver": 4, "localdriver": 10,
 		"authorization": 16, "permission": 14, "role": 10, "middleware": 8,
 		"cors": 18, "origin": 12, "wildcard": 10,
+		"attestation": 18, "predicate": 14, "signature": 10, "verify": 8,
 		"context": 6, "cache": 6, "lifecycle": 6, "servlet": 5,
 	} {
 		if strings.Contains(lowerPath, token) {
@@ -984,7 +988,8 @@ func dependencyGapScore(c dependencyCandidate) int {
 		"sql": 45, "jdbc": 35, "database": 30, "query": 25,
 		"template": 35, "html": 25, "xml": 35, "el": 20, "faces": 18,
 		"upload": 45, "file": 25, "path": 25, "archive": 35, "zip": 30,
-		"crypto": 30, "cipher": 30, "jms": 18, "message": 18,
+		"crypto": 30, "cipher": 30, "signature": 35, "attestation": 40,
+		"predicate": 30, "sigstore": 28, "jms": 18, "message": 18,
 		"deserialize": 40, "objectmessage": 35, "cache": 10,
 	} {
 		if strings.Contains(text, token) {
