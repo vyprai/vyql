@@ -522,6 +522,7 @@ adapter javascript {
   sink receiver "replace" val "+)*m" -> code.RegexMatch
   mark "RegExp" val "d]*(?:;" -> code.CatastrophicRegex
   mark method "match" val "^\\{(,+(?:(\\{,+\\})*),*|,*(?:(\\{,+\\})*),+)\\}" nval "^\\{((?:,|\\{,+\\})+)\\}" -> code.CatastrophicRegex
+  mark exact "analysis.module.context" val "lang=javascript" val "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g" nval "[^]*?(?:\\*\\/|$)" -> code.CatastrophicRegex
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "bulkCreate" -> code.MassAssign

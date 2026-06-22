@@ -818,6 +818,66 @@ csrf.valid = csrf.validate = function (data, token) {
 	}
 }
 
+func TestPrepRanksJavaScriptStaticRegexReDoS(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "index.ts")
+	if err := os.WriteFile(src, []byte(`const commentre = /\/\*[^*]*\*+([^/*][^*]*\*+)*\//g;
+
+export const parse = (css: string): string[] => {
+  function trim(str: string) {
+    return str.trim();
+  }
+
+  function selector() {
+    const m = /^([^{]+)/.exec(css);
+    if (!m) {
+      return [];
+    }
+
+    const res = trim(m[0]).replace(commentre, '');
+    return res.split(',').map(s => trim(s));
+  }
+
+  return selector();
+};
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !staticRegexProfile(profile) {
+		t.Fatal("expected static regex profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatal("expected static regex profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"regex", "replace", "match", "parse", "commentre"} {
+		if !containsString(callTerms, want) {
+			t.Fatalf("expected focused call term %q in %#v", want, callTerms)
+		}
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	for _, want := range []string{"regex", "pattern", "commentre", "selector"} {
+		if !containsString(assignmentTerms, want) {
+			t.Fatalf("expected focused assignment term %q in %#v", want, assignmentTerms)
+		}
+	}
+	narrow := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  mark exact "analysis.module.context" val "lang=javascript" val "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g" nval "[^]*?(?:\\*\\/|$)" -> code.CatastrophicRegex
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow static-regex context mark to validate: %v", err)
+	}
+}
+
 func TestPrepRanksMcpToolCommandTemplates(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"dependencies":{"@modelcontextprotocol/sdk":"^1.0.0","zod":"^3.0.0","@acme/plainlib":"1.0.0"}}`), 0o644); err != nil {
@@ -2184,6 +2244,20 @@ func TestPrepConceptReferenceIncludesSecretComparison(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected secret comparison scan concept in reference, got %#v", concepts)
+	}
+}
+
+func TestPrepConceptReferenceIncludesCatastrophicRegex(t *testing.T) {
+	concepts := conceptReference("static regex redos")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.CatastrophicRegex" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected catastrophic regex scan concept in reference, got %#v", concepts)
 	}
 }
 
