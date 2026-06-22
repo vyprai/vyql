@@ -665,6 +665,77 @@ final class Helper {
 	}
 }
 
+func TestPrepRanksSensitiveModelJsonSerializationProfiles(t *testing.T) {
+	dir := t.TempDir()
+	controllerPath := filepath.Join(dir, "src", "controllers", "VerifyController.php")
+	if err := os.MkdirAll(filepath.Dir(controllerPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `<?php
+final class VerifyController {
+    private function _handleSuccessfulLogin(\craft\elements\User $user): Response {
+        if ($this->request->getAcceptsJson()) {
+            $return = ['returnUrl' => $returnUrl];
+            $return['csrfTokenValue'] = $this->request->getCsrfToken();
+            return $this->asModelSuccess($user, modelName: 'user', data: $return);
+        }
+        return $this->redirectToPostedUrl($userSession->getIdentity(), $returnUrl);
+    }
+}
+`
+	if err := os.WriteFile(controllerPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	servicePath := filepath.Join(dir, "src", "services", "Response.php")
+	if err := os.MkdirAll(filepath.Dir(servicePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(servicePath, []byte("<?php class Response { public function getReturnUrl() { return $this->redirectToPostedUrl($u, $url); } }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "php", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != controllerPath {
+		t.Fatalf("expected VerifyController.php first, got %#v", files)
+	}
+	if !strings.Contains(files[0].Snippet, "asModelSuccess") || !strings.Contains(files[0].Snippet, "csrfTokenValue") {
+		t.Fatalf("expected model serialization snippet, got %q", files[0].Snippet)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected model serialization profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	if !containsString(callTerms, "asmodelsuccess") || !containsString(callTerms, "json") {
+		t.Fatalf("expected focused model serialization call terms, got %#v", callTerms)
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	if !containsString(assignmentTerms, "user") || !containsString(assignmentTerms, "token") {
+		t.Fatalf("expected focused sensitive model assignment terms, got %#v", assignmentTerms)
+	}
+	broadLog := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "symbol_inventory", Arguments: map[string]any{"language": "php", "name_contains": "model"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"language": "php"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "assignment_inventory", Arguments: map[string]any{"language": "php"}}}},
+	}
+	if got := inventoryGateError(profile, broadLog, "read_file"); !strings.Contains(got, "call_inventory") {
+		t.Fatalf("expected broad inventory to be rejected, got %q", got)
+	}
+	readyLog := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "symbol_inventory", Arguments: map[string]any{"language": "php", "name_contains": "model"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"language": "php", "name_contains": "asmodelsuccess"}}}},
+		{ToolCalls: []AgentToolCall{{Name: "assignment_inventory", Arguments: map[string]any{"language": "php", "name_contains": "user"}}}},
+	}
+	if got := inventoryGateError(profile, readyLog, "read_file"); got != "" {
+		t.Fatalf("expected inventory gate satisfied, got %q", got)
+	}
+}
+
 func TestSymbolInventoryFindsClassesMethodsAndFunctions(t *testing.T) {
 	dir := t.TempDir()
 	phpPath := filepath.Join(dir, "src", "Controller", "CustomerTransformerController.php")

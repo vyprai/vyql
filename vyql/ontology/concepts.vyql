@@ -1872,6 +1872,15 @@ concept ConfigExposureReview : sink {
   review_assumption: "repository, keyring, credential, or diagnostic fields may contain inline credentials"
   review_confidence: possibility
 }
+concept SensitiveModelJsonSerializationExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "a framework JSON success response serializes a full user or model object instead of returning an explicit safe data map"
+  review_evidence: "model serialization context {pattern} returns the model object through a JSON response helper"
+  review_assumption: "the serialized model may include password, token, MFA secret, credential, or other sensitive attributes by default"
+  review_confidence: high
+}
 concept SecretDatabindingReview : sink {
   vulnerable_to: [secrets.SecretLeak, crypto.CleartextStorage]
   cwe: [CWE_311, CWE_522]

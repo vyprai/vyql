@@ -1278,6 +1278,12 @@ review code.ConfigExposureReview {
   expected: [core.SecretRedaction]
   text: "verify config or diagnostic serialization redacts inline secrets before exposure"
 }
+review code.SensitiveModelJsonSerializationExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "return explicit safe fields instead of serializing full user or model objects in JSON success responses"
+}
 review code.PermissiveCors {
   category: "auth"
   kind: "attention"

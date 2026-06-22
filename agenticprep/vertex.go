@@ -234,6 +234,13 @@ Rules:
      name_contains values such as title, name, html, body, content, snapshot,
      encode, escape, and sanitize; then call function_context before proposing
      a narrow analysis.function.context mark.
+     For sensitive data exposure through JSON/API responses, inspect model
+     serialization helpers such as asModelSuccess, serialize, toArray, fields,
+     extraFields, modelName, response.data, asJson, and getAcceptsJson. Full
+     user/account/model objects returned through JSON success helpers are more
+     important than adjacent redirect or request-parameter APIs. Use
+     function_context and narrow context marks for local model serialization
+     shapes; do not substitute redirect adapters for model exposure evidence.
      For server-side template injection, host-header poisoning, canonical URL,
      or request URL helper shapes, inspect helpers that call absolute URL
      builders such as absoluteUrlWithProtocol, siteUrl, urlFor, canonicalUrl,
@@ -585,7 +592,7 @@ func agentLogHasCallInventoryTerm(log []AgentStep, terms []string) bool {
 			}
 			arg := strings.ToLower(stringArg(call.Arguments, "name_contains"))
 			if arg == "" {
-				return true
+				continue
 			}
 			for _, term := range terms {
 				if strings.Contains(arg, strings.ToLower(term)) || strings.Contains(strings.ToLower(term), arg) {
@@ -605,7 +612,7 @@ func agentLogHasAssignmentInventoryTerm(log []AgentStep, terms []string) bool {
 			}
 			arg := strings.ToLower(stringArg(call.Arguments, "name_contains") + " " + stringArg(call.Arguments, "value_contains"))
 			if strings.TrimSpace(arg) == "" {
-				return true
+				continue
 			}
 			for _, term := range terms {
 				term = strings.ToLower(term)
@@ -656,6 +663,8 @@ func inventoryGateError(profile Profile, log []AgentStep, toolName string) strin
 
 func requiresSymbolInventory(profile Profile) bool {
 	terms := []string{
+		"asmodelsuccess", "modelname", "getacceptsjson", "response.data",
+		"toarray", "extrafields", "serialize",
 		"cors", "alloworigins", "alloworiginfunc", "allowallorigins",
 		"access-control-allow-origin", "trustedorigin", "trusted_origin",
 		"wildcard", "validateorigin", "checkorigin", "callback",
@@ -703,6 +712,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 	switch {
 	case nativeMemoryProfile(profile):
 		return []string{"alloc", "malloc", "calloc", "realloc", "memcpy", "copy", "size", "length", "capacity", "offset", "escape", "unicode"}
+	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
+		return []string{"asmodelsuccess", "model", "json", "data", "serialize", "toarray", "fields", "accepts"}
 	case profileContainsAnyTerm(profile, []string{"attestation", "predicate", "provenance"}):
 		return []string{"attestation", "predicate", "policy", "printverification", "provenance"}
 	case profileContainsAnyTerm(profile, []string{"cors", "alloworigins", "alloworiginfunc", "allowallorigins", "access-control-allow-origin", "origin", "wildcard", "callback"}):
@@ -721,6 +732,8 @@ func requiresAssignmentInventory(profile Profile) bool {
 	return profileContainsAnyTerm(profile, []string{
 		"xss", "html::encode", "htmlspecialchars", "escapehtml", "template::raw",
 		"twig\\markup", "html", "render", "title", "snapshot", "audit",
+		"asmodelsuccess", "modelname", "getacceptsjson", "response.data",
+		"toarray", "extrafields", "serialize",
 		"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl",
 		"safecanonicalurl", "x-forwarded-host", "host header", "getpathinfo",
 		"sanitizeurl",
@@ -731,6 +744,8 @@ func requiresAssignmentInventory(profile Profile) bool {
 
 func requiredAssignmentInventoryTerms(profile Profile) []string {
 	switch {
+	case profileContainsAnyTerm(profile, []string{"asmodelsuccess", "modelname", "getacceptsjson", "response.data", "toarray", "extrafields", "serialize"}):
+		return []string{"user", "model", "data", "response", "json", "secret", "token", "password", "credential", "fields"}
 	case profileContainsAnyTerm(profile, []string{"ssti", "twig", "absoluteurlwithprotocol", "canonicalurl", "safecanonicalurl", "x-forwarded-host", "host header", "getpathinfo", "sanitizeurl"}):
 		return []string{"url", "host", "canonical", "sanitize", "absolute", "path", "twig", "template", "x-forwarded-host"}
 	case profileContainsAnyTerm(profile, []string{"xss", "html::encode", "htmlspecialchars", "escapehtml", "template::raw", "twig\\markup", "html", "render", "title", "snapshot", "audit"}):
@@ -1395,7 +1410,8 @@ code.DynamicCodeLoad, code.UnsafeUpload, code.ArchiveEntryWrite,
 code.UnboundedCopy, code.RawMemoryCopySize, code.SizeComputation,
 code.UnparameterizedSqlQueryParser, code.ProtocolStateReview,
 code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
-code.AbsolutePathDisclosure, code.OverbroadRolePermissionGrant.
+code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
+code.OverbroadRolePermissionGrant.
 `)
 }
 
@@ -1419,6 +1435,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.UnsanitizedSvgUpload", "surface": "scan", "use": "mark for upload services that accept/store SVG files without sanitizing SVG XML/script content before saving"},
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
+		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
 		{"concept": "core.PathAccessCheck", "surface": "control", "use": "control concept for containment, normalization, allowlist, or traversal guard"},
 	}
@@ -1613,6 +1630,10 @@ func callInventory(profile Profile, q callInventoryQuery) ([]callEntry, error) {
 	pathFilter := strings.TrimSpace(strings.ToLower(filepath.ToSlash(q.PathContains)))
 	seen := map[string]bool{}
 	var out []callEntry
+	collectLimit := q.Max * 20
+	if collectLimit < 1000 {
+		collectLimit = 1000
+	}
 	err := walkProfileFiles(profile, func(path string) bool {
 		fileLang := languageFor(path)
 		if langFilter != "" && fileLang != langFilter {
@@ -1644,7 +1665,7 @@ func callInventory(profile Profile, q callInventoryQuery) ([]callEntry, error) {
 			}
 			seen[key] = true
 			out = append(out, call)
-			if len(out) >= q.Max {
+			if len(out) >= collectLimit {
 				return false
 			}
 		}
@@ -1659,6 +1680,9 @@ func callInventory(profile Profile, q callInventoryQuery) ([]callEntry, error) {
 		}
 		return out[i].Line < out[j].Line
 	})
+	if len(out) > q.Max {
+		out = out[:q.Max]
+	}
 	return out, err
 }
 
@@ -1693,6 +1717,10 @@ func assignmentInventory(profile Profile, q assignmentInventoryQuery) ([]assignm
 	pathFilter := strings.TrimSpace(strings.ToLower(filepath.ToSlash(q.PathContains)))
 	seen := map[string]bool{}
 	var out []assignmentEntry
+	collectLimit := q.Max * 20
+	if collectLimit < 1000 {
+		collectLimit = 1000
+	}
 	err := walkProfileFiles(profile, func(path string) bool {
 		fileLang := languageFor(path)
 		if langFilter != "" && fileLang != langFilter {
@@ -1729,7 +1757,7 @@ func assignmentInventory(profile Profile, q assignmentInventoryQuery) ([]assignm
 			}
 			seen[key] = true
 			out = append(out, assignment)
-			if len(out) >= q.Max {
+			if len(out) >= collectLimit {
 				return false
 			}
 		}
@@ -1744,6 +1772,9 @@ func assignmentInventory(profile Profile, q assignmentInventoryQuery) ([]assignm
 		}
 		return out[i].Line < out[j].Line
 	})
+	if len(out) > q.Max {
+		out = out[:q.Max]
+	}
 	return out, err
 }
 
@@ -1896,6 +1927,8 @@ func assignmentRiskScore(entry assignmentEntry) int {
 		"absoluteurlwithprotocol": 30, "safecanonicalurl": 26, "canonicalurl": 18,
 		"getpathinfo": 16, "sanitizeurl": 20, "sanitizeuserinput": 18,
 		"x-forwarded-host": 24, "twig": 18, "ssti": 24, "host": 8,
+		"asmodelsuccess": 30, "modelname": 18, "getacceptsjson": 14,
+		"toarray": 14, "extrafields": 14, "serialize": 12, "json": 8,
 		"permission": 12, "role": 10, "admin": 8, "policy": 8, "session": 8,
 		"path": 8, "filename": 10, "url": 8, "redirect": 12, "origin": 10,
 		"token": 8, "secret": 12, "password": 12, "key": 6,
@@ -3047,6 +3080,9 @@ func suggestContextVals(name string, compact string) []string {
 		"request.cookies.get(\"sso_state\")", "safe_load", "yaml.load", "redirect", "Location", "htmlspecialchars",
 		"Html::encode", "$model->title", "$snapshot['title']", "$snapshot[\"title\"]", "$element->username",
 		"$element->title", "snapshot", "title", "username",
+		"asModelSuccess", "modelName: 'user'", "modelName:\"user\"",
+		"$this->request->getAcceptsJson()", "return$this->asModelSuccess($user,modelName:'user',data:$return)",
+		"return$this->asSuccess(data:$return)", "$response->data", "toArray", "fields", "extraFields",
 		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
 		"returnUrlHelper::absoluteUrlWithProtocol($url)",
 		"returnDynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))",
@@ -3164,6 +3200,8 @@ func securitySnippet(text string) string {
 		"sanitizeSvg", "Sanitizer",
 		"Html::encode", "htmlspecialchars", "escapeHtml", "$model->title",
 		"$snapshot['title']", "$snapshot[\"title\"]", "snapshot", "audit", "xss",
+		"asModelSuccess", "modelName", "getAcceptsJson", "$response->data",
+		"toArray", "extraFields", "serialize", "secret", "token", "credential",
 		"safeCanonicalUrl", "absoluteUrlWithProtocol", "getPathInfo", "sanitizeUrl",
 		"sanitizeUserInput", "X-Forwarded-Host", "host header", "Twig", "SSTI",
 		"redirect", "header(", "$_GET", "$_POST", "$_FILES", "$_REQUEST",
