@@ -250,6 +250,19 @@ Rules:
      a narrow command-string wrapper mark. Do not model generic execute wrappers
      as code.CommandExecution sinks when the safe form is an argv array; that
      catches fixed code. Prefer code.CommandStringWrapperExecution exact context.
+     For CLI option-taking commands such as gpg, git, tar, ssh, curl, unzip,
+     or package managers, do not treat shell escaping alone as sufficient.
+     escapeshellarg, shlex.quote, Shellwords.escape, or similar APIs prevent
+     shell metacharacter injection, but an attacker value beginning with "-"
+     can still be parsed as a command option unless the command inserts "--"
+     before positional user arguments or validates an option allowlist. Search
+     operation/argument assembly, call function_context for the builder, and
+     prefer a narrow code.CommandOptionInjection mark with an nval for the fixed
+     "--" delimiter or argv/allowlist hardening. CommandOptionInjection is a
+     scan mark, not a taint-only sink; do not finish empty merely because a
+     library has no HTTP/request source if the command builder itself has the
+     missing delimiter pattern. Public API parameters and CLI/library wrapper
+     arguments are sufficient context for this mark.
      For MCP server repositories, treat server.tool callback parameters as
      externally supplied tool input. Inspect @modelcontextprotocol/sdk imports,
      McpServer construction, server.tool schemas such as z.number/string/object,
@@ -521,7 +534,8 @@ agentLoop:
 				emptyJenkinsRemoteValidationOverlay := jenkinsRemoteValidationProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyJobOutputEventOverlay := jobOutputEventUpdateProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyDefaultRelayOverlay := defaultRelaySecretProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay
+				emptyCommandOptionOverlay := commandOptionProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!notesMentionAny(proposal.Notes, []string{"commandoptioninjection", "end-of-options", "--", "option injection"}) || notesMentionAny(proposal.Notes, []string{"no direct untrusted", "no untrusted entry", "no source", "map as a source"}))
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandOptionOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -559,6 +573,9 @@ agentLoop:
 				} else if emptyDefaultRelayOverlay {
 					toolResult["error"] = "default relay URL evidence is present; do not return an empty overlay until you have called concept_reference with topic \"default relay host\", function_context for the URL builder containing host/token/encoded upstream URL assignments, and validate_overlay with an analysis.function.context mark to code.DefaultExternalRelaySecretExposure or concrete evidence that the default host is product-owned/trusted"
 					p.debugf("step=%d finish_overlay rejected: empty default relay overlay", step)
+				} else if emptyCommandOptionOverlay {
+					toolResult["error"] = "command option-injection evidence is present; empty-overlay notes must explicitly address code.CommandOptionInjection or end-of-options delimiter hardening such as --, and must not reject the mark merely because the library has no direct untrusted source. Shell escaping alone is not sufficient evidence for option-taking CLI arguments."
+					p.debugf("step=%d finish_overlay rejected: empty command option overlay without specific rationale", step)
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -760,6 +777,18 @@ func agentLogHasAssignmentInventoryTerm(log []AgentStep, terms []string) bool {
 	return false
 }
 
+func notesMentionAny(notes []string, terms []string) bool {
+	for _, note := range notes {
+		note = strings.ToLower(note)
+		for _, term := range terms {
+			if strings.Contains(note, strings.ToLower(term)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func inventoryGateError(profile Profile, log []AgentStep, toolName string) string {
 	switch toolName {
 	case "search_text", "search_context", "read_file", "read_files":
@@ -829,6 +858,9 @@ func requiresSymbolInventory(profile Profile) bool {
 		"generatederivativeresponse", "$this->cmd->execute",
 		"runquery", "querydb", "dbquery", "executequery", "$ssql",
 		"legacyfilterinputarr", "where di_",
+		"escapeshellarg", "shlex.quote", "shellwords.escape", "setoperation",
+		"--list-secret-keys", "--list-public-keys", "--list-keys",
+		"--delete-key", "--delete-secret-key", "--export", "end-of-options",
 		"update_event", "handlechildresponse", "allow_event_updates_from_jobs",
 		"listfindupdate", "global/schedule",
 		"process::fromshellcommandline", "processbuilder", "command string",
@@ -890,6 +922,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"unmarshal", "migratelisttomap", "getinstance", "initializer", "job_loaded", "credentials"}
 	case jenkinsRemoteValidationProfile(profile):
 		return []string{"testconnection", "connect", "getprojects", "buildclient", "queryparameter", "dotest", "docheck", "dofill", "checkpermission", "haspermission", "post"}
+	case commandOptionProfile(profile):
+		return []string{"escapeshellarg", "operation", "--", "setoperation", "gpg", "gnupg", "key", "fingerprint", "argument", "option"}
 	case phpSqlWrapperProfile(profile):
 		return []string{"runquery", "querydb", "sql", "where", "legacyfilterinputarr", "get", "post"}
 	case jobOutputEventUpdateProfile(profile):
@@ -922,6 +956,9 @@ func requiredCallInventoryTerms(profile Profile) []string {
 }
 
 func requiresAssignmentInventory(profile Profile) bool {
+	if commandOptionProfile(profile) {
+		return true
+	}
 	if profileContainsAnyTerm(profile, []string{"userspec", "strtoll", "uid", "gid", "process->user", "process user", "--user", "parse user"}) {
 		return true
 	}
@@ -954,6 +991,8 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 		return []string{"credentials", "domaincredentialsmap", "initializer", "authentication", "system", "startup"}
 	case jenkinsRemoteValidationProfile(profile):
 		return []string{"url", "applicationname", "password", "proxy", "host", "port", "credential", "permission"}
+	case commandOptionProfile(profile):
+		return []string{"operation", "argument", "args", "keyid", "fingerprint", "option", "command", "escape", "delimiter"}
 	case commandWrapperProfile(profile):
 		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process"}
 	case jobOutputEventUpdateProfile(profile):
@@ -990,6 +1029,22 @@ func commandWrapperProfile(profile Profile) bool {
 		"generatederivativeresponse", "$this->cmd->execute",
 		"process::fromshellcommandline", "processbuilder", "command string",
 	})
+}
+
+func commandOptionProfile(profile Profile) bool {
+	if profile.Languages["php"] == 0 && profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 && profile.Languages["python"] == 0 && profile.Languages["ruby"] == 0 && profile.Languages["java"] == 0 && profile.Languages["go"] == 0 {
+		return false
+	}
+	hasEscapedCommandArg := profileContainsAnyTerm(profile, []string{
+		"escapeshellarg", "shlex.quote", "shellwords.escape", "processbuilder",
+		"exec.command", "execfile", "spawn(", "argv",
+	})
+	hasOptionCommand := profileContainsAnyTerm(profile, []string{
+		"gnupg", "gpg", "--list-secret-keys", "--list-public-keys", "--list-keys",
+		"--delete-key", "--delete-secret-key", "--export", "setoperation",
+		"end-of-options", " -- ", "option injection",
+	})
+	return hasEscapedCommandArg && hasOptionCommand
 }
 
 func mcpToolProfile(profile Profile) bool {
@@ -1818,6 +1873,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.JenkinsRemoteValidationMissingPostPermission", "surface": "scan", "use": "mark for Jenkins descriptor doTest/doCheck/doFill form-validation methods that accept @QueryParameter URL or credential values and perform outbound test/connect calls without @POST and checkPermission/hasPermission guards"},
 		{"concept": "code.FilesystemImageDirentTraversal", "surface": "scan", "use": "mark for archive or filesystem-image extraction functions that copy image-supplied directory entry names into path buffers before recursive extraction without rejecting '.', '..', separators, or traversal components"},
 		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "mark for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
+		{"concept": "code.CommandOptionInjection", "surface": "scan", "use": "mark for command builders that pass escaped user-controlled positional arguments to option-taking CLIs without inserting an end-of-options delimiter such as -- or enforcing an option allowlist"},
 		{"concept": "code.McpToolCommandTemplateExecution", "surface": "scan", "use": "mark for MCP server.tool handlers whose externally supplied tool callback parameters are interpolated into child_process.exec shell command templates instead of execFile argv arrays; include command-template vals and nval execFile/spawn hardening; use analysis.module.context when the server.tool registration wraps the handler body"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
 		{"concept": "core.PathAccessCheck", "surface": "control", "use": "control concept for containment, normalization, allowlist, or traversal guard"},
@@ -2310,6 +2366,10 @@ func assignmentRiskScore(entry assignmentEntry) int {
 		"cmdexecuteservice": 42, "$cmd_string": 36, "x-islandora-args": 30,
 		"generatederivativeresponse": 28, "$this->cmd->execute": 32,
 		"command string": 22, "array_merge": 12, "headerbag": 12,
+		"gnupg": 34, "gpg": 20, "escapeshellarg": 24, "$operation": 24,
+		"setoperation": 26, "--list-secret-keys": 30, "--list-public-keys": 30,
+		"--list-keys": 26, "--delete-key": 30, "--delete-secret-key": 30,
+		"--export": 20, "end-of-options": 32,
 		"do_directory": 28, "expand_fs": 34, "romfs_read": 22, "namelen": 16,
 		"dirent": 16, "bad filename": 18, "strchr(name": 24, "strcmp(name": 20,
 		"pollinghost": 30, "connectionmetadata": 26, "gurl": 20,
@@ -3818,6 +3878,9 @@ func securitySnippet(text string) string {
 		"CmdExecuteService", "$cmd_string", "X-Islandora-Args",
 		"generateDerivativeResponse", "$this->cmd->execute",
 		"Process::fromShellCommandline", "command string",
+		"escapeshellarg", "$operation", "setOperation", "--list-secret-keys",
+		"--list-public-keys", "--list-keys", "--delete-key",
+		"--delete-secret-key", "--export", "end-of-options", "GnuPG", "gpg",
 		"memcpy(newpath + pathlen", "child->namelen", "do_directory",
 		"expand_fs", "romfs_read", "namelen", "dirent",
 		"bad filename", "strchr(name", "strcmp(name",

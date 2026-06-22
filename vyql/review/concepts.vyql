@@ -658,6 +658,12 @@ review code.CommandStringWrapperExecution {
   expected: [core.ShellEscape]
   text: "review command wrapper calls for argv-array execution instead of formatted shell command strings"
 }
+review code.CommandOptionInjection {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review command arguments for end-of-options delimiters or option allowlist validation before passing escaped user values to option-taking CLI commands"
+}
 review code.McpToolCommandTemplateExecution {
   category: "command"
   kind: "attention"

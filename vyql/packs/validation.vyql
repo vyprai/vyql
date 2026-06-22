@@ -7,3 +7,8 @@ rule UncheckedDecodeResult {
   meta { id: "VYQL-VAL-001", severity: medium, cwe: [CWE_20], confidence_floor: medium }
   match code.UncheckedDecodeResult as decode
 }
+
+rule CommandOptionArgumentValidation {
+  meta { id: "VYQL-VAL-004", severity: high, cwe: [CWE_20], confidence_floor: medium }
+  match code.CommandOptionInjection as command
+}

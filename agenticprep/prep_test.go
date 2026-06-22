@@ -966,6 +966,60 @@ $rsDonatedItems = RunQuery($sSQL);
 	}
 }
 
+func TestPrepRanksPhpCommandOptionProfile(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "Crypt", "GPGAbstract.php")
+	if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `<?php
+abstract class Crypt_GPGAbstract {
+    protected function _getKeys($keyId = '') {
+        $operation = '--utf8-strings --list-secret-keys ' . escapeshellarg($keyId);
+        $this->engine->setOperation($operation);
+    }
+}
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !commandOptionProfile(profile) {
+		t.Fatalf("expected PHP command option profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected command option profile to require symbol inventory")
+	}
+	if !requiresAssignmentInventory(profile) {
+		t.Fatalf("expected command option profile to require assignment inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"escapeshellarg", "operation", "gpg", "fingerprint"} {
+		if !containsString(callTerms, want) {
+			t.Fatalf("expected call inventory term %q in %#v", want, callTerms)
+		}
+	}
+	if containsString(callTerms, "runquery") {
+		t.Fatalf("command option profile should outrank PHP SQL wrapper terms, got %#v", callTerms)
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	for _, want := range []string{"operation", "keyid", "delimiter"} {
+		if !containsString(assignmentTerms, want) {
+			t.Fatalf("expected assignment inventory term %q in %#v", want, assignmentTerms)
+		}
+	}
+	files, err := securityRelevantFiles(profile, "php", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != srcPath || !strings.Contains(files[0].Snippet, "list-secret-keys") {
+		t.Fatalf("expected GPG operation file first, got %#v", files)
+	}
+}
+
 func TestPrepRanksGoArchiveOverwriteProfile(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "utils.go")
