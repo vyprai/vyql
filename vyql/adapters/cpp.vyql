@@ -83,6 +83,7 @@ adapter cpp {
   mark exact "analysis.function.context" val "lang=cpp" val "visitBrOn(&curr)" val "validateTypeAnnotation(in,curr.ref)" val "curr.desc" nval "curr.ref->type.isRef" nval "curr.desc->type.isRef" -> code.ReachableAssertionReview
   mark exact "analysis.function.context" val "lang=cpp" val "Record_Type::ApplicationData" val "callbacks().tls_record_received" nval "can_decrypt_application_traffic" -> code.ProtocolStateReview
   mark exact "analysis.function.context" val "lang=cpp" val "name=HTTPAuthorized" val "strUserPass==strRPCUserColonPass" nval "nResult|=" -> code.SecretComparisonReview
+  mark exact "analysis.function.context" val "lang=cpp" val "r.Randomize" val "MultiplicativeInverse(r)" val "Jacobi" val "modn.Square(r)" val "modn.Multiply(y,rInv)" nval "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)" -> code.CryptoImproperBlinding
   mark "analysis.field.clear_null" -> code.OwnerFieldClear
   mark "xmlFreeDoc" -> code.OwnerFree
   mark "__deref" -> code.PointerUse

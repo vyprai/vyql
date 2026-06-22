@@ -399,6 +399,9 @@ func securityRelevanceScore(path string, text string) int {
 		"attestation": 28, "predicate": 24, "signature": 18, "verifyimageattestations": 36,
 		"verifylocalimageattestations": 36, "attestationtopayloadjson": 38,
 		"printverification": 34, "policy": 12,
+		"calculateinverse": 54, "multiplicativeinverse": 44, "randomize": 20,
+		"jacobi": 34, "modularsquareroot": 24, "modn.square": 26,
+		"blind": 18, "unblind": 18, "rabin": 18, "rwss": 16,
 		"select ": 8, "insert ": 8, "update ": 8, "delete ": 8, "query(": 8,
 		"addconditionparam": 24, "whereraw": 18, "havingraw": 18, "orderbyraw": 18,
 		"request": 8, "request->query": 18, "$request->query": 18, "$_get": 12, "$_post": 12, "$_files": 12, "$_request": 12,
@@ -499,6 +502,9 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				}
 				if invalidJobOutputEventUpdateMark(m) {
 					return fmt.Errorf("agentic prep: adapter %q maps child job output event updates too broadly; use analysis.function.context vals from the child-output handler showing update_event copied from data into job state, and nval hardening such as allow_event_updates_from_jobs or delete data.update_event", lang)
+				}
+				if invalidCryptoImproperBlindingMark(m) {
+					return fmt.Errorf("agentic prep: adapter %q maps crypto blinding too broadly; include Randomize, MultiplicativeInverse, Jacobi/Square, and unblinding evidence plus an nval for fixed hardening such as r=modn.Square(r) before MultiplicativeInverse", lang)
 				}
 				if invalidDefaultRelaySecretMark(m) {
 					return fmt.Errorf("agentic prep: adapter %q maps default relay secret exposure too broadly; include concrete relay/proxy/tunnel/default-host URL evidence, embedded token/gurl/connection metadata, and an nval for trusted-host or explicit configured-host hardening", lang)
@@ -847,6 +853,49 @@ func invalidDefaultRelaySecretMark(m parser.AdapterMapping) bool {
 		}
 	}
 	return !hasRelayURL || !hasSensitiveMetadata || !hasHardeningAbsence
+}
+
+func invalidCryptoImproperBlindingMark(m parser.AdapterMapping) bool {
+	if m.Concept != "code.CryptoImproperBlinding" {
+		return false
+	}
+	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+		return true
+	}
+	hasRandomize := false
+	hasInverse := false
+	hasJacobiOrSquare := false
+	hasUnblind := false
+	for _, v := range m.ValMatches {
+		lv := strings.ToLower(v)
+		if strings.Contains(lv, "randomize") {
+			hasRandomize = true
+		}
+		if strings.Contains(lv, "multiplicativeinverse") {
+			hasInverse = true
+		}
+		if strings.Contains(lv, "jacobi") || strings.Contains(lv, "square") || strings.Contains(lv, "modn.square") {
+			hasJacobiOrSquare = true
+		}
+		if strings.Contains(lv, "unblind") ||
+			strings.Contains(lv, "multiply(y,rinv") ||
+			strings.Contains(lv, "modn.multiply(y,rinv") ||
+			strings.Contains(lv, "rinv") {
+			hasUnblind = true
+		}
+	}
+	hasHardeningAbsence := false
+	for _, nv := range m.ValAbsents {
+		lnv := strings.ToLower(nv)
+		if (strings.Contains(lnv, "square") && strings.Contains(lnv, "multiplicativeinverse")) ||
+			strings.Contains(lnv, "r=modn.square(r)") ||
+			strings.Contains(lnv, "subgroup") ||
+			strings.Contains(lnv, "jacobi") {
+			hasHardeningAbsence = true
+			break
+		}
+	}
+	return !hasRandomize || !hasInverse || !hasJacobiOrSquare || !hasUnblind || !hasHardeningAbsence
 }
 
 func localExactContextMapping(m parser.AdapterMapping) bool {

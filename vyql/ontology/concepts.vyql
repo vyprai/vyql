@@ -673,6 +673,15 @@ concept SecretComparisonReview : sink {
   review_assumption: "an attacker can repeatedly submit candidate values and observe timing or error differences"
   review_confidence: medium
 }
+concept CryptoImproperBlinding : sink {
+  vulnerable_to: [crypto.ObservableDiscrepancy]
+  cwe: [CWE_200, CWE_203, CWE_208]
+  review_category: "crypto"
+  review_condition: "a private-key cryptographic operation uses a random blinding factor before applying required subgroup, Jacobi, or square hardening"
+  review_evidence: "crypto blinding context {pattern} derives the inverse or unblinding factor from raw randomized material before the required hardening step"
+  review_assumption: "an attacker can request repeated private-key operations and observe timing or signature differences"
+  review_confidence: high
+}
 concept PremasterSecretLengthReview : sink {
   vulnerable_to: [crypto.ObservableDiscrepancy]
   cwe: [CWE_203]

@@ -812,6 +812,11 @@ review code.SecretComparisonReview {
   kind: "attention"
   text: "review secret comparisons for ordinary equality or early-exit behavior where constant-time comparison is expected"
 }
+review code.CryptoImproperBlinding {
+  category: "crypto"
+  kind: "attention"
+  text: "review private-key blinding code for required subgroup/Jacobi/square hardening before inverse or unblinding use"
+}
 review code.PremasterSecretLengthReview {
   category: "crypto"
   kind: "attention"

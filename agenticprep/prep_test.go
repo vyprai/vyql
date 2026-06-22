@@ -1901,6 +1901,115 @@ func TestPrepConceptReferenceIncludesMcpToolCommandTemplate(t *testing.T) {
 	}
 }
 
+func TestPrepRanksCryptoBlindingProfile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rw.cpp")
+	src := `namespace CryptoPP {
+class Integer {};
+class RandomNumberGenerator {};
+class ModularArithmetic {
+public:
+    Integer MultiplicativeInverse(const Integer &);
+    Integer Square(const Integer &);
+};
+int Jacobi(const Integer &, const Integer &);
+Integer ModularSquareRoot(const Integer &, const Integer &);
+
+Integer InvertibleRWFunction::CalculateInverse(RandomNumberGenerator &rng, const Integer &x) const {
+    ModularArithmetic modn(m_n);
+    Integer r, rInv;
+    do {
+        r.Randomize(rng, Integer::One(), m_n - Integer::One());
+        rInv = modn.MultiplicativeInverse(r);
+    } while (rInv.IsZero());
+    Integer re = modn.Square(r);
+    if (Jacobi(cp, m_p) * Jacobi(cq, m_q) != 1) {}
+    cp = ModularSquareRoot(cp, m_p);
+    Integer y = modn.Multiply(y, rInv);
+    return y;
+}
+}`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !cryptoBlindingProfile(profile) {
+		t.Fatal("expected crypto blinding profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatal("expected crypto blinding profile to require symbol inventory")
+	}
+	terms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"calculateinverse", "multiplicativeinverse", "jacobi"} {
+		if !containsString(terms, want) {
+			t.Fatalf("expected focused call inventory term %q in %#v", want, terms)
+		}
+	}
+	files, err := securityRelevantFiles(profile, "cpp", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || !strings.HasSuffix(filepath.ToSlash(files[0].Path), "/rw.cpp") {
+		t.Fatalf("expected rw.cpp to rank as security relevant, got %#v", files)
+	}
+	calls, err := callInventory(profile, callInventoryQuery{Language: "cpp", NameContains: "multiplicativeinverse", Max: 10})
+	if err != nil {
+		t.Fatalf("callInventory: %v", err)
+	}
+	if len(calls) == 0 || !strings.Contains(strings.ToLower(calls[0].Callee), "multiplicativeinverse") {
+		t.Fatalf("expected MultiplicativeInverse call inventory, got %#v", calls)
+	}
+	contexts, err := functionContexts(profile, path, "InvertibleRWFunction::CalculateInverse", "MultiplicativeInverse", 5)
+	if err != nil {
+		t.Fatalf("functionContexts: %v", err)
+	}
+	if len(contexts) == 0 || !strings.Contains(contexts[0].CompactPreview, "MultiplicativeInverse") {
+		t.Fatalf("expected qualified CalculateInverse function context, got %#v", contexts)
+	}
+}
+
+func TestPrepConceptReferenceIncludesCryptoImproperBlinding(t *testing.T) {
+	concepts := conceptReference("blinding")
+	found := false
+	for _, row := range concepts {
+		if row["concept"] == "code.CryptoImproperBlinding" && row["surface"] == "scan" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected crypto improper blinding scan concept in reference, got %#v", concepts)
+	}
+}
+
+func TestPrepRejectsBroadCryptoBlindingMark(t *testing.T) {
+	profile := Profile{Languages: map[string]int{"cpp": 1}}
+	broad := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "cpp",
+		Source: `adapter cpp {
+  mark exact "analysis.function.context" val "InvertibleRWFunction::CalculateInverse" val "Randomize" val "MultiplicativeInverse" nval "Jacobi(r," -> code.CryptoImproperBlinding
+}`,
+		Evidence: []string{"rw.cpp"},
+	}}}
+	if err := ValidateProposal(profile, broad, Config{}); err == nil {
+		t.Fatal("expected broad crypto blinding mark to be rejected")
+	}
+
+	narrow := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "cpp",
+		Source: `adapter cpp {
+  mark exact "analysis.function.context" val "lang=cpp" val "r.Randomize" val "MultiplicativeInverse(r)" val "Jacobi" val "modn.Square(r)" val "modn.Multiply(y,rInv)" nval "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)" -> code.CryptoImproperBlinding
+}`,
+		Evidence: []string{"rw.cpp"},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow crypto blinding mark to validate: %v", err)
+	}
+}
+
 func TestFinishOverlayRequiresNotesForEmptyOverlay(t *testing.T) {
 	proposal, warn := proposalFromToolArgs(map[string]any{"adapter_files": []any{}})
 	if warn == "" {

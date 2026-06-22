@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -397,6 +398,16 @@ Rules:
      accepted output. Check that filtered or policy-matched subsets are non-empty
      before output/trust, and that code emits only the checked subset rather than
      the original verified collection.
+     For cryptographic blinding, timing, Rabin-Williams/RW, or private-key
+     operation CVEs, inspect functions and calls named CalculateInverse,
+     Randomize, MultiplicativeInverse, Jacobi, Square, ModularSquareRoot,
+     blind, and unblind. If a randomized blinding factor is inverted or used for
+     unblinding before required subgroup/Jacobi/square hardening, call
+     function_context and prefer code.CryptoImproperBlinding with an nval for
+     the fixed hardening such as r = modn.Square(r) before
+     MultiplicativeInverse. Do not finish empty merely because the repository is
+     a standard cryptography library; these are semantic side-channel marks, not
+     framework dependency adapters.
      For information-disclosure CVEs, inspect filesystem drivers and methods
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
@@ -535,7 +546,9 @@ agentLoop:
 				emptyJobOutputEventOverlay := jobOutputEventUpdateProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyDefaultRelayOverlay := defaultRelaySecretProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyCommandOptionOverlay := commandOptionProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!notesMentionAny(proposal.Notes, []string{"commandoptioninjection", "end-of-options", "--", "option injection"}) || notesMentionAny(proposal.Notes, []string{"no direct untrusted", "no untrusted entry", "no source", "map as a source"}))
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandOptionOverlay
+				cryptoBlindingEvidence := cryptoBlindingProfile(profile) || agentLogResultHasAnyTerm(log, []string{"calculateinverse", "multiplicativeinverse", "jacobi", "modn.square", "modularsquareroot", "unblind"})
+				emptyCryptoBlindingOverlay := cryptoBlindingEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"cryptoimproperblinding", "vyql-cry-011", "core scan", "base scanner", "existing scanner"}))
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandOptionOverlay && !emptyCryptoBlindingOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -576,6 +589,9 @@ agentLoop:
 				} else if emptyCommandOptionOverlay {
 					toolResult["error"] = "command option-injection evidence is present; empty-overlay notes must explicitly address code.CommandOptionInjection or end-of-options delimiter hardening such as --, and must not reject the mark merely because the library has no direct untrusted source. Shell escaping alone is not sufficient evidence for option-taking CLI arguments."
 					p.debugf("step=%d finish_overlay rejected: empty command option overlay without specific rationale", step)
+				} else if emptyCryptoBlindingOverlay {
+					toolResult["error"] = "crypto blinding/timing evidence is present; do not return an empty overlay until you have called concept_reference with topic \"blinding\", function_context for the private-key operation containing Randomize/MultiplicativeInverse/Jacobi/Square evidence, and validate_overlay with code.CryptoImproperBlinding or concrete evidence that the randomized blinding factor is squared/subgroup-hardened before inverse/unblinding use"
+					p.debugf("step=%d finish_overlay rejected: empty crypto blinding overlay", step)
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -777,6 +793,63 @@ func agentLogHasAssignmentInventoryTerm(log []AgentStep, terms []string) bool {
 	return false
 }
 
+func agentLogResultHasAnyTerm(log []AgentStep, terms []string) bool {
+	for _, step := range log {
+		for _, result := range step.ToolResults {
+			b, err := json.Marshal(result.Result)
+			if err != nil {
+				continue
+			}
+			hay := strings.ToLower(string(b))
+			for _, term := range terms {
+				if strings.Contains(hay, strings.ToLower(term)) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func agentLogHasNonEmptyToolResult(log []AgentStep, name string) bool {
+	for _, step := range log {
+		for _, result := range step.ToolResults {
+			if result.Name != name {
+				continue
+			}
+			for key, val := range result.Result {
+				if key == "ok" {
+					continue
+				}
+				if isNonEmptyValue(val) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func isNonEmptyValue(v any) bool {
+	switch x := v.(type) {
+	case nil:
+		return false
+	case string:
+		return strings.TrimSpace(x) != ""
+	case []any:
+		return len(x) > 0
+	case []map[string]any:
+		return len(x) > 0
+	default:
+		rv := reflect.ValueOf(v)
+		switch rv.Kind() {
+		case reflect.Slice, reflect.Array, reflect.Map:
+			return rv.Len() > 0
+		}
+		return true
+	}
+}
+
 func notesMentionAny(notes []string, terms []string) bool {
 	for _, note := range notes {
 		note = strings.ToLower(note)
@@ -876,6 +949,8 @@ func requiresSymbolInventory(profile Profile) bool {
 		"wildcard", "validateorigin", "checkorigin", "callback",
 		"attestation", "predicate", "signature", "provenance",
 		"transparencylog", "fulcio", "rekor",
+		"calculateinverse", "multiplicativeinverse", "randomize", "jacobi",
+		"modularsquareroot", "modn.square", "blind", "unblind", "rabin",
 		"malloc", "calloc", "realloc", "alloc", "memcpy", "memmove",
 		"strcpy", "copy", "size", "length", "capacity", "offset",
 		"bounds", "unicode", "escape",
@@ -924,6 +999,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"testconnection", "connect", "getprojects", "buildclient", "queryparameter", "dotest", "docheck", "dofill", "checkpermission", "haspermission", "post"}
 	case commandOptionProfile(profile):
 		return []string{"escapeshellarg", "operation", "--", "setoperation", "gpg", "gnupg", "key", "fingerprint", "argument", "option"}
+	case cryptoBlindingProfile(profile):
+		return []string{"calculateinverse", "randomize", "multiplicativeinverse", "jacobi", "square", "modularsquareroot", "blind", "unblind", "rabin"}
 	case phpSqlWrapperProfile(profile):
 		return []string{"runquery", "querydb", "sql", "where", "legacyfilterinputarr", "get", "post"}
 	case jobOutputEventUpdateProfile(profile):
@@ -1130,6 +1207,21 @@ func nativeMemoryProfile(profile Profile) bool {
 		"strcpy", "copy", "size", "length", "capacity", "offset",
 		"bounds", "unicode", "escape",
 	})
+}
+
+func cryptoBlindingProfile(profile Profile) bool {
+	if profile.Languages["c"] == 0 && profile.Languages["cpp"] == 0 && profile.Languages["go"] == 0 && profile.Languages["java"] == 0 && profile.Languages["rust"] == 0 && profile.Languages["swift"] == 0 {
+		return false
+	}
+	hasPrivateKeyOperation := profileContainsAnyTerm(profile, []string{
+		"calculateinverse", "rabin", "rabin-williams", "rwss", "private key",
+		"signature", "modularsquareroot",
+	})
+	hasBlindingMath := profileContainsAnyTerm(profile, []string{
+		"multiplicativeinverse", "randomize", "jacobi", "modn.square",
+		"blind", "unblind",
+	})
+	return hasPrivateKeyOperation && hasBlindingMath
 }
 
 func profileContainsAnyTerm(profile Profile, terms []string) bool {
@@ -1836,11 +1928,12 @@ code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
 code.AbsolutePathDisclosure, code.SensitiveModelJsonSerializationExposure,
 code.OverbroadRolePermissionGrant, code.FilesystemImageDirentTraversal,
 code.CommandStringWrapperExecution, code.McpToolCommandTemplateExecution,
-code.JenkinsCredentialsStartupLoadContextExposure,
-code.JenkinsRemoteValidationMissingPostPermission,
-code.JobOutputEventUpdateAuthorizationBypass,
-code.DefaultExternalRelaySecretExposure.
-`)
+	code.JenkinsCredentialsStartupLoadContextExposure,
+	code.JenkinsRemoteValidationMissingPostPermission,
+	code.JobOutputEventUpdateAuthorizationBypass,
+	code.DefaultExternalRelaySecretExposure,
+	code.CryptoImproperBlinding.
+	`)
 }
 
 func conceptReference(topic string) []map[string]string {
@@ -1875,6 +1968,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.CommandStringWrapperExecution", "surface": "scan", "use": "mark for command wrappers that receive one formatted command string containing request-controlled headers, args, paths, or options instead of an argv array or process builder"},
 		{"concept": "code.CommandOptionInjection", "surface": "scan", "use": "mark for command builders that pass escaped user-controlled positional arguments to option-taking CLIs without inserting an end-of-options delimiter such as -- or enforcing an option allowlist"},
 		{"concept": "code.McpToolCommandTemplateExecution", "surface": "scan", "use": "mark for MCP server.tool handlers whose externally supplied tool callback parameters are interpolated into child_process.exec shell command templates instead of execFile argv arrays; include command-template vals and nval execFile/spawn hardening; use analysis.module.context when the server.tool registration wraps the handler body"},
+		{"concept": "code.CryptoImproperBlinding", "surface": "scan", "use": "mark for private-key crypto operations where a randomized blinding factor is inverted or used for unblinding before required subgroup, Jacobi, or square hardening; include Randomize, MultiplicativeInverse, Jacobi/Square evidence and nval the fixed hardening"},
 		{"concept": "code.FilePathAccess", "surface": "scan", "use": "taint sink for filesystem path access"},
 		{"concept": "core.PathAccessCheck", "surface": "control", "use": "control concept for containment, normalization, allowlist, or traversal guard"},
 	}
@@ -3427,7 +3521,7 @@ func endOfTopLevelDecl(content string, start int) int {
 func braceFunctionContexts(path string, content string, lang string, name string, contains string, max int) []functionContextPreview {
 	name = strings.TrimSpace(name)
 	contains = strings.TrimSpace(contains)
-	re := regexp.MustCompile(`(?m)(?:public|private|protected|static|async|final|function|\s|[\w\\:&*\[\]<>])+function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(|(?:public|private|protected|static|final|\s)+[A-Za-z_][A-Za-z0-9_:\<\>\\&*\[\]]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(`)
+	re := regexp.MustCompile(`(?m)(?:public|private|protected|static|async|final|function|\s|[\w\\:&*\[\]<>])+function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(|(?:public|private|protected|static|final|\s)+[A-Za-z_][A-Za-z0-9_:\<\>\\&*\[\]]*\s+((?:[A-Za-z_][A-Za-z0-9_]*::)*[A-Za-z_][A-Za-z0-9_]*)\s*\(`)
 	matches := re.FindAllStringSubmatchIndex(content, -1)
 	var out []functionContextPreview
 	for _, m := range matches {
@@ -3437,7 +3531,7 @@ func braceFunctionContexts(path string, content string, lang string, name string
 		} else if len(m) >= 6 && m[4] >= 0 {
 			fnName = content[m[4]:m[5]]
 		}
-		if name != "" && fnName != name {
+		if name != "" && !functionNameMatches(fnName, name) {
 			continue
 		}
 		open := strings.Index(content[m[1]:], "{")
@@ -3469,6 +3563,20 @@ func braceFunctionContexts(path string, content string, lang string, name string
 		}
 	}
 	return out
+}
+
+func functionNameMatches(found string, want string) bool {
+	found = strings.TrimSpace(found)
+	want = strings.TrimSpace(want)
+	if found == "" || want == "" {
+		return found == want
+	}
+	if found == want {
+		return true
+	}
+	foundLast := lastIdentifierSegment(found)
+	wantLast := lastIdentifierSegment(want)
+	return foundLast != "" && foundLast == wantLast
 }
 
 func pythonFunctionContexts(path string, content string, name string, contains string, max int) []functionContextPreview {
@@ -3759,6 +3867,9 @@ func suggestContextVals(name string, compact string) []string {
 		"Access-Control-Allow-Origin", "HasPrefix", "HasSuffix", "o[:i-1]", "o[:i]",
 		"AttestationToPayloadJSON", "PredicateType", "VerifyImageAttestations",
 		"VerifyLocalImageAttestations", "PrintVerification", "checked", "verified",
+		"CalculateInverse", "Randomize", "MultiplicativeInverse", "Jacobi",
+		"ModularSquareRoot", "modn.Square", "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)",
+		"blind", "unblind",
 		"malloc", "calloc", "realloc", "PyString_FromStringAndSize", "ALLOCV_N",
 		"memcpy", "memmove", "strcpy", "size", "len", "length", "capacity",
 		"offset", "count", "ch>=0x10000", "10*size", "6*size",
@@ -3895,6 +4006,8 @@ func securitySnippet(text string) string {
 		"AllowAllOrigins", "validateOrigin", "wildcard", "HasPrefix",
 		"AttestationToPayloadJSON", "PredicateType", "VerifyImageAttestations",
 		"VerifyLocalImageAttestations", "PrintVerification", "attestation",
+		"CalculateInverse", "MultiplicativeInverse", "Randomize", "Jacobi",
+		"ModularSquareRoot", "modn.Square", "blind", "unblind", "Rabin",
 		"restore", "import", "backup", "archive", "extract", "filename", "rrdtool",
 		"ThreadLocal", "beginRequest", "endRequest", "activate(", "deactivate(",
 		"associate(", "dissociate(", "RequestScoped",
