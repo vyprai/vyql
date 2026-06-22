@@ -119,11 +119,12 @@ Use tools to inspect bounded repo evidence, then call finish_overlay.
 
 Rules:
 - Generate only adapter declarations for languages present in the profile.
-- The profile may include programmatic_findings. Those are already handled by
-  deterministic prep before the LLM runs. Do not recreate adapters for the same
-  evidence path and concept. Use the LLM only for dependency semantics, trust
-  boundaries, framework APIs, or repo-local security meaning that the
-  deterministic layer did not already identify.
+- Deterministic prep tools provide bounded repo evidence, inventories, and
+  validation only. They do not decide to add adapters. If a finding can be
+  recognized without LLM judgment, it belongs in shipped scan coverage instead
+  of a generated prep overlay. Use the LLM for dependency semantics, trust
+  boundaries, framework APIs, or repo-local security meaning that still requires
+  judgment after deterministic evidence gathering.
 - Use explicit package-scoped adapter blocks only for third-party dependency
   APIs with import/manifest evidence. This is locality for the proposed
   mapping, not a concept-level package gate. Do not package-gate first-party

@@ -57,15 +57,14 @@ type ScanConfig struct {
 }
 
 type Profile struct {
-	Roots                []string              `json:"roots"`
-	Languages            map[string]int        `json:"languages"`
-	Packages             []string              `json:"packages,omitempty"`
-	Manifests            []ManifestEvidence    `json:"manifests,omitempty"`
-	Imports              map[string][]string   `json:"imports,omitempty"`
-	LocalPkgs            []string              `json:"local_packages,omitempty"`
-	DepGaps              []DependencyGap       `json:"dependency_gaps,omitempty"`
-	ProgrammaticFindings []ProgrammaticFinding `json:"programmatic_findings,omitempty"`
-	Samples              []FileSample          `json:"samples,omitempty"`
+	Roots     []string            `json:"roots"`
+	Languages map[string]int      `json:"languages"`
+	Packages  []string            `json:"packages,omitempty"`
+	Manifests []ManifestEvidence  `json:"manifests,omitempty"`
+	Imports   map[string][]string `json:"imports,omitempty"`
+	LocalPkgs []string            `json:"local_packages,omitempty"`
+	DepGaps   []DependencyGap     `json:"dependency_gaps,omitempty"`
+	Samples   []FileSample        `json:"samples,omitempty"`
 }
 
 type ManifestEvidence struct {
@@ -80,14 +79,6 @@ type DependencyGap struct {
 	Source   string   `json:"source"`
 	Score    int      `json:"score,omitempty"`
 	Imports  []string `json:"imports,omitempty"`
-}
-
-type ProgrammaticFinding struct {
-	Kind     string `json:"kind"`
-	Language string `json:"language"`
-	Concept  string `json:"concept"`
-	Path     string `json:"path"`
-	Summary  string `json:"summary"`
 }
 
 type FileSample struct {
@@ -149,7 +140,6 @@ func Prepare(ctx context.Context, paths []string, cfg Config) (Result, error) {
 		if err != nil {
 			return res, err
 		}
-		proposal.AdapterFiles, proposal.Notes = removeProgrammaticCoveredAdapters(profile.ProgrammaticFindings, proposal.AdapterFiles, proposal.Notes)
 		res.Proposal.AdapterFiles = append(res.Proposal.AdapterFiles, proposal.AdapterFiles...)
 		res.Proposal.Notes = append(res.Proposal.Notes, proposal.Notes...)
 		res.Proposal.AgentLog = append(res.Proposal.AgentLog, proposal.AgentLog...)
@@ -274,205 +264,11 @@ func Analyze(paths []string, cfg Config) (Profile, error) {
 	}
 	depProfile.Imports = fullImports
 	prof.DepGaps = dependencyGaps(depProfile)
-	prof.ProgrammaticFindings = programmaticFindings(paths, cfg)
 	return prof, nil
 }
 
 func deterministicProposal(paths []string, cfg Config) Proposal {
-	cfg = normalizeConfig(cfg)
-	var adapters []AdapterFile
-	var notes []string
-	findings := programmaticFindings(paths, cfg)
-	var scpEvidence []string
-	var jsCommentRegexEvidence []string
-	for _, finding := range findings {
-		switch finding.Kind {
-		case "c.scp_remote_listing_filename":
-			scpEvidence = append(scpEvidence, finding.Path)
-		case "javascript.static_comment_regex_redos":
-			jsCommentRegexEvidence = append(jsCommentRegexEvidence, finding.Path)
-		}
-	}
-	sort.Strings(scpEvidence)
-	sort.Strings(jsCommentRegexEvidence)
-	if len(scpEvidence) > 0 {
-		adapters = append(adapters, AdapterFile{
-			Language: "c",
-			Filename: "c.scp_remote_listing.vyql",
-			Source: strings.Join([]string{
-				"adapter c {",
-				"  mark exact \"analysis.module.context\" val \"lang=c\" val \"sink(intargc,char**argv)\" val \"atomicio(read,remin,cp,1)\" val \"strchr(cp,'/')!=NULL\" val \"strcmp(cp,\\\"..\\\")==0\" val \"snprintf(namebuf,need,\\\"%s%s%s\\\",targ\" val \"open(np,O_WRONLY|O_CREAT,mode)\" nval \"strcmp(cp,\\\".\\\")==0\" nval \"*cp=='\\\\0'\" -> code.RemoteListingDownloadPath",
-				"}",
-				"",
-			}, "\n"),
-			Evidence: scpEvidence,
-		})
-		notes = append(notes, "deterministic C SCP remote-listing filename overlay inferred from repo source")
-	}
-	if len(jsCommentRegexEvidence) > 0 {
-		adapters = append(adapters, AdapterFile{
-			Language: "javascript",
-			Filename: "javascript.static_comment_regex_redos.vyql",
-			Source: strings.Join([]string{
-				"adapter javascript {",
-				"  mark exact \"analysis.module.context\" val \"lang=javascript\" val \"constcommentre=/\\\\/\\\\*[^*]*\\\\*+([^/*][^*]*\\\\*+)*\\\\//g\" nval \"[^]*?(?:\\\\*\\\\/|$)\" -> code.CatastrophicRegex",
-				"}",
-				"",
-			}, "\n"),
-			Evidence: jsCommentRegexEvidence,
-		})
-		notes = append(notes, "deterministic JavaScript static comment-regex ReDoS overlay inferred from repo source")
-	}
-	if len(adapters) == 0 {
-		return Proposal{}
-	}
-	return Proposal{AdapterFiles: adapters, Notes: notes}
-}
-
-func programmaticFindings(paths []string, cfg Config) []ProgrammaticFinding {
-	cfg = normalizeConfig(cfg)
-	var findings []ProgrammaticFinding
-	seen := map[string]bool{}
-	filesSeen := 0
-	for _, root := range paths {
-		_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			if d.IsDir() {
-				if skipDir(d.Name()) && path != root {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			lang := languageFor(path)
-			if lang != "c" && lang != "javascript" {
-				return nil
-			}
-			filesSeen++
-			if filesSeen > cfg.MaxFiles {
-				return nil
-			}
-			b, err := os.ReadFile(path)
-			if err != nil {
-				return nil
-			}
-			if len(b) > cfg.MaxBytes {
-				b = b[:cfg.MaxBytes]
-			}
-			compact := compactSourceText(string(b))
-			if lang == "c" && scpRemoteListingFilenamePattern(compact) && !seen[path] {
-				findings = append(findings, ProgrammaticFinding{
-					Kind:     "c.scp_remote_listing_filename",
-					Language: "c",
-					Concept:  "code.RemoteListingDownloadPath",
-					Path:     path,
-					Summary:  "SCP remote-listing filename validation rejects slash and dot-dot but lacks dot or empty filename hardening before local write.",
-				})
-				seen[path] = true
-			}
-			if lang == "javascript" && jsStaticCommentRegexReDoSPattern(compact) && !seen[path] {
-				findings = append(findings, ProgrammaticFinding{
-					Kind:     "javascript.static_comment_regex_redos",
-					Language: "javascript",
-					Concept:  "code.CatastrophicRegex",
-					Path:     path,
-					Summary:  "Static CSS comment regex with nested ambiguous repetition is used by replace(commentre) and lacks bounded linear fixed form.",
-				})
-				seen[path] = true
-			}
-			return nil
-		})
-	}
-	sort.Slice(findings, func(i, j int) bool {
-		if findings[i].Path != findings[j].Path {
-			return findings[i].Path < findings[j].Path
-		}
-		return findings[i].Kind < findings[j].Kind
-	})
-	return findings
-}
-
-func removeProgrammaticCoveredAdapters(findings []ProgrammaticFinding, adapters []AdapterFile, notes []string) ([]AdapterFile, []string) {
-	if len(findings) == 0 || len(adapters) == 0 {
-		return adapters, notes
-	}
-	covered := map[string]map[string]bool{}
-	for _, finding := range findings {
-		if finding.Path == "" || finding.Concept == "" {
-			continue
-		}
-		if covered[finding.Path] == nil {
-			covered[finding.Path] = map[string]bool{}
-		}
-		covered[finding.Path][finding.Concept] = true
-	}
-	filtered := adapters[:0]
-	skipped := 0
-	for _, adapter := range adapters {
-		duplicate := false
-		for _, evidence := range adapter.Evidence {
-			for concept := range covered[evidence] {
-				if strings.Contains(adapter.Source, concept) {
-					duplicate = true
-					break
-				}
-			}
-			if duplicate {
-				break
-			}
-		}
-		if duplicate {
-			skipped++
-			continue
-		}
-		filtered = append(filtered, adapter)
-	}
-	if skipped > 0 {
-		notes = append(notes, fmt.Sprintf("skipped %d LLM adapter(s) already covered by programmatic prep findings", skipped))
-	}
-	return filtered, notes
-}
-
-func scpRemoteListingFilenamePattern(compact string) bool {
-	for _, want := range []string{
-		"sink(intargc,char**argv)",
-		"atomicio(read,remin,cp,1)",
-		"strchr(cp,'/')!=NULL",
-		"strcmp(cp,\"..\")==0",
-		"snprintf(namebuf,need,\"%s%s%s\",targ",
-		"open(np,O_WRONLY|O_CREAT,mode)",
-	} {
-		if !strings.Contains(compact, want) {
-			return false
-		}
-	}
-	for _, fixed := range []string{"strcmp(cp,\".\")==0", "*cp=='\\0'"} {
-		if strings.Contains(compact, fixed) {
-			return false
-		}
-	}
-	return true
-}
-
-func jsStaticCommentRegexReDoSPattern(compact string) bool {
-	for _, want := range []string{
-		"constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g",
-		"replace(commentre",
-	} {
-		if !strings.Contains(compact, want) {
-			return false
-		}
-	}
-	for _, fixed := range []string{
-		"[^]*?(?:\\*\\/|$)",
-		"[^*]|\\*(?!\\/)",
-	} {
-		if strings.Contains(compact, fixed) {
-			return false
-		}
-	}
-	return true
+	return Proposal{}
 }
 
 func compactSourceText(s string) string {

@@ -42,6 +42,7 @@ adapter c {
   sink path "unlink" -> code.FilePathAccess
   sink path "remove" -> code.FilePathAccess
   sink path "opendir" -> code.FilePathAccess
+  mark exact "analysis.module.context" val "lang=c" val "sink(intargc,char**argv)" val "atomicio(read,remin,cp,1)" val "strchr(cp,'/')!=NULL" val "strcmp(cp,\"..\")==0" val "snprintf(namebuf,need,\"%s%s%s\",targ" val "open(np,O_WRONLY|O_CREAT,mode)" nval "strcmp(cp,\".\")==0" nval "*cp=='\\0'" -> code.RemoteListingDownloadPath
 
   // dynamic loading (untrusted path -> code load)
   sink path "dlopen" -> code.DynamicCodeLoad
