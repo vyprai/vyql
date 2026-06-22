@@ -1418,6 +1418,15 @@ concept AccessPolicyReview : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_863]
 }
+concept OverbroadRolePermissionGrant : sink {
+  vulnerable_to: [access_control.PrivilegeEscalation, access_control.IncorrectAuthorization]
+  cwe: [CWE_269, CWE_863]
+  review_category: "auth"
+  review_condition: "a non-admin role permission table grants backup, restore, or similarly privileged operational permissions"
+  review_evidence: "role permission context {pattern} assigns privileged operations to a non-admin role"
+  review_assumption: "the role can be held by a lower-privileged operator and the granted operation should be admin-only or separately scoped"
+  review_confidence: high
+}
 concept DisabledRelationshipMetadataExposure : sink {
   vulnerable_to: [access_control.IncorrectAuthorization, access_control.MissingAuthorization]
   cwe: [CWE_284, CWE_863]

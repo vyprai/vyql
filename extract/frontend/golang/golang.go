@@ -8,7 +8,9 @@
 package golang
 
 import (
+	"bytes"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
@@ -210,6 +212,7 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 		case *ast.FuncDecl:
 			out = append(out, c.funcDef(fn.Name.Name, fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
 		case *ast.GenDecl:
+			out = append(out, c.moduleContextStmts(fn)...)
 			out = append(out, c.typeContextStmts(fn, methods)...)
 			out = append(out, c.valueDeclStmts(fn)...)
 		}
@@ -250,6 +253,42 @@ func (c *conv) valueDeclStmts(gd *ast.GenDecl) []nir.Stmt {
 		}
 	}
 	return out
+}
+
+func (c *conv) moduleContextStmts(gd *ast.GenDecl) []nir.Stmt {
+	if gd == nil || gd.Tok != token.VAR {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, spec := range gd.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok || len(vs.Names) == 0 || len(vs.Values) == 0 {
+			continue
+		}
+		tokens := []string{"lang=go"}
+		for _, name := range vs.Names {
+			tokens = append(tokens, "var_name:"+name.Name)
+		}
+		for _, value := range vs.Values {
+			if text := compactGoNode(c.fset, value); text != "" {
+				tokens = append(tokens, text)
+			}
+		}
+		out = append(out, nir.ExprStmt{Value: analysisCall("analysis.module.context", "context", c.loc(vs.Pos()), tokens...)})
+	}
+	return out
+}
+
+func compactGoNode(fset *token.FileSet, n ast.Node) string {
+	var buf bytes.Buffer
+	if err := format.Node(&buf, fset, n); err != nil {
+		return ""
+	}
+	text := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(buf.String())
+	if len(text) > 4096 {
+		text = text[:4096]
+	}
+	return text
 }
 
 func (c *conv) methodMap(decls []ast.Decl) map[string]map[string]bool {

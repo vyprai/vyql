@@ -141,6 +141,9 @@ Rules:
 - Before writing mark exact "analysis.function.context", call function_context
   for the target function and choose val/nval substrings from that returned
   single function context. Do not combine vals from different functions.
+- Before writing mark exact "analysis.module.context", call module_context
+  for the target file and choose val/nval substrings from one returned top-level
+  declaration context. Use this for static role, permission, route, or policy maps.
 - For scan catch-rate work, prefer concepts with surface=scan from
   concept_reference. surface=review_only can be useful for review/ATTENTION,
   but it will not make vyql scan emit a finding unless a scan rule matches it.
@@ -160,12 +163,16 @@ Rules:
      For authz/data-model CVEs, inspect public methods returning relationship,
      resource, field, permission, or metadata lists and look for missing enabled,
      access, ownership, or visibility checks before returns.
+     For privilege/permission CVEs, inspect static role, group, route, policy,
+     and permission maps such as PermissionsByRole, roles, grants, ACLs, backup,
+     restore, admin, manager, operator, or support-bundle permission lists.
      For information-disclosure CVEs, inspect filesystem drivers and methods
      using rename/copy/unlink/touch/move_uploaded_file/readfile on absolute
      paths, especially when failures become exceptions or framework warnings;
      check for warning suppression, sanitized error handling, or path removal.
   4. read_file on exact evidence
   5. function_context before any exact context mark
+     or module_context before exact marks for top-level policy/config maps
   6. validate_overlay if producing any non-empty adapter
   7. finish_overlay only after validation is clean, or empty if no useful
      repo-local adapter can improve scan.
@@ -381,6 +388,19 @@ func (p *VertexProvider) generateAgentStep(ctx context.Context, contents []map[s
 				},
 			},
 			{
+				"name":        "module_context",
+				"description": "Return matchable top-level declaration previews for exact analysis.module.context marks. Use for static role, route, permission, ACL, or policy maps.",
+				"parameters": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path":     map[string]any{"type": "string"},
+						"contains": map[string]any{"type": "string"},
+						"max":      map[string]any{"type": "integer"},
+					},
+					"required": []string{"path"},
+				},
+			},
+			{
 				"name":        "validate_overlay",
 				"description": "Validate proposed VyQL adapter overlay JSON before finalizing.",
 				"parameters":  finishOverlayParameters(),
@@ -472,6 +492,14 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 			return map[string]any{"ok": false, "error": err.Error()}
 		}
 		return map[string]any{"ok": true, "contexts": contexts}
+	case "module_context":
+		path, _ := call.Arguments["path"].(string)
+		contains, _ := call.Arguments["contains"].(string)
+		contexts, err := moduleContexts(profile, path, contains, intArg(call.Arguments, "max", 8))
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "contexts": contexts}
 	case "validate_overlay":
 		proposal, warn := proposalFromToolArgs(call.Arguments)
 		if warn != "" {
@@ -520,6 +548,7 @@ adapter <language> {
     sink path "call.name" arg all -> code.CommandExecution
     mark "call_or_context" val "required-substring" nval "missing-hardening" -> code.SomeReviewConcept
     mark exact "analysis.function.context" val "name=handler" val "dangerous call" nval "patched guard" -> code.ProtocolStateReview
+    mark exact "analysis.module.context" val "var_name:PermissionsByRole" val "RoleNetworkManager" val "PermBackup" nval "RoleAdmin:{PermBackup" -> code.OverbroadRolePermissionGrant
   }
 }
 
@@ -527,8 +556,11 @@ When package_reference returns packages, wrap generated mappings in package bloc
 Use path/method/receiver only before the quoted pattern. Put arg after the pattern.
 Use source param for library/package code whose public function parameters are caller-controlled.
 Use mark exact analysis.function.context for narrow local patterns already visible in the scanned function.
+Use mark exact analysis.module.context for top-level role, route, permission, ACL, or policy maps.
 Call function_context before exact marks and copy short returned substrings from one context only.
-For marks, each val must be present in the compact function context and each nval must be absent.
+Call module_context before analysis.module.context marks and copy short returned substrings from one context only.
+For exact context marks, each val must be present in the compact context returned
+by function_context or module_context, and each nval must be absent.
 Use existing code.* concepts only. Common target concepts include:
 code.CommandExecution, code.CodeEval, code.FilePathAccess, code.SqlExecution,
 code.HtmlRender, code.UrlFetch, code.Deserialization, code.RedirectTarget,
@@ -537,7 +569,7 @@ code.DynamicCodeLoad, code.UnsafeUpload, code.ArchiveEntryWrite,
 code.UnboundedCopy, code.RawMemoryCopySize, code.SizeComputation,
 code.UnparameterizedSqlQueryParser, code.ProtocolStateReview,
 code.MethodGatedRedirectValidationBypass, code.SessionStoredRedirectTarget,
-code.AbsolutePathDisclosure.
+code.AbsolutePathDisclosure, code.OverbroadRolePermissionGrant.
 `)
 }
 
@@ -550,6 +582,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.ProtocolStateReview", "surface": "review_only", "use": "review mark for OAuth, protocol, auth, callback, or message state transitions missing required state/cookie/session/order validation"},
 		{"concept": "code.ThreadLocalScopeOverwriteWithoutCleanup", "surface": "scan", "use": "mark for request/session/scope lifecycle methods that overwrite ThreadLocal state or per-thread caches without ending/removing the previous scope first"},
 		{"concept": "code.DisabledRelationshipMetadataExposure", "surface": "scan", "use": "mark for public relationship/resource metadata helpers that return relationship targets for disabled fields or invisible resources without checking enabled/access/visibility"},
+		{"concept": "code.OverbroadRolePermissionGrant", "surface": "scan", "use": "mark for static role/group/permission tables that assign backup, restore, admin, or similarly privileged operations to non-admin roles"},
 		{"concept": "code.MethodGatedRedirectValidationBypass", "surface": "scan", "use": "mark for URL validation skipped for some HTTP methods before redirect/callback handling"},
 		{"concept": "code.SessionStoredRedirectTarget", "surface": "scan", "use": "mark for redirects using session-stored or request-influenced targets without relative/same-origin validation"},
 		{"concept": "code.RedirectTarget", "surface": "scan", "use": "taint sink for redirect APIs or methods returning redirect destinations"},
@@ -723,6 +756,15 @@ type functionContextPreview struct {
 	SuggestedVals  []string `json:"suggested_vals,omitempty"`
 }
 
+type moduleContextPreview struct {
+	Path           string   `json:"path"`
+	Name           string   `json:"name"`
+	Line           int      `json:"line"`
+	Prefix         string   `json:"prefix"`
+	CompactPreview string   `json:"compact_preview"`
+	SuggestedVals  []string `json:"suggested_vals,omitempty"`
+}
+
 func functionContexts(profile Profile, path string, name string, contains string, max int) ([]functionContextPreview, error) {
 	if max <= 0 || max > 20 {
 		max = 8
@@ -750,6 +792,113 @@ func functionContexts(profile Profile, path string, name string, contains string
 		contexts = braceFunctionContexts(abs, content, lang, name, contains, max)
 	}
 	return contexts, nil
+}
+
+func moduleContexts(profile Profile, path string, contains string, max int) ([]moduleContextPreview, error) {
+	if max <= 0 || max > 20 {
+		max = 8
+	}
+	content, ok, err := readProfileFile(profile, path, 0, 256<<10)
+	if err != nil || !ok {
+		return nil, err
+	}
+	contains = strings.TrimSpace(contains)
+	lang := languageFor(path)
+	var out []moduleContextPreview
+	switch lang {
+	case "go":
+		out = goModuleContexts(path, content, contains, max)
+	default:
+		out = braceModuleContexts(path, content, lang, contains, max)
+	}
+	return out, nil
+}
+
+func goModuleContexts(path string, content string, contains string, max int) []moduleContextPreview {
+	re := regexp.MustCompile(`(?ms)\bvar\s+(?:\(\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:=[^{}\n]*|[^=\n]*=\s*)`)
+	matches := re.FindAllStringSubmatchIndex(content, -1)
+	var out []moduleContextPreview
+	for _, m := range matches {
+		name := content[m[2]:m[3]]
+		start := m[0]
+		end := endOfTopLevelDecl(content, m[1])
+		if end <= start {
+			continue
+		}
+		body := content[start:end]
+		if contains != "" && !strings.Contains(body, contains) && !strings.Contains(compactSourceText(body), compactSourceText(contains)) {
+			continue
+		}
+		compact := compactSourceText(body)
+		out = append(out, moduleContextPreview{
+			Path:           path,
+			Name:           name,
+			Line:           1 + strings.Count(content[:start], "\n"),
+			Prefix:         "lang=go\x00var_name=" + name,
+			CompactPreview: compactSnippet(compact, 1800),
+			SuggestedVals:  suggestContextVals(name, compact),
+		})
+		if len(out) >= max {
+			break
+		}
+	}
+	return out
+}
+
+func braceModuleContexts(path string, content string, lang string, contains string, max int) []moduleContextPreview {
+	contains = strings.TrimSpace(contains)
+	var out []moduleContextPreview
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.Contains(trimmed, "=") && !strings.Contains(trimmed, ":") {
+			continue
+		}
+		if contains != "" && !strings.Contains(trimmed, contains) {
+			continue
+		}
+		compact := compactSourceText(trimmed)
+		out = append(out, moduleContextPreview{
+			Path:           path,
+			Name:           "",
+			Line:           i + 1,
+			Prefix:         "lang=" + lang,
+			CompactPreview: compactSnippet(compact, 1000),
+			SuggestedVals:  suggestContextVals("", compact),
+		})
+		if len(out) >= max {
+			break
+		}
+	}
+	return out
+}
+
+func endOfTopLevelDecl(content string, start int) int {
+	depth := 0
+	seenBrace := false
+	for i := start; i < len(content); i++ {
+		switch content[i] {
+		case '{', '(':
+			depth++
+			seenBrace = true
+		case '}', ')':
+			if depth > 0 {
+				depth--
+			}
+			if seenBrace && depth == 0 {
+				j := i + 1
+				for j < len(content) && (content[j] == ',' || content[j] == ' ' || content[j] == '\t' || content[j] == '\r') {
+					j++
+				}
+				return j
+			}
+		case '\n':
+			if !seenBrace && depth == 0 {
+				return i
+			}
+		}
+	}
+	return len(content)
 }
 
 func braceFunctionContexts(path string, content string, lang string, name string, contains string, max int) []functionContextPreview {
@@ -990,6 +1139,8 @@ func securitySnippet(text string) string {
 		"ThreadLocal", "beginRequest", "endRequest", "activate(", "deactivate(",
 		"associate(", "dissociate(", "RequestScoped",
 		"isFieldEnabled", "getRelatableResourceTypes", "ResourceTypeRelationship",
+		"PermissionsByRole", "RoleNetworkManager", "PermBackup", "PermRestore",
+		"permission", "authorization", "middleware",
 	} {
 		if idx := strings.Index(strings.ToLower(text), strings.ToLower(token)); idx >= 0 {
 			start := idx - 120

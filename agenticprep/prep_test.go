@@ -118,6 +118,28 @@ func TestSecurityRelevantFilesRanksFilesystemWarningDisclosureContexts(t *testin
 	}
 }
 
+func TestSecurityRelevantFilesRanksRolePermissionTables(t *testing.T) {
+	dir := t.TempDir()
+	authz := filepath.Join(dir, "authorization_middleware.go")
+	if err := os.WriteFile(authz, []byte("package server\nvar PermissionsByRole = map[RoleID][]string{RoleNetworkManager: {PermBackup, PermRestore, PermSupportBundle}}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "restore.go"), []byte("package db\nfunc restore(){ exec.Command(\"tar\") }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	files, err := securityRelevantFiles(profile, "go", 10)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != authz {
+		t.Fatalf("expected role permission table first, got %#v", files)
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)

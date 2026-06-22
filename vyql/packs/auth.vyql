@@ -84,6 +84,11 @@ rule DisabledRelationshipMetadataExposure {
   match code.DisabledRelationshipMetadataExposure as metadata
 }
 
+rule OverbroadRolePermissionGrant {
+  meta { id: "VYQL-AUTH-028", severity: high, cwe: [CWE_269, CWE_863], confidence_floor: high }
+  match code.OverbroadRolePermissionGrant as grant
+}
+
 rule InsecureDirectObjectReference {
   meta { id: "VYQL-AUTH-002", severity: high, cwe: [CWE_639] }
   taint core.UserControlledData -> code.ObjectLookupByUserInput

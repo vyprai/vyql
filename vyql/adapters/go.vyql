@@ -64,6 +64,8 @@ adapter go {
   source "apiauth.ExtractIssuer" -> code.HttpInput
   source "ExtractIssuer" -> code.HttpInput
 
+  mark exact "analysis.module.context" val "var_name:PermissionsByRole" val "RoleNetworkManager" val "PermBackup" val "PermRestore" nval "RoleAdmin:{PermBackup,PermRestore" -> code.OverbroadRolePermissionGrant
+
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution

@@ -312,6 +312,9 @@ func securityRelevanceScore(path string, text string) int {
 		"requestscoped": 24, "sessionholder": 10, "nestedinvocationguard": 10,
 		"isfieldenabled": 36, "getrelatableresourcetypes": 36, "resourcetyperelationship": 30,
 		"relationship": 12, "field enabled": 16, "access check": 16,
+		"permissionsbyrole": 48, "rolenetworkmanager": 42, "roleadmin": 14,
+		"permbackup": 36, "permrestore": 36, "permission denied": 12,
+		"authorize(": 18, "authorization": 16, "middleware": 12,
 	} {
 		if strings.Contains(lowerText, token) {
 			score += weight
@@ -321,6 +324,7 @@ func securityRelevanceScore(path string, text string) int {
 		"/www/": 6, "/controllers/": 6, "/api/": 6, "/routes/": 6, "/handlers/": 6,
 		"backup": 8, "restore": 8, "import": 6, "upload": 8, "archive": 6,
 		"auth": 5, "login": 5, "admin": 4, "config": 4, "driver": 4, "localdriver": 10,
+		"authorization": 16, "permission": 14, "role": 10, "middleware": 8,
 		"context": 6, "cache": 6, "lifecycle": 6, "servlet": 5,
 	} {
 		if strings.Contains(lowerPath, token) {
