@@ -169,6 +169,7 @@ adapter php {
   sink path "pg_query" arg 1 -> code.SqlExecution
   sink path "sqlite_query" -> code.SqlExecution
   sink path "queryDB" -> code.SqlExecution
+  sink path "RunQuery" -> code.SqlExecution
   sink method "query" -> code.SqlExecution
   sink method "exec" -> code.SqlExecution
   sink method "prepare" -> code.SqlExecution

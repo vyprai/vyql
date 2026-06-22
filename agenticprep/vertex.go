@@ -311,6 +311,11 @@ Rules:
      addConditionParam, whereRaw, havingRaw, orderByRaw, and selectRaw as high-priority
      source/sink candidates. Prefer executable SQL fragment arguments only; bound
      parameter value arguments should not become SQL sinks.
+     For legacy PHP applications, inspect project-local SQL wrappers named
+     RunQuery, queryDB, DBQuery, ExecuteQuery, or similar. If a request-derived
+     value flows into a concatenated SQL string variable such as $sSQL before
+     one of these wrappers, add or rely on a SQL execution sink for the wrapper
+     instead of returning an empty overlay.
      For CORS, Origin, callback, trusted-origin, or wildcard host validators,
      call symbol_inventory with name_contains values such as origin, wildcard,
      cors, validate, and match before opening files. Inspect parsers that split,
@@ -733,6 +738,8 @@ func requiresSymbolInventory(profile Profile) bool {
 		"initializer", "forceloadduringstartup",
 		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
 		"generatederivativeresponse", "$this->cmd->execute",
+		"runquery", "querydb", "dbquery", "executequery", "$ssql",
+		"legacyfilterinputarr", "where di_",
 		"process::fromshellcommandline", "processbuilder", "command string",
 		"@modelcontextprotocol", "mcpserver", "server.tool",
 		"stdioservertransport", "child_process", "execfile", "z.number",
@@ -788,6 +795,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"tool", "server.tool", "mcpserver", "exec", "execfile", "child_process", "z.number", "port"}
 	case jenkinsCredentialStartupProfile(profile):
 		return []string{"unmarshal", "migratelisttomap", "getinstance", "initializer", "job_loaded", "credentials"}
+	case phpSqlWrapperProfile(profile):
+		return []string{"runquery", "querydb", "sql", "where", "legacyfilterinputarr", "get", "post"}
 	case commandWrapperProfile(profile):
 		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
@@ -882,6 +891,16 @@ func jenkinsCredentialStartupProfile(profile Profile) bool {
 		"systemcredentialsprovider", "domaincredentials.migratelisttomap",
 		"xml.unmarshal", "credentials.xml", "initmilestone.job_loaded",
 		"initializer", "forceloadduringstartup",
+	})
+}
+
+func phpSqlWrapperProfile(profile Profile) bool {
+	if profile.Languages["php"] == 0 {
+		return false
+	}
+	return profileContainsAnyTerm(profile, []string{
+		"runquery", "querydb", "dbquery", "executequery", "$ssql",
+		"legacyfilterinputarr", "where di_", "select ", "from ",
 	})
 }
 

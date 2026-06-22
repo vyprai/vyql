@@ -371,6 +371,8 @@ func securityRelevanceScore(path string, text string) int {
 		"asmodelsuccess": 38, "modelname": 18, "getacceptsjson": 18,
 		"getcsrftoken": 10, "json": 8, "secret": 12, "token": 10,
 		"credential": 12, "password": 12,
+		"runquery": 42, "$ssql": 26, "legacyfilterinputarr": 24,
+		"where di_fr_id": 34, "donateditem_di": 18,
 		"systemcredentialsprovider": 52, "domaincredentials.migratelisttomap": 46,
 		"xml.unmarshal": 34, "credentials.xml": 28, "initmilestone.job_loaded": 42,
 		"@initializer": 26, "forceloadduringstartup": 24,

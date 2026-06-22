@@ -795,6 +795,45 @@ public class SystemCredentialsProvider {
 	}
 }
 
+func TestPrepRanksPhpSqlWrapperProfile(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "src", "FundRaiserEditor.php")
+	if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := `<?php
+$iFundRaiserID = InputUtils::legacyFilterInputArr($_GET, 'FundRaiserID', 'int');
+$sSQL = "SELECT di_ID FROM donateditem_di WHERE di_FR_ID = '" . $iFundRaiserID . "'";
+$rsDonatedItems = RunQuery($sSQL);
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !phpSqlWrapperProfile(profile) {
+		t.Fatalf("expected PHP SQL wrapper profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected PHP SQL wrapper profile to require symbol/call inventory")
+	}
+	terms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"runquery", "sql", "legacyfilterinputarr"} {
+		if !containsString(terms, want) {
+			t.Fatalf("expected call inventory term %q in %#v", want, terms)
+		}
+	}
+	files, err := securityRelevantFiles(profile, "php", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != srcPath {
+		t.Fatalf("expected SQL wrapper file first, got %#v", files)
+	}
+}
+
 func TestCoarsePackagesReadsComposerAndPackageJSONNames(t *testing.T) {
 	composer := `{"name":"liftkit/database","require":{"php":">=5.4","doctrine/dbal":"^2"}}`
 	got := coarsePackages("composer.json", composer)
