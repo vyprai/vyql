@@ -184,6 +184,10 @@ Rules:
 - Before writing mark exact "analysis.module.context", call module_context
   for the target file and choose val/nval substrings from one returned top-level
   declaration context. Use this for static role, permission, route, or policy maps.
+- Before writing mark exact "analysis.class.context", call class_context
+  for the target class and choose val/nval tokens from one returned class
+  context. Prefer structured tokens such as class_name:, class_base:,
+  function_name:, call_path:, and annotation: over loose source-text substrings.
 - For scan catch-rate work, prefer concepts with surface=scan from
   concept_reference. surface=review_only can be useful for review/ATTENTION,
   but it will not make vyql scan emit a finding unless a scan rule matches it.
@@ -283,11 +287,18 @@ Rules:
      read credentials.xml, call XmlFile.unmarshal, or migrate persisted
      DomainCredentials. Check whether the same class has an @Initializer after
      InitMilestone.JOB_LOADED that force-loads getInstance() under SYSTEM during
-     startup. If missing, prefer a narrow analysis.class.context mark to
+     startup. If missing, call class_context for SystemCredentialsProvider and
+     prefer a narrow analysis.class.context mark to
      code.JenkinsCredentialsStartupLoadContextExposure rather than ordinary
      credential endpoint or authorization-check review concepts. Do not use
      analysis.function.context for this concept: the fixed @Initializer method
      is outside the constructor body, so function-context marks catch fixed code.
+     For that concept, use minimal positive vals from class_context:
+     class_name:SystemCredentialsProvider, function_name:SystemCredentialsProvider,
+     call_path:xml.unmarshal, call_path:DomainCredentials.migrateListToMap,
+     and function_name:getInstance. Do not add class_base:* or positive
+     annotation:* vals. Use structured nvals such as annotation:Initializer or
+     function_name:forceLoadDuringStartup for the hardening absence check.
      For server-side template injection, host-header poisoning, canonical URL,
      or request URL helper shapes, inspect helpers that call absolute URL
      builders such as absoluteUrlWithProtocol, siteUrl, urlFor, canonicalUrl,
@@ -323,7 +334,8 @@ Rules:
      calloc, realloc, memcpy, copy, size, length, capacity, offset, escape, and
      unicode; then open only the enclosing functions returned by inventory.
   6. read_files or read_file on exact evidence
-  7. function_context before any exact context mark
+  7. function_context before analysis.function.context marks,
+     class_context before analysis.class.context marks,
      or module_context before exact marks for top-level policy/config maps
   8. validate_overlay if producing any non-empty adapter
   9. finish_overlay only after validation is clean, or empty if no useful
@@ -1155,6 +1167,20 @@ func vertexPrepTools() []map[string]any {
 			},
 		},
 		{
+			"name":        "class_context",
+			"description": "Return matchable class context previews for exact analysis.class.context marks. Use before writing class-level exact marks.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path":     map[string]any{"type": "string"},
+					"name":     map[string]any{"type": "string"},
+					"contains": map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
 			"name":        "module_context",
 			"description": "Return matchable top-level declaration previews for exact analysis.module.context marks. Use for static role, route, permission, ACL, or policy maps.",
 			"parameters": map[string]any{
@@ -1441,6 +1467,15 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 			return map[string]any{"ok": false, "error": err.Error()}
 		}
 		return map[string]any{"ok": true, "contexts": contexts}
+	case "class_context":
+		path, _ := call.Arguments["path"].(string)
+		name, _ := call.Arguments["name"].(string)
+		contains, _ := call.Arguments["contains"].(string)
+		contexts, err := classContexts(profile, path, name, contains, intArg(call.Arguments, "max", 8))
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "contexts": contexts}
 	case "module_context":
 		path, _ := call.Arguments["path"].(string)
 		contains, _ := call.Arguments["contains"].(string)
@@ -1510,10 +1545,12 @@ Use source param only when the same overlay also adds a concrete sink, mark, or
 control for the package. Do not emit source-only source param overlays.
 Use mark exact analysis.function.context for narrow local patterns already visible in the scanned function.
 Use mark exact analysis.module.context for top-level role, route, permission, ACL, or policy maps.
+Use mark exact analysis.class.context for class-level evidence that spans multiple methods.
 Call function_context before exact marks and copy short returned substrings from one context only.
+Call class_context before analysis.class.context marks and copy structured tokens from one context only.
 Call module_context before analysis.module.context marks and copy short returned substrings from one context only.
 For exact context marks, each val must be present in the compact context returned
-by function_context or module_context, and each nval must be absent.
+by function_context, class_context, or module_context, and each nval must be absent.
 Use existing code.* concepts only. Common target concepts include:
 code.CommandExecution, code.CodeEval, code.FilePathAccess, code.SqlExecution,
 code.HtmlRender, code.UrlFetch, code.Deserialization, code.RedirectTarget,
@@ -2924,6 +2961,15 @@ type functionContextPreview struct {
 	SuggestedVals  []string `json:"suggested_vals,omitempty"`
 }
 
+type classContextPreview struct {
+	Path           string   `json:"path"`
+	Name           string   `json:"name"`
+	Line           int      `json:"line"`
+	Prefix         string   `json:"prefix"`
+	CompactPreview string   `json:"compact_preview"`
+	SuggestedVals  []string `json:"suggested_vals,omitempty"`
+}
+
 type moduleContextPreview struct {
 	Path           string   `json:"path"`
 	Name           string   `json:"name"`
@@ -2960,6 +3006,23 @@ func functionContexts(profile Profile, path string, name string, contains string
 		contexts = braceFunctionContexts(abs, content, lang, name, contains, max)
 	}
 	return contexts, nil
+}
+
+func classContexts(profile Profile, path string, name string, contains string, max int) ([]classContextPreview, error) {
+	if max <= 0 || max > 20 {
+		max = 8
+	}
+	content, ok, err := readProfileFile(profile, path, 0, 256<<10)
+	if err != nil || !ok {
+		return nil, err
+	}
+	lang := languageFor(path)
+	switch lang {
+	case "python":
+		return pythonClassContexts(path, content, name, contains, max), nil
+	default:
+		return braceClassContexts(path, content, lang, name, contains, max), nil
+	}
 }
 
 func moduleContexts(profile Profile, path string, contains string, max int) ([]moduleContextPreview, error) {
@@ -3162,6 +3225,184 @@ func pythonFunctionContexts(path string, content string, name string, contains s
 		}
 	}
 	return out
+}
+
+func braceClassContexts(path string, content string, lang string, name string, contains string, max int) []classContextPreview {
+	name = strings.TrimSpace(name)
+	contains = strings.TrimSpace(contains)
+	symbols := extractSymbols(lang, content)
+	var out []classContextPreview
+	for _, sym := range symbols {
+		if sym.Kind != "class" && sym.Kind != "interface" && sym.Kind != "record" && sym.Kind != "struct" {
+			continue
+		}
+		if name != "" && sym.Name != name {
+			continue
+		}
+		start := offsetForLine(content, sym.Line)
+		if start < 0 {
+			continue
+		}
+		openRel := strings.Index(content[start:], "{")
+		if openRel < 0 {
+			continue
+		}
+		open := start + openRel
+		end := findMatchingBrace(content, open)
+		if end < 0 {
+			continue
+		}
+		body := content[start : end+1]
+		compactBody := compactSourceText(body)
+		if contains != "" && !strings.Contains(body, contains) && !strings.Contains(compactBody, compactSourceText(contains)) {
+			continue
+		}
+		tokens := classContextTokens(lang, sym.Name, body)
+		compact := strings.Join(tokens, "\x00")
+		out = append(out, classContextPreview{
+			Path:           path,
+			Name:           sym.Name,
+			Line:           sym.Line,
+			Prefix:         "lang=" + lang + "\x00class_name:" + sym.Name,
+			CompactPreview: compactSnippet(compact, 2400),
+			SuggestedVals:  tokens,
+		})
+		if len(out) >= max {
+			break
+		}
+	}
+	return out
+}
+
+func pythonClassContexts(path string, content string, name string, contains string, max int) []classContextPreview {
+	name = strings.TrimSpace(name)
+	contains = strings.TrimSpace(contains)
+	lines := strings.Split(content, "\n")
+	classRe := regexp.MustCompile(`^\s*class\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
+	var out []classContextPreview
+	for i := 0; i < len(lines); i++ {
+		m := classRe.FindStringSubmatch(lines[i])
+		if m == nil {
+			continue
+		}
+		className := m[1]
+		if name != "" && className != name {
+			continue
+		}
+		indent := leadingSpaces(lines[i])
+		j := i + 1
+		for ; j < len(lines); j++ {
+			if strings.TrimSpace(lines[j]) == "" {
+				continue
+			}
+			if leadingSpaces(lines[j]) <= indent && !strings.HasPrefix(strings.TrimSpace(lines[j]), "#") {
+				break
+			}
+		}
+		body := strings.Join(lines[i:j], "\n")
+		compactBody := compactSourceText(body)
+		if contains != "" && !strings.Contains(body, contains) && !strings.Contains(compactBody, compactSourceText(contains)) {
+			continue
+		}
+		tokens := classContextTokens("python", className, body)
+		compact := strings.Join(tokens, "\x00")
+		out = append(out, classContextPreview{
+			Path:           path,
+			Name:           className,
+			Line:           i + 1,
+			Prefix:         "lang=python\x00class_name:" + className,
+			CompactPreview: compactSnippet(compact, 2400),
+			SuggestedVals:  tokens,
+		})
+		if len(out) >= max {
+			break
+		}
+	}
+	return out
+}
+
+func classContextTokens(lang string, className string, body string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(tok string) {
+		tok = strings.TrimSpace(tok)
+		if tok == "" || seen[tok] || len(out) >= 120 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	if lang == "php" || lang == "ruby" {
+		add("lang=" + lang)
+	}
+	if className != "" {
+		add("class_name:" + className)
+	}
+	header := body
+	if i := strings.IndexByte(body, '{'); i >= 0 {
+		header = body[:i]
+	}
+	if m := regexp.MustCompile(`\bextends\s+([A-Za-z_][A-Za-z0-9_.$]*)`).FindStringSubmatch(header); len(m) == 2 {
+		add("class_base:" + lastIdentifierSegment(m[1]))
+	}
+	if m := regexp.MustCompile(`\bimplements\s+([A-Za-z0-9_.$,\s]+)`).FindStringSubmatch(header); len(m) == 2 {
+		for _, base := range strings.Split(m[1], ",") {
+			add("class_base:" + lastIdentifierSegment(base))
+		}
+	}
+	for _, m := range regexp.MustCompile(`@([A-Za-z_][A-Za-z0-9_.]*)`).FindAllStringSubmatch(body, -1) {
+		add("annotation:" + m[1])
+		add("annotation:" + lastIdentifierSegment(m[1]))
+	}
+	symbols := extractSymbols(lang, body)
+	for _, sym := range symbols {
+		switch sym.Kind {
+		case "function", "method":
+			add("function_name:" + sym.Name)
+		}
+	}
+	for _, call := range extractCalls(lang, body, symbols) {
+		if call.Callee != "" && strings.Contains(call.Callee, ".") {
+			add("call_path:" + call.Callee)
+		}
+		if call.Receiver != "" && call.Name != "" {
+			add("call_path:" + call.Receiver + "." + call.Name)
+		}
+		if call.Name != "" {
+			add("call:" + call.Name)
+		}
+	}
+	for _, assignment := range extractAssignments(lang, body, symbols) {
+		if assignment.Target != "" {
+			add("assign:" + compactSourceText(assignment.Target+"="+assignment.Value))
+		}
+	}
+	return out
+}
+
+func lastIdentifierSegment(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.Trim(s, "{}()[];")
+	if i := strings.LastIndexAny(s, ".$\\"); i >= 0 {
+		s = s[i+1:]
+	}
+	return strings.TrimSpace(s)
+}
+
+func offsetForLine(content string, line int) int {
+	if line <= 1 {
+		return 0
+	}
+	current := 1
+	for i, r := range content {
+		if r == '\n' {
+			current++
+			if current == line {
+				return i + 1
+			}
+		}
+	}
+	return -1
 }
 
 func findMatchingBrace(s string, open int) int {

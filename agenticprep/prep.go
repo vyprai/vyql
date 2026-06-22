@@ -470,7 +470,7 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 					return fmt.Errorf("agentic prep: adapter %q maps a broad MCP tool command mark; include concrete exec command-template evidence and nval hardening such as execFile so fixed argv-array code is not flagged", lang)
 				}
 				if invalidJenkinsCredentialStartupMark(m) {
-					return fmt.Errorf("agentic prep: adapter %q maps Jenkins credential startup loading too broadly; use analysis.class.context with credential unmarshal/migration evidence and @Initializer/InitMilestone.JOB_LOADED absence checks so fixed force-load methods are not flagged", lang)
+					return fmt.Errorf("agentic prep: adapter %q maps Jenkins credential startup loading too broadly; use minimal analysis.class.context vals for class_name:SystemCredentialsProvider, credential unmarshal/migration call_path evidence, function_name:getInstance, and structured @Initializer/forceLoad absence checks; do not add class_base or positive annotation vals", lang)
 				}
 				if localExactContextMapping(m) && len(m.Packages) > 0 {
 					return fmt.Errorf("agentic prep: adapter %q package-scopes an exact context mark; keep exact context marks unscoped and put package/dependency evidence in adapter evidence instead of a package gate", lang)
@@ -696,30 +696,45 @@ func invalidJenkinsCredentialStartupMark(m parser.AdapterMapping) bool {
 	}
 	hasCredentialLoad := false
 	hasSystemProviderIdentity := false
+	hasStructuredContext := false
+	hasGetInstance := false
 	for _, v := range m.ValMatches {
 		lv := strings.ToLower(v)
-		if strings.Contains(lv, "unmarshal") ||
-			strings.Contains(lv, "migratelisttomap") ||
+		if strings.HasPrefix(lv, "class_base:") || strings.HasPrefix(lv, "annotation:") {
+			return true
+		}
+		if strings.HasPrefix(lv, "class_name:") ||
+			strings.HasPrefix(lv, "class_base:") ||
+			strings.HasPrefix(lv, "function_name:") ||
+			strings.HasPrefix(lv, "call_path:") ||
+			strings.HasPrefix(lv, "annotation:") {
+			hasStructuredContext = true
+		}
+		if strings.Contains(lv, "call_path:xml.unmarshal") ||
+			strings.Contains(lv, "call_path:domaincredentials.migratelisttomap") ||
 			strings.Contains(lv, "credentials.xml") {
 			hasCredentialLoad = true
 		}
-		if strings.Contains(lv, "systemcredentialsprovider") ||
+		if strings.Contains(lv, "class_name:systemcredentialsprovider") ||
 			strings.Contains(lv, "credentials.xml") ||
-			strings.Contains(lv, "xml.unmarshal") {
+			strings.Contains(lv, "call_path:xml.unmarshal") {
 			hasSystemProviderIdentity = true
+		}
+		if strings.Contains(lv, "function_name:getinstance") {
+			hasGetInstance = true
 		}
 	}
 	hasStartupAbsence := false
 	for _, nv := range m.ValAbsents {
 		lnv := strings.ToLower(nv)
-		if strings.Contains(lnv, "initializer") ||
-			strings.Contains(lnv, "job_loaded") ||
-			strings.Contains(lnv, "forceloadduringstartup") {
+		if strings.Contains(lnv, "annotation:initializer") ||
+			strings.Contains(lnv, "call_path:initmilestone.job_loaded") ||
+			strings.Contains(lnv, "function_name:forceloadduringstartup") {
 			hasStartupAbsence = true
 			break
 		}
 	}
-	return !hasCredentialLoad || !hasSystemProviderIdentity || !hasStartupAbsence
+	return !hasStructuredContext || !hasCredentialLoad || !hasSystemProviderIdentity || !hasGetInstance || !hasStartupAbsence
 }
 
 func localExactContextMapping(m parser.AdapterMapping) bool {

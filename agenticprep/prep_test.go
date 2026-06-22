@@ -708,6 +708,25 @@ public class SystemCredentialsProvider {
 	if !found {
 		t.Fatalf("expected Jenkins startup scan concept in reference, got %#v", concepts)
 	}
+	classPreviews, err := classContexts(profile, srcPath, "SystemCredentialsProvider", "unmarshal", 2)
+	if err != nil {
+		t.Fatalf("classContexts: %v", err)
+	}
+	if len(classPreviews) != 1 {
+		t.Fatalf("expected one SystemCredentialsProvider class context, got %#v", classPreviews)
+	}
+	classTokens := strings.Join(classPreviews[0].SuggestedVals, "\n")
+	for _, want := range []string{
+		"class_name:SystemCredentialsProvider",
+		"function_name:SystemCredentialsProvider",
+		"function_name:getInstance",
+		"call_path:xml.unmarshal",
+		"call_path:DomainCredentials.migrateListToMap",
+	} {
+		if !strings.Contains(classTokens, want) {
+			t.Fatalf("class context missing %q in:\n%s", want, classTokens)
+		}
+	}
 	functionContext := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
@@ -741,10 +760,32 @@ public class SystemCredentialsProvider {
 	if err := ValidateProposal(profile, migrationOnlyClass, Config{}); err == nil || !strings.Contains(err.Error(), "too broadly") {
 		t.Fatalf("expected migration-only Jenkins startup class-context rejection, got %v", err)
 	}
+	looseClassText := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "java",
+		Source: `adapter java {
+  mark exact "analysis.class.context" val "class SystemCredentialsProvider" val "unmarshal" nval "@Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, looseClassText, Config{}); err == nil || !strings.Contains(err.Error(), "too broadly") {
+		t.Fatalf("expected loose Jenkins startup class-context rejection, got %v", err)
+	}
+	noisyClassContext := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "java",
+		Source: `adapter java {
+  mark exact "analysis.class.context" val "class_name:SystemCredentialsProvider" val "class_base:AbstractDescribableImpl" val "annotation:Extension" val "call_path:xml.unmarshal" val "call_path:DomainCredentials.migrateListToMap" nval "annotation:Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+}
+`,
+		Evidence: []string{srcPath},
+	}}}
+	if err := ValidateProposal(profile, noisyClassContext, Config{}); err == nil || !strings.Contains(err.Error(), "too broadly") {
+		t.Fatalf("expected noisy Jenkins startup class-context rejection, got %v", err)
+	}
 	classContext := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "java",
 		Source: `adapter java {
-  mark exact "analysis.class.context" val "class_name:SystemCredentialsProvider" val "call_path:xml.unmarshal" val "call_path:DomainCredentials.migrateListToMap" nval "annotation:Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
+  mark exact "analysis.class.context" val "class_name:SystemCredentialsProvider" val "function_name:SystemCredentialsProvider" val "call_path:xml.unmarshal" val "call_path:DomainCredentials.migrateListToMap" val "function_name:getInstance" nval "annotation:Initializer" -> code.JenkinsCredentialsStartupLoadContextExposure
 }
 `,
 		Evidence: []string{srcPath},
