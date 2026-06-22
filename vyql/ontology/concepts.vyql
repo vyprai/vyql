@@ -2782,6 +2782,15 @@ concept ContainerdCriImageEnvAliasLeak : sink {
   review_assumption: "multiple CRI containers can be created from the same image config with different environment variables"
   review_confidence: high
 }
+concept ContainerPrimaryGidMissingSupplementalGroup : sink {
+  vulnerable_to: [access_control.InsecurePermission, access_control.MissingAuthorization]
+  cwe: [CWE_284, CWE_732]
+  review_category: "auth"
+  review_condition: "container process setup applies an effective primary GID without also adding that GID to supplemental groups"
+  review_evidence: "container user setup context {pattern} calls SetProcessGID and adds other supplemental groups before the patched AddProcessAdditionalGid(gid) call"
+  review_assumption: "the container runtime requires the effective GID to appear in the process supplemental group list for expected filesystem/group access semantics"
+  review_confidence: high
+}
 concept SensitiveConfigInfoLog : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_200, CWE_532]

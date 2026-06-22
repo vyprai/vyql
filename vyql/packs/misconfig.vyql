@@ -62,6 +62,11 @@ rule SecretConfigFilePermissionMissing {
   match code.SecretConfigFilePermissionMissing as p
 }
 
+rule ContainerPrimaryGidMissingSupplementalGroup {
+  meta { id: "VYQL-CFG-019", severity: high, cwe: [CWE_284, CWE_732], confidence_floor: high }
+  match code.ContainerPrimaryGidMissingSupplementalGroup as p
+}
+
 // Clickjacking — frame protection explicitly disabled: X-Frame-Options ALLOWALL,
 // helmet frameguard off, CSP frame-ancestors * (CWE-1021), value-matched presence.
 // Pure omission is NOT flagged (framework defaults vary) — only explicit disabling.

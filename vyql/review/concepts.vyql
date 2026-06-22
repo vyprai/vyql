@@ -1267,6 +1267,11 @@ review code.ContainerdCriImageEnvAliasLeak {
   kind: "attention"
   text: "copy imageConfig.Env before appending CRI container environment variables"
 }
+review code.ContainerPrimaryGidMissingSupplementalGroup {
+  category: "auth"
+  kind: "attention"
+  text: "add the configured container primary GID to supplemental groups after resolving RunAsGroup"
+}
 review code.CloakserveFingerprintSeedPathTraversal {
   category: "path"
   kind: "attention"
