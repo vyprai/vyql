@@ -174,6 +174,40 @@ func TestValidateProposalRejectsFirstPartyManifestPackageGate(t *testing.T) {
 	}
 }
 
+func TestValidateProposalRejectsBroadDefaultRelaySecretMark(t *testing.T) {
+	profile := Profile{
+		Languages: map[string]int{"go": 1},
+	}
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "go",
+		Source: `adapter go {
+  mark exact "analysis.function.context" val "name=NewAPIC" val "apiclient.NewClient" val "dbClient.SaveAPICToken" -> code.DefaultExternalRelaySecretExposure
+}
+`,
+		Evidence: []string{"pkg/apiserver/apic.go"},
+	}}}
+	if err := ValidateProposal(profile, proposal, Config{}); err == nil {
+		t.Fatal("expected generic API token client mark to be rejected as broad default relay exposure")
+	}
+}
+
+func TestValidateProposalAllowsNarrowDefaultRelaySecretMark(t *testing.T) {
+	profile := Profile{
+		Languages: map[string]int{"typescript": 1},
+	}
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "typescript",
+		Source: `adapter typescript {
+  mark exact "analysis.function.context" val "name=buildRelayUrl" val "relay" val "herokuapp.com" val "encodeURIComponent(gurl)" val "token" nval "configured relay host" -> code.DefaultExternalRelaySecretExposure
+}
+`,
+		Evidence: []string{"src/relay.ts"},
+	}}}
+	if err := ValidateProposal(profile, proposal, Config{}); err != nil {
+		t.Fatalf("expected narrow default relay mark to validate: %v", err)
+	}
+}
+
 func TestAnalyzePrioritizesSecurityRelevantSamplesAndPHPInc(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "a.php"), []byte("<?php echo 'boring';\n"), 0o644); err != nil {
@@ -971,6 +1005,69 @@ func UnzipDirectory(destination string, source string) error {
 	}
 }
 
+func TestPrepRanksGoRequestBodySizeProfiles(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "request.go")
+	src := `package appsec
+
+import (
+	"io"
+	"net/http"
+)
+
+func NewParsedRequestFromRequest(r *http.Request) error {
+	contentLength := max(r.ContentLength, 0)
+	body := make([]byte, contentLength)
+	_, err := io.ReadFull(r.Body, body)
+	return err
+}
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plain.go"), []byte("package appsec\nfunc ok() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	archivePath := filepath.Join(dir, "archive.go")
+	archiveSrc := `package appsec
+
+func UnzipDirectory(destination string, source string) error {
+	archive, _ := zip.OpenReader(source)
+	for _, f := range archive.File {
+		dstFile, _ := os.OpenFile(filepath.Join(destination, f.Name), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		_ = dstFile
+	}
+	return nil
+}
+`
+	if err := os.WriteFile(archivePath, []byte(archiveSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatalf("expected request body size profile to require symbol/call inventory")
+	}
+	terms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"contentlength", "readfull", "limitreader", "maxbytesreader"} {
+		if !containsString(terms, want) {
+			t.Fatalf("expected call inventory term %q in %#v", want, terms)
+		}
+	}
+	if containsString(terms, "openfile") {
+		t.Fatalf("request body terms should take priority over archive-overwrite noise, got %#v", terms)
+	}
+	files, err := securityRelevantFiles(profile, "go", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || files[0].Path != srcPath {
+		t.Fatalf("expected request body file first, got %#v", files)
+	}
+}
+
 func TestPrepRanksJobOutputEventUpdateProfile(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "job.js")
@@ -1452,6 +1549,40 @@ func TestPrepRanksDefaultRelaySecretExposureProfiles(t *testing.T) {
 	}}}
 	if got := inventoryGateError(profile, readyLog, "read_file"); got != "" {
 		t.Fatalf("expected relay inventory gate satisfied, got %q", got)
+	}
+}
+
+func TestPrepDoesNotTreatGenericAPIClientTokenAsDefaultRelay(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "apic.go")
+	src := `package apiserver
+
+import "net/url"
+
+func NewAPIC(config Config, dbClient DB) error {
+	apiURL, err := url.Parse(config.Credentials.URL)
+	if err != nil {
+		return err
+	}
+	client := apiclient.NewClient(&apiclient.Config{
+		URL: apiURL,
+		TokenSave: func(token string) error {
+			return dbClient.SaveAPICToken(token)
+		},
+	})
+	_ = client
+	return nil
+}
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if defaultRelaySecretProfile(profile) {
+		t.Fatalf("generic configured API client token storage should not trigger default relay profile")
 	}
 }
 

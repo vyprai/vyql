@@ -272,6 +272,14 @@ Rules:
      If the patch adds os.Stat plus a GetInput/confirmation prompt before
      truncation, prefer a narrow ManualZipEntryFileWrite function-context mark
      with nvals for os.Stat/GetInput rather than a broad path sink.
+     For request-body resource DoS in Go or similar HTTP servers, inspect
+     functions that derive allocation sizes from request ContentLength or
+     Content-Length and then use make/read-full/read-all body buffering.
+     Fixed forms usually use io.LimitReader, http.MaxBytesReader, explicit
+     max body size defaults, read deadlines, or oversized-body drop/partial
+     actions. If the vulnerable shape is generic stdlib behavior already
+     represented by code.LengthDerivedAllocation, prefer noting the base
+     scanner concept over emitting a repo-local overlay.
      For upload XSS CVEs, inspect upload services/helpers that derive extensions
      from client filenames or MIME types and store SVG, HTML, or XML-capable files;
      check for SVG/XML sanitizers before storeAs/move/save/write.
@@ -320,11 +328,13 @@ Rules:
      accessors. Check sanitizer ordering: sanitizing a path before absolute URL
      or host expansion can reintroduce attacker-controlled host text. Prefer
      function_context over broad source/sink mappings for local ordering bugs.
-     For relay, websocket, proxy, tunneling, or polling helpers, inspect default
-     host fallback logic that builds URLs containing tokens, credentials,
-     connection metadata, or encoded upstream URLs. If a helper uses a hardcoded
-     third-party/default host while embedding token/gurl/conman/original URL
-     metadata, call function_context and prefer a narrow
+     For relay, websocket, proxy, tunneling, or polling helpers, inspect explicit
+     default host fallback logic that builds URLs containing tokens,
+     credentials, connection metadata, or encoded upstream URLs. Do not treat
+     ordinary configured API clients, URL parsing, API tokens, or token storage
+     as relay exposure without hardcoded/default relay/proxy/tunnel evidence.
+     If a helper uses a hardcoded third-party/default host while embedding
+     token/gurl/conman/original URL metadata, call function_context and prefer a narrow
      DefaultExternalRelaySecretExposure exact mark with an nval for trusted-host
      hardening. Do not finish empty merely because URL parsing or websocket
      libraries are standard.
@@ -885,6 +895,8 @@ func requiredCallInventoryTerms(profile Profile) []string {
 		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
 		return []string{"expand", "extract", "directory", "dirent", "name", "path", "romfs", "read", "mkdir", "open"}
+	case profileContainsAnyTerm(profile, []string{"contentlength", "content-length", "io.readfull", "limitreader", "maxbytesreader", "maxbodysize", "bodysizexceeded", "readrequestbody"}):
+		return []string{"contentlength", "readfull", "readall", "limitreader", "maxbytesreader", "maxbodysize", "body", "request"}
 	case archiveOverwriteProfile(profile):
 		return []string{"zip", "openreader", "openfile", "o_trunc", "stat", "getinput", "overwrite"}
 	case nativeMemoryProfile(profile):
@@ -1092,10 +1104,38 @@ func defaultRelaySecretProfile(profile Profile) bool {
 	if profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 && profile.Languages["python"] == 0 && profile.Languages["go"] == 0 && profile.Languages["java"] == 0 {
 		return false
 	}
-	hasURLHost := profileContainsAnyTerm(profile, []string{"pollinghost", "websocket", "relay", "proxy", "tunnel", "gurl", "conmanurl", "connectionstr", "connectionmetadata", "host"})
-	hasSensitive := profileContainsAnyTerm(profile, []string{"token", "credential", "secret", "authorization", "connectionmetadata", "gurl", "conmanurl"})
-	hasOutbound := profileContainsAnyTerm(profile, []string{"encodeuricomponent", "url.format", "urllib.format", "urlparse", "wsv2", "ws://", "wss://", "http://", "https://", "herokuapp.com"})
-	return hasURLHost && hasSensitive && hasOutbound
+	return profileSampleContainsAllTermGroups(profile, [][]string{
+		{"pollinghost", "default host", "default_host", "defaulthost", "websocket", "relay", "proxy", "tunnel", "gurl", "conmanurl", "connectionstr", "connectionmetadata"},
+		{"token", "credential", "secret", "authorization", "connectionmetadata", "gurl", "conmanurl"},
+		{"encodeuricomponent", "url.format", "urllib.format", "urlparse", "wsv2", "ws://", "wss://", "http://", "https://", "herokuapp.com"},
+	})
+}
+
+func profileSampleContainsAllTermGroups(profile Profile, groups [][]string) bool {
+	if len(groups) == 0 {
+		return false
+	}
+	for _, sample := range profile.Samples {
+		text := strings.ToLower(filepath.ToSlash(sample.Path) + "\n" + sample.Preview)
+		matchedAll := true
+		for _, group := range groups {
+			matchedGroup := false
+			for _, term := range group {
+				if strings.Contains(text, strings.ToLower(term)) {
+					matchedGroup = true
+					break
+				}
+			}
+			if !matchedGroup {
+				matchedAll = false
+				break
+			}
+		}
+		if matchedAll {
+			return true
+		}
+	}
+	return false
 }
 
 func vertexPrepTools() []map[string]any {
@@ -1757,6 +1797,7 @@ func conceptReference(topic string) []map[string]string {
 		{"concept": "code.ExpressionEval", "surface": "scan", "use": "taint sink for expression-language or template-message evaluation such as SpEL, MVEL, OGNL, XPath, and Bean Validation buildConstraintViolationWithTemplate"},
 		{"concept": "code.HtmlRender", "surface": "scan", "use": "taint sink for raw HTML/template rendering or unescaped response content"},
 		{"concept": "code.UnsanitizedSvgUpload", "surface": "scan", "use": "mark for upload services that accept/store SVG files without sanitizing SVG XML/script content before saving"},
+		{"concept": "code.LengthDerivedAllocation", "surface": "scan", "use": "mark for resource DoS patterns where request/protocol/body length fields drive allocation or full buffering before an explicit max-size or available-data bound"},
 		{"concept": "core.HtmlEscape", "surface": "control", "use": "control concept for HTML escaping or safe text-node wrapping"},
 		{"concept": "code.AbsolutePathDisclosure", "surface": "scan", "use": "mark for filesystem, path resolution, error, or warning flows that can expose absolute local paths"},
 		{"concept": "code.SensitiveModelJsonSerializationExposure", "surface": "scan", "use": "mark for JSON/API response helpers that serialize a full user, account, settings, credential, or model object instead of explicit safe fields"},

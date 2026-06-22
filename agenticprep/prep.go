@@ -402,6 +402,9 @@ func securityRelevanceScore(path string, text string) int {
 		"filename": 8, "path": 6, "basename": 6, "../": 10,
 		"zip.openreader": 34, "os.openfile": 24, "os.o_trunc": 30,
 		"getinput": 18, "overwrite": 18,
+		"contentlength": 58, "content-length": 46, "io.readfull": 56,
+		"limitreader": 42, "maxbytesreader": 40, "maxbodysize": 40,
+		"bodysizexceeded": 30, "readrequestbody": 28, "request body": 18,
 		"do_directory": 30, "expand_fs": 34, "romfs_read": 26, "namelen": 18,
 		"dirent": 16, "bad filename": 20, "strchr(name": 24, "strcmp(name": 20,
 		"rrdtool": 18, "shell_safe": 6, "escapeshellarg": 6,
@@ -490,6 +493,9 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				}
 				if invalidJobOutputEventUpdateMark(m) {
 					return fmt.Errorf("agentic prep: adapter %q maps child job output event updates too broadly; use analysis.function.context vals from the child-output handler showing update_event copied from data into job state, and nval hardening such as allow_event_updates_from_jobs or delete data.update_event", lang)
+				}
+				if invalidDefaultRelaySecretMark(m) {
+					return fmt.Errorf("agentic prep: adapter %q maps default relay secret exposure too broadly; include concrete relay/proxy/tunnel/default-host URL evidence, embedded token/gurl/connection metadata, and an nval for trusted-host or explicit configured-host hardening", lang)
 				}
 				if localExactContextMapping(m) && len(m.Packages) > 0 {
 					return fmt.Errorf("agentic prep: adapter %q package-scopes an exact context mark; keep exact context marks unscoped and put package/dependency evidence in adapter evidence instead of a package gate", lang)
@@ -788,6 +794,53 @@ func invalidJobOutputEventUpdateMark(m parser.AdapterMapping) bool {
 		}
 	}
 	return !hasChildOutputHandler || !hasChildOutputCopy || !hasHardeningAbsence
+}
+
+func invalidDefaultRelaySecretMark(m parser.AdapterMapping) bool {
+	if m.Concept != "code.DefaultExternalRelaySecretExposure" {
+		return false
+	}
+	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+		return true
+	}
+	hasRelayURL := false
+	hasSensitiveMetadata := false
+	for _, v := range m.ValMatches {
+		lv := strings.ToLower(v)
+		if strings.Contains(lv, "relay") ||
+			strings.Contains(lv, "proxy") ||
+			strings.Contains(lv, "tunnel") ||
+			strings.Contains(lv, "pollinghost") ||
+			strings.Contains(lv, "default host") ||
+			strings.Contains(lv, "defaulthost") ||
+			strings.Contains(lv, "default_host") ||
+			strings.Contains(lv, "herokuapp.com") ||
+			strings.Contains(lv, "wsv2") {
+			hasRelayURL = true
+		}
+		if strings.Contains(lv, "token") ||
+			strings.Contains(lv, "gurl") ||
+			strings.Contains(lv, "conmanurl") ||
+			strings.Contains(lv, "connectionmetadata") ||
+			strings.Contains(lv, "credential") ||
+			strings.Contains(lv, "authorization") {
+			hasSensitiveMetadata = true
+		}
+	}
+	hasHardeningAbsence := false
+	for _, nv := range m.ValAbsents {
+		lnv := strings.ToLower(nv)
+		if strings.Contains(lnv, "trusted") ||
+			strings.Contains(lnv, "configured") ||
+			strings.Contains(lnv, "allowlist") ||
+			strings.Contains(lnv, "product-owned") ||
+			strings.Contains(lnv, "custom host") ||
+			strings.Contains(lnv, "default host") {
+			hasHardeningAbsence = true
+			break
+		}
+	}
+	return !hasRelayURL || !hasSensitiveMetadata || !hasHardeningAbsence
 }
 
 func localExactContextMapping(m parser.AdapterMapping) bool {
