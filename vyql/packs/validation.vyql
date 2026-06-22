@@ -12,3 +12,8 @@ rule CommandOptionArgumentValidation {
   meta { id: "VYQL-VAL-004", severity: high, cwe: [CWE_20], confidence_floor: medium }
   match code.CommandOptionInjection as command
 }
+
+rule CommandStringWrapperInputValidation {
+  meta { id: "VYQL-VAL-005", severity: high, cwe: [CWE_20], confidence_floor: high }
+  match code.CommandStringWrapperExecution as command
+}

@@ -181,7 +181,10 @@ Rules:
   scan precision.
 - Before writing mark exact "analysis.function.context", call function_context
   for the target function and choose val/nval substrings from that returned
-  single function context. Do not combine vals from different functions.
+  single function context. Do not combine vals from different functions. For Go
+  function contexts, use the returned suggested_vals token
+  function_name:<Name>; do not use name=<Name>, which is not emitted by the Go
+  frontend and will not match.
 - Before writing mark exact "analysis.module.context", call module_context
   for the target file and choose val/nval substrings from one returned top-level
   declaration context. Use this for static role, permission, route, or policy maps.
@@ -251,6 +254,20 @@ Rules:
      a narrow command-string wrapper mark. Do not model generic execute wrappers
      as code.CommandExecution sinks when the safe form is an argv array; that
      catches fixed code. Prefer code.CommandStringWrapperExecution exact context.
+     CommandStringWrapperExecution exact marks must include an nval for the
+     fixed form, such as $Env:, cmdEnv, argv array, process builder, execFile,
+     or array_merge; otherwise the overlay will catch patched code.
+     For Go/Windows PowerShell wrappers, inspect functions and calls named
+     RunPowershellCmd, powershell, -Command, fmt.Sprintf, Get-Volume,
+     Get-Item, Add-PartitionAccessPath, and Remove-PartitionAccessPath. If a
+     parameter such as volumeID, path, mountpath, linkpath, or drivepath is
+     interpolated into a PowerShell command string before RunPowershellCmd,
+     prefer a narrow code.CommandStringWrapperExecution function_context mark
+     with nvals for fixed hardening such as $Env: variables or
+     RunPowershellCmd(cmd, cmdEnv...). Do not finish empty merely because
+     os/exec.Command is a core sink; local string-command wrappers usually need
+     an exact context mark to distinguish vulnerable string interpolation from
+     fixed env/argv forms.
      For CLI option-taking commands such as gpg, git, tar, ssh, curl, unzip,
      or package managers, do not treat shell escaping alone as sufficient.
      escapeshellarg, shlex.quote, Shellwords.escape, or similar APIs prevent
@@ -545,10 +562,11 @@ agentLoop:
 				emptyJenkinsRemoteValidationOverlay := jenkinsRemoteValidationProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyJobOutputEventOverlay := jobOutputEventUpdateProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyDefaultRelayOverlay := defaultRelaySecretProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
+				emptyCommandWrapperOverlay := commandWrapperProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || (!notesMentionAny(proposal.Notes, []string{"commandstringwrapperexecution", "argv", "process builder", "processbuilder", "$env:", "env var", "environment variable"}) || notesMentionAny(proposal.Notes, []string{"interprocedural", "automatically handled", "generic command execution", "os/exec", "exec.command"})))
 				emptyCommandOptionOverlay := commandOptionProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!notesMentionAny(proposal.Notes, []string{"commandoptioninjection", "end-of-options", "--", "option injection"}) || notesMentionAny(proposal.Notes, []string{"no direct untrusted", "no untrusted entry", "no source", "map as a source"}))
 				cryptoBlindingEvidence := cryptoBlindingProfile(profile) || agentLogResultHasAnyTerm(log, []string{"calculateinverse", "multiplicativeinverse", "jacobi", "modn.square", "modularsquareroot", "unblind"})
 				emptyCryptoBlindingOverlay := cryptoBlindingEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"cryptoimproperblinding", "vyql-cry-011", "core scan", "base scanner", "existing scanner"}))
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandOptionOverlay && !emptyCryptoBlindingOverlay
+				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptyCryptoBlindingOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -586,6 +604,9 @@ agentLoop:
 				} else if emptyDefaultRelayOverlay {
 					toolResult["error"] = "default relay URL evidence is present; do not return an empty overlay until you have called concept_reference with topic \"default relay host\", function_context for the URL builder containing host/token/encoded upstream URL assignments, and validate_overlay with an analysis.function.context mark to code.DefaultExternalRelaySecretExposure or concrete evidence that the default host is product-owned/trusted"
 					p.debugf("step=%d finish_overlay rejected: empty default relay overlay", step)
+				} else if emptyCommandWrapperOverlay {
+					toolResult["error"] = "command-wrapper evidence is present; do not return an empty overlay until you have called concept_reference with topic \"command wrapper\", function_context for the wrapper caller containing command-string construction and execute evidence, and validate_overlay with code.CommandStringWrapperExecution or concrete evidence that the command uses argv/process-builder/env-variable hardening. Do not rely on generic interprocedural taint through a local helper as the empty-overlay rationale."
+					p.debugf("step=%d finish_overlay rejected: empty command-wrapper overlay", step)
 				} else if emptyCommandOptionOverlay {
 					toolResult["error"] = "command option-injection evidence is present; empty-overlay notes must explicitly address code.CommandOptionInjection or end-of-options delimiter hardening such as --, and must not reject the mark merely because the library has no direct untrusted source. Shell escaping alone is not sufficient evidence for option-taking CLI arguments."
 					p.debugf("step=%d finish_overlay rejected: empty command option overlay without specific rationale", step)
@@ -929,6 +950,9 @@ func requiresSymbolInventory(profile Profile) bool {
 		"initializer", "forceloadduringstartup",
 		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
 		"generatederivativeresponse", "$this->cmd->execute",
+		"runpowershellcmd", "powershell", "-command", "fmt.sprintf",
+		"$env:", "get-volume", "get-item", "add-partitionaccesspath",
+		"remove-partitionaccesspath",
 		"runquery", "querydb", "dbquery", "executequery", "$ssql",
 		"legacyfilterinputarr", "where di_",
 		"escapeshellarg", "shlex.quote", "shellwords.escape", "setoperation",
@@ -1008,7 +1032,7 @@ func requiredCallInventoryTerms(profile Profile) []string {
 	case defaultRelaySecretProfile(profile):
 		return []string{"host", "polling", "connect", "websocket", "url", "token", "gurl"}
 	case commandWrapperProfile(profile):
-		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative"}
+		return []string{"execute", "command", "cmd", "process", "shell", "headers", "args", "generatederivative", "runpowershellcmd", "powershell", "sprintf", "get-volume", "get-item"}
 	case profileContainsAnyTerm(profile, []string{"do_directory", "expand_fs", "romfs_read", "namelen", "dirent", "bad filename", "strchr(name", "strcmp(name"}):
 		return []string{"expand", "extract", "directory", "dirent", "name", "path", "romfs", "read", "mkdir", "open"}
 	case profileContainsAnyTerm(profile, []string{"contentlength", "content-length", "io.readfull", "limitreader", "maxbytesreader", "maxbodysize", "bodysizexceeded", "readrequestbody"}):
@@ -1071,7 +1095,7 @@ func requiredAssignmentInventoryTerms(profile Profile) []string {
 	case commandOptionProfile(profile):
 		return []string{"operation", "argument", "args", "keyid", "fingerprint", "option", "command", "escape", "delimiter"}
 	case commandWrapperProfile(profile):
-		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process"}
+		return []string{"cmd", "command", "args", "headers", "source", "execute", "shell", "process", "volumeid", "mountpath", "linkpath", "drivepath", "env"}
 	case jobOutputEventUpdateProfile(profile):
 		return []string{"update_event", "job", "data", "schedule", "config", "allow_event_updates_from_jobs"}
 	case defaultRelaySecretProfile(profile):
@@ -1101,11 +1125,24 @@ func commandWrapperProfile(profile Profile) bool {
 	if profile.Languages["php"] == 0 && profile.Languages["javascript"] == 0 && profile.Languages["typescript"] == 0 && profile.Languages["python"] == 0 && profile.Languages["ruby"] == 0 && profile.Languages["java"] == 0 && profile.Languages["go"] == 0 {
 		return false
 	}
-	return profileContainsAnyTerm(profile, []string{
+	if profileContainsAnyTerm(profile, []string{
 		"cmdexecuteservice", "$cmd_string", "x-islandora-args",
 		"generatederivativeresponse", "$this->cmd->execute",
 		"process::fromshellcommandline", "processbuilder", "command string",
-	})
+	}) {
+		return true
+	}
+	if profile.Languages["go"] > 0 {
+		hasPowerShellWrapper := profileContainsAnyTerm(profile, []string{
+			"runpowershellcmd", "powershell", "-command",
+		})
+		hasStringCommandTemplate := profileContainsAnyTerm(profile, []string{
+			"fmt.sprintf", "get-volume", "get-item", "add-partitionaccesspath",
+			"remove-partitionaccesspath", "$env:",
+		})
+		return hasPowerShellWrapper && hasStringCommandTemplate
+	}
+	return false
 }
 
 func commandOptionProfile(profile Profile) bool {
@@ -1264,9 +1301,9 @@ func defaultRelaySecretProfile(profile Profile) bool {
 		return false
 	}
 	return profileSampleContainsAllTermGroups(profile, [][]string{
-		{"pollinghost", "default host", "default_host", "defaulthost", "websocket", "relay", "proxy", "tunnel", "gurl", "conmanurl", "connectionstr", "connectionmetadata"},
+		{"pollinghost", "default host", "default_host", "defaulthost", "relay", "tunnel", "gurl", "conmanurl", "connectionmetadata"},
 		{"token", "credential", "secret", "authorization", "connectionmetadata", "gurl", "conmanurl"},
-		{"encodeuricomponent", "url.format", "urllib.format", "urlparse", "wsv2", "ws://", "wss://", "http://", "https://", "herokuapp.com"},
+		{"encodeuricomponent", "url.format", "urllib.format", "urlparse", "wsv2", "ws://", "wss://", "herokuapp.com"},
 	})
 }
 
@@ -3521,25 +3558,42 @@ func endOfTopLevelDecl(content string, start int) int {
 func braceFunctionContexts(path string, content string, lang string, name string, contains string, max int) []functionContextPreview {
 	name = strings.TrimSpace(name)
 	contains = strings.TrimSpace(contains)
-	re := regexp.MustCompile(`(?m)(?:public|private|protected|static|async|final|function|\s|[\w\\:&*\[\]<>])+function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(|(?:public|private|protected|static|final|\s)+[A-Za-z_][A-Za-z0-9_:\<\>\\&*\[\]]*\s+((?:[A-Za-z_][A-Za-z0-9_]*::)*[A-Za-z_][A-Za-z0-9_]*)\s*\(`)
-	matches := re.FindAllStringSubmatchIndex(content, -1)
+	type fnMatch struct {
+		start     int
+		headerEnd int
+		nameStart int
+		nameEnd   int
+	}
+	var matches []fnMatch
+	if lang == "go" {
+		re := regexp.MustCompile(`(?m)^\s*func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(`)
+		for _, m := range re.FindAllStringSubmatchIndex(content, -1) {
+			if len(m) >= 4 && m[2] >= 0 {
+				matches = append(matches, fnMatch{start: m[0], headerEnd: m[1], nameStart: m[2], nameEnd: m[3]})
+			}
+		}
+	} else {
+		re := regexp.MustCompile(`(?m)(?:public|private|protected|static|async|final|function|\s|[\w\\:&*\[\]<>])+function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(|(?:public|private|protected|static|final|\s)+[A-Za-z_][A-Za-z0-9_:\<\>\\&*\[\]]*\s+((?:[A-Za-z_][A-Za-z0-9_]*::)*[A-Za-z_][A-Za-z0-9_]*)\s*\(`)
+		for _, m := range re.FindAllStringSubmatchIndex(content, -1) {
+			if len(m) >= 4 && m[2] >= 0 {
+				matches = append(matches, fnMatch{start: m[0], headerEnd: m[1], nameStart: m[2], nameEnd: m[3]})
+			} else if len(m) >= 6 && m[4] >= 0 {
+				matches = append(matches, fnMatch{start: m[0], headerEnd: m[1], nameStart: m[4], nameEnd: m[5]})
+			}
+		}
+	}
 	var out []functionContextPreview
 	for _, m := range matches {
-		fnName := ""
-		if m[2] >= 0 {
-			fnName = content[m[2]:m[3]]
-		} else if len(m) >= 6 && m[4] >= 0 {
-			fnName = content[m[4]:m[5]]
-		}
+		fnName := content[m.nameStart:m.nameEnd]
 		if name != "" && !functionNameMatches(fnName, name) {
 			continue
 		}
-		open := strings.Index(content[m[1]:], "{")
+		open := strings.Index(content[m.headerEnd:], "{")
 		if open < 0 {
 			continue
 		}
-		start := m[0]
-		bodyStart := m[1] + open
+		start := m.start
+		bodyStart := m.headerEnd + open
 		end := findMatchingBrace(content, bodyStart)
 		if end < 0 {
 			continue
@@ -3549,14 +3603,24 @@ func braceFunctionContexts(path string, content string, lang string, name string
 			continue
 		}
 		compact := compactSourceText(body)
+		prefix := "lang=" + lang + "\x00name=" + fnName
+		suggested := suggestContextVals(fnName, compact)
+		if lang == "go" {
+			prefix = "lang=go\x00function_name:" + fnName
+			if len(suggested) == 0 {
+				suggested = []string{"function_name:" + fnName}
+			} else {
+				suggested[0] = "function_name:" + fnName
+			}
+		}
 		line := 1 + strings.Count(content[:start], "\n")
 		out = append(out, functionContextPreview{
 			Path:           path,
 			Name:           fnName,
 			Line:           line,
-			Prefix:         "lang=" + lang + "\x00name=" + fnName,
+			Prefix:         prefix,
 			CompactPreview: compactSnippet(compact, 1600),
-			SuggestedVals:  suggestContextVals(fnName, compact),
+			SuggestedVals:  suggested,
 		})
 		if len(out) >= max {
 			break
@@ -3853,6 +3917,10 @@ func suggestContextVals(name string, compact string) []string {
 		"CmdExecuteService", "$cmd_string", "X-Islandora-Args",
 		"generateDerivativeResponse", "$this->cmd->execute",
 		"Process::fromShellCommandline", "array_merge", "HeaderBag",
+		"fmt.Sprintf", "RunPowershellCmd", "utils.RunPowershellCmd",
+		"Get-Volume", "Get-Item", "Format-Volume",
+		"Add-PartitionAccessPath", "Remove-PartitionAccessPath",
+		"Resize-Partition", "$Env:", "cmdEnv",
 		"do_directory", "expand_fs", "romfs_read", "child->namelen",
 		"memcpy(newpath+pathlen,romfs_read(offset),newlen)",
 		"strchr(name,'/')", "strcmp(name,\"..\")",

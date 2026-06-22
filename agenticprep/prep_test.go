@@ -550,13 +550,132 @@ func TestPrepRejectsBroadCommandWrapperSink(t *testing.T) {
 	narrow := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "php",
 		Source: `adapter php {
-  mark exact "analysis.function.context" val "name=f" val "$this->cmd->execute($cmd)" nval "$cmd=array_merge" -> code.CommandStringWrapperExecution
+  mark exact "analysis.function.context" val "name=f" val "$cmd_string" val "$this->cmd->execute($cmd)" nval "$cmd=array_merge" -> code.CommandStringWrapperExecution
 }
 `,
 		Evidence: []string{src},
 	}}}
 	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
 		t.Fatalf("expected narrow command-wrapper context mark to validate: %v", err)
+	}
+}
+
+func TestPrepRanksGoPowerShellCommandWrapperProfile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/kubernetes-csi/csi-proxy\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "pkg", "os", "volume", "api.go")
+	if err := os.MkdirAll(filepath.Dir(src), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(src, []byte(`package volume
+
+import (
+	"fmt"
+	"github.com/kubernetes-csi/csi-proxy/pkg/utils"
+)
+
+type volumeAPI struct{}
+
+func (v *volumeAPI) MountVolume(volumeID, mountpath string) error {
+	cmd := fmt.Sprintf("(Get-Volume -UniqueId \"%s\" | Add-PartitionAccessPath -AccessPath %s)", volumeID, mountpath)
+	_, err := utils.RunPowershellCmd(cmd)
+	return err
+}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	utils := filepath.Join(dir, "pkg", "utils", "utils.go")
+	if err := os.MkdirAll(filepath.Dir(utils), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(utils, []byte(`package utils
+
+import "os/exec"
+
+func RunPowershellCmd(command string, envs ...string) ([]byte, error) {
+	return exec.Command("powershell", "-Mta", "-NoProfile", "-Command", command).CombinedOutput()
+}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if !commandWrapperProfile(profile) {
+		t.Fatal("expected Go PowerShell wrapper profile")
+	}
+	if !requiresSymbolInventory(profile) {
+		t.Fatal("expected PowerShell command wrapper profile to require symbol inventory")
+	}
+	callTerms := requiredCallInventoryTerms(profile)
+	for _, want := range []string{"runpowershellcmd", "powershell", "sprintf", "get-volume"} {
+		if !containsString(callTerms, want) {
+			t.Fatalf("expected focused call term %q in %#v", want, callTerms)
+		}
+	}
+	assignmentTerms := requiredAssignmentInventoryTerms(profile)
+	for _, want := range []string{"volumeid", "env"} {
+		if !containsString(assignmentTerms, want) {
+			t.Fatalf("expected focused assignment term %q in %#v", want, assignmentTerms)
+		}
+	}
+	files, err := securityRelevantFiles(profile, "go", 5)
+	if err != nil {
+		t.Fatalf("securityRelevantFiles: %v", err)
+	}
+	if len(files) == 0 || !strings.HasSuffix(filepath.ToSlash(files[0].Path), "/pkg/os/volume/api.go") {
+		t.Fatalf("expected PowerShell API file first, got %#v", files)
+	}
+	narrow := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "go",
+		Source: `adapter go {
+  mark exact "analysis.function.context" val "function_name:MountVolume" val "fmt.Sprintf" val "Get-Volume" val "RunPowershellCmd(cmd)" nval "$Env:" -> code.CommandStringWrapperExecution
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow PowerShell command-wrapper context mark to validate: %v", err)
+	}
+	contexts, err := functionContexts(profile, src, "MountVolume", "RunPowershellCmd", 5)
+	if err != nil {
+		t.Fatalf("functionContexts: %v", err)
+	}
+	if len(contexts) == 0 || contexts[0].Name != "MountVolume" || !strings.Contains(contexts[0].CompactPreview, "Add-PartitionAccessPath") {
+		t.Fatalf("expected Go receiver method context for MountVolume, got %#v", contexts)
+	}
+	if contexts[0].Prefix != "lang=go\x00function_name:MountVolume" || !containsString(contexts[0].SuggestedVals, "function_name:MountVolume") {
+		t.Fatalf("expected Go function context to expose frontend tokens, got prefix=%q vals=%#v", contexts[0].Prefix, contexts[0].SuggestedVals)
+	}
+	if defaultRelaySecretProfile(profile) {
+		t.Fatal("PowerShell command-wrapper proxy repo should not trigger default relay profile")
+	}
+
+	badNameToken := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "go",
+		Source: `adapter go {
+  mark exact "analysis.function.context" val "name=MountVolume" val "fmt.Sprintf" -> code.CommandStringWrapperExecution
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, badNameToken, Config{}); err == nil || !strings.Contains(err.Error(), "function_name") {
+		t.Fatalf("expected Go name= context mark to be rejected, got %v", err)
+	}
+
+	missingHardeningNval := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "go",
+		Source: `adapter go {
+  mark exact "analysis.function.context" val "function_name:MountVolume" val "fmt.Sprintf" val "utils.RunPowershellCmd" val "Get-Volume" -> code.CommandStringWrapperExecution
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, missingHardeningNval, Config{}); err == nil || !strings.Contains(err.Error(), "hardening") {
+		t.Fatalf("expected command wrapper mark without nval hardening to be rejected, got %v", err)
 	}
 }
 

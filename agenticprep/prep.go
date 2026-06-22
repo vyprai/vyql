@@ -387,8 +387,11 @@ func securityRelevanceScore(path string, text string) int {
 		"dotest": 28, "docheck": 24, "dofill": 18, "jenkins.administer": 28,
 		"checkpermission": 22, "haspermission": 18, "crowdconfigurationservice": 30,
 		"cmdexecuteservice": 52, "$cmd_string": 42, "x-islandora-args": 36,
-		"generateDerivativeResponse": 32, "$this->cmd->execute": 34,
+		"generatederivativeresponse": 32, "$this->cmd->execute": 34,
 		"command string": 24, "array_merge": 14, "headerbag": 14,
+		"runpowershellcmd": 54, "powershell": 36, "-command": 18,
+		"fmt.sprintf": 34, "$env:": 26, "get-volume": 34, "get-item": 26,
+		"add-partitionaccesspath": 34, "remove-partitionaccesspath": 34,
 		"gnupg": 38, "gpg": 22, "escapeshellarg": 24, "setoperation": 26,
 		"$operation": 22, "--list-secret-keys": 30, "--list-public-keys": 30,
 		"--list-keys": 26, "--delete-key": 30, "--delete-secret-key": 30,
@@ -494,6 +497,12 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				if broadCommandWrapperSink(lang, m) {
 					return fmt.Errorf("agentic prep: adapter %q maps a broad command-wrapper execute sink; use a narrow analysis.function.context mark to code.CommandStringWrapperExecution so argv-array fixes are not flagged", lang)
 				}
+				if invalidGoFunctionContextNameToken(lang, m) {
+					return fmt.Errorf("agentic prep: adapter %q uses name= in a Go function-context mark; use function_name:<name> from function_context suggested_vals so the overlay matches frontend context tokens", lang)
+				}
+				if invalidCommandStringWrapperMark(m) {
+					return fmt.Errorf("agentic prep: adapter %q maps command-string wrapper execution without fixed-form hardening evidence; use an exact analysis.function.context mark with command construction, wrapper execution, and nval hardening such as $Env:, cmdEnv, argv array, process builder, execFile, or array_merge", lang)
+				}
 				if broadMcpToolCommandMark(m) {
 					return fmt.Errorf("agentic prep: adapter %q maps a broad MCP tool command mark; include concrete exec command-template evidence and nval hardening such as execFile so fixed argv-array code is not flagged", lang)
 				}
@@ -533,6 +542,62 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 		}
 	}
 	return nil
+}
+
+func invalidGoFunctionContextNameToken(lang string, m parser.AdapterMapping) bool {
+	if lang != "go" || m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+		return false
+	}
+	for _, v := range m.ValMatches {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(v)), "name=") {
+			return true
+		}
+	}
+	return false
+}
+
+func invalidCommandStringWrapperMark(m parser.AdapterMapping) bool {
+	if m.Concept != "code.CommandStringWrapperExecution" {
+		return false
+	}
+	if m.Kind != "mark" || !m.Exact || m.Pattern != "analysis.function.context" {
+		return false
+	}
+	hasCommandConstruction := false
+	hasWrapperExecution := false
+	for _, v := range m.ValMatches {
+		lv := strings.ToLower(v)
+		if strings.Contains(lv, "sprintf") ||
+			strings.Contains(lv, "format") ||
+			strings.Contains(lv, "cmd_string") ||
+			strings.Contains(lv, "command string") ||
+			strings.Contains(lv, "fromshellcommandline") {
+			hasCommandConstruction = true
+		}
+		if strings.Contains(lv, "runpowershellcmd") ||
+			strings.Contains(lv, "execute") ||
+			strings.Contains(lv, "process") ||
+			strings.Contains(lv, "shell") ||
+			strings.Contains(lv, "cmd") {
+			hasWrapperExecution = true
+		}
+	}
+	hasHardeningAbsence := false
+	for _, nv := range m.ValAbsents {
+		lnv := strings.ToLower(nv)
+		if strings.Contains(lnv, "$env:") ||
+			strings.Contains(lnv, "env:") ||
+			strings.Contains(lnv, "cmdenv") ||
+			strings.Contains(lnv, "argv") ||
+			strings.Contains(lnv, "array_merge") ||
+			strings.Contains(lnv, "processbuilder") ||
+			strings.Contains(lnv, "execfile") ||
+			strings.Contains(lnv, "spawn") {
+			hasHardeningAbsence = true
+			break
+		}
+	}
+	return !hasCommandConstruction || !hasWrapperExecution || !hasHardeningAbsence
 }
 
 func firstPartyManifestPackages(profile Profile) map[string]bool {
