@@ -1,0 +1,50 @@
+test "rank593: dd-plist parser factory without XXE hardening"
+  lang java
+  expect VYQL-DESER-004
+  expect_review code.XmlParserCreate
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.parsers.ParserConfigurationException;
+
+  class XMLPropertyListParser {
+      private static DocumentBuilderFactory docBuilderFactory = null;
+
+      private static synchronized DocumentBuilder getDocBuilder() throws ParserConfigurationException {
+          if (docBuilderFactory == null) {
+              docBuilderFactory = DocumentBuilderFactory.newInstance();
+          }
+          return docBuilderFactory.newDocumentBuilder();
+      }
+  }
+  ```
+
+test "rank593: dd-plist static parser factory disables external entities"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.parsers.ParserConfigurationException;
+
+  class XMLPropertyListParser {
+      private static final DocumentBuilderFactory FACTORY = DocumentBuilderFactory.newInstance();
+      static {
+          try {
+              FACTORY.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+              FACTORY.setFeature("http://xml.org/sax/features/external-general-entities", false);
+              FACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+              FACTORY.setXIncludeAware(false);
+              FACTORY.setExpandEntityReferences(false);
+          } catch (ParserConfigurationException e) {
+              throw new RuntimeException(e);
+          }
+      }
+
+      public static synchronized DocumentBuilder getDocBuilder() throws ParserConfigurationException {
+          return FACTORY.newDocumentBuilder();
+      }
+  }
+  ```

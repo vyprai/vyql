@@ -157,3 +157,35 @@ rule CountDerivedElementAccess {
 		t.Fatalf("qualified dominating branch guard should suppress match, got %d", len(fs))
 	}
 }
+
+func TestMatchGuardedBySameXmlFactoryHardening(t *testing.T) {
+	rule := `
+package vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  match code.XmlParserCreate as p
+  unless guarded_by core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "hardening", Type: "code.Call", Loc: "Parser.java:10", Region: "Parser.java/static", Props: map[string]string{"callee_path": "FACTORY.setFeature"}})
+	g.AddLabel("hardening", usg.Label{Concept: "core.XmlHardening"})
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Region: "Parser.java/fn1", Props: map[string]string{"callee_path": "FACTORY.newDocumentBuilder"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parser.Parse(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("same XML factory hardening should suppress parser creation, got %d", len(fs))
+	}
+}

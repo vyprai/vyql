@@ -956,6 +956,51 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 			}
 		}
 	}
+	if control == "core.XmlHardening" && e.sameReceiverXmlFactoryGuarded(sinkID, control) {
+		return true
+	}
+	return false
+}
+
+func (e *Engine) sameReceiverXmlFactoryGuarded(sinkID, control string) bool {
+	sink, ok, _ := e.Store.GetNode(sinkID)
+	if !ok || !nodeHasConcept(e.labels(sinkID), "code.XmlParserCreate") {
+		return false
+	}
+	sinkRecv := receiverPrefix(sink.Prop("callee_path"))
+	if sinkRecv == "" {
+		return false
+	}
+	guards, _ := e.Store.NodesWithConcept(control)
+	for _, gid := range guards {
+		if gid == sinkID {
+			continue
+		}
+		guard, ok, _ := e.Store.GetNode(gid)
+		if !ok {
+			continue
+		}
+		if receiverPrefix(guard.Prop("callee_path")) == sinkRecv {
+			return true
+		}
+	}
+	return false
+}
+
+func receiverPrefix(path string) string {
+	i := strings.LastIndexByte(path, '.')
+	if i <= 0 {
+		return ""
+	}
+	return path[:i]
+}
+
+func nodeHasConcept(labels []usg.Label, concept string) bool {
+	for _, l := range labels {
+		if l.Concept == concept {
+			return true
+		}
+	}
 	return false
 }
 
