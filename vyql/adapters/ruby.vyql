@@ -191,6 +191,11 @@ adapter ruby {
     has "#{comment.content}"
     lacks "sanitize comment.content"
   }
+  flag code.UnparameterizedSqlQueryParser in function {
+    has "lang=ruby"
+    has "find_by(params"
+    lacks "find_by(email:"
+  }
   flag code.ChefUserManagementWithoutAdminGuard in class {
     has "lang=ruby"
     has "name=Users"
