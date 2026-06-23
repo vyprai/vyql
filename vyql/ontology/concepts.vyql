@@ -2849,6 +2849,15 @@ concept CompassCsfleEjsonParserMissingStrictMode : sink {
   review_assumption: "connection form encrypted field configuration text can be supplied by a user or imported connection data and reaches the parser"
   review_confidence: high
 }
+concept IncompleteGeneratedJsIdentifierReservedWords : sink {
+  vulnerable_to: [injection.CodeInjection, validation.ImproperInputValidation]
+  cwe: [CWE_94, CWE_20]
+  review_category: "injection"
+  review_condition: "generated JavaScript identifiers are validated with an incomplete reserved-word denylist"
+  review_evidence: "JavaScript identifier validator {pattern} feeds generated script helpers but omits eval and arguments from the reserved-word set"
+  review_assumption: "validated names can be inserted into generated JavaScript source as bindings or callable identifiers"
+  review_confidence: high
+}
 concept PdfJsEvalSupported : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_79]

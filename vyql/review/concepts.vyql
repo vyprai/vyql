@@ -1340,6 +1340,12 @@ review code.CompassCsfleEjsonParserMissingStrictMode {
   expected: [core.InputValidation]
   text: "review Compass CSFLE EJSON parsing for strict-mode parsing rather than shell/query parser evaluation"
 }
+review code.IncompleteGeneratedJsIdentifierReservedWords {
+  category: "injection"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify generated JavaScript identifier validation rejects eval and arguments before names enter generated source"
+}
 review code.LdapCrlCredentialReuse {
   category: "secret"
   kind: "attention"

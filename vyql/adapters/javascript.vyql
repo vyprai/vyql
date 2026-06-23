@@ -517,6 +517,16 @@ adapter javascript {
     lacks "parseShellStringToEJSON"
     lacks "ParseMode.Strict"
   }
+  flag code.IncompleteGeneratedJsIdentifierReservedWords in module {
+    has "lang=javascript"
+    has "JS_RESERVED_WORDS"
+    has "isValidJsIdentifier"
+    has "compileShellApiFunctionName"
+    has "dbgateApi.${functionName}"
+    has "'enum'"
+    lacks "'eval'"
+    lacks "'arguments'"
+  }
   sink path "globalEval" -> code.CodeEval
   sink path "require" -> code.DynamicCodeLoad
   sink path "import" -> code.DynamicCodeLoad
