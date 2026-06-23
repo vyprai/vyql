@@ -230,6 +230,17 @@ adapter ruby {
     lacks "colors.to_i"
     lacks "depth.to_i"
   }
+  flag code.WindowsBacktickDiffCommandInjection in function {
+    has "lang=ruby"
+    has "WINDOWS"
+    has "sprintf"
+    has "diff_options.join(' ')"
+    has "@paths.map"
+    has "cmd"
+    lacks "Open3.capture3"
+    lacks "Shellwords"
+    lacks "shellescape"
+  }
   flag code.UnescapedQueueQueryStringXss in function {
     has "lang=ruby"
     has "name=url_path"

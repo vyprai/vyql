@@ -142,6 +142,11 @@ rule ComposerGitBranchDiffCommandInjection {
   match code.ComposerGitBranchDiffCommandInjection as sink
 }
 
+rule WindowsBacktickDiffCommandInjection {
+  meta { id: "VYQL-INJ-135", severity: critical, cwe: [CWE_78, CWE_88], confidence_floor: high }
+  match code.WindowsBacktickDiffCommandInjection as sink
+}
+
 rule CommandStringWrapperExecution {
   meta { id: "VYQL-INJ-119", severity: critical, cwe: [CWE_78, CWE_88, CWE_150, CWE_157], confidence_floor: high }
   match code.CommandStringWrapperExecution as sink

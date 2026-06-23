@@ -286,6 +286,15 @@ concept ComposerGitBranchDiffCommandInjection : sink {
   review_assumption: "a dependency installed from source can contain specially crafted local or remote Git branch names"
   review_confidence: high
 }
+concept WindowsBacktickDiffCommandInjection : sink {
+  vulnerable_to: [injection.CommandInjection, injection.ArgumentInjection]
+  cwe: [CWE_78, CWE_88]
+  review_category: "command"
+  review_condition: "a Windows-specific diff execution path builds one shell string from options and file paths before executing it with backticks"
+  review_evidence: "Ruby diff execution context {pattern} formats diff options and paths into a command string and evaluates it through shell backticks"
+  review_assumption: "library callers can supply diff options or file path values containing shell metacharacters on Windows"
+  review_confidence: high
+}
 concept CommandStringWrapperExecution : sink {
   vulnerable_to: [injection.CommandInjection, injection.ArgumentInjection]
   cwe: [CWE_78, CWE_88, CWE_150, CWE_157]
