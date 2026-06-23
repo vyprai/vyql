@@ -2630,6 +2630,15 @@ concept WordPressAddQueryArgHrefXss : sink {
   review_assumption: "the generated URL may include request-controlled current-URL data and is served to a browser as HTML"
   review_confidence: high
 }
+concept UnescapedQueueQueryStringXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "queue names are joined into a URL query string without URL escaping before links are rendered"
+  review_evidence: "URL helper context {pattern} appends a queues query parameter from joined queue names without CGI.escape"
+  review_assumption: "queue names can contain characters that break the query parameter or rendered link context"
+  review_confidence: high
+}
 concept JavaScriptUrlRedirectXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

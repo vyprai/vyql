@@ -230,6 +230,12 @@ adapter ruby {
     lacks "colors.to_i"
     lacks "depth.to_i"
   }
+  flag code.UnescapedQueueQueryStringXss in function {
+    has "lang=ruby"
+    has "name=url_path"
+    has "?queues=#{@queues.join(\",\")}"
+    lacks "CGI.escape(@queues.join"
+  }
   // HTTP response splitting / header injection (CWE-113).
   sink path "response.set_header" arg 1 -> code.ResponseHeaderWrite
   sink path "headers.__setitem__" arg 1 -> code.ResponseHeaderWrite

@@ -240,6 +240,11 @@ rule WordPressAddQueryArgHrefXss {
   match code.WordPressAddQueryArgHrefXss as sink
 }
 
+rule UnescapedQueueQueryStringXss {
+  meta { id: "VYQL-INJ-131", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedQueueQueryStringXss as sink
+}
+
 rule IncompleteGeneratedJsIdentifierReservedWords {
   meta { id: "VYQL-INJ-127", severity: high, cwe: [CWE_94, CWE_20], confidence_floor: high }
   match code.IncompleteGeneratedJsIdentifierReservedWords as validator
