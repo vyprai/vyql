@@ -771,6 +771,14 @@ adapter go {
     has "literal:FROM aurora_global_db_instance_status()"
     lacks "pg_catalog.aurora_global_db_instance_status"
   }
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "goqu.L"
+    has "project"
+  }
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "goqu.L"
+    has "group"
+  }
   flag code.CommandOptionInjection in function {
     has "function_name:NodePublishVolume"
     has "call:GetVolumeContext"
