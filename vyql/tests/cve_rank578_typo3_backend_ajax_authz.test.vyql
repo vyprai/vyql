@@ -1,0 +1,38 @@
+test "rank578: TYPO3 backend AJAX routes must inherit module authorization"
+  lang php
+  expect VYQL-AUTH-034
+  code
+  ```
+  <?php
+  declare(strict_types=1);
+
+  use TYPO3\CMS\Dashboard\Controller\DashboardAjaxController;
+
+  return [
+      'dashboard_widget_remove' => [
+          'path' => '/dashboard/widget/remove',
+          'target' => DashboardAjaxController::class . '::removeWidget',
+          'methods' => ['POST'],
+      ],
+  ];
+  ```
+
+test "rank578: TYPO3 backend AJAX routes inherit module authorization"
+  lang php
+  reject VYQL-AUTH-034
+  code
+  ```
+  <?php
+  declare(strict_types=1);
+
+  use TYPO3\CMS\Dashboard\Controller\DashboardAjaxController;
+
+  return [
+      'dashboard_widget_remove' => [
+          'path' => '/dashboard/widget/remove',
+          'target' => DashboardAjaxController::class . '::removeWidget',
+          'methods' => ['POST'],
+          'inheritAccessFromModule' => 'dashboard',
+      ],
+  ];
+  ```

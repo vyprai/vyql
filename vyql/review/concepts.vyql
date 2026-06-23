@@ -445,6 +445,12 @@ review code.BasicAuthStreamAuthBypass {
   expected: [core.AuthenticationCheck]
   text: "review streaming/SSE auth option builders that enable Basic auth but do not set AuthRequired=true"
 }
+review code.BackendRouteMissingModuleAuthorization {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify backend AJAX routes inherit or enforce permissions from the owning backend module"
+}
 review code.ProxyClientIpSpoofingBypass {
   category: "auth"
   kind: "attention"

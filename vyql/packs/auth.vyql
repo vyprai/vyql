@@ -39,6 +39,11 @@ rule BasicAuthStreamAuthBypass {
   match code.BasicAuthStreamAuthBypass as auth
 }
 
+rule BackendRouteMissingModuleAuthorization {
+  meta { id: "VYQL-AUTH-034", severity: high, cwe: [CWE_862], confidence_floor: high }
+  match code.BackendRouteMissingModuleAuthorization as route
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller

@@ -1409,6 +1409,15 @@ concept BasicAuthStreamAuthBypass : sink {
   review_assumption: "the returned options protect streaming endpoints and the middleware allows unauthenticated requests when AuthRequired is false"
   review_confidence: high
 }
+concept BackendRouteMissingModuleAuthorization : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+  review_category: "auth"
+  review_condition: "backend route configuration exposes module-owned routes without inheriting or enforcing the module permission check"
+  review_evidence: "backend route map {pattern} defines module AJAX routes but lacks the module authorization binding"
+  review_assumption: "authenticated users can invoke the route directly even when they lack access to the owning backend module"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]

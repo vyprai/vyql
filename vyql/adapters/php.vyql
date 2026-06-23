@@ -655,6 +655,16 @@ adapter php {
     has "asJson"
     lacks "requireAdmin"
   }
+  // TYPO3 backend AJAX routes owned by a backend module must inherit that
+  // module's access check; otherwise authenticated backend users can call the
+  // route directly without module permissions.
+  flag code.BackendRouteMissingModuleAuthorization in module {
+    has "lang=php"
+    has "DashboardAjaxController"
+    has "/dashboard/"
+    has "methods"
+    lacks "inheritAccessFromModule"
+  }
   flag code.MfaRedirectBypass in function {
     has "lang=php"
     has "MfaRequiredException"
