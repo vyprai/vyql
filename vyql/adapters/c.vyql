@@ -355,6 +355,8 @@ adapter c {
     has "_cups_strcasecmp(username,ownername)"
     lacks "strcmp(pw->pw_name,ownername)"
   }
+  sink path "ucsdet_open" -> code.ResourceHandle
+  control "ucsdet_close" -> core.ResourceRelease
   flag code.ReachableAssertionReview in function {
     has "lang=c"
     has "AVAHI_FLAGS_VALID"

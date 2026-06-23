@@ -157,6 +157,8 @@ adapter cpp {
     lacks "buff_size"
     lacks "end-start-1"
   }
+  sink path "ucsdet_open" -> code.ResourceHandle
+  control "ucsdet_close" -> core.ResourceRelease
   flag code.ProtocolListAmplification in function {
     has "lang=cpp"
     has "inlineCompositeListElementCount"
