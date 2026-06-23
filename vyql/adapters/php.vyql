@@ -231,6 +231,15 @@ adapter php {
     lacks "getActionSegments"
     lacks "HttpException(403)"
   }
+  flag code.BackendServiceResourceTraversal in function {
+    has "lang=php"
+    has "name=handleServiceRequest"
+    has "$resource"
+    has "ServiceManager::handleServiceRequest"
+    lacks "str_replace(['..'],'',$resource)"
+    lacks "str_replace(array('..'),'',$resource)"
+    lacks "PathAccessCheck"
+  }
   flag code.HostExpandedUrlSanitizedBeforeExpansionSsti in function {
     has "lang=php"
     has "name=safeCanonicalUrl"

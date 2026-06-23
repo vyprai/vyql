@@ -2238,6 +2238,15 @@ concept CharmRouteFileStorePathAccess : sink {
   review_assumption: "the route wildcard can include traversal components that alter the user's data-directory path"
   review_confidence: medium
 }
+concept BackendServiceResourceTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "request route/resource path segments are forwarded to a backend service dispatcher without rejecting parent-directory traversal"
+  review_evidence: "service dispatch context {pattern} forwards a resource route value to a backend service handler without an observed traversal-segment strip or path access guard"
+  review_assumption: "the backend service handler interprets the resource value as an object path, file path, or nested service route"
+  review_confidence: medium
+}
 concept ArchiveSymlinkFilterBypass : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   cwe: [CWE_22, CWE_59]
