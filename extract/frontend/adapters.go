@@ -520,7 +520,11 @@ type adapterSpec struct {
 // AdaptersFor loads the framework adapters for a technology from
 // vyql/adapters/<tech>.vyql and builds the input + sink + control adapters.
 func AdaptersFor(tech string) []adapters.Adapter {
-	return adaptersFromSpec(loadSpec(tech))
+	out := adaptersFromSpec(loadSpec(tech))
+	if tech == "javascript" {
+		out = append(out, jsPathRegexGuardAdapter())
+	}
+	return out
 }
 
 // OverlayAdapters loads repo-local adapter overlays from root. Files may live
@@ -1849,6 +1853,108 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 			return out
 		},
 	}
+}
+
+func jsPathRegexGuardAdapter() adapters.Adapter {
+	return adapters.Adapter{
+		Name: "javascript.path-regex-guards", Technology: "javascript", Specificity: 2,
+		Fidelity: "semantic", Origin: "deterministic",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			ids, _ := s.NodesOfType("code.Call")
+			var out []adapters.Mapping
+			for _, id := range ids {
+				n, ok, err := s.GetNode(id)
+				if err != nil || !ok {
+					continue
+				}
+				if t := nodeTech(n.Prop("loc")); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+					continue
+				}
+				method := n.Prop("method")
+				path := n.Prop("callee_path")
+				if method != "match" && method != "test" && !matchSinkPath(path, "match") && !matchSinkPath(path, "test") {
+					continue
+				}
+				if !safeJSPathComponentRegex(n.Prop("lit0")) {
+					continue
+				}
+				out = append(out, adapters.Mapping{NodeID: id, Concept: "core.PathAccessCheck", Specificity: 2})
+			}
+			return out
+		},
+	}
+}
+
+func safeJSPathComponentRegex(lit string) bool {
+	body, ok := jsRegexBody(lit)
+	if !ok || len(body) < 2 || body[0] != '^' || body[len(body)-1] != '$' {
+		return false
+	}
+	body = body[1 : len(body)-1]
+	if body == "" {
+		return false
+	}
+	inClass := false
+	escaped := false
+	for _, r := range body {
+		if escaped {
+			if !strings.ContainsRune(`.-_dDwW[](){}|^$+?*,`, r) {
+				return false
+			}
+			escaped = false
+			continue
+		}
+		switch r {
+		case '\\':
+			escaped = true
+		case '/':
+			return false
+		case '.':
+			if !inClass {
+				return false
+			}
+		case '[':
+			inClass = true
+		case ']':
+			inClass = false
+		default:
+			if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
+				continue
+			}
+			if !strings.ContainsRune(`^$(){}|?+*,-_`, r) {
+				return false
+			}
+		}
+	}
+	return !escaped && !inClass
+}
+
+func jsRegexBody(lit string) (string, bool) {
+	if len(lit) < 3 || lit[0] != '/' {
+		return "", false
+	}
+	inClass := false
+	escaped := false
+	for i := 1; i < len(lit); i++ {
+		ch := lit[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		switch ch {
+		case '\\':
+			escaped = true
+		case '[':
+			inClass = true
+		case ']':
+			inClass = false
+		case '/':
+			if !inClass {
+				return lit[1:i], true
+			}
+		}
+	}
+	return "", false
 }
 
 func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }
