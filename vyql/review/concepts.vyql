@@ -451,6 +451,12 @@ review code.BackendRouteMissingModuleAuthorization {
   expected: [core.AuthorizationCheck]
   text: "verify backend AJAX routes inherit or enforce permissions from the owning backend module"
 }
+review code.PluginManagementMissingAuthorization {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify plugin upload, install, uninstall, and status-change endpoints require operation-specific permissions"
+}
 review code.ProxyClientIpSpoofingBypass {
   category: "auth"
   kind: "attention"

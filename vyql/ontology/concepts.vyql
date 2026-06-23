@@ -1427,6 +1427,15 @@ concept BackendRouteMissingModuleAuthorization : sink {
   review_assumption: "authenticated users can invoke the route directly even when they lack access to the owning backend module"
   review_confidence: high
 }
+concept PluginManagementMissingAuthorization : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+  review_category: "auth"
+  review_condition: "plugin-management controller operations install or uninstall plugins without an operation-specific authorization guard"
+  review_evidence: "plugin management endpoint {pattern} invokes install or uninstall service logic without a permission annotation or guard"
+  review_assumption: "non-privileged authenticated users or API clients can invoke the plugin management endpoint directly"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]

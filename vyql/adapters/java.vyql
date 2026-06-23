@@ -447,6 +447,8 @@ adapter java {
   control method "hasAuthority" -> core.AuthorizationCheck
   control method "hasRole" -> core.AuthorizationCheck
   control method "checkPermission" -> core.AuthorizationCheck
+  control "analysis.function.context" val "annotation:RequiresPermissions" -> core.AuthorizationCheck
+  control "analysis.function.context" val "annotation:PreAuthorize" -> core.AuthorizationCheck
   flag code.SensitiveOperation on any {
     path "Login.accurevLoginFromGlobalConfig"
   }
@@ -600,6 +602,22 @@ adapter java {
     has "call:getNode"
     has "call:attachPublicIP"
     lacks "call:checkPermission"
+  }
+  flag code.PluginManagementMissingAuthorization in function {
+    has "annotation:PostMapping"
+    has "call_path:pluginService.localInstall"
+    lacks "annotation:RequiresPermissions"
+    lacks "annotation:PreAuthorize"
+    lacks "call:checkPermission"
+    lacks "call:hasPermission"
+  }
+  flag code.PluginManagementMissingAuthorization in function {
+    has "annotation:PostMapping"
+    has "call_path:pluginService.uninstall"
+    lacks "annotation:RequiresPermissions"
+    lacks "annotation:PreAuthorize"
+    lacks "call:checkPermission"
+    lacks "call:hasPermission"
   }
   flag code.StateChangingOp in function {
     has "function_name:doFill"

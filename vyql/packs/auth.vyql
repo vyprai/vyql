@@ -44,6 +44,11 @@ rule BackendRouteMissingModuleAuthorization {
   match code.BackendRouteMissingModuleAuthorization as route
 }
 
+rule PluginManagementMissingAuthorization {
+  meta { id: "VYQL-AUTH-035", severity: high, cwe: [CWE_862], confidence_floor: high }
+  match code.PluginManagementMissingAuthorization as endpoint
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller
