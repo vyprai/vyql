@@ -2639,6 +2639,15 @@ concept UnescapedQueueQueryStringXss : sink {
   review_assumption: "queue names can contain characters that break the query parameter or rendered link context"
   review_confidence: high
 }
+concept ResponseWriterScriptWindowIdXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "JSF ResponseWriter emits a window identifier into a script string with write instead of escaping text"
+  review_evidence: "ResponseWriter context {pattern} builds a dswh.init JavaScript string containing windowId before writer.writeText is applied"
+  review_assumption: "the client-window identifier can contain characters that terminate the JavaScript string and execute script"
+  review_confidence: high
+}
 concept JavaScriptUrlRedirectXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

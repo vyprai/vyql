@@ -1,0 +1,49 @@
+test "rank602: JSF ResponseWriter writes windowId into script string"
+  lang java
+  expect VYQL-INJ-132
+  expect_review code.ResponseWriterScriptWindowIdXss
+  code
+  ```
+  import javax.faces.context.FacesContext;
+  import javax.faces.context.ResponseWriter;
+  import javax.faces.component.UIComponent;
+
+  class WindowIdHtmlRenderer {
+      public void encodeBegin(FacesContext context, UIComponent component) throws java.io.IOException {
+          String windowId = clientWindow.getWindowId(context);
+          windowId = secureWindowId(windowId);
+          ResponseWriter writer = context.getResponseWriter();
+          writer.write("<script type=\"text/javascript\">");
+          writer.write("(function(){");
+          writer.write("dswh.init('" + windowId + "','"
+                  + clientWindowRenderMode.name() + "',"
+                  + maxWindowIdLength + ",{");
+      }
+  }
+  ```
+
+test "rank602: JSF ResponseWriter escapes windowId with writeText"
+  lang java
+  reject VYQL-INJ-132
+  reject_review code.ResponseWriterScriptWindowIdXss
+  code
+  ```
+  import javax.faces.context.FacesContext;
+  import javax.faces.context.ResponseWriter;
+  import javax.faces.component.UIComponent;
+
+  class WindowIdHtmlRenderer {
+      public void encodeBegin(FacesContext context, UIComponent component) throws java.io.IOException {
+          String windowId = clientWindow.getWindowId(context);
+          windowId = secureWindowId(windowId);
+          ResponseWriter writer = context.getResponseWriter();
+          writer.write("<script type=\"text/javascript\">");
+          writer.write("(function(){");
+          writer.write("dswh.init('");
+          writer.writeText(windowId, null);
+          writer.write("','"
+                  + clientWindowRenderMode.name() + "',"
+                  + maxWindowIdLength + ",{");
+      }
+  }
+  ```

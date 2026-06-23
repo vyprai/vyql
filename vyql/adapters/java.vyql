@@ -129,6 +129,13 @@ adapter java {
     has "call_path:buildAbsoluteURL"
     lacks "call_path:validateCallbackURL"
   }
+  flag code.ResponseWriterScriptWindowIdXss in function {
+    has "function_name:encodeBegin"
+    has "call_path:writer.write"
+    has "dswh.init"
+    has "windowId"
+    lacks "call_path:writer.writeText"
+  }
   flag code.MissingSessionRotationAfterAuthentication in function {
     has "call:setAuthentication"
     has "call:getSession"
