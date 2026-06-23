@@ -82,6 +82,8 @@ func main() {
 		err = cmdGraph(args)
 	case "adapters":
 		err = cmdAdapters(args)
+	case "definitions":
+		err = cmdDefinitions(args)
 	case "validate-adapter":
 		err = cmdValidateAdapter(args)
 	case "diff":
@@ -440,6 +442,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
 	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
 	fmt.Fprintln(os.Stderr, "  adapters   list an adapter's source/sink/control/mark/assume vocabulary   [-lang go]")
+	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/adapters/reviews   [-kind all -query TEXT -format text|json]")
 	fmt.Fprintln(os.Stderr, "  validate-adapter parse and summarize a VyQL adapter file   [-file adapter.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }

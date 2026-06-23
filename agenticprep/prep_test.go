@@ -2850,6 +2850,87 @@ func TestValidateProposalRejectsAbsentLanguage(t *testing.T) {
 	}
 }
 
+func TestPrepProbeSummariesDetectLift(t *testing.T) {
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  flag code.SecretComparisonReview in function {
+    has "token"
+    lacks "timingSafeEqual"
+  }
+}
+`,
+		Evidence: []string{"app.js"},
+	}}}
+	concepts := proposalConcepts(proposal)
+	if !containsString(concepts, "code.SecretComparisonReview") {
+		t.Fatalf("expected proposal concept extraction, got %#v", concepts)
+	}
+
+	baseScan := []any{map[string]any{"rule": "VYQL-OLD", "fp": "a"}}
+	overlayScan := []any{
+		map[string]any{"rule": "VYQL-OLD", "fp": "a"},
+		map[string]any{"rule": "VYQL-NEW", "fp": "b"},
+	}
+	rules, overlayKeys := scanRuleSummary(overlayScan)
+	if !containsString(rules, "VYQL-NEW") {
+		t.Fatalf("expected overlay scan rule summary, got %#v", rules)
+	}
+	_, baseKeys := scanRuleSummary(baseScan)
+	added := sortedSetDiff(overlayKeys, baseKeys)
+	if len(added) != 1 || !strings.Contains(added[0], "VYQL-NEW") {
+		t.Fatalf("expected one added scan key, got %#v", added)
+	}
+
+	baseReview := []any{map[string]any{"concept": "code.OldReview", "loc": "a.js:1"}}
+	overlayReview := []any{
+		map[string]any{"concept": "code.OldReview", "loc": "a.js:1"},
+		map[string]any{"concept": "code.SecretComparisonReview", "loc": "a.js:2"},
+	}
+	reviewConcepts, overlayReviewKeys := reviewConceptSummary(overlayReview)
+	if !containsString(reviewConcepts, "code.SecretComparisonReview") {
+		t.Fatalf("expected overlay review concept summary, got %#v", reviewConcepts)
+	}
+	_, baseReviewKeys := reviewConceptSummary(baseReview)
+	if diff := sortedSetDiff(overlayReviewKeys, baseReviewKeys); len(diff) != 1 || !strings.Contains(diff[0], "SecretComparisonReview") {
+		t.Fatalf("expected one added review key, got %#v", diff)
+	}
+
+	log := []AgentStep{{ToolResults: []AgentToolResult{{
+		Name:   "scan_delta",
+		Result: map[string]any{"scan_lift": false, "review_lift": true},
+	}}}}
+	if !agentLogHasPositiveScanDelta(log) {
+		t.Fatal("expected positive scan_delta lift to be detected")
+	}
+}
+
+func TestAgentLogReadyForHypothesisRequiresTargetAndFocusedEvidence(t *testing.T) {
+	if agentLogReadyForHypothesis(nil) {
+		t.Fatal("empty log should not be ready for hypothesis")
+	}
+	onlyTarget := []AgentStep{{
+		ToolCalls: []AgentToolCall{{Name: "target_inventory"}},
+	}}
+	if agentLogReadyForHypothesis(onlyTarget) {
+		t.Fatal("target inventory alone should not force a hypothesis")
+	}
+	withFocusedEvidence := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "target_inventory"}}},
+		{ToolCalls: []AgentToolCall{{Name: "call_inventory", Arguments: map[string]any{"name_contains": "verify"}}}},
+	}
+	if !agentLogReadyForHypothesis(withFocusedEvidence) {
+		t.Fatal("target plus focused inventory should be ready for hypothesis")
+	}
+	withBaseline := []AgentStep{
+		{ToolCalls: []AgentToolCall{{Name: "target_inventory"}}},
+		{ToolCalls: []AgentToolCall{{Name: "baseline_probe"}}},
+	}
+	if !agentLogReadyForHypothesis(withBaseline) {
+		t.Fatal("target plus baseline probe should be ready for hypothesis")
+	}
+}
+
 func hasDependencyGap(gaps []DependencyGap, lang, pkg string) bool {
 	for _, gap := range gaps {
 		if gap.Language == lang && gap.Package == pkg {

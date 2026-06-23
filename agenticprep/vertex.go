@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -16,7 +17,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vyprai/vyql/definitions"
 	"github.com/vyprai/vyql/extract/sca"
+	"github.com/vyprai/vyql/parser"
 	"golang.org/x/oauth2/google"
 )
 
@@ -191,6 +194,17 @@ Rules:
 - Do not generate rules, ontology, CWE metadata, or prose outside JSON.
 - If evidence is insufficient, call finish_overlay with an empty adapter_files
   array and notes explaining why.
+- If target_inventory, call_inventory, or assignment_inventory shows target-local
+  security semantics such as token/password/secret/auth/session/redirect/url/path/
+  file/upload/html/sql/command/permission/role/cookie/origin data, do not finish
+  empty immediately. First call function_context/class_context/module_context for
+  the exact target-local declaration and either validate the smallest scan-surface
+  adapter/flag, or finish empty with notes that explicitly explain why no
+  validated adapter target exists. Do not claim "core scan already covers it"
+  unless adapter_coverage or concept_reference gave concrete rule/concept evidence
+  for the exact API shape. If a context tool returns no contexts, retry with the
+  path plus exact enclosing function/class name from target_inventory,
+  symbol_inventory, call_inventory, or assignment_inventory before finishing.
 - Do not map generic standard library APIs unless the repo evidence shows a
   project/framework-specific meaning that shipped adapters cannot know.
 - Prefer repo-specific wrappers, public API boundaries, and narrow context
@@ -203,6 +217,12 @@ Rules:
   specific framework API, wrapper, sink, sanitizer/control, or narrow context
   flag. Broad source-only overlays tend to increase noise without improving
   scan precision.
+- After target inventory plus one focused coverage/inventory/context tool,
+  call set_hypothesis before proposing a non-empty overlay. The hypothesis must
+  name the semantic family, exact target path/symbol, proposed concept(s), and
+  expected scan or review lift. If you cannot name those, keep gathering only
+  the one missing piece or finish empty. This is a planning checkpoint, not an
+  adapter by itself.
 - Before writing flag <concept> in function, call function_context
   for the target function and choose has/lacks substrings from that returned
   single function context. Do not combine values from different functions. For Go
@@ -220,8 +240,10 @@ Rules:
   concept_reference. surface=review_only can be useful for review/ATTENTION,
   but it will not make vyql scan emit a finding unless a scan rule matches it.
 - Once validate_overlay returns ok=true with at least one valid adapter, call
-  finish_overlay immediately unless a specific validation warning requires a
-  correction.
+  overlay_probe, then scan_delta. Finish a non-empty overlay only when scan_delta
+  reports scan_lift or review_lift. If scan_delta reports no lift, revise the
+  adapter once using the delta/probe evidence; if the revised overlay still has
+  no lift, finish empty with notes explaining the no-lift mechanic.
 - Prefer repo_structure, symbol_inventory, call_inventory, search_context, and read_files over repeated
   single-file reads. Use symbol_inventory to map classes/functions/methods, then
   call_inventory and assignment_inventory to find API callers, state writes,
@@ -236,15 +258,24 @@ Rules:
   2. trust_model and entrypoint_inventory to understand the repo archetype,
      active trust boundary, request/API/CLI/config surfaces, and whether prep
      should mostly adjust scan configuration rather than adapters.
-  3. adapter_coverage, then dependency_gaps. The returned gaps are ranked by deterministic security
+  3. baseline_probe to see current VyQL scan/review/match behavior on the
+     target slice before proposing new coverage. If baseline already shows a
+     sink/source/review surface, prefer fixing missing complementary semantics
+     instead of duplicating that surface.
+  4. vyql_definitions for the relevant concept/API family to inspect existing
+     shipped concepts, scan rules, review metadata, and adapter mappings before
+     inventing an overlay. Use query terms from baseline_probe and target_inventory
+     such as UrlFetch, CryptoOperation, verify, redirect, command, cookie, sql,
+     package names, or API call names.
+  5. adapter_coverage, then dependency_gaps. The returned gaps are ranked by deterministic security
      score and may include recommended_probe. If any gap is returned, call
      probe_dependency on recommended_probe before security_relevant_files,
      search_text, or read_file. Prefer dependencies that appear in request handling,
      parsing, upload, auth/session, redirect, command, filesystem, template,
      database, crypto, XML, archive, or network code.
-  4. repo_structure for unfamiliar repositories, then adapter_reference,
+  6. repo_structure for unfamiliar repositories, then adapter_reference,
      package_reference, and concept_reference
-  5. security_relevant_files, then symbol_inventory, call_inventory,
+  7. security_relevant_files, then symbol_inventory, call_inventory,
      assignment_inventory, list_files,
      search_context, or search_text for exact wrappers/routes/config. Use
      symbol_inventory before opening many files just to discover class, method,
@@ -488,13 +519,19 @@ Rules:
      Focus call_inventory on allocation/copy/size terms such as alloc, malloc,
      calloc, realloc, memcpy, copy, size, length, capacity, offset, escape, and
      unicode; then open only the enclosing functions returned by inventory.
-  6. read_files or read_file on exact evidence
-  7. function_context before analysis.function.context flags,
+  8. read_files or read_file on exact evidence
+  9. set_hypothesis once you can name the target semantic family, path/symbol,
+     concepts, and expected scan/review lift
+  10. function_context before analysis.function.context flags,
      class_context before analysis.class.context flags,
      or module_context before context flags for top-level policy/config maps
-  8. validate_overlay if producing any non-empty adapter
-  9. finish_overlay only after validation is clean, or empty if no useful
-     repo-local adapter can improve scan.
+  11. validate_overlay if producing any non-empty adapter
+  12. overlay_probe, then scan_delta with the same adapter_files. If scan_delta
+     reports no scan_lift and no review_lift, revise once using the probe/delta
+     evidence instead of finishing a decorative overlay.
+  13. finish_overlay only after validation is clean and scan_delta proves
+      scan/review lift, or empty if no useful repo-local adapter can improve
+      scan/review.
 
 Repo profile:
 ` + string(payload)
@@ -536,7 +573,9 @@ agentLoop:
 				notes = append(notes, "vertex context cache generate failed: "+err.Error()+"; retrying uncached")
 				p.debugf("step=%d cached generate failed: %v; retrying uncached", step, err)
 				cacheName = ""
-				contents = fullPromptContents
+				uncachedContents := append([]map[string]any{}, fullPromptContents...)
+				uncachedContents = append(uncachedContents, contents...)
+				contents = uncachedContents
 				text, calls, modelParts, finish, err = p.generateAgentStep(ctx, contents, cacheName)
 			}
 		}
@@ -613,6 +652,11 @@ agentLoop:
 					validationWarnings = warnings
 					validAdapterCount = len(filtered.AdapterFiles)
 				}
+				missingScanDelta := validAdapterCount > 0 && !agentLogHasTool(log, "scan_delta")
+				overlayNoLift := validAdapterCount > 0 && agentLogHasTool(log, "scan_delta") && !agentLogHasPositiveScanDelta(log)
+				missingBaselineProbe := validAdapterCount > 0 && !agentLogHasTool(log, "baseline_probe")
+				missingDefinitions := validAdapterCount > 0 && !agentLogHasTool(log, "vyql_definitions")
+				missingHypothesis := validAdapterCount > 0 && !agentLogHasTool(log, "set_hypothesis")
 				emptyJenkinsStartupOverlay := jenkinsCredentialStartupProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0
 				emptyJenkinsRemoteValidationOverlay := jenkinsRemoteValidationProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
 				emptyJobOutputEventOverlay := jobOutputEventUpdateProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && !agentLogHasTool(log, "function_context")
@@ -623,7 +667,10 @@ agentLoop:
 				emptySecretComparisonOverlay := secretComparisonProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"secretcomparisonreview", "vyql-cry-006", "constant-time", "constant time", "timingsafeequal", "scmp"}))
 				cryptoBlindingEvidence := cryptoBlindingProfile(profile)
 				emptyCryptoBlindingOverlay := cryptoBlindingEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"cryptoimproperblinding", "vyql-cry-011", "core scan", "base scanner", "existing scanner"}))
-				ok := warn == "" && !missingTargetInventory && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptySecureCookieOverlay && !emptySecretComparisonOverlay && !emptyCryptoBlindingOverlay
+				targetSemanticEvidence := targetSecuritySemanticEvidence(log)
+				targetCoreCoverageClaim := targetSemanticEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && notesMentionAny(proposal.Notes, []string{"core scan", "base scanner", "existing scanner", "already covers", "standard framework apis", "standard active record", "standard activerecord"})
+				emptyTargetSemanticOverlay := targetSemanticEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasAnyContextTool(log) || agentLogHasEmptyContextTool(log) || (!agentLogHasTool(log, "validate_overlay") && !notesMentionAny(proposal.Notes, []string{"no validated adapter target", "no valid adapter target", "no adapter target"})) || targetCoreCoverageClaim)
+				ok := warn == "" && !missingTargetInventory && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !missingBaselineProbe && !missingDefinitions && !missingHypothesis && !missingScanDelta && !overlayNoLift && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptySecureCookieOverlay && !emptySecretComparisonOverlay && !emptyCryptoBlindingOverlay && !emptyTargetSemanticOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -652,6 +699,21 @@ agentLoop:
 				} else if missingFocusedAssignments {
 					toolResult["error"] = "assignment_inventory must be focused on repo output/trust-boundary evidence before finish_overlay; call assignment_inventory with one of these name_contains terms: " + strings.Join(requiredAssignmentTerms, ", ")
 					p.debugf("step=%d finish_overlay rejected: focused assignment_inventory required terms=%s", step, strings.Join(requiredAssignmentTerms, ","))
+				} else if missingBaselineProbe {
+					toolResult["error"] = "non-empty overlays require baseline_probe before finish_overlay; inspect current scan/review/match behavior so the overlay complements existing VyQL coverage instead of duplicating it"
+					p.debugf("step=%d finish_overlay rejected: baseline_probe required", step)
+				} else if missingDefinitions {
+					toolResult["error"] = "non-empty overlays require vyql_definitions before finish_overlay; inspect shipped concepts, rules, review metadata, and adapter mappings for the proposed family/API so the overlay does not duplicate existing VyQL definitions"
+					p.debugf("step=%d finish_overlay rejected: vyql_definitions required", step)
+				} else if missingHypothesis {
+					toolResult["error"] = "non-empty overlays require set_hypothesis before finish_overlay; name the semantic family, exact target path/symbol, proposed concepts, expected scan/review lift, and evidence, then finish with the same validated overlay"
+					p.debugf("step=%d finish_overlay rejected: hypothesis required", step)
+				} else if missingScanDelta {
+					toolResult["error"] = "non-empty overlays must prove behavior before finish_overlay; call overlay_probe, then scan_delta with the same adapter_files and finish only if scan_delta reports scan_lift or review_lift"
+					p.debugf("step=%d finish_overlay rejected: scan_delta required", step)
+				} else if overlayNoLift {
+					toolResult["error"] = "scan_delta reported no scan/review lift for this overlay; revise the adapter once using overlay_probe/scan_delta evidence, or finish empty with notes explaining the no-lift scanner/reviewer mechanic"
+					p.debugf("step=%d finish_overlay rejected: overlay no lift", step)
 				} else if emptyJenkinsStartupOverlay {
 					toolResult["error"] = "Jenkins credentials startup-load evidence is present; do not return an empty overlay until you have called concept_reference with topic \"jenkins credentials startup\", class/function context for SystemCredentialsProvider, and validate_overlay with an analysis.class.context flag to code.JenkinsCredentialsStartupLoadContextExposure or concrete evidence that @Initializer after InitMilestone.JOB_LOADED already force-loads getInstance"
 					p.debugf("step=%d finish_overlay rejected: empty Jenkins credentials startup overlay", step)
@@ -679,6 +741,9 @@ agentLoop:
 				} else if emptyCryptoBlindingOverlay {
 					toolResult["error"] = "crypto blinding/timing evidence is present; do not return an empty overlay until you have called concept_reference with topic \"blinding\", function_context for the private-key operation containing Randomize/MultiplicativeInverse/Jacobi/Square evidence, and validate_overlay with code.CryptoImproperBlinding or concrete evidence that the randomized blinding factor is squared/subgroup-hardened before inverse/unblinding use"
 					p.debugf("step=%d finish_overlay rejected: empty crypto blinding overlay", step)
+				} else if emptyTargetSemanticOverlay {
+					toolResult["error"] = "target-local security semantic evidence is present in inventory results; do not return an empty overlay until a context tool returns non-empty context for the exact target-local declaration. Use the path plus enclosing function/class names from target_inventory/call_inventory/assignment_inventory, then validate_overlay with the smallest scan-surface adapter/flag or provide notes explaining why no validated adapter target exists. Do not claim core scan coverage without concrete adapter_coverage/concept_reference evidence for this exact API shape."
+					p.debugf("step=%d finish_overlay rejected: empty target semantic overlay", step)
 				}
 				if len(validationWarnings) > 0 {
 					toolResult["warnings"] = validationWarnings
@@ -743,6 +808,15 @@ agentLoop:
 			})
 		}
 		log = append(log, entry)
+		if step >= 8 && !agentLogHasTool(log, "set_hypothesis") && !hasAnyToolCall(calls, "validate_overlay", "finish_overlay", "set_hypothesis") && agentLogReadyForHypothesis(log) {
+			p.debugf("step=%d injecting hypothesis checkpoint", step)
+			contents = append(contents, map[string]any{
+				"role": "user",
+				"parts": []map[string]any{{
+					"text": "Hypothesis checkpoint: before more broad search, call set_hypothesis with the best current semantic family, exact target path/symbol, proposed concepts, expected scan/review lift, and evidence. If one field is missing, call exactly the focused inventory/context tool needed for that field next. Do not keep reading unrelated files.",
+				}},
+			})
+		}
 		validatorRequiredInventory := hasToolCall(calls, "symbol_inventory") || hasToolCall(calls, "call_inventory") || hasToolCall(calls, "assignment_inventory")
 		if decisionCheckpointSent && validatorRequiredInventory && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") {
 			needsSymbols := requiresSymbolInventory(profile)
@@ -753,7 +827,7 @@ agentLoop:
 			missingFocused := len(requiredCallTerms) > 0 && !agentLogHasCallInventoryTerm(log, requiredCallTerms)
 			missingAssignments := requiresAssignmentInventory(profile) && !agentLogHasTool(log, "assignment_inventory")
 			missingFocusedAssignments := requiresAssignmentInventory(profile) && len(requiredAssignmentTerms) > 0 && !agentLogHasAssignmentInventoryTerm(log, requiredAssignmentTerms)
-			msg := "Required inventory is now satisfied. Next tool call must be finish_overlay with adapter_files=[] unless you have already validated a concrete adapter."
+			msg := "Required inventory is now satisfied. If target-local security semantics are present in the returned symbols/calls/assignments, next call function_context/class_context/module_context for the exact declaration and then validate_overlay with the smallest scan-surface adapter or flag. If a context tool returns no contexts, retry with the exact path plus enclosing function/class name from inventory. Finish empty only when notes explicitly explain why no validated adapter target exists; do not claim core scan coverage without concrete adapter_coverage/concept_reference evidence for the exact API shape."
 			switch {
 			case missingSymbols:
 				msg = "Checkpoint correction: symbol_inventory is still required before finish_overlay. Call symbol_inventory with focused declaration terms, then finish_overlay."
@@ -774,12 +848,21 @@ agentLoop:
 				}},
 			})
 		}
+		if decisionCheckpointSent && hasAnyToolCall(calls, "function_context", "class_context", "module_context") && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") {
+			p.debugf("step=%d context checkpoint correction", step)
+			contents = append(contents, map[string]any{
+				"role": "user",
+				"parts": []map[string]any{{
+					"text": "Context evidence is now available. Do not call more inventory/search/context tools. Next tool call must be validate_overlay with a minimal adapter using values from the returned context, or finish_overlay with adapter_files=[] only if no validated adapter target exists.",
+				}},
+			})
+		}
 		if decisionCheckpointSent && step >= 16 && !hasToolCall(calls, "validate_overlay") && !hasToolCall(calls, "finish_overlay") && !validatorRequiredInventory {
 			p.debugf("step=%d corrective checkpoint after unrelated tool calls", step)
 			contents = append(contents, map[string]any{
 				"role": "user",
 				"parts": []map[string]any{{
-					"text": "Checkpoint correction: do not call more setup/search/reference tools. Next call must be finish_overlay, unless the last finish_overlay response required symbol_inventory, call_inventory, or assignment_inventory; in that case call only the required inventory tool with the requested focused terms, then finish_overlay.",
+					"text": "Checkpoint correction: do not call more setup/search/reference tools. If inventory found target-local security semantics, call the exact context tool and validate_overlay; retry context with exact path plus enclosing function/class name if it returns empty. Otherwise finish_overlay with adapter_files=[] and notes explaining why no validated adapter target exists. If the last finish_overlay response required symbol_inventory, call_inventory, or assignment_inventory, call only the required inventory tool with the requested focused terms first.",
 				}},
 			})
 		}
@@ -822,6 +905,15 @@ func toolCallNames(calls []vertexToolCall) string {
 func hasToolCall(calls []vertexToolCall, name string) bool {
 	for _, call := range calls {
 		if call.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAnyToolCall(calls []vertexToolCall, names ...string) bool {
+	for _, name := range names {
+		if hasToolCall(calls, name) {
 			return true
 		}
 	}
@@ -893,6 +985,107 @@ func agentLogResultHasAnyTerm(log []AgentStep, terms []string) bool {
 					return true
 				}
 			}
+		}
+	}
+	return false
+}
+
+func targetSecuritySemanticEvidence(log []AgentStep) bool {
+	tools := map[string]bool{
+		"target_inventory":     true,
+		"call_inventory":       true,
+		"assignment_inventory": true,
+		"symbol_inventory":     true,
+	}
+	terms := []string{
+		"token", "password", "secret", "credential", "auth", "csrf", "xsrf",
+		"session", "cookie", "redirect", "callback", "origin", "cors", "host",
+		"url", "path", "filename", "file", "upload", "html", "body", "content",
+		"title", "sql", "query", "command", "exec", "shell", "permission",
+		"role", "policy", "admin", "validate", "verify", "check", "signature",
+	}
+	for _, step := range log {
+		for _, result := range step.ToolResults {
+			if !tools[result.Name] {
+				continue
+			}
+			b, err := json.Marshal(result.Result)
+			if err != nil {
+				continue
+			}
+			hay := strings.ToLower(string(b))
+			for _, term := range terms {
+				if strings.Contains(hay, term) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func agentLogHasAnyContextTool(log []AgentStep) bool {
+	return agentLogHasNonEmptyToolResult(log, "function_context") ||
+		agentLogHasNonEmptyToolResult(log, "class_context") ||
+		agentLogHasNonEmptyToolResult(log, "module_context")
+}
+
+func agentLogHasPositiveScanDelta(log []AgentStep) bool {
+	for _, step := range log {
+		for _, result := range step.ToolResults {
+			if result.Name != "scan_delta" {
+				continue
+			}
+			if boolResult(result.Result, "scan_lift") || boolResult(result.Result, "review_lift") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func agentLogReadyForHypothesis(log []AgentStep) bool {
+	if !agentLogHasTool(log, "target_inventory") {
+		return false
+	}
+	focusedTools := []string{
+		"baseline_probe",
+		"vyql_definitions",
+		"adapter_coverage",
+		"dependency_gaps",
+		"probe_dependency",
+		"symbol_inventory",
+		"call_inventory",
+		"assignment_inventory",
+		"function_context",
+		"class_context",
+		"module_context",
+		"concept_reference",
+	}
+	for _, name := range focusedTools {
+		if agentLogHasTool(log, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func boolResult(m map[string]any, key string) bool {
+	v, ok := m[key]
+	if !ok {
+		return false
+	}
+	b, _ := v.(bool)
+	return b
+}
+
+func agentLogHasEmptyContextTool(log []AgentStep) bool {
+	if agentLogHasAnyContextTool(log) {
+		return false
+	}
+	for _, name := range []string{"function_context", "class_context", "module_context"} {
+		if agentLogHasTool(log, name) {
+			return true
 		}
 	}
 	return false
@@ -1529,6 +1722,27 @@ func vertexPrepTools() []map[string]any {
 			},
 		},
 		{
+			"name":        "baseline_probe",
+			"description": "Run current VyQL scan, review, and match on the target slice without an overlay. Use before set_hypothesis or any non-empty overlay so prep complements existing source/sink/review coverage.",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "vyql_definitions",
+			"description": "Inspect shipped VyQL concepts, scan rules, adapter mappings, and review metadata. Use this to learn what is already available before proposing a new overlay.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"kind":     map[string]any{"type": "string"},
+					"language": map[string]any{"type": "string"},
+					"query":    map[string]any{"type": "string"},
+					"max":      map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
 			"name":        "concept_reference",
 			"description": "Return existing VyQL concepts useful for repo-local prep flags and sinks.",
 			"parameters": map[string]any{
@@ -1536,6 +1750,30 @@ func vertexPrepTools() []map[string]any {
 				"properties": map[string]any{
 					"topic": map[string]any{"type": "string"},
 				},
+			},
+		},
+		{
+			"name":        "set_hypothesis",
+			"description": "Record the current repo-local adapter hypothesis before proposing a non-empty overlay: semantic family, exact target path/symbol, concepts, evidence, and expected scan/review lift.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"summary":         map[string]any{"type": "string"},
+					"semantic_family": map[string]any{"type": "string"},
+					"target_path":     map[string]any{"type": "string"},
+					"target_symbol":   map[string]any{"type": "string"},
+					"proposed_concepts": map[string]any{
+						"type":  "array",
+						"items": map[string]any{"type": "string"},
+					},
+					"expected_lift": map[string]any{"type": "string"},
+					"evidence": map[string]any{
+						"type":  "array",
+						"items": map[string]any{"type": "string"},
+					},
+					"uncertainty": map[string]any{"type": "string"},
+				},
+				"required": []string{"summary", "semantic_family", "target_path", "target_symbol", "proposed_concepts", "expected_lift", "evidence"},
 			},
 		},
 		{
@@ -1748,6 +1986,16 @@ func vertexPrepTools() []map[string]any {
 			"parameters":  finishOverlayParameters(),
 		},
 		{
+			"name":        "overlay_probe",
+			"description": "Run vyql match with the proposed overlay on target files and report whether proposed concepts bind to scanned code. Use after validate_overlay succeeds.",
+			"parameters":  finishOverlayParameters(),
+		},
+		{
+			"name":        "scan_delta",
+			"description": "Run baseline and overlay scan/review on target files and report added scan rules and review concepts. Required before finishing a non-empty overlay.",
+			"parameters":  finishOverlayParameters(),
+		},
+		{
 			"name":        "finish_overlay",
 			"description": "Finish with repo-local VyQL adapter overlay files.",
 			"parameters":  finishOverlayParameters(),
@@ -1895,9 +2143,66 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 	case "adapter_coverage":
 		lang, _ := call.Arguments["language"].(string)
 		return map[string]any{"ok": true, "coverage": adapterCoverage(profile, lang, intArg(call.Arguments, "max", 80))}
+	case "baseline_probe":
+		return baselineProbe(profile)
+	case "vyql_definitions":
+		cat, err := definitions.Inspect(definitions.InspectOptions{
+			Kind:     stringArg(call.Arguments, "kind"),
+			Language: stringArg(call.Arguments, "language"),
+			Query:    stringArg(call.Arguments, "query"),
+			Max:      intArg(call.Arguments, "max", 40),
+		})
+		if err != nil {
+			return map[string]any{"ok": false, "error": err.Error()}
+		}
+		return map[string]any{"ok": true, "definitions": cat}
 	case "concept_reference":
 		topic, _ := call.Arguments["topic"].(string)
 		return map[string]any{"ok": true, "concepts": conceptReference(topic)}
+	case "set_hypothesis":
+		summary := strings.TrimSpace(stringArg(call.Arguments, "summary"))
+		family := strings.TrimSpace(stringArg(call.Arguments, "semantic_family"))
+		targetPath := strings.TrimSpace(stringArg(call.Arguments, "target_path"))
+		targetSymbol := strings.TrimSpace(stringArg(call.Arguments, "target_symbol"))
+		concepts := stringSliceArg(call.Arguments, "proposed_concepts")
+		lift := strings.ToLower(strings.TrimSpace(stringArg(call.Arguments, "expected_lift")))
+		evidence := stringSliceArg(call.Arguments, "evidence")
+		missing := []string{}
+		if summary == "" {
+			missing = append(missing, "summary")
+		}
+		if family == "" {
+			missing = append(missing, "semantic_family")
+		}
+		if targetPath == "" {
+			missing = append(missing, "target_path")
+		}
+		if targetSymbol == "" {
+			missing = append(missing, "target_symbol")
+		}
+		if len(concepts) == 0 {
+			missing = append(missing, "proposed_concepts")
+		}
+		if lift != "scan" && lift != "review" && lift != "none" {
+			missing = append(missing, "expected_lift(scan|review|none)")
+		}
+		if len(evidence) == 0 {
+			missing = append(missing, "evidence")
+		}
+		if len(missing) > 0 {
+			return map[string]any{"ok": false, "error": "set_hypothesis missing or invalid: " + strings.Join(missing, ", ")}
+		}
+		return map[string]any{
+			"ok":                true,
+			"summary":           summary,
+			"semantic_family":   family,
+			"target_path":       targetPath,
+			"target_symbol":     targetSymbol,
+			"proposed_concepts": concepts,
+			"expected_lift":     lift,
+			"evidence":          evidence,
+			"next":              "Use this hypothesis to choose the smallest adapter, validate_overlay, overlay_probe, and scan_delta. If scan_delta has no lift, revise the hypothesis once or finish empty.",
+		}
 	case "package_reference":
 		lang, _ := call.Arguments["language"].(string)
 		return map[string]any{"ok": true, "packages": packageReference(profile, lang), "syntax": `adapter <language> { package "<package>" { ...mappings... } }`}
@@ -2042,10 +2347,386 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 		}
 		filtered, warnings := FilterValidProposal(profile, proposal, Config{})
 		hints := overlayHints(profile, proposal)
-		return map[string]any{"ok": len(warnings) == 0, "valid_adapter_count": len(filtered.AdapterFiles), "warnings": warnings, "hints": hints}
+		out := map[string]any{"ok": len(warnings) == 0, "valid_adapter_count": len(filtered.AdapterFiles), "warnings": warnings, "hints": hints}
+		if len(warnings) == 0 && len(filtered.AdapterFiles) > 0 {
+			out["next"] = "Call overlay_probe, then scan_delta with the same adapter_files before finish_overlay."
+		}
+		return out
+	case "overlay_probe":
+		proposal, warn := proposalFromToolArgs(call.Arguments)
+		if warn != "" {
+			return map[string]any{"ok": false, "error": warn}
+		}
+		return overlayProbe(profile, proposal)
+	case "scan_delta":
+		proposal, warn := proposalFromToolArgs(call.Arguments)
+		if warn != "" {
+			return map[string]any{"ok": false, "error": warn}
+		}
+		return scanDeltaProbe(profile, proposal)
 	default:
 		return map[string]any{"ok": false, "error": "unknown tool"}
 	}
+}
+
+func baselineProbe(profile Profile) map[string]any {
+	paths := probeScanPaths(profile)
+	out := map[string]any{"paths": paths}
+	scanData, scanErr := runVyqlJSON("", append([]string{"scan", "-format", "json"}, paths...)...)
+	reviewData, reviewErr := runVyqlJSON("", append([]string{"review", "-format", "json"}, paths...)...)
+	matchStdout, matchStderr, matchErr := runVyqlProbe("", append([]string{"match"}, paths...)...)
+	if scanErr != nil || reviewErr != nil || matchErr != nil {
+		out["ok"] = false
+		out["errors"] = compactProbeErrors(scanErr, reviewErr, matchErr)
+		if strings.TrimSpace(matchStderr) != "" {
+			out["match_stderr"] = compactSnippet(matchStderr, 1200)
+		}
+		if strings.TrimSpace(matchStdout) != "" {
+			out["match_output_tail"] = compactSnippet(matchStdout, 2000)
+		}
+		return out
+	}
+	scanRules, _ := scanRuleSummary(scanData)
+	reviewConcepts, _ := reviewConceptSummary(reviewData)
+	out["ok"] = true
+	out["scan_count"] = len(asJSONArray(scanData))
+	out["scan_rules"] = scanRules
+	out["review_count"] = len(asJSONArray(reviewData))
+	out["review_concepts"] = reviewConcepts
+	out["match_output_tail"] = compactSnippet(matchStdout, 2400)
+	out["next"] = "Use this baseline to avoid duplicate source/sink/review mappings; set_hypothesis should explain the missing complementary concept or reviewer surface."
+	return out
+}
+
+func overlayProbe(profile Profile, proposal Proposal) map[string]any {
+	filtered, warnings := FilterValidProposal(profile, proposal, Config{})
+	out := map[string]any{"warnings": warnings, "valid_adapter_count": len(filtered.AdapterFiles)}
+	if len(filtered.AdapterFiles) == 0 {
+		out["ok"] = false
+		out["error"] = "no valid adapter files to probe"
+		return out
+	}
+	overlayDir, cleanup, err := writeTempOverlay(filtered)
+	if err != nil {
+		out["ok"] = false
+		out["error"] = err.Error()
+		return out
+	}
+	defer cleanup()
+
+	paths := probeScanPaths(profile)
+	stdout, stderr, err := runVyqlProbe(overlayDir, append([]string{"match"}, paths...)...)
+	if err != nil {
+		out["ok"] = false
+		out["error"] = err.Error()
+		out["stderr"] = compactSnippet(stderr, 1200)
+		out["stdout"] = compactSnippet(stdout, 1200)
+		return out
+	}
+	concepts := proposalConcepts(filtered)
+	counts := map[string]int{}
+	lines := strings.Split(stdout, "\n")
+	for _, concept := range concepts {
+		for _, line := range lines {
+			if strings.Contains(line, concept) {
+				counts[concept]++
+			}
+		}
+	}
+	matched := []string{}
+	for _, concept := range concepts {
+		if counts[concept] > 0 {
+			matched = append(matched, concept)
+		}
+	}
+	out["ok"] = true
+	out["paths"] = paths
+	out["proposed_concepts"] = concepts
+	out["matched_concepts"] = matched
+	out["concept_match_counts"] = counts
+	out["match_output_tail"] = compactSnippet(stdout, 2000)
+	if len(matched) == 0 {
+		out["hint"] = "No proposed concept appeared in vyql match output for the target slice; revise selectors before scan_delta or finish empty."
+	} else {
+		out["next"] = "Call scan_delta with the same adapter_files to prove scan/review lift."
+	}
+	return out
+}
+
+func scanDeltaProbe(profile Profile, proposal Proposal) map[string]any {
+	filtered, warnings := FilterValidProposal(profile, proposal, Config{})
+	out := map[string]any{"warnings": warnings, "valid_adapter_count": len(filtered.AdapterFiles)}
+	if len(filtered.AdapterFiles) == 0 {
+		out["ok"] = false
+		out["error"] = "no valid adapter files to probe"
+		return out
+	}
+	overlayDir, cleanup, err := writeTempOverlay(filtered)
+	if err != nil {
+		out["ok"] = false
+		out["error"] = err.Error()
+		return out
+	}
+	defer cleanup()
+
+	paths := probeScanPaths(profile)
+	baseScan, baseScanErr := runVyqlJSON("", append([]string{"scan", "-format", "json"}, paths...)...)
+	overScan, overScanErr := runVyqlJSON(overlayDir, append([]string{"scan", "-format", "json"}, paths...)...)
+	baseReview, baseReviewErr := runVyqlJSON("", append([]string{"review", "-format", "json"}, paths...)...)
+	overReview, overReviewErr := runVyqlJSON(overlayDir, append([]string{"review", "-format", "json"}, paths...)...)
+	if baseScanErr != nil || overScanErr != nil || baseReviewErr != nil || overReviewErr != nil {
+		out["ok"] = false
+		out["errors"] = compactProbeErrors(baseScanErr, overScanErr, baseReviewErr, overReviewErr)
+		return out
+	}
+
+	baseRules, baseScanKeys := scanRuleSummary(baseScan)
+	overRules, overScanKeys := scanRuleSummary(overScan)
+	baseReviewConcepts, baseReviewKeys := reviewConceptSummary(baseReview)
+	overReviewConcepts, overReviewKeys := reviewConceptSummary(overReview)
+	addedScanKeys := sortedSetDiff(overScanKeys, baseScanKeys)
+	addedReviewKeys := sortedSetDiff(overReviewKeys, baseReviewKeys)
+	out["ok"] = true
+	out["paths"] = paths
+	out["baseline_scan_count"] = len(asJSONArray(baseScan))
+	out["overlay_scan_count"] = len(asJSONArray(overScan))
+	out["baseline_review_count"] = len(asJSONArray(baseReview))
+	out["overlay_review_count"] = len(asJSONArray(overReview))
+	out["baseline_scan_rules"] = baseRules
+	out["overlay_scan_rules"] = overRules
+	out["baseline_review_concepts"] = baseReviewConcepts
+	out["overlay_review_concepts"] = overReviewConcepts
+	out["added_scan"] = addedScanKeys
+	out["added_review"] = addedReviewKeys
+	out["scan_lift"] = len(addedScanKeys) > 0
+	out["review_lift"] = len(addedReviewKeys) > 0
+	if len(addedScanKeys) == 0 && len(addedReviewKeys) == 0 {
+		out["hint"] = "Overlay produced no scan/review delta on the target slice; revise selectors/concepts once or finish empty with no-lift notes."
+	} else {
+		out["next"] = "Finish the overlay if the added scan/review items are intended and not broad noise."
+	}
+	return out
+}
+
+func writeTempOverlay(proposal Proposal) (string, func(), error) {
+	dir, err := os.MkdirTemp("", "vyql-prep-probe-")
+	if err != nil {
+		return "", func() {}, err
+	}
+	cleanup := func() { _ = os.RemoveAll(dir) }
+	adaptersDir := filepath.Join(dir, "adapters")
+	if err := os.MkdirAll(adaptersDir, 0o755); err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	for _, f := range proposal.AdapterFiles {
+		name := safeAdapterFilename(f)
+		if err := os.WriteFile(filepath.Join(adaptersDir, name), []byte(f.Source), 0o644); err != nil {
+			cleanup()
+			return "", func() {}, err
+		}
+	}
+	return dir, cleanup, nil
+}
+
+func probeScanPaths(profile Profile) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return
+		}
+		if !filepath.IsAbs(path) && len(profile.Roots) > 0 {
+			path = filepath.Join(profile.Roots[0], path)
+		}
+		path = filepath.Clean(path)
+		if !seen[path] {
+			seen[path] = true
+			out = append(out, path)
+		}
+	}
+	for _, target := range profile.Target.Files {
+		add(target.Path)
+	}
+	if len(out) == 0 {
+		for _, root := range profile.Roots {
+			add(root)
+		}
+	}
+	if len(out) > 12 {
+		out = out[:12]
+	}
+	return out
+}
+
+func runVyqlJSON(overlayDir string, args ...string) (any, error) {
+	stdout, stderr, err := runVyqlProbe(overlayDir, args...)
+	if err != nil {
+		if strings.TrimSpace(stderr) != "" {
+			return nil, fmt.Errorf("%w: %s", err, compactSnippet(stderr, 1000))
+		}
+		return nil, err
+	}
+	var data any
+	if err := json.Unmarshal([]byte(stdout), &data); err != nil {
+		return nil, fmt.Errorf("parse json: %w: %s", err, compactSnippet(stdout, 1000))
+	}
+	return data, nil
+}
+
+func runVyqlProbe(overlayDir string, args ...string) (string, string, error) {
+	exe := strings.TrimSpace(os.Getenv("VYQL_AGENTIC_PREP_PROBE_EXE"))
+	if exe == "" {
+		var err error
+		exe, err = os.Executable()
+		if err != nil {
+			return "", "", err
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, exe, args...)
+	env := append([]string{}, os.Environ()...)
+	env = append(env, "VYQL_CACHE=", "VYQL_AGENTIC_PREP=")
+	if overlayDir != "" {
+		env = append(env, "VYQL_ADAPTER_OVERLAY="+overlayDir)
+	} else {
+		env = append(env, "VYQL_ADAPTER_OVERLAY=")
+	}
+	cmd.Env = env
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if ctx.Err() != nil {
+		return stdout.String(), stderr.String(), ctx.Err()
+	}
+	return stdout.String(), stderr.String(), err
+}
+
+func proposalConcepts(proposal Proposal) []string {
+	seen := map[string]bool{}
+	for _, f := range proposal.AdapterFiles {
+		decls, err := parser.Parse(f.Source)
+		if err == nil {
+			for _, d := range decls {
+				ad, ok := d.(*parser.AdapterDecl)
+				if !ok {
+					continue
+				}
+				for _, m := range ad.Mappings {
+					if strings.TrimSpace(m.Concept) != "" {
+						seen[m.Concept] = true
+					}
+				}
+			}
+		}
+		for _, m := range regexp.MustCompile(`\bcode\.[A-Za-z0-9_]+\b`).FindAllString(f.Source, -1) {
+			seen[m] = true
+		}
+	}
+	return sortedKeys(seen)
+}
+
+func scanRuleSummary(data any) ([]string, map[string]bool) {
+	rules := map[string]bool{}
+	keys := map[string]bool{}
+	for _, item := range asJSONArray(data) {
+		rule := stringMapValue(item, "rule")
+		if rule == "" {
+			rule = stringMapValue(item, "RuleID")
+		}
+		if rule == "" {
+			continue
+		}
+		rules[rule] = true
+		fp := firstNonEmptyString(stringMapValue(item, "fp"), stringMapValue(item, "sink"), stringMapValue(item, "source"))
+		keys[rule+"@"+fp] = true
+	}
+	return sortedKeys(rules), keys
+}
+
+func reviewConceptSummary(data any) ([]string, map[string]bool) {
+	concepts := map[string]bool{}
+	keys := map[string]bool{}
+	for _, item := range asJSONArray(data) {
+		concept := stringMapValue(item, "concept")
+		if concept == "" {
+			continue
+		}
+		concepts[concept] = true
+		keys[concept+"@"+firstNonEmptyString(stringMapValue(item, "loc"), stringMapValue(item, "node_id"), stringMapValue(item, "call"))] = true
+	}
+	return sortedKeys(concepts), keys
+}
+
+func asJSONArray(data any) []map[string]any {
+	raw, ok := data.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(raw))
+	for _, item := range raw {
+		if m, ok := item.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func stringMapValue(m map[string]any, key string) string {
+	if v, ok := m[key]; ok {
+		switch x := v.(type) {
+		case string:
+			return x
+		case fmt.Stringer:
+			return x.String()
+		}
+	}
+	return ""
+}
+
+func firstNonEmptyString(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func sortedSetDiff(a, b map[string]bool) []string {
+	var out []string
+	for k := range a {
+		if !b[k] {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	if len(out) > 40 {
+		out = out[:40]
+	}
+	return out
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func compactProbeErrors(errs ...error) []string {
+	var out []string
+	for _, err := range errs {
+		if err != nil {
+			out = append(out, err.Error())
+		}
+	}
+	return out
 }
 
 func finishOverlayParameters() map[string]any {
