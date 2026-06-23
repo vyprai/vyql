@@ -692,6 +692,15 @@ concept CryptoImproperBlinding : sink {
   review_assumption: "an attacker can request repeated private-key operations and observe timing or signature differences"
   review_confidence: high
 }
+concept CryptoMissingOptimizationBarrier : sink {
+  vulnerable_to: [crypto.ObservableDiscrepancy]
+  cwe: [CWE_200, CWE_203, CWE_208, CWE_733]
+  review_category: "crypto"
+  review_condition: "secret-dependent mask arithmetic in constant-time scalar code lacks an optimization barrier"
+  review_evidence: "constant-time scalar arithmetic context {pattern} uses a mask in limb correction without read_volatile or equivalent black-boxing"
+  review_assumption: "compiler optimization can introduce data-dependent branches that are observable across repeated scalar operations"
+  review_confidence: high
+}
 concept PremasterSecretLengthReview : sink {
   vulnerable_to: [crypto.ObservableDiscrepancy]
   cwe: [CWE_203]

@@ -171,6 +171,14 @@ adapter rust {
     lacks ".saturating_sub(1)"
     lacks ".min(self.config.update_limit)"
   }
+  flag code.CryptoMissingOptimizationBarrier in function {
+    has "lang=rust"
+    has "name=sub"
+    has "underflow_mask=((borrow>>63)^1).wrapping_sub(1)"
+    has "constants::L[i]&underflow_mask"
+    lacks "read_volatile"
+    lacks "black_box(underflow_mask)"
+  }
 
   // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
   sink path "reqwest.get" -> code.UrlFetch
