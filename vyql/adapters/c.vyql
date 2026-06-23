@@ -10,6 +10,9 @@ adapter c {
   source "fread" -> code.HttpInput
   source "recv" -> code.HttpInput
   source "recvfrom" -> code.HttpInput
+  source "http_request_param_get" -> code.HttpInput
+  source "http_request_get_query_string" -> code.HttpInput
+  source "http_request_get_path_info" -> code.HttpInput
 
   // command execution (the program/command string is arg0)
   sink path "system" -> code.CommandExecution
@@ -46,6 +49,20 @@ adapter c {
   sink path "unlink" -> code.FilePathAccess
   sink path "remove" -> code.FilePathAccess
   sink path "opendir" -> code.FilePathAccess
+  sink path "access" arg 0 -> code.FilePathAccess
+  sink path "file_read" arg 0 -> code.FilePathAccess
+  sink path "file_write" arg 0 -> code.FilePathAccess
+  flag code.CWebRequestFilePathTraversal in function {
+    has "lang=c"
+    has "http_request_param_get"
+    has "http_request_get_query_string"
+    has "file_read"
+    has "file_write"
+    has "unlink"
+    lacks "page_name_is_good(page)"
+    lacks "strstr(page,\"..\")"
+    lacks "strchr(page,'/')"
+  }
   flag code.RemoteListingDownloadPath in module {
     has "lang=c"
     has "sink(intargc,char**argv)"
@@ -547,6 +564,7 @@ adapter c {
   // controls (sanitizers) — realpath canonicalizes a path; preamble defines the rest
   control "realpath" -> core.PathCanonicalization
   control "safe_path" -> core.PathCanonicalization
+  control "page_name_is_good" -> core.PathAccessCheck
   control "escape_shell" -> core.ShellEscape
   control "escape_html" -> core.HtmlEscape
   control "encode_for_ldap" -> core.LdapEscape

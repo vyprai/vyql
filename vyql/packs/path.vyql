@@ -147,3 +147,8 @@ rule BackendServiceResourceTraversal {
   meta { id: "VYQL-PATH-028", severity: high, cwe: [CWE_22], confidence_floor: medium }
   match code.BackendServiceResourceTraversal as sink
 }
+
+rule CWebRequestFilePathTraversal {
+  meta { id: "VYQL-PATH-029", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.CWebRequestFilePathTraversal as sink
+}

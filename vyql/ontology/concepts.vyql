@@ -2256,6 +2256,15 @@ concept BackendServiceResourceTraversal : sink {
   review_assumption: "the backend service handler interprets the resource value as an object path, file path, or nested service route"
   review_confidence: medium
 }
+concept CWebRequestFilePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "C web request page parameters reach filesystem helpers without rejecting traversal-capable path components"
+  review_evidence: "C web handler context {pattern} obtains request page data and calls file access helpers without an observed page-name/path guard"
+  review_assumption: "the request helper returns client-controlled path text and the file helper resolves it relative to the process working directory"
+  review_confidence: high
+}
 concept ArchiveSymlinkFilterBypass : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   cwe: [CWE_22, CWE_59]
