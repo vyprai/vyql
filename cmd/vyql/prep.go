@@ -22,10 +22,12 @@ type prepCLIConfig struct {
 	Creds        string
 	ContextCache bool
 	Debug        bool
+	Targets      []string
 }
 
 func cmdPrep(args []string) error {
 	fs := flag.NewFlagSet("prep", flag.ExitOnError)
+	var targets stringListFlag
 	outDir := fs.String("out", os.Getenv("VYQL_AGENTIC_PREP_OUT"), "output directory for manifest and adapter overlay")
 	provider := fs.String("provider", envDefault("VYQL_AGENTIC_PREP_PROVIDER", "off"), "provider: off | vertex")
 	project := fs.String("vertex-project", os.Getenv("VYQL_VERTEX_PROJECT"), "Vertex project")
@@ -35,6 +37,7 @@ func cmdPrep(args []string) error {
 	contextCache := fs.Bool("vertex-context-cache", envBoolDefault("VYQL_VERTEX_CONTEXT_CACHE", true), "enable Vertex explicit context caching for repeated agentic prep prompt tokens")
 	debug := fs.Bool("debug", envBool("VYQL_AGENTIC_PREP_DEBUG"), "print agentic prep debug logs to stderr")
 	format := fs.String("format", "text", "output format: text | json")
+	fs.Var(&targets, "target", "optional scan target path for target-aware prep; repeatable")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -49,6 +52,7 @@ func cmdPrep(args []string) error {
 		Creds:        *creds,
 		ContextCache: *contextCache,
 		Debug:        *debug,
+		Targets:      append([]string(nil), targets...),
 	})
 	if err != nil {
 		return err
@@ -83,7 +87,7 @@ func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, agenticpr
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 	if cfg.Debug {
-		fmt.Fprintf(os.Stderr, "[agentic-prep] start provider=%s out=%s paths=%s\n", cfg.Provider, out, strings.Join(paths, ","))
+		fmt.Fprintf(os.Stderr, "[agentic-prep] start provider=%s out=%s paths=%s targets=%s\n", cfg.Provider, out, strings.Join(paths, ","), strings.Join(cfg.Targets, ","))
 	}
 
 	var provider agenticprep.Provider
@@ -106,9 +110,10 @@ func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, agenticpr
 		return "", agenticprep.ScanConfig{}, fmt.Errorf("unknown agentic prep provider %q", cfg.Provider)
 	}
 	res, err := agenticprep.Prepare(ctx, paths, agenticprep.Config{
-		OutDir:   out,
-		Provider: provider,
-		Model:    cfg.Model,
+		OutDir:      out,
+		Provider:    provider,
+		Model:       cfg.Model,
+		TargetPaths: cfg.Targets,
 	})
 	if err != nil {
 		return "", res.ScanConfig, err
@@ -122,6 +127,20 @@ func runAgenticPrepForScan(paths []string, cfg prepCLIConfig) (string, agenticpr
 		fmt.Fprintf(os.Stderr, "[agentic-prep] warning: %s\n", warning)
 	}
 	return out, res.ScanConfig, nil
+}
+
+type stringListFlag []string
+
+func (s *stringListFlag) String() string {
+	return strings.Join(*s, ",")
+}
+
+func (s *stringListFlag) Set(v string) error {
+	v = strings.TrimSpace(v)
+	if v != "" {
+		*s = append(*s, v)
+	}
+	return nil
 }
 
 func envDefault(key, fallback string) string {

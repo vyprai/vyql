@@ -2728,6 +2728,84 @@ final class AuditService {
 	}
 }
 
+func TestAnalyzeTargetRanksDependencyGaps(t *testing.T) {
+	dir := t.TempDir()
+	appPath := filepath.Join(dir, "apps", "api", "src", "gateway.ts")
+	if err := os.MkdirAll(filepath.Dir(appPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(appPath, []byte(`import { WebSocketGateway } from "@nestjs/websockets";
+export function gateway(input: string) { return input; }
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	otherPath := filepath.Join(dir, "tools", "xml.ts")
+	if err := os.MkdirAll(filepath.Dir(otherPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(otherPath, []byte(`import { parseStringPromise } from "xml2js";
+export async function parse(x: string) { return parseStringPromise(x); }
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{
+  "dependencies": {
+    "@nestjs/websockets": "latest",
+    "xml2js": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "eslint": "latest"
+  }
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := Analyze([]string{dir}, Config{TargetPaths: []string{appPath}})
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	if len(profile.Target.Files) != 1 || profile.Target.Files[0].Path != "apps/api/src/gateway.ts" {
+		t.Fatalf("unexpected target files: %#v", profile.Target.Files)
+	}
+	if len(profile.DepGaps) == 0 {
+		t.Fatalf("expected dependency gaps")
+	}
+	top := profile.DepGaps[0]
+	if top.Package != "@nestjs/websockets" || !top.Target || !containsString(top.TargetFiles, "apps/api/src/gateway.ts") {
+		t.Fatalf("expected target import to rank first, got %#v", profile.DepGaps[:minInt(len(profile.DepGaps), 5)])
+	}
+	if dependencyGapScoreForTest(profile.DepGaps, "@nestjs/websockets") <= dependencyGapScoreForTest(profile.DepGaps, "xml2js") {
+		t.Fatalf("expected target websocket dependency score to beat repo-wide xml2js: %#v", profile.DepGaps[:minInt(len(profile.DepGaps), 5)])
+	}
+	inv := targetInventory(profile, 20)
+	gaps, ok := inv["dependency_gaps"].([]DependencyGap)
+	if !ok || len(gaps) == 0 || gaps[0].Package != "@nestjs/websockets" {
+		t.Fatalf("target_inventory should expose target-ranked gaps, got %#v", inv["dependency_gaps"])
+	}
+}
+
+func TestOverlayHintsWarnWhenEvidenceOutsideTarget(t *testing.T) {
+	profile := Profile{
+		Languages: map[string]int{"php": 1},
+		Target: TargetProfile{Files: []TargetFile{{
+			Path:     "src/Http/Controllers/RestController.php",
+			Language: "php",
+		}}},
+	}
+	proposal := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "php",
+		Source:   "adapter php {\n  flag code.SecretComparisonReview in function {\n    has \"name=verifyUser\"\n  }\n}\n",
+		Evidence: []string{"src/Utility/JWTUtilities.php"},
+	}}}
+	hints := overlayHints(profile, proposal)
+	if !containsSubstring(hints, "outside profile.target.files") {
+		t.Fatalf("expected outside-target evidence hint, got %#v", hints)
+	}
+	if err := ValidateProposal(profile, proposal, Config{}); err == nil || !strings.Contains(err.Error(), "outside profile.target.files") {
+		t.Fatalf("expected outside-target context flag rejection, got %v", err)
+	}
+}
+
 func TestRepoStructureRanksSecurityRelevantDirectories(t *testing.T) {
 	dir := t.TempDir()
 	api := filepath.Join(dir, "api", "upload.php")
@@ -2815,4 +2893,20 @@ func dependencyGapScoreForTest(gaps []DependencyGap, pkg string) int {
 		}
 	}
 	return -1
+}
+
+func containsSubstring(vals []string, want string) bool {
+	for _, v := range vals {
+		if strings.Contains(v, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

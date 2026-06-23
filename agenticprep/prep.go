@@ -37,6 +37,7 @@ type Config struct {
 	MaxBytes     int
 	Provider     Provider
 	Model        string
+	TargetPaths  []string
 }
 
 type Provider interface {
@@ -58,6 +59,7 @@ type ScanConfig struct {
 
 type Profile struct {
 	Roots     []string            `json:"roots"`
+	Target    TargetProfile       `json:"target,omitempty"`
 	Languages map[string]int      `json:"languages"`
 	Packages  []string            `json:"packages,omitempty"`
 	Manifests []ManifestEvidence  `json:"manifests,omitempty"`
@@ -67,6 +69,22 @@ type Profile struct {
 	Samples   []FileSample        `json:"samples,omitempty"`
 }
 
+type TargetProfile struct {
+	Files     []TargetFile        `json:"files,omitempty"`
+	Languages map[string]int      `json:"languages,omitempty"`
+	Imports   map[string][]string `json:"imports,omitempty"`
+	Manifests []ManifestEvidence  `json:"manifests,omitempty"`
+	Packages  []string            `json:"packages,omitempty"`
+}
+
+type TargetFile struct {
+	Path     string   `json:"path"`
+	Language string   `json:"language,omitempty"`
+	SHA256   string   `json:"sha256,omitempty"`
+	Score    int      `json:"score,omitempty"`
+	Imports  []string `json:"imports,omitempty"`
+}
+
 type ManifestEvidence struct {
 	Path     string   `json:"path"`
 	Kind     string   `json:"kind"`
@@ -74,11 +92,14 @@ type ManifestEvidence struct {
 }
 
 type DependencyGap struct {
-	Language string   `json:"language,omitempty"`
-	Package  string   `json:"package"`
-	Source   string   `json:"source"`
-	Score    int      `json:"score,omitempty"`
-	Imports  []string `json:"imports,omitempty"`
+	Language    string   `json:"language,omitempty"`
+	Package     string   `json:"package"`
+	Source      string   `json:"source"`
+	Score       int      `json:"score,omitempty"`
+	TargetScore int      `json:"target_score,omitempty"`
+	Target      bool     `json:"target,omitempty"`
+	TargetFiles []string `json:"target_files,omitempty"`
+	Imports     []string `json:"imports,omitempty"`
 }
 
 type FileSample struct {
@@ -263,8 +284,184 @@ func Analyze(paths []string, cfg Config) (Profile, error) {
 		sort.Strings(depProfile.LocalPkgs)
 	}
 	depProfile.Imports = fullImports
+	target, err := analyzeTargets(paths, cfg.TargetPaths, cfg)
+	if err != nil {
+		return prof, err
+	}
+	prof.Target = target
+	depProfile.Target = target
 	prof.DepGaps = dependencyGaps(depProfile)
 	return prof, nil
+}
+
+func analyzeTargets(roots []string, targets []string, cfg Config) (TargetProfile, error) {
+	out := TargetProfile{
+		Languages: map[string]int{},
+		Imports:   map[string][]string{},
+	}
+	if len(targets) == 0 {
+		return out, nil
+	}
+	seenFiles := map[string]bool{}
+	seenImports := map[string]map[string]bool{}
+	seenManifests := map[string]bool{}
+	seenPackages := map[string]bool{}
+	for _, target := range targets {
+		path := resolveTargetPath(roots, target)
+		info, err := os.Stat(path)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			_ = filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return nil
+				}
+				if d.IsDir() {
+					if skipDir(d.Name()) && path != target {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+				collectTargetFile(path, roots, cfg, &out, seenFiles, seenImports)
+				return nil
+			})
+			continue
+		}
+		collectTargetFile(path, roots, cfg, &out, seenFiles, seenImports)
+		for _, man := range nearestTargetManifests(path, roots, cfg.MaxFileBytes) {
+			if seenManifests[man.Path] {
+				continue
+			}
+			seenManifests[man.Path] = true
+			out.Manifests = append(out.Manifests, man)
+			for _, pkg := range man.Packages {
+				seenPackages[pkg] = true
+			}
+		}
+	}
+	for lang, imports := range seenImports {
+		vals := make([]string, 0, len(imports))
+		for imp := range imports {
+			vals = append(vals, imp)
+		}
+		sort.Strings(vals)
+		out.Imports[lang] = vals
+		for _, imp := range vals {
+			for _, pkg := range importDependencyCandidates(lang, imp) {
+				if pkg != "" {
+					seenPackages[pkg] = true
+				}
+			}
+		}
+	}
+	for pkg := range seenPackages {
+		out.Packages = append(out.Packages, pkg)
+	}
+	sort.Strings(out.Packages)
+	sort.Slice(out.Manifests, func(i, j int) bool { return out.Manifests[i].Path < out.Manifests[j].Path })
+	return out, nil
+}
+
+func collectTargetFile(path string, roots []string, cfg Config, out *TargetProfile, seenFiles map[string]bool, seenImports map[string]map[string]bool) {
+	lang := languageFor(path)
+	if lang == "" && !knownTargetConfig(path) {
+		return
+	}
+	if seenFiles[path] {
+		return
+	}
+	seenFiles[path] = true
+	file, imports, _ := sampleFile(path, lang, cfg.MaxFileBytes)
+	if file.Path == "" {
+		return
+	}
+	display := displayTargetPath(roots, path)
+	tf := TargetFile{
+		Path:     display,
+		Language: lang,
+		SHA256:   file.SHA256,
+		Score:    securityRelevanceScore(display, file.Preview),
+		Imports:  cappedStrings(imports, 40),
+	}
+	out.Files = append(out.Files, tf)
+	if lang != "" {
+		out.Languages[lang]++
+		if seenImports[lang] == nil {
+			seenImports[lang] = map[string]bool{}
+		}
+		for _, imp := range imports {
+			seenImports[lang][imp] = true
+		}
+	}
+}
+
+func resolveTargetPath(roots []string, target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" || filepath.IsAbs(target) {
+		return target
+	}
+	for _, root := range roots {
+		cand := filepath.Join(root, target)
+		if _, err := os.Stat(cand); err == nil {
+			return cand
+		}
+	}
+	return target
+}
+
+func displayTargetPath(roots []string, path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.ToSlash(path)
+	}
+	for _, root := range roots {
+		rabs, err := filepath.Abs(root)
+		if err != nil {
+			continue
+		}
+		if rel, err := filepath.Rel(rabs, abs); err == nil && !strings.HasPrefix(rel, "..") {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return filepath.ToSlash(path)
+}
+
+func nearestTargetManifests(path string, roots []string, maxBytes int) []ManifestEvidence {
+	var out []ManifestEvidence
+	dir := filepath.Dir(path)
+	rootSet := map[string]bool{}
+	for _, root := range roots {
+		abs, err := filepath.Abs(root)
+		if err == nil {
+			rootSet[abs] = true
+		}
+	}
+	for {
+		for _, name := range []string{"package.json", "composer.json", "go.mod", "requirements.txt", "pyproject.toml", "cargo.toml", "pom.xml", "build.gradle"} {
+			if man, ok := manifestEvidence(filepath.Join(dir, name), maxBytes); ok {
+				out = append(out, man)
+			}
+		}
+		abs, err := filepath.Abs(dir)
+		if err != nil || rootSet[abs] || dir == filepath.Dir(dir) {
+			break
+		}
+		dir = filepath.Dir(dir)
+	}
+	return out
+}
+
+func knownTargetConfig(path string) bool {
+	if knownConfigOrManifest(path) {
+		return true
+	}
+	switch strings.ToLower(filepath.Base(path)) {
+	case "project.pbxproj", "tox.ini":
+		return true
+	default:
+		return false
+	}
 }
 
 func deterministicProposal(paths []string, cfg Config) Proposal {
@@ -420,6 +617,7 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 		}
 		onto := ontology.Seed()
 		seen := false
+		localContext := false
 		for _, d := range decls {
 			ad, ok := d.(*parser.AdapterDecl)
 			if !ok {
@@ -433,6 +631,9 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				return fmt.Errorf("agentic prep: adapter %q has no mappings", lang)
 			}
 			for _, m := range ad.Mappings {
+				if localExactContextMapping(m) {
+					localContext = true
+				}
 				if m.Concept != "" && !onto.Exists(m.Concept) {
 					return fmt.Errorf("agentic prep: adapter %q references unknown concept %q", lang, m.Concept)
 				}
@@ -478,6 +679,9 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 			if sourceOnlyParamOverlay(ad) {
 				return fmt.Errorf("agentic prep: adapter %q only broadens public parameters as sources; add a concrete sink/flag/control mapping or return an empty overlay", lang)
 			}
+		}
+		if localContext && !adapterEvidenceTouchesTarget(profile, f) {
+			return fmt.Errorf("agentic prep: adapter %q uses target-local context flag evidence outside profile.target.files", lang)
 		}
 		if !seen {
 			return fmt.Errorf("agentic prep: adapter %q contains no adapter declaration", lang)
@@ -1278,10 +1482,13 @@ func profilePackageCandidates(profile Profile) []string {
 }
 
 type dependencyCandidate struct {
-	Language string
-	Package  string
-	Source   string
-	Imports  map[string]bool
+	Language    string
+	Package     string
+	Source      string
+	Imports     map[string]bool
+	Target      bool
+	TargetScore int
+	TargetFiles map[string]bool
 }
 
 func dependencyGaps(profile Profile) []DependencyGap {
@@ -1298,11 +1505,14 @@ func dependencyGaps(profile Profile) []DependencyGap {
 		}
 		sort.Strings(imports)
 		out = append(out, DependencyGap{
-			Language: cand.Language,
-			Package:  cand.Package,
-			Source:   cand.Source,
-			Score:    dependencyGapScore(cand),
-			Imports:  imports,
+			Language:    cand.Language,
+			Package:     cand.Package,
+			Source:      cand.Source,
+			Score:       dependencyGapScore(cand),
+			TargetScore: cand.TargetScore,
+			Target:      cand.Target,
+			TargetFiles: sortedMapKeys(cand.TargetFiles),
+			Imports:     imports,
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -1349,12 +1559,13 @@ func dependencyGapScore(c dependencyCandidate) int {
 	if strings.HasPrefix(c.Source, "manifest:") {
 		score += 8
 	}
+	score += c.TargetScore
 	return score
 }
 
 func dependencyCandidates(profile Profile) []dependencyCandidate {
 	seen := map[string]*dependencyCandidate{}
-	add := func(lang, pkg, source, imp string) {
+	add := func(lang, pkg, source, imp string, target bool, targetFile string, targetScore int) {
 		lang = strings.TrimSpace(lang)
 		pkg = sca.NormalizePackageName(pkg)
 		if pkg == "" || isLikelyStdOrLocalPackage(lang, pkg) {
@@ -1366,7 +1577,7 @@ func dependencyCandidates(profile Profile) []dependencyCandidate {
 		key := lang + "\x00" + pkg
 		cand := seen[key]
 		if cand == nil {
-			cand = &dependencyCandidate{Language: lang, Package: pkg, Source: source, Imports: map[string]bool{}}
+			cand = &dependencyCandidate{Language: lang, Package: pkg, Source: source, Imports: map[string]bool{}, TargetFiles: map[string]bool{}}
 			seen[key] = cand
 		}
 		if cand.Source == "" || strings.HasPrefix(source, "manifest:") {
@@ -1375,19 +1586,43 @@ func dependencyCandidates(profile Profile) []dependencyCandidate {
 		if imp != "" {
 			cand.Imports[imp] = true
 		}
+		if target {
+			cand.Target = true
+			cand.TargetScore += targetScore
+			if targetFile != "" {
+				cand.TargetFiles[targetFile] = true
+			}
+		}
 	}
 	for _, man := range profile.Manifests {
 		langs := manifestLanguages(man.Kind)
 		for _, pkg := range man.Packages {
 			for _, lang := range langs {
-				add(lang, pkg, "manifest:"+man.Kind+":"+man.Path, "")
+				target := targetManifestPath(profile.Target, man.Path)
+				score := 0
+				if target {
+					score = 60
+				}
+				add(lang, pkg, "manifest:"+man.Kind+":"+man.Path, "", target, "", score)
 			}
 		}
 	}
 	for lang, imports := range profile.Imports {
 		for _, imp := range imports {
 			for _, pkg := range importDependencyCandidates(lang, imp) {
-				add(lang, pkg, "import:"+lang, imp)
+				targetFiles, target := targetImportFiles(profile.Target, lang, imp)
+				score := 0
+				if target {
+					score = 120
+				}
+				if len(targetFiles) == 0 {
+					add(lang, pkg, "import:"+lang, imp, target, "", score)
+					continue
+				}
+				for _, targetFile := range targetFiles {
+					add(lang, pkg, "import:"+lang, imp, true, targetFile, score)
+					score = 0
+				}
 			}
 		}
 	}
@@ -1402,6 +1637,58 @@ func dependencyCandidates(profile Profile) []dependencyCandidate {
 		return out[i].Package < out[j].Package
 	})
 	return out
+}
+
+func sortedMapKeys(set map[string]bool) []string {
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(set))
+	for v := range set {
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func targetManifestPath(target TargetProfile, path string) bool {
+	if len(target.Manifests) == 0 {
+		return false
+	}
+	norm := normalizePathForCompare(path)
+	for _, man := range target.Manifests {
+		if normalizePathForCompare(man.Path) == norm {
+			return true
+		}
+	}
+	return false
+}
+
+func targetImportFiles(target TargetProfile, lang string, imp string) ([]string, bool) {
+	if len(target.Files) == 0 {
+		return nil, false
+	}
+	var files []string
+	for _, file := range target.Files {
+		if lang != "" && file.Language != "" && file.Language != lang {
+			continue
+		}
+		for _, targetImp := range file.Imports {
+			if targetImp == imp {
+				files = append(files, file.Path)
+				break
+			}
+		}
+	}
+	return files, len(files) > 0
+}
+
+func normalizePathForCompare(path string) string {
+	path = filepath.ToSlash(path)
+	if abs, err := filepath.Abs(path); err == nil {
+		path = filepath.ToSlash(abs)
+	}
+	return strings.TrimPrefix(path, "./")
 }
 
 func localPackageCandidates(lang, text string) []string {

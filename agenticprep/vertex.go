@@ -229,6 +229,10 @@ Rules:
   exact files. Use read_file only when one exact file or offset is needed.
 - Prefer this workflow:
   1. inspect_profile
+     If profile.target.files is non-empty, call target_inventory before
+     repo-wide dependency, search, or file tools. Treat target files as the
+     primary scan slice; use repo-wide evidence only to explain framework or
+     dependency semantics relevant to that slice.
   2. trust_model and entrypoint_inventory to understand the repo archetype,
      active trust boundary, request/API/CLI/config surfaces, and whether prep
      should mostly adjust scan configuration rather than adapters.
@@ -596,6 +600,7 @@ agentLoop:
 				requiredCallTerms := requiredCallInventoryTerms(profile)
 				needsAssignments := requiresAssignmentInventory(profile)
 				requiredAssignmentTerms := requiredAssignmentInventoryTerms(profile)
+				missingTargetInventory := len(profile.Target.Files) > 0 && !agentLogHasTool(log, "target_inventory")
 				missingRequiredSymbols := needsSymbols && !agentLogHasTool(log, "symbol_inventory")
 				missingRequiredCalls := needsSymbols && !agentLogHasTool(log, "call_inventory")
 				missingFocusedCalls := len(requiredCallTerms) > 0 && !agentLogHasCallInventoryTerm(log, requiredCallTerms)
@@ -603,7 +608,7 @@ agentLoop:
 				missingFocusedAssignments := needsAssignments && len(requiredAssignmentTerms) > 0 && !agentLogHasAssignmentInventoryTerm(log, requiredAssignmentTerms)
 				validationWarnings := []string(nil)
 				validAdapterCount := 0
-				if warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments {
+				if warn == "" && !missingTargetInventory && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments {
 					filtered, warnings := FilterValidProposal(profile, proposal, Config{})
 					validationWarnings = warnings
 					validAdapterCount = len(filtered.AdapterFiles)
@@ -618,7 +623,7 @@ agentLoop:
 				emptySecretComparisonOverlay := secretComparisonProfile(profile) && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"secretcomparisonreview", "vyql-cry-006", "constant-time", "constant time", "timingsafeequal", "scmp"}))
 				cryptoBlindingEvidence := cryptoBlindingProfile(profile)
 				emptyCryptoBlindingOverlay := cryptoBlindingEvidence && validAdapterCount == 0 && len(proposal.AdapterFiles) == 0 && (!agentLogHasNonEmptyToolResult(log, "function_context") || !notesMentionAny(proposal.Notes, []string{"cryptoimproperblinding", "vyql-cry-011", "core scan", "base scanner", "existing scanner"}))
-				ok := warn == "" && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptySecureCookieOverlay && !emptySecretComparisonOverlay && !emptyCryptoBlindingOverlay
+				ok := warn == "" && !missingTargetInventory && !missingRequiredSymbols && !missingRequiredCalls && !missingFocusedCalls && !missingRequiredAssignments && !missingFocusedAssignments && len(validationWarnings) == 0 && !emptyJenkinsStartupOverlay && !emptyJenkinsRemoteValidationOverlay && !emptyJobOutputEventOverlay && !emptyDefaultRelayOverlay && !emptyCommandWrapperOverlay && !emptyCommandOptionOverlay && !emptySecureCookieOverlay && !emptySecretComparisonOverlay && !emptyCryptoBlindingOverlay
 				toolResult := map[string]any{
 					"ok":                  ok,
 					"valid_adapter_count": validAdapterCount,
@@ -626,7 +631,10 @@ agentLoop:
 				if warn != "" {
 					toolResult["error"] = warn
 				}
-				if missingRequiredSymbols && missingRequiredCalls {
+				if missingTargetInventory {
+					toolResult["error"] = "target_inventory is required before finish_overlay because profile.target.files is non-empty; inspect the scan target slice before finishing or proposing adapters"
+					p.debugf("step=%d finish_overlay rejected: target_inventory required", step)
+				} else if missingRequiredSymbols && missingRequiredCalls {
 					toolResult["error"] = "symbol_inventory and call_inventory are required before finish_overlay for repositories with security-relevant framework, verification, or native memory evidence; call symbol_inventory to map declarations, then call_inventory with focused API terms such as validate, origin, attestation, predicate, verify, print, policy, alloc, copy, size, capacity, escape, or unicode"
 					p.debugf("step=%d finish_overlay rejected: symbol_inventory and call_inventory required", step)
 				} else if missingRequiredSymbols {
@@ -1489,6 +1497,16 @@ func vertexPrepTools() []map[string]any {
 			},
 		},
 		{
+			"name":        "target_inventory",
+			"description": "Return target-slice files, imports, nearest manifests, dependency gaps, and compact symbols/calls/assignments for the current scan target. Use before repo-wide search when profile.target.files is non-empty.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"max": map[string]any{"type": "integer"},
+				},
+			},
+		},
+		{
 			"name":        "entrypoint_inventory",
 			"description": "Return deterministic API/route/handler/CLI/config entrypoint candidates found in repo files so prep can configure trust model and target adapters.",
 			"parameters": map[string]any{
@@ -1865,6 +1883,8 @@ func (p *VertexProvider) executePrepTool(profile Profile, call vertexToolCall) m
 		return map[string]any{"ok": true, "reference": adapterReferenceText()}
 	case "trust_model":
 		return map[string]any{"ok": true, "trust_model": trustModelSummary(profile)}
+	case "target_inventory":
+		return map[string]any{"ok": true, "target": targetInventory(profile, intArg(call.Arguments, "max", 80))}
 	case "entrypoint_inventory":
 		lang, _ := call.Arguments["language"].(string)
 		entries, err := entrypointInventory(profile, lang, intArg(call.Arguments, "max", 60))
@@ -2992,6 +3012,85 @@ func adapterCoverage(profile Profile, lang string, max int) map[string]any {
 	return out
 }
 
+func targetInventory(profile Profile, max int) map[string]any {
+	if max <= 0 || max > 200 {
+		max = 80
+	}
+	out := map[string]any{
+		"files":     profile.Target.Files,
+		"languages": profile.Target.Languages,
+		"imports":   profile.Target.Imports,
+		"manifests": profile.Target.Manifests,
+		"packages":  cappedStrings(profile.Target.Packages, 80),
+	}
+	var gaps []DependencyGap
+	for _, gap := range profile.DepGaps {
+		if gap.Target {
+			gaps = append(gaps, gap)
+		}
+	}
+	if len(gaps) > max {
+		gaps = gaps[:max]
+	}
+	out["dependency_gaps"] = gaps
+	if len(gaps) > 0 {
+		out["recommended_probe"] = map[string]any{"language": gaps[0].Language, "package": gaps[0].Package}
+	}
+	type targetFacts struct {
+		Symbols     []symbolEntry     `json:"symbols,omitempty"`
+		Calls       []callEntry       `json:"calls,omitempty"`
+		Assignments []assignmentEntry `json:"assignments,omitempty"`
+	}
+	facts := targetFacts{}
+	perKindLimit := max
+	if perKindLimit > 80 {
+		perKindLimit = 80
+	}
+	for _, file := range profile.Target.Files {
+		if len(facts.Symbols) >= perKindLimit && len(facts.Calls) >= perKindLimit && len(facts.Assignments) >= perKindLimit {
+			break
+		}
+		content, ok, err := readProfileFile(profile, file.Path, 0, 96<<10)
+		if err != nil || !ok {
+			continue
+		}
+		lang := file.Language
+		if lang == "" {
+			lang = languageFor(file.Path)
+		}
+		symbols := extractSymbols(lang, content)
+		for i := range symbols {
+			if len(facts.Symbols) >= perKindLimit {
+				break
+			}
+			symbols[i].Path = file.Path
+			symbols[i].Language = lang
+			symbols[i].Score = securityRelevanceScore(file.Path, symbols[i].Signature+"\n"+symbols[i].Snippet)
+			facts.Symbols = append(facts.Symbols, symbols[i])
+		}
+		for _, call := range extractCalls(lang, content, symbols) {
+			if len(facts.Calls) >= perKindLimit {
+				break
+			}
+			call.Path = file.Path
+			call.Language = lang
+			call.Score = securityRelevanceScore(file.Path, call.Snippet)
+			facts.Calls = append(facts.Calls, call)
+		}
+		for _, assignment := range extractAssignments(lang, content, symbols) {
+			if len(facts.Assignments) >= perKindLimit {
+				break
+			}
+			assignment.Path = file.Path
+			assignment.Language = lang
+			assignment.Score = securityRelevanceScore(file.Path, assignment.Target+"\n"+assignment.Value+"\n"+assignment.Snippet) + assignmentRiskScore(assignment)
+			facts.Assignments = append(facts.Assignments, assignment)
+		}
+	}
+	out["facts"] = facts
+	return out
+}
+
 func cappedStrings(vals []string, max int) []string {
 	out := append([]string(nil), vals...)
 	sort.Strings(out)
@@ -3217,6 +3316,9 @@ func overlayHints(profile Profile, proposal Proposal) []string {
 	firstPartyPackages := firstPartyManifestPackages(profile)
 	for _, f := range proposal.AdapterFiles {
 		src := f.Source
+		if len(profile.Target.Files) > 0 && !adapterEvidenceTouchesTarget(profile, f) {
+			hints = append(hints, "Adapter evidence is outside profile.target.files; generated prep should target the current scan slice unless it maps a dependency/framework API used by that slice.")
+		}
 		if strings.Contains(src, "SqlExecution") && !strings.Contains(src, "source ") && !strings.Contains(src, "UnparameterizedSqlQueryParser") {
 			hints = append(hints, "SQL sinks need a source/control flow to fire; for library public APIs consider source param -> code.ExternalEntryInput, or use a narrow code.UnparameterizedSqlQueryParser flag for local query-fragment assembly.")
 		}
@@ -3243,6 +3345,36 @@ func overlayHints(profile Profile, proposal Proposal) []string {
 		}
 	}
 	return hints
+}
+
+func adapterEvidenceTouchesTarget(profile Profile, file AdapterFile) bool {
+	if len(profile.Target.Files) == 0 || len(file.Evidence) == 0 {
+		return true
+	}
+	for _, ev := range file.Evidence {
+		ev = normalizeOverlayPath(ev)
+		for _, target := range profile.Target.Files {
+			if pathsRelated(ev, normalizeOverlayPath(target.Path)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func normalizeOverlayPath(path string) string {
+	path = filepath.ToSlash(strings.TrimSpace(path))
+	path = strings.TrimPrefix(path, "./")
+	return path
+}
+
+func pathsRelated(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	a = strings.TrimSuffix(a, "/")
+	b = strings.TrimSuffix(b, "/")
+	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 }
 
 type dirSummary struct {
