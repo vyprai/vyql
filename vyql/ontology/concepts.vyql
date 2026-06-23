@@ -2450,6 +2450,15 @@ concept UnsanitizedSvgUpload : sink {
   review_assumption: "stored SVG files can be served back to users and scriptable SVG content can execute in a browser"
   review_confidence: high
 }
+concept UnescapedJsonTreeLabelXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "JSON tree or list node labels include stored names without HTML escaping before the browser UI renders them"
+  review_evidence: "tree-node label context {pattern} returns a stored name in a text label without htmlspecialchars or equivalent escaping"
+  review_assumption: "the frontend component renders the text label as HTML or otherwise interprets markup in tree/list labels"
+  review_confidence: high
+}
 concept CordysRequestParamXssFilterDisabled : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

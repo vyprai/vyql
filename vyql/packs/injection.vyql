@@ -220,6 +220,11 @@ rule JavaScriptUrlRedirectXss {
   match code.JavaScriptUrlRedirectXss as sink
 }
 
+rule UnescapedJsonTreeLabelXss {
+  meta { id: "VYQL-INJ-125", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedJsonTreeLabelXss as sink
+}
+
 rule JenkinsComputerQueueUnescapedTooltipXss {
   meta { id: "VYQL-INJ-097", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.JenkinsComputerQueueUnescapedTooltipXss as sink

@@ -1269,6 +1269,12 @@ review code.UnescapedHtmlPresenter {
   expected: [core.HtmlEscape]
   text: "review HTML presenters that interpolate computed or input-derived values into returned markup"
 }
+review code.UnescapedJsonTreeLabelXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "verify JSON tree or list labels escape stored names before returning them to browser UI components"
+}
 review code.UnescapedChartTooltipHtml {
   category: "xss"
   kind: "attention"

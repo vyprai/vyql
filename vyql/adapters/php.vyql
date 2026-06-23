@@ -485,6 +485,13 @@ adapter php {
     has "$result['log']=$log"
     lacks "$log.=htmlentities($this->last_headers"
   }
+  flag code.UnescapedJsonTreeLabelXss in function {
+    has "lang=php"
+    has "$name=$configuration->getName()"
+    has "'text'=>$name"
+    lacks "'text'=>htmlspecialchars($name)"
+    lacks "'text'=>htmlentities($name)"
+  }
   // Review-only access-policy config: nested PHP arrays such as
   // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]
   // carry key-path tokens, so broad role grants on sensitive resource groups can
