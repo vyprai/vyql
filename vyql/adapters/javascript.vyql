@@ -973,6 +973,15 @@ adapter javascript {
     lacks "invalids.includes(key)"
     lacks "'__proto__'"
   }
+  flag code.ForOwnRecursiveDefaultsPrototypePollution on any {
+    path exact "analysis.function.context"
+    has "lang=javascript"
+    has "name=copy"
+    has "lazy.forOwn(current,function(value,key)"
+    has "target[key]=value"
+    has "defaultsDeep(val,value)"
+    lacks "key==='__proto__'"
+  }
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute

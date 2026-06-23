@@ -706,6 +706,12 @@ review code.CommandOptionInjection {
   expected: [core.InputValidation]
   text: "review command arguments for end-of-options delimiters or option allowlist validation before passing escaped user values to option-taking CLI commands"
 }
+review code.ForOwnRecursiveDefaultsPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review recursive defaults merge keys for __proto__ filtering before assigning target[key]"
+}
 review code.McpToolCommandTemplateExecution {
   category: "command"
   kind: "attention"

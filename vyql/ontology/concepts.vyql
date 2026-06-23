@@ -440,6 +440,15 @@ concept CookiexDeepPrototypePollution : sink {
   review_assumption: "a caller can pass attacker-controlled objects containing __proto__, constructor, or prototype keys to the deep assignment API"
   review_confidence: high
 }
+concept ForOwnRecursiveDefaultsPrototypePollution : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "recursive defaults merge copies forOwn callback keys into target object properties without skipping prototype-mutating names"
+  review_evidence: "defaults merge context {pattern} iterates source keys with forOwn, writes target[key], and recurses into nested objects"
+  review_assumption: "a caller can pass attacker-controlled objects containing __proto__ keys to the deep defaults API"
+  review_confidence: high
+}
 concept SchemaCodegenValidationBypass : sink {
   vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
   cwe: [CWE_1321, CWE_915]

@@ -593,6 +593,11 @@ rule CookiexDeepPrototypePollution {
   match code.CookiexDeepPrototypePollution as sink
 }
 
+rule ForOwnRecursiveDefaultsPrototypePollution {
+  meta { id: "VYQL-INJ-130", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.ForOwnRecursiveDefaultsPrototypePollution as sink
+}
+
 rule CordysRequestParamXssFilterDisabled {
   meta { id: "VYQL-INJ-108", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.CordysRequestParamXssFilterDisabled as sink
