@@ -320,6 +320,24 @@ adapter c {
     has "u->gid=(int)l"
     lacks "u->uid=(int)l;if(*endptr=='\\0')returnu"
   }
+  flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
+    has "lang=c"
+    has "name=cupsdCheckGroup"
+    has "_cups_strcasecmp(username,group->gr_mem[i])"
+    lacks "strcmp(user->pw_name,group->gr_mem[i])"
+  }
+  flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
+    has "lang=c"
+    has "name=cupsdIsAuthorized"
+    has "_cups_strcasecmp(username,name)"
+    lacks "strcmp(pw->pw_name,name)"
+  }
+  flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
+    has "lang=c"
+    has "name=cupsdIsAuthorized"
+    has "_cups_strcasecmp(username,ownername)"
+    lacks "strcmp(pw->pw_name,ownername)"
+  }
   flag code.ReachableAssertionReview in function {
     has "lang=c"
     has "AVAHI_FLAGS_VALID"

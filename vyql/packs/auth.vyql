@@ -29,6 +29,11 @@ rule ParsedUserIdDefaultRootPrivilegeEscalation {
   match code.ParsedUserIdDefaultRootPrivilegeEscalation as parser
 }
 
+rule CaseInsensitiveLocalIdentityAuthorizationBypass {
+  meta { id: "VYQL-AUTH-032", severity: high, cwe: [CWE_178, CWE_863], confidence_floor: high }
+  match code.CaseInsensitiveLocalIdentityAuthorizationBypass as authz
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller

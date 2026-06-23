@@ -1369,6 +1369,15 @@ concept ParsedUserIdDefaultRootPrivilegeEscalation : sink {
   review_assumption: "the zero-initialized user structure represents root or another higher-privilege default when a caller supplies a non-root UID"
   review_confidence: high
 }
+concept CaseInsensitiveLocalIdentityAuthorizationBypass : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_178, CWE_863]
+  review_category: "auth"
+  review_condition: "local user or group names are authorized with case-insensitive string comparison instead of canonical OS identity names"
+  review_evidence: "local identity authorization context {pattern} compares supplied identity text with _cups_strcasecmp before using passwd/group canonical names"
+  review_assumption: "the platform treats local user or group names as case-sensitive for identity resolution or has distinct principals that differ only by case"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]

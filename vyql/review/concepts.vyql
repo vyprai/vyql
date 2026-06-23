@@ -87,6 +87,12 @@ review code.ParsedUserIdDefaultRootPrivilegeEscalation {
   kind: "attention"
   text: "review UID/GID parsers that can return a zero-initialized privileged user before assigning the parsed UID"
 }
+review code.CaseInsensitiveLocalIdentityAuthorizationBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review local user/group authorization checks that compare supplied identity text case-insensitively instead of canonical OS identity names"
+}
 review code.ClearanceKitPolicyApplyBeforeAdapterStart {
   category: "auth"
   kind: "attention"
