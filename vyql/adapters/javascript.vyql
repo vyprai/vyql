@@ -884,6 +884,14 @@ adapter javascript {
     path "replace"
     has "\\s*\\n\\s*"
   }
+  flag code.CatastrophicRegex on any {
+    path "StringPrototypeSplit"
+    has "\\s*,\\s*"
+  }
+  flag code.CatastrophicRegex on any {
+    method "split"
+    has "\\s*,\\s*"
+  }
   flag code.CatastrophicRegex in function {
     has "lang=javascript"
     has "varhwb=/^hwb\\("
