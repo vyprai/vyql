@@ -1,0 +1,61 @@
+test "rank589: DBI preparse allocates too little for generated placeholder indexes"
+  lang c
+  expect VYQL-MEM-033
+  expect_review code.LengthMultiplierFormattedExpansionUnderallocation
+  code
+  ```
+  typedef struct SV SV;
+  SV *newSV(unsigned long size);
+  char *SvPVX(SV *sv);
+  unsigned long strlen(const char *s);
+  int sprintf(char *s, const char *fmt, ...);
+
+  static SV *preparse(const char *statement) {
+      int idx = 1;
+      const char *src;
+      char *dest, *start;
+      SV *new_stmt_sv = newSV(strlen(statement) * 3);
+      src = statement;
+      dest = SvPVX(new_stmt_sv);
+      while (*src) {
+          start = dest;
+          if (*src++ == '?') {
+              sprintf(start, ":p%d", idx++);
+              dest = start + strlen(start);
+          }
+      }
+      *dest = '\0';
+      return new_stmt_sv;
+  }
+  ```
+
+test "rank589: DBI preparse reserves enough room for generated placeholder indexes"
+  lang c
+  reject VYQL-MEM-033
+  reject_review code.LengthMultiplierFormattedExpansionUnderallocation
+  code
+  ```
+  typedef struct SV SV;
+  SV *newSV(unsigned long size);
+  char *SvPVX(SV *sv);
+  unsigned long strlen(const char *s);
+  int sprintf(char *s, const char *fmt, ...);
+
+  static SV *preparse(const char *statement) {
+      int idx = 1;
+      const char *src;
+      char *dest, *start;
+      SV *new_stmt_sv = newSV(strlen(statement) * 6 + 16);
+      src = statement;
+      dest = SvPVX(new_stmt_sv);
+      while (*src) {
+          start = dest;
+          if (*src++ == '?') {
+              sprintf(start, ":p%d", idx++);
+              dest = start + strlen(start);
+          }
+      }
+      *dest = '\0';
+      return new_stmt_sv;
+  }
+  ```

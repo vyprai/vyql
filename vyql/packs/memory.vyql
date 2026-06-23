@@ -83,6 +83,11 @@ rule SignedMessageLengthUnderflowCopy {
   match code.SignedMessageLengthUnderflowCopy as c
 }
 
+rule LengthMultiplierFormattedExpansionUnderallocation {
+  meta { id: "VYQL-MEM-033", severity: high, cwe: [CWE_787, CWE_190], confidence_floor: high }
+  match code.LengthMultiplierFormattedExpansionUnderallocation as c
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse

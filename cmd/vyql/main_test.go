@@ -72,6 +72,25 @@ func TestExtractAllSupportsPHPIncludes(t *testing.T) {
 	}
 }
 
+func TestExtractAllSupportsPerlXSAsC(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "DBI.xs")
+	if err := os.WriteFile(src, []byte("int xs_helper(void) { return 42; }\n"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	prog, _, _, stats, err := extractAll([]string{src})
+	if err != nil {
+		t.Fatalf("extractAll .xs: %v", err)
+	}
+	if got := stats.files["c"]; got != 1 {
+		t.Fatalf(".xs should route through c frontend, got count %d stats=%v", got, stats.files)
+	}
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
+		t.Fatalf(".xs should extract C statements, got modules=%d body=%d", len(prog.Modules), len(prog.Modules[0].Body))
+	}
+}
+
 // The full default rule library (vyql/packs/*.vyql) must parse and type-check
 // against the ontology with zero errors.
 func TestDefaultPacksCompile(t *testing.T) {

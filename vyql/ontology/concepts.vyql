@@ -1219,6 +1219,15 @@ concept CgifAddframeSignedFrameCountOverflow : sink {
   review_assumption: "large width and height values can overflow the promoted signed int product and skip or truncate frame comparison"
   review_confidence: high
 }
+concept LengthMultiplierFormattedExpansionUnderallocation : sink {
+  vulnerable_to: [memory.OobWrite, memory.IntegerOverflow]
+  cwe: [CWE_787, CWE_190]
+  review_category: "memory"
+  review_condition: "a buffer is allocated from input length with a fixed small multiplier before formatted numeric expansion writes into it"
+  review_evidence: "allocation/format context {pattern} sizes output from strlen(input) * N and later writes generated %d text into the same expansion buffer"
+  review_assumption: "the generated formatted tokens can grow beyond the per-input multiplier as numeric indexes gain digits"
+  review_confidence: high
+}
 concept UncheckedEncodedLengthArithmetic : sink {
   vulnerable_to: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
   cwe: [CWE_190, CWE_835]

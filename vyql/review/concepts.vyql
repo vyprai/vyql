@@ -1705,6 +1705,11 @@ review code.CgifAddframeSignedFrameCountOverflow {
   kind: "attention"
   text: "review CGIF frame-count loop bounds for unsigned width-height multiplication before indexing image data"
 }
+review code.LengthMultiplierFormattedExpansionUnderallocation {
+  category: "memory"
+  kind: "attention"
+  text: "review strlen-multiplier output allocations before formatted numeric token expansion; digit growth may exceed the reserved per-character budget"
+}
 review code.UncheckedEncodedLengthArithmetic {
   category: "numeric"
   kind: "attention"

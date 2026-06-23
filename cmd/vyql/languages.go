@@ -33,7 +33,7 @@ var languages = []language{
 	{"java", map[string]bool{".java": true}, treesitter.ExtractJava, frontend.JavaAdapters},
 	{"php", map[string]bool{".php": true, ".phtml": true, ".inc": true}, treesitter.ExtractPHP, frontend.PHPAdapters},
 	{"csharp", map[string]bool{".cs": true}, treesitter.ExtractCSharp, frontend.CSharpAdapters},
-	{"c", map[string]bool{".c": true, ".h": true}, treesitter.ExtractC, frontend.CAdapters},
+	{"c", map[string]bool{".c": true, ".h": true, ".xs": true}, treesitter.ExtractC, frontend.CAdapters},
 	{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".c++": true, ".hpp": true}, treesitter.ExtractCPP, frontend.CPPAdapters},
 	{"rust", map[string]bool{".rs": true}, treesitter.ExtractRust, frontend.RustAdapters},
 	{"bash", map[string]bool{".sh": true, ".bash": true}, treesitter.ExtractBash, frontend.BashAdapters},

@@ -257,6 +257,15 @@ adapter c {
     lacks "i>="
     lacks "realloc("
   }
+  flag code.LengthMultiplierFormattedExpansionUnderallocation in function {
+    has "lang=c"
+    has "newSV(strlen("
+    has ")*3)"
+    has "sprintf("
+    has "%d"
+    lacks "*6+16"
+    lacks "snprintf("
+  }
   flag code.ClamavWwpackStructsPointerOobWrite in function {
     has "lang=c"
     has "name=wwunpack"
