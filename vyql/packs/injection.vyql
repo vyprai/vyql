@@ -260,6 +260,11 @@ rule JenkinsComputerQueueUnescapedTooltipXss {
   match code.JenkinsComputerQueueUnescapedTooltipXss as sink
 }
 
+rule JenkinsProjectDisplayNameXss {
+  meta { id: "VYQL-INJ-133", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.JenkinsProjectDisplayNameXss as sink
+}
+
 rule PrestaShopContactformMessageEmailXss {
   meta { id: "VYQL-INJ-101", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.PrestaShopContactformMessageEmailXss as sink

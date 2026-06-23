@@ -1,0 +1,48 @@
+test "rank606: Jenkins project display name is returned without HTML escaping"
+  lang java
+  file ProjectNode.java
+  expect VYQL-INJ-133
+  expect_review code.JenkinsProjectDisplayNameXss
+  code
+  ```
+  package hudson.plugins.depgraph_view.model.graph;
+
+  import hudson.model.AbstractProject;
+
+  public class ProjectNode {
+      private final AbstractProject<?,?> project;
+
+      public ProjectNode(AbstractProject<?, ?> project) {
+          this.project = project;
+      }
+
+      public String getName() {
+          return project.getFullDisplayName();
+      }
+  }
+  ```
+
+test "rank606: Jenkins project display name is HTML escaped"
+  lang java
+  file ProjectNode.java
+  reject VYQL-INJ-133
+  reject_review code.JenkinsProjectDisplayNameXss
+  code
+  ```
+  package hudson.plugins.depgraph_view.model.graph;
+
+  import hudson.model.AbstractProject;
+  import org.apache.commons.lang.StringEscapeUtils;
+
+  public class ProjectNode {
+      private final AbstractProject<?,?> project;
+
+      public ProjectNode(AbstractProject<?, ?> project) {
+          this.project = project;
+      }
+
+      public String getName() {
+          return StringEscapeUtils.escapeHtml(project.getFullDisplayName());
+      }
+  }
+  ```

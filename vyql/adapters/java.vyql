@@ -223,6 +223,12 @@ adapter java {
     lacks "call_path:StringEscapeUtils.escapeHtml"
     lacks "call_path:HtmlUtils.htmlEscape"
   }
+  flag code.JenkinsProjectDisplayNameXss in function {
+    has "function_name:getName"
+    has "call_path:project.getFullDisplayName"
+    lacks "call_path:StringEscapeUtils.escapeHtml"
+    lacks "call_path:Util.escape"
+  }
   flag code.JenkinsPluginForkedDirectoryBrowserWithoutCsp on any {
     path exact "DirectoryBrowserSupport"
     has "Compare Html Report"

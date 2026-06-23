@@ -1152,6 +1152,12 @@ review code.JenkinsComputerQueueUnescapedTooltipXss {
   expected: [core.HtmlEscape]
   text: "review Jenkins Computer Queue tooltips for h.escape around agent/cause text before rendering"
 }
+review code.JenkinsProjectDisplayNameXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Jenkins project display names for HTML escaping before graph or UI rendering"
+}
 review code.PrestaShopContactformMessageEmailXss {
   category: "xss"
   kind: "attention"
