@@ -2111,6 +2111,15 @@ concept JdbcCredentialAttributeExposure : sink {
   review_assumption: "database-name fields may be visible in protocol metadata, logs, or DatabaseMetaData.getURL output while credentials should travel only through the authentication mechanism"
   review_confidence: high
 }
+concept WindowsRemotePathCredentialLeak : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "privileged Windows service code probes or opens a caller-configurable path before rejecting UNC or network paths"
+  review_evidence: "Windows path handling context {pattern} uses a configured path in QFileInfo/QSettings/watchdog setup without an observed remote-path guard"
+  review_assumption: "probing a UNC path from a privileged Windows service can trigger outbound SMB authentication and expose machine or service credential material"
+  review_confidence: high
+}
 concept CinnyServiceWorkerMediaAuthLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_20, CWE_200, CWE_522]

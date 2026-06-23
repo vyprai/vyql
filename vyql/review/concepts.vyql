@@ -1499,6 +1499,12 @@ review code.JdbcCredentialAttributeExposure {
   expected: [core.SecretRedaction]
   text: "review JDBC URL/property handling so user and password attributes are stripped before database-name, protocol metadata, or getURL exposure"
 }
+review code.WindowsRemotePathCredentialLeak {
+  category: "secret"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review privileged Windows path probes for UNC/network path rejection before file existence checks or config parsing"
+}
 review code.DefaultExternalRelaySecretExposure {
   category: "secret"
   kind: "attention"

@@ -215,6 +215,14 @@ adapter cpp {
     has "W*H*D>siz"
     lacks "(cimg_int64)W*H*D>siz"
   }
+  flag code.WindowsRemotePathCredentialLeak in function {
+    has "lang=cpp"
+    has "QFileInfo::exists(m_configFile)"
+    has "QSettingsconfig(m_configFile,QSettings::IniFormat)"
+    has "m_pWatchdog->setProcessConfig(command,elevate)"
+    lacks "m_configFile.startsWith(QStringLiteral(\"\\\\\\\\\"))"
+    lacks "m_configFile.startsWith(QStringLiteral(\"//\"))"
+  }
   flag code.LibreOfficeEnhwmfDibHeaderSizeUnderflow in function {
     has "lang=cpp"
     has "EMR_ALPHABLEND"
