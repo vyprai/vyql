@@ -551,6 +551,12 @@ adapter go {
     lacks "call_path:n.removingHopByHopHeaders"
     lacks "call_path:httpguts.HeaderValuesContainsToken"
   }
+  flag code.BasicAuthStreamAuthBypass on any {
+    path exact "Options"
+    has "BasicAuthEnabled"
+    has "Creds"
+    lacks "AuthRequired"
+  }
   flag code.ProxyClientIpSpoofingBypass in function {
     has "call_path:g.management.GetProxy"
     has "call_path:proxy.ServeHTTP"

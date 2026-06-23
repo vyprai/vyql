@@ -34,6 +34,11 @@ rule CaseInsensitiveLocalIdentityAuthorizationBypass {
   match code.CaseInsensitiveLocalIdentityAuthorizationBypass as authz
 }
 
+rule BasicAuthStreamAuthBypass {
+  meta { id: "VYQL-AUTH-033", severity: high, cwe: [CWE_287, CWE_306], confidence_floor: high }
+  match code.BasicAuthStreamAuthBypass as auth
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller

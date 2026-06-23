@@ -439,6 +439,12 @@ review code.HopByHopHeaderAuthBypass {
   expected: [core.AuthenticationCheck, core.AuthorizationCheck]
   text: "review reverse-proxy impersonation handlers for hop-by-hop Connection header stripping before backend auth headers are written"
 }
+review code.BasicAuthStreamAuthBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review streaming/SSE auth option builders that enable Basic auth but do not set AuthRequired=true"
+}
 review code.ProxyClientIpSpoofingBypass {
   category: "auth"
   kind: "attention"

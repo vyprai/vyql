@@ -1391,6 +1391,15 @@ concept CaseInsensitiveLocalIdentityAuthorizationBypass : sink {
   review_assumption: "the platform treats local user or group names as case-sensitive for identity resolution or has distinct principals that differ only by case"
   review_confidence: high
 }
+concept BasicAuthStreamAuthBypass : sink {
+  vulnerable_to: [authentication.AuthenticationBypass, authentication.MissingAuthentication]
+  cwe: [CWE_287, CWE_306]
+  review_category: "auth"
+  review_condition: "streaming or SSE auth options enable Basic authentication without requiring authentication"
+  review_evidence: "stream auth option builder {pattern} sets BasicAuthEnabled but omits AuthRequired=true"
+  review_assumption: "the returned options protect streaming endpoints and the middleware allows unauthenticated requests when AuthRequired is false"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]
