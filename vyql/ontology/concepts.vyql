@@ -2124,6 +2124,15 @@ concept WindowsRemotePathCredentialLeak : sink {
   review_assumption: "probing a UNC path from a privileged Windows service can trigger outbound SMB authentication and expose machine or service credential material"
   review_confidence: high
 }
+concept MessageBusSecretConfigExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "message-bus password options remain in service configuration after creating the client"
+  review_evidence: "message-bus bootstrap context {pattern} loads auth data into messageBusInfo and passes messageBusInfo.Optional into the message client without deleting the password option"
+  review_assumption: "the service exposes or serializes its runtime configuration to callers such as diagnostics or /config endpoints"
+  review_confidence: high
+}
 concept CinnyServiceWorkerMediaAuthLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_20, CWE_200, CWE_522]

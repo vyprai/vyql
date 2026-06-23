@@ -476,6 +476,13 @@ adapter go {
     path "settingspkg.Settings"
     has "PasswordPattern"
   }
+  flag code.MessageBusSecretConfigExposure in function {
+    has "call_path:bootstrapMessaging.SetOptionsAuthData"
+    has "call_path:messaging.NewMessageClient"
+    has "field:Optional"
+    has "selector:messageBusInfo.Optional"
+    lacks "selector:bootstrapMessaging.OptionsPasswordKey"
+  }
   // Review-only: protocol/state handlers that stop a registration timer without
   // first checking the corresponding state can accept out-of-sequence messages.
   flag code.ProtocolStateReview in function {
