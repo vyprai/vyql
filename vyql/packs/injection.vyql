@@ -340,6 +340,11 @@ rule UnescapedChartTooltipHtml {
   match code.UnescapedChartTooltipHtml as sink
 }
 
+rule IncompleteHtmlEventHandlerStrip {
+  meta { id: "VYQL-INJ-136", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.IncompleteHtmlEventHandlerStrip as sink
+}
+
 rule CraftAnonymousTemplateRenderActionXss {
   meta { id: "VYQL-INJ-076", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.CraftAnonymousTemplateRenderActionXss as sink

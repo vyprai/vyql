@@ -2961,6 +2961,15 @@ concept UnescapedChartTooltipHtml : sink {
   review_assumption: "tooltip labels or legends can contain stored project data controlled by an editor"
   review_confidence: high
 }
+concept IncompleteHtmlEventHandlerStrip : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "an HTML source/editor sanitizer strips scripts and iframes but leaves inline event-handler attributes"
+  review_evidence: "HTML source filter {pattern} removes script/iframe content without an observed on* attribute removal step"
+  review_assumption: "attacker-controlled or user-editable HTML can contain inline event handlers that execute when rendered back into the editor"
+  review_confidence: high
+}
 concept CheckmkPendingChangeTextUnescapeXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

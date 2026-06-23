@@ -169,6 +169,18 @@ adapter javascript {
     lacks "replaceChildren"
     lacks "textContent"
   }
+  flag code.IncompleteHtmlEventHandlerStrip in module {
+    has "lang=javascript"
+    has "ViewSource"
+    has "stripScripts"
+    has "stripIFrames"
+    has "stripComments"
+    has "_stripScripts"
+    has "_stripIFrames"
+    has "_filter"
+    lacks "stripEventHandlers"
+    lacks "_stripEventHandlers"
+  }
   flag code.JobOutputEventUpdateAuthorizationBypass in function {
     has "Got job update from child"
     has "update_event"
