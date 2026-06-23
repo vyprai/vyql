@@ -1169,6 +1169,17 @@ adapter javascript {
     has "i+=incr"
     lacks "Math.max(Math.abs(numeric(n[2])),1)"
   }
+  flag code.FoldedHeaderContinuationCrash in function {
+    has "lang=javascript"
+    has "this.buffer.split(RE_CRLF)"
+    has "lines[i][0]"
+    has "RE_HDR.exec(lines[i])"
+    has "this.header[h]"
+    has "lines[i]"
+    lacks "if(h)"
+    lacks "if(h!==undefined)"
+    lacks "if(h!=null)"
+  }
   flag code.ResourceHandle on any {
     path "fs.openSync"
   }

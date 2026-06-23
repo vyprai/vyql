@@ -103,3 +103,8 @@ rule EmmettUnhandledCookieParseException {
   meta { id: "VYQL-DOS-020", severity: high, cwe: [CWE_248, CWE_400], confidence_floor: high }
   match code.EmmettUnhandledCookieParseException as s
 }
+
+rule FoldedHeaderContinuationCrash {
+  meta { id: "VYQL-DOS-021", severity: high, cwe: [CWE_248, CWE_400], confidence_floor: high }
+  match code.FoldedHeaderContinuationCrash as s
+}

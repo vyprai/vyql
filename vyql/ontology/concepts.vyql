@@ -1973,6 +1973,15 @@ concept EmmettUnhandledCookieParseException : sink {
   review_assumption: "an unauthenticated remote client can send malformed Cookie headers and trigger the request cookies property"
   review_confidence: high
 }
+concept FoldedHeaderContinuationCrash : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_248, CWE_400]
+  review_category: "resource"
+  review_condition: "a header parser handles folded continuation lines before proving a current header field exists"
+  review_evidence: "header parser context {pattern} appends leading-whitespace lines into the current header bucket without an observed current-header guard"
+  review_assumption: "a remote peer can send a malformed header block whose first non-empty line is a folded continuation"
+  review_confidence: high
+}
 concept GsonObjectTypeAdapterRecursiveRead : sink {
   vulnerable_to: [deserialization.DeserializationAbuse, dos.UncontrolledResourceConsumption]
   cwe: [CWE_502, CWE_400]

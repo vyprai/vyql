@@ -1,0 +1,74 @@
+# Rank 622 / CVE-2022-24434: dicer's header parser dereferenced the
+# current header bucket for folded continuation lines before proving a
+# header field had been parsed.
+test "rank622: folded header continuation lacks current-header guard"
+  lang javascript
+  file HeaderParser.js
+  expect VYQL-DOS-021
+  code
+  ```
+  var RE_CRLF = /\r\n/g,
+      RE_HDR = /^([^:]+):[ \t]?([\x00-\xFF]+)?$/;
+
+  HeaderParser.prototype._parseHeader = function() {
+    var lines = this.buffer.split(RE_CRLF), len = lines.length, m, h,
+        modded = false;
+
+    for (var i = 0; i < len; ++i) {
+      if (lines[i].length === 0)
+        continue;
+      if (lines[i][0] === '\t' || lines[i][0] === ' ') {
+        this.header[h][this.header[h].length - 1] += lines[i];
+      } else {
+        m = RE_HDR.exec(lines[i]);
+        if (m) {
+          h = m[1].toLowerCase();
+          this.header[h] = [m[2] || ''];
+        } else {
+          this.buffer = lines[i];
+          modded = true;
+          break;
+        }
+      }
+    }
+    if (!modded)
+      this.buffer = '';
+  };
+  ```
+
+test "rank622: folded header continuation is ignored until a header exists"
+  lang javascript
+  file HeaderParser.js
+  reject VYQL-DOS-021
+  code
+  ```
+  var RE_CRLF = /\r\n/g,
+      RE_HDR = /^([^:]+):[ \t]?([\x00-\xFF]+)?$/;
+
+  HeaderParser.prototype._parseHeader = function() {
+    var lines = this.buffer.split(RE_CRLF), len = lines.length, m, h,
+        modded = false;
+
+    for (var i = 0; i < len; ++i) {
+      if (lines[i].length === 0)
+        continue;
+      if (lines[i][0] === '\t' || lines[i][0] === ' ') {
+        if (h) {
+          this.header[h][this.header[h].length - 1] += lines[i];
+          continue;
+        }
+      }
+      m = RE_HDR.exec(lines[i]);
+      if (m) {
+        h = m[1].toLowerCase();
+        this.header[h] = [m[2] || ''];
+      } else {
+        this.buffer = lines[i];
+        modded = true;
+        break;
+      }
+    }
+    if (!modded)
+      this.buffer = '';
+  };
+  ```
