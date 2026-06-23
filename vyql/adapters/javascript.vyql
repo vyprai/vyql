@@ -382,6 +382,7 @@ adapter javascript {
   control "isUrlAllowed" -> core.AllowlistValidation
   control "isAllowedHost" -> core.AllowlistValidation
   control "validateUrl" -> core.AllowlistValidation
+  control "validateFetchUrl" -> core.AllowlistValidation
   control "isUrlSafeToOpen" -> core.AllowlistValidation
   flag code.ExternalResourceIntegrityReview in function {
     has "name=updateDynamicPageSriHashes"
@@ -560,6 +561,7 @@ adapter javascript {
   sink path "axios.request" -> code.UrlFetch
   sink path "axios" -> code.UrlFetch
   sink path "fetch" -> code.UrlFetch
+  sink path "cross-fetch" -> code.UrlFetch
   sink path "node-fetch" -> code.UrlFetch
   sink path "http.get" -> code.UrlFetch
   sink path "https.get" -> code.UrlFetch
