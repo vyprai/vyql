@@ -795,6 +795,16 @@ adapter go {
     has "binary:password==wrapper.password"
     lacks "call:ConstantTimeCompare"
   }
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "!="]
+    operand {
+      key contains_any [".Password", ".password", ".Secret", ".secret", ".Token", ".token", ".APIKey", ".apiKey", ".AccessKey", ".accessKey"]
+    }
+    operand {
+      key contains_any [".Password", ".password", ".Secret", ".secret", ".Token", ".token", ".APIKey", ".apiKey", ".AccessKey", ".accessKey"]
+    }
+    lacks call contains_any ["ConstantTimeCompare", "hmac.Equal", "subtle.ConstantTimeCompare", "CompareHashAndPassword"]
+  }
   flag code.InsecurePermission on any {
     path "os.WriteFile"
     has "0666"
