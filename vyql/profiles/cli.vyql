@@ -7,5 +7,5 @@ profile cli {
   detect: ["dep:cobra", "dep:click", "dep:argparse", "dep:clap", "dep:commander",
            "dep:yargs", "dep:picocli", "dep:thor"]
   entrypoints: [CliArgument, EnvVariable, StdinInput, ConfigFileInput, StoredDataRead,
-                ExternalApiResponse, SecretValue, ComputedSizeValue, ArchiveEntryName]
+                ExternalApiResponse, PatternOptionInput, SecretValue, ComputedSizeValue, ArchiveEntryName]
 }

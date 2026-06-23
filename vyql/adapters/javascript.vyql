@@ -10,6 +10,7 @@ adapter javascript {
   // Library option bags are caller-controlled under the library profile. These option
   // fields have appeared in code-generation CVEs where the public API reaches an internal
   // compiler callback through a cache/helper the analyzer cannot inline.
+  source "options.pattern" -> code.PatternOptionInput
   source "options.timezone" -> core.UserControlledData
   source "config.timezone" -> core.UserControlledData
   source path "analysis.parameter.entry" val "decorator_method:Get" -> code.HttpInput

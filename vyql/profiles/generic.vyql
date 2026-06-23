@@ -7,6 +7,6 @@ profile generic {
   priority: "0"
   entrypoints: [HttpInput, HttpHeader, HttpRequest, Cookie, FileUpload, SecretValue,
                 DatabaseRead, StoredDataRead, ExternalApiResponse, MessageInput, IntentInput, PasteboardInput,
-                CliArgument, EnvVariable, StdinInput, ConfigFileInput, ComputedSizeValue,
+                CliArgument, EnvVariable, StdinInput, ConfigFileInput, PatternOptionInput, ComputedSizeValue,
                 ArchiveEntryName]
 }

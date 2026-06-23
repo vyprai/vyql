@@ -7,6 +7,6 @@ profile frontend {
   priority: "70"
   detect: ["dep:react", "dep:vue", "dep:@angular/core", "dep:svelte", "dep:preact",
            "file:angular.json", "ext:.jsx", "ext:.tsx", "ext:.vue", "ext:.svelte"]
-  entrypoints: [DomInput, HttpInput, HttpHeader, Cookie, FileUpload, SecretValue, ComputedSizeValue,
+  entrypoints: [DomInput, HttpInput, HttpHeader, Cookie, FileUpload, PatternOptionInput, SecretValue, ComputedSizeValue,
                 ArchiveEntryName]
 }

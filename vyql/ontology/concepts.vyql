@@ -39,6 +39,10 @@ concept ExternalEntryInput : source {
   source_assumption: "the library is invoked with untrusted input at this entry point"
   source_confidence: medium
 }
+concept PatternOptionInput : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
 concept CodeEval : sink {
   vulnerable_to: [injection.CodeInjection]
   enabled_by: [taint.UntrustedData]
