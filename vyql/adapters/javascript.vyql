@@ -175,6 +175,15 @@ adapter javascript {
     lacks "allow_event_updates_from_jobs"
     lacks "delete data.update_event"
   }
+  flag code.PublicVisibilityCacheInvalidationMissing in module {
+    has "lang=javascript"
+    has "ProxyCacheInvalidationService"
+    has "RUNNER_INFO_CACHE_PREFIX"
+    has "SandboxEvents.ARCHIVED"
+    has "redis.del"
+    lacks "SandboxEvents.PUBLIC_STATUS_UPDATED"
+    lacks "PUBLIC_CACHE_PREFIX"
+  }
   flag code.TotalJsAdminThemeXss in module {
     has "lang=javascript"
     has "COMPONENT('grid'"

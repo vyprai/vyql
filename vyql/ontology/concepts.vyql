@@ -1436,6 +1436,15 @@ concept PluginManagementMissingAuthorization : sink {
   review_assumption: "non-privileged authenticated users or API clients can invoke the plugin management endpoint directly"
   review_confidence: high
 }
+concept PublicVisibilityCacheInvalidationMissing : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_863]
+  review_category: "auth"
+  review_condition: "public-visibility cache entries are not invalidated when the public status changes"
+  review_evidence: "cache invalidation service {pattern} clears sandbox runner cache on lifecycle events but lacks public-status update invalidation"
+  review_assumption: "the cached public-status response gates unauthenticated or cross-tenant access to sandbox proxy or preview data"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]

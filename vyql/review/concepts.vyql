@@ -457,6 +457,12 @@ review code.PluginManagementMissingAuthorization {
   expected: [core.AuthorizationCheck]
   text: "verify plugin upload, install, uninstall, and status-change endpoints require operation-specific permissions"
 }
+review code.PublicVisibilityCacheInvalidationMissing {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify public visibility changes invalidate cached public sandbox proxy or preview status"
+}
 review code.ProxyClientIpSpoofingBypass {
   category: "auth"
   kind: "attention"
