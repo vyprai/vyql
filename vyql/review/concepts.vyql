@@ -688,6 +688,12 @@ review code.McpToolCommandTemplateExecution {
   expected: [core.ShellEscape]
   text: "review MCP tool handlers for execFile or argv-array execution instead of shell command templates"
 }
+review code.ApiScanFoundActionCommandExecution {
+  category: "command"
+  kind: "attention"
+  expected: [core.InputValidation, core.AuthenticationCheck]
+  text: "review API scan handlers that bind request options and forward found-action command settings into the scan engine"
+}
 review code.ConnectCmsCodestudiesPluginCodeExecution {
   category: "code_execution"
   kind: "attention"

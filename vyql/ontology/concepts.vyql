@@ -127,6 +127,15 @@ concept CommandExecution : sink {
   cwe: [CWE_78]
   excluded_chars: ";|&$<>()"
 }
+concept ApiScanFoundActionCommandExecution : sink {
+  vulnerable_to: [injection.CommandInjection, injection.CodeInjection]
+  cwe: [CWE_78, CWE_15]
+  review_category: "command"
+  review_condition: "API request bodies can configure scan options that trigger host-side found-action command execution"
+  review_evidence: "API scan handler context {pattern} binds request options and forwards them to the scan engine without stripping found-action command fields"
+  review_assumption: "the scan engine executes configured found-action commands when a finding is produced"
+  review_confidence: high
+}
 concept RubyPipeOpenCommandExecution : sink {
   vulnerable_to: [injection.CommandInjection]
   enabled_by: [taint.UntrustedData]

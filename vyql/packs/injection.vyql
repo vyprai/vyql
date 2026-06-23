@@ -142,6 +142,11 @@ rule McpToolCommandTemplateExecution {
   match code.McpToolCommandTemplateExecution as sink
 }
 
+rule ApiScanFoundActionCommandExecution {
+  meta { id: "VYQL-INJ-123", severity: critical, cwe: [CWE_78, CWE_15], confidence_floor: high }
+  match code.ApiScanFoundActionCommandExecution as sink
+}
+
 rule ConnectCmsCodestudiesPluginCodeExecution {
   meta { id: "VYQL-INJ-100", severity: critical, cwe: [CWE_94, CWE_78], confidence_floor: high }
   match code.ConnectCmsCodestudiesPluginCodeExecution as sink

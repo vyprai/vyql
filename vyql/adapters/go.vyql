@@ -778,6 +778,13 @@ adapter go {
     has "call:Mount"
     lacks "call:ParseIP"
   }
+  flag code.ApiScanFoundActionCommandExecution in function {
+    has "function_name:postScanHandler"
+    has "call_path:c.Bind"
+    has "selector:rq.Options"
+    has "call_path:ScanFromAPI"
+    lacks "call_path:sanitizeAPIScanOptions"
+  }
   // Review-only: writing security state through ordinary path opening of procfs control
   // files needs a verified procfs/open boundary to avoid link or mount redirection.
   flag code.SpecialFileAccessReview in function {

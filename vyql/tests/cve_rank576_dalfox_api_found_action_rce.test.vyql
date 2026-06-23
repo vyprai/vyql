@@ -1,0 +1,89 @@
+test "rank576: API scan handler must strip found-action command options"
+  lang go
+  expect VYQL-INJ-123
+  code
+  ```
+  package server
+
+  type Context interface {
+      Bind(any) error
+  }
+
+  type Options struct {
+      Scan map[string]Scan
+      FoundAction string
+      FoundActionShell string
+  }
+
+  type Scan struct{}
+
+  type Req struct {
+      URL string
+      Options Options
+  }
+
+  func GenerateRandomToken(s string) string { return s }
+  func ScanFromAPI(url string, reqOptions Options, serverOptions Options, sid string) {}
+
+  func postScanHandler(c Context, scans *[]string, options *Options) error {
+      rq := new(Req)
+      if err := c.Bind(rq); err != nil {
+          return err
+      }
+      sid := GenerateRandomToken(rq.URL)
+      *scans = append(*scans, sid)
+      if options.Scan == nil {
+          options.Scan = make(map[string]Scan)
+      }
+      go ScanFromAPI(rq.URL, rq.Options, *options, sid)
+      return nil
+  }
+  ```
+
+test "rank576: API scan handler sanitizes found-action command options"
+  lang go
+  reject VYQL-INJ-123
+  code
+  ```
+  package server
+
+  type Context interface {
+      Bind(any) error
+  }
+
+  type Options struct {
+      Scan map[string]Scan
+      FoundAction string
+      FoundActionShell string
+  }
+
+  type Scan struct{}
+
+  type Req struct {
+      URL string
+      Options Options
+  }
+
+  func GenerateRandomToken(s string) string { return s }
+  func ScanFromAPI(url string, reqOptions Options, serverOptions Options, sid string) {}
+
+  func sanitizeAPIScanOptions(o *Options) {
+      o.FoundAction = ""
+      o.FoundActionShell = ""
+  }
+
+  func postScanHandler(c Context, scans *[]string, options *Options) error {
+      rq := new(Req)
+      if err := c.Bind(rq); err != nil {
+          return err
+      }
+      sanitizeAPIScanOptions(&rq.Options)
+      sid := GenerateRandomToken(rq.URL)
+      *scans = append(*scans, sid)
+      if options.Scan == nil {
+          options.Scan = make(map[string]Scan)
+      }
+      go ScanFromAPI(rq.URL, rq.Options, *options, sid)
+      return nil
+  }
+  ```
