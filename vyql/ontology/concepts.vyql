@@ -2459,6 +2459,15 @@ concept UnescapedJsonTreeLabelXss : sink {
   review_assumption: "the frontend component renders the text label as HTML or otherwise interprets markup in tree/list labels"
   review_confidence: high
 }
+concept RawDatatablesAttributeXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "server-side DataTables raw columns insert model fields into HTML attributes without escaping"
+  review_evidence: "DataTables raw-column context {pattern} returns generated markup with a model field inside a data-* attribute and no HTML escaping"
+  review_assumption: "the DataTables response is rendered into the browser as HTML, so attribute-breaking markup in stored model fields can execute script"
+  review_confidence: high
+}
 concept CordysRequestParamXssFilterDisabled : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

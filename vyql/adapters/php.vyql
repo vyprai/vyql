@@ -492,6 +492,16 @@ adapter php {
     lacks "'text'=>htmlspecialchars($name)"
     lacks "'text'=>htmlentities($name)"
   }
+  flag code.RawDatatablesAttributeXss in function {
+    has "lang=php"
+    has "call_path:Datatables.of"
+    has ".rawColumns"
+    has "data-title"
+    has "attr_path:$tasks.title"
+    lacks "htmlspecialchars"
+    lacks "htmlentities"
+    lacks "e($tasks->title"
+  }
   // Review-only access-policy config: nested PHP arrays such as
   // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]
   // carry key-path tokens, so broad role grants on sensitive resource groups can
@@ -970,6 +980,7 @@ adapter php {
   }
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
+  control "e" -> core.HtmlEscape
   control "Tools.htmlentitiesUTF8" -> core.HtmlEscape
   control "html_escape" -> core.HtmlEscape
   control "esc_html" -> core.HtmlEscape

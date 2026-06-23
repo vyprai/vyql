@@ -258,7 +258,7 @@ func (c *phConv) phpModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	if root == nil {
 		return nil
 	}
-	return c.phpContextCall("analysis.module.context", c.loc(root), "module", "lang=php", c.text(root))
+	return c.phpContextCall("analysis.module.context", c.loc(root), "module", []string{"lang=php"}, c.text(root))
 }
 
 func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
@@ -267,7 +267,9 @@ func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	name := c.text(field(fn, "name"))
-	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", "lang=php\x00name="+name, c.text(body))
+	tokens := []string{"lang=php", "name=" + name}
+	tokens = append(tokens, c.phpAstContextTokens(body)...)
+	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", tokens, c.text(body))
 }
 
 func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt {
@@ -275,15 +277,21 @@ func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt 
 	if body == nil {
 		return nil
 	}
-	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", "lang=php\x00name="+name, c.text(body))
+	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", []string{"lang=php", "name=" + name}, c.text(body))
 }
 
-func (c *phConv) phpContextCall(path, loc, method, prefix, text string) []nir.Stmt {
-	args := []nir.Expr{
-		nir.Const{Loc: loc, Value: prefix},
+func (c *phConv) phpContextCall(path, loc, method string, tokens []string, text string) []nir.Stmt {
+	args := make([]nir.Expr, 0, len(tokens)+2)
+	for _, tok := range tokens {
+		if tok == "" {
+			continue
+		}
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	args = append(args,
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: phpCompactText(text)},
-	}
+	)
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
@@ -291,6 +299,38 @@ func (c *phConv) phpContextCall(path, loc, method, prefix, text string) []nir.St
 		Method: method,
 		Loc:    loc,
 	}}}
+}
+
+func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		switch cur.Kind() {
+		case "function_call_expression", "member_call_expression", "scoped_call_expression":
+			add("call_path:" + c.dotted(cur))
+		case "member_access_expression":
+			add("attr_path:" + c.dotted(cur))
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
 }
 
 func phpCompactText(s string) string {

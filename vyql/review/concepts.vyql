@@ -1275,6 +1275,12 @@ review code.UnescapedJsonTreeLabelXss {
   expected: [core.HtmlEscape]
   text: "verify JSON tree or list labels escape stored names before returning them to browser UI components"
 }
+review code.RawDatatablesAttributeXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "verify server-side DataTables raw columns escape model fields before inserting them into HTML attributes"
+}
 review code.UnescapedChartTooltipHtml {
   category: "xss"
   kind: "attention"
