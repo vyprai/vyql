@@ -1225,6 +1225,24 @@ adapter javascript {
     has "http://"
     lacks "127.0"
   }
+  flag code.CleartextChannel on any {
+    path "fetch"
+    has "http://"
+    lacks "127.0"
+    lacks "localhost"
+  }
+  flag code.CleartextChannel on any {
+    path "URL"
+    has "http://"
+    lacks "127.0"
+    lacks "localhost"
+  }
+  flag code.CleartextChannel on any {
+    path "node:url.URL"
+    has "http://"
+    lacks "127.0"
+    lacks "localhost"
+  }
   flag code.InsecureExecutableDownload in module {
     has "lang=javascript"
     has "jrePrefix"
