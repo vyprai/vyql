@@ -880,6 +880,10 @@ adapter javascript {
     has "^(\\s|\\/\\*.*?\\*\\/)*[\\[\\(\\w]"
     lacks "([^*]|\\*(?!\\/))*?"
   }
+  flag code.CatastrophicRegex on any {
+    path "replace"
+    has "\\s*\\n\\s*"
+  }
   flag code.CatastrophicRegex in function {
     has "lang=javascript"
     has "varhwb=/^hwb\\("
