@@ -764,6 +764,12 @@ review code.UnparameterizedSqlQueryParser {
   kind: "attention"
   text: "review SQL query builders for unparameterized fragments derived from caller-controlled values"
 }
+review code.UnvalidatedSqlOrderDirection {
+  category: "sql"
+  kind: "target"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "verify ORDER BY direction values are normalized to an ASC/DESC allowlist before SQL concatenation"
+}
 review code.UnfilteredSearchWhereColumns {
   category: "sql"
   kind: "attention"

@@ -753,6 +753,14 @@ adapter php {
     lacks "isOrderBy"
     lacks "isOrderWay"
   }
+  flag code.UnvalidatedSqlOrderDirection in function {
+    has "lang=php"
+    has "name=processOrderBy"
+    has "ORDERBY"
+    has "$orderBy['direction']"
+    lacks "QUERY_ORDER_DESC"
+    lacks "QUERY_ORDER_ASC"
+  }
   flag code.CodeIgniterActiveRecordOffsetSqlInjection in function {
     has "lang=php"
     has "name=offset"

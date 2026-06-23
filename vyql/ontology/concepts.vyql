@@ -3187,6 +3187,15 @@ concept UnparameterizedSqlQueryParser : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]
 }
+concept UnvalidatedSqlOrderDirection : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "query builder concatenates caller-controlled ORDER BY direction tokens without allowlisting ASC/DESC"
+  review_evidence: "ORDER BY builder context {pattern} appends a stored direction value into SQL without normalizing it to allowed constants"
+  review_assumption: "application callers can pass request-controlled sort direction values into the query builder"
+  review_confidence: high
+}
 concept UnfilteredSearchWhereColumns : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89, CWE_287]

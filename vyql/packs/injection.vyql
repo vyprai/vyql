@@ -14,6 +14,11 @@ rule UnparameterizedSqlQueryParser {
   match code.UnparameterizedSqlQueryParser as sink
 }
 
+rule UnvalidatedSqlOrderDirection {
+  meta { id: "VYQL-INJ-124", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.UnvalidatedSqlOrderDirection as sink
+}
+
 rule UnfilteredSearchWhereColumns {
   meta { id: "VYQL-INJ-050", severity: high, cwe: [CWE_89, CWE_287], confidence_floor: medium }
   match code.UnfilteredSearchWhereColumns as sink
