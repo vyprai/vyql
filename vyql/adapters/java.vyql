@@ -208,6 +208,14 @@ adapter java {
     has "call_path:CssFouffa"
     lacks "call:getMessage"
   }
+  flag code.UnescapedDiagnosticHtml in function {
+    has "call_path:IOUtils.toString"
+    has "literal:text/html"
+    has "call_path:Fault"
+    lacks "call_path:MessageUtils.isRequestor"
+    lacks "call_path:StringEscapeUtils.escapeHtml"
+    lacks "call_path:HtmlUtils.htmlEscape"
+  }
   flag code.JenkinsPluginForkedDirectoryBrowserWithoutCsp on any {
     path exact "DirectoryBrowserSupport"
     has "Compare Html Report"
