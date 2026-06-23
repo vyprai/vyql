@@ -613,6 +613,11 @@ rule ForOwnRecursiveDefaultsPrototypePollution {
   match code.ForOwnRecursiveDefaultsPrototypePollution as sink
 }
 
+rule NestedPathInheritedPropertyPrototypePollution {
+  meta { id: "VYQL-INJ-134", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.NestedPathInheritedPropertyPrototypePollution as sink
+}
+
 rule CordysRequestParamXssFilterDisabled {
   meta { id: "VYQL-INJ-108", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.CordysRequestParamXssFilterDisabled as sink

@@ -453,6 +453,15 @@ concept ForOwnRecursiveDefaultsPrototypePollution : sink {
   review_assumption: "a caller can pass attacker-controlled objects containing __proto__ keys to the deep defaults API"
   review_confidence: high
 }
+concept NestedPathInheritedPropertyPrototypePollution : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "nested path assignment creates missing child objects from inherited path properties without checking that the current segment is an own property"
+  review_evidence: "nested path setter context {pattern} reads obj[currentKeyPath], conditionally creates obj[currentKeyPath] = {}, and recurses without an own-property guard"
+  review_assumption: "a caller can provide dotted path segments such as __proto__ or constructor.prototype"
+  review_confidence: high
+}
 concept SchemaCodegenValidationBypass : sink {
   vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
   cwe: [CWE_1321, CWE_915]

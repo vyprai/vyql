@@ -999,6 +999,16 @@ adapter javascript {
     has "defaultsDeep(val,value)"
     lacks "key==='__proto__'"
   }
+  flag code.NestedPathInheritedPropertyPrototypePollution in function {
+    has "lang=javascript"
+    has "currentKeyPath"
+    has "remainingKeyPath"
+    has "obj[currentKeyPath]"
+    has "obj[currentKeyPath]={}"
+    has "setByKeyPath(innerObj,remainingKeyPath,value)"
+    lacks "hasOwn(obj,currentKeyPath)"
+    lacks "Object.prototype.hasOwnProperty.call(obj,currentKeyPath)"
+  }
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute
