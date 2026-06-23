@@ -54,6 +54,11 @@ rule PublicVisibilityCacheInvalidationMissing {
   match code.PublicVisibilityCacheInvalidationMissing as cache
 }
 
+rule UnverifiedFederationMissingEvents {
+  meta { id: "VYQL-AUTH-037", severity: critical, cwe: [CWE_287, CWE_347], confidence_floor: high }
+  match code.UnverifiedFederationMissingEvents as event
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller

@@ -1738,6 +1738,15 @@ concept SamlFirstSignatureOnlyBypass : sink {
   review_assumption: "an attacker can submit a SAML response containing an attacker-chosen signed element before unsigned or differently signed assertion data"
   review_confidence: high
 }
+concept UnverifiedFederationMissingEvents : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+  cwe: [CWE_287, CWE_347]
+  review_category: "auth"
+  review_condition: "federated Matrix missing events are accepted from an untrusted response without per-event signature verification"
+  review_evidence: "federation missing-events context {pattern} iterates UntrustedEvents and caches or returns each event before VerifyEventSignatures"
+  review_assumption: "the missing events response is supplied by a remote homeserver and cached events can affect room state or auth decisions"
+  review_confidence: high
+}
 concept CiliumCliEtcdInitMountMismatch : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_280, CWE_755]

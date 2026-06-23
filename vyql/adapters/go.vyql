@@ -858,6 +858,11 @@ adapter go {
     lacks "call_path:r.Header.Get"
     lacks "selector:r.Host"
   }
+  flag code.UnverifiedFederationMissingEvents in function {
+    has "call_path:missingResp.Events.UntrustedEvents"
+    has "call_path:t.cacheAndReturn"
+    lacks "call_path:ev.VerifyEventSignatures"
+  }
 
   // resource lifecycle (CWE-772) — raw handles that must be closed.
   flag code.ResourceHandle on any {
