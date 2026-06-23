@@ -1493,6 +1493,12 @@ review code.JenkinsCredentialsStartupLoadContextExposure {
   expected: [core.AuthorizationCheck]
   text: "review Jenkins credentials providers for SYSTEM-context startup loading before persisted credential migration"
 }
+review code.JdbcCredentialAttributeExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review JDBC URL/property handling so user and password attributes are stripped before database-name, protocol metadata, or getURL exposure"
+}
 review code.DefaultExternalRelaySecretExposure {
   category: "secret"
   kind: "attention"

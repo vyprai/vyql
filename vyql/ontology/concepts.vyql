@@ -2102,6 +2102,15 @@ concept JenkinsCredentialsStartupLoadContextExposure : sink {
   review_assumption: "lazy loading after startup can occur under a lower-privileged authentication context and expose credential metadata or material"
   review_confidence: high
 }
+concept JdbcCredentialAttributeExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "JDBC URL or connection properties preserve user/password attributes in a database-name or metadata URL path"
+  review_evidence: "JDBC driver connection context {pattern} forwards parsed URL/properties attributes to the database name without filtering credential keys"
+  review_assumption: "database-name fields may be visible in protocol metadata, logs, or DatabaseMetaData.getURL output while credentials should travel only through the authentication mechanism"
+  review_confidence: high
+}
 concept CinnyServiceWorkerMediaAuthLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_20, CWE_200, CWE_522]

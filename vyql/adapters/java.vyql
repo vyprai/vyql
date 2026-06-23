@@ -604,6 +604,13 @@ adapter java {
     lacks "annotation:Initializer"
     lacks "function_name:forceLoadDuringStartup"
   }
+  flag code.JdbcCredentialAttributeExposure in function {
+    has "function_name:connect"
+    has "call:tokenizeDatabase"
+    has "call:tokenizeURLProperties"
+    has "call:NetConnection"
+    lacks "call:appendDatabaseAttributes"
+  }
   flag code.SensitiveOperation in function {
     has "function_name:doConfigure"
     has "call:configure"
