@@ -1,0 +1,93 @@
+# Rank 619 / CVE-2020-26290: Dex SAML response handling needed XML round-trip
+# validation before signature verification and application unmarshalling.
+test "rank619: SAML HandlePOST verifies and unmarshals without XML roundtrip validation"
+  lang go
+  expect VYQL-AUTH-038
+  code
+  ```
+  package saml
+
+  import (
+    "encoding/base64"
+    "encoding/xml"
+  )
+
+  type provider struct { validator interface{} }
+  type response struct { Assertion *assertion }
+  type assertion struct { Subject *subject }
+  type subject struct{}
+  type Identity struct{}
+
+  func verifyResponseSig(v interface{}, data []byte) ([]byte, bool, error) { return data, true, nil }
+  func (p *provider) validateSubject(s *subject, inResponseTo string) error { return nil }
+
+  func (p *provider) HandlePOST(samlResponse, inResponseTo string) (ident Identity, err error) {
+    rawResp, err := base64.StdEncoding.DecodeString(samlResponse)
+    if err != nil {
+      return ident, err
+    }
+    if p.validator != nil {
+      rawResp, _, err = verifyResponseSig(p.validator, rawResp)
+      if err != nil {
+        return ident, err
+      }
+    }
+    var resp response
+    if err := xml.Unmarshal(rawResp, &resp); err != nil {
+      return ident, err
+    }
+    if err = p.validateSubject(resp.Assertion.Subject, inResponseTo); err != nil {
+      return ident, err
+    }
+    return ident, nil
+  }
+  ```
+
+test "rank619: SAML HandlePOST validates XML roundtrip before signature and unmarshal"
+  lang go
+  reject VYQL-AUTH-038
+  code
+  ```
+  package saml
+
+  import (
+    "bytes"
+    "encoding/base64"
+    "encoding/xml"
+    xrv "github.com/mattermost/xml-roundtrip-validator"
+  )
+
+  type provider struct { validator interface{} }
+  type response struct { Assertion *assertion }
+  type assertion struct { Subject *subject }
+  type subject struct{}
+  type Identity struct{}
+
+  func verifyResponseSig(v interface{}, data []byte) ([]byte, bool, error) { return data, true, nil }
+  func (p *provider) validateSubject(s *subject, inResponseTo string) error { return nil }
+
+  func (p *provider) HandlePOST(samlResponse, inResponseTo string) (ident Identity, err error) {
+    rawResp, err := base64.StdEncoding.DecodeString(samlResponse)
+    if err != nil {
+      return ident, err
+    }
+    byteReader := bytes.NewReader(rawResp)
+    if err := xrv.Validate(byteReader); err != nil {
+      return ident, err
+    }
+    if p.validator != nil {
+      rawResp, _, err = verifyResponseSig(p.validator, rawResp)
+      if err != nil {
+        return ident, err
+      }
+    }
+    var resp response
+    if err := xml.Unmarshal(rawResp, &resp); err != nil {
+      return ident, err
+    }
+    if err = p.validateSubject(resp.Assertion.Subject, inResponseTo); err != nil {
+      return ident, err
+    }
+    return ident, nil
+  }
+  ```

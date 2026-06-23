@@ -1751,6 +1751,15 @@ concept SamlFirstSignatureOnlyBypass : sink {
   review_assumption: "an attacker can submit a SAML response containing an attacker-chosen signed element before unsigned or differently signed assertion data"
   review_confidence: high
 }
+concept SamlXmlRoundtripValidationBypass : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+  cwe: [CWE_287, CWE_347]
+  review_category: "auth"
+  review_condition: "SAML response handling verifies XML signatures and then unmarshals assertion data without first checking that XML parsing round-trips safely"
+  review_evidence: "SAML HandlePOST context {pattern} decodes, verifies, and unmarshals the response before an observed XML round-trip validation call"
+  review_assumption: "an attacker can submit a crafted SAML response whose signed XML view differs from the application-unmarshaled assertion view"
+  review_confidence: high
+}
 concept UnverifiedFederationMissingEvents : sink {
   vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
   cwe: [CWE_287, CWE_347]

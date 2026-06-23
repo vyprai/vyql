@@ -59,6 +59,11 @@ rule UnverifiedFederationMissingEvents {
   match code.UnverifiedFederationMissingEvents as event
 }
 
+rule SamlXmlRoundtripValidationBypass {
+  meta { id: "VYQL-AUTH-038", severity: critical, cwe: [CWE_287, CWE_347], confidence_floor: high }
+  match code.SamlXmlRoundtripValidationBypass as verifier
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller

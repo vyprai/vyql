@@ -877,6 +877,14 @@ adapter go {
     has "call_path:t.cacheAndReturn"
     lacks "call_path:ev.VerifyEventSignatures"
   }
+  flag code.SamlXmlRoundtripValidationBypass in function {
+    has "function_name:HandlePOST"
+    has "call_path:base64.StdEncoding.DecodeString"
+    has "call_path:verifyResponseSig"
+    has "call_path:xml.Unmarshal"
+    has "call_path:p.validateSubject"
+    lacks "call_path:xrv.Validate"
+  }
 
   // resource lifecycle (CWE-772) — raw handles that must be closed.
   flag code.ResourceHandle on any {
