@@ -421,6 +421,12 @@ adapter javascript {
     path "webPreferences"
     has "nodeIntegration=true"
   }
+  flag code.ElectronNodeIntegration in function {
+    has "lang=javascript"
+    has "will-attach-webview"
+    has "webPreferences.nodeIntegration=false"
+    lacks "webPreferences.contextIsolation=true"
+  }
 
   sink path "child_process.exec" -> code.CommandExecution
   sink path "child_process.execSync" -> code.CommandExecution
