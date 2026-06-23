@@ -275,6 +275,11 @@ rule UnescapedTableExportHtml {
   match code.UnescapedTableExportHtml as sink
 }
 
+rule UnescapedHtmlPresenter {
+  meta { id: "VYQL-INJ-122", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedHtmlPresenter as sink
+}
+
 rule UnescapedChartTooltipHtml {
   meta { id: "VYQL-INJ-061", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.UnescapedChartTooltipHtml as sink

@@ -2687,6 +2687,15 @@ concept UnescapedTableExportHtml : sink {
   review_assumption: "exported table cells may contain attacker-controlled markup"
   review_confidence: medium
 }
+concept UnescapedHtmlPresenter : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "an operation presenter returns HTML containing computed or input-derived values without escaping"
+  review_evidence: "HTML presenter context {pattern} interpolates printable values into returned markup"
+  review_assumption: "the presenter output is rendered as HTML in the application UI"
+  review_confidence: medium
+}
 concept UnescapedChartTooltipHtml : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

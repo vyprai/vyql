@@ -150,6 +150,15 @@ adapter javascript {
     lacks "returncell.text"
     lacks "returncell.text()"
   }
+  flag code.UnescapedHtmlPresenter in module {
+    has "lang=javascript"
+    has "presentType=\"html\""
+    has "present(encodings)"
+    has "Utils.printable"
+    has "<td>${value}</td>"
+    lacks "Utils.escapeHtml"
+    lacks "DOMPurify"
+  }
   flag code.UnescapedChartTooltipHtml in function {
     has "lang=javascript"
     has "tooltipModel.body"
