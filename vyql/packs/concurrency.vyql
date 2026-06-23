@@ -21,3 +21,8 @@ rule ThreadLocalScopeOverwriteWithoutCleanup {
   meta { id: "VYQL-RACE-004", severity: high, cwe: [CWE_362], confidence_floor: high }
   match code.ThreadLocalScopeOverwriteWithoutCleanup as m
 }
+
+rule ReconfirmationDirtyTrackingRace {
+  meta { id: "VYQL-RACE-005", severity: high, cwe: [CWE_362, CWE_287], confidence_floor: high }
+  match code.ReconfirmationDirtyTrackingRace as m
+}

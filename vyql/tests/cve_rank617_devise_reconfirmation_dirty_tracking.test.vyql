@@ -1,0 +1,42 @@
+# Rank 617 / CVE-2026-32700: Devise reconfirmation regenerated a token while
+# restoring the persisted email without forcing the unconfirmed_email write.
+test "rank617: reconfirmation token regeneration lacks pending-email dirty tracking"
+  lang ruby
+  expect VYQL-RACE-005
+  code
+  ```
+  module Devise
+    module Models
+      module Confirmable
+        def postpone_email_change_until_confirmation_and_regenerate_confirmation_token
+          @reconfirmation_required = true
+          self.unconfirmed_email = self.email
+          self.email = self.devise_email_in_database
+          self.confirmation_token = nil
+          generate_confirmation_token
+        end
+      end
+    end
+  end
+  ```
+
+test "rank617: reconfirmation forces pending-email dirty tracking before token regeneration"
+  lang ruby
+  reject VYQL-RACE-005
+  code
+  ```
+  module Devise
+    module Models
+      module Confirmable
+        def postpone_email_change_until_confirmation_and_regenerate_confirmation_token
+          @reconfirmation_required = true
+          devise_unconfirmed_email_will_change!
+          self.unconfirmed_email = self.email
+          self.email = self.devise_email_in_database
+          self.confirmation_token = nil
+          generate_confirmation_token
+        end
+      end
+    end
+  end
+  ```

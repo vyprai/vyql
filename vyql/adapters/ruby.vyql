@@ -443,6 +443,15 @@ adapter ruby {
     has "model.send"
     lacks "valid_polymorphic_class"
   }
+  flag code.ReconfirmationDirtyTrackingRace in function {
+    has "lang=ruby"
+    has "name=postpone_email_change_until_confirmation_and_regenerate_confirmation_token"
+    has "self.unconfirmed_email = self.email"
+    has "self.email = self.devise_email_in_database"
+    has "self.confirmation_token = nil"
+    has "generate_confirmation_token"
+    lacks "devise_unconfirmed_email_will_change!"
+  }
   sink path "search" arg 1 -> code.LdapQuery
   sink path "Net::LDAP" arg 1 -> code.LdapQuery
   sink method "search" arg 1 -> code.LdapQuery
