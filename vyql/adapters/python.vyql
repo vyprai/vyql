@@ -302,6 +302,7 @@ adapter python {
   control method "verify_password" -> core.InputValidation
   control "analysis.function.result" val "marker:validator" -> core.InputValidation
   control "validate_url" -> core.AllowlistValidation
+  control "_validate_url" -> core.AllowlistValidation
   control "validate_python_code" -> core.CodeExecutionValidation
   // XXE hardening — a parser configured to not resolve external entities / fetch network,
   // dominating the parse it is passed to (value-matched config).
@@ -492,6 +493,8 @@ adapter python {
   sink path "pycurl.Curl" -> code.UrlFetch
   sink path "treq.get" -> code.UrlFetch
   sink path "treq.post" -> code.UrlFetch
+  source path "analysis.function.context.source" val "forurlinurls:" val "requests.get(url" nval "validate_url(url" nval "_validate_url(url" -> code.HttpInput
+  sink path "analysis.function.context.sink" val "forurlinurls:" val "requests.get(url" nval "validate_url(url" nval "_validate_url(url" -> code.UrlFetch
   // trust boundary (CWE-501): user input stored into the server-trusted Flask session
   // (`flask.session[key] = value`, lowered to __setitem__). A tainted KEY or VALUE is the
   // violation (arg all) — UNLESS it passed through a validator/authenticator first (the
