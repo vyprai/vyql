@@ -196,6 +196,24 @@ adapter cpp {
     has "callbacks().tls_record_received"
     lacks "can_decrypt_application_traffic"
   }
+  flag code.JpegSetjmpConstructorEscape in function {
+    has "lang=cpp"
+    has "jpeg_std_error"
+    has "jerr_.pub.error_exit=my_error_exit"
+    has "setjmp(jerr_.setjmp_buffer)"
+    has "jpeg_create_decompress"
+    lacks "std::memcpy(jerr_.setjmp_buffer,setjmp_buffer"
+    lacks "DIP__DECLARE_JPEG_EXIT"
+  }
+  flag code.JpegSetjmpConstructorEscape in function {
+    has "lang=cpp"
+    has "jpeg_std_error"
+    has "jerr_.pub.error_exit=my_error_exit"
+    has "setjmp(jerr_.setjmp_buffer)"
+    has "jpeg_create_compress"
+    lacks "std::memcpy(jerr_.setjmp_buffer,setjmp_buffer"
+    lacks "DIP__DECLARE_JPEG_EXIT"
+  }
   flag code.SecretComparisonReview in function {
     has "lang=cpp"
     has "name=HTTPAuthorized"

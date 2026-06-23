@@ -108,3 +108,8 @@ rule FoldedHeaderContinuationCrash {
   meta { id: "VYQL-DOS-021", severity: high, cwe: [CWE_248, CWE_400], confidence_floor: high }
   match code.FoldedHeaderContinuationCrash as s
 }
+
+rule JpegSetjmpConstructorEscape {
+  meta { id: "VYQL-DOS-022", severity: high, cwe: [CWE_248, CWE_400, CWE_755], confidence_floor: high }
+  match code.JpegSetjmpConstructorEscape as s
+}
