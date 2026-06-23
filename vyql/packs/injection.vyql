@@ -82,6 +82,11 @@ rule UnsafeBuildClientCommandAssembly {
   match code.UnsafeBuildClientCommandAssembly as sink
 }
 
+rule ShellTruePackageManagerProbe {
+  meta { id: "VYQL-INJ-129", severity: high, cwe: [CWE_78], confidence_floor: high }
+  match code.ShellTruePackageManagerProbe as sink
+}
+
 rule TemplateInstallScriptHostExecution {
   meta { id: "VYQL-INJ-054", severity: critical, cwe: [CWE_78], confidence_floor: medium }
   match code.TemplateInstallScriptHostExecution as sink

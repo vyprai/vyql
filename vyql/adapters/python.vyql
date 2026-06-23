@@ -373,6 +373,24 @@ adapter python {
   sink path "subprocess.getstatusoutput" -> code.CommandExecution
   sink path "commands.getoutput" -> code.CommandExecution
   sink path "commands.getstatusoutput" -> code.CommandExecution
+  flag code.ShellTruePackageManagerProbe on any {
+    path exact "analysis.function.context"
+    has "name=check_for_libaio_pkg"
+    has "find_executable"
+    has "subprocess.Popen"
+    has "shell=True"
+    has "pkgmgr"
+    has "lib"
+  }
+  flag code.ShellTruePackageManagerProbe on any {
+    path exact "analysis.function.context"
+    has "name=check_for_numactl_pkg"
+    has "find_executable"
+    has "subprocess.Popen"
+    has "shell=True"
+    has "pkgmgr"
+    has "lib"
+  }
   sink path "module.run_command" val "apt-key" val "--recv" -> code.SecurityKeyTrustOperation
   flag code.CommandLineAssemblyReview in function {
     has "name=_fork"

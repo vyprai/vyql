@@ -653,6 +653,12 @@ review code.UnsafeBuildClientCommandAssembly {
   expected: [core.InputValidation, core.ShellEscape]
   text: "review client build shell commands for filename/address/port validation before formatting into sh -c"
 }
+review code.ShellTruePackageManagerProbe {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review package-manager probe commands for argv-array subprocess execution instead of shell=True command strings"
+}
 review code.PartiallyEscapedSshCommand {
   category: "command"
   kind: "attention"
