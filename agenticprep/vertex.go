@@ -147,6 +147,14 @@ Rules:
   core scan concept/rule already covers the relevant surface, or whether no
   validated adapter target exists. Do not create adapters whose only locality
   is a local command, binary, crate, module, controller, or utility package name.
+- A generated overlay is prep, not a vulnerability hunt. Do not add an exact
+  context flag merely because a sampled function looks suspicious. Exact
+  context flags are valid only when they close a concrete repo setup,
+  trust-boundary, framework, dependency, wrapper-API, or scanner coverage gap
+  found through tools such as trust_model, entrypoint_inventory,
+  adapter_coverage, dependency_gaps, probe_dependency, symbol_inventory, or
+  call_inventory. If the evidence is an isolated first-party utility issue
+  unrelated to those prep gaps, finish with an empty overlay and notes.
 - Adapter source must be valid VyQL DSL, for example:
   adapter python {
     source "request.args" -> code.HttpInput
@@ -187,9 +195,9 @@ Rules:
   project/framework-specific meaning that shipped adapters cannot know.
 - Prefer repo-specific wrappers, public API boundaries, and narrow context
   flags over broad generic mappings. If a CVE shape is visible in one function
-  and existing concepts already describe it, a narrow flag <concept> in function
-  overlay is
-  usually better than trying to invent a source/sink flow.
+  and existing concepts already describe it, add a narrow flag <concept> in
+  function only when the previous tool evidence shows this is the relevant
+  repo-local prep gap. Otherwise do not turn the agent into a one-off scanner.
 - Do not broaden an entire package just because it handles requests, protocols,
   plugins, controllers, or model objects. Generated adapters should identify a
   specific framework API, wrapper, sink, sanitizer/control, or narrow context
