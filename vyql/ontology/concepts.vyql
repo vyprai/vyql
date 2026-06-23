@@ -3164,9 +3164,9 @@ concept UnvalidatedNumericSqlInterpolation : sink {
   vulnerable_to: [injection.SqlInjection, validation.ImproperInputValidation]
   cwe: [CWE_89, CWE_20]
   review_category: "sql"
-  review_condition: "request-derived numeric identifier is interpolated into SQL without a numeric validation guard"
-  review_evidence: "PHP action context {pattern} assigns a message parameter to an identifier field and interpolates it into an item_id predicate before an is_numeric guard"
-  review_assumption: "attackers can choose the action message parameter used as the numeric identifier"
+  review_condition: "request-derived numeric identifier reaches an ORM primary-key lookup or SQL predicate without a numeric validation guard"
+  review_evidence: "PHP action context {pattern} passes an uncast request/route identifier into numeric query handling"
+  review_assumption: "attackers can choose the route or request parameter used as the numeric identifier"
   review_confidence: high
 }
 concept CodeIgniterActiveRecordOffsetSqlInjection : sink {

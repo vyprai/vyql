@@ -755,7 +755,7 @@ review code.UnvalidatedNumericSqlInterpolation {
   category: "sql"
   kind: "attention"
   expected: [core.InputValidation]
-  text: "review request-derived numeric identifiers before interpolating them into SQL predicates"
+  text: "review request-derived numeric identifiers before ORM primary-key lookups or SQL predicates"
 }
 review code.CodeIgniterActiveRecordOffsetSqlInjection {
   category: "sql"

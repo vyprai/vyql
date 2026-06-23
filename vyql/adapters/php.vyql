@@ -72,6 +72,19 @@ adapter php {
     has "db_query("
     lacks "is_numeric($this->iid)"
   }
+  flag code.UnvalidatedNumericSqlInterpolation in function {
+    has "lang=php"
+    has "name=actionUpload"
+    has "performReadValidation($model_name,$model_id)"
+    has "'model_id'=>$model_id"
+    lacks "(int)$model_id"
+  }
+  flag code.UnvalidatedNumericSqlInterpolation in function {
+    has "lang=php"
+    has "name=actionDownloadFile"
+    has "'model_id'=>$id"
+    lacks "(int)$id"
+  }
   flag code.UnrestrictedRequestParamDeserialization in module {
     has "lang=php"
     has "param('params'"
