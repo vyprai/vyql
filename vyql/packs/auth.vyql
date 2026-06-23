@@ -64,6 +64,11 @@ rule SamlXmlRoundtripValidationBypass {
   match code.SamlXmlRoundtripValidationBypass as verifier
 }
 
+rule TokenCacheAuthorizationBypass {
+  meta { id: "VYQL-AUTH-039", severity: high, cwe: [CWE_862, CWE_863], confidence_floor: high }
+  match code.TokenCacheAuthorizationBypass as cache
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller

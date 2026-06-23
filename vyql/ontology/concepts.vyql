@@ -1512,6 +1512,15 @@ concept PublicVisibilityCacheInvalidationMissing : sink {
   review_assumption: "the cached public-status response gates unauthenticated or cross-tenant access to sandbox proxy or preview data"
   review_confidence: high
 }
+concept TokenCacheAuthorizationBypass : sink {
+  vulnerable_to: [access_control.MissingAuthorization, access_control.IncorrectAuthorization]
+  cwe: [CWE_862, CWE_863]
+  review_category: "auth"
+  review_condition: "a token endpoint returns cached access or refresh tokens before performing the requester's authorization check"
+  review_evidence: "token service context {pattern} looks up and returns a cached token ahead of the privilege/property validation branch"
+  review_assumption: "cached tokens may correspond to users, groups, scopes, or audiences that the current authenticated caller is not authorized to obtain"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]

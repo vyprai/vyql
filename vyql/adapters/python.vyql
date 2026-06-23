@@ -279,6 +279,9 @@ adapter python {
     has "checkers_by_labels"
     lacks "self.__require_view()guideline_rules=defaultdict(list)"
   }
+  flag code.TokenCacheAuthorizationBypass on any {
+    path "DIRAC.FrameworkSystem.Utilities.TokenManagementUtilities.getCachedToken"
+  }
   control method "check_ownership" -> core.OwnershipCheck
   control method "require_owner" -> core.OwnershipCheck
   control method "is_owner" -> core.OwnershipCheck
