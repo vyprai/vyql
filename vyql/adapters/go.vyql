@@ -786,6 +786,13 @@ adapter go {
     path exact "goqu.L"
     has "group"
   }
+  flag code.UnparameterizedSqlQueryParser in function {
+    has "call_path:impl.dbConnection.Query"
+    has "literal:SELECT "
+    has "literal: and "
+    has "='"
+    lacks "queryParams"
+  }
   flag code.CommandOptionInjection in function {
     has "function_name:NodePublishVolume"
     has "call:GetVolumeContext"
