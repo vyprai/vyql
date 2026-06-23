@@ -2686,6 +2686,11 @@ concept CheckmkPendingChangeTextUnescapeXss : sink {
 concept UnescapedExceptionMessageMarkup : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "exception text is propagated into a markup-rendered error response without escaping"
+  review_evidence: "exception rendering context {pattern} passes a raw caught exception or exception message into an HTML-facing error helper"
+  review_assumption: "the exception message can include attacker-controlled request, URL, parser, or validation text and is later rendered in a browser"
+  review_confidence: medium
 }
 concept UnescapedDiagnosticHtml : sink {
   vulnerable_to: [injection.Xss]

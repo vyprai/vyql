@@ -203,6 +203,11 @@ adapter java {
     has "call_path:StructureFactory.getStructuresByUser"
     lacks "call_path:SQLUtil.sanitizeSortBy"
   }
+  flag code.UnescapedExceptionMessageMarkup in function {
+    has "function_name:parseURL"
+    has "call_path:CssFouffa"
+    lacks "call:getMessage"
+  }
   flag code.JenkinsPluginForkedDirectoryBrowserWithoutCsp on any {
     path exact "DirectoryBrowserSupport"
     has "Compare Html Report"
