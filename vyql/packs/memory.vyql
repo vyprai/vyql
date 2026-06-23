@@ -139,6 +139,11 @@ rule CjsonTrailingBackslashStringOverread {
   match code.CjsonTrailingBackslashStringOverread as read
 }
 
+rule UnboundedFileReadIntoFixedBuffer {
+  meta { id: "VYQL-MEM-032", severity: high, cwe: [CWE_787, CWE_121], confidence_floor: high }
+  match code.UnboundedFileReadIntoFixedBuffer as write
+}
+
 rule ClamavWwpackStructsPointerOobWrite {
   meta { id: "VYQL-MEM-026", severity: high, cwe: [CWE_787], confidence_floor: high }
   match code.ClamavWwpackStructsPointerOobWrite as write

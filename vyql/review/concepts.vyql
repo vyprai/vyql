@@ -1539,6 +1539,12 @@ review code.CjsonTrailingBackslashStringOverread {
   expected: [core.MemoryBoundsCheck]
   text: "review cJSON parse_string for a trailing-backslash guard before advancing past escaped bytes"
 }
+review code.UnboundedFileReadIntoFixedBuffer {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review file-read loops that write into fixed-size stack buffers for index bounds checks or dynamic resizing"
+}
 review code.ClamavWwpackStructsPointerOobWrite {
   category: "memory"
   kind: "attention"

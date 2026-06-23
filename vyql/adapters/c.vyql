@@ -249,6 +249,14 @@ adapter c {
     has "cJSON_malloc(len+1)"
     lacks "if(*end_ptr=='\\0')"
   }
+  flag code.UnboundedFileReadIntoFixedBuffer in function {
+    has "lang=c"
+    has "chartemp["
+    has "for(;;)"
+    has "temp[i]=fgetc("
+    lacks "i>="
+    lacks "realloc("
+  }
   flag code.ClamavWwpackStructsPointerOobWrite in function {
     has "lang=c"
     has "name=wwunpack"
