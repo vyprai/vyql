@@ -855,6 +855,12 @@ adapter python {
   control receiver method "relative_to" -> core.PathCanonicalization
   control method "relative_to" -> core.PathAccessCheck
   control "SAFE_SEED_RE.match" -> core.PathAccessCheck
+  flag core.PathAccessCheck on binop {
+    path exact "__binop.in"
+    operand {
+      path exact "__object_literal"
+    }
+  }
 
   // UNSOUND neutralizers (`assume`) — never suppress; emit an assumption note. The dominant
   // Python OWASP idiom is the `if '<bad>' in tainted:` substring blocklist, recognized
