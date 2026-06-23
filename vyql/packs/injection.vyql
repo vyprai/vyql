@@ -230,6 +230,11 @@ rule RawDatatablesAttributeXss {
   match code.RawDatatablesAttributeXss as sink
 }
 
+rule WordPressAddQueryArgHrefXss {
+  meta { id: "VYQL-INJ-128", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.WordPressAddQueryArgHrefXss as sink
+}
+
 rule IncompleteGeneratedJsIdentifierReservedWords {
   meta { id: "VYQL-INJ-127", severity: high, cwe: [CWE_94, CWE_20], confidence_floor: high }
   match code.IncompleteGeneratedJsIdentifierReservedWords as validator

@@ -306,6 +306,15 @@ adapter php {
     lacks "esc_attr"
     lacks "htmlspecialchars"
   }
+  flag code.WordPressAddQueryArgHrefXss in function {
+    has "lang=php"
+    has "sprintf("
+    has "<ahref=\"%s\""
+    has "add_query_arg("
+    lacks "esc_url(add_query_arg("
+    lacks "esc_attr(add_query_arg("
+    lacks "htmlspecialchars(add_query_arg("
+  }
   flag code.PrestaShopContactformMessageEmailXss in function {
     has "lang=php"
     has "name=sendMessage"

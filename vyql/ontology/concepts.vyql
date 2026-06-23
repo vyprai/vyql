@@ -2603,6 +2603,15 @@ concept CodeSnippetsSafeModeQueryXss : sink {
   review_assumption: "generated admin URLs are later rendered into HTML attributes, matching the reported reflected snippets-safe-mode XSS"
   review_confidence: high
 }
+concept WordPressAddQueryArgHrefXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "WordPress add_query_arg output is rendered into an HTML href attribute without URL or attribute escaping"
+  review_evidence: "function context {pattern} formats an anchor href placeholder with add_query_arg before esc_url or equivalent escaping"
+  review_assumption: "the generated URL may include request-controlled current-URL data and is served to a browser as HTML"
+  review_confidence: high
+}
 concept JavaScriptUrlRedirectXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
