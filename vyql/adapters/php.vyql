@@ -942,6 +942,17 @@ adapter php {
   control "strip_tags" -> core.HtmlEscape
   control "esc_csv" -> core.CsvEscape
   control method "esc_csv" -> core.CsvEscape
+  control "escapeCsvRecord" -> core.CsvEscape
+  control method "escapeCsvRecord" -> core.CsvEscape
+  flag code.CsvFormulaProneExportRow in function {
+    has "lang=php"
+    has "getForCsvExport"
+    has "self::COLUMNS"
+    has "$row[self::COLUMNS][]="
+    has "$rows[]=$row"
+    lacks "escapeCsvRecord"
+    lacks "esc_csv"
+  }
   control method "purify" -> core.HtmlEscape
   control "escapeshellarg" -> core.ShellEscape
   control "escapeshellcmd" -> core.ShellEscape

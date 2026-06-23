@@ -585,6 +585,13 @@ rule CsvInjection {
   unless sanitized_by core.CsvEscape
 }
 
+// Export builders that assemble spreadsheet/CSV rows from object fields before a downstream
+// writer sees them still need formula escaping at row construction time.
+rule CsvFormulaProneExportRow {
+  meta { id: "VYQL-INJ-121", severity: low, cwe: [CWE_1236], confidence_floor: medium }
+  match code.CsvFormulaProneExportRow as sink
+}
+
 // Untrusted filename/destination when saving an uploaded file (CWE-434).
 rule UnrestrictedUpload {
   meta { id: "VYQL-INJ-015", severity: medium, cwe: [CWE_434] }

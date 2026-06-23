@@ -444,6 +444,10 @@ concept CsvCell : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_1236]
 }
+concept CsvFormulaProneExportRow : sink {
+  vulnerable_to: [injection.CsvInjection]
+  cwe: [CWE_1236]
+}
 
 concept UnsafeUpload : sink {
   vulnerable_to: [injection.UnrestrictedUpload]
