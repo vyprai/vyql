@@ -2283,6 +2283,15 @@ concept CWebRequestFilePathTraversal : sink {
   review_assumption: "the request helper returns client-controlled path text and the file helper resolves it relative to the process working directory"
   review_confidence: high
 }
+concept InternalServiceUrlPathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "a caller-controlled path segment is joined into an internal service base URL without decoded traversal validation"
+  review_evidence: "internal service request context {pattern} combines a base URL with a path parameter and returns the composed URL for an authenticated service call"
+  review_assumption: "the downstream service interprets URL path segments after percent-decoding and exposes privileged internal routes or objects"
+  review_confidence: high
+}
 concept ArchiveSymlinkFilterBypass : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   cwe: [CWE_22, CWE_59]

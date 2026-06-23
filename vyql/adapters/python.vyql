@@ -665,6 +665,18 @@ adapter python {
     lacks "absreal(os.path.join(path_base,self.vpath[5:]))"
     lacks "static_path.startswith(path_base)"
   }
+  flag code.InternalServiceUrlPathTraversal in function {
+    has "name=_prepare_request"
+    has "plugin_daemon_inner_api_baseurl"
+    has "path"
+    has "url=plugin_daemon_inner_api_baseurl/path"
+    has "prepared_headers[\"X-Api-Key\"]"
+    has "PLUGIN_DAEMON_KEY"
+    has "returnstr(url)"
+    lacks "unquote(path)"
+    lacks "decoded_path.split(\"/\")"
+    lacks "\"..\""
+  }
   flag code.ChatterBotSqlalchemySessionPoolExhaustion in function {
     has "class_name=SQLStorageAdapter"
     has "name=__init__"

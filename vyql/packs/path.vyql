@@ -152,3 +152,8 @@ rule CWebRequestFilePathTraversal {
   meta { id: "VYQL-PATH-029", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.CWebRequestFilePathTraversal as sink
 }
+
+rule InternalServiceUrlPathTraversal {
+  meta { id: "VYQL-PATH-030", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.InternalServiceUrlPathTraversal as sink
+}
