@@ -1049,6 +1049,16 @@ adapter javascript {
     path "__object_literal"
     has "isEvalSupported=true"
   }
+  // Default relay/proxy URL builders that embed caller URL/token metadata into
+  // a hardcoded fallback host need trust-boundary review.
+  flag code.DefaultExternalRelaySecretExposure in function {
+    has "lang=javascript"
+    has "name=buildRelayUrl"
+    has "herokuapp.com"
+    has "encodeURIComponent(gurl)"
+    has "token"
+    lacks "configuredRelayHost"
+  }
 
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.

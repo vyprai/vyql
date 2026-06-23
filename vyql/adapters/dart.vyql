@@ -182,7 +182,7 @@ adapter dart {
   }
 
   // insecure randomness (CWE-330) — dart:math Random() (Random.secure() is safe)
-  flag code.WeakRandomValue on any {
+  flag code.WeakRandomValue on call {
     path exact "Random"
   }
 

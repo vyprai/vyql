@@ -1,7 +1,7 @@
 test "rank527: Craft 2FA serializes full user model in JSON success"
   lang php
   file VerifyController.php
-  expect VYQL-SEC-016
+  expect VYQL-SEC-018
   expect_review code.SensitiveModelJsonSerializationExposure
   code
   ```
@@ -37,7 +37,7 @@ test "rank527: Craft 2FA serializes full user model in JSON success"
 test "rank527: Craft 2FA returns explicit success data only"
   lang php
   file VerifyController.php
-  reject VYQL-SEC-016
+  reject VYQL-SEC-018
   reject_review code.SensitiveModelJsonSerializationExposure
   code
   ```
