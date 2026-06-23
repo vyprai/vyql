@@ -906,6 +906,15 @@ concept FrameworkRequestBeforeSessionValidation : sink {
   review_assumption: "attackers can supply an invalid session identifier that should be rejected before framework request setup"
   review_confidence: medium
 }
+concept RegexLineCommentStripWithoutCharWhitelist : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "parser input is comment-stripped with a line-anchor regex before enforcing the parser's accepted character and newline alphabet"
+  review_evidence: "parser preprocessing context {pattern} applies a multiline // comment regex without an observed character whitelist verification step"
+  review_assumption: "the parsed source text can contain alternate control or line-separator characters that the regex and grammar treat inconsistently"
+  review_confidence: high
+}
 concept OwnerFieldClear : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_401]

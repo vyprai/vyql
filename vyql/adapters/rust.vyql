@@ -171,6 +171,16 @@ adapter rust {
     lacks ".saturating_sub(1)"
     lacks ".min(self.config.update_limit)"
   }
+  flag code.RegexLineCommentStripWithoutCharWhitelist in function {
+    has "lang=rust"
+    has "name=strip_comments"
+    has "Regex::new"
+    has "(?m)//.*$"
+    has "replace_all"
+    lacks "verify_string"
+    lacks "is_permitted_char"
+    lacks "strip_comments_and_verify"
+  }
   flag code.CryptoMissingOptimizationBarrier in function {
     has "lang=rust"
     has "name=sub"
