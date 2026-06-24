@@ -1102,6 +1102,25 @@ adapter javascript {
     lacks "email.length>300"
     lacks "email.length>=300"
   }
+  flag code.OversizedWebsocketPayloadDefault in class {
+    lang "javascript"
+    has "maxHttpBufferSize:10e7"
+    has "newwsModule.Server({"
+    has "maxPayload:this.opts.maxHttpBufferSize"
+    lacks "maxHttpBufferSize:1e6"
+  }
+  flag code.OversizedWebsocketPayloadDefault in class {
+    lang "javascript"
+    has "maxHttpBufferSize:100e6"
+    has "maxPayload:this.opts.maxHttpBufferSize"
+    lacks "maxHttpBufferSize:1e6"
+  }
+  flag code.OversizedWebsocketPayloadDefault in class {
+    lang "javascript"
+    has "maxHttpBufferSize:104857600"
+    has "maxPayload:this.opts.maxHttpBufferSize"
+    lacks "maxHttpBufferSize:1e6"
+  }
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "bulkCreate" -> code.MassAssign

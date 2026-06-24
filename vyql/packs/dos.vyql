@@ -118,3 +118,8 @@ rule UnboundedEmailRegexValidation {
   meta { id: "VYQL-DOS-023", severity: high, cwe: [CWE_1333, CWE_400], confidence_floor: high }
   match code.UnboundedEmailRegexValidation as email
 }
+
+rule OversizedWebsocketPayloadDefault {
+  meta { id: "VYQL-DOS-024", severity: high, cwe: [CWE_400], confidence_floor: high }
+  match code.OversizedWebsocketPayloadDefault as limit
+}

@@ -1257,6 +1257,12 @@ review code.UnboundedEmailRegexValidation {
   expected: [core.InputValidation]
   text: "review email validation regexes for maximum input length checks before matching attacker-controlled strings"
 }
+review code.OversizedWebsocketPayloadDefault {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review WebSocket or long-polling payload defaults for low, denial-of-service-resistant request body limits"
+}
 review code.RubyLineAnchorValidationBypass {
   category: "resource"
   kind: "attention"
