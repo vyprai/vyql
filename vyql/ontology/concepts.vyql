@@ -785,6 +785,15 @@ concept DerSignatureNonCanonicalImport : sink {
   review_assumption: "attackers can supply encoded signatures and exploit alternative encodings for malleability or parser-confusion behavior"
   review_confidence: high
 }
+concept CryptoScalarRandomBitsByteLengthConfusion : sink {
+  vulnerable_to: [crypto.InsufficientEntropy]
+  cwe: [CWE_331, CWE_330]
+  review_category: "crypto"
+  review_condition: "elliptic-curve scalar or nonce generation may pass a byte-length value to a random-bits API"
+  review_evidence: "random scalar helper context {pattern} calls try_random_bits(rng, bit_length) and only rejects zero or values above the curve order"
+  review_assumption: "callers may supply a byte count instead of a bit count, biasing security-sensitive scalar or nonce generation"
+  review_confidence: high
+}
 
 concept AttestationPredicateVerificationBypass : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]

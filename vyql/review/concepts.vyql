@@ -951,6 +951,12 @@ review code.DerSignatureNonCanonicalImport {
   expected: [core.InputValidation]
   text: "review DER/ECDSA signature import for canonical length parsing and rejection of unnecessary leading zeroes before BN construction"
 }
+review code.CryptoScalarRandomBitsByteLengthConfusion {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.SecureRandom, core.InputValidation]
+  text: "review elliptic-curve scalar or nonce helpers using random-bits APIs to ensure callers pass bit counts rather than byte counts"
+}
 review code.ConstellationLuks2AttachedHeaderActivation {
   category: "crypto"
   kind: "attention"

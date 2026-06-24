@@ -1,0 +1,60 @@
+# Rank 742 / CVE-2026-22698: RustCrypto SM2PKE generated biased
+# encryption scalars by passing a byte count into a random-bits API.
+
+test "rank742: SM2 scalar k generation passes byte length to random bits"
+  lang rust
+  expect VYQL-CRY-019
+  expect_review code.CryptoScalarRandomBitsByteLengthConfusion
+  code
+  ```
+  fn encrypt<R: TryCryptoRng + ?Sized>(
+      rng: &mut R,
+      public_key: &PublicKey,
+      msg: &[u8],
+  ) -> Result<Vec<u8>> {
+      const N_BYTES: u32 = Sm2::ORDER.as_ref().bits().div_ceil(8);
+      loop {
+          let k = Scalar::from_uint(&next_k(rng, N_BYTES)?).unwrap();
+          let kg = ProjectivePoint::mul_by_generator(&k).to_affine();
+          let pb_point = public_key.as_affine();
+          let s = *pb_point * Scalar::reduce(&U256::from_u32(FieldElement::S));
+          let hpb = (s * k).to_affine();
+          if !hpb.is_identity().into() {
+              return Ok(kg.to_encoded_point(false).as_bytes().to_vec());
+          }
+      }
+  }
+
+  fn next_k<R: TryCryptoRng + ?Sized>(rng: &mut R, bit_length: u32) -> Result<U256> {
+      loop {
+          let k = U256::try_random_bits(rng, bit_length).map_err(|_| Error)?;
+          if !bool::from(k.is_zero()) && k < *Sm2::ORDER {
+              return Ok(k);
+          }
+      }
+  }
+  ```
+
+test "rank742: generated nonzero scalar suppresses biased random-bits finding"
+  lang rust
+  reject VYQL-CRY-019
+  reject_review code.CryptoScalarRandomBitsByteLengthConfusion
+  code
+  ```
+  fn encrypt<R: TryCryptoRng + ?Sized>(
+      rng: &mut R,
+      public_key: &PublicKey,
+      msg: &[u8],
+  ) -> Result<Vec<u8>> {
+      loop {
+          let k = NonZeroScalar::try_generate_from_rng(rng).map_err(|_| Error)?;
+          let kg = ProjectivePoint::mul_by_generator(&k).to_affine();
+          let pb_point = public_key.as_affine();
+          let s = *pb_point * Scalar::reduce(&U256::from_u32(FieldElement::S));
+          let hpb = (s * *k).to_affine();
+          if !hpb.is_identity().into() {
+              return Ok(kg.to_encoded_point(false).as_bytes().to_vec());
+          }
+      }
+  }
+  ```

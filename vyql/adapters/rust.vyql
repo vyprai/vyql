@@ -189,6 +189,25 @@ adapter rust {
     lacks "read_volatile"
     lacks "black_box(underflow_mask)"
   }
+  flag code.CryptoScalarRandomBitsByteLengthConfusion in function {
+    lang "rust"
+    has ".bits().div_ceil(8)"
+    has "try_random_bits"
+    has "Scalar::from_uint"
+    has "ProjectivePoint::mul_by_generator"
+    lacks "try_generate_from_rng"
+    lacks "NonZeroScalar"
+  }
+  flag code.CryptoScalarRandomBitsByteLengthConfusion in function {
+    lang "rust"
+    name "next_k"
+    has "try_random_bits(rng,bit_length)"
+    has "k<*"
+    has "::ORDER"
+    has "is_zero"
+    lacks "try_generate_from_rng"
+    lacks "NonZeroScalar"
+  }
   flag code.Luks2AttachedHeaderActivation in function {
     lang "rust"
     name "mount_data_disk"
