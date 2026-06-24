@@ -1195,6 +1195,12 @@ review code.HtmlSanitizerLogicReview {
   kind: "attention"
   text: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
 }
+review code.IncompleteHtmlEntityEscape {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review strip_tags-only or partial entity escaping before browser-rendered HTML output"
+}
 review code.StoredHtmlWrite {
   category: "xss"
   kind: "attention"

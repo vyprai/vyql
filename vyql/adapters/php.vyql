@@ -103,6 +103,14 @@ adapter php {
     lacks "esc_sql"
     lacks "sanitize_text_field"
   }
+  flag code.IncompleteHtmlEntityEscape in function {
+    has "lang=php"
+    has "$_POST"
+    has ".=strip_tags("
+    lacks "htmlspecialchars(strip_tags("
+    lacks "htmlentities(strip_tags("
+    lacks "esc_html(strip_tags("
+  }
   flag code.UnrestrictedRequestParamDeserialization in module {
     has "lang=php"
     has "param('params'"

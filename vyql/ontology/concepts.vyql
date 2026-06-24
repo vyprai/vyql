@@ -3476,6 +3476,11 @@ concept HtmlSanitizerLogicReview : sink {
 concept IncompleteHtmlEntityEscape : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "input is stripped of literal HTML tags but not entity-escaped before browser rendering"
+  review_evidence: "HTML feedback context {pattern} uses incomplete entity escaping"
+  review_assumption: "attacker-controlled text can be interpreted by the browser when later rendered as HTML"
+  review_confidence: medium
 }
 concept HtmlAttributeRewriteReview : sink {
   vulnerable_to: [injection.Xss]
