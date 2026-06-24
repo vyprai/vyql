@@ -32,3 +32,8 @@ rule RegexLineCommentStripWithoutCharWhitelist {
   meta { id: "VYQL-VAL-006", severity: high, cwe: [CWE_20], confidence_floor: high }
   match code.RegexLineCommentStripWithoutCharWhitelist as parser
 }
+
+rule UnvalidatedChoiceControlField {
+  meta { id: "VYQL-VAL-007", severity: medium, cwe: [CWE_20], confidence_floor: medium }
+  match code.UnvalidatedChoiceControlField as choice
+}

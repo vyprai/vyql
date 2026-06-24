@@ -1143,6 +1143,15 @@ concept RegexLineCommentStripWithoutCharWhitelist : sink {
   review_assumption: "the parsed source text can contain alternate control or line-separator characters that the regex and grammar treat inconsistently"
   review_confidence: high
 }
+concept UnvalidatedChoiceControlField : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "a request- or caller-controlled choice field can bypass normalization when it is merely truthy"
+  review_evidence: "choice normalization context {pattern} returns early on a truthy control field before assigning canonical allowed values"
+  review_assumption: "callers can supply the choice field and downstream authorization or business logic depends on the canonical value set"
+  review_confidence: medium
+}
 concept OwnerFieldClear : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_401]

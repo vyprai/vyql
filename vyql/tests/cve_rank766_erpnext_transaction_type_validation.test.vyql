@@ -1,0 +1,44 @@
+# Rank 766 / CVE-2026-32954: ERPNext trusted a truthy
+# transaction_type instead of validating it against canonical choices.
+
+test "rank766: truthy transaction_type skips canonical choice normalization"
+  lang python
+  file pricing_rule.py
+  expect VYQL-VAL-007
+  expect_review code.UnvalidatedChoiceControlField
+  code
+  ```
+  def set_transaction_type(args):
+      if args.transaction_type:
+          return
+
+      if args.doctype in ("Sales Order", "Sales Invoice"):
+          args.transaction_type = "selling"
+      elif args.doctype in ("Purchase Order", "Purchase Invoice"):
+          args.transaction_type = "buying"
+      elif args.customer:
+          args.transaction_type = "selling"
+      else:
+          args.transaction_type = "buying"
+  ```
+
+test "rank766: transaction_type is accepted only from canonical choices"
+  lang python
+  file pricing_rule.py
+  reject VYQL-VAL-007
+  reject_review code.UnvalidatedChoiceControlField
+  code
+  ```
+  def set_transaction_type(args):
+      if args.transaction_type in ["buying", "selling"]:
+          return
+
+      if args.doctype in ("Sales Order", "Sales Invoice"):
+          args.transaction_type = "selling"
+      elif args.doctype in ("Purchase Order", "Purchase Invoice"):
+          args.transaction_type = "buying"
+      elif args.customer:
+          args.transaction_type = "selling"
+      else:
+          args.transaction_type = "buying"
+  ```

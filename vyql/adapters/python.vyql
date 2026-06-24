@@ -988,6 +988,13 @@ adapter python {
     name "_parse_qsl"
     has "qs.replace(';','&').split('&')"
   }
+  flag code.UnvalidatedChoiceControlField in function {
+    name "set_transaction_type"
+    has "ifargs.transaction_type:"
+    has "args.transaction_type=\"selling\""
+    has "args.transaction_type=\"buying\""
+    lacks "args.transaction_typein[\"buying\",\"selling\"]"
+  }
   flag code.ProtocolStateReview in function {
     has "_original_transport"
     has "_reader._transport"

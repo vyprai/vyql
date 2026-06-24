@@ -1175,6 +1175,12 @@ review code.FrameworkRequestBeforeSessionValidation {
   expected: [core.InputValidation]
   text: "review request/session validation ordering before framework request or transport state is created"
 }
+review code.UnvalidatedChoiceControlField {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review truthy early returns on caller-controlled choice fields before canonical allowed-value normalization"
+}
 review code.PolymorphicTypeSelectionReview {
   category: "input_validation"
   kind: "attention"
