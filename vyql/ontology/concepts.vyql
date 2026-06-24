@@ -2680,6 +2680,15 @@ concept FlarumTranslatorRawStringParameterXss : sink {
   review_assumption: "translation parameters include user-controlled UI strings such as the forum search query"
   review_confidence: high
 }
+concept InstallerHiddenFieldXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "installer form renders a hidden-field value from preserved request state without HTML escaping"
+  review_evidence: "installer next-step context {pattern} echoes uchidden into a hidden input before dhtmlspecialchars validation"
+  review_assumption: "the installer step can receive attacker-controlled uchidden state"
+  review_confidence: high
+}
 concept DotcmsSqlUtilBlacklistBypass : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]

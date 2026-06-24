@@ -510,6 +510,17 @@ adapter php {
     lacks "'text'=>htmlspecialchars($name)"
     lacks "'text'=>htmlentities($name)"
   }
+  flag code.InstallerHiddenFieldXss in function {
+    has "lang=php"
+    has "name=show_next_step"
+    has "$uchidden"
+    has "<input type="
+    has "hidden"
+    has "uchidden"
+    lacks "dhtmlspecialchars($uchidden)"
+    lacks "htmlspecialchars($uchidden"
+    lacks "htmlentities($uchidden"
+  }
   flag code.RawDatatablesAttributeXss in function {
     has "lang=php"
     has "call_path:Datatables.of"
