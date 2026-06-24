@@ -185,9 +185,17 @@ func scanConcretePHP(src []byte, file string) []nir.Stmt {
 }
 
 func scanJSP(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	out = append(out, scanTemplateExpressions(src, file, "jsp")...)
 	out = append(out, scanTemplateExpressions(src, file, "jsp_scriptlet")...)
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "jsp", line, file, i+1)...)
+	}
 	return out
 }
 

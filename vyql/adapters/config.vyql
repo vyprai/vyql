@@ -33,6 +33,7 @@ adapter config {
       "terraform|0.0.0.0/0|analysis.config.terraform.open_cidr",
       "jelly|permission=\"${it.ADMINISTRATOR}\"|analysis.config.jenkins_advisor_weak_layout_permission",
       "jelly|tooltip=\"${item.why}${h.escape(item.params)}|analysis.config.jenkins_computer_queue_unescaped_tooltip",
+      "jsp|label: item.displayedValue +|analysis.config.dspace_jspui_autocomplete_label_xss",
       "pest|dangerous_url = { \"data:\" ~ !(\"image/\"|analysis.config.comrak_dangerous_url_case_sensitive"
     ],
     config_file_contains_all_events: [
@@ -69,10 +70,11 @@ adapter config {
     config_template_render_event_jsp: "analysis.template.jsp.render",
     config_template_expr_start_jsp_scriptlet: "<%=",
     config_template_expr_end_jsp_scriptlet: "%>",
-    config_template_input_pattern_jsp_scriptlet: "\\b(leftPropertyValue|rightPropertyValue|mediaType|leftOp|rightOp)\\b",
+    config_template_input_pattern_jsp_scriptlet: "\\b(leftPropertyValue|rightPropertyValue|mediaType|leftOp|rightOp|spellCheckQuery)\\b",
     config_template_skip_contains_jsp_scriptlet: ["<%@", "<%--", "Encode.forHtml"],
     config_template_input_event_jsp_scriptlet: "analysis.template.jsp.input",
     config_template_render_event_jsp_scriptlet: "analysis.template.jsp.render",
+    config_template_escape_prefix_jsp_scriptlet: "Utils.addEntities(",
     config_template_escape_event_jsp_scriptlet: "analysis.template.jsp.escape",
     config_template_escape_active_contains_jsp_scriptlet: ["leftPropertyValue = Encode.forHtml(leftPropertyValue)"],
     config_template_escape_line_contains_jsp_scriptlet: ["<%=leftPropertyValue%>", "<%=rightPropertyValue%>", "<%=mediaType%>", "<%=filterMediaType%>", "<%=leftOp%>", "<%=rightOp%>"],
@@ -180,6 +182,9 @@ adapter config {
   }
   flag code.JenkinsComputerQueueUnescapedTooltipXss on any {
     path "analysis.config.jenkins_computer_queue_unescaped_tooltip"
+  }
+  flag code.DspaceJspuiAutocompleteLabelXss on any {
+    path "analysis.config.dspace_jspui_autocomplete_label_xss"
   }
   flag code.ComrakDangerousUrlCaseSensitiveGrammar on any {
     path "analysis.config.comrak_dangerous_url_case_sensitive"

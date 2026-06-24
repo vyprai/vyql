@@ -1335,6 +1335,12 @@ review code.RawDatatablesAttributeXss {
   expected: [core.HtmlEscape]
   text: "verify server-side DataTables raw columns escape model fields before inserting them into HTML attributes"
 }
+review code.DspaceJspuiAutocompleteLabelXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review JSPUI autocomplete label rendering for escapeHtml around displayedValue before insertion into label HTML"
+}
 review code.UnescapedChartTooltipHtml {
   category: "xss"
   kind: "attention"

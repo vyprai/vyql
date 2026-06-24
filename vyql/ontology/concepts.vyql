@@ -2824,6 +2824,15 @@ concept RawDatatablesAttributeXss : sink {
   review_assumption: "the DataTables response is rendered into the browser as HTML, so attribute-breaking markup in stored model fields can execute script"
   review_confidence: high
 }
+concept DspaceJspuiAutocompleteLabelXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "JSPUI autocomplete labels escape server-provided display text before inserting it into the jQuery UI label HTML"
+  review_evidence: "autocomplete label context {pattern} concatenates item.displayedValue into label without escapeHtml or equivalent encoding"
+  review_assumption: "autocomplete suggestions may contain attacker-controlled or indexed metadata that jQuery UI renders as HTML"
+  review_confidence: high
+}
 concept CordysRequestParamXssFilterDisabled : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
