@@ -3256,6 +3256,15 @@ concept ClientLightboxOptionXss : sink {
   review_assumption: "widget, shortcode, CMS, or editor content can control the lightbox option bag and is later viewed by a privileged user"
   review_confidence: high
 }
+concept RequestViewVariableHtmlEscapeMissing : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "request-derived view variables are passed into an HTML view without local entity escaping"
+  review_evidence: "view-render context {pattern} reads a request parameter and passes the same variable into a view parameter array before htmlentities/htmlspecialchars-style escaping"
+  review_assumption: "the receiving view renders the variable in HTML or JavaScript where caller-side escaping is required"
+  review_confidence: high
+}
 concept GouniverseCmsAliasXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

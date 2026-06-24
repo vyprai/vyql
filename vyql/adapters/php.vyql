@@ -200,6 +200,15 @@ adapter php {
     lacks "esc_html($_GET"
     lacks "strip_tags($_GET"
   }
+  flag code.RequestViewVariableHtmlEscapeMissing in module {
+    lang "php"
+    has "$internalname=get_input('internalname')"
+    has "'internalname'=>$internalname"
+    has "elgg_view("
+    lacks "$internalname=htmlentities($internalname)"
+    lacks "$internalname=htmlspecialchars($internalname)"
+    lacks "$internalname=esc_html($internalname)"
+  }
   flag code.ElefantAdminPreviewMissingAdminXss in module {
     lang "php"
     has "$wp=newWebpage($_POST);"

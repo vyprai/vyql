@@ -1384,6 +1384,12 @@ review code.ClientLightboxOptionXss {
   expected: [core.HtmlEscape, core.InputValidation]
   text: "review client lightbox option rendering for HTML sanitization, event-attribute filtering, and URL protocol allowlisting"
 }
+review code.RequestViewVariableHtmlEscapeMissing {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review request-derived view variables for htmlentities/htmlspecialchars before passing them into HTML view rendering"
+}
 review code.GouniverseCmsAliasXss {
   category: "xss"
   kind: "attention"

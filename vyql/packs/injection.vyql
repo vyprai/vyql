@@ -485,6 +485,11 @@ rule ClientLightboxOptionXss {
   match code.ClientLightboxOptionXss as sink
 }
 
+rule RequestViewVariableHtmlEscapeMissing {
+  meta { id: "VYQL-INJ-162", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RequestViewVariableHtmlEscapeMissing as sink
+}
+
 rule GouniverseCmsAliasXss {
   meta { id: "VYQL-INJ-079", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.GouniverseCmsAliasXss as sink
