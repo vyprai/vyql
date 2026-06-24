@@ -957,6 +957,12 @@ adapter go {
     not binary "h.epoch==0"
     not binary "0==h.epoch"
   }
+  flag code.GrpcGatewayCommonNameAuthenticationBypass in function {
+    has "call_path:peer.FromContext"
+    has "selector:tlsInfo.State.VerifiedChains"
+    has "selector:chains.Subject.CommonName"
+    lacks "literal:grpcgateway-accept"
+  }
   flag code.UnverifiedFederationMissingEvents in function {
     call path "missingResp.Events.UntrustedEvents"
     call path "t.cacheAndReturn"

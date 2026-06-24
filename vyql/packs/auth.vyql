@@ -14,6 +14,11 @@ rule SharedOtaHandlerMissingAuthentication {
   match code.SharedOtaHandlerMissingAuthentication as handler
 }
 
+rule GrpcGatewayCommonNameAuthenticationBypass {
+  meta { id: "VYQL-AUTH-052", severity: critical, cwe: [CWE_287, CWE_290], confidence_floor: high }
+  match code.GrpcGatewayCommonNameAuthenticationBypass as auth
+}
+
 rule JmxRmiRegistryExposure {
   meta { id: "VYQL-AUTH-013", severity: high, cwe: [CWE_306, CWE_94], confidence_floor: medium }
   match code.JmxRmiRegistryExposure as exposure

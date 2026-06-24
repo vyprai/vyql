@@ -71,6 +71,12 @@ review code.SharedOtaHandlerMissingAuthentication {
   expected: [core.AuthenticationCheck]
   text: "verify shared web-server handler registration wraps OTA upload handlers in the same authentication middleware as normal request handlers"
 }
+review code.GrpcGatewayCommonNameAuthenticationBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review gRPC TLS CommonName authentication for a gRPC-gateway metadata guard before accepting certificate CommonName as the request user"
+}
 review code.JmxRmiRegistryExposure {
   category: "auth"
   kind: "attention"

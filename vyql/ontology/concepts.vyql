@@ -1704,6 +1704,15 @@ concept SharedOtaHandlerMissingAuthentication : sink {
   review_assumption: "the OTA endpoint is reachable over the device web server when web authentication is configured for other handlers"
   review_confidence: high
 }
+concept GrpcGatewayCommonNameAuthenticationBypass : sink {
+  vulnerable_to: [authentication.AuthenticationBypass]
+  cwe: [CWE_287, CWE_290]
+  review_category: "auth"
+  review_condition: "gRPC TLS CommonName authentication accepts certificate CommonName for gateway-proxied requests"
+  review_evidence: "gRPC auth context {pattern} derives AuthInfo.Username from VerifiedChains[0].Subject.CommonName without an observed grpcgateway-accept metadata rejection"
+  review_assumption: "the gRPC-gateway proxy uses a client certificate whose CommonName must not authenticate the proxied HTTP caller"
+  review_confidence: high
+}
 concept JmxRmiRegistryExposure : sink {
   vulnerable_to: [authentication.MissingAuthentication, injection.CodeInjection]
   cwe: [CWE_306, CWE_94]
