@@ -173,6 +173,15 @@ adapter c {
     has "memcpy(newData+newpos,extraPtr,y)"
     lacks "newpos+y>newDataLength"
   }
+  flag code.Fat12SuccessorEntryBoundsBypass in function {
+    has "lang=c"
+    has "name=set_fat"
+    has "fs->fat_bits"
+    has "cluster*3/2"
+    has "get_fat(&subseqEntry,fs->fat,cluster+1,fs)"
+    has "cluster!=fs->clusters-1"
+    lacks "cluster!=fs->clusters+1"
+  }
   flag code.UnderallocatedFormattedAddressList in function {
     has "lang=c"
     has "name=option_to_env"

@@ -1276,6 +1276,15 @@ concept BinarySearchTableIndexGuardBypass : sink {
   review_assumption: "a malformed or attacker-selected lookup id can fall outside the table's covered range"
   review_confidence: medium
 }
+concept Fat12SuccessorEntryBoundsBypass : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_125, CWE_787, CWE_193]
+  review_category: "memory"
+  review_condition: "FAT12 even-entry writes read the successor FAT entry using a cluster bound that excludes the reserved FAT entries"
+  review_evidence: "FAT12 set_fat context {pattern} reads cluster + 1 after checking cluster against fs->clusters - 1 instead of the total FAT entry upper bound"
+  review_assumption: "a crafted FAT12 filesystem can drive writes near the last FAT entry and make the stale successor entry corrupt later memory accesses"
+  review_confidence: high
+}
 concept CountDerivedElementAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   cwe: [CWE_129, CWE_125, CWE_787]

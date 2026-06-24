@@ -88,6 +88,11 @@ rule LengthMultiplierFormattedExpansionUnderallocation {
   match code.LengthMultiplierFormattedExpansionUnderallocation as c
 }
 
+rule Fat12SuccessorEntryBoundsBypass {
+  meta { id: "VYQL-MEM-034", severity: high, cwe: [CWE_125, CWE_787, CWE_193], confidence_floor: high }
+  match code.Fat12SuccessorEntryBoundsBypass as c
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse

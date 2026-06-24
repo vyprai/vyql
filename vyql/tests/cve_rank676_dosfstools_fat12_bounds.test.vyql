@@ -1,0 +1,58 @@
+# Rank 676 / CVE-2015-8872: dosfstools FAT12 set_fat used an off-by-two
+# successor-entry guard before reading cluster + 1.
+
+test "rank676: FAT12 successor entry uses stale fs clusters minus one guard"
+  lang c
+  expect VYQL-MEM-034
+  code
+  ```
+  typedef struct { int fat_bits; unsigned char *fat; unsigned long fat_start; unsigned long fat_size; unsigned long clusters; int nfats; } DOS_FS;
+  typedef struct { int value; } FAT_ENTRY;
+  void get_fat(FAT_ENTRY *entry, unsigned char *fat, unsigned int cluster, DOS_FS *fs);
+  void fs_write(unsigned long offs, int size, unsigned char *data);
+
+  void set_fat(DOS_FS *fs, unsigned int cluster, int new) {
+      unsigned char *data = 0;
+      FAT_ENTRY subseqEntry;
+      switch (fs->fat_bits) {
+      case 12:
+          data = fs->fat + cluster * 3 / 2;
+          if (cluster != fs->clusters - 1)
+              get_fat(&subseqEntry, fs->fat, cluster + 1, fs);
+          else
+              subseqEntry.value = 0;
+          data[0] = new & 0xff;
+          data[1] = (new >> 8) | ((0xff & subseqEntry.value) << 4);
+          break;
+      }
+      fs_write(fs->fat_start + cluster * 3 / 2, 2, data);
+  }
+  ```
+
+test "rank676: FAT12 successor entry uses total FAT entry upper bound"
+  lang c
+  reject VYQL-MEM-034
+  code
+  ```
+  typedef struct { int fat_bits; unsigned char *fat; unsigned long fat_start; unsigned long fat_size; unsigned long clusters; int nfats; } DOS_FS;
+  typedef struct { int value; } FAT_ENTRY;
+  void get_fat(FAT_ENTRY *entry, unsigned char *fat, unsigned int cluster, DOS_FS *fs);
+  void fs_write(unsigned long offs, int size, unsigned char *data);
+
+  void set_fat(DOS_FS *fs, unsigned int cluster, int new) {
+      unsigned char *data = 0;
+      FAT_ENTRY subseqEntry;
+      switch (fs->fat_bits) {
+      case 12:
+          data = fs->fat + cluster * 3 / 2;
+          if (cluster != fs->clusters + 1)
+              get_fat(&subseqEntry, fs->fat, cluster + 1, fs);
+          else
+              subseqEntry.value = 0;
+          data[0] = new & 0xff;
+          data[1] = (new >> 8) | ((0xff & subseqEntry.value) << 4);
+          break;
+      }
+      fs_write(fs->fat_start + cluster * 3 / 2, 2, data);
+  }
+  ```
