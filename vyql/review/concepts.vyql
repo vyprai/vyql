@@ -1285,6 +1285,11 @@ review code.UnboundedEmailRegexValidation {
   expected: [core.InputValidation]
   text: "review email validation regexes for maximum input length checks before matching attacker-controlled strings"
 }
+review code.CsharpEnumParseMissCacheGrowth {
+  category: "resource"
+  kind: "attention"
+  text: "review C# enum string parse caches for inserting arbitrary failed lookup keys instead of precomputing valid enum strings"
+}
 review code.OversizedWebsocketPayloadDefault {
   category: "resource"
   kind: "target"

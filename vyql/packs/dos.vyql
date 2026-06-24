@@ -123,3 +123,8 @@ rule OversizedWebsocketPayloadDefault {
   meta { id: "VYQL-DOS-024", severity: high, cwe: [CWE_400], confidence_floor: high }
   match code.OversizedWebsocketPayloadDefault as limit
 }
+
+rule CsharpEnumParseMissCacheGrowth {
+  meta { id: "VYQL-DOS-025", severity: high, cwe: [CWE_400, CWE_770], confidence_floor: high }
+  match code.CsharpEnumParseMissCacheGrowth as cache
+}

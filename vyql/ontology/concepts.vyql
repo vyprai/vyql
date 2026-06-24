@@ -413,6 +413,16 @@ concept OversizedWebsocketPayloadDefault : sink {
   review_confidence: high
 }
 
+concept CsharpEnumParseMissCacheGrowth : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770]
+  review_category: "resource"
+  review_condition: "C# enum string parsing caches failed lookup keys in process-global state"
+  review_evidence: "enum parse cache context {pattern} inserts arbitrary miss keys into a ConcurrentDictionary"
+  review_assumption: "callers can submit high-cardinality invalid enum strings to the parser"
+  review_confidence: high
+}
+
 concept RubyLineAnchorValidationBypass : sink {
   vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]

@@ -351,6 +351,15 @@ adapter csharp {
     has "GetValidity(node.ChildNodes[i])"
     lacks "MaxValidationDepth"
   }
+  flag code.CsharpEnumParseMissCacheGrowth in function {
+    lang "csharp"
+    has "ConcurrentDictionary<string,Enum>"
+    has "GetOrAdd(lowerStringValue"
+    has "TryParseStringValueToEnum_Uncached"
+    has "returnparseSucceededForDictionary?(Enum)parsedValueForDictionary:null;"
+    lacks "BuildCacheDictionaryForParseStringValue"
+    lacks "TryGetValue(lowerStringValue"
+  }
   flag code.TimeBoundAccessTokenReview in function {
     lang "csharp"
     has "BlobSasBuilder"

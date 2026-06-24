@@ -1,0 +1,81 @@
+# Rank 762 / CVE-2020-36620: EnumStringValues cached every invalid enum
+# parse string, allowing high-cardinality misses to grow process state.
+
+test "rank762: C# enum parser caches failed string parse misses"
+  lang csharp
+  file EnumExtensions.cs
+  expect VYQL-DOS-025
+  expect_review code.CsharpEnumParseMissCacheGrowth
+  code
+  ```
+  using System;
+  using System.Collections.Concurrent;
+
+  public static class EnumExtensions
+  {
+    private static ConcurrentDictionary<Type, ConcurrentDictionary<string, Enum>> parsedEnumStringsDictionaryByType;
+
+    private static bool TryParseStringValueToEnum_ViaCache<TEnumType>(string lowerStringValue, out TEnumType parsedValue) where TEnumType : System.Enum
+    {
+      var enumTypeObject = typeof(TEnumType);
+      var typeAppropriateDictionary = parsedEnumStringsDictionaryByType.GetOrAdd(enumTypeObject, (x) => new ConcurrentDictionary<string, Enum>());
+
+      var cachedValue = typeAppropriateDictionary.GetOrAdd(lowerStringValue, (str) =>
+      {
+        var parseSucceededForDictionary = TryParseStringValueToEnum_Uncached<TEnumType>(lowerStringValue, out var parsedValueForDictionary);
+        return parseSucceededForDictionary ? (Enum) parsedValueForDictionary : null;
+      });
+
+      if (cachedValue != null)
+      {
+        parsedValue = (TEnumType)cachedValue;
+        return true;
+      }
+      parsedValue = default(TEnumType);
+      return false;
+    }
+
+    private static bool TryParseStringValueToEnum_Uncached<TEnumType>(string value, out TEnumType parsedValue) where TEnumType : System.Enum
+    {
+      parsedValue = default(TEnumType);
+      return false;
+    }
+  }
+  ```
+
+test "rank762: C# enum parser prebuilds valid string cache"
+  lang csharp
+  file EnumExtensions.cs
+  reject VYQL-DOS-025
+  code
+  ```
+  using System;
+  using System.Collections.Concurrent;
+
+  public static class EnumExtensions
+  {
+    private static ConcurrentDictionary<Type, ConcurrentDictionary<string, Enum>> parsedEnumStringsDictionaryByType;
+
+    private static bool TryParseStringValueToEnum_ViaCache<TEnumType>(string lowerStringValue, out TEnumType parsedValue) where TEnumType : System.Enum
+    {
+      var enumTypeObject = typeof(TEnumType);
+      var typeAppropriateDictionary = parsedEnumStringsDictionaryByType.GetOrAdd(
+        enumTypeObject,
+        (x) => BuildCacheDictionaryForParseStringValue<TEnumType>()
+      );
+
+      if (typeAppropriateDictionary.TryGetValue(lowerStringValue, out var cachedValue))
+      {
+        parsedValue = (TEnumType)cachedValue;
+        return true;
+      }
+      parsedValue = default(TEnumType);
+      return false;
+    }
+
+    private static ConcurrentDictionary<string, Enum> BuildCacheDictionaryForParseStringValue<TEnumType>() where TEnumType : System.Enum
+    {
+      return new ConcurrentDictionary<string, Enum>();
+    }
+  }
+  ```
