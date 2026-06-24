@@ -147,6 +147,15 @@ adapter javascript {
     lacks "DOMPurify"
     lacks "sanitize-html"
   }
+  flag code.HighlightedSearchResultHtmlEscapeMissing on any {
+    path exact "analysis.function.context"
+    has "lang=javascript"
+    has "name=search"
+    has "ignoreDiacriticalMarks"
+    has "search-keyword"
+    has "matchingPost"
+    lacks "escapeHtml("
+  }
   flag code.UnescapedTableExportHtml in module {
     has "lang=javascript"
     has "onCellHtmlData"

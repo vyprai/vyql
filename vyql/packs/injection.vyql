@@ -668,6 +668,11 @@ rule InstallerHiddenFieldXss {
   match code.InstallerHiddenFieldXss as sink
 }
 
+rule HighlightedSearchResultHtmlEscapeMissing {
+  meta { id: "VYQL-INJ-144", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.HighlightedSearchResultHtmlEscapeMissing as sink
+}
+
 rule ContaoAjaxToggleSubpaletteSqlIdentifierInjection {
   meta { id: "VYQL-INJ-112", severity: high, cwe: [CWE_89], confidence_floor: high }
   match code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection as sink
