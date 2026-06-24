@@ -167,6 +167,15 @@ adapter javascript {
     lacks "Utils.escapeHtml"
     lacks "DOMPurify"
   }
+  flag code.UninitializedBufferExposure in module {
+    has "lang=javascript"
+    has "name.encode=function(str,buf,offset)"
+    has "Buffer.allocUnsafe(name.encodingLength(str))"
+    has "constn=str.replace(/^\\.|\\.$/gm,'')"
+    has "name.encodingLength=function(n)"
+    has "returnBuffer.byteLength(n)+2"
+    lacks "returnBuffer.byteLength(n.replace(/^\\.|\\.$/gm,''))+2"
+  }
   flag code.UnescapedChartTooltipHtml in function {
     has "lang=javascript"
     has "tooltipModel.body"
