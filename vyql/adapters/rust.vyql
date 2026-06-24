@@ -22,42 +22,42 @@ adapter rust {
   sink method "arg" -> code.CommandExecution
   sink method "args" -> code.CommandExecution
   flag code.TemplateInstallScriptHostExecution in function {
-    has "lang=rust"
+    lang "rust"
     has "installScript"
     has "final_script"
     lacks "spawn_installer_container"
   }
   flag code.UnsafeMutableAlias in function {
-    has "lang=rust"
+    lang "rust"
     has "&mut"
     has "as *const"
     has "as *mut"
   }
   flag code.FfiEnumLayoutRisk on any {
     path exact "analysis.rust.enum"
-    has "kind:enum"
-    has "repr:C"
+    token kind "enum"
+    token repr "C"
   }
   flag code.UnsafeAutoTraitImpl on any {
     path exact "analysis.rust.unsafe_impl"
-    has "trait:Send"
-    lacks "bound:Send"
+    trait "Send"
+    not bound "Send"
   }
   flag code.UnsafeAutoTraitImpl on any {
     path exact "analysis.rust.unsafe_impl"
-    has "trait:Sync"
-    lacks "bound:Sync"
-    lacks "bound:Send"
+    trait "Sync"
+    not bound "Sync"
+    not bound "Send"
   }
   flag code.UncheckedFfiLengthNarrowing in function {
-    has "lang=rust"
+    lang "rust"
     has "avail_in=input.len()asc_uint"
     has "avail_out=output.len()asc_uint"
     has "BZ2_bz"
     lacks ".min(c_uint::MAXasusize)asc_uint"
   }
   flag code.UninitializedBufferExposure in function {
-    has "lang=rust"
+    lang "rust"
     has "with_capacity"
     has "as_mut_ptr"
     has "from_raw_parts_mut"
@@ -65,14 +65,14 @@ adapter rust {
     has "set_len"
   }
   flag code.UninitializedBufferExposure in function {
-    has "lang=rust"
+    lang "rust"
     has "Vec::with_capacity"
     has "set_len"
     has "read_exact(&mut"
     lacks "resize"
   }
   flag code.UninitializedBufferExposure in function {
-    has "lang=rust"
+    lang "rust"
     has "as_mut_ptr"
     has "from_raw_parts_mut"
     has ".read("
@@ -82,8 +82,8 @@ adapter rust {
     path exact "analysis.rust.uninitialized"
   }
   flag code.ClaxonResidualPartitionBufferExposure in function {
-    has "lang=rust"
-    has "name=decode_residual"
+    lang "rust"
+    name "decode_residual"
     has "letn_partitions=1u32<<order;"
     has "letn_samples=block_size>>order;"
     has "letmutlen=n_samples-n_warm_up;"
@@ -94,13 +94,13 @@ adapter rust {
     lacks "n_samples_per_partition"
   }
   flag code.UnboundedResourceOperation in function {
-    has "lang=rust"
+    lang "rust"
     has ".next().await"
     lacks "timeout"
   }
   flag code.ConduitHyperUnboundedBodyToBytes in function {
-    has "lang=rust"
-    has "name=blocking_handler"
+    lang "rust"
+    name "blocking_handler"
     has "request.into_parts()"
     has "hyper::body::to_bytes(body).await?"
     has "Request::from_parts(parts, full_body)"
@@ -108,8 +108,8 @@ adapter rust {
     lacks "size_hint"
   }
   flag code.CookieMaxAgeDurationSecondsPanic in function {
-    has "lang=rust"
-    has "name=parse_inner"
+    lang "rust"
+    name "parse_inner"
     has "\"max-age\",Some(v)"
     has "v.parse()"
     has "Duration::seconds(val)"
@@ -117,14 +117,14 @@ adapter rust {
     lacks "cmp::min"
   }
   flag code.CallFutureRawWeakStateRef in function {
-    has "lang=rust"
-    has "name=poll"
+    lang "rust"
+    name "poll"
     has "letstate_ptr=Weak::into_raw(Arc::downgrade(&self_ref.state));letmutstate=self_ref.state.write().unwrap();"
     has "state.waker.is_none()"
     has "ic0::call_new"
   }
   flag code.WindowsReservedDeviceNameBypass in function {
-    has "lang=rust"
+    lang "rust"
     has "path.file_stem()"
     has "stemstr.to_uppercase().as_str()"
     has "\"COM0\""
@@ -133,7 +133,7 @@ adapter rust {
     lacks "\"COM¹\""
   }
   flag code.WindowsReservedDeviceNameBypass in function {
-    has "lang=rust"
+    lang "rust"
     has "path.file_stem()"
     has "stemstr.to_uppercase().as_str()"
     has "\"LPT0\""
@@ -142,7 +142,7 @@ adapter rust {
     lacks "\"LPT¹\""
   }
   flag code.ArchiveMarkerSymlinkOverwrite in function {
-    has "lang=rust"
+    lang "rust"
     has "PACKAGE_SOURCE_LOCK"
     has "entry.unpack_in(parent)"
     has "OpenOptions::new().create(true)"
@@ -151,8 +151,8 @@ adapter rust {
     lacks "create_new(true)"
   }
   flag code.StateMutationBeforeOperationPreconditions in function {
-    has "lang=rust"
-    has "name=apply_smart_op_tx"
+    lang "rust"
+    name "apply_smart_op_tx"
     has "self.ensure_smart_account_at_round(&tx.from,current_round);"
     has "self.debit(&tx.from,tx.fee)?;"
     has "self.increment_nonce(&tx.from);"
@@ -162,8 +162,8 @@ adapter rust {
     lacks "tx.fee.saturating_add(*amount)"
   }
   flag code.PeerLimitUnderflow in function {
-    has "lang=rust"
-    has "name=poll"
+    lang "rust"
+    name "poll"
     has "DiscoveryMessage::Handshake"
     has "self.peer_list_limit = Some(limit);"
     has "self.peer_list_limit.unwrap() as usize - 1"
@@ -172,8 +172,8 @@ adapter rust {
     lacks ".min(self.config.update_limit)"
   }
   flag code.RegexLineCommentStripWithoutCharWhitelist in function {
-    has "lang=rust"
-    has "name=strip_comments"
+    lang "rust"
+    name "strip_comments"
     has "Regex::new"
     has "(?m)//.*$"
     has "replace_all"
@@ -182,16 +182,16 @@ adapter rust {
     lacks "strip_comments_and_verify"
   }
   flag code.CryptoMissingOptimizationBarrier in function {
-    has "lang=rust"
-    has "name=sub"
+    lang "rust"
+    name "sub"
     has "underflow_mask=((borrow>>63)^1).wrapping_sub(1)"
     has "constants::L[i]&underflow_mask"
     lacks "read_volatile"
     lacks "black_box(underflow_mask)"
   }
   flag code.Luks2AttachedHeaderActivation in function {
-    has "lang=rust"
-    has "name=mount_data_disk"
+    lang "rust"
+    name "mount_data_disk"
     has "cryptsetupluksOpen--typeluks2-d-$root_hd$name"
     lacks "open_encrypted_volume"
     lacks "--header"
@@ -210,7 +210,7 @@ adapter rust {
   sink path "surf.get" -> code.UrlFetch
   sink path "surf.post" -> code.UrlFetch
   flag code.IncompleteIpDenylist in function {
-    has "lang=rust"
+    lang "rust"
     has "is_private"
     has "is_loopback"
     has "is_link_local"
@@ -219,7 +219,7 @@ adapter rust {
     lacks "is_unspecified"
   }
   flag code.IncompleteIpDenylist in function {
-    has "lang=rust"
+    lang "rust"
     has "is_private"
     has "is_loopback"
     has "is_link_local"
@@ -436,7 +436,7 @@ adapter rust {
     has "S_IRWXO"
   }
   flag code.SecretConfigFilePermissionMissing in function {
-    has "lang=rust"
+    lang "rust"
     has "config_dest.push(\"ignition\");"
     has "config_dest.push(\"config.ign\");"
     has "create_dir_all(&config_dest)"

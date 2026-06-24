@@ -281,9 +281,19 @@ adapter neutral {
     path exact "Widget"
   }
   flag custom.Marker in function {
-    has "lang=javascript"
-    has "name=validate"
-    lacks "timingSafeEqual"
+    lang "javascript"
+    name "validate"
+    not call path "crypto.timingSafeEqual"
+    selector "signature.r"
+    literal "classifier"
+    annotation "POST"
+    param type "Secret"
+    method name "MarshalYAML"
+    class bases "HTMLSerializer"
+    call "fromString"
+    fact index_kind "field_derived"
+    token identifier "nerModel"
+    attr path "$tasks.title"
   }
 }
 `
@@ -356,10 +366,22 @@ adapter neutral {
 	}
 	if ad.Mappings[14].Kind != "flag" || ad.Mappings[14].Concept != "custom.Marker" ||
 		ad.Mappings[14].Flag == nil || ad.Mappings[14].Flag.Scope != "function" ||
-		len(ad.Mappings[14].Flag.Predicates) != 3 ||
+		len(ad.Mappings[14].Flag.Predicates) != 13 ||
 		ad.Mappings[14].Flag.Predicates[0].Property != "tokens" ||
 		ad.Mappings[14].Flag.Predicates[0].Values[0] != "lang=javascript" ||
-		!ad.Mappings[14].Flag.Predicates[2].Negative {
+		ad.Mappings[14].Flag.Predicates[1].Values[0] != "name=validate" ||
+		ad.Mappings[14].Flag.Predicates[2].Values[0] != "call_path:crypto.timingSafeEqual" ||
+		!ad.Mappings[14].Flag.Predicates[2].Negative ||
+		ad.Mappings[14].Flag.Predicates[3].Values[0] != "selector:signature.r" ||
+		ad.Mappings[14].Flag.Predicates[4].Values[0] != "literal:classifier" ||
+		ad.Mappings[14].Flag.Predicates[5].Values[0] != "annotation:POST" ||
+		ad.Mappings[14].Flag.Predicates[6].Values[0] != "param_type:Secret" ||
+		ad.Mappings[14].Flag.Predicates[7].Values[0] != "method:MarshalYAML" ||
+		ad.Mappings[14].Flag.Predicates[8].Values[0] != "class_bases=HTMLSerializer" ||
+		ad.Mappings[14].Flag.Predicates[9].Values[0] != "call:fromString" ||
+		ad.Mappings[14].Flag.Predicates[10].Values[0] != "index_kind=field_derived" ||
+		ad.Mappings[14].Flag.Predicates[11].Values[0] != "identifier:nerModel" ||
+		ad.Mappings[14].Flag.Predicates[12].Values[0] != "attr_path:$tasks.title" {
 		t.Fatalf("context flag wrong: %+v", ad.Mappings[14])
 	}
 }

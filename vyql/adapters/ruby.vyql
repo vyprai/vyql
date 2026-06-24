@@ -193,19 +193,19 @@ adapter ruby {
     lacks call contains_any ["content_tag", "ERB::Util.html_escape", "ERB::Util.h", "CGI.escapeHTML", "Rack.Utils.escape_html"]
   }
   flag code.StoredHtmlWrite in function {
-    has "lang=ruby"
-    has "name=cama_comments_render_html"
+    lang "ruby"
+    name "cama_comments_render_html"
     has "#{comment.content}"
     lacks "sanitize comment.content"
   }
   flag code.UnparameterizedSqlQueryParser in function {
-    has "lang=ruby"
+    lang "ruby"
     has "find_by(params"
     lacks "find_by(email:"
   }
   flag code.ChefUserManagementWithoutAdminGuard in class {
-    has "lang=ruby"
-    has "name=Users"
+    lang "ruby"
+    name "Users"
     has "Chef::WebUIUser.cdb_load"
     has "@user.cdb_save"
     has "@user.cdb_destroy"
@@ -219,8 +219,8 @@ adapter ruby {
   sink path "redirect_to" -> code.RedirectTarget
   sink path "redirect" -> code.RedirectTarget
   flag code.ClockworkWebJobCsrf in class {
-    has "lang=ruby"
-    has "name=HomeController"
+    lang "ruby"
+    name "HomeController"
     has "params[:job]"
     has "params[:enable]"
     has "ClockworkWeb.enable(job)"
@@ -228,8 +228,8 @@ adapter ruby {
     lacks "protect_from_forgery"
   }
   flag code.ColorscoreImagemagickCommandInjection in function {
-    has "lang=ruby"
-    has "name=initialize"
+    lang "ruby"
+    name "initialize"
     has "`convert #{image_path}"
     has "-colors #{colors}"
     has "-depth #{depth}"
@@ -238,7 +238,7 @@ adapter ruby {
     lacks "depth.to_i"
   }
   flag code.WindowsBacktickDiffCommandInjection in function {
-    has "lang=ruby"
+    lang "ruby"
     has "WINDOWS"
     has "sprintf"
     has "diff_options.join(' ')"
@@ -249,8 +249,8 @@ adapter ruby {
     lacks "shellescape"
   }
   flag code.PostEditReportPrivateContentLeak in function {
-    has "lang=ruby"
-    has "name=report_post_edits"
+    lang "ruby"
+    name "report_post_edits"
     has "FROM post_revisions pr"
     has "JOIN posts p"
     has "report.data << revision"
@@ -258,8 +258,8 @@ adapter ruby {
     lacks "secure_category"
   }
   flag code.UnescapedQueueQueryStringXss in function {
-    has "lang=ruby"
-    has "name=url_path"
+    lang "ruby"
+    name "url_path"
     has "?queues=#{@queues.join(\",\")}"
     lacks "CGI.escape(@queues.join"
   }
@@ -311,8 +311,8 @@ adapter ruby {
     path "__regex.match"
   }
   flag code.RubyLineAnchorValidationBypass in function {
-    has "lang=ruby"
-    has "name=legal?"
+    lang "ruby"
+    name "legal?"
     has "string.to_s"
     has "/^[0-9a-f]{24}$/i"
   }
@@ -378,11 +378,11 @@ adapter ruby {
   }
   flag code.JwtUnverified on any {
     path "JWT.decode"
-    has "algorithm=none"
+    fact algorithm "none"
   }
   flag code.JwtUnverified on any {
     path "JWT.encode"
-    has "algorithm=none"
+    fact algorithm "none"
   }
   flag code.CsrfDisabled on any {
     path "skip_before_action"
@@ -393,7 +393,7 @@ adapter ruby {
     has "VERIFY_NONE"
   }
   flag code.CertValidationDisabled in function {
-    has "lang=ruby"
+    lang "ruby"
     has "SSLContext.new"
     has "ca_file"
     lacks "verify_mode"
@@ -463,7 +463,7 @@ adapter ruby {
   // character-filter: gsub is always global.
   filter method "gsub" global
   flag code.PolymorphicTypeSelectionReview in function {
-    has "lang=ruby"
+    lang "ruby"
     has "polymorphic_as"
     has "_type="
     has "params[\"#{polymorphic_as}_type\"]"
@@ -471,8 +471,8 @@ adapter ruby {
     lacks "valid_polymorphic_class"
   }
   flag code.ReconfirmationDirtyTrackingRace in function {
-    has "lang=ruby"
-    has "name=postpone_email_change_until_confirmation_and_regenerate_confirmation_token"
+    lang "ruby"
+    name "postpone_email_change_until_confirmation_and_regenerate_confirmation_token"
     has "self.unconfirmed_email = self.email"
     has "self.email = self.devise_email_in_database"
     has "self.confirmation_token = nil"

@@ -34,10 +34,10 @@ adapter java {
   }
   package "neo.dbaccess" {
     flag UnparameterizedSqlQueryParser in function {
-      has "function_name:execute"
-      has "call_path:t.getConnection.prepareStatement"
-      has "call_path:st.executeQuery"
-      lacks "call:setString"
+      function "execute"
+      call path "t.getConnection.prepareStatement"
+      call path "st.executeQuery"
+      not call "setString"
     }
   }
   package "hibernate-core" {
@@ -124,10 +124,10 @@ adapter java {
     sink path "FormValidation.errorWithMarkup" -> HtmlRender
     control "Util.escape" -> HtmlEscape
     flag code.UnescapedExceptionMessageMarkup in function {
-      has "call_path:Pattern.compile"
-      has "call_path:FormValidation.errorWithMarkup"
-      has "call:getMessage"
-      lacks "call_path:Util.escape"
+      call path "Pattern.compile"
+      call path "FormValidation.errorWithMarkup"
+      call "getMessage"
+      not call path "Util.escape"
     }
   }
   package "commons-validator" {

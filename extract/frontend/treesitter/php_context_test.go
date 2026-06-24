@@ -57,6 +57,50 @@ class TasksController {
 	t.Fatalf("analysis.function.context for anyData not found")
 }
 
+func TestPHPFunctionContextIncludesAssignmentFacts(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TempPath.php")
+	src := []byte(`<?php
+function zipdl($args) {
+  $file = $args['targets'][1];
+  $path = $volume->getTempPath() . DIRECTORY_SEPARATOR . $file;
+  $GLOBALS['tempFiles'][$path] = true;
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.function.context" && strings.Contains(n.Prop("str_args"), "name=zipdl") {
+			args := n.Prop("str_args")
+			for _, want := range []string{
+				"assign_call_method:getTempPath",
+				"assign_literal:DIRECTORY_SEPARATOR",
+				"global_subscript_write=true",
+				"subscript:$GLOBALS['tempFiles'][$path]",
+			} {
+				if !strings.Contains(args, want) {
+					t.Fatalf("PHP function context missing %q; context=%q", want, args)
+				}
+			}
+			return
+		}
+	}
+	t.Fatalf("analysis.function.context for zipdl not found")
+}
+
 func TestPHPLegacyScriptLanguageTagParsesStatements(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "search_opensearch.php")

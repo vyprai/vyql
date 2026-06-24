@@ -1581,6 +1581,12 @@ review code.CopypartyCprStaticPathTraversal {
   expected: [core.PathAccessCheck]
   text: "review copyparty /.cpr static file serving for canonical containment under the embedded web directory"
 }
+review code.TempPathJoinBeforeSeparatorCheck {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review temp filename joins for path-separator rejection or basename canonicalization before temp path registration"
+}
 review code.AssemblyLoadPathTraversal {
   category: "path"
   kind: "attention"

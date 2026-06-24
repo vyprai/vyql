@@ -91,7 +91,7 @@ adapter csharp {
   sink path "Assembly.LoadFrom" -> code.DynamicCodeLoad
   sink path "Assembly.LoadFile" -> code.DynamicCodeLoad
   flag code.AssemblyLoadPathTraversal in function {
-    has "function_name:GetType"
+    function "GetType"
     has "AssemblyLoadContext.Default.LoadFromAssemblyPath"
     has "AppContext.BaseDirectory+splitName[1].Trim()+\".dll\""
     lacks "path.Contains(\"..\")"
@@ -153,7 +153,7 @@ adapter csharp {
   sink method "RedirectPermanentPreserveMethod" -> code.RedirectTarget
   sink method "RedirectSafelyAsync" -> code.RedirectTarget
   flag code.UnencodedUrlQueryParameter in function {
-    has "function_name:ConstructValidateUrl"
+    function "ConstructValidateUrl"
     has "QueryItems.Add"
     has "ArtifactParameterName"
     has "serviceTicket"
@@ -267,8 +267,8 @@ adapter csharp {
     has "ValidateIssuerSigningKey=false"
   }
   flag code.SamlFirstSignatureOnlyBypass in function {
-    has "lang=csharp"
-    has "name=VerifySignature"
+    lang "csharp"
+    name "VerifySignature"
     has "signedDocument.GetElementsByTagName"
     has "nodeList[0]"
     has "signedXml.LoadXml"
@@ -283,52 +283,52 @@ adapter csharp {
     path "UnixFileMode.OtherWrite"
   }
   flag code.UncheckedEncodedLengthArithmetic in function {
-    has "lang=csharp"
+    lang "csharp"
     has "ReadVarUInt32"
     has "(int)input.ReadVarUInt32()"
     lacks "checked"
   }
   flag code.UncheckedEncodedLengthArithmetic in function {
-    has "lang=csharp"
+    lang "csharp"
     has "ReadVarUInt32"
     has "input.ReadVarUInt32()<<1"
     lacks "checked"
   }
   flag code.UncheckedEncodedLengthArithmetic in function {
-    has "lang=csharp"
+    lang "csharp"
     has "input.SkipBytes(count*sizeof("
     lacks "checked(count*sizeof("
   }
   flag code.UncheckedEncodedLengthArithmetic in function {
-    has "lang=csharp"
-    has "name=SkipBytes"
+    lang "csharp"
+    name "SkipBytes"
     has "position+=count"
     lacks "checked(position+count)"
   }
   flag code.UncheckedEncodedLengthArithmetic in function {
-    has "lang=csharp"
+    lang "csharp"
     has "currentLength+=count"
     lacks "checked(stackFrame.currentLength+count)"
   }
   flag code.UncheckedEncodedLengthArithmetic in function {
-    has "lang=csharp"
+    lang "csharp"
     has "value.Length<<1"
     lacks "checked(value.Length*2)"
   }
   flag code.UnboundedStateGrowthReview in function {
-    has "lang=csharp"
-    has "name=GetOrAddNode"
+    lang "csharp"
+    name "GetOrAddNode"
     has "GetOrAddNode(subKey)"
     lacks "MaxStateDepth"
   }
   flag code.UnboundedStateGrowthReview in function {
-    has "lang=csharp"
-    has "name=GetValidity"
+    lang "csharp"
+    name "GetValidity"
     has "GetValidity(node.ChildNodes[i])"
     lacks "MaxValidationDepth"
   }
   flag code.TimeBoundAccessTokenReview in function {
-    has "lang=csharp"
+    lang "csharp"
     has "BlobSasBuilder"
     has "ExpiresOn"
     has "AddHours(1)"
@@ -336,8 +336,8 @@ adapter csharp {
     lacks "AddMinutes(tokenDuration)"
   }
   flag code.RequestTokenCacheCleanupBypass in function {
-    has "lang=csharp"
-    has "name=AddParameterToEndpoint"
+    lang "csharp"
+    name "AddParameterToEndpoint"
     has "ParameterBasedFrom<IToken<IUser>>"
     has "returnthis.AuthenticateToken(context,database);"
     has "returntoken.User;"

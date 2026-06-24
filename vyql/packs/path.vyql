@@ -182,3 +182,8 @@ rule UnvalidatedDynamicRequirePathTraversal {
   meta { id: "VYQL-PATH-035", severity: critical, cwe: [CWE_22, CWE_829], confidence_floor: high }
   match code.UnvalidatedDynamicRequirePathTraversal as sink
 }
+
+rule TempPathJoinBeforeSeparatorCheck {
+  meta { id: "VYQL-PATH-036", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.TempPathJoinBeforeSeparatorCheck as sink
+}

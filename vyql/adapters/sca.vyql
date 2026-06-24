@@ -6,42 +6,42 @@ adapter sca {
 
   flag sbom.VulnerableDependency on any {
     path exact "analysis.sca.package"
-    has "status=vulnerable"
+    fact status "vulnerable"
   }
   flag sbom.HttpRequestSmugglingDependency on any {
     path exact "analysis.sca.package"
-    has "advisory_cwe=CWE-444"
+    fact advisory_cwe "CWE-444"
   }
   flag sbom.HttpRequestSmugglingDependency on any {
     path exact "analysis.sca.package"
-    has "advisory_cwe=CWE_444"
+    fact advisory_cwe "CWE_444"
   }
   flag sbom.CertValidationDependency on any {
     path exact "analysis.sca.package"
-    has "advisory_cwe=CWE-295"
+    fact advisory_cwe "CWE-295"
   }
   flag sbom.CertValidationDependency on any {
     path exact "analysis.sca.package"
-    has "advisory_cwe=CWE_295"
+    fact advisory_cwe "CWE_295"
   }
   flag sbom.SuspiciousDependency on any {
     path exact "analysis.sca.package"
-    has "status=suspicious"
+    fact status "suspicious"
   }
   flag sbom.MaliciousDependency on any {
     path exact "analysis.sca.package"
-    has "status=malicious"
+    fact status "malicious"
   }
   flag sbom.MaliciousDependency on any {
     path exact "analysis.sca.package"
-    has "advisory_cwe=CWE-506"
+    fact advisory_cwe "CWE-506"
   }
   flag sbom.MaliciousDependency on any {
     path exact "analysis.sca.package"
-    has "advisory_cwe=CWE_506"
+    fact advisory_cwe "CWE_506"
   }
   flag sbom.ReachableSymbol on any {
     path exact "analysis.sca.package"
-    has "reachable=true"
+    fact reachable "true"
   }
 }

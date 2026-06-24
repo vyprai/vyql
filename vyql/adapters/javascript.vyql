@@ -121,7 +121,7 @@ adapter javascript {
   // are attacker-controlled unless independently verified.
   source method "parseFromString" -> core.UserControlledData
   flag code.StoredHtmlWrite in function {
-    has "lang=javascript"
+    lang "javascript"
     has "copyIn"
     has "file.path"
     has "info.extension"
@@ -129,7 +129,7 @@ adapter javascript {
     lacks "DOMPurify"
   }
   flag code.UnescapedHtmlOptionRenderer in function {
-    has "lang=javascript"
+    lang "javascript"
     has "newTomSelect"
     has "directoryName"
     has "return`<"
@@ -138,7 +138,7 @@ adapter javascript {
     lacks "innerHTML"
   }
   flag code.UnescapedHtmlOptionRenderer in function {
-    has "lang=javascript"
+    lang "javascript"
     has "getAttribute"
     has "data-content"
     has "optionContent"
@@ -150,15 +150,15 @@ adapter javascript {
   }
   flag code.HighlightedSearchResultHtmlEscapeMissing on any {
     path exact "analysis.function.context"
-    has "lang=javascript"
-    has "name=search"
+    lang "javascript"
+    name "search"
     has "ignoreDiacriticalMarks"
     has "search-keyword"
     has "matchingPost"
     lacks "escapeHtml("
   }
   flag code.UnescapedTableExportHtml in module {
-    has "lang=javascript"
+    lang "javascript"
     has "onCellHtmlData"
     has "htmlData"
     has "returnhtmlData"
@@ -169,7 +169,7 @@ adapter javascript {
     lacks "returncell.text()"
   }
   flag code.UnescapedHtmlPresenter in module {
-    has "lang=javascript"
+    lang "javascript"
     has "presentType=\"html\""
     has "present(encodings)"
     has "Utils.printable"
@@ -178,7 +178,7 @@ adapter javascript {
     lacks "DOMPurify"
   }
   flag code.UninitializedBufferExposure in module {
-    has "lang=javascript"
+    lang "javascript"
     has "name.encode=function(str,buf,offset)"
     has "Buffer.allocUnsafe(name.encodingLength(str))"
     has "constn=str.replace(/^\\.|\\.$/gm,'')"
@@ -187,7 +187,7 @@ adapter javascript {
     lacks "returnBuffer.byteLength(n.replace(/^\\.|\\.$/gm,''))+2"
   }
   flag code.UnescapedChartTooltipHtml in function {
-    has "lang=javascript"
+    lang "javascript"
     has "tooltipModel.body"
     has "tooltipModel.labelColors"
     has "generateTooltipContent"
@@ -196,8 +196,8 @@ adapter javascript {
     lacks "textContent"
   }
   flag code.UnescapedChartTooltipDataName in function {
-    has "lang=javascript"
-    has "name=formatTooltip"
+    lang "javascript"
+    name "formatTooltip"
     has "itemModel.get('name')"
     has "if(name){returnname;}"
     has "createTooltipMarkup('nameValue'"
@@ -207,8 +207,8 @@ adapter javascript {
     lacks "escapeHtml(name)"
   }
   flag code.DropdownEntryLabelInnerHtmlXss in function {
-    has "lang=javascript"
-    has "name=addDropDownEntry"
+    lang "javascript"
+    name "addDropDownEntry"
     has "li.innerHTML"
     has "dropdown-item"
     has "label"
@@ -216,14 +216,14 @@ adapter javascript {
     lacks "textContent"
   }
   flag code.DefaultPermissiveCorsConfig in module {
-    has "lang=javascript"
+    lang "javascript"
     has "CORS_ENABLED:true"
     has "CORS_ORIGIN:true"
     lacks "CORS_ENABLED:false"
     lacks "CORS_ORIGIN:false"
   }
   flag code.IncompleteHtmlEventHandlerStrip in module {
-    has "lang=javascript"
+    lang "javascript"
     has "ViewSource"
     has "stripScripts"
     has "stripIFrames"
@@ -235,7 +235,7 @@ adapter javascript {
     lacks "_stripEventHandlers"
   }
   flag code.ClientLightboxOptionXss in module {
-    has "lang=javascript"
+    lang "javascript"
     has "setHTMLContent"
     has "setMessage(html)"
     lacks "DOMPurify"
@@ -243,7 +243,7 @@ adapter javascript {
     lacks "sanitizeHtml(html)"
   }
   flag code.ClientLightboxOptionXss in module {
-    has "lang=javascript"
+    lang "javascript"
     has "setVideoContent"
     has "options.videoParams"
     has "$('<video>',videoParams)"
@@ -252,7 +252,7 @@ adapter javascript {
     lacks "deletevideoParams[key]"
   }
   flag code.ClientLightboxOptionXss in module {
-    has "lang=javascript"
+    lang "javascript"
     has "setSlideshowContent"
     has "options.slides.forEach"
     has "data-elementor-slideshow-video"
@@ -261,7 +261,7 @@ adapter javascript {
     lacks "startsWith(protocol)"
   }
   flag code.AjaxBackslashProtocolRelativeUrlXss in module {
-    has "lang=javascript"
+    lang "javascript"
     has "function ajax(url, handler)"
     has "url[0] != '/'"
     has "url[1] == '/'"
@@ -281,7 +281,7 @@ adapter javascript {
     lacks "delete data.update_event"
   }
   flag code.PublicVisibilityCacheInvalidationMissing in module {
-    has "lang=javascript"
+    lang "javascript"
     has "ProxyCacheInvalidationService"
     has "RUNNER_INFO_CACHE_PREFIX"
     has "SandboxEvents.ARCHIVED"
@@ -290,8 +290,8 @@ adapter javascript {
     lacks "PUBLIC_CACHE_PREFIX"
   }
   flag code.EcdhPeerPublicKeyMissingCurveValidation in function {
-    has "lang=javascript"
-    has "name=deriveSharedSecret"
+    lang "javascript"
+    name "deriveSharedSecret"
     has "publicKey.Q.multiply(this.d)"
     has "zeroBuffer(S.getX().toBigInteger().toString(16),this._size)"
     lacks "onCurve(publicKey)"
@@ -299,7 +299,7 @@ adapter javascript {
     lacks "isOnCurve(publicKey)"
   }
   flag code.TotalJsAdminThemeXss in module {
-    has "lang=javascript"
+    lang "javascript"
     has "COMPONENT('grid'"
     has "column.format"
     has "m.value=column.template?column.template(items[i],column):column.render?column.render(val,column,items[i]):val==null?'':(column.format?val.format(column.format):val)"
@@ -307,24 +307,24 @@ adapter javascript {
     lacks "Thelpers.encode((column.format?val.format(column.format):val))"
   }
   flag code.CocotaisEchoPlatformTagInjection in module {
-    has "lang=javascript"
-    has "builtin:echo"
+    lang "javascript"
+    token builtin "echo"
     has "\"/echo\""
     has "_msgs.join(\" \")"
     has "event.reply(content)"
   }
   flag code.ArchiveSymlinkFilterBypass in module {
-    has "lang=javascript"
+    lang "javascript"
     has "tar.extract"
-    has "ignore:isSymlink"
+    token ignore "isSymlink"
     has "functionisSymlink(entry)"
     has "entry.type==='SymbolicLink'"
     lacks "functionisSymlink(_,entry)"
     lacks "entry.type==='symlink'"
   }
   flag code.FlarumTranslatorRawStringParameterXss in function {
-    has "lang=javascript"
-    has "name=preprocessParameters"
+    lang "javascript"
+    name "preprocessParameters"
     has "if('user'inparameters)"
     has "extract(parameters,'user')"
     has "parameters.username"
@@ -415,7 +415,7 @@ adapter javascript {
     lacks "hasValidCliToken"
   }
   flag code.AccessPolicyReview in function {
-    has "lang=javascript"
+    lang "javascript"
     has "authorized_keys?.includes(data.pubkey)"
     has "private_keys[data.pubkey]"
     has "!noscraper"
@@ -423,13 +423,13 @@ adapter javascript {
     lacks "authorized_keys?.length&&!pubkeyInConfig"
   }
   flag code.SecretComparisonReview in function {
-    has "lang=javascript"
+    lang "javascript"
     has "user==username&&pass==password"
     lacks "timingSafeCompare"
     lacks "tsscmp"
   }
   flag code.SecretComparisonReview in function {
-    has "lang=javascript"
+    lang "javascript"
     has "data['x-csrf-token']===token"
     has "deletedata['x-csrf-token']"
     lacks "scmp"
@@ -437,7 +437,7 @@ adapter javascript {
   }
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
   flag code.MethodGatedRedirectValidationBypass in function {
-    has "lang=javascript"
+    lang "javascript"
     has "ctx.request?.method"
     has "POST"
     has "return;"
@@ -447,7 +447,7 @@ adapter javascript {
     has "validateURL"
   }
   flag code.CinnyServiceWorkerMediaAuthLeak in function {
-    has "lang=javascript"
+    lang "javascript"
     has "event.respondWith"
     has "askForAccessToken(client)"
     has "fetchConfig(token)"
@@ -456,8 +456,8 @@ adapter javascript {
     lacks "validMediaRequest(url,session.baseUrl)"
   }
   flag code.CkeditorStaticProtectedSourceTokenBypass in function {
-    has "lang=javascript"
-    has "name=protectSource"
+    lang "javascript"
+    name "protectSource"
     has "protectedHtml"
     has "cke_tempcomment"
     has "/cke_temp(comment)?/"
@@ -466,8 +466,8 @@ adapter javascript {
     lacks "cke_temp_"
   }
   flag code.CkeditorRawElementLiveDocumentRenderXss in function {
-    has "lang=javascript"
-    has "name=viewToPlainText"
+    lang "javascript"
+    name "viewToPlainText"
     has "viewItem.is('rawElement')"
     has "document.createElement('div')"
     has "viewItem.render(tempElement,converter)"
@@ -475,15 +475,15 @@ adapter javascript {
     lacks "createHTMLDocument"
   }
   flag code.CodeServerPathProxyPortConfusedProxy in function {
-    has "lang=javascript"
-    has "name=getProxyTarget"
+    lang "javascript"
+    name "getProxyTarget"
     has "req.params.port"
     has "0.0.0.0:"
     has "req.originalUrl.slice(base.length)"
     lacks "parseInt(req.params.port,10)"
   }
   flag code.JavaScriptUrlRedirectXss in function {
-    has "lang=javascript"
+    lang "javascript"
     has "URLSearchParams(window.location.search).get"
     has "window.location=decodeURI"
     lacks "redirect[0]==='/'"
@@ -498,7 +498,7 @@ adapter javascript {
   control "validateFetchUrl" -> core.AllowlistValidation
   control "isUrlSafeToOpen" -> core.AllowlistValidation
   flag code.ExternalResourceIntegrityReview in function {
-    has "name=updateDynamicPageSriHashes"
+    name "updateDynamicPageSriHashes"
     has "integrityRegex.exec(attrs)"
     has "globalHashes[t2].set(src,sriHash)"
     lacks "Detected reference to not explicitly allowed external resource"
@@ -508,15 +508,15 @@ adapter javascript {
   // React Native CLI's development-server URL opener passed request body `url`
   // directly to the OS browser opener before CVE-2025-11953 added protocol checks.
   flag code.ReactNativeCliOpenUrlMiddlewareCommandExecution in function {
-    has "lang=javascript"
-    has "name=openURLMiddleware"
+    lang "javascript"
+    name "openURLMiddleware"
     has "req.body"
     has "awaitopen(url);"
     lacks "newURL(url)"
     lacks "parsedUrl.protocol"
   }
   flag code.CloudBaseOpenUrlSsrf in function {
-    has "lang=javascript"
+    lang "javascript"
     has "/api/open-url"
     has "req.body"
     has "awaitopenUrl(url,undefined,this._mcpServer);"
@@ -537,15 +537,15 @@ adapter javascript {
     has "nodeIntegration=true"
   }
   flag code.ElectronNodeIntegration in function {
-    has "lang=javascript"
+    lang "javascript"
     has "will-attach-webview"
     has "webPreferences.nodeIntegration=false"
     lacks "webPreferences.contextIsolation=true"
   }
   flag code.ElectronPrivilegedUrlNodeIntegration in module {
-    has "lang=javascript"
-    has "expr:window.location.protocol==='chrome-devtools:'"
-    has "assign:nodeIntegration=true"
+    lang "javascript"
+    expr "window.location.protocol==='chrome-devtools:'"
+    assign "nodeIntegration=true"
   }
 
   sink path "child_process.exec" -> code.CommandExecution
@@ -585,7 +585,7 @@ adapter javascript {
   sink path "webpack-shell-plugin-next" -> code.CommandExecution
   sink path "WebpackShellPlugin" -> code.CommandExecution
   flag code.CodecovNodeGcovCommandInjection in module {
-    has "lang=javascript"
+    lang "javascript"
     has "functionsanitizeVar(arg)"
     has "arg.replace(/&/g,'')"
     has "args.options['gcov-root']"
@@ -595,42 +595,42 @@ adapter javascript {
     lacks "execFileSync(gcov)"
   }
   flag code.AuthenticodeSignaturePathBindingBypass in function {
-    has "lang=javascript"
-    has "name=verifySignature"
+    lang "javascript"
+    name "verifySignature"
     has "Get-AuthenticodeSignature"
     has "LiteralPath"
-    has "call_path:parseOut"
-    has "selector:data.SignerCertificate.Subject"
+    call path "parseOut"
+    selector "data.SignerCertificate.Subject"
     has "publisherNames"
-    lacks "selector:data.Path"
-    lacks "call_path:path.normalize"
+    not selector "data.Path"
+    not call path "path.normalize"
   }
   flag code.ClamscanBinaryPathShellCommandInjection in function {
-    has "lang=javascript"
-    has "name=_is_clamav_binary"
+    lang "javascript"
+    name "_is_clamav_binary"
     has "version_cmds"
     has "${path}--version"
     has "cp_exec(version_cmds[scanner])"
     lacks "cp_execfile"
   }
   flag code.CompileSassCleanupShellCommandWithoutPathCheck in function {
-    has "lang=javascript"
-    has "name=setupCleanupOnExit"
+    lang "javascript"
+    name "setupCleanupOnExit"
     has "exec"
     has "rm-r"
     has "cssPath"
     lacks "fs.lstat"
   }
   flag code.McpToolCommandTemplateExecution in module {
-    has "lang=javascript"
+    lang "javascript"
     has "server.tool"
     has "lsof -t -i tcp:${port}"
     has "ps -p ${pid} -o comm="
     lacks "execFile("
   }
   flag code.CommandStringWrapperExecution in function {
-    has "lang=javascript"
-    has "name=writeConfigRemote"
+    lang "javascript"
+    name "writeConfigRemote"
     has "execAsyncRemote"
     has "echo'${traefikConfig}'"
     has ">${configPath}"
@@ -640,7 +640,7 @@ adapter javascript {
     lacks "shellQuote.quote"
   }
   flag code.DynamicFunctionMutableObjectEval in function {
-    has "lang=javascript"
+    lang "javascript"
     has "newFunction('node'"
     has "props(expr,'node.')"
     lacks "Object.freeze(node)"
@@ -666,13 +666,13 @@ adapter javascript {
     lacks "Isolate"
   }
   flag code.CompassCsfleEjsonParserMissingStrictMode in function {
-    has "name=textToEncryptedFieldConfig"
+    name "textToEncryptedFieldConfig"
     has "parseFilter(text)"
     lacks "parseShellStringToEJSON"
     lacks "ParseMode.Strict"
   }
   flag code.IncompleteGeneratedJsIdentifierReservedWords in module {
-    has "lang=javascript"
+    lang "javascript"
     has "JS_RESERVED_WORDS"
     has "isValidJsIdentifier"
     has "compileShellApiFunctionName"
@@ -683,7 +683,7 @@ adapter javascript {
   }
   flag code.UnfilteredAgentCommandTag on any {
     path exact "analysis.function.context"
-    has "name=parseCustomTags"
+    name "parseCustomTags"
     has "customTagNames"
     has "dyad-execute-sql"
     has "dyad-codebase-context"
@@ -692,8 +692,8 @@ adapter javascript {
   }
   flag code.EnvFileVariableInjection on any {
     path exact "analysis.function.context"
-    has "lang=javascript"
-    has "name=updateEnvFile"
+    lang "javascript"
+    name "updateEnvFile"
     has "Object.entries(updates)"
     has "newLine=`${key}=\"${value}\"`"
     has "writeFileSync(envPath,envContent"
@@ -743,7 +743,7 @@ adapter javascript {
     lacks "request.url.trim().toLowerCase().substring(0,4)==='file'"
   }
   flag code.ConvertSvgMultiSvgSanitizerBypass in function {
-    has "lang=javascript"
+    lang "javascript"
     has "cheerio.default.html"
     has "this[_sanitize]"
     has "cheerio.load(input,null,false)('svg')"
@@ -1041,7 +1041,7 @@ adapter javascript {
     has "d]*(?:;"
   }
   flag code.CatastrophicRegex in module {
-    has "lang=javascript"
+    lang "javascript"
     has "constpattern=["
     has "].join"
     has "newRegExp(pattern"
@@ -1054,7 +1054,7 @@ adapter javascript {
     lacks "^\\{((?:,|\\{,+\\})+)\\}"
   }
   flag code.CatastrophicRegex in module {
-    has "lang=javascript"
+    lang "javascript"
     has "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g"
     lacks "[^]*?(?:\\*\\/|$)"
   }
@@ -1076,7 +1076,7 @@ adapter javascript {
     has "\\s*,\\s*"
   }
   flag code.CatastrophicRegex in function {
-    has "lang=javascript"
+    lang "javascript"
     has "varhwb=/^hwb\\("
     has "string.match(hwb)"
     lacks "\\d{0,3}"
@@ -1101,15 +1101,15 @@ adapter javascript {
   control "analysis.function.context" val "k=='__proto__'||k=='constructor'||k=='prototype'" -> core.PrototypePollutionGuard
   control "analysis.function.context" val "k==='__proto__'||k==='constructor'||k==='prototype'" -> core.PrototypePollutionGuard
   flag code.UncheckedPrototypeConfigKey in function {
-    has "name=separateExposeGlobals"
+    name "separateExposeGlobals"
     has "Object.keys(shims).forEach"
     has "exposeGlobals[k]=exp"
     has "onlyShims[k]=val"
     lacks "k==='__proto__'||k==='constructor'"
   }
   flag code.PrototypeKeyCachePoisoning in function {
-    has "lang=javascript"
-    has "name=cachedPathRelative"
+    lang "javascript"
+    name "cachedPathRelative"
     has "cache[from]"
     has "cache[from][to]"
     has "relative.call(path,from,to)"
@@ -1117,7 +1117,7 @@ adapter javascript {
     lacks "Object.create(null)"
   }
   flag code.CspParserProtoDirectivePollution in module {
-    has "lang=javascript"
+    lang "javascript"
     has "constresult:PolicyResult={}"
     has "directiveKey===\"__proto__\""
     has "Object.defineProperty(result,directiveKey"
@@ -1126,8 +1126,8 @@ adapter javascript {
     lacks "result.set(directiveKey,directiveValue)"
   }
   flag code.ControlledMergeInheritedKeyPrototypePollution in function {
-    has "lang=javascript"
-    has "name=iterateAndMerge"
+    lang "javascript"
+    name "iterateAndMerge"
     has "for(varattrinobj2)"
     has "result[attr]=clone(obj2[attr])"
     has "result[attr]=iterateAndMerge(obj1[attr],obj2[attr])"
@@ -1135,7 +1135,7 @@ adapter javascript {
     lacks "allowedAttrs.includes(attr)"
   }
   flag code.ControlledMergeInheritedKeyPrototypePollution in function {
-    has "lang=javascript"
+    lang "javascript"
     has "for(varxinprops)"
     has "obj[x]=props[x]"
     has "obj[x]=jqMix(obj[x],props[x])"
@@ -1146,15 +1146,15 @@ adapter javascript {
     lacks "hasOwnProperty.call(props,x)"
   }
   flag code.ChartkickRecursiveExtendPrototypePollution in function {
-    has "lang=javascript"
-    has "name=extend"
+    lang "javascript"
+    name "extend"
     has "for(keyinsource)"
     has "target[key]=source[key]"
     has "extend(target[key],source[key])"
     lacks "key===\"__proto__\""
   }
   flag code.CollectionExtendPrototypePollution in module {
-    has "lang=javascript"
+    lang "javascript"
     has "Collection.prototype.extend"
     has "forEach((el,key)=>"
     has "byLink"
@@ -1162,7 +1162,7 @@ adapter javascript {
     lacks "key==='__proto__'"
   }
   flag code.CollectionExtendPrototypePollution in module {
-    has "lang=javascript"
+    lang "javascript"
     has "_core.Collection.prototype.extend"
     has "forEach((el,key)=>"
     has "_link.byLink"
@@ -1170,7 +1170,7 @@ adapter javascript {
     lacks "key==='__proto__'"
   }
   flag code.CookiexDeepPrototypePollution in module {
-    has "lang=javascript"
+    lang "javascript"
     has "Object.keys(b).forEach(key=>"
     has "a[key]=b[key]"
     has "delegate.call(this,a[key],b[key])"
@@ -1179,8 +1179,8 @@ adapter javascript {
   }
   flag code.ForOwnRecursiveDefaultsPrototypePollution on any {
     path exact "analysis.function.context"
-    has "lang=javascript"
-    has "name=copy"
+    lang "javascript"
+    name "copy"
     has "lazy.forOwn(current,function(value,key)"
     has "target[key]=value"
     has "defaultsDeep(val,value)"
@@ -1188,14 +1188,14 @@ adapter javascript {
   }
   flag code.TemplateDirectoryHiddenGlobCopy on any {
     path exact "analysis.function.context"
-    has "lang=javascript"
-    has "name=downloadTemplate"
+    lang "javascript"
+    name "downloadTemplate"
     has "fs.statSync(file).isDirectory()"
     has "d.copy(file,dist)"
     lacks "hide:false"
   }
   flag code.NestedPathInheritedPropertyPrototypePollution in function {
-    has "lang=javascript"
+    lang "javascript"
     has "currentKeyPath"
     has "remainingKeyPath"
     has "obj[currentKeyPath]"
@@ -1315,8 +1315,8 @@ adapter javascript {
   // Default relay/proxy URL builders that embed caller URL/token metadata into
   // a hardcoded fallback host need trust-boundary review.
   flag code.DefaultExternalRelaySecretExposure in function {
-    has "lang=javascript"
-    has "name=buildRelayUrl"
+    lang "javascript"
+    name "buildRelayUrl"
     has "herokuapp.com"
     has "encodeURIComponent(gurl)"
     has "token"
@@ -1352,20 +1352,20 @@ adapter javascript {
     lacks "stream.destroy()"
   }
   flag code.UnboundedDelimiterSplitCount in function {
-    has "lang=javascript"
+    lang "javascript"
     has "body.split('&').length"
     has "len>limit?undefined:len-1"
     lacks "indexOf('&'"
   }
   flag code.ZeroStepSequenceExpansion in function {
-    has "lang=javascript"
+    lang "javascript"
     has "Math.abs(numeric(n[2]))"
     has "test(i,y)"
     has "i+=incr"
     lacks "Math.max(Math.abs(numeric(n[2])),1)"
   }
   flag code.FoldedHeaderContinuationCrash in function {
-    has "lang=javascript"
+    lang "javascript"
     has "this.buffer.split(RE_CRLF)"
     has "lines[i][0]"
     has "RE_HDR.exec(lines[i])"
@@ -1390,7 +1390,7 @@ adapter javascript {
     lacks "stream.destroy"
   }
   flag code.ProtocolStateReview in function {
-    has "name=processMessage"
+    name "processMessage"
     has "protocolMsg"
     has "HISTORY_SYNC_NOTIFICATION"
     has "APP_STATE_SYNC_KEY_SHARE"
@@ -1404,21 +1404,21 @@ adapter javascript {
     lacks "basename(file.name)"
   }
   flag code.BrowserlessWorkspaceFilePathTraversal in function {
-    has "name=<lambda>"
+    name "<lambda>"
     has "req.params[0]"
     has "path.join(workspaceDir,file)"
     has "res.sendFile(filePath"
     lacks "filePath.includes(workspaceDir)"
   }
   flag code.BrowserlessWorkspaceFilePathTraversal in function {
-    has "name=<lambda>"
+    name "<lambda>"
     has "req.params[0]"
     has "path.join(workspaceDir,file)"
     has "rimraf(filePath"
     lacks "filePath.includes(workspaceDir)"
   }
   flag code.ClaspRemoteFilePathTraversal in function {
-    has "name=fetchRemote"
+    name "fetchRemote"
     has "script.projects.getContent"
     has "response.data.files"
     has "f.name"
@@ -1426,8 +1426,8 @@ adapter javascript {
     lacks "isInside"
   }
   flag code.UnvalidatedDynamicRequirePathTraversal in function {
-    has "lang=javascript"
-    has "name=runWidget"
+    lang "javascript"
+    name "runWidget"
     has "widgetId"
     has "widget-${widgetId}.js"
     has "path.join(__dirname,file)"
@@ -1437,7 +1437,7 @@ adapter javascript {
     lacks "widgetIdPattern"
   }
   flag code.ClientAuthFailureResponseReview in function {
-    has "name=<lambda>"
+    name "<lambda>"
     has "callbackData.hasOwnProperty(\"status\")"
     has "data.status==-1"
     has "callbackFun(callbackData)"
@@ -1455,11 +1455,11 @@ adapter javascript {
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
   flag code.JwtUnverified on any {
     path "jwt.verify"
-    has "algorithms=none"
+    fact algorithms "none"
   }
   flag code.JwtUnverified on any {
     path "jwt.sign"
-    has "algorithm=none"
+    fact algorithm "none"
   }
   // explicit CSRF middleware disablement.
   flag code.CsrfDisabled on any {
@@ -1497,7 +1497,7 @@ adapter javascript {
     lacks "localhost"
   }
   flag code.InsecureExecutableDownload in module {
-    has "lang=javascript"
+    lang "javascript"
     has "jrePrefix"
     has "OpenJDK-JRE"
     has "http://bundled-openjdk-jre"
@@ -1516,7 +1516,7 @@ adapter javascript {
   }
   flag code.InsecureCookie on any {
     path "res.cookie"
-    lacks "secure=true"
+    not fact secure "true"
   }
 
   // permissive CORS (CWE-942) — ACAO header set to "*" (multi-val: name AND wildcard)

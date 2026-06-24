@@ -35,7 +35,7 @@ adapter groovy {
   sink path "URL" -> code.UrlFetch
   sink path "URI" -> code.UrlFetch
   flag code.ChecksumErrorLogoutRedirect in module {
-    has "lang=groovy"
+    lang "groovy"
     has "checksumError"
     has "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient)"
     lacks "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient,\"\",false)"

@@ -73,40 +73,40 @@ adapter java {
   // Offset/length range checks must avoid additive overflow before a native or buffer
   // operation consumes the range. The patched idiom checks `offset > len - length`.
   flag code.IntegerSizeArithmetic in function {
-    has "expr:offset+length>b.length"
-    has "call_path:write"
-    lacks "expr:offset>b.length-length"
+    expr "offset+length>b.length"
+    call path "write"
+    not expr "offset>b.length-length"
   }
   flag code.IntegerSizeArithmetic in function {
-    has "function_name:crypt_raw"
-    has "expr:1<<log_rounds"
-    lacks "call:roundsForLogRounds"
+    function "crypt_raw"
+    expr "1<<log_rounds"
+    not call "roundsForLogRounds"
   }
   flag code.UnvalidatedRatingRange in function {
-    has "function_name:rateTopic"
-    has "call_path:registry.rateResource"
-    has "call_path:genericArtifact.getPath"
+    function "rateTopic"
+    call path "registry.rateResource"
+    call path "genericArtifact.getPath"
     lacks "MAX_RATE"
     lacks "MIN_RATE"
   }
   flag code.FrameworkRequestBeforeSessionValidation in function {
-    has "function_name:doFilter"
-    has "call_path:Meteor.build"
-    has "call_path:httpReq.getParameter"
-    has "call_path:pushContext.getSessionManager.getPushSession"
-    has "call_path:httpResp.sendError"
-    has "call:RequestImpl"
-    has "call_order:Meteor.build>Collections.emptyList"
-    has "call_order:Collections.emptyList>httpReq.getParameter"
-    lacks "call_order:httpResp.setContentType>Meteor.build"
+    function "doFilter"
+    call path "Meteor.build"
+    call path "httpReq.getParameter"
+    call path "pushContext.getSessionManager.getPushSession"
+    call path "httpResp.sendError"
+    call "RequestImpl"
+    call order "Meteor.build>Collections.emptyList"
+    call order "Collections.emptyList>httpReq.getParameter"
+    not call order "httpResp.setContentType>Meteor.build"
   }
   flag code.UnvalidatedModelSelection in function {
-    has "function_name:addResults"
-    has "call_path:request.getParameter"
-    has "literal:classifier"
-    has "call_path:response.addHeader"
-    has "call_path:ners.get.classifyToString"
-    lacks "identifier:nerModel"
+    function "addResults"
+    call path "request.getParameter"
+    literal "classifier"
+    call path "response.addHeader"
+    call path "ners.get.classifyToString"
+    not token identifier "nerModel"
   }
   flag code.IntegerSizeArithmetic on any {
     path "__binop.shl"
@@ -115,78 +115,78 @@ adapter java {
     lacks "1L"
   }
   flag code.PremasterSecretLengthReview in function {
-    has "function_name:safeDecryptPreMasterSecret"
-    has "call:doFinal"
-    has "call:createSecret"
+    function "safeDecryptPreMasterSecret"
+    call "doFinal"
+    call "createSecret"
     has "M[0]"
-    lacks "expr:m.length==48"
+    not expr "m.length==48"
   }
   flag code.EcdsaSignatureScalarBoundsMissing in function {
-    has "function_name:verify"
-    has "selector:signature.r"
-    has "selector:signature.s"
-    has "selector:publicKey.point"
-    has "call_path:Math.inv"
-    has "call_path:Math.multiply"
-    lacks "expr:r.compareTo(curve.N)>=0"
-    lacks "expr:s.compareTo(curve.N)>=0"
+    function "verify"
+    selector "signature.r"
+    selector "signature.s"
+    selector "publicKey.point"
+    call path "Math.inv"
+    call path "Math.multiply"
+    not expr "r.compareTo(curve.N)>=0"
+    not expr "s.compareTo(curve.N)>=0"
   }
   flag code.VerboseHttpClientAuthorizationLog in function {
-    has "call_path:RestAdapter.Builder"
-    has "call:setLogLevel"
-    has "call:setLog"
-    has "selector:RestAdapter.LogLevel.FULL"
-    lacks "selector:RestAdapter.LogLevel.BASIC"
-    lacks "selector:RestAdapter.LogLevel.NONE"
+    call path "RestAdapter.Builder"
+    call "setLogLevel"
+    call "setLog"
+    selector "RestAdapter.LogLevel.FULL"
+    not selector "RestAdapter.LogLevel.BASIC"
+    not selector "RestAdapter.LogLevel.NONE"
   }
   flag code.RequestHostUrlValidationBypass in function {
-    has "call:getServerName"
-    has "call:getHost"
-    has "call:equals"
-    lacks "call:contains"
+    call "getServerName"
+    call "getHost"
+    call "equals"
+    not call "contains"
   }
   flag code.MultiOptionUrlValidationBypass in function {
-    has "function_name:isValidURL"
-    has "call_path:isURLRelative"
-    has "call_path:buildAbsoluteURL"
-    lacks "call_path:validateCallbackURL"
+    function "isValidURL"
+    call path "isURLRelative"
+    call path "buildAbsoluteURL"
+    not call path "validateCallbackURL"
   }
   flag code.ResponseWriterScriptWindowIdXss in function {
-    has "function_name:encodeBegin"
-    has "call_path:writer.write"
+    function "encodeBegin"
+    call path "writer.write"
     has "dswh.init"
     has "windowId"
-    lacks "call_path:writer.writeText"
+    not call path "writer.writeText"
   }
   flag code.MissingSessionRotationAfterAuthentication in function {
-    has "call:setAuthentication"
-    has "call:getSession"
-    lacks "call:invalidate"
+    call "setAuthentication"
+    call "getSession"
+    not call "invalidate"
   }
   flag code.ExpiredCachedAuthTokenReuse in function {
-    has "call_path:accessTokenCache.timeout.isBefore"
-    has "call_path:ZonedDateTime.now"
-    has "selector:accessTokenCache.resource"
-    has "call_path:accessToken.getExpiresAtAsInstant"
-    has "call_path:expiresAt.minus"
-    lacks "call_path:accessTokenCache.timeout.isAfter"
+    call path "accessTokenCache.timeout.isBefore"
+    call path "ZonedDateTime.now"
+    selector "accessTokenCache.resource"
+    call path "accessToken.getExpiresAtAsInstant"
+    call path "expiresAt.minus"
+    not call path "accessTokenCache.timeout.isAfter"
   }
   flag code.PublicKeyHashBindingReview in function {
-    has "function_name:correctlySpends"
-    has "call:fromPublicOnly"
-    has "call:verify"
+    function "correctlySpends"
+    call "fromPublicOnly"
+    call "verify"
     has "hashFor"
-    lacks "call:sha256hash160"
+    not call "sha256hash160"
   }
   flag code.LdapCrlCredentialReuse in function {
-    has "function_name:prepareConnectionFactory"
-    has "call_path:ConnectionConfig.copy"
-    has "call_path:cc.setLdapUrl"
-    has "call:DefaultConnectionFactory"
-    lacks "call_path:cc.setConnectionInitializers"
+    function "prepareConnectionFactory"
+    call path "ConnectionConfig.copy"
+    call path "cc.setLdapUrl"
+    call "DefaultConnectionFactory"
+    not call path "cc.setConnectionInitializers"
   }
   flag code.SessionStoredRedirectTarget in function {
-    has "function_name:determineTargetUrl"
+    function "determineTargetUrl"
     has "SimpleUrlAuthenticationSuccessHandler"
     has "session.getAttribute"
     has "targetUrlSessionAttribute"
@@ -194,7 +194,7 @@ adapter java {
     lacks "Util.isSafeToRedirectTo"
   }
   flag code.JmxRmiRegistryExposure in function {
-    has "function_name:createJMXServer"
+    function "createJMXServer"
     has "RMIExporter.EXPORTER_ATTRIBUTE"
     has "configureRMIRegistry"
     has "JMXConnectorServerFactory.newJMXConnectorServer"
@@ -202,72 +202,72 @@ adapter java {
     lacks "RMIJRMPServerImpl"
   }
   flag code.NodetoolArchiveCommandPrivilegeEscalation in function {
-    has "function_name:enableFullQueryLogger"
+    function "enableFullQueryLogger"
     has "archiveCommand"
     has "fqlOptions.archive_command"
     has "FullQueryLogger.instance.enableWithoutClean"
     lacks "allow_nodetool_archive_command"
   }
   flag code.CommandStringWrapperExecution in function {
-    has "literal:/bin/sh"
-    has "literal:-c"
-    has "identifier:scriptPath"
-    has "expr:scriptPath+ALERT_TITLE_OPTION"
-    has "call_path:ProcessUtils.executeScript"
-    lacks "call_path:File"
-    lacks "call:exists"
-    lacks "call:isFile"
+    literal "/bin/sh"
+    literal "-c"
+    token identifier "scriptPath"
+    expr "scriptPath+ALERT_TITLE_OPTION"
+    call path "ProcessUtils.executeScript"
+    not call path "File"
+    not call "exists"
+    not call "isFile"
   }
   flag code.CommonsCompressBzip2FallbackSortMissing in function {
-    has "function_name:blockSort"
-    has "call:mainSort"
-    has "call:randomiseBlock"
-    has "expr:this.workDone>this.workLimit"
-    lacks "call:fallbackSort"
+    function "blockSort"
+    call "mainSort"
+    call "randomiseBlock"
+    expr "this.workDone>this.workLimit"
+    not call "fallbackSort"
   }
   flag code.CordysRequestParamXssFilterDisabled in function {
-    has "function_name:jackson2ObjectMapperBuilderCustomizer"
-    has "call_path:jacksonObjectMapperBuilder.deserializerByType"
-    has "call_path:StringUtils.trim"
-    has "call_path:jsonParser.getValueAsString"
-    has "call_path:HtmlUtils.htmlEscape"
-    has "identifier:escape"
-    lacks "call:shouldEscapeXss"
-    lacks "identifier:xssFilterUrlList"
+    function "jackson2ObjectMapperBuilderCustomizer"
+    call path "jacksonObjectMapperBuilder.deserializerByType"
+    call path "StringUtils.trim"
+    call path "jsonParser.getValueAsString"
+    call path "HtmlUtils.htmlEscape"
+    token identifier "escape"
+    not call "shouldEscapeXss"
+    not token identifier "xssFilterUrlList"
   }
   flag code.DotcmsSqlUtilBlacklistBypass in function {
-    has "function_name:sanitizeParameter"
-    has "call_path:StringEscapeUtils.escapeSql"
-    has "identifier:EVIL_SQL_WORDS"
-    has "call:isValidSQLCharacter"
-    lacks "call:sanitizeSQL"
-    lacks "identifier:EVIL_SQL_CONDITION_WORDS"
+    function "sanitizeParameter"
+    call path "StringEscapeUtils.escapeSql"
+    token identifier "EVIL_SQL_WORDS"
+    call "isValidSQLCharacter"
+    not call "sanitizeSQL"
+    not token identifier "EVIL_SQL_CONDITION_WORDS"
   }
   flag code.DotcmsFormsOrderBySqlInjection in function {
-    has "class_name:ViewFormHandlerAction"
-    has "function_name:_loadStructures"
-    has "call_path:req.getParameter"
-    has "call_path:StructureFactory.getStructuresByUser"
-    lacks "call_path:SQLUtil.sanitizeSortBy"
+    class name "ViewFormHandlerAction"
+    function "_loadStructures"
+    call path "req.getParameter"
+    call path "StructureFactory.getStructuresByUser"
+    not call path "SQLUtil.sanitizeSortBy"
   }
   flag code.UnescapedExceptionMessageMarkup in function {
-    has "function_name:parseURL"
-    has "call_path:CssFouffa"
-    lacks "call:getMessage"
+    function "parseURL"
+    call path "CssFouffa"
+    not call "getMessage"
   }
   flag code.UnescapedDiagnosticHtml in function {
-    has "call_path:IOUtils.toString"
-    has "literal:text/html"
-    has "call_path:Fault"
-    lacks "call_path:MessageUtils.isRequestor"
-    lacks "call_path:StringEscapeUtils.escapeHtml"
-    lacks "call_path:HtmlUtils.htmlEscape"
+    call path "IOUtils.toString"
+    literal "text/html"
+    call path "Fault"
+    not call path "MessageUtils.isRequestor"
+    not call path "StringEscapeUtils.escapeHtml"
+    not call path "HtmlUtils.htmlEscape"
   }
   flag code.JenkinsProjectDisplayNameXss in function {
-    has "function_name:getName"
-    has "call_path:project.getFullDisplayName"
-    lacks "call_path:StringEscapeUtils.escapeHtml"
-    lacks "call_path:Util.escape"
+    function "getName"
+    call path "project.getFullDisplayName"
+    not call path "StringEscapeUtils.escapeHtml"
+    not call path "Util.escape"
   }
   flag code.JenkinsPluginForkedDirectoryBrowserWithoutCsp on any {
     path exact "DirectoryBrowserSupport"
@@ -317,17 +317,17 @@ adapter java {
   // routing text through the shared quoting routine.
   flag code.UnparameterizedSqlQueryParser on any {
     path exact "analysis.function.return"
-    has "function_name:toString"
+    function "toString"
     has "::uuid"
   }
   flag code.UnparameterizedSqlQueryParser on any {
     path exact "analysis.function.return"
-    has "function_name:toString"
+    function "toString"
     has "::point"
   }
   flag code.UnparameterizedSqlQueryParser on any {
     path exact "analysis.function.return"
-    has "function_name:toString"
+    function "toString"
     has "::box"
   }
 
@@ -349,34 +349,34 @@ adapter java {
   sink path "yaml.load" -> code.Deserialization
   sink path "Yaml.load" -> code.Deserialization
   flag code.DeserializableInvocationHandler in class {
-    has "class_base:InvocationHandler"
-    has "call:getMethod"
-    has "call:invokeMethod"
-    lacks "function_name:readResolve"
-    lacks "function_name:readObject"
-    lacks "call:NotSerializableException"
+    class base "InvocationHandler"
+    call "getMethod"
+    call "invokeMethod"
+    not function "readResolve"
+    not function "readObject"
+    not call "NotSerializableException"
   }
   flag code.GsonObjectTypeAdapterRecursiveRead in function {
-    has "selector:ObjectTypeAdapter.FACTORY"
-    has "identifier:read"
-    has "call:read"
-    has "call_path:list.add"
-    has "call_path:map.put"
-    lacks "call:tryBeginNesting"
-    lacks "call:readTerminal"
+    selector "ObjectTypeAdapter.FACTORY"
+    token identifier "read"
+    call "read"
+    call path "list.add"
+    call path "map.put"
+    not call "tryBeginNesting"
+    not call "readTerminal"
   }
   flag code.UnrestrictedRequestParamDeserialization in function {
-    has "function_name:createXStream"
-    has "call_path:XStream"
-    has "call:registerConverter"
-    lacks "call:addDefaultPermissions"
-    lacks "call:addPermissions"
-    lacks "call:addPermission"
-    lacks "call:denyPermission"
+    function "createXStream"
+    call path "XStream"
+    call "registerConverter"
+    not call "addDefaultPermissions"
+    not call "addPermissions"
+    not call "addPermission"
+    not call "denyPermission"
   }
   package "org.yaml.snakeyaml" {
     flag code.UnsafeYamlConstructor in class {
-      has "class_base:Constructor"
+      class base "Constructor"
     }
     flag code.UnsafeYamlConstructor on any {
       path exact "org.yaml.snakeyaml.constructor.Constructor"
@@ -406,23 +406,23 @@ adapter java {
     method "newTransformer"
   }
   flag code.XmlParserCreate in function {
-    has "call_path:SAXReader"
-    has "call_path:reader.read"
-    lacks "literal:http://apache.org/xml/features/nonvalidating/load-external-dtd"
-    lacks "literal:http://xml.org/sax/features/external-general-entities"
-    lacks "literal:http://xml.org/sax/features/external-parameter-entities"
+    call path "SAXReader"
+    call path "reader.read"
+    not literal "http://apache.org/xml/features/nonvalidating/load-external-dtd"
+    not literal "http://xml.org/sax/features/external-general-entities"
+    not literal "http://xml.org/sax/features/external-parameter-entities"
   }
   flag code.XmlParserCreate in function {
-    has "call_path:getTaskUnmarshaller.unmarshal"
-    lacks "call_path:getXMLStreamReader"
+    call path "getTaskUnmarshaller.unmarshal"
+    not call path "getXMLStreamReader"
   }
   flag code.CheckstyleExternalParameterEntitiesXxe in function {
-    has "function_name:setFeaturesBySystemProperty"
-    has "class_name:LoadExternalDtdFeatureProvider"
-    has "call_path:factory.setFeature"
-    has "identifier:LOAD_EXTERNAL_DTD"
-    has "identifier:EXTERNAL_GENERAL_ENTITIES"
-    lacks "identifier:EXTERNAL_PARAMETER_ENTITIES"
+    function "setFeaturesBySystemProperty"
+    class name "LoadExternalDtdFeatureProvider"
+    call path "factory.setFeature"
+    token identifier "LOAD_EXTERNAL_DTD"
+    token identifier "EXTERNAL_GENERAL_ENTITIES"
+    not token identifier "EXTERNAL_PARAMETER_ENTITIES"
   }
 
   // Path / file. `new File(parent, child)` puts the tainted child path at arg 1, and
@@ -516,24 +516,24 @@ adapter java {
   // result stops the operation. Surface ignored results for review; treat throw-on-false
   // contexts as authorization checks.
   flag code.IgnoredAuthorizationResult in function {
-    has "call:canFlush"
-    lacks "call:ThriftSecurityException"
+    call "canFlush"
+    not call "ThriftSecurityException"
   }
   flag code.IgnoredAuthorizationResult in function {
-    has "call:canPerformSystemActions"
-    lacks "call:ThriftSecurityException"
+    call "canPerformSystemActions"
+    not call "ThriftSecurityException"
   }
   flag code.IgnoredAuthorizationResult in function {
-    has "call:canAlterNamespace"
-    lacks "call:ThriftSecurityException"
+    call "canAlterNamespace"
+    not call "ThriftSecurityException"
   }
   flag code.IgnoredAuthorizationResult in function {
-    has "call:canAlterTable"
-    lacks "call:ThriftSecurityException"
+    call "canAlterTable"
+    not call "ThriftSecurityException"
   }
   flag code.IgnoredAuthorizationResult in function {
-    has "call:canObtainDelegationToken"
-    lacks "call:ThriftSecurityException"
+    call "canObtainDelegationToken"
+    not call "ThriftSecurityException"
   }
   control "analysis.function.context" val "call:canFlush" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canPerformSystemActions" val "call:ThriftSecurityException" -> core.AuthorizationCheck
@@ -541,192 +541,192 @@ adapter java {
   control "analysis.function.context" val "call:canAlterTable" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canObtainDelegationToken" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   flag code.CredentialedEndpointReview in function {
-    has "function_name:doTest"
-    has "call:setCredentialsId"
-    has "call:accurevLoginFromGlobalConfig"
-    lacks "call:hasPermission"
-    lacks "call:checkPermission"
+    function "doTest"
+    call "setCredentialsId"
+    call "accurevLoginFromGlobalConfig"
+    not call "hasPermission"
+    not call "checkPermission"
   }
   flag code.CredentialedEndpointReview in function {
-    has "function_name:doFill"
-    has "call:getBzmUtils"
-    lacks "call:checkPermission"
+    function "doFill"
+    call "getBzmUtils"
+    not call "checkPermission"
   }
   flag code.CredentialedEndpointReview in function {
-    has "function_name:doFillCredentialsIdItems"
-    has "call:lookupCredentials"
-    lacks "call:hasPermission"
-    lacks "call:checkPermission"
+    function "doFillCredentialsIdItems"
+    call "lookupCredentials"
+    not call "hasPermission"
+    not call "checkPermission"
   }
   flag code.JenkinsDescriptorConfigEnumerationMissingPermission in function {
-    has "function_name:doFillConnectionIdItems"
-    has "call:getHostConnections"
-    lacks "call:hasPermission"
-    lacks "call:checkPermission"
+    function "doFillConnectionIdItems"
+    call "getHostConnections"
+    not call "hasPermission"
+    not call "checkPermission"
   }
   flag code.JenkinsDescriptorConfigEnumerationMissingPermission in function {
-    has "function_name:doFillCredentialsIdItems"
-    has "call:lookupCredentials"
-    lacks "call:hasPermission"
-    lacks "call:checkPermission"
+    function "doFillCredentialsIdItems"
+    call "lookupCredentials"
+    not call "hasPermission"
+    not call "checkPermission"
   }
   flag code.JenkinsBuildScheduleMissingPermission in function {
-    has "function_name:doBuild"
-    has "call_path:Jenkins.get.getQueue.schedule"
-    has "identifier:project"
-    lacks "call:hasPermission"
-    lacks "call:checkPermission"
-    lacks "selector:Item.BUILD"
+    function "doBuild"
+    call path "Jenkins.get.getQueue.schedule"
+    token identifier "project"
+    not call "hasPermission"
+    not call "checkPermission"
+    not selector "Item.BUILD"
   }
   flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
-    has "function_name:doCheckUrl"
-    has "call:buildClient"
-    has "call:getProjects"
-    lacks "annotation:POST"
-    lacks "call:checkPermissionForRemoteRequests"
+    function "doCheckUrl"
+    call "buildClient"
+    call "getProjects"
+    not annotation "POST"
+    not call "checkPermissionForRemoteRequests"
   }
   flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
-    has "function_name:doCheckSelfSignedCertificateFingerprint"
-    has "call:buildClient"
-    has "call:getProjects"
-    lacks "annotation:POST"
-    lacks "call:checkPermissionForRemoteRequests"
+    function "doCheckSelfSignedCertificateFingerprint"
+    call "buildClient"
+    call "getProjects"
+    not annotation "POST"
+    not call "checkPermissionForRemoteRequests"
   }
   flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
-    has "function_name:doFillProjectIdItems"
-    has "call:buildClient"
-    has "call:getProjects"
-    lacks "annotation:POST"
-    lacks "call:checkPermissionForRemoteRequests"
+    function "doFillProjectIdItems"
+    call "buildClient"
+    call "getProjects"
+    not annotation "POST"
+    not call "checkPermissionForRemoteRequests"
   }
   flag code.JenkinsRemoteValidationMissingPermission in function {
-    has "function_name:doTestDynatraceConnection"
-    has "annotation:RequirePOST"
-    has "call:DynatraceClient"
-    has "call:getSystemProfiles"
-    lacks "call:checkPermission"
-    lacks "call:hasPermission"
+    function "doTestDynatraceConnection"
+    annotation "RequirePOST"
+    call "DynatraceClient"
+    call "getSystemProfiles"
+    not call "checkPermission"
+    not call "hasPermission"
   }
   flag code.JenkinsRemoteValidationMissingPermission in function {
-    has "function_name:doCheck"
-    has "annotation:RequirePOST"
-    has "call:DynatraceClient"
-    has "call:getSystemProfiles"
-    lacks "call:checkPermission"
-    lacks "call:hasPermission"
+    function "doCheck"
+    annotation "RequirePOST"
+    call "DynatraceClient"
+    call "getSystemProfiles"
+    not call "checkPermission"
+    not call "hasPermission"
   }
   flag code.JenkinsRemoteValidationMissingPermission in function {
-    has "function_name:doTestConnection"
-    has "call:testConnection"
-    lacks "call:checkPermission"
-    lacks "call:hasPermission"
+    function "doTestConnection"
+    call "testConnection"
+    not call "checkPermission"
+    not call "hasPermission"
   }
   flag code.JenkinsRemoteValidationMissingPostPermission in function {
-    has "function_name:doTest"
-    has "call:testConnection"
-    has "call:CrowdConfigurationService"
-    lacks "annotation:POST"
-    lacks "call:checkPermission"
-    lacks "call:hasPermission"
+    function "doTest"
+    call "testConnection"
+    call "CrowdConfigurationService"
+    not annotation "POST"
+    not call "checkPermission"
+    not call "hasPermission"
   }
   flag code.JenkinsRemoteValidationMissingPostPermission in function {
-    has "function_name:doCheck"
-    has "call:testConnection"
-    has "call:CrowdConfigurationService"
-    lacks "annotation:POST"
-    lacks "call:checkPermission"
-    lacks "call:hasPermission"
+    function "doCheck"
+    call "testConnection"
+    call "CrowdConfigurationService"
+    not annotation "POST"
+    not call "checkPermission"
+    not call "hasPermission"
   }
   flag code.JenkinsRemotingCallableSystemPropertiesLeak in class {
-    has "class_base:Callable"
-    has "function_name:call"
-    has "function_name:checkRoles"
-    has "call_path:System.getProperties"
-    lacks "class_base:MasterToSlaveCallable"
-    lacks "call:Roles.SLAVE"
+    class base "Callable"
+    function "call"
+    function "checkRoles"
+    call path "System.getProperties"
+    not class base "MasterToSlaveCallable"
+    not call "Roles.SLAVE"
   }
   flag code.SecretDatabindingReview on any {
     path exact "analysis.parameter.entry"
-    has "param_name:awsSecretKey"
-    has "param_type:Secret"
+    param name "awsSecretKey"
+    param type "Secret"
   }
   flag code.SecretDatabindingReview in function {
-    has "function_name:setAkid"
-    lacks "call:fromString"
+    function "setAkid"
+    not call "fromString"
   }
   flag code.SecretDatabindingReview in function {
-    has "function_name:setSkid"
-    lacks "call:fromString"
+    function "setSkid"
+    not call "fromString"
   }
   flag code.JenkinsPlaintextDataboundCredential on any {
     path exact "analysis.parameter.entry"
-    has "annotation:DataBoundConstructor"
-    has "param_name:apilogin"
-    has "param_type:String"
-    lacks "param_type:Secret"
+    annotation "DataBoundConstructor"
+    param name "apilogin"
+    param type "String"
+    not param type "Secret"
   }
   flag code.JenkinsPlaintextDataboundCredential on any {
     path exact "analysis.parameter.entry"
-    has "annotation:DataBoundConstructor"
-    has "param_name:apitoken"
-    has "param_type:String"
-    lacks "param_type:Secret"
+    annotation "DataBoundConstructor"
+    param name "apitoken"
+    param type "String"
+    not param type "Secret"
   }
   flag code.JenkinsCredentialsStartupLoadContextExposure in class {
-    has "class_name:SystemCredentialsProvider"
-    has "function_name:SystemCredentialsProvider"
-    has "call_path:xml.unmarshal"
-    has "call_path:DomainCredentials.migrateListToMap"
-    has "function_name:getInstance"
-    lacks "annotation:Initializer"
-    lacks "function_name:forceLoadDuringStartup"
+    class name "SystemCredentialsProvider"
+    function "SystemCredentialsProvider"
+    call path "xml.unmarshal"
+    call path "DomainCredentials.migrateListToMap"
+    function "getInstance"
+    not annotation "Initializer"
+    not function "forceLoadDuringStartup"
   }
   flag code.JdbcCredentialAttributeExposure in function {
-    has "function_name:connect"
-    has "call:tokenizeDatabase"
-    has "call:tokenizeURLProperties"
-    has "call:NetConnection"
-    lacks "call:appendDatabaseAttributes"
+    function "connect"
+    call "tokenizeDatabase"
+    call "tokenizeURLProperties"
+    call "NetConnection"
+    not call "appendDatabaseAttributes"
   }
   flag code.SensitiveOperation in function {
-    has "function_name:doConfigure"
-    has "call:configure"
-    has "call:save"
-    lacks "call:checkPermission"
+    function "doConfigure"
+    call "configure"
+    call "save"
+    not call "checkPermission"
   }
   flag code.SensitiveOperation in function {
-    has "function_name:doAttachPublicIP"
-    has "call:getNode"
-    has "call:attachPublicIP"
-    lacks "call:checkPermission"
+    function "doAttachPublicIP"
+    call "getNode"
+    call "attachPublicIP"
+    not call "checkPermission"
   }
   flag code.PluginManagementMissingAuthorization in function {
-    has "annotation:PostMapping"
-    has "call_path:pluginService.localInstall"
-    lacks "annotation:RequiresPermissions"
-    lacks "annotation:PreAuthorize"
-    lacks "call:checkPermission"
-    lacks "call:hasPermission"
+    annotation "PostMapping"
+    call path "pluginService.localInstall"
+    not annotation "RequiresPermissions"
+    not annotation "PreAuthorize"
+    not call "checkPermission"
+    not call "hasPermission"
   }
   flag code.PluginManagementMissingAuthorization in function {
-    has "annotation:PostMapping"
-    has "call_path:pluginService.uninstall"
-    lacks "annotation:RequiresPermissions"
-    lacks "annotation:PreAuthorize"
-    lacks "call:checkPermission"
-    lacks "call:hasPermission"
+    annotation "PostMapping"
+    call path "pluginService.uninstall"
+    not annotation "RequiresPermissions"
+    not annotation "PreAuthorize"
+    not call "checkPermission"
+    not call "hasPermission"
   }
   flag code.StateChangingOp in function {
-    has "function_name:doFill"
-    lacks "call:checkPermission"
-    lacks "annotation:POST"
-    lacks "annotation:RequirePOST"
+    function "doFill"
+    not call "checkPermission"
+    not annotation "POST"
+    not annotation "RequirePOST"
   }
   flag code.AbsolutePathDisclosure in function {
-    has "selector:Constants.MC_REALPATH"
-    has "selector:Constants.MC_RELATIVE_PATH"
-    has "call:FileReader"
-    lacks "call:FileNotFoundException"
+    selector "Constants.MC_REALPATH"
+    selector "Constants.MC_RELATIVE_PATH"
+    call "FileReader"
+    not call "FileNotFoundException"
   }
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.
@@ -894,23 +894,23 @@ adapter java {
     has "/tmp/"
   }
   flag code.ThreadLocalScopeOverwriteWithoutCleanup in function {
-    has "class_name:RequestScopedCache"
-    has "function_name:beginRequest"
-    has "call_path:CACHE.set"
-    lacks "call:endRequest"
-    lacks "call_path:CACHE.remove"
+    class name "RequestScopedCache"
+    function "beginRequest"
+    call path "CACHE.set"
+    not call "endRequest"
+    not call path "CACHE.remove"
   }
   flag code.InternalContentExposureReview in function {
-    has "call:setContent"
-    has "call:toJson"
-    has "call:saveDocument"
-    lacks "call:setHidden"
+    call "setContent"
+    call "toJson"
+    call "saveDocument"
+    not call "setHidden"
   }
   flag code.ProtocolStateReview in function {
-    has "call:getType"
-    has "selector:FEDERATION_DOWNSTREAM_CONNECT"
-    has "call:deploy"
-    lacks "call:getSubject"
+    call "getType"
+    selector "FEDERATION_DOWNSTREAM_CONNECT"
+    call "deploy"
+    not call "getSubject"
   }
   flag code.ResourceHandle on any {
     path "Socket"
@@ -1027,11 +1027,11 @@ adapter java {
     has "SHA1"
   }
   flag code.SecretComparisonReview in function {
-    has "function_name:doIndex"
-    has "call:getReloadTokenProperty"
-    has "call:getRequestToken"
-    has "call_path:token.equals"
-    lacks "call_path:MessageDigest.isEqual"
+    function "doIndex"
+    call "getReloadTokenProperty"
+    call "getRequestToken"
+    call path "token.equals"
+    not call path "MessageDigest.isEqual"
   }
 
   // server-side template injection (CWE-1336) — unambiguous engine entrypoints that

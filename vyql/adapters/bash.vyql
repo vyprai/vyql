@@ -25,7 +25,7 @@ adapter bash {
   sink path "python" arg 1 -> code.CodeEval
   sink path "python3" arg 1 -> code.CodeEval
   flag code.PythonTripleQuoteShellInterpolation in module {
-    has "lang=bash"
+    lang "bash"
     has "input=$(cat)"
     has "python3-c\""
     has "json.loads('''$input''')"

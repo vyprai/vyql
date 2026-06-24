@@ -130,28 +130,28 @@ adapter cpp {
   }
   flag code.FieldDerivedIndexAccess on any {
     path "analysis.index.access"
-    has "index_kind=field_derived"
-    has "guard=missing_upper_bound"
+    fact index_kind "field_derived"
+    fact guard "missing_upper_bound"
   }
   flag code.FailurePathOwnedBufferFree on any {
     path "analysis.lifetime.release_then_return"
-    has "release=delete"
-    has "return=false"
-    has "storage=nonlocal"
+    fact release "delete"
+    fact return "false"
+    fact storage "nonlocal"
   }
   flag code.EscapedTerminatorWrite in function {
-    has "lang=cpp"
+    lang "cpp"
     has "unescapeChar(*readPtr++);}*writePtr++=c;"
   }
   flag code.UnboundedAllocationReview in function {
-    has "lang=cpp"
+    lang "cpp"
     has "count_vertices+=*itf;"
     has "newaiVector3D[count_vertices]"
     lacks "AI_MAX_FACE_INDICES"
     lacks "count_vertices>vertices.size()"
   }
   flag code.PointerOffsetBoundsCheck in function {
-    has "lang=cpp"
+    lang "cpp"
     has "start+len+1>end"
     has "start+=len"
     lacks "buff_size"
@@ -160,21 +160,21 @@ adapter cpp {
   sink path "ucsdet_open" -> code.ResourceHandle
   control "ucsdet_close" -> core.ResourceRelease
   flag code.ProtocolListAmplification in function {
-    has "lang=cpp"
+    lang "cpp"
     has "inlineCompositeListElementCount"
     has "wordsPerElement"
     has "ListReader"
     lacks "amplifiedRead"
   }
   flag code.ProtocolListAmplification in function {
-    has "lang=cpp"
+    lang "cpp"
     has "elementSize"
     has "ElementSize::VOID"
     has "ListReader"
     lacks "amplifiedRead"
   }
   flag code.ChakraScopeSlotArrayUncheckedIndex in function {
-    has "lang=cpp"
+    lang "cpp"
     has "propertyIdsForScopeSlotArray[sym->GetScopeSlot()]=sym->EnsurePosition(funcInfo)"
     has "propertyIdsForScopeSlotArray[funcInfo->thisScopeSlot]=Js::PropertyIds::_lexicalThisSlotSymbol"
     has "propertyIdsForScopeSlotArray[funcInfo->superCtorScopeSlot]=Js::PropertyIds::_superCtorReferenceSymbol"
@@ -183,7 +183,7 @@ adapter cpp {
     lacks "Js::Throw::FatalInternalError()"
   }
   flag code.ReachableAssertionReview in function {
-    has "lang=cpp"
+    lang "cpp"
     has "visitBrOn(&curr)"
     has "validateTypeAnnotation(in,curr.ref)"
     has "curr.desc"
@@ -191,13 +191,13 @@ adapter cpp {
     lacks "curr.desc->type.isRef"
   }
   flag code.ProtocolStateReview in function {
-    has "lang=cpp"
+    lang "cpp"
     has "Record_Type::ApplicationData"
     has "callbacks().tls_record_received"
     lacks "can_decrypt_application_traffic"
   }
   flag code.JpegSetjmpConstructorEscape in function {
-    has "lang=cpp"
+    lang "cpp"
     has "jpeg_std_error"
     has "jerr_.pub.error_exit=my_error_exit"
     has "setjmp(jerr_.setjmp_buffer)"
@@ -206,7 +206,7 @@ adapter cpp {
     lacks "DIP__DECLARE_JPEG_EXIT"
   }
   flag code.JpegSetjmpConstructorEscape in function {
-    has "lang=cpp"
+    lang "cpp"
     has "jpeg_std_error"
     has "jerr_.pub.error_exit=my_error_exit"
     has "setjmp(jerr_.setjmp_buffer)"
@@ -215,13 +215,13 @@ adapter cpp {
     lacks "DIP__DECLARE_JPEG_EXIT"
   }
   flag code.SecretComparisonReview in function {
-    has "lang=cpp"
-    has "name=HTTPAuthorized"
+    lang "cpp"
+    name "HTTPAuthorized"
     has "strUserPass==strRPCUserColonPass"
     lacks "nResult|="
   }
   flag code.CryptoImproperBlinding in function {
-    has "lang=cpp"
+    lang "cpp"
     has "r.Randomize"
     has "MultiplicativeInverse(r)"
     has "Jacobi"
@@ -230,13 +230,13 @@ adapter cpp {
     lacks "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)"
   }
   flag code.CimgPnmDimensionProductOverflow in function {
-    has "lang=cpp"
+    lang "cpp"
     has "cimg::fsize(filename)"
     has "W*H*D>siz"
     lacks "(cimg_int64)W*H*D>siz"
   }
   flag code.WindowsRemotePathCredentialLeak in function {
-    has "lang=cpp"
+    lang "cpp"
     has "QFileInfo::exists(m_configFile)"
     has "QSettingsconfig(m_configFile,QSettings::IniFormat)"
     has "m_pWatchdog->setProcessConfig(command,elevate)"
@@ -244,14 +244,14 @@ adapter cpp {
     lacks "m_configFile.startsWith(QStringLiteral(\"//\"))"
   }
   flag code.SniffCsvExternalAccessBypass in function {
-    has "lang=cpp"
-    has "name=CSVSniffBind"
+    lang "cpp"
+    name "CSVSniffBind"
     has "result->path=input.inputs[0].ToString();"
     has "result->options.FromNamedParameters(input.named_parameters,context);"
     lacks "enable_external_access"
   }
   flag code.LibreOfficeEnhwmfDibHeaderSizeUnderflow in function {
-    has "lang=cpp"
+    lang "cpp"
     has "EMR_ALPHABLEND"
     has "getDIBV5HeaderSize"
     has "cbBmiSrc"

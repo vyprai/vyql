@@ -93,7 +93,7 @@ adapter swift {
     path "makeAdmin"
   }
   flag code.ClearanceKitPolicyApplyBeforeAdapterStart in module {
-    has "lang=swift"
+    lang "swift"
     has "server.applyPolicyToFilter()server.applyAllowlistToFilter()server.applyJailRulesToFilter()"
     has "adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})"
     lacks "adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})server.applyPolicyToFilter()"

@@ -53,7 +53,7 @@ adapter c {
   sink path "file_read" arg 0 -> code.FilePathAccess
   sink path "file_write" arg 0 -> code.FilePathAccess
   flag code.CWebRequestFilePathTraversal in function {
-    has "lang=c"
+    lang "c"
     has "http_request_param_get"
     has "http_request_get_query_string"
     has "file_read"
@@ -64,7 +64,7 @@ adapter c {
     lacks "strchr(page,'/')"
   }
   flag code.RemoteListingDownloadPath in module {
-    has "lang=c"
+    lang "c"
     has "sink(intargc,char**argv)"
     has "atomicio(read,remin,cp,1)"
     has "strchr(cp,'/')!=NULL"
@@ -157,25 +157,25 @@ adapter c {
   }
   flag code.FieldDerivedIndexAccess on any {
     path "analysis.index.access"
-    has "index_kind=field_derived"
-    has "guard=missing_upper_bound"
+    fact index_kind "field_derived"
+    fact guard "missing_upper_bound"
   }
   flag code.FailurePathOwnedBufferFree on any {
     path "analysis.lifetime.release_then_return"
-    has "release=delete"
-    has "return=false"
-    has "storage=nonlocal"
+    fact release "delete"
+    fact return "false"
+    fact storage "nonlocal"
   }
   flag code.MissingPostCopyBoundsCheck in function {
-    has "lang=c"
-    has "name=patch"
+    lang "c"
+    name "patch"
     has "newpos+=x"
     has "memcpy(newData+newpos,extraPtr,y)"
     lacks "newpos+y>newDataLength"
   }
   flag code.Fat12SuccessorEntryBoundsBypass in function {
-    has "lang=c"
-    has "name=set_fat"
+    lang "c"
+    name "set_fat"
     has "fs->fat_bits"
     has "cluster*3/2"
     has "get_fat(&subseqEntry,fs->fat,cluster+1,fs)"
@@ -183,8 +183,8 @@ adapter c {
     lacks "cluster!=fs->clusters+1"
   }
   flag code.UnderallocatedFormattedAddressList in function {
-    has "lang=c"
-    has "name=option_to_env"
+    lang "c"
+    name "option_to_env"
     has "D6_OPT_DNS_SERVERS"
     has "xmalloc(4+addrs*40-1)"
     has "sprint_nip6(dlist,option+4+option_offset)"
@@ -192,15 +192,15 @@ adapter c {
     lacks "xmalloc(4+addrs*40+1)"
   }
   flag code.ContikiSicslowpanFragmentOffsetOobWrite in function {
-    has "lang=c"
-    has "name=copy_frags2uip"
+    lang "c"
+    name "copy_frags2uip"
     has "memcpy((uint8_t*)UIP_IP_BUF+(uint16_t)(frag_buf[i].offset<<3),(uint8_t*)frag_buf[i].data,frag_buf[i].len)"
     lacks "(frag_buf[i].offset<<3)+frag_buf[i].len>sizeof(uip_buf)"
     lacks "frag_info[context].len>sizeof(uip_buf)"
   }
   flag code.BinarySearchTableIndexGuardBypass in function {
-    has "lang=c"
-    has "name=X86_insn_reg_intel"
+    lang "c"
+    name "X86_insn_reg_intel"
     has "insn_regs_intel_sorted[mid].insn<id"
     has "first=mid+1"
     has "last=mid-1"
@@ -209,8 +209,8 @@ adapter c {
     lacks "insn_regs_intel_sorted[last].insn<id"
   }
   flag code.CompressedBlockSizeCapacityMismatch in function {
-    has "lang=c"
-    has "name=blosc_c"
+    lang "c"
+    name "blosc_c"
     has "_sw32(dest-4,-value)"
     has "ntbytes+maxout>maxbytes"
     has "maxout=(int64_t)maxbytes-(int64_t)ntbytes"
@@ -219,7 +219,7 @@ adapter c {
     lacks "ntbytes>destsize"
   }
   flag code.LengthDerivedAllocation in function {
-    has "lang=c"
+    lang "c"
     has "read_and_decode_block_header"
     has "blockSize"
     has "malloc_from_callbacks(blockSize"
@@ -228,16 +228,16 @@ adapter c {
     lacks "fileSize-runningFilePos"
   }
   flag code.UncheckedPythonCapiHashError in function {
-    has "lang=c"
-    has "name=CBORTag_hash"
+    lang "c"
+    name "CBORTag_hash"
     has "PyObject_Hash(tmp)"
     has "PySet_Discard(running_hashes,self_id)"
     has "PySequence_Length(running_hashes)"
     lacks "ret==-1"
   }
   flag code.RubyCgiEscapeHtmlLengthOverflow in function {
-    has "lang=c"
-    has "name=optimized_escape_html"
+    lang "c"
+    name "optimized_escape_html"
     has "HTML_ESCAPE_MAX_LEN"
     has "RSTRING_LEN(str)"
     has "ALLOCV_N(char,vbuf,RSTRING_LEN(str)*HTML_ESCAPE_MAX_LEN)"
@@ -245,30 +245,30 @@ adapter c {
     lacks "typedefcharescape_buf[HTML_ESCAPE_MAX_LEN]"
   }
   flag code.PythonUnicodeEscapeWideUnderallocation in function {
-    has "lang=c"
-    has "name=unicodeescape_string"
+    lang "c"
+    name "unicodeescape_string"
     has "PyString_FromStringAndSize(NULL,2+6*size+1)"
     has "ch>=0x10000"
     has "*p++='U'"
     lacks "10*size"
   }
   flag code.SignedMessageLengthUnderflowCopy in function {
-    has "lang=c"
-    has "name=crypto_sign_open"
+    lang "c"
+    name "crypto_sign_open"
     has "*mlen=smlen-(unsignedlonglong)sizeof(CROSS_sig_t)"
     has "memcpy((unsignedchar*)m,(constunsignedchar*)sm,(size_t)*mlen)"
     lacks "smlen<(size_t)sizeof(CROSS_sig_t)"
   }
   flag code.CgifAddframeSignedFrameCountOverflow in function {
-    has "lang=c"
-    has "name=cgif_addframe"
+    lang "c"
+    name "cgif_addframe"
     has "for(i=0;i<pGIF->config.width*pGIF->config.height;i++)"
     has "cmpPixel(pGIF,pConfig,&pGIF->aFrames[pGIF->iHEAD]->config,pConfig->pImageData[i],pGIF->aFrames[pGIF->iHEAD]->config.pImageData[i])"
     lacks "for(i=0;i<MULU16(pGIF->config.width,pGIF->config.height);i++)"
   }
   flag code.ReentrantQueueCleanupReview in function {
-    has "lang=c"
-    has "name=bt_att_cancel"
+    lang "c"
+    name "bt_att_cancel"
     has "queue_remove_if(att->req_queue"
     has "queue_remove_if(att->ind_queue"
     has "queue_remove_if(att->write_queue"
@@ -277,15 +277,15 @@ adapter c {
     lacks "bt_att_disc_cancel"
   }
   flag code.CjsonTrailingBackslashStringOverread in function {
-    has "lang=c"
-    has "name=parse_string"
+    lang "c"
+    name "parse_string"
     has "while(*end_ptr!='\\\"'&&*end_ptr&&++len)"
     has "if(*end_ptr++=='\\\\')end_ptr++"
     has "cJSON_malloc(len+1)"
     lacks "if(*end_ptr=='\\0')"
   }
   flag code.UnboundedFileReadIntoFixedBuffer in function {
-    has "lang=c"
+    lang "c"
     has "chartemp["
     has "for(;;)"
     has "temp[i]=fgetc("
@@ -293,7 +293,7 @@ adapter c {
     lacks "realloc("
   }
   flag code.LengthMultiplierFormattedExpansionUnderallocation in function {
-    has "lang=c"
+    lang "c"
     has "newSV(strlen("
     has ")*3)"
     has "sprintf("
@@ -302,8 +302,8 @@ adapter c {
     lacks "snprintf("
   }
   flag code.ClamavWwpackStructsPointerOobWrite in function {
-    has "lang=c"
-    has "name=wwunpack"
+    lang "c"
+    name "wwunpack"
     has "structs=&exe[(0xffff&cli_readint32(&exe[pe+0x14]))+pe+0x18]"
     has "cli_writeint32(structs+8,sects[i].vsz)"
     has "cli_writeint32(structs+20,sects[i].rva)"
@@ -312,26 +312,26 @@ adapter c {
     lacks "CLI_ISCONTAINED(exe,exesz,structs,0x28)"
   }
   flag code.EscapedTerminatorWrite in function {
-    has "lang=c"
+    lang "c"
     has "unescapeChar(*readPtr++);}*writePtr++=c;"
   }
   flag code.PointerOffsetBoundsCheck in function {
-    has "lang=c"
+    lang "c"
     has "start+len+1>end"
     has "start+=len"
     lacks "buff_size"
     lacks "end-start-1"
   }
   flag code.ProtocolFrameBindingReview in function {
-    has "lang=c"
-    has "name=match"
+    lang "c"
+    name "match"
     has "cur->peercallno==callno"
     has "dcallno==cur->callno"
     lacks "full_frame?dcallno==cur->callno"
   }
   flag code.ProtocolStateReview in function {
-    has "lang=c"
-    has "name=__of_unflatten_dtb"
+    lang "c"
+    name "__of_unflatten_dtb"
     has "FDT_BEGIN_NODE"
     has "FDT_PROP"
     has "is_reserved_name(pathp)"
@@ -342,8 +342,8 @@ adapter c {
     lacks "strchr(name,'/')"
   }
   flag code.FilesystemImageDirentTraversal in function {
-    has "lang=c"
-    has "name=do_directory"
+    lang "c"
+    name "do_directory"
     has "memcpy(newpath+pathlen,romfs_read(offset),newlen)"
     has "newpath[pathlen+newlen]=0"
     has "expand_fs(newpath,child)"
@@ -351,8 +351,8 @@ adapter c {
     lacks "strcmp(name,\"..\")"
   }
   flag code.ProtocolCommandInjection in function {
-    has "lang=c"
-    has "name=dispatch_cmd"
+    lang "c"
+    name "dispatch_cmd"
     has "OP_PUT"
     has "body_size=strtoul"
     has "body_size>job_data_size_limit"
@@ -360,40 +360,40 @@ adapter c {
     lacks "skip(c,body_size+2,MSG_JOB_TOO_BIG)"
   }
   flag code.PrivilegedEntryPointReview in function {
-    has "name=perform_http_xact"
+    name "perform_http_xact"
     has "CREATION_NOTIFICATION"
     has "run_post_create"
     lacks "client_uid!=0"
   }
   flag code.ParsedUserIdDefaultRootPrivilegeEscalation in function {
-    has "lang=c"
+    lang "c"
     has "strtoll(userspec,&endptr,10)"
     has "if(*endptr=='\\0')returnu"
     has "u->gid=(int)l"
     lacks "u->uid=(int)l;if(*endptr=='\\0')returnu"
   }
   flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
-    has "lang=c"
-    has "name=cupsdCheckGroup"
+    lang "c"
+    name "cupsdCheckGroup"
     has "_cups_strcasecmp(username,group->gr_mem[i])"
     lacks "strcmp(user->pw_name,group->gr_mem[i])"
   }
   flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
-    has "lang=c"
-    has "name=cupsdIsAuthorized"
+    lang "c"
+    name "cupsdIsAuthorized"
     has "_cups_strcasecmp(username,name)"
     lacks "strcmp(pw->pw_name,name)"
   }
   flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
-    has "lang=c"
-    has "name=cupsdIsAuthorized"
+    lang "c"
+    name "cupsdIsAuthorized"
     has "_cups_strcasecmp(username,ownername)"
     lacks "strcmp(pw->pw_name,ownername)"
   }
   sink path "ucsdet_open" -> code.ResourceHandle
   control "ucsdet_close" -> core.ResourceRelease
   flag code.ReachableAssertionReview in function {
-    has "lang=c"
+    lang "c"
     has "AVAHI_FLAGS_VALID"
     has "AVAHI_PUBLISH_USE_WIDE_AREA"
     has "AVAHI_PUBLISH_USE_MULTICAST"
@@ -401,7 +401,7 @@ adapter c {
     lacks "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)"
   }
   flag code.UncheckedNullableResultDeref in function {
-    has "lang=c"
+    lang "c"
     has "px->ft=imcb_file_send_start"
     has "px->ft->data=px"
     lacks "if(!px->ft)"
@@ -437,8 +437,8 @@ adapter c {
     path "__binop.shl"
   }
   flag code.JpegSubsamplingRatioValidationMissing in function {
-    has "lang=c"
-    has "name=stbi__process_frame_header"
+    lang "c"
+    name "stbi__process_frame_header"
     has "if(z->img_comp[i].h>h_max)h_max=z->img_comp[i].h;"
     has "if(z->img_comp[i].v>v_max)v_max=z->img_comp[i].v;"
     has "z->img_comp[i].x=(s->img_x*z->img_comp[i].h+h_max-1)/h_max;"
@@ -569,7 +569,7 @@ adapter c {
   // disabled. Corosync CVE-2013-0250 is this shape: crypto_cipher can be aes*
   // while crypto_hash is none unless the config reader rejects the combination.
   flag code.CipherWithoutIntegrityHash in function {
-    has "lang=c"
+    lang "c"
     has "crypto_cipher"
     has "crypto_hash"
     has "tmp_cipher"

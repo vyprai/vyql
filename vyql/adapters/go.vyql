@@ -66,7 +66,7 @@ adapter go {
   source "ExtractIssuer" -> code.HttpInput
 
   flag code.OverbroadRolePermissionGrant in module {
-    has "var_name:PermissionsByRole"
+    var "PermissionsByRole"
     has "RoleNetworkManager"
     has "PermBackup"
     has "PermRestore"
@@ -155,18 +155,18 @@ adapter go {
   sink path "analysis.function.return" val "<body" -> code.HtmlRender
   sink path "analysis.function.return" val "<a " -> code.HtmlRender
   flag code.GouniverseCmsAliasXss in function {
-    has "function_name:PageRenderHtmlByAlias"
-    has "param_type:http.Request"
-    has "call_path:cms.PageFindByAlias"
-    has "literal:Page with alias '"
-    lacks "call:ToHTML"
+    function "PageRenderHtmlByAlias"
+    param type "http.Request"
+    call path "cms.PageFindByAlias"
+    literal "Page with alias '"
+    not call "ToHTML"
   }
   flag code.DocumizeMarkdownRenderWithoutSanitizer in function {
-    has "function_name:Render"
-    has "call_path:blackfriday.Run"
-    has "call:string"
-    lacks "call_path:bluemonday.UGCPolicy"
-    lacks "call:SanitizeBytes"
+    function "Render"
+    call path "blackfriday.Run"
+    call "string"
+    not call path "bluemonday.UGCPolicy"
+    not call "SanitizeBytes"
   }
   // Gin/http response writer bodies. These are the last-hop render boundary for
   // raw strings/bytes assembled by handlers.
@@ -205,22 +205,22 @@ adapter go {
     path "MakeAdmin"
   }
   flag code.PathMatcherNormalizationOrderBypass in function {
-    has "function_name:Match"
-    has "call_path:url.PathUnescape"
-    has "selector:r.URL.Path"
-    has "call_order:strings.TrimRight>path.Clean"
-    has "call:HasSuffix"
+    function "Match"
+    call path "url.PathUnescape"
+    selector "r.URL.Path"
+    call order "strings.TrimRight>path.Clean"
+    call "HasSuffix"
   }
   flag code.AuthAttemptLimitReview in function {
-    has "function_name:SolveChallenge"
-    has "selector:challenge.tries"
-    has "selector:s.challenges"
+    function "SolveChallenge"
+    selector "challenge.tries"
+    selector "s.challenges"
   }
   flag code.EmptyVerifierAcceptance in function {
-    has "function_name:Verify"
-    has "call:Get"
-    has "binary:v==answer"
-    lacks "binary:v!=\"\""
+    function "Verify"
+    call "Get"
+    binary "v==answer"
+    not binary "v!=\"\""
   }
   // HTTP response splitting / header injection (CWE-113).
   sink path "Header.Set" arg 1 -> code.ResponseHeaderWrite
@@ -230,10 +230,10 @@ adapter go {
   sink path "log.Printf" arg all -> code.LogOutput
   sink path "log.Println" arg all -> code.LogOutput
   flag code.LogWrite in function {
-    has "function_name:NewClient"
-    has "call_path:log.Infof"
-    has "literal:Loaded client config: %#v"
-    has "selector:cfg.Spec"
+    function "NewClient"
+    call path "log.Infof"
+    literal "Loaded client config: %#v"
+    selector "cfg.Spec"
   }
   flag code.CoderAgentManifestInfoLog on any {
     path exact "a.logger.Info"
@@ -242,11 +242,11 @@ adapter go {
     has "manifest"
   }
   flag code.KubernetesCurlAuthorizationHeaderLogLeak in function {
-    has "function_name:toCurl"
-    has "selector:r.RequestHeaders"
-    has "call_path:fmt.Sprintf"
-    has "literal:%s: %s"
-    lacks "call:maskValue"
+    function "toCurl"
+    selector "r.RequestHeaders"
+    call path "fmt.Sprintf"
+    literal "%s: %s"
+    not call "maskValue"
   }
   flag code.LogWrite on any {
     path "log.Print"
@@ -365,16 +365,16 @@ adapter go {
     has "256"
   }
   flag code.ConstellationLuks2AttachedHeaderActivation in function {
-    has "function_name:initByDevicePath"
-    has "call_path:cryptsetup.Init"
-    lacks "call_path:detachHeader"
-    lacks "call_path:cryptsetup.InitDataDevice"
+    function "initByDevicePath"
+    call path "cryptsetup.Init"
+    not call path "detachHeader"
+    not call path "cryptsetup.InitDataDevice"
   }
   flag code.ConstellationLuks2AttachedHeaderActivation in function {
-    has "function_name:initByName"
-    has "call_path:cryptsetup.InitByName"
-    lacks "call_path:detachHeader"
-    lacks "call_path:cryptsetup.InitByNameAndHeader"
+    function "initByName"
+    call path "cryptsetup.InitByName"
+    not call path "detachHeader"
+    not call path "cryptsetup.InitByNameAndHeader"
   }
 
   // weak cipher (CWE-327) — named broken ciphers
@@ -426,42 +426,42 @@ adapter go {
   }
   flag code.ConfigExposureReview on any {
     path exact "analysis.type.context"
-    has "field:Repositories"
-    has "field:Keyring"
-    lacks "method:MarshalYAML"
+    field "Repositories"
+    field "Keyring"
+    not method name "MarshalYAML"
   }
   flag code.InheritedProcessEnvironmentLeak in function {
-    has "call_path:unshare.Command"
-    has "selector:cmd.Env"
-    has "call_path:os.Environ"
-    has "literal:LOGLEVEL=%d"
+    call path "unshare.Command"
+    selector "cmd.Env"
+    call path "os.Environ"
+    literal "LOGLEVEL=%d"
   }
   flag code.ContainerdCriImageEnvAliasLeak in function {
-    has "assign:env=imageConfig.Env"
-    has "call_path:config.GetEnvs"
-    has "call_path:oci.WithEnv"
-    lacks "append_copy:imageConfig.Env"
+    assign "env=imageConfig.Env"
+    call path "config.GetEnvs"
+    call path "oci.WithEnv"
+    not token append_copy "imageConfig.Env"
   }
   flag code.ContainerPrimaryGidMissingSupplementalGroup in function {
-    has "function_name:setupContainerUser"
-    has "call_path:specgen.SetProcessGID"
-    has "selector:sc.RunAsGroup"
-    has "call_path:specgen.AddProcessAdditionalGid"
-    lacks "call_arg:specgen.AddProcessAdditionalGid:gid"
+    function "setupContainerUser"
+    call path "specgen.SetProcessGID"
+    selector "sc.RunAsGroup"
+    call path "specgen.AddProcessAdditionalGid"
+    not call arg "specgen.AddProcessAdditionalGid:gid"
   }
   flag code.MountStubCleanupPathEscape in function {
-    has "call_path:os.Lstat"
-    has "call_path:filepath.Dir"
-    has "call_path:os.Remove"
-    has "call_path:os.Chtimes"
-    lacks "call_path:fs.RootPath"
+    call path "os.Lstat"
+    call path "filepath.Dir"
+    call path "os.Remove"
+    call path "os.Chtimes"
+    not call path "fs.RootPath"
   }
   flag code.ContainersCommonFipsModeMountSymlink on any {
     path "analysis.function.context"
-    has "function_name:addFIPSModeSubscription"
-    has "call_path:filepath.Join"
-    has "call_path:fileutils.Exists"
-    lacks "call_path:securejoin.SecureJoin"
+    function "addFIPSModeSubscription"
+    call path "filepath.Join"
+    call path "fileutils.Exists"
+    not call path "securejoin.SecureJoin"
   }
   // Docker CLI for Windows removed the legacy ProgramData system plugin search
   // directory because standard users can create it and plant plugin binaries.
@@ -477,86 +477,86 @@ adapter go {
     has "PasswordPattern"
   }
   flag code.MessageBusSecretConfigExposure in function {
-    has "call_path:bootstrapMessaging.SetOptionsAuthData"
-    has "call_path:messaging.NewMessageClient"
-    has "field:Optional"
-    has "selector:messageBusInfo.Optional"
-    lacks "selector:bootstrapMessaging.OptionsPasswordKey"
+    call path "bootstrapMessaging.SetOptionsAuthData"
+    call path "messaging.NewMessageClient"
+    field "Optional"
+    selector "messageBusInfo.Optional"
+    not selector "bootstrapMessaging.OptionsPasswordKey"
   }
   // Review-only: protocol/state handlers that stop a registration timer without
   // first checking the corresponding state can accept out-of-sequence messages.
   flag code.ProtocolStateReview in function {
-    has "call:StopT3550"
-    lacks "selector:ue.T3550"
+    call "StopT3550"
+    not selector "ue.T3550"
   }
   // Review-only: protocol handlers that compare an incoming previous-state pointer
   // against the last stored state need manual review for stale or forked-chain cases.
   flag code.ProtocolStateReview in function {
     has "PrevATXID"
-    has "call:GetLastIDByNodeID"
+    call "GetLastIDByNodeID"
   }
   // Review-only: protocol response loops that abort on malformed frame parse
   // errors before checking request/response identifiers can let spoofed packets
   // block the valid upstream response. A fixed implementation distinguishes
   // UDP parse errors from network errors and continues waiting.
   flag code.ProtocolStateReview in function {
-    has "call_path:pc.c.WriteMsg"
-    has "call_path:pc.c.ReadMsg"
-    has "call_path:pc.c.Close"
-    has "selector:state.Req.Id"
-    has "selector:ret.Id"
-    lacks "selector:net.Error"
-    lacks "binary:proto==\"udp\""
+    call path "pc.c.WriteMsg"
+    call path "pc.c.ReadMsg"
+    call path "pc.c.Close"
+    selector "state.Req.Id"
+    selector "ret.Id"
+    not selector "net.Error"
+    not binary "proto==\"udp\""
   }
   // Review-only: request handlers that derive request metadata, load resource metadata,
   // then dispatch a resource handler need a visible request/resource scope consistency
   // check before dispatch.
   flag code.RequestScopePolicyReview in function {
-    has "function_name:ServeHTTP"
-    has "call:RequestInfoFrom"
-    has "call:Get"
-    has "call:serveResource"
-    lacks "selector:apiextensions.NamespaceScoped"
+    function "ServeHTTP"
+    call "RequestInfoFrom"
+    call "Get"
+    call "serveResource"
+    not selector "apiextensions.NamespaceScoped"
   }
   flag code.ExternalResourceNamespaceControl in function {
-    has "function_name:newBuildPod"
-    has "call_path:build.BuilderPodNamespace"
+    function "newBuildPod"
+    call path "build.BuilderPodNamespace"
   }
   flag code.ExternalResourceNamespaceControl in function {
-    has "function_name:deleteBuilderPod"
-    has "call_path:build.BuilderPodNamespace"
+    function "deleteBuilderPod"
+    call path "build.BuilderPodNamespace"
   }
   flag code.ExternalResourceNamespaceControl in function {
-    has "function_name:getBuilderPod"
-    has "call_path:build.BuilderPodNamespace"
+    function "getBuilderPod"
+    call path "build.BuilderPodNamespace"
   }
   flag code.TenantServiceAccountAdmissionBypass in function {
-    has "function_name:IsCapsuleUser"
-    has "call:NewUserGroupList"
-    has "literal:system:serviceaccounts:kube-system"
-    has "call:Find"
-    lacks "call:MatchingFieldsSelector"
-    lacks "literal:.status.namespaces"
+    function "IsCapsuleUser"
+    call "NewUserGroupList"
+    literal "system:serviceaccounts:kube-system"
+    call "Find"
+    not call "MatchingFieldsSelector"
+    not literal ".status.namespaces"
   }
   flag code.NamespacedSubjectKeyCollision in function {
-    has "function_name:OwnerRoleBindingsIndexFunc"
-    has "selector:rb.Subjects"
-    has "selector:subject.Kind"
-    has "selector:subject.Name"
-    has "call_path:fmt.Sprintf"
-    lacks "selector:subject.Namespace"
-    lacks "call_path:strings.Join"
+    function "OwnerRoleBindingsIndexFunc"
+    selector "rb.Subjects"
+    selector "subject.Kind"
+    selector "subject.Name"
+    call path "fmt.Sprintf"
+    not selector "subject.Namespace"
+    not call path "strings.Join"
   }
   flag code.HopByHopHeaderAuthBypass in function {
-    has "function_name:impersonateHandler"
-    has "call_path:hr.GetUserAndGroups"
-    has "call_path:request.Header.Set"
-    has "call_path:request.Header.Add"
-    has "literal:Authorization"
-    has "literal:Impersonate-User"
-    has "literal:Impersonate-Group"
-    lacks "call_path:n.removingHopByHopHeaders"
-    lacks "call_path:httpguts.HeaderValuesContainsToken"
+    function "impersonateHandler"
+    call path "hr.GetUserAndGroups"
+    call path "request.Header.Set"
+    call path "request.Header.Add"
+    literal "Authorization"
+    literal "Impersonate-User"
+    literal "Impersonate-Group"
+    not call path "n.removingHopByHopHeaders"
+    not call path "httpguts.HeaderValuesContainsToken"
   }
   flag code.BasicAuthStreamAuthBypass on any {
     path exact "Options"
@@ -565,237 +565,237 @@ adapter go {
     lacks "AuthRequired"
   }
   flag code.ProxyClientIpSpoofingBypass in function {
-    has "call_path:g.management.GetProxy"
-    has "call_path:proxy.ServeHTTP"
-    lacks "call_path:rewriteRequestSourceIP"
+    call path "g.management.GetProxy"
+    call path "proxy.ServeHTTP"
+    not call path "rewriteRequestSourceIP"
   }
   flag code.UnvalidatedRouteConfigKeyStoredXss in function {
-    has "call_path:mux.Vars"
-    has "call_path:meta.AddConnectionConfKey"
-    has "call_path:json.Unmarshal"
-    lacks "call_path:validate.ValidateID"
-    lacks "call_path:ValidateID"
+    call path "mux.Vars"
+    call path "meta.AddConnectionConfKey"
+    call path "json.Unmarshal"
+    not call path "validate.ValidateID"
+    not call path "ValidateID"
   }
   flag code.UploadFilePathTraversalWrite in function {
-    has "function_name:UploadFileSafe"
-    has "call_path:uploadFile"
-    lacks "call_path:strings.Contains"
+    function "UploadFileSafe"
+    call path "uploadFile"
+    not call path "strings.Contains"
   }
   flag code.AttestationPredicateVerificationBypass in function {
-    has "call_path:policy.AttestationToPayloadJSON"
-    has "selector:c.PredicateType"
-    has "binary:len(payload)==0"
-    has "call_path:PrintVerification"
-    has "call_arg:PrintVerification:verified"
-    lacks "call_arg:PrintVerification:checked"
-    lacks "binary:len(checked)==0"
+    call path "policy.AttestationToPayloadJSON"
+    selector "c.PredicateType"
+    binary "len(payload)==0"
+    call path "PrintVerification"
+    call arg "PrintVerification:verified"
+    not call arg "PrintVerification:checked"
+    not binary "len(checked)==0"
   }
   // Review-only: admission ignore helpers that skip every non-empty subresource
   // need manual review for alternate API paths that bypass the primary policy.
   flag code.AdmissionSubresourcePolicyReview in function {
-    has "function_name:shouldIgnore"
-    has "call:GetSubresource"
+    function "shouldIgnore"
+    call "GetSubresource"
     lacks "ignoredSubresources"
   }
   flag code.UnboundedStateGrowthReview in function {
-    has "call:LoadOrStore"
-    has "literal:overflow"
+    call "LoadOrStore"
+    literal "overflow"
   }
   flag code.UnboundedProtocolStateByIdentifier in function {
-    has "function_name:MessageReceived"
-    has "call:Wantlist"
-    has "call:splitWantsCancels"
-    has "call:Wants"
-    has "call:PushTasksTruncated"
-    lacks "call:ByteLen"
+    function "MessageReceived"
+    call "Wantlist"
+    call "splitWantsCancels"
+    call "Wants"
+    call "PushTasksTruncated"
+    not call "ByteLen"
     lacks "mh.IDENTITY"
   }
   flag code.BlockingReadInAcceptLoop in function {
-    has "call:Accept"
-    has "call:ReadTCP"
-    has "call:serve"
+    call "Accept"
+    call "ReadTCP"
+    call "serve"
   }
   flag code.UnderboundedProtocolCountLimit in function {
-    has "function_name:BtcDecode"
-    has "call:ReadVarInt"
-    has "selector:txin.Witness"
-    has "const:maxWitnessItemsPerInput=500000"
+    function "BtcDecode"
+    call "ReadVarInt"
+    selector "txin.Witness"
+    token const "maxWitnessItemsPerInput=500000"
   }
   flag code.IntegerSizeArithmetic in function {
-    has "function_name:readBytes"
-    has "call:ReadLong"
-    has "call:int"
-    has "call:make"
-    lacks "selector:math.MaxInt"
+    function "readBytes"
+    call "ReadLong"
+    call "int"
+    call "make"
+    not selector "math.MaxInt"
   }
   flag code.IntegerSizeArithmetic in function {
-    has "call:ReadBlockHeader"
-    has "call:int"
-    has "call:getMaxSliceAllocSize"
+    call "ReadBlockHeader"
+    call "int"
+    call "getMaxSliceAllocSize"
   }
   flag code.IntegerSizeArithmetic in function {
-    has "call:ReadBlockHeader"
-    has "call:int"
-    has "call:getMaxMapAllocSize"
+    call "ReadBlockHeader"
+    call "int"
+    call "getMaxMapAllocSize"
   }
   flag code.IntegerSizeArithmetic in function {
-    has "call:SkipNBytes"
-    has "call:int"
-    lacks "call:SkipNBytesInt64"
-    lacks "function_name:SkipNBytesInt64"
+    call "SkipNBytes"
+    call "int"
+    not call "SkipNBytesInt64"
+    not function "SkipNBytesInt64"
   }
   flag code.IntegerSizeArithmetic in function {
-    has "function_name:readBlock"
-    has "call:ReadLong"
-    has "call:make"
-    lacks "selector:math.MaxInt"
+    function "readBlock"
+    call "ReadLong"
+    call "make"
+    not selector "math.MaxInt"
   }
   flag code.ChGoCompressedSizeUint32Overflow in function {
-    has "function_name:Compress"
-    has "call_path:binary.LittleEndian.PutUint32"
-    has "call:uint32"
-    lacks "selector:math.MaxUint32"
-    lacks "literal:compressed size overflows uint32"
+    function "Compress"
+    call path "binary.LittleEndian.PutUint32"
+    call "uint32"
+    not selector "math.MaxUint32"
+    not literal "compressed size overflows uint32"
   }
   flag code.OffsetLengthBoundsOverflow in function {
-    has "call:int"
-    has "call:len"
-    has "call_arg:int:header.StringOff+header.StringLen"
-    has "call_arg:len:btf"
-    has "slice:btf:header.StringOff:"
-    has "slice:btf::header.StringOff+header.StringLen"
-    lacks "call:uint64"
-    lacks "call_arg:uint64:header.StringOff"
+    call "int"
+    call "len"
+    call arg "int:header.StringOff+header.StringLen"
+    call arg "len:btf"
+    slice "btf:header.StringOff:"
+    slice "btf::header.StringOff+header.StringLen"
+    not call "uint64"
+    not call arg "uint64:header.StringOff"
   }
   flag code.OffsetLengthBoundsOverflow in function {
-    has "call:int"
-    has "call:len"
-    has "call_arg:int:header.TypeOff+header.TypeLen"
-    has "call_arg:len:btf"
-    has "slice:btf:header.TypeOff:"
-    has "slice:btf::header.TypeOff+header.TypeLen"
-    lacks "call:uint64"
-    lacks "call_arg:uint64:header.TypeOff"
+    call "int"
+    call "len"
+    call arg "int:header.TypeOff+header.TypeLen"
+    call arg "len:btf"
+    slice "btf:header.TypeOff:"
+    slice "btf::header.TypeOff+header.TypeLen"
+    not call "uint64"
+    not call arg "uint64:header.TypeOff"
   }
   flag code.LengthDerivedAllocation in function {
-    has "function_name:readNBytes"
-    has "call:make"
-    has "call:ReadByte"
-    lacks "selector:reader.data"
-    lacks "selector:reader.pos"
+    function "readNBytes"
+    call "make"
+    call "ReadByte"
+    not selector "reader.data"
+    not selector "reader.pos"
   }
   flag code.LengthDerivedAllocation in function {
-    has "selector:r.ContentLength"
-    has "call:make"
-    has "call_path:io.ReadFull"
-    lacks "call_path:io.LimitReader"
-    lacks "call_path:http.MaxBytesReader"
+    selector "r.ContentLength"
+    call "make"
+    call path "io.ReadFull"
+    not call path "io.LimitReader"
+    not call path "http.MaxBytesReader"
   }
   flag code.FieldDerivedIndexAccess in function {
-    has "call:ReadString"
-    has "call:BytesNtohs"
-    has "binary:len(buf)<=off"
-    lacks "binary:len(buf)<off+2"
+    call "ReadString"
+    call "BytesNtohs"
+    binary "len(buf)<=off"
+    not binary "len(buf)<off+2"
   }
   flag code.FieldDerivedIndexAccess in function {
-    has "function_name:readObject"
-    has "index:ber:offset"
-    has "binary:contentEnd>len(ber)"
-    has "literal:ber2der: BER tag length is more than available data"
-    lacks "binary:len(ber)<=offset"
+    function "readObject"
+    index "ber:offset"
+    binary "contentEnd>len(ber)"
+    literal "ber2der: BER tag length is more than available data"
+    not binary "len(ber)<=offset"
   }
   flag code.Free5gcChfRechargeInfoSplitPanic in function {
-    has "function_name:RechargePut"
-    has "call_path:strings.Split"
-    has "literal:rechargingInfo"
-    has "index:ueIdRatingGroup:1"
-    lacks "call:len"
-    lacks "call_path:c.Query"
+    function "RechargePut"
+    call path "strings.Split"
+    literal "rechargingInfo"
+    index "ueIdRatingGroup:1"
+    not call "len"
+    not call path "c.Query"
   }
   flag code.ManualZipEntryFileWrite in function {
-    has "function_name:Decode"
-    has "call_path:zip.NewReader"
-    has "call_path:filepath.Join"
-    has "selector:f.Name"
-    has "call_path:copy"
-    lacks "call_path:sanitizeArchivePath"
-    lacks "call_path:strings.HasPrefix"
+    function "Decode"
+    call path "zip.NewReader"
+    call path "filepath.Join"
+    selector "f.Name"
+    call path "copy"
+    not call path "sanitizeArchivePath"
+    not call path "strings.HasPrefix"
   }
   flag code.ManualZipEntryFileWrite in function {
-    has "function_name:UnzipDirectory"
-    has "call_path:zip.OpenReader"
-    has "call_path:filepath.Join"
-    has "selector:f.Name"
-    has "call_path:os.OpenFile"
-    has "call_arg:os.OpenFile:filePath"
-    has "selector:os.O_TRUNC"
-    lacks "call_path:os.Stat"
-    lacks "call_path:GetInput"
+    function "UnzipDirectory"
+    call path "zip.OpenReader"
+    call path "filepath.Join"
+    selector "f.Name"
+    call path "os.OpenFile"
+    call arg "os.OpenFile:filePath"
+    selector "os.O_TRUNC"
+    not call path "os.Stat"
+    not call path "GetInput"
   }
   flag code.CiliumBroadTcFilterCleanup in function {
-    has "function_name:getTCFilters"
-    has "selector:bpfFilter.Name"
-    has "call_path:strings.Contains"
-    has "literal:cilium"
-    lacks "literal:cil_"
+    function "getTCFilters"
+    selector "bpfFilter.Name"
+    call path "strings.Contains"
+    literal "cilium"
+    not literal "cil_"
   }
   flag code.CiliumCliEtcdInitMountMismatch in function {
-    has "function_name:generateDeployment"
-    has "literal:etcd-init"
-    has "field:MountPath=etcd-data-dir"
-    has "field:Args"
+    function "generateDeployment"
+    literal "etcd-init"
+    field "MountPath=etcd-data-dir"
+    field "Args"
   }
   flag code.CharmRouteFileStorePathAccess in function {
-    has "function_name:handlePostFile"
-    has "call_path:pattern.Path"
-    has "call_path:s.cfg.FileStore.Put"
-    lacks "call_path:filepath.Clean"
+    function "handlePostFile"
+    call path "pattern.Path"
+    call path "s.cfg.FileStore.Put"
+    not call path "filepath.Clean"
   }
   flag code.CharmRouteFileStorePathAccess in function {
-    has "function_name:handleGetFile"
-    has "call_path:pattern.Path"
-    has "call_path:s.cfg.FileStore.Get"
-    lacks "call_path:filepath.Clean"
+    function "handleGetFile"
+    call path "pattern.Path"
+    call path "s.cfg.FileStore.Get"
+    not call path "filepath.Clean"
   }
   flag code.CharmRouteFileStorePathAccess in function {
-    has "function_name:handleDeleteFile"
-    has "call_path:pattern.Path"
-    has "call_path:s.cfg.FileStore.Delete"
-    lacks "call_path:filepath.Clean"
+    function "handleDeleteFile"
+    call path "pattern.Path"
+    call path "s.cfg.FileStore.Delete"
+    not call path "filepath.Clean"
   }
   flag code.BoundRequestPathDeleteTraversal in function {
-    has "function_name:Delete"
-    has "call_path:self.Validate"
-    has "selector:params.Path"
-    has "call_path:GetSaveRealPath"
-    has "call_path:os.Remove"
-    lacks "call_path:filepath.IsLocal"
-    lacks "call_path:filepath.Clean"
+    function "Delete"
+    call path "self.Validate"
+    selector "params.Path"
+    call path "GetSaveRealPath"
+    call path "os.Remove"
+    not call path "filepath.IsLocal"
+    not call path "filepath.Clean"
   }
   flag code.UnderwidthFormattedIndex in function {
-    has "call_path:fmt.Sprintf"
-    has "literal:%08b"
-    has "index:capabilities:8"
-    lacks "literal:%016b"
+    call path "fmt.Sprintf"
+    literal "%08b"
+    index "capabilities:8"
+    not literal "%016b"
   }
   flag code.UnsafeBuildClientCommandAssembly in function {
-    has "function_name:BuildClient"
-    has "literal:GO_ENABLED=1 GOOS=%s GOARCH=amd64 go build"
-    has "selector:input.Filename"
-    has "call:handleFilename"
-    has "call_path:fmt.Sprintf"
-    has "call_path:exec.Command"
-    lacks "call_path:utils.NormalizeString"
-    lacks "call_path:utils.StringIsNumber"
-    lacks "call_path:utils.IsValidIPAddress"
+    function "BuildClient"
+    literal "GO_ENABLED=1 GOOS=%s GOARCH=amd64 go build"
+    selector "input.Filename"
+    call "handleFilename"
+    call path "fmt.Sprintf"
+    call path "exec.Command"
+    not call path "utils.NormalizeString"
+    not call path "utils.StringIsNumber"
+    not call path "utils.IsValidIPAddress"
   }
   flag code.UnsignedIndexConversionGuardBypass in function {
-    has "function_name:checkTopicRegister"
-    has "selector:data.Idx"
-    has "selector:data.Topics"
-    has "call:int"
-    has "call:len"
-    has "binary:data.Idx<0"
+    function "checkTopicRegister"
+    selector "data.Idx"
+    selector "data.Topics"
+    call "int"
+    call "len"
+    binary "data.Idx<0"
   }
   sink method "BranchPageElement" val "Count" -> code.CountDerivedElementAccess
   flag core.MemoryBoundsCheck on any {
@@ -804,19 +804,19 @@ adapter go {
     has "0"
   }
   flag code.UnqualifiedDatabaseRoutineReview in function {
-    has "literal:SELECT 'aurora_global_db_status'::regproc"
+    literal "SELECT 'aurora_global_db_status'::regproc"
     lacks "pg_catalog.aurora_global_db_status"
   }
   flag code.UnqualifiedDatabaseRoutineReview in function {
-    has "literal:SELECT 'aurora_global_db_instance_status'::regproc"
+    literal "SELECT 'aurora_global_db_instance_status'::regproc"
     lacks "pg_catalog.aurora_global_db_instance_status"
   }
   flag code.UnqualifiedDatabaseRoutineReview in function {
-    has "literal:SELECT count(1) FROM aurora_global_db_status()"
+    literal "SELECT count(1) FROM aurora_global_db_status()"
     lacks "pg_catalog.aurora_global_db_status"
   }
   flag code.UnqualifiedDatabaseRoutineReview in function {
-    has "literal:FROM aurora_global_db_instance_status()"
+    literal "FROM aurora_global_db_instance_status()"
     lacks "pg_catalog.aurora_global_db_instance_status"
   }
   flag code.UnparameterizedSqlQueryParser on any {
@@ -828,57 +828,57 @@ adapter go {
     has "group"
   }
   flag code.UnparameterizedSqlQueryParser in function {
-    has "call_path:impl.dbConnection.Query"
-    has "literal:SELECT "
-    has "literal: and "
+    call path "impl.dbConnection.Query"
+    literal "SELECT "
+    literal " and "
     has "='"
     lacks "queryParams"
   }
   flag code.CommandOptionInjection in function {
-    has "function_name:NodePublishVolume"
-    has "call:GetVolumeContext"
-    has "call:append"
-    has "call:Mount"
-    lacks "call:ParseIP"
+    function "NodePublishVolume"
+    call "GetVolumeContext"
+    call "append"
+    call "Mount"
+    not call "ParseIP"
   }
   flag code.ApiScanFoundActionCommandExecution in function {
-    has "function_name:postScanHandler"
-    has "call_path:c.Bind"
-    has "selector:rq.Options"
-    has "call_path:ScanFromAPI"
-    lacks "call_path:sanitizeAPIScanOptions"
+    function "postScanHandler"
+    call path "c.Bind"
+    selector "rq.Options"
+    call path "ScanFromAPI"
+    not call path "sanitizeAPIScanOptions"
   }
   // Review-only: writing security state through ordinary path opening of procfs control
   // files needs a verified procfs/open boundary to avoid link or mount redirection.
   flag code.SpecialFileAccessReview in function {
-    has "call_path:os.OpenFile"
-    has "literal:/proc/self/attr/exec"
-    lacks "call:OpenProcRoot"
-    lacks "call:OpenThreadSelf"
-    lacks "call_path:pathrs.Reopen"
+    call path "os.OpenFile"
+    literal "/proc/self/attr/exec"
+    not call "OpenProcRoot"
+    not call "OpenThreadSelf"
+    not call path "pathrs.Reopen"
   }
   // Review-only: request/header secrets compared after ordinary string conversion need
   // constant-time comparison when attacker-controlled candidates can be repeated.
   flag code.SecretComparisonReview in function {
-    has "function_name:ParseAndValidate"
-    has "selector:r.Header.Get"
-    has "call:string"
-    lacks "call:ConstantTimeCompare"
+    function "ParseAndValidate"
+    selector "r.Header.Get"
+    call "string"
+    not call "ConstantTimeCompare"
   }
   flag code.SecretComparisonReview in function {
-    has "call:BasicAuth"
-    has "binary:username==wrapper.username"
-    has "binary:password==wrapper.password"
-    lacks "call:ConstantTimeCompare"
+    call "BasicAuth"
+    binary "username==wrapper.username"
+    binary "password==wrapper.password"
+    not call "ConstantTimeCompare"
   }
   flag code.SecretComparisonReview in function {
-    has "call_path:scrypt.Key"
-    has "call_path:bytes.Equal"
-    has "call_arg:bytes.Equal:source_master_key"
-    has "call_arg:bytes.Equal:target_master_key"
-    lacks "call:ConstantTimeCompare"
-    lacks "call_path:hmac.Equal"
-    lacks "call_path:subtle.ConstantTimeCompare"
+    call path "scrypt.Key"
+    call path "bytes.Equal"
+    call arg "bytes.Equal:source_master_key"
+    call arg "bytes.Equal:target_master_key"
+    not call "ConstantTimeCompare"
+    not call path "hmac.Equal"
+    not call path "subtle.ConstantTimeCompare"
   }
   flag code.SecretComparisonReview on binop {
     op any ["==", "!="]
@@ -891,7 +891,7 @@ adapter go {
     lacks call contains_any ["ConstantTimeCompare", "hmac.Equal", "subtle.ConstantTimeCompare", "CompareHashAndPassword"]
   }
   flag code.FastPasswordHash in function {
-    has "function_name:GenerateUsers"
+    function "GenerateUsers"
     has "user.Password"
     has "sha256sum"
     lacks "GenerateFromPassword"
@@ -900,7 +900,7 @@ adapter go {
     lacks "scrypt"
   }
   flag code.FastPasswordHash in function {
-    has "function_name:FindByPassword"
+    function "FindByPassword"
     has "user.Password"
     has "sha256sum"
     lacks "CompareHashAndPassword"
@@ -934,34 +934,34 @@ adapter go {
     path "ParseUnverified"
   }
   flag code.CsrfDisabled in function {
-    has "function_name:CheckOrigin"
-    has "param_type:http.Request"
+    function "CheckOrigin"
+    param type "http.Request"
     has "return:true"
-    lacks "call_path:r.Header.Get"
-    lacks "selector:r.Host"
+    not call path "r.Header.Get"
+    not selector "r.Host"
   }
   flag code.DtlsEpochZeroApplicationData in function {
-    has "function_name:handleIncomingPacket"
-    has "call_path:h.Unmarshal"
-    has "selector:h.epoch"
-    has "call_path:c.state.cipherSuite.decrypt"
-    has "call_path:r.Unmarshal"
-    has "selector:c.decrypted"
-    lacks "binary:h.epoch==0"
-    lacks "binary:0==h.epoch"
+    function "handleIncomingPacket"
+    call path "h.Unmarshal"
+    selector "h.epoch"
+    call path "c.state.cipherSuite.decrypt"
+    call path "r.Unmarshal"
+    selector "c.decrypted"
+    not binary "h.epoch==0"
+    not binary "0==h.epoch"
   }
   flag code.UnverifiedFederationMissingEvents in function {
-    has "call_path:missingResp.Events.UntrustedEvents"
-    has "call_path:t.cacheAndReturn"
-    lacks "call_path:ev.VerifyEventSignatures"
+    call path "missingResp.Events.UntrustedEvents"
+    call path "t.cacheAndReturn"
+    not call path "ev.VerifyEventSignatures"
   }
   flag code.SamlXmlRoundtripValidationBypass in function {
-    has "function_name:HandlePOST"
-    has "call_path:base64.StdEncoding.DecodeString"
-    has "call_path:verifyResponseSig"
-    has "call_path:xml.Unmarshal"
-    has "call_path:p.validateSubject"
-    lacks "call_path:xrv.Validate"
+    function "HandlePOST"
+    call path "base64.StdEncoding.DecodeString"
+    call path "verifyResponseSig"
+    call path "xml.Unmarshal"
+    call path "p.validateSubject"
+    not call path "xrv.Validate"
   }
 
   // resource lifecycle (CWE-772) — raw handles that must be closed.
@@ -996,12 +996,12 @@ adapter go {
   // CORS wildcard origin parsers must keep the whole prefix before a trailing *.
   // Slicing to i-1 before prefix matching weakens origin validation by one byte.
   flag code.CorsWildcardPrefixTruncation in function {
-    has "function_name:parseWildcardRules"
-    has "selector:c.AllowOrigins"
-    has "selector:c.AllowWildcard"
-    has "call_path:strings.Index"
-    has "call_path:append"
-    has "slice:o::i-1"
+    function "parseWildcardRules"
+    selector "c.AllowOrigins"
+    selector "c.AllowWildcard"
+    call path "strings.Index"
+    call path "append"
+    slice "o::i-1"
   }
 
   // clickjacking (CWE-1021) — X-Frame-Options EXPLICITLY set to ALLOWALL (omission not flagged)
@@ -1058,29 +1058,29 @@ adapter go {
     path "RLock"
   }
   flag code.RecursiveJsonMarshalUnderLock in function {
-    has "function_name:MarshalJSON"
-    has "call_path:ps.mtx.Lock"
-    has "call_path:cmtjson.Marshal"
-    has "selector:ps"
+    function "MarshalJSON"
+    call path "ps.mtx.Lock"
+    call path "cmtjson.Marshal"
+    selector "ps"
     lacks "jsonPeerState"
-    lacks "call_path:ps.Count"
-    lacks "call_path:ps.Total"
+    not call path "ps.Count"
+    not call path "ps.Total"
   }
   flag code.LocklessSharedMutation on any {
     path exact "analysis.global.mutation"
-    has "field:ctx"
+    field "ctx"
   }
   flag code.LocklessSharedMutation on any {
     path exact "analysis.global.mutation"
-    has "field:roundTripper"
+    field "roundTripper"
   }
   flag code.LocklessSharedMutation in function {
-    has "function_name:ReplaceIndividualSubcription"
-    has "call:GetSubscription"
-    has "index:bsfContext.BsfSelf.Subscriptions:subId"
-    has "call:Status"
-    has "selector:http.StatusNoContent"
-    lacks "selector:http.StatusNotFound"
+    function "ReplaceIndividualSubcription"
+    call "GetSubscription"
+    index "bsfContext.BsfSelf.Subscriptions:subId"
+    call "Status"
+    selector "http.StatusNoContent"
+    not selector "http.StatusNotFound"
   }
   control method "Unlock" -> core.LockRelease
   control method "RUnlock" -> core.LockRelease

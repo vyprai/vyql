@@ -80,8 +80,8 @@ adapter objc {
   }
   flag code.FieldDerivedIndexAccess on any {
     path "analysis.index.access"
-    has "index_kind=field_derived"
-    has "guard=missing_upper_bound"
+    fact index_kind "field_derived"
+    fact guard "missing_upper_bound"
   }
   flag code.OwnerFieldClear on any {
     path "analysis.field.clear_null"

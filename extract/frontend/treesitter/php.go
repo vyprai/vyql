@@ -380,10 +380,102 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 			return
 		}
 		switch cur.Kind() {
+		case "assignment_expression", "augmented_assignment_expression":
+			left := field(cur, "left")
+			right := field(cur, "right")
+			leftText := phpCompactText(c.text(left))
+			rightText := phpCompactText(c.text(right))
+			if leftText != "" && rightText != "" {
+				add("assign:" + leftText + "=" + rightText)
+			}
+			for _, path := range c.phpCallPaths(right) {
+				add("assign_call:" + path)
+				if method := lastSeg(path); method != "" {
+					add("assign_call_method:" + method)
+				}
+				if leftText != "" {
+					add("assign_call:" + leftText + ":" + path)
+					if method := lastSeg(path); method != "" {
+						add("assign_call_method:" + leftText + ":" + method)
+					}
+				}
+			}
+			for _, lit := range c.phpLiteralTokens(right) {
+				add("assign_literal:" + lit)
+				if leftText != "" {
+					add("assign_literal:" + leftText + ":" + lit)
+				}
+			}
+			if leftText != "" && strings.HasPrefix(leftText, "$GLOBALS[") {
+				add("global_subscript_write=true")
+			}
 		case "function_call_expression", "member_call_expression", "scoped_call_expression":
-			add("call_path:" + c.dotted(cur))
+			path := c.dotted(cur)
+			add("call_path:" + path)
+			if method := lastSeg(path); method != "" {
+				add("call:" + method)
+			}
 		case "member_access_expression":
 			add("attr_path:" + c.dotted(cur))
+		case "subscript_expression":
+			add("subscript:" + phpCompactText(c.text(cur)))
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *phConv) phpCallPaths(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		switch cur.Kind() {
+		case "function_call_expression", "member_call_expression", "scoped_call_expression":
+			path := c.dotted(cur)
+			if path != "" && !seen[path] {
+				seen[path] = true
+				out = append(out, path)
+			}
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *phConv) phpLiteralTokens(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		switch cur.Kind() {
+		case "string", "encapsed_string", "integer", "float", "boolean", "name", "qualified_name":
+			add(strings.Trim(phpCompactText(c.text(cur)), `"'`))
 		}
 		for _, ch := range namedChildren(cur) {
 			walk(ch)

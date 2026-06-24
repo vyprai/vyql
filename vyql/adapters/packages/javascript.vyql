@@ -20,7 +20,7 @@ adapter javascript {
   package "next" {
     source "searchParams" -> HttpInput
     flag ProtocolStateReview in function {
-      has "name=updateSession"
+      name "updateSession"
       has "request.headers"
       has "getSessionFromCookie"
       has "verifyAccessToken"

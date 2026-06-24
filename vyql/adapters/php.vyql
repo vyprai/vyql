@@ -54,7 +54,7 @@ adapter php {
   source "getenv" val "REMOTE_ADDR" -> code.HttpInput
   source "getenv" val "PATH_INFO" -> code.HttpInput
   flag code.IncompleteServerPortValidation in module {
-    has "lang=php"
+    lang "php"
     has "connect("
     has "is_numeric($port)"
     has "explode("
@@ -62,7 +62,7 @@ adapter php {
     has "$port<1024"
   }
   flag code.IncompleteServerPortValidation in module {
-    has "lang=php"
+    lang "php"
     has "connect("
     has "is_numeric($port)"
     has "explode("
@@ -70,27 +70,27 @@ adapter php {
     has "1024>$port"
   }
   flag code.UnvalidatedNumericSqlInterpolation in class {
-    has "lang=php"
+    lang "php"
     has "getMessageParam('iid'"
     has "item_id=$this->iid"
     has "db_query("
     lacks "is_numeric($this->iid)"
   }
   flag code.UnvalidatedNumericSqlInterpolation in function {
-    has "lang=php"
-    has "name=actionUpload"
+    lang "php"
+    name "actionUpload"
     has "performReadValidation($model_name,$model_id)"
     has "'model_id'=>$model_id"
     lacks "(int)$model_id"
   }
   flag code.UnvalidatedNumericSqlInterpolation in function {
-    has "lang=php"
-    has "name=actionDownloadFile"
+    lang "php"
+    name "actionDownloadFile"
     has "'model_id'=>$id"
     lacks "(int)$id"
   }
   flag code.WordPressPostsWhereDateSqlInjection in function {
-    has "lang=php"
+    lang "php"
     has "$where.="
     has "post_date"
     has "$edcal_startDate"
@@ -104,7 +104,7 @@ adapter php {
     lacks "sanitize_text_field"
   }
   flag code.IncompleteHtmlEntityEscape in function {
-    has "lang=php"
+    lang "php"
     has "$_POST"
     has ".=strip_tags("
     lacks "htmlspecialchars(strip_tags("
@@ -112,14 +112,14 @@ adapter php {
     lacks "esc_html(strip_tags("
   }
   flag code.UnrestrictedRequestParamDeserialization in module {
-    has "lang=php"
+    lang "php"
     has "param('params'"
     has "unserialize($params"
     lacks "substr"
     lacks "a:"
   }
   flag code.UnboundedReportPeriod in module {
-    has "lang=php"
+    lang "php"
     has "CHttpRequest::get_Value('period')"
     has "DateTimeUtil::getLastDaysIntervals($period)"
     has "getStoredBytes"
@@ -128,7 +128,7 @@ adapter php {
     lacks "filter_var($period"
   }
   flag code.ArchiveManifestDeserialization in function {
-    has "lang=php"
+    lang "php"
     has "Tar"
     has "extract("
     has "manifest"
@@ -137,7 +137,7 @@ adapter php {
     lacks "allowed_classes"
   }
   flag code.UnescapedSessionFlash in function {
-    has "lang=php"
+    lang "php"
     has "$_SESSION['info']"
     has "$"
     lacks "htmlspecialchars"
@@ -146,7 +146,7 @@ adapter php {
     lacks "strip_tags"
   }
   flag code.UnescapedSessionFlash in function {
-    has "lang=php"
+    lang "php"
     has "$_SESSION[\"info\"]"
     has "$"
     lacks "htmlspecialchars"
@@ -155,7 +155,7 @@ adapter php {
     lacks "strip_tags"
   }
   flag code.UnescapedSessionFlash in function {
-    has "lang=php"
+    lang "php"
     has "$_SESSION['message']"
     has "$"
     lacks "htmlspecialchars"
@@ -164,7 +164,7 @@ adapter php {
     lacks "strip_tags"
   }
   flag code.UnescapedSessionFlash in function {
-    has "lang=php"
+    lang "php"
     has "$_SESSION[\"message\"]"
     has "$"
     lacks "htmlspecialchars"
@@ -173,7 +173,7 @@ adapter php {
     lacks "strip_tags"
   }
   flag code.UnescapedSessionFlash in function {
-    has "lang=php"
+    lang "php"
     has "$_SESSION['flash']"
     has "$"
     lacks "htmlspecialchars"
@@ -182,7 +182,7 @@ adapter php {
     lacks "strip_tags"
   }
   flag code.UnescapedSessionFlash in function {
-    has "lang=php"
+    lang "php"
     has "$_SESSION[\"flash\"]"
     has "$"
     lacks "htmlspecialchars"
@@ -191,7 +191,7 @@ adapter php {
     lacks "strip_tags"
   }
   flag code.UnescapedRequestGlobalTemplateVar in module {
-    has "lang=php"
+    lang "php"
     has "$GLOBALS["
     has "$_GET["
     has "$this->_tplVars=$this->_globalVar"
@@ -201,14 +201,22 @@ adapter php {
     lacks "strip_tags($_GET"
   }
   flag code.ElefantAdminPreviewMissingAdminXss in module {
-    has "lang=php"
+    lang "php"
     has "$wp=newWebpage($_POST);"
     has "$page->title=$_POST['title'];"
     has "$tpl->run_includes($_POST['body']);"
     lacks "$this->require_admin();"
   }
+  flag code.TempPathJoinBeforeSeparatorCheck in function {
+    lang "php"
+    token assign_call_method "getTempPath"
+    token assign_literal "DIRECTORY_SEPARATOR"
+    fact global_subscript_write "true"
+    not call "strpos"
+    not call "basename"
+  }
   flag code.CentreonMyAccountContactXss in module {
-    has "lang=php"
+    lang "php"
     has "RowMenu_name"
     has "RowMenu_desc"
     has "contact_name"
@@ -217,7 +225,7 @@ adapter php {
     lacks "ESCAPE_ILLEGAL_CHARS"
   }
   flag code.IncompleteCommandEscapeRegex in module {
-    has "lang=php"
+    lang "php"
     has "escape_command"
     has "preg_replace"
     has "/(\\\\\\$|`)/"
@@ -225,14 +233,14 @@ adapter php {
     has "ns_id"
   }
   flag code.ClassroomBookingsDisplayNameAltXss in module {
-    has "lang=php"
+    lang "php"
     has "foreach($global_menuas$idx=>$item)"
     has "$icon=img(asset_url('assets/images/ui/'.$item['icon']),FALSE"
     has "align='top'alt='{$item['label']}'"
   }
   flag code.IncompleteDangerousUploadExtensionBlocklist in function {
-    has "lang=php"
-    has "name=process"
+    lang "php"
+    name "process"
     has "$this->no_script"
     has "preg_match"
     has "php|php5|php4|php3|phtml|pl|py|cgi|asp|js"
@@ -241,13 +249,13 @@ adapter php {
     lacks "phar"
   }
   flag code.ConcreteCmsIncompleteUploadExtensionBlacklist in module {
-    has "lang=php"
+    lang "php"
     has "'extensions_blacklist'=>'*.php;*.php2;*.php3;*.php4;*.php5;*.php7;*.phtml'"
     lacks "*.phar"
   }
   flag code.StatamicAssetUploadPhpExtensionValidationBypass in function {
-    has "lang=php"
-    has "name=extraRules"
+    lang "php"
+    name "extraRules"
     has "$field->fieldtype()->handle()==='assets'"
     has "$field->handle().'.*'=>'file'"
     lacks "getClientOriginalExtension"
@@ -255,8 +263,8 @@ adapter php {
     lacks "phtml"
   }
   flag code.CraftAnonymousTemplateRenderActionXss in class {
-    has "lang=php"
-    has "name=TemplatesController"
+    lang "php"
+    name "TemplatesController"
     has "public$allowAnonymous=true"
     has "functionactionRender($template,array$variables=array())"
     has "doesTemplateExist($template)"
@@ -265,8 +273,8 @@ adapter php {
     lacks "HttpException(403)"
   }
   flag code.BackendServiceResourceTraversal in function {
-    has "lang=php"
-    has "name=handleServiceRequest"
+    lang "php"
+    name "handleServiceRequest"
     has "$resource"
     has "ServiceManager::handleServiceRequest"
     lacks "str_replace(['..'],'',$resource)"
@@ -274,31 +282,31 @@ adapter php {
     lacks "PathAccessCheck"
   }
   flag code.HostExpandedUrlSanitizedBeforeExpansionSsti in function {
-    has "lang=php"
-    has "name=safeCanonicalUrl"
+    lang "php"
+    name "safeCanonicalUrl"
     has "$url=Craft::$app->getRequest()->getPathInfo()"
     has "$url=DynamicMetaHelper::sanitizeUrl($url)"
     has "returnUrlHelper::absoluteUrlWithProtocol($url)"
     lacks "returnDynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))"
   }
   flag code.SensitiveModelJsonSerializationExposure in function {
-    has "lang=php"
-    has "name=_handleSuccessfulLogin"
+    lang "php"
+    name "_handleSuccessfulLogin"
     has "$this->request->getAcceptsJson()"
     has "return$this->asModelSuccess($user,modelName:'user',data:$return)"
     lacks "return$this->asSuccess(data:$return)"
   }
   flag code.PersistentModelTitleStoredXss in function {
-    has "lang=php"
-    has "name=onSaveElement"
+    lang "php"
+    name "onSaveElement"
     has "$model->title=$title"
     has "$snapshot['title']=Html::encode($title)"
     has "$model->snapshot=$this->afterSnapshot"
     lacks "$model->title=Html::encode($title)"
   }
   flag code.QuickAppsUserRealNameStoredXss in class {
-    has "lang=php"
-    has "name=User"
+    lang "php"
+    name "User"
     has "StaticCacheTrait"
     has "TableRegistry::get('User.Users')->updateToken($this)"
     has "ROLE_ID_ADMINISTRATOR"
@@ -306,8 +314,8 @@ adapter php {
     lacks "returnh($name)"
   }
   flag code.FeehiUsernameStoredXss in class {
-    has "lang=php"
-    has "name=User"
+    lang "php"
+    name "User"
     has "username"
     has "attributeLabels"
     has "beforeSave($insert)"
@@ -315,8 +323,8 @@ adapter php {
     lacks "$this->username=Html::encode($this->username)"
   }
   flag code.CodiadFilemanagerSearchCommandInjection in class {
-    has "lang=php"
-    has "name=Filemanager"
+    lang "php"
+    name "Filemanager"
     has "$this->query=$get['query']"
     has "$this->search_string=$post['search_string']"
     has "$this->search_file_type=$post['search_file_type']"
@@ -327,8 +335,8 @@ adapter php {
     lacks "$this->search_file_type=escapeshellarg($post['search_file_type'])"
   }
   flag code.ConnectCmsCodestudiesPluginCodeExecution in class {
-    has "lang=php"
-    has "name=CodestudiesPlugin"
+    lang "php"
+    name "CodestudiesPlugin"
     has "$functions['post']"
     has "run"
     has "role_reporter"
@@ -341,15 +349,15 @@ adapter php {
     has "java -Dfile.encoding=UTF-8"
   }
   flag code.CodeSnippetsSafeModeQueryXss in function {
-    has "lang=php"
-    has "name=add_safe_mode_query_var"
+    lang "php"
+    name "add_safe_mode_query_var"
     has "add_query_arg('snippets-safe-mode',$_REQUEST['snippets-safe-mode'],$url)"
     lacks "(bool)$_REQUEST['snippets-safe-mode']"
     lacks "esc_attr"
     lacks "htmlspecialchars"
   }
   flag code.WordPressAddQueryArgHrefXss in function {
-    has "lang=php"
+    lang "php"
     has "sprintf("
     has "<ahref=\"%s\""
     has "add_query_arg("
@@ -358,38 +366,38 @@ adapter php {
     lacks "htmlspecialchars(add_query_arg("
   }
   flag code.PrestaShopContactformMessageEmailXss in function {
-    has "lang=php"
-    has "name=sendMessage"
+    lang "php"
+    name "sendMessage"
     has "Tools::nl2br"
     has "Tools::stripslashes"
     has "Mail::Send"
     lacks "htmlentitiesUTF8"
   }
   flag code.FreePbxContactManagerGroupLinkXss in function {
-    has "lang=php"
-    has "name=ajaxHandler"
+    lang "php"
+    name "ajaxHandler"
     has "$final[$i]['actions']"
     has "group='.$_REQUEST['group'].'"
     lacks "(int)$_REQUEST['group']"
   }
   flag code.OveleonCookiebarLocaleReflectedXss in function {
-    has "lang=php"
-    has "name=blockAction"
+    lang "php"
+    name "blockAction"
     has "System::loadLanguageFile('tl_cookiebar',$locale)"
     has "$objTemplate->language=$locale"
     has "return$objTemplate->getResponse();"
     lacks "Validator::isLocale($locale)"
   }
   flag code.ZikulaThemeNameReflectedXss in function {
-    has "lang=php"
-    has "name=setasdefault"
+    lang "php"
+    name "setasdefault"
     has "FormUtil::getPassedValue('themename'"
     has "$this->view->assign('themename',$themename)"
     has "theme_admin_setasdefault.tpl"
     lacks "FILTER_SANITIZE_STRING"
   }
   flag code.UnsanitizedSvgUpload in class {
-    has "lang=php"
+    lang "php"
     has "UploadedFile"
     has "getClientOriginalExtension"
     has "$file->storeAs"
@@ -400,15 +408,15 @@ adapter php {
     lacks "Sanitizer"
   }
   flag code.CommonMarkPreserveEntitiesUrlAttributeXss in function {
-    has "lang=php"
-    has "name=render"
+    lang "php"
+    name "render"
     has "RegexHelper::isLinkPotentiallyUnsafe($inline->getUrl())"
     has "Xml::escape($inline->getUrl(),true)"
     lacks "Xml::escape($inline->getUrl())"
   }
   flag code.BladeRawMarkdownRenderWithoutSanitizer on any {
     path exact "analysis.module.context"
-    has "lang=php"
+    lang "php"
     has "{!!"
     has "->markdown("
     has "data['content']"
@@ -422,7 +430,7 @@ adapter php {
   }
   flag code.BladeRawMarkdownRenderWithoutSanitizer on any {
     path exact "analysis.module.context"
-    has "lang=php"
+    lang "php"
     has "{!!"
     has "->markdown("
     has "data[\"content\"]"
@@ -435,8 +443,8 @@ adapter php {
     lacks "HtmlString"
   }
   flag code.StoredHtmlWrite in function {
-    has "lang=php"
-    has "name=save"
+    lang "php"
+    name "save"
     has "$html=post('html')"
     has "$html=$this->_filter_html($html)"
     has "Comment_model::updateOrCreate"
@@ -445,22 +453,22 @@ adapter php {
     lacks "setSafeMode(true)"
   }
   flag code.CockpitAuthArrayNosqlInjection in function {
-    has "lang=php"
-    has "name=check"
+    lang "php"
+    name "check"
     has "$this->param('auth')"
     has "$this->module('cockpit')->authenticate($data)"
     lacks "is_string($data['user'])"
     lacks "is_string($data['password'])"
   }
   flag code.CockpitLimeRedirectStopContinuation in function {
-    has "lang=php"
-    has "name=stop"
+    lang "php"
+    name "stop"
     has "$this->request->stopped=true"
     lacks "app:request:stop"
   }
   flag code.CodeceptionRunProcessDeserializationGadget in class {
-    has "lang=php"
-    has "name=RunProcess"
+    lang "php"
+    name "RunProcess"
     has "Process::fromShellCommandline($command"
     has "function__destruct()"
     has "$this->stopProcess()"
@@ -468,16 +476,16 @@ adapter php {
     lacks "function__wakeup()"
   }
   flag code.CodeIgniterRestserverXmlEntityLoaderXxe in function {
-    has "lang=php"
-    has "name=__construct"
+    lang "php"
+    name "__construct"
     has "_detect_input_format"
     has "$this->format->factory"
     has "->to_array"
     lacks "libxml_disable_entity_loader"
   }
   flag code.PhpMyAdminSetupRedirectorOpenRedirect in function {
-    has "lang=php"
-    has "name=PMA_linkURL"
+    lang "php"
+    name "PMA_linkURL"
     has "url.php"
     has "PMA_generate_common_url"
     has "$params['url']=$url"
@@ -486,8 +494,8 @@ adapter php {
     lacks "defined('PMA_SETUP')){return$url"
   }
   flag code.ComposerGitBranchDiffCommandInjection in function {
-    has "lang=php"
-    has "name=getUnpushedChanges"
+    lang "php"
+    name "getUnpushedChanges"
     has "gitdiff--name-status%s...%s--"
     has "$remoteBranch"
     has "$branch"
@@ -495,52 +503,52 @@ adapter php {
     lacks "$command=['git','diff','--name-status'"
   }
   flag code.CommandStringWrapperExecution in function {
-    has "lang=php"
-    has "name=convert"
+    lang "php"
+    name "convert"
     has "$cmd_string=\"$this->executable-headers$headers-i$source$args$cmd_params-f$format$temp_file_path\""
     has "$this->generateDerivativeResponse($cmd_string,$source,$temp_file_path,$content_type)"
     lacks "$cmd=array_merge"
     lacks "HeaderBag"
   }
   flag code.CommandOptionInjection in function {
-    has "lang=php"
+    lang "php"
     has "escapeshellarg($fingerprint)"
     has "$operation='--delete-key'.escapeshellarg($fingerprint)"
     lacks "$operation='--delete-key--'.escapeshellarg($fingerprint)"
   }
   flag code.CommandOptionInjection in function {
-    has "lang=php"
+    lang "php"
     has "escapeshellarg($fingerprint)"
     has "$operation='--delete-secret-key'.escapeshellarg($fingerprint)"
     lacks "$operation='--delete-secret-key--'.escapeshellarg($fingerprint)"
   }
   flag code.CommandOptionInjection in function {
-    has "lang=php"
+    lang "php"
     has "escapeshellarg($keyId)"
     has "$operation='--list-keys'.escapeshellarg($keyId)"
     lacks "$operation='--list-keys--'.escapeshellarg($keyId)"
   }
   flag code.CommandOptionInjection in function {
-    has "lang=php"
+    lang "php"
     has "escapeshellarg($fingerprint)"
     has "$operation.=''.escapeshellarg($fingerprint)"
     lacks "$operation.='--'.escapeshellarg($fingerprint)"
   }
   flag code.CommandOptionInjection in function {
-    has "lang=php"
+    lang "php"
     has "escapeshellarg($keyId)"
     has "$operation='--utf8-strings--list-secret-keys'.escapeshellarg($keyId)"
     lacks "$operation='--utf8-strings--list-secret-keys--'.escapeshellarg($keyId)"
   }
   flag code.CommandOptionInjection in function {
-    has "lang=php"
+    lang "php"
     has "escapeshellarg($keyId)"
     has "$operation='--utf8-strings--list-public-keys'.escapeshellarg($keyId)"
     lacks "$operation='--utf8-strings--list-public-keys--'.escapeshellarg($keyId)"
   }
   flag code.ConnectCmsCodestudiesPluginCodeExecution in class {
-    has "lang=php"
-    has "name=CodestudiesPlugin"
+    lang "php"
+    name "CodestudiesPlugin"
     has "$functions['post']=['savecode','run','deletecode']"
     has "$role_ckeck_table[\"run\"]=array('role_reporter')"
     has "$codestudies->code_text=$request->code_text"
@@ -549,8 +557,8 @@ adapter php {
     has "exec(\"$cmd2>&1\",$result)"
   }
   flag code.OpnSenseRrdRestoreFilenameCommandInjection in function {
-    has "lang=php"
-    has "name=rrd_import"
+    lang "php"
+    name "rrd_import"
     has "$rrd_file=\"/var/db/rrd/{$rrd['filename']}\""
     has "file_put_contents($xml_file,gzinflate(base64_decode($rrd['xmldata'])))"
     has "exec(\"/usr/local/bin/rrdtoolrestore-f'{$xml_file}''{$rrd_file}'\""
@@ -558,21 +566,21 @@ adapter php {
     lacks "shell_safe"
   }
   flag code.UnescapedDiagnosticHtml in function {
-    has "lang=php"
+    lang "php"
     has "$this->last_headers"
     has "$log.=$this->last_headers"
     has "$result['log']=$log"
     lacks "$log.=htmlentities($this->last_headers"
   }
   flag code.UnescapedJsonTreeLabelXss in function {
-    has "lang=php"
+    lang "php"
     has "$name=$configuration->getName()"
     has "'text'=>$name"
     lacks "'text'=>htmlspecialchars($name)"
     lacks "'text'=>htmlentities($name)"
   }
   flag code.RequestTextParamHtmlEscapeMissing in function {
-    has "lang=php"
+    lang "php"
     has "$_GET[$paramname]"
     has "$_POST[$paramname]"
     has "$check=='alpha'"
@@ -584,8 +592,8 @@ adapter php {
     lacks "html_escape($out"
   }
   flag code.InstallerHiddenFieldXss in function {
-    has "lang=php"
-    has "name=show_next_step"
+    lang "php"
+    name "show_next_step"
     has "$uchidden"
     has "<input type="
     has "hidden"
@@ -595,18 +603,18 @@ adapter php {
     lacks "htmlentities($uchidden"
   }
   flag code.RawDatatablesAttributeXss in function {
-    has "lang=php"
-    has "call_path:Datatables.of"
+    lang "php"
+    call path "Datatables.of"
     has ".rawColumns"
     has "data-title"
-    has "attr_path:$tasks.title"
+    attr path "$tasks.title"
     lacks "htmlspecialchars"
     lacks "htmlentities"
     lacks "e($tasks->title"
   }
   flag code.PgEscapeStringSqlFilterInjection on any {
     path exact "analysis.function.context"
-    has "name=freedomrss_search"
+    name "freedomrss_search"
     has "GetHttpVars"
     has "pg_escape_string"
     has "SearchDoc"
@@ -653,15 +661,15 @@ adapter php {
   // Review-only resource-scope policy: returning authorization/workflow rules for a
   // file-scoped request should include an access/ownership check for the supplied file.
   flag code.IdorPolicyReview in function {
-    has "lang=php"
+    lang "php"
     has "fileId"
     has "getRules("
     has "return$userRules;"
     lacks "userHasAccessTo"
   }
   flag code.CommentUpdateMissingOwnershipConstraint in function {
-    has "lang=php"
-    has "name=updateComment"
+    lang "php"
+    name "updateComment"
     has "comment_comment"
     has "comment_id"
     has "getDb()->update"
@@ -669,8 +677,8 @@ adapter php {
     lacks "USERID"
   }
   flag code.CommentUpdateMissingOwnershipConstraint in function {
-    has "lang=php"
-    has "name=updateComment"
+    lang "php"
+    name "updateComment"
     has "comment_comment"
     has "comment_id"
     has "$sql->update"
@@ -680,7 +688,7 @@ adapter php {
   // Review-only WordPress public endpoint policy: returning post/meta data by a request
   // selected object id should show either a publish-status gate or a read permission check.
   flag code.IdorPolicyReview in function {
-    has "lang=php"
+    lang "php"
     has "audioigniter_playlist_id"
     has "get_post("
     has "get_post_meta("
@@ -692,7 +700,7 @@ adapter php {
   // slugs that are persisted into group-blog settings need target blog permissions and
   // role allowlist validation before saving.
   flag code.AccessPolicyReview in function {
-    has "lang=php"
+    lang "php"
     has "groupblog_edit_settings"
     has "groupblog-blogid"
     has "groupblog_edit_base_settings"
@@ -700,7 +708,7 @@ adapter php {
     lacks "current_user_can_for_blog"
   }
   flag code.AccessPolicyReview in function {
-    has "lang=php"
+    lang "php"
     has "bp_groupblog_create_screen_save"
     has "default-administrator"
     has "default-moderator"
@@ -712,8 +720,8 @@ adapter php {
   // Review-only BuddyPress Docs save policy: a direct doc save POST protected only
   // by a nonce still needs per-doc edit or create capability checks before save().
   flag code.AccessPolicyReview in function {
-    has "lang=php"
-    has "name=catch_page_load"
+    lang "php"
+    name "catch_page_load"
     has "$_POST['doc-edit-submit']"
     has "check_admin_referer('bp_docs_save')"
     has "BP_Docs_Query"
@@ -722,39 +730,39 @@ adapter php {
     lacks "elseif(!$doc&&!current_user_can('bp_docs_create'))"
   }
   flag code.DisabledRelationshipMetadataExposure in function {
-    has "lang=php"
-    has "name=getRelatableResourceTypes"
+    lang "php"
+    name "getRelatableResourceTypes"
     has "$fieldinstanceofResourceTypeRelationship"
     has "$field->getRelatableResourceTypes()"
     lacks "$field->isFieldEnabled()"
   }
   flag code.DisabledRelationshipMetadataExposure in function {
-    has "lang=php"
-    has "name=getRelatableResourceTypesByField"
+    lang "php"
+    name "getRelatableResourceTypesByField"
     has "$field=$this->getFieldByPublicName($field_name)"
     has "$fieldinstanceofResourceTypeRelationship"
     has "$field->getRelatableResourceTypes()"
     lacks "$field->isFieldEnabled()"
   }
   flag code.NextcloudCircleMemberAddMissingCircleCheck in function {
-    has "lang=php"
-    has "name=memberAdd"
+    lang "php"
+    name "memberAdd"
     has "generateFederatedUser($userId,$type)"
     has "addMember($circleId,$federatedUser)"
     lacks "Member::TYPE_CIRCLE"
     lacks "circleService->getCircle($userId)"
   }
   flag code.NextcloudCircleMemberAddMissingCircleCheck in function {
-    has "lang=php"
-    has "name=membersAdd"
+    lang "php"
+    name "membersAdd"
     has "generateFederatedUser($this->get('id',$member),$this->getInt('type',$member))"
     has "addMembers($circleId,$federatedUsers)"
     lacks "Member::TYPE_CIRCLE"
     lacks "circleService->getCircle($userId)"
   }
   flag code.CollectivesPublicTrashMissingEditPermission in function {
-    has "lang=php"
-    has "name=index"
+    lang "php"
+    name "index"
     has "$this->handleErrorResponse(function():array{"
     has "$this->getCollectiveShare()->getOwner()"
     has "$this->service->findAllTrash($collectiveId,$owner)"
@@ -762,8 +770,8 @@ adapter php {
     lacks "$this->checkEditPermissions()"
   }
   flag code.ShopwareStoreApiManyToManyCriteriaBypass in function {
-    has "lang=php"
-    has "name=processCriteria"
+    lang "php"
+    name "processCriteria"
     has "SalesChannelDefinitionInterface"
     has "$definition->processCriteria"
     has "$criteria->getAssociations"
@@ -777,7 +785,7 @@ adapter php {
     lacks "$processedKey"
   }
   flag code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection in function {
-    has "lang=php"
+    lang "php"
     has "toggleSubpalette"
     has "$this->Database->prepare(\"UPDATE\""
     has "\"SET\".$this->Input->post('field')"
@@ -788,14 +796,14 @@ adapter php {
   // Review-only credentialed cloud-resource endpoint: posted credentials used to enumerate
   // buckets should have an admin/authorization gate before returning JSON.
   flag code.CredentialedEndpointReview in function {
-    has "lang=php"
+    lang "php"
     has "getRequiredBodyParam"
     has "loadBucketList"
     has "asJson"
     lacks "requireAdmin"
   }
   flag code.CredentialedEndpointReview in function {
-    has "lang=php"
+    lang "php"
     has "getRequiredBodyParam"
     has "loadContainerList"
     has "asJson"
@@ -805,22 +813,22 @@ adapter php {
   // module's access check; otherwise authenticated backend users can call the
   // route directly without module permissions.
   flag code.BackendRouteMissingModuleAuthorization in module {
-    has "lang=php"
+    lang "php"
     has "DashboardAjaxController"
     has "/dashboard/"
     has "methods"
     lacks "inheritAccessFromModule"
   }
   flag code.MfaRedirectBypass in function {
-    has "lang=php"
+    lang "php"
     has "MfaRequiredException"
     has "redirectToMfaEndpoint"
     has "!$mfaRequested"
     has "!$this->isLoggedInBackendUserRequired"
   }
   flag code.RequestControlledMfaSecretBypass in function {
-    has "lang=php"
-    has "name=getAuthService"
+    lang "php"
+    name "getAuthService"
     has "MfaHelper"
     has "$this->Session->get('mfa_secret')"
     has "$this->Request->request->get('mfa_secret')"
@@ -829,7 +837,7 @@ adapter php {
   // Review-only HTML attribute rewrites: string/regex-based lazyload rewrites that splice a
   // dynamic placeholder into generated image markup should be inspected for attribute breakouts.
   flag code.HtmlAttributeRewriteReview in function {
-    has "lang=php"
+    lang "php"
     has "autoptimize_filter_imgopt_lazyload_placeholder"
     has "preg_replace"
     has "$placeholder"
@@ -837,7 +845,7 @@ adapter php {
     has "data-srcset"
   }
   flag code.IncompleteArchiveFilenameValidation in function {
-    has "lang=php"
+    lang "php"
     has "_maliciousFilename"
     has "strpos("
     has "/../"
@@ -845,8 +853,8 @@ adapter php {
     lacks "phar://"
   }
   flag code.IncompleteFileExtensionValidation in function {
-    has "lang=php"
-    has "name=fileExt"
+    lang "php"
+    name "fileExt"
     has "decodeContent"
     has "$file['type']"
     has "$file['name']"
@@ -858,14 +866,14 @@ adapter php {
   // Review-only installer/config entry point: rewriting a live PHP configuration file from
   // request data should have an install-state or authorization gate before the write.
   flag code.PrivilegedEntryPointReview in module {
-    has "lang=php"
+    lang "php"
     has "$_POST['systemRootPath']"
     has "videos/configuration.php"
     has "fopen"
     lacks "../videos/configuration.php"
   }
   flag code.MissingGuestFallbackForWebAuth in module {
-    has "lang=php"
+    lang "php"
     has "WebBasicAuth"
     has "db_fetch_row_prepared('SELECT * FROM user_auth WHERE username = ? AND realm = 2'"
     has "read_config_option('user_template')=='0'"
@@ -875,7 +883,7 @@ adapter php {
   // SSRF review: public thumbnail helpers that pass a request URL to ffmpeg (`-i`) need
   // host parsing plus private/internal address rejection, not only URL syntax checks.
   flag code.IncompleteIpDenylist in module {
-    has "lang=php"
+    lang "php"
     has "base64Url"
     has "get_ffmpeg()"
     has "-i"
@@ -883,16 +891,16 @@ adapter php {
     lacks "ip_is_private"
   }
   flag code.ChamiloUnsafeGuzzleUrlFetch in function {
-    has "lang=php"
-    has "name=verifyUrl"
+    lang "php"
+    name "verifyUrl"
     has "$client->request('GET',$uri"
     lacks "self::isUrlSafe($uri)"
     lacks "FILTER_FLAG_NO_PRIV_RANGE"
     lacks "FILTER_FLAG_NO_RES_RANGE"
   }
   flag code.SvgNestedResourceValidationBypass in function {
-    has "lang=php"
-    has "name=resolve_url"
+    lang "php"
+    name "resolve_url"
     has "Helpers::dompdf_getimagesize"
     has "\"svg\""
     has "file_put_contents($resolved_url,$image)"
@@ -901,8 +909,8 @@ adapter php {
     lacks "self::resolve_url($url"
   }
   flag code.OwnCloudLoginRedirectUrlOpenRedirect in function {
-    has "lang=php"
-    has "name=redirectToDefaultPage"
+    lang "php"
+    name "redirectToDefaultPage"
     has "isset($_REQUEST['redirect_url'])"
     has "header('Location:/'.htmlentities($_REQUEST['redirect_url']))"
     lacks "substr($_REQUEST['redirect_url'],0,strlen(OC::$WEBROOT))==OC::$WEBROOT"
@@ -910,7 +918,7 @@ adapter php {
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   flag code.UnparameterizedSqlQueryParser in function {
-    has "lang=php"
+    lang "php"
     has "toLegacyOrderBy"
     has "toLegacyOrderWay"
     has "orderBy"
@@ -918,30 +926,30 @@ adapter php {
     lacks "isOrderWay"
   }
   flag code.UnvalidatedSqlOrderDirection in function {
-    has "lang=php"
-    has "name=processOrderBy"
+    lang "php"
+    name "processOrderBy"
     has "ORDERBY"
     has "$orderBy['direction']"
     lacks "QUERY_ORDER_DESC"
     lacks "QUERY_ORDER_ASC"
   }
   flag code.CodeIgniterActiveRecordOffsetSqlInjection in function {
-    has "lang=php"
-    has "name=offset"
+    lang "php"
+    name "offset"
     has "$this->ar_offset=$offset"
     lacks "$this->ar_offset=(int)$offset"
   }
   flag code.CraftCommercePurchasablesSortSqlInjection in function {
-    has "lang=php"
-    has "name=actionPurchasablesTable"
+    lang "php"
+    name "actionPurchasablesTable"
     has "$sort=$this->request->getParam('sort')"
     has "[$column,$direction]=explode('|',$sort)"
     has "$sqlQuery->orderBy([$column=>$direction=='asc'?SORT_ASC:SORT_DESC])"
     lacks "$column=null"
   }
   flag code.ContaoListingModuleSqlIdentifierInjection in function {
-    has "lang=php"
-    has "name=compile"
+    lang "php"
+    name "compile"
     has "$strWhere=(!$this->list_where?\"WHERE\":\"AND\").\\Input::get('search').\"LIKE?\""
     has "$strQuery.=$strWhere"
     has "\\Input::get('order_by')"
@@ -951,8 +959,8 @@ adapter php {
     lacks "!in_array($order_by,$arrFields,true)"
   }
   flag code.UnparameterizedSqlQueryParser in function {
-    has "lang=php"
-    has "name=get"
+    lang "php"
+    name "get"
     has "$where_conditions['exclude']=\"a.idNOTIN({$exclude})\""
     has "$where_sql='WHERE'.join"
     has "$wpdb->get_results"
@@ -960,36 +968,36 @@ adapter php {
     lacks "wp_parse_id_list($exclude)"
   }
   flag code.UnfilteredSearchWhereColumns in function {
-    has "lang=php"
-    has "name=scopeSearch"
+    lang "php"
+    name "scopeSearch"
     has "array_intersect(array_keys($search),$this->searchable)"
     has "return$query->where($search);"
     lacks "array_intersect_key($search,array_flip($this->searchable))"
     lacks "where($allowed_search)"
   }
   flag code.CiviCrmScientificNotationNumericValidationBypass in function {
-    has "lang=php"
-    has "name=integer"
+    lang "php"
+    name "integer"
     has "is_int($value)"
     has "is_numeric($value)&&preg_match"
     lacks "!is_numeric($value)"
   }
   flag code.CiviCrmScientificNotationNumericValidationBypass in function {
-    has "lang=php"
-    has "name=positiveInteger"
+    lang "php"
+    name "positiveInteger"
     has "is_int($value)"
     has "is_numeric($value)&&preg_match"
     lacks "!is_numeric($value)"
   }
   flag code.CiviCrmScientificNotationNumericValidationBypass in function {
-    has "lang=php"
-    has "name=numeric"
+    lang "php"
+    name "numeric"
     has "returnpreg_match"
     lacks "!is_numeric($value)"
   }
   flag code.UnvalidatedLocaleFileInclude in function {
-    has "lang=php"
-    has "name=resetMessages"
+    lang "php"
+    name "resetMessages"
     has "include"
     has "sprintf('%s/%s.php'"
     has "$locale"
@@ -1049,7 +1057,7 @@ adapter php {
   // deserialization
   sink path "unserialize" -> code.Deserialization
   flag code.PhpSimplexmlEntityLoaderXxe in function {
-    has "lang=php"
+    lang "php"
     has "simplexml_load_string"
     lacks "libxml_disable_entity_loader"
   }
@@ -1084,7 +1092,7 @@ adapter php {
   sink path "die" -> code.HtmlRender
   sink path "exit" -> code.HtmlRender
   flag code.BufferedErrorPageRequestMetadataXss in function {
-    has "lang=php"
+    lang "php"
     has "$out.="
     has "REQUEST_URI"
     has "print$out"
@@ -1163,7 +1171,7 @@ adapter php {
   control "escapeCsvRecord" -> core.CsvEscape
   control method "escapeCsvRecord" -> core.CsvEscape
   flag code.CsvFormulaProneExportRow in function {
-    has "lang=php"
+    lang "php"
     has "getForCsvExport"
     has "self::COLUMNS"
     has "$row[self::COLUMNS][]="
@@ -1194,7 +1202,7 @@ adapter php {
   sink method "fill" -> code.MassAssign
   sink method "forceFill" -> code.MassAssign
   flag code.IncompleteMassAssignmentIdUnset in module {
-    has "lang=php"
+    lang "php"
     has "functionadd("
     has "$patchEntityParams=['associated'=>[],'accessibleFields'=>$data->getAccessibleFieldForNew(),];"
     has "unset($params['id']);"
@@ -1285,8 +1293,8 @@ adapter php {
     lacks "$this->assertAllowedHttpMethod"
   }
   flag code.IncompleteCsrfTokenValidation in function {
-    has "lang=php"
-    has "name=restart"
+    lang "php"
+    name "restart"
     has "delete_option"
     has "$wpdb->query"
     has "DELETE FROM"
@@ -1294,8 +1302,8 @@ adapter php {
     lacks "wp_verify_nonce"
   }
   flag code.BestWebSoftContactFormSettingsCsrf in function {
-    has "lang=php"
-    has "name=cntctfrm_settings_page"
+    lang "php"
+    name "cntctfrm_settings_page"
     has "cntctfrm_form_submit"
     has "$cntctfrm_options_submit"
     has "update_option"
@@ -1331,14 +1339,14 @@ adapter php {
     path "makeAdmin"
   }
   flag code.DokuwikiRemoteAclMissingAdminCheck in function {
-    has "lang=php"
+    lang "php"
     has "plugin_load('admin','acl')"
     has "$apa->_acl_add"
     lacks "auth_isadmin"
     lacks "RemoteAccessDeniedException"
   }
   flag code.DokuwikiRemoteAclMissingAdminCheck in function {
-    has "lang=php"
+    lang "php"
     has "plugin_load('admin','acl')"
     has "$apa->_acl_del"
     lacks "auth_isadmin"
@@ -1347,7 +1355,7 @@ adapter php {
 
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
   flag code.UncheckedUploadedImageProcessing in function {
-    has "lang=php"
+    lang "php"
     has "imagecopyresampled"
     has "$imgt($new_image,$thumb_path)"
     has "$imgt($old_image,$source_path)"
@@ -1356,31 +1364,31 @@ adapter php {
     lacks "return$imgt"
   }
   flag code.AbsolutePathDisclosure in function {
-    has "lang=php"
+    lang "php"
     has "getAbsolutePath"
     has "move_uploaded_file("
     lacks "@move_uploaded_file("
   }
   flag code.AbsolutePathDisclosure in function {
-    has "lang=php"
+    lang "php"
     has "getAbsolutePath"
     has "rename("
     lacks "@rename("
   }
   flag code.AbsolutePathDisclosure in function {
-    has "lang=php"
+    lang "php"
     has "getAbsolutePath"
     has "copy("
     lacks "@copy("
   }
   flag code.AbsolutePathDisclosure in function {
-    has "lang=php"
+    lang "php"
     has "getAbsolutePath"
     has "touch("
     lacks "@touch("
   }
   flag code.AbsolutePathDisclosure in function {
-    has "lang=php"
+    lang "php"
     has "getAbsolutePath"
     has "unlink("
     lacks "@unlink("
@@ -1435,7 +1443,7 @@ adapter php {
     has "ecb"
   }
   flag code.AuthenticatedDecryptionTagReview in function {
-    has "lang=php"
+    lang "php"
     has "openssl_decrypt"
     has "VAL_CRYPTO_ALGO"
     has "base64_decode"
@@ -1475,15 +1483,15 @@ adapter php {
   // insecure cookie (CWE-614) — setcookie options array EXPLICITLY disabling a flag
   flag code.InsecureCookie on any {
     path "setcookie"
-    has "httponly=false"
+    fact httponly "false"
   }
   flag code.InsecureCookie on any {
     path "setcookie"
-    has "secure=false"
+    fact secure "false"
   }
   flag code.InsecureCookie on any {
     path "setrawcookie"
-    has "httponly=false"
+    fact httponly "false"
   }
 
   // JWT signature not verified (CWE-347) — firebase/php-jwt decode allowing alg "none"
@@ -1543,7 +1551,7 @@ adapter php {
   // PDF previews can execute embedded script in-browser when streamed/rendered before
   // content scanning. Match only explicit PDF responses and suppress once a scan gate runs.
   flag code.UnscannedPdfPreview in function {
-    has "lang=php"
+    lang "php"
     has "StreamedResponse"
     has "application/pdf"
     lacks "getResponseByScanStatus"
@@ -1551,7 +1559,7 @@ adapter php {
     lacks "scan_pdf"
   }
   flag code.UnrestrictedVariableVariableAssignment in module {
-    has "lang=php"
+    lang "php"
     has "foreach"
     has "$_GET"
     has "$$"
@@ -1560,7 +1568,7 @@ adapter php {
     lacks "array_key_exists"
   }
   flag code.UnrestrictedVariableVariableAssignment in function {
-    has "lang=php"
+    lang "php"
     has "foreach"
     has "$_GET"
     has "$$"

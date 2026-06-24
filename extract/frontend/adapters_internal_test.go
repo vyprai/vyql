@@ -427,9 +427,10 @@ func TestContextFlagSyntaxBuildsScopedFlag(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter javascript {
   flag custom.SecretComparison in function {
-    has "lang=javascript"
-    has "data['x-csrf-token']===token"
-    lacks "timingSafeEqual"
+    lang "javascript"
+    selector "data.x-csrf-token"
+    token identifier "providedToken"
+    not call path "crypto.timingSafeEqual"
   }
 }
 `)
@@ -445,10 +446,11 @@ adapter javascript {
 		t.Fatalf("expected one flag spec, got %#v", spec.Flags)
 	}
 	flag := spec.Flags[0]
-	if flag.Scope != "function" || len(flag.Predicates) != 3 ||
+	if flag.Scope != "function" || len(flag.Predicates) != 4 ||
 		flag.Predicates[0].Values[0] != "lang=javascript" ||
-		flag.Predicates[1].Values[0] != "data['x-csrf-token']===token" ||
-		!flag.Predicates[2].Negative {
+		flag.Predicates[1].Values[0] != "selector:data.x-csrf-token" ||
+		flag.Predicates[2].Values[0] != "identifier:providedToken" ||
+		!flag.Predicates[3].Negative {
 		t.Fatalf("unexpected context flag spec: %#v", flag)
 	}
 
@@ -457,7 +459,7 @@ adapter javascript {
 		"loc":         "sample.js:1",
 		"callee_path": "analysis.function.context",
 		"method":      "context",
-		"str_args":    "lang=javascript\x00name=validate\x00data['x-csrf-token']===token",
+		"str_args":    "lang=javascript\x00selector:data.x-csrf-token\x00identifier:providedToken",
 	}})
 	got := spec.flagAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.SecretComparison" {
@@ -468,7 +470,7 @@ adapter javascript {
 		"loc":         "sample.js:2",
 		"callee_path": "analysis.function.context",
 		"method":      "context",
-		"str_args":    "lang=javascript\x00data['x-csrf-token']===token\x00timingSafeEqual",
+		"str_args":    "lang=javascript\x00selector:data.x-csrf-token\x00identifier:providedToken\x00call_path:crypto.timingSafeEqual",
 	}})
 	got = spec.flagAdapter().Apply(store)
 	if len(got) != 1 {

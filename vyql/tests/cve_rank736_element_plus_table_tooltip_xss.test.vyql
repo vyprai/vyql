@@ -29,8 +29,8 @@ test "rank736: element-plus table popper escapes overflow tooltip HTML"
     function renderContent() {
       const content = document.createElement('div')
       content.className = 'el-popper'
-      popperContent = escapeHtml(popperContent)
-      content.innerHTML = popperContent
+      const safeContent = escapeHtml(popperContent)
+      content.innerHTML = safeContent
       return content
     }
     return renderContent()
