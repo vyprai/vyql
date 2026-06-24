@@ -1385,6 +1385,12 @@ adapter javascript {
     path "tls.connect"
     has "rejectUnauthorized=false"
   }
+  flag code.CertValidationDisabled in module {
+    lang "javascript"
+    has "this.rejectUnauthorized=opts.rejectUnauthorized===undefined?null:opts.rejectUnauthorized"
+    has "rejectUnauthorized:this.rejectUnauthorized"
+    lacks "opts.rejectUnauthorized===undefined?true:opts.rejectUnauthorized"
+  }
   flag code.UnboundedResourceOperation in function {
     has "responseBuffer.push(chunk)"
     has "Buffer.concat(responseBuffer).length>config.maxContentLength"

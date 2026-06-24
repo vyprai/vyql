@@ -669,6 +669,12 @@ review code.InsecureExecutableDownload {
   expected: [core.CertificateValidation]
   text: "review installer/runtime downloads for HTTPS transport or integrity verification before local execution"
 }
+review code.CertValidationDisabled {
+  category: "crypto"
+  kind: "target"
+  expected: [core.CertificateValidation]
+  text: "review TLS client options for disabled or missing certificate and hostname validation"
+}
 review code.CryptoOperation {
   category: "crypto"
   kind: "target"
