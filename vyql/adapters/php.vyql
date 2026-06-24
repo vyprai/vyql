@@ -1056,6 +1056,7 @@ adapter php {
   control "wp_kses" -> core.HtmlEscape
   control "wp_kses_post" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape
+  control "preg_replace" val "[^a-zA-Z0-9" -> core.HtmlEscape
   control "libxml_disable_entity_loader" val "true" -> core.XmlHardening
   control "esc_csv" -> core.CsvEscape
   control method "esc_csv" -> core.CsvEscape

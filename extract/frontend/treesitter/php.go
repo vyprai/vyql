@@ -22,12 +22,13 @@ type phConv struct {
 
 // ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
 func ExtractPHP(files []string, root string) (nir.Program, error) {
-	mods := parseModules(files, root,
+	mods := parseModulesPreprocess(files, root,
 		func() *tree_sitter.Parser {
 			p := tree_sitter.NewParser()
 			_ = p.SetLanguage(tree_sitter.NewLanguage(tsphp.LanguagePHP()))
 			return p
 		},
+		phpNormalizeLegacyScriptTags,
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &phConv{src: src, root: root, file: rel}
 			body := c.block(tree.RootNode())
@@ -35,6 +36,52 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
+}
+
+func phpNormalizeLegacyScriptTags(src []byte) []byte {
+	s := string(src)
+	lower := strings.ToLower(s)
+	if !strings.Contains(lower, "<script language=\"php\"") {
+		return src
+	}
+	out := []byte(s)
+	replacePreserveWidth := func(start, end int, repl string) {
+		copy(out[start:end], []byte(repl))
+		for i := start + len(repl); i < end; i++ {
+			if out[i] != '\n' && out[i] != '\r' {
+				out[i] = ' '
+			}
+		}
+	}
+	searchFrom := 0
+	for {
+		lower = strings.ToLower(string(out))
+		start := strings.Index(lower[searchFrom:], "<script language=\"php\"")
+		if start < 0 {
+			break
+		}
+		start += searchFrom
+		endRel := strings.Index(lower[start:], ">")
+		if endRel < 0 {
+			break
+		}
+		end := start + endRel + 1
+		replacePreserveWidth(start, end, "<?php")
+		searchFrom = end
+	}
+	lower = strings.ToLower(string(out))
+	searchFrom = 0
+	for {
+		start := strings.Index(lower[searchFrom:], "</script>")
+		if start < 0 {
+			break
+		}
+		start += searchFrom
+		end := start + len("</script>")
+		replacePreserveWidth(start, end, "?>")
+		searchFrom = end
+	}
+	return out
 }
 
 func (c *phConv) loc(n *tree_sitter.Node) string {

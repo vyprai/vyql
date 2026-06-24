@@ -56,3 +56,40 @@ class TasksController {
 	}
 	t.Fatalf("analysis.function.context for anyData not found")
 }
+
+func TestPHPLegacyScriptLanguageTagParsesStatements(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "search_opensearch.php")
+	src := []byte(`<script language="PHP">
+$query = array_key_exists('query', $_GET) ? $_GET['query'] : "";
+print "Search results for '$query':\n\n";
+</script>
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawPost, sawPrint bool
+	for _, n := range nodes {
+		if strings.Contains(n.Prop("callee_path"), "$_GET") || strings.Contains(n.Prop("path"), "$_GET") {
+			sawPost = true
+		}
+		if n.Type == "code.Call" && n.Prop("method") == "print" {
+			sawPrint = true
+		}
+	}
+	if !sawPost || !sawPrint {
+		t.Fatalf("legacy PHP script tag did not expose $_GET and print nodes; sawGet=%v sawPrint=%v", sawPost, sawPrint)
+	}
+}
