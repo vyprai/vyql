@@ -933,6 +933,12 @@ review code.EcdhPeerPublicKeyMissingCurveValidation {
   expected: [core.InputValidation]
   text: "review ECDH shared-secret derivation for peer public-key curve membership validation before scalar multiplication"
 }
+review code.JavaMailSmtpSslIdentityVerificationMissing {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.CertificateValidation]
+  text: "review JavaMail SMTP SSL/TLS setup for mail.smtp.ssl.checkserveridentity=true before sending mail or credentials"
+}
 review code.EcdsaSignatureScalarBoundsMissing {
   category: "crypto"
   kind: "attention"

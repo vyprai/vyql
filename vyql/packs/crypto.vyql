@@ -108,3 +108,8 @@ rule EcdsaNonceBitLengthTimingLeak {
   meta { id: "VYQL-CRY-020", severity: high, cwe: [CWE_200, CWE_203, CWE_208], confidence_floor: high }
   match code.EcdsaNonceBitLengthTimingLeak as nonce
 }
+
+rule JavaMailSmtpSslIdentityVerificationMissing {
+  meta { id: "VYQL-CRY-021", severity: high, cwe: [CWE_295], confidence_floor: high }
+  match code.JavaMailSmtpSslIdentityVerificationMissing as smtp
+}

@@ -877,6 +877,14 @@ adapter java {
   flag code.CertValidationDisabled on any {
     path "NoopHostnameVerifier"
   }
+  flag code.JavaMailSmtpSslIdentityVerificationMissing in function {
+    has "function_name:createSession"
+    has "call_path:props.put"
+    has "literal:mail.smtp.socketFactory.class"
+    has "literal:javax.net.ssl.SSLSocketFactory"
+    has "literal:mail.smtp.socketFactory.fallback"
+    lacks "literal:mail.smtp.ssl.checkserveridentity"
+  }
   flag code.JwtUnverified on any {
     path "Algorithm.none"
   }

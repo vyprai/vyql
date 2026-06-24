@@ -740,6 +740,16 @@ concept CertValidationDisabled : sink {
   cwe: [CWE_295]
 }
 
+concept JavaMailSmtpSslIdentityVerificationMissing : sink {
+  vulnerable_to: [crypto.ImproperCertValidation]
+  cwe: [CWE_295]
+  review_category: "crypto"
+  review_condition: "JavaMail SMTP SSL/TLS is configured without enabling server identity verification"
+  review_evidence: "JavaMail SMTP SSL context {pattern} configures an SSL socket factory without mail.smtp.ssl.checkserveridentity=true"
+  review_assumption: "SMTP credentials or message content rely on TLS hostname verification against a server that may be intercepted"
+  review_confidence: high
+}
+
 concept JwtUnverified : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]
   cwe: [CWE_347]
