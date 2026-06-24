@@ -3313,6 +3313,15 @@ concept UnescapedChartTooltipHtml : sink {
   review_assumption: "tooltip labels or legends can contain stored project data controlled by an editor"
   review_confidence: high
 }
+concept UnescapedChartTooltipDataName : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "chart tooltip formatter returns a raw data item name before the tooltip markup builder can escape or structure it"
+  review_evidence: "chart tooltip formatter {pattern} reads an item name and returns it directly"
+  review_assumption: "series data item names can contain stored project data controlled by a chart author"
+  review_confidence: high
+}
 concept DropdownEntryLabelInnerHtmlXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

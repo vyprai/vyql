@@ -195,6 +195,17 @@ adapter javascript {
     lacks "replaceChildren"
     lacks "textContent"
   }
+  flag code.UnescapedChartTooltipDataName in function {
+    has "lang=javascript"
+    has "name=formatTooltip"
+    has "itemModel.get('name')"
+    has "if(name){returnname;}"
+    has "createTooltipMarkup('nameValue'"
+    lacks "name:itemName"
+    lacks "encodeHTML(name)"
+    lacks "escapeHTML(name)"
+    lacks "escapeHtml(name)"
+  }
   flag code.DropdownEntryLabelInnerHtmlXss in function {
     has "lang=javascript"
     has "name=addDropDownEntry"

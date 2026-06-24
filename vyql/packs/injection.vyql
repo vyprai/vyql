@@ -380,6 +380,11 @@ rule UnescapedChartTooltipHtml {
   match code.UnescapedChartTooltipHtml as sink
 }
 
+rule UnescapedChartTooltipDataName {
+  meta { id: "VYQL-INJ-157", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedChartTooltipDataName as sink
+}
+
 rule IncompleteHtmlEventHandlerStrip {
   meta { id: "VYQL-INJ-136", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.IncompleteHtmlEventHandlerStrip as sink
