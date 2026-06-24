@@ -107,6 +107,7 @@ adapter javascript {
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:jsonWrapper" -> code.DomInput
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:fetchJson" -> code.DomInput
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:fetchJSON" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:global_function_assignment" -> code.DomInput
   source "queryParams" -> code.DomInput
   // jQuery data-* reads can carry server/user-controlled DOM content into client-side HTML.
   source method "data" -> code.DomInput

@@ -176,6 +176,61 @@ export const middleware = createAuthMiddleware(async (ctx) => {
 	t.Fatalf("inline lambda context was not lowered; nodes=%#v", nodes)
 }
 
+func TestJavaScriptBrowserGlobalAssignmentLambdaParamEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "origin.tsx")
+	src := []byte(`
+function setup(board: Board) {
+  (window as any)['__debug_console'] = (value: string) => {
+    addDebugLog(board, value);
+  };
+}
+function addDebugLog(board: Board, value: string) {
+  const div = document.createElement('div');
+  div.innerHTML = value;
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var eventID, paramID string
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.parameter.entry" &&
+			strings.Contains(n.Prop("str_args"), "entry_kind:global_function_assignment") &&
+			strings.Contains(n.Prop("str_args"), "global_object:window") &&
+			strings.Contains(n.Prop("str_args"), "global_target:window.__debug_console") &&
+			strings.Contains(n.Prop("str_args"), "param_name:value") {
+			eventID = n.ID
+		}
+		if n.Type == "code.Param" && n.Prop("name") == "value" && n.Loc == "origin.tsx:3" {
+			paramID = n.ID
+		}
+	}
+	if eventID == "" || paramID == "" {
+		t.Fatalf("missing global assignment parameter entry event=%q param=%q nodes=%#v", eventID, paramID, nodes)
+	}
+	outs, _ := g.OutEdges(eventID, "FLOWS")
+	for _, edge := range outs {
+		if edge.Dst == paramID {
+			return
+		}
+	}
+	t.Fatalf("global assignment parameter entry event does not flow to callback param")
+}
+
 func TestJavaScriptModuleContextIsLowered(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "table.js")

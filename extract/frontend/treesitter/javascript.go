@@ -600,9 +600,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *jsConv) jsAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
-	for n != nil && n.Kind() == "parenthesized_expression" {
+	for n != nil && isJsTransparentExpr(n.Kind()) {
 		kids := namedChildren(n)
-		if len(kids) != 1 {
+		if len(kids) == 0 {
 			return "", nil, false
 		}
 		n = kids[0]
@@ -829,6 +829,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		// Method is empty so it can never collide with method-name mappings.
 		if left != nil && left.Kind() == "member_expression" {
 			p := c.dotted(left)
+			right = c.markBrowserGlobalAssignmentParamEntries(left, right, L)
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}
 		}
 		// subscript write (obj[key] = v): model as a write to the base's path so the
@@ -836,6 +837,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		if left != nil && left.Kind() == "subscript_expression" {
 			base := field(left, "object")
 			key := field(left, "index")
+			right = c.markBrowserGlobalAssignmentParamEntries(left, right, L)
 			return []nir.Stmt{
 				// Preserve dynamic property-name flow separately from value flow.
 				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{c.expr(key)}, Path: "__js_dynamic_property_write", Method: "", Loc: L}},
@@ -1250,6 +1252,59 @@ func (c *jsConv) markCallLambdaParams(path string, lam nir.Lambda, L string) nir
 	return lam
 }
 
+func (c *jsConv) markBrowserGlobalAssignmentParamEntries(left *tree_sitter.Node, right nir.Expr, L string) nir.Expr {
+	lam, ok := right.(nir.Lambda)
+	if !ok {
+		return right
+	}
+	root, target, ok := c.browserGlobalAssignmentTarget(left)
+	if !ok {
+		return right
+	}
+	for i, p := range lam.Params {
+		if p == "" || p == "_" {
+			continue
+		}
+		tokens := []string{
+			"entry_kind:global_function_assignment",
+			"global_object:" + root,
+			"global_target:" + target,
+			"param_count:" + itoa(len(lam.Params)),
+			"param_name:" + p,
+			"param_index:" + itoa(i),
+		}
+		lam.ParamEntries = append(lam.ParamEntries, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return lam
+}
+
+func (c *jsConv) browserGlobalAssignmentTarget(left *tree_sitter.Node) (string, string, bool) {
+	switch {
+	case left == nil:
+		return "", "", false
+	case left.Kind() == "member_expression":
+		base := c.unwrapJsTransparentExpr(field(left, "object"))
+		root := c.dotted(base)
+		if !isBrowserGlobalObject(root) {
+			return "", "", false
+		}
+		return root, c.dotted(left), true
+	case left.Kind() == "subscript_expression":
+		base := c.unwrapJsTransparentExpr(field(left, "object"))
+		root := c.dotted(base)
+		if !isBrowserGlobalObject(root) {
+			return "", "", false
+		}
+		key := c.keyName(c.unwrapJsTransparentExpr(field(left, "index")))
+		target := root + "[]"
+		if key != "" {
+			target = root + "." + key
+		}
+		return root, target, true
+	}
+	return "", "", false
+}
+
 func (c *jsConv) jsDecoratorTokens(n *tree_sitter.Node) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -1497,7 +1552,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			method = path[i+1:]
 		}
 		return nir.Call{Callee: c.expr(ctor), Args: arglist, Path: path, Method: method, Loc: L}
-	case "await_expression", "parenthesized_expression", "non_null_expression":
+	case "await_expression", "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
@@ -1642,10 +1697,38 @@ func (c *jsConv) keyName(n *tree_sitter.Node) string {
 	return t
 }
 
+func isJsTransparentExpr(kind string) bool {
+	switch kind {
+	case "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
+		return true
+	}
+	return false
+}
+
+func (c *jsConv) unwrapJsTransparentExpr(n *tree_sitter.Node) *tree_sitter.Node {
+	for n != nil && isJsTransparentExpr(n.Kind()) {
+		kids := namedChildren(n)
+		if len(kids) == 0 {
+			return n
+		}
+		n = kids[0]
+	}
+	return n
+}
+
+func isBrowserGlobalObject(path string) bool {
+	switch path {
+	case "window", "globalThis", "self":
+		return true
+	}
+	return false
+}
+
 func (c *jsConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
+	n = c.unwrapJsTransparentExpr(n)
 	switch n.Kind() {
 	case "identifier", "property_identifier":
 		return c.text(n)
@@ -1655,10 +1738,6 @@ func (c *jsConv) dotted(n *tree_sitter.Node) string {
 		return c.dotted(field(n, "function"))
 	case "subscript_expression":
 		return c.dotted(field(n, "object")) + "[]"
-	case "parenthesized_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
-			return c.dotted(kids[0])
-		}
 	}
 	return "?"
 }
