@@ -53,6 +53,44 @@ func TestExtractAllSupportsVueSingleFileComponents(t *testing.T) {
 	}
 }
 
+func TestExtractAllSupportsHtmlInlineScripts(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "unit.html")
+	if err := os.WriteFile(src, []byte("<html><body><script>\nconst q = location.search;\ndocument.body.innerHTML = q;\n</script></body></html>\n"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	prog, _, _, stats, err := extractAll([]string{src})
+	if err != nil {
+		t.Fatalf("extractAll .html: %v", err)
+	}
+	if got := stats.files["javascript"]; got != 1 {
+		t.Fatalf(".html should route through javascript frontend, got count %d stats=%v", got, stats.files)
+	}
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
+		t.Fatalf(".html should extract inline script statements, got modules=%d body=%d", len(prog.Modules), len(prog.Modules[0].Body))
+	}
+}
+
+func TestExtractAllIgnoresHtmlScriptsInsideComments(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "unit.html")
+	if err := os.WriteFile(src, []byte("<!--<html><body><script>\ndocument.body.innerHTML = location.search;\n</script></body></html>-->\n"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	prog, _, _, stats, err := extractAll([]string{src})
+	if err != nil {
+		t.Fatalf("extractAll commented .html: %v", err)
+	}
+	if got := stats.files["javascript"]; got != 1 {
+		t.Fatalf(".html should still be counted by javascript frontend, got count %d stats=%v", got, stats.files)
+	}
+	if len(prog.Modules) != 0 {
+		t.Fatalf("commented HTML script should not produce JavaScript modules, got %#v", prog.Modules)
+	}
+}
+
 func TestExtractAllSupportsPHPIncludes(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "helpers.inc")

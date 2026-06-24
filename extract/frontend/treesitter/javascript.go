@@ -39,12 +39,14 @@ func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
 // matching grammar by extension (.ts → typescript, .tsx → tsx, else javascript); all
 // share the jsConv walker.
 func ExtractJavaScript(files []string, root string) (nir.Program, error) {
-	var js, ts, tsx, vue []string
+	var js, ts, tsx, vue, html []string
 	for _, f := range files {
 		l := strings.ToLower(f)
 		switch {
 		case strings.HasSuffix(l, ".vue"):
 			vue = append(vue, f)
+		case isHTMLFile(l):
+			html = append(html, f)
 		case strings.HasSuffix(l, ".tsx"):
 			tsx = append(tsx, f)
 		case strings.HasSuffix(l, ".ts") || strings.HasSuffix(l, ".mts") || strings.HasSuffix(l, ".cts"):
@@ -65,6 +67,7 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 	mods = append(mods, parseModules(ts, root, jsParserFor(tstypescript.LanguageTypescript()), build)...)
 	mods = append(mods, parseModules(tsx, root, jsParserFor(tstypescript.LanguageTSX()), build)...)
 	mods = append(mods, parseVueModules(vue, root, build)...)
+	mods = append(mods, parseHTMLScriptModules(html, root, build)...)
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
@@ -147,6 +150,162 @@ func vueScriptSource(src []byte) ([]byte, string, bool) {
 	}
 }
 
+func parseHTMLScriptModules(
+	files []string,
+	root string,
+	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+) []nir.Module {
+	if len(files) == 0 {
+		return nil
+	}
+	out := make([]nir.Module, 0, len(files))
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		script, ok := htmlScriptSource(src)
+		if !ok {
+			continue
+		}
+		parser := jsParserFor(tsjs.Language())()
+		tree := parser.Parse(script, nil)
+		if tree == nil {
+			parser.Close()
+			continue
+		}
+		m, good := build(script, f, relPath(root, f), tree)
+		tree.Close()
+		parser.Close()
+		if good {
+			m.Hash = contentHash(src)
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func htmlScriptSource(src []byte) ([]byte, bool) {
+	lower := strings.ToLower(string(src))
+	out := make([]byte, len(src))
+	for i, b := range src {
+		switch b {
+		case '\n', '\r':
+			out[i] = b
+		default:
+			out[i] = ' '
+		}
+	}
+	commentRanges := htmlCommentRanges(lower)
+	found := false
+	searchAt := 0
+	for {
+		startRel := strings.Index(lower[searchAt:], "<script")
+		if startRel < 0 {
+			break
+		}
+		start := searchAt + startRel
+		tagEndRel := strings.IndexByte(lower[start:], '>')
+		if tagEndRel < 0 {
+			break
+		}
+		tagEnd := start + tagEndRel
+		codeStart := tagEnd + 1
+		endRel := strings.Index(lower[codeStart:], "</script>")
+		if endRel < 0 {
+			break
+		}
+		codeEnd := codeStart + endRel
+		searchAt = codeEnd + len("</script>")
+		if inAnyRange(start, commentRanges) || !isJavaScriptScriptTag(lower[start:tagEnd]) {
+			continue
+		}
+		copy(out[codeStart:codeEnd], src[codeStart:codeEnd])
+		found = true
+	}
+	return out, found
+}
+
+func htmlCommentRanges(lower string) [][2]int {
+	var out [][2]int
+	searchAt := 0
+	for {
+		startRel := strings.Index(lower[searchAt:], "<!--")
+		if startRel < 0 {
+			return out
+		}
+		start := searchAt + startRel
+		endRel := strings.Index(lower[start+4:], "-->")
+		if endRel < 0 {
+			return append(out, [2]int{start, len(lower)})
+		}
+		end := start + 4 + endRel + len("-->")
+		out = append(out, [2]int{start, end})
+		searchAt = end
+	}
+}
+
+func inAnyRange(pos int, ranges [][2]int) bool {
+	for _, r := range ranges {
+		if pos >= r[0] && pos < r[1] {
+			return true
+		}
+	}
+	return false
+}
+
+func isJavaScriptScriptTag(tag string) bool {
+	if strings.Contains(tag, " src=") || strings.Contains(tag, "\tsrc=") || strings.Contains(tag, "\nsrc=") || strings.Contains(tag, "\rsrc=") {
+		return false
+	}
+	for _, attr := range []string{"type", "language"} {
+		val, ok := htmlTagAttr(tag, attr)
+		if !ok {
+			continue
+		}
+		val = strings.TrimSpace(strings.ToLower(val))
+		if attr == "language" {
+			return val == "javascript" || val == "js" || val == "ecmascript"
+		}
+		switch val {
+		case "", "text/javascript", "application/javascript", "application/ecmascript", "text/ecmascript", "module":
+			return true
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func htmlTagAttr(tag, name string) (string, bool) {
+	needle := name + "="
+	i := strings.Index(tag, needle)
+	if i < 0 {
+		return "", false
+	}
+	i += len(needle)
+	if i >= len(tag) {
+		return "", true
+	}
+	quote := tag[i]
+	if quote == '"' || quote == '\'' {
+		j := strings.IndexByte(tag[i+1:], quote)
+		if j < 0 {
+			return tag[i+1:], true
+		}
+		return tag[i+1 : i+1+j], true
+	}
+	j := i
+	for j < len(tag) && tag[j] != ' ' && tag[j] != '\t' && tag[j] != '\n' && tag[j] != '\r' && tag[j] != '>' {
+		j++
+	}
+	return tag[i:j], true
+}
+
+func isHTMLFile(path string) bool {
+	return strings.HasSuffix(path, ".html") || strings.HasSuffix(path, ".htm")
+}
+
 func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	out := map[string]bool{}
 	var markObjectExports func(*tree_sitter.Node)
@@ -218,6 +377,9 @@ func jsModuleKey(root, f string) string {
 }
 
 func (c *jsConv) loc(n *tree_sitter.Node) string {
+	if isHTMLFile(strings.ToLower(c.file)) {
+		return c.file + "#script.js:" + itoa(int(n.StartPosition().Row)+1)
+	}
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
@@ -684,10 +846,23 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	case "augmented_assignment_expression":
 		left := field(inner, "left")
-		if left != nil && left.Kind() == "identifier" {
-			return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: c.expr(field(inner, "right")), Loc: L}}
+		right := c.expr(field(inner, "right"))
+		if left != nil && left.Kind() == "member_expression" {
+			p := c.dotted(left)
+			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}
 		}
-		return []nir.Stmt{nir.ExprStmt{Value: c.expr(field(inner, "right"))}}
+		if left != nil && left.Kind() == "subscript_expression" {
+			base := field(left, "object")
+			key := field(left, "index")
+			return []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{c.expr(key)}, Path: "__js_dynamic_property_write", Method: "", Loc: L}},
+				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right}, Path: c.dotted(base), Method: "", Loc: L}},
+			}
+		}
+		if left != nil && left.Kind() == "identifier" {
+			return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: right, Loc: L}}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 }
