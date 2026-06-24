@@ -523,6 +523,7 @@ func AdaptersFor(tech string) []adapters.Adapter {
 	out := adaptersFromSpec(loadSpec(tech))
 	if tech == "javascript" {
 		out = append(out, jsPathRegexGuardAdapter())
+		out = append(out, jsSafePathResolverAdapter())
 	}
 	if tech == "ruby" {
 		out = append(out, processArgVectorAdapter(tech))
@@ -1886,6 +1887,91 @@ func jsPathRegexGuardAdapter() adapters.Adapter {
 			return out
 		},
 	}
+}
+
+func jsSafePathResolverAdapter() adapters.Adapter {
+	return adapters.Adapter{
+		Name: "javascript.safe-path-resolver-summaries", Technology: "javascript", Specificity: 2,
+		Fidelity: "semantic", Origin: "deterministic",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			contexts, _ := s.NodesOfType("code.Call")
+			safe := map[string]bool{}
+			for _, id := range contexts {
+				n, ok, err := s.GetNode(id)
+				if err != nil || !ok {
+					continue
+				}
+				if t := nodeTech(n.Prop("loc")); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+					continue
+				}
+				if n.Prop("callee_path") != "analysis.function.context" {
+					continue
+				}
+				name, ok := safeJSPathResolverFunction(n.Prop("str_args"))
+				if ok {
+					safe[name] = true
+				}
+			}
+			if len(safe) == 0 {
+				return nil
+			}
+			var out []adapters.Mapping
+			for _, id := range contexts {
+				n, ok, err := s.GetNode(id)
+				if err != nil || !ok {
+					continue
+				}
+				if t := nodeTech(n.Prop("loc")); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+					continue
+				}
+				path := n.Prop("callee_path")
+				method := n.Prop("method")
+				for name := range safe {
+					if path == name || method == name || strings.HasSuffix(path, "."+name) {
+						out = append(out, adapters.Mapping{NodeID: id, Concept: "core.PathAccessCheck", Specificity: 2})
+						break
+					}
+				}
+			}
+			return out
+		},
+	}
+}
+
+func safeJSPathResolverFunction(tokens string) (string, bool) {
+	name := ""
+	for _, tok := range strings.Split(tokens, "\x00") {
+		if strings.HasPrefix(tok, "name=") {
+			name = strings.TrimPrefix(tok, "name=")
+			break
+		}
+	}
+	if name == "" || name == "<lambda>" {
+		return "", false
+	}
+	lower := strings.ToLower(tokens)
+	if !strings.Contains(lower, "path.resolve") {
+		return "", false
+	}
+	if !strings.Contains(lower, "startswith") {
+		return "", false
+	}
+	if !strings.Contains(lower, "path.relative") {
+		return "", false
+	}
+	if !strings.Contains(lower, ".includes") && !strings.Contains(lower, "includes(") {
+		return "", false
+	}
+	if !strings.Contains(lower, "return") {
+		return "", false
+	}
+	// A safe resolver must reject escape and allowlist failures before returning
+	// the resolved path. path.resolve alone remains intentionally untrusted.
+	if !strings.Contains(lower, "returnnull") && !strings.Contains(lower, "return null") &&
+		!strings.Contains(lower, "throw") {
+		return "", false
+	}
+	return name, true
 }
 
 func safeJSPathComponentRegex(lit string) bool {

@@ -1019,6 +1019,9 @@ func (e *Engine) flowGuarded(path []string, control string) bool {
 		return false
 	}
 	for i, pid := range path {
+		if i < len(path)-1 && e.nodeHasConcept(pid, control) {
+			return true
+		}
 		for _, gid := range e.flowGuardCandidates(pid, control) {
 			if gid == pid || !e.hasCFG(gid) {
 				continue
