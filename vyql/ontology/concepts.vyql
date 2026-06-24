@@ -2615,6 +2615,15 @@ concept FilePathAccess : sink {
   cwe: [CWE_22]
   excluded_chars: "/\\"
 }
+concept MimeSubtypeFileExtensionPathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "a MIME subtype from response metadata is converted directly into a file extension used for writes"
+  review_evidence: "MIME extension context {pattern} splits content-type into subtype and assigns it to an output extension without using a registry allowlist such as mimetypes.guess_extension"
+  review_assumption: "an attacker-controlled server can return a crafted Content-Type subtype containing path separators or dangerous extension text"
+  review_confidence: high
+}
 concept CowAgentMemoryFilenameTraversal : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]

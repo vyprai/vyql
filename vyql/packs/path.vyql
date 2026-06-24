@@ -162,3 +162,8 @@ rule RelativeOnlyFilenameValidation {
   meta { id: "VYQL-PATH-031", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
   match code.RelativeOnlyFilenameValidation as sink
 }
+
+rule MimeSubtypeFileExtensionPathTraversal {
+  meta { id: "VYQL-PATH-032", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.MimeSubtypeFileExtensionPathTraversal as sink
+}

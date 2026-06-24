@@ -782,6 +782,13 @@ adapter python {
     lacks "os.path.isabs"
     lacks "is_absolute()"
   }
+  flag code.MimeSubtypeFileExtensionPathTraversal in function {
+    has "name=connect"
+    has "content_type.split('/',1)"
+    has "subtype"
+    has "self.ext='.'+subtype.replace('jpeg','jpg')"
+    lacks "mimetypes.guess_extension"
+  }
   flag code.CopypartyCprStaticPathTraversal in function {
     has "class_name=HttpCli"
     has "name=handle_get"
