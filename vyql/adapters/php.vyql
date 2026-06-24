@@ -89,6 +89,20 @@ adapter php {
     has "'model_id'=>$id"
     lacks "(int)$id"
   }
+  flag code.WordPressPostsWhereDateSqlInjection in function {
+    has "lang=php"
+    has "$where.="
+    has "post_date"
+    has "$edcal_startDate"
+    has "$edcal_endDate"
+    has "return$where"
+    lacks "is_numeric(str_replace(\"-\",\"\",$edcal_startDate))"
+    lacks "is_numeric(str_replace(\"-\",\"\",$edcal_endDate))"
+    lacks "preg_match"
+    lacks "$wpdb->prepare"
+    lacks "esc_sql"
+    lacks "sanitize_text_field"
+  }
   flag code.UnrestrictedRequestParamDeserialization in module {
     has "lang=php"
     has "param('params'"

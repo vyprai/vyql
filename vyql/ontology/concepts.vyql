@@ -3903,6 +3903,15 @@ concept UnvalidatedNumericSqlInterpolation : sink {
   review_assumption: "attackers can choose the route or request parameter used as the numeric identifier"
   review_confidence: high
 }
+concept WordPressPostsWhereDateSqlInjection : sink {
+  vulnerable_to: [injection.SqlInjection, validation.ImproperInputValidation]
+  cwe: [CWE_89, CWE_20]
+  review_category: "sql"
+  review_condition: "WordPress posts_where filter appends date parameter variables into SQL without strict validation"
+  review_evidence: "posts_where filter context {pattern} concatenates start/end date variables into post_date predicates and returns the SQL fragment"
+  review_assumption: "the date variables are populated from request parameters before query_posts or the posts_where callback runs"
+  review_confidence: high
+}
 concept CodeIgniterActiveRecordOffsetSqlInjection : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]

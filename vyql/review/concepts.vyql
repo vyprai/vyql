@@ -847,6 +847,12 @@ review code.UnvalidatedNumericSqlInterpolation {
   expected: [core.InputValidation]
   text: "review request-derived numeric identifiers before ORM primary-key lookups or SQL predicates"
 }
+review code.WordPressPostsWhereDateSqlInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "review WordPress posts_where filters that append date parameters to SQL without strict date or numeric validation"
+}
 review code.CodeIgniterActiveRecordOffsetSqlInjection {
   category: "sql"
   kind: "attention"
