@@ -13,6 +13,7 @@ adapter python {
   source path "analysis.parameter.entry" val "decorator_method:route" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
   source path "analysis.parameter.entry" val "decorator_method:websocket" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
   source path "analysis.parameter.entry" val "decorator_method:api_route" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:filter" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
   source path "analysis.parameter.entry" val "function_name:resolve_" nval "param_name:self" nval "param_name:cls" nval "param_name:info" nval "param_name:root" nval "param_name:parent" nval "param_name:_" -> code.HttpInput
 
   source "request.form" -> code.HttpInput
