@@ -79,3 +79,8 @@ rule CodeIgniterRestserverXmlEntityLoaderXxe {
   meta { id: "VYQL-DESER-014", severity: high, cwe: [CWE_611], confidence_floor: high }
   match code.CodeIgniterRestserverXmlEntityLoaderXxe as parser
 }
+
+rule PhpSimplexmlEntityLoaderXxe {
+  meta { id: "VYQL-DESER-015", severity: high, cwe: [CWE_611], confidence_floor: medium }
+  match code.PhpSimplexmlEntityLoaderXxe as parser
+}

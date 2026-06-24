@@ -952,6 +952,11 @@ adapter php {
 
   // deserialization
   sink path "unserialize" -> code.Deserialization
+  flag code.PhpSimplexmlEntityLoaderXxe in function {
+    has "lang=php"
+    has "simplexml_load_string"
+    lacks "libxml_disable_entity_loader"
+  }
 
   // file inclusion (include/require modeled as include() call)
   sink path "include" -> code.FileInclude
@@ -1051,6 +1056,7 @@ adapter php {
   control "wp_kses" -> core.HtmlEscape
   control "wp_kses_post" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape
+  control "libxml_disable_entity_loader" val "true" -> core.XmlHardening
   control "esc_csv" -> core.CsvEscape
   control method "esc_csv" -> core.CsvEscape
   control "escapeCsvRecord" -> core.CsvEscape

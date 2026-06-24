@@ -3876,6 +3876,15 @@ concept CodeIgniterRestserverXmlEntityLoaderXxe : sink {
   review_assumption: "the bundled Format library parses XML bodies with simplexml_load_string and request clients can submit XML payloads"
   review_confidence: high
 }
+concept PhpSimplexmlEntityLoaderXxe : sink {
+  vulnerable_to: [deserialization.Xxe]
+  cwe: [CWE_611]
+  review_category: "xml"
+  review_condition: "PHP code parses XML with simplexml_load_string without disabling external entity loading"
+  review_evidence: "PHP XML parsing context {pattern} calls simplexml_load_string without libxml_disable_entity_loader(true) in the same function"
+  review_assumption: "the XML string can be influenced by request, file, or integration input and libxml external entity loading is enabled in the runtime"
+  review_confidence: medium
+}
 // Construction of an XML parser/factory (newSAXParser / newDocumentBuilder /
 // createXMLReader …). Distinct from XmlParse (the .parse call) so the structural
 // XXE rule can flag an unhardened parser precisely without matching bare `.parse`
