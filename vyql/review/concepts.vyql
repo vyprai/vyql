@@ -818,6 +818,12 @@ review code.UnvalidatedSqlIdentifierInterpolation {
   expected: [core.InputValidation]
   text: "review SQL builders that interpolate caller-selected table or column identifiers before an allowlist check"
 }
+review code.EnvFileVariableInjection {
+  category: "injection"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review .env file update helpers for dotenv-safe escaping or rejection of newline and quote syntax in values"
+}
 review code.PgEscapeStringSqlFilterInjection {
   category: "sql"
   kind: "attention"

@@ -295,6 +295,11 @@ rule UnfilteredAgentCommandTag {
   match code.UnfilteredAgentCommandTag as sink
 }
 
+rule EnvFileVariableInjection {
+  meta { id: "VYQL-INJ-156", severity: high, cwe: [CWE_15, CWE_74], confidence_floor: high }
+  match code.EnvFileVariableInjection as sink
+}
+
 rule JenkinsComputerQueueUnescapedTooltipXss {
   meta { id: "VYQL-INJ-097", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.JenkinsComputerQueueUnescapedTooltipXss as sink

@@ -628,6 +628,18 @@ adapter javascript {
     has "tagPattern"
     lacks "dyad-command"
   }
+  flag code.EnvFileVariableInjection on any {
+    path exact "analysis.function.context"
+    has "lang=javascript"
+    has "name=updateEnvFile"
+    has "Object.entries(updates)"
+    has "newLine=`${key}=\"${value}\"`"
+    has "writeFileSync(envPath,envContent"
+    lacks "dotenv.parse"
+    lacks "stringify("
+    lacks "replace(/\\n"
+    lacks "JSON.stringify(value)"
+  }
   sink path "globalEval" -> code.CodeEval
   sink path "require" -> code.DynamicCodeLoad
   sink path "import" -> code.DynamicCodeLoad

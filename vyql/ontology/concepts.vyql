@@ -3403,6 +3403,15 @@ concept UnfilteredAgentCommandTag : sink {
   review_assumption: "model output or imported content can contain command tags that later drive agent/tool execution or unsafe preview behavior"
   review_confidence: high
 }
+concept EnvFileVariableInjection : sink {
+  vulnerable_to: [injection.CodeInjection, validation.ImproperInputValidation]
+  cwe: [CWE_15, CWE_74]
+  review_category: "injection"
+  review_condition: ".env update helper writes caller-supplied values into environment assignment lines without escaping newline or quote syntax"
+  review_evidence: "environment file update context {pattern} interpolates update values into raw KEY=value lines before writeFileSync instead of using dotenv stringify or equivalent escaping"
+  review_assumption: "the token or setting value can contain newline or quote characters that introduce additional environment variables"
+  review_confidence: high
+}
 concept PdfJsEvalSupported : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_79]
