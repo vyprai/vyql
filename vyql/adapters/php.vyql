@@ -209,6 +209,15 @@ adapter php {
     lacks "$internalname=htmlspecialchars($internalname)"
     lacks "$internalname=esc_html($internalname)"
   }
+  flag code.BbcodeUrlTagProtocolXss in function {
+    lang "php"
+    call "preg_replace"
+    has "url"
+    has "img"
+    has "<a href=\"$1\""
+    has "<img src=\"$1\""
+    lacks "https?:"
+  }
   flag code.EcdsaNonceBitLengthTimingLeak in function {
     lang "php"
     name "sign"

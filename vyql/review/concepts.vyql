@@ -1437,6 +1437,12 @@ review code.SvgOnclickWindowOpenLinkXss {
   expected: [core.HtmlEscape, core.InputValidation]
   text: "review SVG onclick/window.open link rendering for protocol allowlisting and JavaScript-string-safe quoting"
 }
+review code.BbcodeUrlTagProtocolXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review BBCode/UBB URL and image tag parsing for http/https protocol allowlisting before rendering href or src attributes"
+}
 review code.GouniverseCmsAliasXss {
   category: "xss"
   kind: "attention"

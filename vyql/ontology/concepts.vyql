@@ -3348,6 +3348,15 @@ concept SvgOnclickWindowOpenLinkXss : sink {
   review_assumption: "the link value can be configured or requested by a lower-trust user and the generated SVG is rendered by a browser"
   review_confidence: high
 }
+concept BbcodeUrlTagProtocolXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "BBCode or UBB URL/image tags render href/src attributes without a safe protocol allowlist"
+  review_evidence: "markup parser context {pattern} rewrites url/img tags into href/src attributes without an observed http/https protocol restriction"
+  review_assumption: "attacker-controlled markup content can contain javascript:, data:, or other browser-interpreted URL schemes"
+  review_confidence: high
+}
 concept GouniverseCmsAliasXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
