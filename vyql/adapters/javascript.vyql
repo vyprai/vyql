@@ -100,6 +100,13 @@ adapter javascript {
   // in a client model and later render model fields into the DOM.
   source "response.json" -> code.DomInput
   source "res.json" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:getJSON" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:ajax" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:get" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:post" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:jsonWrapper" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:fetchJson" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:fetchJSON" -> code.DomInput
   source "queryParams" -> code.DomInput
   // jQuery data-* reads can carry server/user-controlled DOM content into client-side HTML.
   source method "data" -> code.DomInput
@@ -761,8 +768,8 @@ adapter javascript {
   sink path "insertAdjacentHTML" arg 1 -> code.HtmlRender
   // jQuery root calls can parse an HTML string, unlike scoped lookups such as
   // $(document).find(selector).
-  sink exact "$" val "selector" -> code.HtmlRender
-  sink exact "jQuery" val "selector" -> code.HtmlRender
+  sink exact "$" arg 0 -> code.HtmlRender
+  sink exact "jQuery" arg 0 -> code.HtmlRender
   sink path "$.html" -> code.HtmlRender
   sink path "el.html" -> code.HtmlRender
   sink method "html" -> code.HtmlRender
@@ -827,6 +834,12 @@ adapter javascript {
   control "parseInt" -> core.SqlParameterization
   control "parseFloat" -> core.HtmlEscape
   control "parseFloat" -> core.SqlParameterization
+  // jQuery element construction with DOM option fields sets properties/text through
+  // DOM APIs rather than parsing the supplied values as markup.
+  control "$" val "text" -> core.HtmlEscape
+  control "jQuery" val "text" -> core.HtmlEscape
+  control "$" val "href" -> core.HtmlEscape
+  control "jQuery" val "href" -> core.HtmlEscape
   // numeric coercion is also INPUT VALIDATION: the value is confined to a number, so it
   // cannot carry a forged identity/role into a trust context (CWE-501). FN-safe — real
   // trust-boundary violations write the raw string, with no Number()/parseInt() coercion.
