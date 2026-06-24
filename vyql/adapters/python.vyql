@@ -424,6 +424,15 @@ adapter python {
     lacks "is_safe_url"
     lacks "get_account_adapter"
   }
+  flag code.SecretComparisonReview in function {
+    has "name=validate_request"
+    has "self.basic_auth"
+    has "get_request_basic_auth(request)"
+    has "basic_auth not in self.basic_auth"
+    lacks "constant_time_compare"
+    lacks "hmac.compare_digest"
+    lacks "secrets.compare_digest"
+  }
   flag code.PartiallyEscapedSshCommand in function {
     has "name=run_ssh_command_with_credentials"
     has "escaped_password"
