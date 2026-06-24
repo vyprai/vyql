@@ -303,6 +303,18 @@ adapter c {
     lacks "i>="
     lacks "realloc("
   }
+  flag code.DhcpOptionLengthUncheckedRead in function {
+    lang "c"
+    name "parse_options"
+    has "u8_t*end=optptr+len;"
+    has "while(optptr<end)"
+    has "type=*(optptr+2);"
+    has "memcmp((char*)&client.addr,(char*)optptr+2,4)==0"
+    has "optptr+=optptr[1]+2;"
+    lacks "optptr+1>=end"
+    lacks "optptr+2+opt_len>end"
+    lacks "opt_len>=4"
+  }
   flag code.LengthMultiplierFormattedExpansionUnderallocation in function {
     lang "c"
     has "newSV(strlen("

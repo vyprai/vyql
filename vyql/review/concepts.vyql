@@ -83,6 +83,12 @@ review code.NodetoolArchiveCommandPrivilegeEscalation {
   expected: [core.AuthorizationCheck]
   text: "review nodetool/JMX archive-command options for explicit privileged opt-in before local shell execution"
 }
+review code.DhcpOptionLengthUncheckedRead {
+  category: "memory"
+  kind: "target"
+  expected: [core.InputValidation, core.MemoryBoundsCheck]
+  text: "verify DHCP option parsing checks the option header and payload length before reading option data"
+}
 review code.EffectiveUidRootCheckBypass {
   category: "auth"
   kind: "attention"

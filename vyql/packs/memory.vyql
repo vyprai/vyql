@@ -103,6 +103,11 @@ rule ArrayBufferTransferMaxLengthBypass {
   match code.ArrayBufferTransferMaxLengthBypass as c
 }
 
+rule DhcpOptionLengthUncheckedRead {
+  meta { id: "VYQL-MEM-037", severity: high, cwe: [CWE_125, CWE_20], confidence_floor: high }
+  match code.DhcpOptionLengthUncheckedRead as parser
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse

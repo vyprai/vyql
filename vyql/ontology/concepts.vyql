@@ -2511,6 +2511,15 @@ concept ArrayBufferTransferMaxLengthBypass : sink {
   review_assumption: "callers can request a transfer length larger than the resizable ArrayBuffer maximum"
   review_confidence: high
 }
+concept DhcpOptionLengthUncheckedRead : sink {
+  vulnerable_to: [memory.OobRead, validation.ImproperInputValidation]
+  cwe: [CWE_125, CWE_20]
+  review_category: "memory"
+  review_condition: "DHCP option parsing reads option payload bytes before validating the option length fits in the packet"
+  review_evidence: "DHCP option parser context {pattern} reads optptr+2/optptr[1] and advances by the advertised length without observed end and option-length checks"
+  review_assumption: "a network client can send a truncated DHCP option buffer to the parser"
+  review_confidence: high
+}
 concept UnboundedDelimiterSplitCount : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
