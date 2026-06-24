@@ -607,6 +607,12 @@ adapter java {
     lacks "call:checkPermission"
     lacks "call:hasPermission"
   }
+  flag code.JenkinsRemoteValidationMissingPermission in function {
+    has "function_name:doTestConnection"
+    has "call:testConnection"
+    lacks "call:checkPermission"
+    lacks "call:hasPermission"
+  }
   flag code.JenkinsRemoteValidationMissingPostPermission in function {
     has "function_name:doTest"
     has "call:testConnection"

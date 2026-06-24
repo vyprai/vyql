@@ -1,0 +1,45 @@
+test "rank719: Jenkins connection test lacks administrator permission"
+  lang java
+  expect VYQL-AUTH-045
+  expect_review code.JenkinsRemoteValidationMissingPermission
+  code
+  ```
+  import hudson.util.FormValidation;
+  import org.kohsuke.stapler.QueryParameter;
+
+  class DescriptorImpl {
+    public FormValidation doTestConnection(
+        @QueryParameter final String serverURL,
+        @QueryParameter final String serverPort,
+        @QueryParameter final String serverContextPath,
+        @QueryParameter final boolean useHttpsConnection,
+        @QueryParameter final boolean ignoreSSL) {
+      return atxValidator.testConnection(serverURL, serverPort, serverContextPath, useHttpsConnection, ignoreSSL);
+    }
+  }
+  ```
+
+test "rank719: Jenkins connection test checks administrator permission"
+  lang java
+  reject VYQL-AUTH-045
+  reject_review code.JenkinsRemoteValidationMissingPermission
+  code
+  ```
+  import hudson.util.FormValidation;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.QueryParameter;
+  import org.kohsuke.stapler.interceptor.RequirePOST;
+
+  class DescriptorImpl {
+    @RequirePOST
+    public FormValidation doTestConnection(
+        @QueryParameter final String serverURL,
+        @QueryParameter final String serverPort,
+        @QueryParameter final String serverContextPath,
+        @QueryParameter final boolean useHttpsConnection,
+        @QueryParameter final boolean ignoreSSL) {
+      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+      return atxValidator.testConnection(serverURL, serverPort, serverContextPath, useHttpsConnection, ignoreSSL);
+    }
+  }
+  ```
