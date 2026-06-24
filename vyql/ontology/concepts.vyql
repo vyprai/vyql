@@ -3050,6 +3050,15 @@ concept CanonicalPathStringPrefixContainment : sink {
   review_assumption: "an attacker-controlled path can share the parent path string prefix while residing outside the intended parent directory"
   review_confidence: high
 }
+concept LeadingDotSegmentOnlyRouteFilter : sink {
+  vulnerable_to: [path.PathTraversal, validation.ImproperInputValidation]
+  cwe: [CWE_22, CWE_184]
+  review_category: "path"
+  review_condition: "route path filtering blocks only leading dot segments and misses nested dot or parent-directory segments"
+  review_evidence: "route filter context {pattern} checks HasPrefix(pathname, \"/.\") but lacks a Contains(pathname, \"/.\") or equivalent nested dot-segment rejection"
+  review_assumption: "request paths can contain nested '/.' or '/../' segments that reach later file resolution or package asset access"
+  review_confidence: high
+}
 concept UnvalidatedDynamicRequirePathTraversal : sink {
   vulnerable_to: [path.PathTraversal, injection.UnsafeDynamicLoading]
   cwe: [CWE_22, CWE_829]

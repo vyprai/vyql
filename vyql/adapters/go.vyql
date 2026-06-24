@@ -211,6 +211,13 @@ adapter go {
     call order "strings.TrimRight>path.Clean"
     call "HasSuffix"
   }
+  flag code.LeadingDotSegmentOnlyRouteFilter on any {
+    path exact "analysis.function.context"
+    has "call_path:strings.HasPrefix"
+    has "literal:/."
+    has "selector:ctx.R.URL.Path"
+    lacks "call_path:strings.Contains"
+  }
   flag code.AuthAttemptLimitReview in function {
     function "SolveChallenge"
     selector "challenge.tries"
