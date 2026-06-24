@@ -197,6 +197,19 @@ adapter javascript {
     lacks "stripEventHandlers"
     lacks "_stripEventHandlers"
   }
+  flag code.AjaxBackslashProtocolRelativeUrlXss in module {
+    has "lang=javascript"
+    has "function ajax(url, handler)"
+    has "url[0] != '/'"
+    has "url[1] == '/'"
+    has "$.ajax"
+    has "url: url"
+    has "$(receivedHtml).find('.paginate-container')"
+    has ".append($(this).html())"
+    lacks "startsWith"
+    lacks "replace(/\\\\/g,'/')"
+    lacks "new URL"
+  }
   flag code.JobOutputEventUpdateAuthorizationBypass in function {
     has "Got job update from child"
     has "update_event"

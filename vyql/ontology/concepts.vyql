@@ -2833,6 +2833,15 @@ concept JavaScriptUrlRedirectXss : sink {
   review_assumption: "a victim can be induced to visit the login or redirect URL and complete the action that triggers navigation"
   review_confidence: high
 }
+concept AjaxBackslashProtocolRelativeUrlXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "AJAX URL validation blocks ordinary protocol-relative URLs but misses browser-normalized backslash variants"
+  review_evidence: "AJAX pagination context {pattern} checks url[0] and url[1] before $.ajax and HTML replacement without a startsWith(\"/\\\\\") guard"
+  review_assumption: "attacker-controlled links or hashes can supply a /\\ host-prefixed URL whose response is inserted into the page"
+  review_confidence: high
+}
 concept CollectiveContactWidgetTitleXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

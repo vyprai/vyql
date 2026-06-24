@@ -355,6 +355,11 @@ rule DropdownEntryLabelInnerHtmlXss {
   match code.DropdownEntryLabelInnerHtmlXss as sink
 }
 
+rule AjaxBackslashProtocolRelativeUrlXss {
+  meta { id: "VYQL-INJ-140", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.AjaxBackslashProtocolRelativeUrlXss as sink
+}
+
 rule CraftAnonymousTemplateRenderActionXss {
   meta { id: "VYQL-INJ-076", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.CraftAnonymousTemplateRenderActionXss as sink
