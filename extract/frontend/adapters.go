@@ -524,6 +524,9 @@ func AdaptersFor(tech string) []adapters.Adapter {
 	if tech == "javascript" {
 		out = append(out, jsPathRegexGuardAdapter())
 	}
+	if tech == "ruby" {
+		out = append(out, processArgVectorAdapter(tech))
+	}
 	return out
 }
 
@@ -1955,6 +1958,50 @@ func jsRegexBody(lit string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func processArgVectorAdapter(tech string) adapters.Adapter {
+	return adapters.Adapter{
+		Name: "process-arg-vector.controls", Technology: tech, Specificity: 1,
+		Fidelity: "semantic", Origin: "human",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			ids, _ := s.NodesOfType("code.Seq")
+			var idx collectionFlowIndex
+			var out []adapters.Mapping
+			for _, id := range ids {
+				n, ok, err := s.GetNode(id)
+				if err != nil || !ok {
+					continue
+				}
+				if t := nodeTech(n.Prop("loc")); t != "" && tech != "" && t != tech {
+					continue
+				}
+				if !safeProcessArgVectorSeq(s, &idx, id) {
+					continue
+				}
+				out = append(out, adapters.Mapping{NodeID: id, Concept: "core.ProcessArgVector", Specificity: 1})
+			}
+			return out
+		},
+	}
+}
+
+func safeProcessArgVectorSeq(s usg.Store, idx *collectionFlowIndex, seqID string) bool {
+	idx.ensure(s)
+	first := idx.seqElements[seqID][0]
+	if first == "" {
+		return false
+	}
+	elem, ok, err := s.GetNode(first)
+	if err != nil || !ok {
+		return false
+	}
+	switch elem.Prop("vkind") {
+	case "Name", "Call", "Format", "Index", "Seq", "Lambda":
+		return false
+	default:
+		return true
+	}
 }
 
 func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }

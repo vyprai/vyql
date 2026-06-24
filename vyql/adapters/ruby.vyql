@@ -183,7 +183,7 @@ adapter ruby {
   sink path "html_safe" -> code.HtmlRender
   sink path "render" -> code.HtmlRender
   sink path "content_tag" -> code.HtmlRender
-  sink path "concat" -> code.HtmlRender
+  sink exact "concat" -> code.HtmlRender
   sink path "safe_concat" -> code.HtmlRender
   flag code.StoredHtmlWrite in function {
     has "lang=ruby"

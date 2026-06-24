@@ -3831,6 +3831,11 @@ concept ShellEscape : control {
   neutralizes: [injection.CommandInjection]
   applies: path
 }
+concept ProcessArgVector : control {
+  refines: core.ShellEscape
+  neutralizes: [injection.CommandInjection]
+  applies: path
+}
 concept SqlParameterization : control {
   neutralizes: [injection.SqlInjection]
   applies: path

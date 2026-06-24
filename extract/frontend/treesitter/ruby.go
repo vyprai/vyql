@@ -17,9 +17,10 @@ import (
 // Ripper frontend). All binary operators are treated as taint-propagating
 // (string build), matching frontend_ruby.py.
 type rbConv struct {
-	src  []byte
-	root string
-	file string
+	src        []byte
+	root       string
+	file       string
+	visibility string
 }
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
@@ -75,9 +76,6 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "method", "singleton_method":
-		// Ruby methods are PUBLIC by default (the gem's API surface). A `private`/`protected`
-		// marker would hide subsequent methods — not tracked yet, so this slightly
-		// over-marks; the library param-source is caller-conditional, which absorbs that.
 		body := field(n, "body")
 		name := c.text(field(n, "name"))
 		params := c.params(field(n, "parameters"))
@@ -88,15 +86,23 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			ParamEntries: c.rbParamEntries(name, params),
 			Body:         c.rbMethodBody(body),
 			Loc:          L,
-			Exported:     true,
+			Exported:     c.rubyExportedMethod(name),
 		})
 		return out
 	case "class", "module":
 		out := c.rubyClassContext(n)
-		out = append(out, nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L})
+		oldVisibility := c.visibility
+		c.visibility = "public"
+		body := c.body(field(n, "body"))
+		c.visibility = oldVisibility
+		out = append(out, nir.ClassDef{Name: c.text(field(n, "name")), Body: body, Loc: L})
 		return out
 	case "singleton_class":
-		return c.body(field(n, "body"))
+		oldVisibility := c.visibility
+		c.visibility = "public"
+		body := c.body(field(n, "body"))
+		c.visibility = oldVisibility
+		return body
 	case "assignment":
 		left := field(n, "left")
 		right := c.expr(field(n, "right"))
@@ -354,6 +360,10 @@ func (c *rbConv) rbStmtList(kids []*tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	for i := 0; i < len(kids); i++ {
 		ch := kids[i]
+		if vis := c.rubyVisibilityMarker(ch); vis != "" {
+			c.visibility = vis
+			continue
+		}
 		if isRbCallNode(ch) && rbCallHasHeredocArg(ch) && i+1 < len(kids) && kids[i+1].Kind() == "heredoc_body" {
 			out = append(out, c.callStmtWithExtraArg(ch, c.expr(kids[i+1]))...)
 			i++
@@ -362,6 +372,25 @@ func (c *rbConv) rbStmtList(kids []*tree_sitter.Node) []nir.Stmt {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
+}
+
+func (c *rbConv) rubyVisibilityMarker(n *tree_sitter.Node) string {
+	if !isRbCallNode(n) {
+		return ""
+	}
+	switch strings.TrimSpace(c.text(n)) {
+	case "public", "private", "protected":
+		return strings.TrimSpace(c.text(n))
+	default:
+		return ""
+	}
+}
+
+func (c *rbConv) rubyExportedMethod(name string) bool {
+	if strings.HasPrefix(name, "_") {
+		return false
+	}
+	return c.visibility == "" || c.visibility == "public"
 }
 
 func isRbCallNode(n *tree_sitter.Node) bool {
