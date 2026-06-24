@@ -880,6 +880,14 @@ adapter python {
     lacks "{"
     lacks "}"
   }
+  flag code.IncompleteTemplateValidation in function {
+    has "name=get_jinja_env"
+    has "Environment(extensions="
+    has "filters.update(get_jinja_filters())"
+    has "returnjinja_env"
+    lacks "SandboxedEnvironment"
+    lacks "ImmutableSandboxedEnvironment"
+  }
   flag code.UnparameterizedSqlQueryParser in function {
     has "name=parse"
     has "query_expr.parseString"
