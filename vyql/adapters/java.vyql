@@ -53,6 +53,10 @@ adapter java {
   source ".getQueryParameter" -> code.IntentInput
   source ".getQueryParameters" -> code.IntentInput
   source ".getLastPathSegment" -> code.IntentInput
+  // Secret material exposed by credential/key APIs. These are only findings when they
+  // flow to a sink such as a log write or persistence target.
+  source method "getKeyMaterial" -> code.SecretValue
+  source method "getPrivateKey" -> code.SecretValue
 
   // receiver-type tracking — a variable assigned `new FileWriter(...)` carries that type so
   // its `.write()` is recognised as a FILE write (not the response-writer XSS sink above).
@@ -1084,6 +1088,23 @@ adapter java {
   sink path "LOG.info" arg all -> code.LogOutput
   sink path "LOG.error" arg all -> code.LogOutput
   sink path "System.out.println" arg all -> code.LogOutput
+  sink method "logInfo" arg all -> code.LogOutput
+  sink method "logWarning" arg all -> code.LogOutput
+  sink method "logException" arg all -> code.LogOutput
+  sink path "logger.info" arg all -> code.LogWrite
+  sink path "logger.warn" arg all -> code.LogWrite
+  sink path "logger.error" arg all -> code.LogWrite
+  sink path "logger.debug" arg all -> code.LogWrite
+  sink path "log.info" arg all -> code.LogWrite
+  sink path "log.warn" arg all -> code.LogWrite
+  sink path "log.error" arg all -> code.LogWrite
+  sink path "log.debug" arg all -> code.LogWrite
+  sink path "LOG.info" arg all -> code.LogWrite
+  sink path "LOG.error" arg all -> code.LogWrite
+  sink path "System.out.println" arg all -> code.LogWrite
+  sink method "logInfo" arg all -> code.LogWrite
+  sink method "logWarning" arg all -> code.LogWrite
+  sink method "logException" arg all -> code.LogWrite
   flag code.LogWrite on any {
     path "logger.info"
   }
@@ -1107,6 +1128,15 @@ adapter java {
   }
   flag code.LogWrite on any {
     path "System.out.println"
+  }
+  flag code.LogWrite on any {
+    path "logInfo"
+  }
+  flag code.LogWrite on any {
+    path "logWarning"
+  }
+  flag code.LogWrite on any {
+    path "logException"
   }
 
   // character-filter: String.replaceAll(regex, repl) is always global.
