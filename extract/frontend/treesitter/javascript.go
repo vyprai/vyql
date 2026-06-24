@@ -440,6 +440,12 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 			if expr := jsContextCompact(c.text(n)); expr != "" {
 				add("expr:" + expr)
 			}
+		case "pair":
+			if key := jsContextCompact(c.keyName(field(n, "key"))); key != "" {
+				if val := jsContextValue(c.text(field(n, "value"))); val != "" {
+					add("prop:" + key + "=" + val)
+				}
+			}
 		case "member_expression":
 			if sel := c.dotted(n); sel != "" && sel != "?" {
 				add("selector:" + sel)

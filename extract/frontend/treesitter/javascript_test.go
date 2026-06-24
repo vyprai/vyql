@@ -216,6 +216,7 @@ let nodeIntegration = 'false';
 if (window.location.protocol === 'chrome-devtools:') {
   nodeIntegration = 'true';
 }
+execFile("powershell.exe", ["-Command", "echo ok"], { shell: true });
 `)
 	if err := os.WriteFile(path, src, 0o600); err != nil {
 		t.Fatal(err)
@@ -240,7 +241,8 @@ if (window.location.protocol === 'chrome-devtools:') {
 		tokens := n.Prop("str_args")
 		if strings.Contains(tokens, "expr:window.location.protocol==='chrome-devtools:'") &&
 			strings.Contains(tokens, "assign:nodeIntegration=true") &&
-			strings.Contains(tokens, "selector:window.location.protocol") {
+			strings.Contains(tokens, "selector:window.location.protocol") &&
+			strings.Contains(tokens, "prop:shell=true") {
 			return
 		}
 	}

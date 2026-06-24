@@ -767,6 +767,15 @@ concept EcdsaSignatureScalarBoundsMissing : sink {
   review_assumption: "an attacker can provide malformed signatures with out-of-range r or s values"
   review_confidence: high
 }
+concept AuthenticodeSignaturePathBindingBypass : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck, injection.ArgumentInjection]
+  cwe: [CWE_347, CWE_154]
+  review_category: "crypto"
+  review_condition: "Windows Authenticode verification accepts signer metadata without confirming the signed file path is the intended update file"
+  review_evidence: "Authenticode verifier context {pattern} parses Get-AuthenticodeSignature output and compares publisher names before using returned data.Path as a LiteralPath binding check"
+  review_assumption: "the update path can contain shell-expanded environment-variable syntax or other manifest-controlled path tricks that make PowerShell verify a different file"
+  review_confidence: high
+}
 
 concept AttestationPredicateVerificationBypass : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]

@@ -568,6 +568,17 @@ adapter javascript {
     has "execSync(gcov)"
     lacks "execFileSync(gcov)"
   }
+  flag code.AuthenticodeSignaturePathBindingBypass in function {
+    has "lang=javascript"
+    has "name=verifySignature"
+    has "Get-AuthenticodeSignature"
+    has "LiteralPath"
+    has "call_path:parseOut"
+    has "selector:data.SignerCertificate.Subject"
+    has "publisherNames"
+    lacks "selector:data.Path"
+    lacks "call_path:path.normalize"
+  }
   flag code.ClamscanBinaryPathShellCommandInjection in function {
     has "lang=javascript"
     has "name=_is_clamav_binary"

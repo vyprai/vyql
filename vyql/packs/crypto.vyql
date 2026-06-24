@@ -88,3 +88,8 @@ rule EcdsaSignatureScalarBoundsMissing {
   meta { id: "VYQL-CRY-016", severity: high, cwe: [CWE_347], confidence_floor: high }
   match code.EcdsaSignatureScalarBoundsMissing as ecdsa
 }
+
+rule AuthenticodeSignaturePathBindingBypass {
+  meta { id: "VYQL-CRY-017", severity: high, cwe: [CWE_347, CWE_154], confidence_floor: high }
+  match code.AuthenticodeSignaturePathBindingBypass as verifier
+}

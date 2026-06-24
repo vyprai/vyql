@@ -939,6 +939,12 @@ review code.EcdsaSignatureScalarBoundsMissing {
   expected: [core.InputValidation]
   text: "review ECDSA verification for r and s range checks before modular inverse and point arithmetic"
 }
+review code.AuthenticodeSignaturePathBindingBypass {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.CertificateValidation, core.InputValidation]
+  text: "review Authenticode update verification for comparing Get-AuthenticodeSignature data.Path with the intended update file before accepting publisher names"
+}
 review code.ConstellationLuks2AttachedHeaderActivation {
   category: "crypto"
   kind: "attention"
