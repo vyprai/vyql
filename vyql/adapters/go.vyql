@@ -844,6 +844,15 @@ adapter go {
     has "binary:password==wrapper.password"
     lacks "call:ConstantTimeCompare"
   }
+  flag code.SecretComparisonReview in function {
+    has "call_path:scrypt.Key"
+    has "call_path:bytes.Equal"
+    has "call_arg:bytes.Equal:source_master_key"
+    has "call_arg:bytes.Equal:target_master_key"
+    lacks "call:ConstantTimeCompare"
+    lacks "call_path:hmac.Equal"
+    lacks "call_path:subtle.ConstantTimeCompare"
+  }
   flag code.SecretComparisonReview on binop {
     op any ["==", "!="]
     operand {
