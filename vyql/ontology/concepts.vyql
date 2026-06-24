@@ -3220,6 +3220,15 @@ concept TotalJsAdminThemeXss : sink {
   review_assumption: "grid column values or notification message text can contain attacker-controlled content shown to an administrator"
   review_confidence: high
 }
+concept ElefantAdminPreviewMissingAdminXss : sink {
+  vulnerable_to: [injection.Xss, access_control.MissingAuthorization]
+  cwe: [CWE_79, CWE_862]
+  review_category: "xss"
+  review_condition: "Elefant admin preview renders POST-controlled page fields without requiring an administrator session"
+  review_evidence: "admin preview context {pattern} builds a Webpage from POST data and renders POST body through run_includes before require_admin"
+  review_assumption: "the preview handler is reachable by unauthenticated or lower-privileged remote callers without the patched admin gate"
+  review_confidence: high
+}
 concept GouniverseCmsAliasXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

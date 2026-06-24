@@ -475,6 +475,11 @@ rule TotalJsAdminThemeXss {
   match code.TotalJsAdminThemeXss as sink
 }
 
+rule ElefantAdminPreviewMissingAdminXss {
+  meta { id: "VYQL-INJ-160", severity: high, cwe: [CWE_79, CWE_862], confidence_floor: high }
+  match code.ElefantAdminPreviewMissingAdminXss as sink
+}
+
 rule GouniverseCmsAliasXss {
   meta { id: "VYQL-INJ-079", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.GouniverseCmsAliasXss as sink

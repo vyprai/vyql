@@ -1372,6 +1372,12 @@ review code.TotalJsAdminThemeXss {
   expected: [core.HtmlEscape]
   text: "review Total.js admin theme grid and notification rendering for Thelpers.encode before HTML insertion"
 }
+review code.ElefantAdminPreviewMissingAdminXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck, core.HtmlEscape]
+  text: "review Elefant admin preview for require_admin before rendering POST-supplied preview fields"
+}
 review code.GouniverseCmsAliasXss {
   category: "xss"
   kind: "attention"

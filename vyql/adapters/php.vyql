@@ -200,6 +200,13 @@ adapter php {
     lacks "esc_html($_GET"
     lacks "strip_tags($_GET"
   }
+  flag code.ElefantAdminPreviewMissingAdminXss in module {
+    has "lang=php"
+    has "$wp=newWebpage($_POST);"
+    has "$page->title=$_POST['title'];"
+    has "$tpl->run_includes($_POST['body']);"
+    lacks "$this->require_admin();"
+  }
   flag code.CentreonMyAccountContactXss in module {
     has "lang=php"
     has "RowMenu_name"
