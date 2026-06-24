@@ -650,6 +650,26 @@ adapter go {
     lacks "selector:math.MaxUint32"
     lacks "literal:compressed size overflows uint32"
   }
+  flag code.OffsetLengthBoundsOverflow in function {
+    has "call:int"
+    has "call:len"
+    has "call_arg:int:header.StringOff+header.StringLen"
+    has "call_arg:len:btf"
+    has "slice:btf:header.StringOff:"
+    has "slice:btf::header.StringOff+header.StringLen"
+    lacks "call:uint64"
+    lacks "call_arg:uint64:header.StringOff"
+  }
+  flag code.OffsetLengthBoundsOverflow in function {
+    has "call:int"
+    has "call:len"
+    has "call_arg:int:header.TypeOff+header.TypeLen"
+    has "call_arg:len:btf"
+    has "slice:btf:header.TypeOff:"
+    has "slice:btf::header.TypeOff+header.TypeLen"
+    lacks "call:uint64"
+    lacks "call_arg:uint64:header.TypeOff"
+  }
   flag code.LengthDerivedAllocation in function {
     has "function_name:readNBytes"
     has "call:make"

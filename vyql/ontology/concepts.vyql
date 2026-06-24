@@ -1413,6 +1413,15 @@ concept PointerOffsetBoundsCheck : sink {
   review_assumption: "a malformed serialized length can move the pointer outside the valid buffer before the check"
   review_confidence: medium
 }
+concept OffsetLengthBoundsOverflow : sink {
+  vulnerable_to: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
+  cwe: [CWE_190, CWE_125]
+  review_category: "numeric"
+  review_condition: "offset plus length is added at a narrow width before comparing against the buffer length"
+  review_evidence: "offset-length bounds context {pattern} converts or compares offset + length after the addition"
+  review_assumption: "a malformed parsed header can choose offset and length values large enough to wrap before the bounds check"
+  review_confidence: high
+}
 concept UnderwidthFormattedIndex : sink {
   vulnerable_to: [memory.OobRead]
   cwe: [CWE_192, CWE_125]

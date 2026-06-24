@@ -67,3 +67,8 @@ rule PeerLimitUnderflow {
   meta { id: "VYQL-NUM-013", severity: medium, cwe: [CWE_191], confidence_floor: high }
   match code.PeerLimitUnderflow as underflow
 }
+
+rule OffsetLengthBoundsOverflow {
+  meta { id: "VYQL-NUM-014", severity: high, cwe: [CWE_190, CWE_125], confidence_floor: high }
+  match code.OffsetLengthBoundsOverflow as overflow
+}

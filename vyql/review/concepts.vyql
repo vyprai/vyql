@@ -1852,6 +1852,12 @@ review code.PointerOffsetBoundsCheck {
   kind: "attention"
   text: "review pointer-plus-length bounds comparisons; compare the length to remaining buffer size before advancing the pointer"
 }
+review code.OffsetLengthBoundsOverflow {
+  category: "numeric"
+  kind: "attention"
+  expected: [core.IntegerOverflowGuard]
+  text: "review offset-plus-length bounds checks for widened arithmetic before comparing with the buffer length"
+}
 review code.UnsafeYamlConstructor {
   category: "deserialization"
   kind: "attention"
