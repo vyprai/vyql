@@ -1727,6 +1727,12 @@ review code.InternalAssetRoutePathTraversal {
   expected: [core.PathAccessCheck]
   text: "review internal static-asset handlers for realpath and root containment checks before serving package asset files"
 }
+review code.CanonicalPathStringPrefixContainment {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review canonical path string-prefix checks; use filesystem-aware Path containment for parent directory validation"
+}
 review code.TemplateDirectoryHiddenGlobCopy {
   category: "path"
   kind: "attention"

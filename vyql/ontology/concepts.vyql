@@ -3032,6 +3032,15 @@ concept InternalAssetRoutePathTraversal : sink {
   review_assumption: "the routed path suffix can contain traversal segments that escape the intended package asset directory"
   review_confidence: high
 }
+concept CanonicalPathStringPrefixContainment : sink {
+  vulnerable_to: [path.PathTraversal, validation.ImproperInputValidation]
+  cwe: [CWE_22, CWE_184]
+  review_category: "path"
+  review_condition: "canonical paths are compared with string-prefix containment instead of filesystem path containment"
+  review_evidence: "path containment context {pattern} calls getCanonicalPath().startsWith(...) before the patched getCanonicalFile().toPath().startsWith(...) form"
+  review_assumption: "an attacker-controlled path can share the parent path string prefix while residing outside the intended parent directory"
+  review_confidence: high
+}
 concept UnvalidatedDynamicRequirePathTraversal : sink {
   vulnerable_to: [path.PathTraversal, injection.UnsafeDynamicLoading]
   cwe: [CWE_22, CWE_829]

@@ -775,6 +775,12 @@ adapter java {
     call "FileReader"
     not call "FileNotFoundException"
   }
+  flag code.CanonicalPathStringPrefixContainment in function {
+    function "getValidDirectoryPath"
+    call "getCanonicalPath"
+    call "startsWith"
+    not call "toPath"
+  }
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.
   flag code.SensitiveOperation on any {

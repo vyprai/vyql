@@ -202,3 +202,8 @@ rule InternalAssetRoutePathTraversal {
   meta { id: "VYQL-PATH-039", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.InternalAssetRoutePathTraversal as sink
 }
+
+rule CanonicalPathStringPrefixContainment {
+  meta { id: "VYQL-PATH-040", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
+  match code.CanonicalPathStringPrefixContainment as sink
+}
