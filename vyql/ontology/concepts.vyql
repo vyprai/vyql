@@ -1648,6 +1648,15 @@ concept PostEditReportPrivateContentLeak : sink {
   review_assumption: "moderators or staff users can request the report without admin-only visibility"
   review_confidence: high
 }
+concept FidoRegistrationChallengeReplay : sink {
+  vulnerable_to: [authentication.AuthenticationBypass]
+  cwe: [CWE_294]
+  review_category: "auth"
+  review_condition: "FIDO/WebAuthn registration challenge is reused after successful registration"
+  review_evidence: "FIDO registration context {pattern} passes request.session['fido_state'] to register_complete and saves a credential without invalidating the session challenge"
+  review_assumption: "an attacker can replay a captured or previously issued registration response while the session challenge remains reusable"
+  review_confidence: high
+}
 concept TimeBoundAccessTokenReview : sink {
   vulnerable_to: [access_control.BrokenAccess]
   cwe: [CWE_284]

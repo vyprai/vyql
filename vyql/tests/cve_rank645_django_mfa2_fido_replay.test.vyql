@@ -1,0 +1,43 @@
+# Rank 645 / CVE-2022-42731: django-mfa2 completed FIDO2 registration
+# using a reusable session challenge, allowing registration response replay.
+test "rank645: FIDO registration challenge is reused after register_complete"
+  lang python
+  file FIDO2.py
+  expect VYQL-AUTH-041
+  code
+  ```
+  def complete_reg(request):
+      data = cbor.decode(request.body)
+      client_data = CollectedClientData(data['clientDataJSON'])
+      att_obj = AttestationObject((data['attestationObject']))
+      server = getServer()
+      auth_data = server.register_complete(
+          request.session['fido_state'],
+          client_data,
+          att_obj
+      )
+      uk = User_Keys()
+      uk.properties = {"device": websafe_encode(auth_data.credential_data)}
+      uk.save()
+  ```
+
+test "rank645: FIDO registration challenge is popped before credential save"
+  lang python
+  file FIDO2.py
+  reject VYQL-AUTH-041
+  code
+  ```
+  def complete_reg(request):
+      data = cbor.decode(request.body)
+      client_data = CollectedClientData(data['clientDataJSON'])
+      att_obj = AttestationObject((data['attestationObject']))
+      server = getServer()
+      auth_data = server.register_complete(
+          request.session.pop('fido_state'),
+          client_data,
+          att_obj
+      )
+      uk = User_Keys()
+      uk.properties = {"device": websafe_encode(auth_data.credential_data)}
+      uk.save()
+  ```

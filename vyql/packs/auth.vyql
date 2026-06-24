@@ -74,6 +74,11 @@ rule PostEditReportPrivateContentLeak {
   match code.PostEditReportPrivateContentLeak as report
 }
 
+rule FidoRegistrationChallengeReplay {
+  meta { id: "VYQL-AUTH-041", severity: high, cwe: [CWE_294], confidence_floor: high }
+  match code.FidoRegistrationChallengeReplay as registration
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller

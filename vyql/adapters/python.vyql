@@ -455,6 +455,15 @@ adapter python {
     lacks "'file_insertion_enabled': False"
     lacks "\"file_insertion_enabled\": False"
   }
+  flag code.FidoRegistrationChallengeReplay in function {
+    has "name=complete_reg"
+    has "server.register_complete"
+    has "request.session['fido_state']"
+    has "User_Keys()"
+    has "uk.save()"
+    lacks "request.session.pop"
+    lacks "del request.session['fido_state']"
+  }
   flag code.PartiallyEscapedSshCommand in function {
     has "name=run_ssh_command_with_credentials"
     has "escaped_password"
