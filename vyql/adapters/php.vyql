@@ -630,6 +630,24 @@ adapter php {
     has "return$userRules;"
     lacks "userHasAccessTo"
   }
+  flag code.CommentUpdateMissingOwnershipConstraint in function {
+    has "lang=php"
+    has "name=updateComment"
+    has "comment_comment"
+    has "comment_id"
+    has "getDb()->update"
+    lacks "comment_author_id"
+    lacks "USERID"
+  }
+  flag code.CommentUpdateMissingOwnershipConstraint in function {
+    has "lang=php"
+    has "name=updateComment"
+    has "comment_comment"
+    has "comment_id"
+    has "$sql->update"
+    lacks "comment_author_id"
+    lacks "USERID"
+  }
   // Review-only WordPress public endpoint policy: returning post/meta data by a request
   // selected object id should show either a publish-status gate or a read permission check.
   flag code.IdorPolicyReview in function {

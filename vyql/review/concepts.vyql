@@ -535,6 +535,12 @@ review code.IdorPolicyReview {
   expected: [core.OwnershipCheck, core.AuthorizationCheck]
   text: "review object lookup or delete criteria for a current-principal ownership constraint"
 }
+review code.CommentUpdateMissingOwnershipConstraint {
+  category: "auth"
+  kind: "attention"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "review comment update queries for current-author or current-user ownership constraints"
+}
 review code.IncompleteIpDenylist {
   category: "request"
   kind: "attention"

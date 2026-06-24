@@ -2014,6 +2014,15 @@ concept IdorPolicyReview : sink {
   vulnerable_to: [access_control.Idor]
   cwe: [CWE_639]
 }
+concept CommentUpdateMissingOwnershipConstraint : sink {
+  vulnerable_to: [access_control.Idor, access_control.BrokenAccess]
+  cwe: [CWE_639, CWE_862]
+  review_category: "auth"
+  review_condition: "comment update criteria select a comment by id without constraining the row to the current author or user"
+  review_evidence: "comment update context {pattern} updates comment body data using comment_id while missing comment_author_id or current-user ownership criteria"
+  review_assumption: "the comment id can reference another user's comment through the edit/update path"
+  review_confidence: high
+}
 // Review-only: externally supplied polymorphic type/class names are written into
 // association state without being constrained to a configured allowlist.
 concept PolymorphicTypeSelectionReview : sink {
