@@ -197,3 +197,8 @@ rule EmailAttachmentFilenamePathTraversal {
   meta { id: "VYQL-PATH-038", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.EmailAttachmentFilenamePathTraversal as sink
 }
+
+rule InternalAssetRoutePathTraversal {
+  meta { id: "VYQL-PATH-039", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.InternalAssetRoutePathTraversal as sink
+}

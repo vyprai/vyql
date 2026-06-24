@@ -1664,6 +1664,12 @@ review code.EmailAttachmentFilenamePathTraversal {
   expected: [core.PathCanonicalization]
   text: "review email attachment extraction for basename canonicalization before joining attachment filenames into output paths"
 }
+review code.InternalAssetRoutePathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review internal static-asset handlers for realpath and root containment checks before serving package asset files"
+}
 review code.TemplateDirectoryHiddenGlobCopy {
   category: "path"
   kind: "attention"

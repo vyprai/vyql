@@ -2950,6 +2950,15 @@ concept EmailAttachmentFilenamePathTraversal : sink {
   review_assumption: "email attachment filename metadata can contain path separators, traversal segments, or absolute paths"
   review_confidence: high
 }
+concept InternalAssetRoutePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "an internal static-asset route joins the requested suffix under a package asset directory without canonical containment"
+  review_evidence: "static asset handler context {pattern} slices a route prefix into a filename, joins it under an asset directory, and serves the file before realpath/root checks"
+  review_assumption: "the routed path suffix can contain traversal segments that escape the intended package asset directory"
+  review_confidence: high
+}
 concept UnvalidatedDynamicRequirePathTraversal : sink {
   vulnerable_to: [path.PathTraversal, injection.UnsafeDynamicLoading]
   cwe: [CWE_22, CWE_829]

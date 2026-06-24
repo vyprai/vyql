@@ -153,6 +153,16 @@ adapter python {
     lacks "pathlib.Path(a['filename']).name"
     lacks "os.path.basename(a['filename'])"
   }
+  flag code.InternalAssetRoutePathTraversal in function {
+    path exact "analysis.function.context"
+    has "path.startswith(\"/__emmett__\")"
+    has "file_name = path[12:]"
+    has "os.path.join(os.path.dirname(__file__), \"..\", \"assets\", file_name)"
+    has "self._static_response(static_file)"
+    lacks "os.path.realpath"
+    lacks "static_file.startswith"
+    lacks ".relative_to"
+  }
   flag code.AnsibleSnmpFactsCredentialsNoLogMissing in function {
     name "main"
     has "AnsibleModule"
