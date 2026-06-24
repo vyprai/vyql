@@ -178,6 +178,16 @@ adapter java {
     has "FullQueryLogger.instance.enableWithoutClean"
     lacks "allow_nodetool_archive_command"
   }
+  flag code.CommandStringWrapperExecution in function {
+    has "literal:/bin/sh"
+    has "literal:-c"
+    has "identifier:scriptPath"
+    has "expr:scriptPath+ALERT_TITLE_OPTION"
+    has "call_path:ProcessUtils.executeScript"
+    lacks "call_path:File"
+    lacks "call:exists"
+    lacks "call:isFile"
+  }
   flag code.CommonsCompressBzip2FallbackSortMissing in function {
     has "function_name:blockSort"
     has "call:mainSort"
