@@ -1733,6 +1733,15 @@ concept ExpiredCachedAuthTokenReuse : sink {
   review_assumption: "the cached token is used for authenticated requests and becomes invalid or stale after its expiry time"
   review_confidence: high
 }
+concept DtlsEpochZeroApplicationData : sink {
+  vulnerable_to: [authentication.AuthenticationBypass, injection.ProtocolStateConfusion]
+  cwe: [CWE_287, CWE_294, CWE_841]
+  review_category: "auth"
+  review_condition: "DTLS application data is rejected when the record epoch is zero"
+  review_evidence: "DTLS record handler context {pattern} decrypts nonzero epochs and forwards application data without an observed epoch-zero rejection"
+  review_assumption: "epoch-zero application data is unauthenticated or unencrypted and can be supplied by a remote peer"
+  review_confidence: high
+}
 // Review-only: authentication challenge, retry, or attempt-limit logic. Used for
 // cases where static analysis should hand context to the AI/manual stage to verify
 // brute-force limits, rate limiting, and concurrency around failed-attempt counters.

@@ -79,6 +79,11 @@ rule ExpiredCachedAuthTokenReuse {
   match code.ExpiredCachedAuthTokenReuse as cache
 }
 
+rule DtlsEpochZeroApplicationData {
+  meta { id: "VYQL-AUTH-044", severity: critical, cwe: [CWE_287, CWE_294, CWE_841], confidence_floor: high }
+  match code.DtlsEpochZeroApplicationData as record
+}
+
 rule PostEditReportPrivateContentLeak {
   meta { id: "VYQL-AUTH-040", severity: high, cwe: [CWE_200, CWE_863], confidence_floor: high }
   match code.PostEditReportPrivateContentLeak as report

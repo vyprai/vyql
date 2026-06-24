@@ -904,6 +904,16 @@ adapter go {
     lacks "call_path:r.Header.Get"
     lacks "selector:r.Host"
   }
+  flag code.DtlsEpochZeroApplicationData in function {
+    has "function_name:handleIncomingPacket"
+    has "call_path:h.Unmarshal"
+    has "selector:h.epoch"
+    has "call_path:c.state.cipherSuite.decrypt"
+    has "call_path:r.Unmarshal"
+    has "selector:c.decrypted"
+    lacks "binary:h.epoch==0"
+    lacks "binary:0==h.epoch"
+  }
   flag code.UnverifiedFederationMissingEvents in function {
     has "call_path:missingResp.Events.UntrustedEvents"
     has "call_path:t.cacheAndReturn"
