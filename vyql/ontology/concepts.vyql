@@ -3664,6 +3664,15 @@ concept AmbiguousQueryParameterSeparator : sink {
   review_assumption: "upstream components, caches, or security filters use ampersand-only query delimiter semantics"
   review_confidence: medium
 }
+concept UnencodedUrlQueryParameter : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion, request_forgery.OpenRedirect]
+  cwe: [CWE_116, CWE_20]
+  review_category: "request"
+  review_condition: "a caller-controlled value is appended as a URL query parameter without URL encoding"
+  review_evidence: "URL builder context {pattern} adds a ticket or artifact parameter value to QueryItems without HttpUtility.UrlEncode or equivalent URL encoding"
+  review_assumption: "the parameter value can contain delimiters or encoded URL syntax that changes downstream CAS or service URL parsing"
+  review_confidence: high
+}
 concept SecretValue : source {
   taint: [taint.SecretValue]
   coverage_reserved_source: true

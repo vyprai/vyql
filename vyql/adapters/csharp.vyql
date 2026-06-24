@@ -152,6 +152,13 @@ adapter csharp {
   sink method "RedirectPreserveMethod" -> code.RedirectTarget
   sink method "RedirectPermanentPreserveMethod" -> code.RedirectTarget
   sink method "RedirectSafelyAsync" -> code.RedirectTarget
+  flag code.UnencodedUrlQueryParameter in function {
+    has "function_name:ConstructValidateUrl"
+    has "QueryItems.Add"
+    has "ArtifactParameterName"
+    has "serviceTicket"
+    lacks "HttpUtility.UrlEncode(serviceTicket)"
+  }
   // HTTP response splitting / header injection (CWE-113).
   sink path "Response.Headers.Add" arg 1 -> code.ResponseHeaderWrite
   sink path "Response.Headers.Append" arg 1 -> code.ResponseHeaderWrite
