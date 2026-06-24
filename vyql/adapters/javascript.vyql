@@ -1382,6 +1382,17 @@ adapter javascript {
     has "path.resolve(contentDir"
     lacks "isInside"
   }
+  flag code.UnvalidatedDynamicRequirePathTraversal in function {
+    has "lang=javascript"
+    has "name=runWidget"
+    has "widgetId"
+    has "widget-${widgetId}.js"
+    has "path.join(__dirname,file)"
+    has "require(path.join(__dirname,file))"
+    lacks "resolveWidgetPath"
+    lacks "path.relative"
+    lacks "widgetIdPattern"
+  }
   flag code.ClientAuthFailureResponseReview in function {
     has "name=<lambda>"
     has "callbackData.hasOwnProperty(\"status\")"

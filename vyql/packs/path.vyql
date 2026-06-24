@@ -177,3 +177,8 @@ rule TemplateDirectoryHiddenGlobCopy {
   meta { id: "VYQL-PATH-034", severity: medium, cwe: [CWE_22, CWE_200], confidence_floor: high }
   match code.TemplateDirectoryHiddenGlobCopy as sink
 }
+
+rule UnvalidatedDynamicRequirePathTraversal {
+  meta { id: "VYQL-PATH-035", severity: critical, cwe: [CWE_22, CWE_829], confidence_floor: high }
+  match code.UnvalidatedDynamicRequirePathTraversal as sink
+}

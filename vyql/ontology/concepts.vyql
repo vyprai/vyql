@@ -2822,6 +2822,15 @@ concept AssemblyLoadPathTraversal : sink {
   review_assumption: "library callers can pass type names containing assembly components such as '../payload' or drive-qualified paths"
   review_confidence: high
 }
+concept UnvalidatedDynamicRequirePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal, injection.UnsafeDynamicLoading]
+  cwe: [CWE_22, CWE_829]
+  review_category: "code_loading"
+  review_condition: "a caller-controlled module id is joined into a local require path without an allowlist or canonical containment check"
+  review_evidence: "dynamic require context {pattern} builds a JavaScript module path from an identifier and loads it before the patched validation/containment helper"
+  review_assumption: "the module id can cross a trust boundary such as IPC, plugin code, or renderer-controlled widget configuration"
+  review_confidence: high
+}
 concept LocalFileUrlNavigation : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]
