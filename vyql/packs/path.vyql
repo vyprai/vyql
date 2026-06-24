@@ -157,3 +157,8 @@ rule InternalServiceUrlPathTraversal {
   meta { id: "VYQL-PATH-030", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.InternalServiceUrlPathTraversal as sink
 }
+
+rule RelativeOnlyFilenameValidation {
+  meta { id: "VYQL-PATH-031", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
+  match code.RelativeOnlyFilenameValidation as sink
+}

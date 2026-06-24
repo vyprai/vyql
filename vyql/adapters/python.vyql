@@ -745,6 +745,16 @@ adapter python {
     lacks "fullpath.startswith(mediapath)"
     lacks "os.path.abspath(os.path.join(mediapath,path))"
   }
+  flag code.RelativeOnlyFilenameValidation in function {
+    has "'../'in"
+    has "re.search"
+    has "A-Za-z0-9"
+    has "returnTrue"
+    has "returnFalse"
+    lacks "startswith('/')"
+    lacks "os.path.isabs"
+    lacks "is_absolute()"
+  }
   flag code.CopypartyCprStaticPathTraversal in function {
     has "class_name=HttpCli"
     has "name=handle_get"
