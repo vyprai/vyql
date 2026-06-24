@@ -2493,6 +2493,15 @@ concept UnboundedAllocationReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_770]
 }
+concept ArrayBufferTransferMaxLengthBypass : sink {
+  vulnerable_to: [memory.OobWrite, validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_20, CWE_787, CWE_789]
+  review_category: "memory"
+  review_condition: "ArrayBuffer transfer allocates a caller-selected new length with a resizable-buffer max length but without rejecting lengths above the max"
+  review_evidence: "ArrayBuffer transfer context {pattern} passes newByteLength and maxLength to allocateArrayBuffer without an observed newByteLength > maxLength check"
+  review_assumption: "callers can request a transfer length larger than the resizable ArrayBuffer maximum"
+  review_confidence: high
+}
 concept UnboundedDelimiterSplitCount : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]

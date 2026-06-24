@@ -1137,6 +1137,12 @@ review code.UnboundedAllocationReview {
   kind: "attention"
   text: "review allocation sizes derived from parsed counts for per-item limits, aggregate consistency checks, and overflow"
 }
+review code.ArrayBufferTransferMaxLengthBypass {
+  category: "memory"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ArrayBuffer transfer length checks against resizable-buffer maxByteLength before allocation"
+}
 review code.UnboundedDelimiterSplitCount {
   category: "resource"
   kind: "attention"

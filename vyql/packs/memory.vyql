@@ -98,6 +98,11 @@ rule JpegSubsamplingRatioValidationMissing {
   match code.JpegSubsamplingRatioValidationMissing as c
 }
 
+rule ArrayBufferTransferMaxLengthBypass {
+  meta { id: "VYQL-MEM-036", severity: high, cwe: [CWE_20, CWE_787, CWE_789], confidence_floor: high }
+  match code.ArrayBufferTransferMaxLengthBypass as c
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse

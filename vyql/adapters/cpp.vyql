@@ -150,6 +150,14 @@ adapter cpp {
     lacks "AI_MAX_FACE_INDICES"
     lacks "count_vertices>vertices.size()"
   }
+  flag code.ArrayBufferTransferMaxLengthBypass in function {
+    lang "cpp"
+    has "newByteLength=argv[0].toIndex(state)"
+    has "maxLength=obj->maxByteLength()"
+    has "allocateArrayBuffer(state,state.context()->globalObject()->arrayBuffer(),newByteLength,maxLength)"
+    lacks "newByteLength>maxLength.value()"
+    lacks "throwTypeErrorIfDetached(state);Optional"
+  }
   flag code.PointerOffsetBoundsCheck in function {
     lang "cpp"
     has "start+len+1>end"
