@@ -134,6 +134,15 @@ concept PackageVersionSpecifierValidationReview : sink {
   review_assumption: "project metadata or action inputs can influence the dependency specifier passed to the package installer"
   review_confidence: medium
 }
+concept UnboundedJupyterKernelDependency : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_1104]
+  review_category: "supply_chain"
+  review_condition: "Jupyter kernel runtime dependencies are installed without an upper compatibility cap"
+  review_evidence: "dependency context {pattern} installs ipykernel without an observed upper bound"
+  review_assumption: "the image or environment is used to run remote kernels whose message protocol must remain compatible with the gateway/server stack"
+  review_confidence: high
+}
 concept CommandExecution : sink {
   vulnerable_to: [injection.CommandInjection]
   enabled_by: [taint.UntrustedData]

@@ -30,6 +30,8 @@ adapter config {
     ],
     config_line_contains_events: [
       "dockerfile|--privileged|analysis.config.container.privileged_mode",
+      "dockerfile|pip install --upgrade ipykernel|analysis.config.python.jupyter_kernel_dependency_unbounded",
+      "dockerfile|pip install --upgrade future pycryptodomex ipykernel|analysis.config.python.jupyter_kernel_dependency_unbounded",
       "terraform|0.0.0.0/0|analysis.config.terraform.open_cidr",
       "jelly|permission=\"${it.ADMINISTRATOR}\"|analysis.config.jenkins_advisor_weak_layout_permission",
       "jelly|tooltip=\"${item.why}${h.escape(item.params)}|analysis.config.jenkins_computer_queue_unescaped_tooltip",
@@ -40,6 +42,7 @@ adapter config {
       "yaml|analysis.config.github_actions.privileged_pr_framework_execution|pull_request_target;;git show \"$PR_SHA:$file\" > \"$file\";;python manage.py makemigrations"
     ],
     config_line_exact_compact_events: [
+      "yaml|- ipykernel|analysis.config.python.jupyter_kernel_dependency_unbounded",
       "yaml|privileged: true|analysis.config.k8s.privileged_container",
       "yaml|allowprivilegeescalation: true|analysis.config.k8s.privileged_container",
       "yaml|hostnetwork: true|analysis.config.k8s.host_namespace",
@@ -161,6 +164,9 @@ adapter config {
   }
   flag code.PrivilegedContainer on any {
     path "analysis.config.container.privileged_mode"
+  }
+  flag code.UnboundedJupyterKernelDependency on any {
+    path "analysis.config.python.jupyter_kernel_dependency_unbounded"
   }
   flag code.HostNamespaceShare on any {
     path "analysis.config.k8s.host_namespace"

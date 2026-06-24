@@ -702,6 +702,11 @@ review code.PackageVersionSpecifierValidationReview {
   expected: [core.InputValidation]
   text: "review package version specifier validation before using the specifier in package installation"
 }
+review code.UnboundedJupyterKernelDependency {
+  category: "supply_chain"
+  kind: "attention"
+  text: "review Jupyter kernel runtime dependencies for upper compatibility caps before building gateway or remote-kernel images"
+}
 review code.CommandLineAssemblyReview {
   category: "command"
   kind: "attention"
