@@ -1,0 +1,33 @@
+# Rank 631 / CVE-2022-26969: Directus defaulted CORS to enabled and origin
+# reflection to true, so default deployments allowed arbitrary browser origins.
+test "rank631: default config enables permissive CORS"
+  lang javascript
+  file env.ts
+  expect VYQL-CFG-020
+  code
+  ```
+  const defaults: Record<string, any> = {
+    ROOT_REDIRECT: './admin',
+    CORS_ENABLED: true,
+    CORS_ORIGIN: true,
+    CORS_METHODS: 'GET,POST,PATCH,DELETE',
+    CORS_ALLOWED_HEADERS: 'Content-Type,Authorization',
+    CORS_CREDENTIALS: true,
+  };
+  ```
+
+test "rank631: default config disables CORS unless configured"
+  lang javascript
+  file env.ts
+  reject VYQL-CFG-020
+  code
+  ```
+  const defaults: Record<string, any> = {
+    ROOT_REDIRECT: './admin',
+    CORS_ENABLED: false,
+    CORS_ORIGIN: false,
+    CORS_METHODS: 'GET,POST,PATCH,DELETE',
+    CORS_ALLOWED_HEADERS: 'Content-Type,Authorization',
+    CORS_CREDENTIALS: true,
+  };
+  ```

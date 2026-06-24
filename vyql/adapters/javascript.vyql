@@ -169,6 +169,13 @@ adapter javascript {
     lacks "replaceChildren"
     lacks "textContent"
   }
+  flag code.DefaultPermissiveCorsConfig in module {
+    has "lang=javascript"
+    has "CORS_ENABLED:true"
+    has "CORS_ORIGIN:true"
+    lacks "CORS_ENABLED:false"
+    lacks "CORS_ORIGIN:false"
+  }
   flag code.IncompleteHtmlEventHandlerStrip in module {
     has "lang=javascript"
     has "ViewSource"

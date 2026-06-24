@@ -627,6 +627,16 @@ concept PermissiveCors : sink {
   cwe: [CWE_942]
 }
 
+concept DefaultPermissiveCorsConfig : sink {
+  vulnerable_to: [access_control.PermissiveCors]
+  cwe: [CWE_942]
+  review_category: "misconfig"
+  review_condition: "application defaults enable CORS and allow arbitrary or reflected origins unless operators override them"
+  review_evidence: "CORS defaults context {pattern} sets both the CORS enable flag and origin policy to permissive true values"
+  review_assumption: "default deployments expose authenticated or sensitive APIs to browser-origin requests before explicit hardening"
+  review_confidence: high
+}
+
 concept CorsWildcardPrefixTruncation : sink {
   vulnerable_to: [access_control.OriginValidationError]
   cwe: [CWE_346]

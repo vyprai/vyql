@@ -24,6 +24,11 @@ rule CorsWildcardPrefixTruncation {
   match code.CorsWildcardPrefixTruncation as c
 }
 
+rule DefaultPermissiveCorsConfig {
+  meta { id: "VYQL-CFG-020", severity: medium, cwe: [CWE_942], confidence_floor: high }
+  match code.DefaultPermissiveCorsConfig as c
+}
+
 // TLS certificate validation disabled — verify=False / rejectUnauthorized:false /
 // InsecureSkipVerify:true (CWE-295), named-value presence.
 rule CertValidationDisabled {
