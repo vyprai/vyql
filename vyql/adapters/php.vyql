@@ -1189,6 +1189,20 @@ adapter php {
   flag code.AuthenticationRequiredOp on any {
     path "makeAdmin"
   }
+  flag code.DokuwikiRemoteAclMissingAdminCheck in function {
+    has "lang=php"
+    has "plugin_load('admin','acl')"
+    has "$apa->_acl_add"
+    lacks "auth_isadmin"
+    lacks "RemoteAccessDeniedException"
+  }
+  flag code.DokuwikiRemoteAclMissingAdminCheck in function {
+    has "lang=php"
+    has "plugin_load('admin','acl')"
+    has "$apa->_acl_del"
+    lacks "auth_isadmin"
+    lacks "RemoteAccessDeniedException"
+  }
 
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
   flag code.UncheckedUploadedImageProcessing in function {

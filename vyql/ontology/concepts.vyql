@@ -1540,6 +1540,15 @@ concept PluginManagementMissingAuthorization : sink {
   review_assumption: "non-privileged authenticated users or API clients can invoke the plugin management endpoint directly"
   review_confidence: high
 }
+concept DokuwikiRemoteAclMissingAdminCheck : sink {
+  vulnerable_to: [access_control.MissingAuthorization, access_control.PrivilegeEscalation]
+  cwe: [CWE_862, CWE_269]
+  review_category: "auth"
+  review_condition: "DokuWiki XML-RPC ACL mutation method invokes ACL add/delete operations without requiring superuser permission"
+  review_evidence: "DokuWiki remote ACL context {pattern} loads the admin ACL plugin and calls _acl_add or _acl_del without auth_isadmin or RemoteAccessDeniedException"
+  review_assumption: "users allowed to call the XML-RPC API may not be DokuWiki superusers and can alter ACL rules"
+  review_confidence: high
+}
 concept PublicVisibilityCacheInvalidationMissing : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_863]

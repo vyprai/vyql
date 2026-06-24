@@ -49,6 +49,11 @@ rule PluginManagementMissingAuthorization {
   match code.PluginManagementMissingAuthorization as endpoint
 }
 
+rule DokuwikiRemoteAclMissingAdminCheck {
+  meta { id: "VYQL-AUTH-042", severity: high, cwe: [CWE_862, CWE_269], confidence_floor: high }
+  match code.DokuwikiRemoteAclMissingAdminCheck as endpoint
+}
+
 rule PublicVisibilityCacheInvalidationMissing {
   meta { id: "VYQL-AUTH-036", severity: high, cwe: [CWE_863], confidence_floor: high }
   match code.PublicVisibilityCacheInvalidationMissing as cache
