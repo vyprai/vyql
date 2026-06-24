@@ -3456,6 +3456,15 @@ concept OwnCloudLoginRedirectUrlOpenRedirect : sink {
   review_assumption: "an attacker can place an absolute or scheme-relative URL in redirect_url and induce a victim to complete the login flow"
   review_confidence: high
 }
+concept SamlRelayStateOpenRedirect : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "SAML RelayState is accepted as a post-login redirect URL without a safe-url allowlist"
+  review_evidence: "SAML RelayState context {pattern} parses relay_state and returns it as next_url when it has a scheme, netloc, or absolute path"
+  review_assumption: "IdP-initiated SSO or a crafted SAML flow can provide RelayState and cause an authenticated browser redirect"
+  review_confidence: high
+}
 concept PathMatcherNormalizationOrderBypass : sink {
   vulnerable_to: [request_forgery.OpenRedirect, path.PathTraversal]
   cwe: [CWE_601, CWE_22]

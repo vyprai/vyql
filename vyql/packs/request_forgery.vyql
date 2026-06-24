@@ -85,6 +85,11 @@ rule OwnCloudLoginRedirectUrlOpenRedirect {
   match code.OwnCloudLoginRedirectUrlOpenRedirect as redirect
 }
 
+rule SamlRelayStateOpenRedirect {
+  meta { id: "VYQL-RF-024", severity: medium, cwe: [CWE_601], confidence_floor: high }
+  match code.SamlRelayStateOpenRedirect as redirect
+}
+
 rule PathMatcherNormalizationOrderBypass {
   meta { id: "VYQL-RF-011", severity: medium, cwe: [CWE_601, CWE_22], confidence_floor: medium }
   match code.PathMatcherNormalizationOrderBypass as matcher

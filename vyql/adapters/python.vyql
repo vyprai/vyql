@@ -415,6 +415,15 @@ adapter python {
     lacks "$djangocompilemo"
     lacks "%djangocompilemo%"
   }
+  flag code.SamlRelayStateOpenRedirect in function {
+    has "name=decode_relay_state"
+    has "urlparse(relay_state)"
+    has "parts.scheme or parts.netloc"
+    has "parts.path.startswith(\"/\")"
+    has "next_url = relay_state"
+    lacks "is_safe_url"
+    lacks "get_account_adapter"
+  }
   flag code.PartiallyEscapedSshCommand in function {
     has "name=run_ssh_command_with_credentials"
     has "escaped_password"
