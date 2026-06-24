@@ -185,6 +185,13 @@ adapter ruby {
   sink path "content_tag" -> code.HtmlRender
   sink exact "concat" -> code.HtmlRender
   sink path "safe_concat" -> code.HtmlRender
+  flag code.RailsRawTranslationHtmlInterpolationXss on call {
+    path "raw"
+    operand {
+      path "t"
+    }
+    lacks call contains_any ["content_tag", "ERB::Util.html_escape", "ERB::Util.h", "CGI.escapeHTML", "Rack.Utils.escape_html"]
+  }
   flag code.StoredHtmlWrite in function {
     has "lang=ruby"
     has "name=cama_comments_render_html"

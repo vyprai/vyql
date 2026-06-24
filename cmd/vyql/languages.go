@@ -29,7 +29,7 @@ var languages = []language{
 	{"python", map[string]bool{".py": true}, treesitter.ExtractPython, frontend.PythonAdapters},
 	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true, ".html": true, ".htm": true},
 		treesitter.ExtractJavaScript, frontend.JsAdapters},
-	{"ruby", map[string]bool{".rb": true}, treesitter.ExtractRuby, frontend.RubyAdapters},
+	{"ruby", map[string]bool{".rb": true, ".erb": true}, treesitter.ExtractRuby, frontend.RubyAdapters},
 	{"java", map[string]bool{".java": true}, treesitter.ExtractJava, frontend.JavaAdapters},
 	{"php", map[string]bool{".php": true, ".phtml": true, ".inc": true}, treesitter.ExtractPHP, frontend.PHPAdapters},
 	{"csharp", map[string]bool{".cs": true}, treesitter.ExtractCSharp, frontend.CSharpAdapters},

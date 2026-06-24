@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"strings"
 	"unicode"
 
@@ -25,17 +26,103 @@ type rbConv struct {
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
 func ExtractRuby(files []string, root string) (nir.Program, error) {
-	mods := parseModules(files, root,
+	var ruby, erb []string
+	for _, f := range files {
+		if strings.HasSuffix(strings.ToLower(f), ".erb") {
+			erb = append(erb, f)
+		} else {
+			ruby = append(ruby, f)
+		}
+	}
+	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+		c := &rbConv{src: src, root: root, file: rel}
+		return nir.Module{Key: "", File: rel, Body: c.blockChildren(tree.RootNode())}, true
+	}
+	mods := parseModules(ruby, root,
 		func() *tree_sitter.Parser {
 			p := tree_sitter.NewParser()
 			_ = p.SetLanguage(tree_sitter.NewLanguage(tsruby.Language()))
 			return p
 		},
-		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &rbConv{src: src, root: root, file: rel}
-			return nir.Module{Key: "", File: rel, Body: c.blockChildren(tree.RootNode())}, true
-		})
+		build)
+	mods = append(mods, parseERBModules(erb, root, build)...)
 	return nir.Program{SelfName: "self", Modules: mods}, nil
+}
+
+func parseERBModules(
+	files []string,
+	root string,
+	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+) []nir.Module {
+	if len(files) == 0 {
+		return nil
+	}
+	out := make([]nir.Module, 0, len(files))
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		code, ok := erbRubySource(src)
+		if !ok {
+			continue
+		}
+		parser := tree_sitter.NewParser()
+		_ = parser.SetLanguage(tree_sitter.NewLanguage(tsruby.Language()))
+		tree := parser.Parse(code, nil)
+		if tree == nil {
+			parser.Close()
+			continue
+		}
+		m, good := build(code, f, relPath(root, f)+"#erb.rb", tree)
+		tree.Close()
+		parser.Close()
+		if good {
+			m.Hash = contentHash(src)
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func erbRubySource(src []byte) ([]byte, bool) {
+	out := make([]byte, len(src))
+	for i, b := range src {
+		switch b {
+		case '\n', '\r':
+			out[i] = b
+		default:
+			out[i] = ' '
+		}
+	}
+	found := false
+	for i := 0; i+1 < len(src); {
+		if src[i] != '<' || src[i+1] != '%' {
+			i++
+			continue
+		}
+		start := i + 2
+		if start < len(src) && src[start] == '#' {
+			if end := bytes.Index(src[start:], []byte("%>")); end >= 0 {
+				i = start + end + 2
+			} else {
+				break
+			}
+			continue
+		}
+		if start < len(src) && src[start] == '=' {
+			start++
+		}
+		endRel := bytes.Index(src[start:], []byte("%>"))
+		if endRel < 0 {
+			break
+		}
+		end := start + endRel
+		copy(out[start:end], src[start:end])
+		found = true
+		i = end + 2
+	}
+	return out, found
 }
 
 func (c *rbConv) loc(n *tree_sitter.Node) string {

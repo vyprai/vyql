@@ -673,6 +673,11 @@ rule FlarumTranslatorRawStringParameterXss {
   match code.FlarumTranslatorRawStringParameterXss as sink
 }
 
+rule RailsRawTranslationHtmlInterpolationXss {
+  meta { id: "VYQL-INJ-148", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RailsRawTranslationHtmlInterpolationXss as sink
+}
+
 rule InstallerHiddenFieldXss {
   meta { id: "VYQL-INJ-137", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.InstallerHiddenFieldXss as sink

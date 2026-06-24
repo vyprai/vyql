@@ -91,6 +91,28 @@ func TestExtractAllIgnoresHtmlScriptsInsideComments(t *testing.T) {
 	}
 }
 
+func TestExtractAllSupportsERBRubyIslands(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "new.html.erb")
+	if err := os.WriteFile(src, []byte(`<p><%= raw t('.prompt', client_name: "<strong>#{ @pre_auth.client.name }</strong>") %></p>`+"\n"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	prog, _, _, stats, err := extractAll([]string{src})
+	if err != nil {
+		t.Fatalf("extractAll .erb: %v", err)
+	}
+	if got := stats.files["ruby"]; got != 1 {
+		t.Fatalf(".erb should route through ruby frontend, got count %d stats=%v", got, stats.files)
+	}
+	if len(prog.Modules) == 0 || len(prog.Modules[0].Body) == 0 {
+		t.Fatalf(".erb should extract embedded Ruby statements, got modules=%d", len(prog.Modules))
+	}
+	if !strings.Contains(prog.Modules[0].File, "#erb.rb") {
+		t.Fatalf(".erb module should use ruby loc suffix for adapter routing, got %q", prog.Modules[0].File)
+	}
+}
+
 func TestExtractAllSupportsPHPIncludes(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "helpers.inc")

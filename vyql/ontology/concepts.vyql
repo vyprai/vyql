@@ -2797,6 +2797,15 @@ concept FlarumTranslatorRawStringParameterXss : sink {
   review_assumption: "translation parameters include user-controlled UI strings such as the forum search query"
   review_confidence: high
 }
+concept RailsRawTranslationHtmlInterpolationXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Rails ERB marks a translated HTML fragment as raw after passing dynamic interpolation values that are not built through escaping helpers"
+  review_evidence: "ERB raw translation render {pattern} calls raw around a translation result and the template lacks content_tag or equivalent escaping around interpolated HTML values"
+  review_assumption: "translation interpolation values can include stored or request-controlled model fields that are rendered in the browser"
+  review_confidence: high
+}
 concept InstallerHiddenFieldXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
