@@ -189,6 +189,9 @@ adapter config {
   flag code.ComrakDangerousUrlCaseSensitiveGrammar on any {
     path "analysis.config.comrak_dangerous_url_case_sensitive"
   }
+  flag code.ExternalLinkReferrerLeak on any {
+    path "analysis.config.html.external_link_missing_noreferrer"
+  }
   // Jenkins Jelly views: template model fields such as it.name/it.description
   // rendered into HTML-bearing attributes need escaping before display.
   source "analysis.template.jelly.input" -> core.UserControlledData

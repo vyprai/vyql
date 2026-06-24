@@ -62,6 +62,7 @@ func Extract(files []string, root string) (nir.Program, error) {
 		case strings.HasPrefix(k, "texttemplate:"):
 			body = scanTextTemplate(src, rel, strings.TrimPrefix(k, "texttemplate:"))
 		}
+		body = append(body, scanHTMLReferrerLinks(src, rel)...)
 		if k != "dottemplate" && len(fileSignatureBody) > 0 {
 			body = append(body, fileSignatureBody...)
 		}
@@ -784,6 +785,44 @@ func scanSetupCfg(src []byte, file string) []nir.Stmt {
 		out = append(out, scopedContainsEvents(cfg, "setupcfg", line, file, i+1)...)
 	}
 	return out
+}
+
+func scanHTMLReferrerLinks(src []byte, file string) []nir.Stmt {
+	ext := strings.ToLower(filepath.Ext(file))
+	if ext != ".html" && ext != ".htm" {
+		return nil
+	}
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		low := strings.ToLower(line)
+		if !strings.Contains(low, "<a ") || !strings.Contains(low, "href=") {
+			continue
+		}
+		if strings.Contains(low, "noreferrer") || !htmlLinkLooksExternal(low) {
+			continue
+		}
+		out = append(out, nir.ExprStmt{Value: call("analysis.config.html.external_link_missing_noreferrer", file, i+1)})
+	}
+	return out
+}
+
+func htmlLinkLooksExternal(low string) bool {
+	if strings.Contains(low, "http://") || strings.Contains(low, "https://") || strings.Contains(low, "//") {
+		return true
+	}
+	if !strings.Contains(low, "settings.platform_") {
+		return false
+	}
+	for _, marker := range []string{
+		"twitter", "facebook", "linkedin", "meetup", "google_plus", "googleplus",
+		"instagram", "youtube", "social",
+	} {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func call(token, file string, line int) nir.Call {

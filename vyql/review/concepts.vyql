@@ -1619,6 +1619,12 @@ review code.CkanSolrConnectionErrorDisclosure {
   expected: [core.SecretRedaction]
   text: "review CKAN Solr search error handling for generic connection failures before API serialization"
 }
+review code.ExternalLinkReferrerLeak {
+  category: "secret"
+  kind: "attention"
+  expected: [core.ReferrerPolicy]
+  text: "review external HTML links for rel=noreferrer or an equivalent referrer policy before rendering on token-bearing pages"
+}
 review code.KubernetesCurlAuthorizationHeaderLogLeak {
   category: "secret"
   kind: "attention"

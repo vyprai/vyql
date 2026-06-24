@@ -3571,6 +3571,15 @@ concept SniffCsvExternalAccessBypass : sink {
   review_assumption: "callers can invoke the sniffing function with filesystem paths while external access is expected to be disabled"
   review_confidence: high
 }
+concept ExternalLinkReferrerLeak : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_598]
+  review_category: "secret"
+  review_condition: "HTML template contains external links that can receive sensitive current-page URLs through the Referer header"
+  review_evidence: "external link context {pattern} lacks rel=noreferrer before rendering cross-origin navigation links"
+  review_assumption: "the template can appear on pages whose URLs contain reset tokens, session keys, or other bearer secrets"
+  review_confidence: high
+}
 concept ContainerPrimaryGidMissingSupplementalGroup : sink {
   vulnerable_to: [access_control.InsecurePermission, access_control.MissingAuthorization]
   cwe: [CWE_284, CWE_732]
@@ -4191,6 +4200,11 @@ concept HtmlEscape : control {
 concept SafeResponseContentType : control {
   neutralizes: [injection.Xss]
   cwe: [CWE_79]
+  applies: endpoint
+}
+concept ReferrerPolicy : control {
+  neutralizes: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_598]
   applies: endpoint
 }
 concept CookieSecureFlag : control {
