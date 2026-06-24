@@ -517,6 +517,12 @@ review code.NextcloudCircleMemberAddMissingCircleCheck {
   expected: [core.AuthorizationCheck]
   text: "review Nextcloud Circles member-add APIs for circle visibility checks before accepting circle member IDs"
 }
+review code.NextcloudFileDropShareScopeBypass {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck, core.OwnershipCheck]
+  text: "review Nextcloud file-drop metadata updates for share-root containment checks before accepting a requested file id"
+}
 review code.CollectivesPublicTrashMissingEditPermission {
   category: "access_control"
   kind: "attention"

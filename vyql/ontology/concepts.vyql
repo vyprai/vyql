@@ -2095,6 +2095,15 @@ concept NextcloudCircleMemberAddMissingCircleCheck : sink {
   review_assumption: "a caller who learns a private circle id can submit it as a member id to track or add that circle through the API"
   review_confidence: high
 }
+concept NextcloudFileDropShareScopeBypass : sink {
+  vulnerable_to: [access_control.Idor, access_control.IncorrectAuthorization]
+  cwe: [CWE_639, CWE_863]
+  review_category: "access_control"
+  review_condition: "a Nextcloud public file-drop metadata endpoint accepts a share token and requested file id without proving the id belongs under the shared folder"
+  review_evidence: "file-drop metadata context {pattern} derives the owner from getShareByToken and then looks up the requested id in the owner's root folder before a share-node containment or encryption check"
+  review_assumption: "an external share recipient can supply the share token and choose the file id parameter for the public metadata endpoint"
+  review_confidence: high
+}
 concept CollectivesPublicTrashMissingEditPermission : sink {
   vulnerable_to: [access_control.BrokenAccess]
   cwe: [CWE_284]

@@ -114,6 +114,11 @@ rule NextcloudCircleMemberAddMissingCircleCheck {
   match code.NextcloudCircleMemberAddMissingCircleCheck as controller
 }
 
+rule NextcloudFileDropShareScopeBypass {
+  meta { id: "VYQL-AUTH-050", severity: high, cwe: [CWE_639, CWE_863], confidence_floor: high }
+  match code.NextcloudFileDropShareScopeBypass as controller
+}
+
 rule ClearanceKitPolicyApplyBeforeAdapterStart {
   meta { id: "VYQL-AUTH-020", severity: medium, cwe: [CWE_269], confidence_floor: high }
   match code.ClearanceKitPolicyApplyBeforeAdapterStart as startup

@@ -815,6 +815,27 @@ adapter php {
     lacks "Member::TYPE_CIRCLE"
     lacks "circleService->getCircle($userId)"
   }
+  flag code.NextcloudFileDropShareScopeBypass in function {
+    lang "php"
+    name "addMetadataFileDrop"
+    has "$this->getOwnerId($shareToken)"
+    has "$this->rootFolder->getUserFolder($ownerId)"
+    has "$userFolder->getById($id)"
+    has "$this->metaDataStorage->updateMetaDataIntoIntermediateFile($ownerId,$id"
+    lacks "getFileDropOwnerId"
+    lacks "getFirstNodeById"
+    lacks "$share->getNode()"
+  }
+  flag code.NextcloudFileDropShareScopeBypass in function {
+    lang "php"
+    name "getOwnerId"
+    has "$this->shareManager->getShareByToken($shareToken)"
+    has "$share->getPermissions()&\\OCP\\Constants::PERMISSION_CREATE"
+    has "$share->getShareOwner()"
+    lacks "$share->getNode()"
+    lacks "getFirstNodeById"
+    lacks "isEncrypted()"
+  }
   flag code.CollectivesPublicTrashMissingEditPermission in function {
     lang "php"
     name "index"
