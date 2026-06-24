@@ -983,6 +983,7 @@ adapter javascript {
   }
   control "encode" -> core.HtmlEscape
   control "encodeEntities" -> core.HtmlEscape
+  control "escapeHtml" -> core.HtmlEscape
   control "escapeHTML" -> core.HtmlEscape
   control "escape-html" -> core.HtmlEscape
   control "utils.escape" -> core.HtmlEscape

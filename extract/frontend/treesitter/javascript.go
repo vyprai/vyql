@@ -930,10 +930,10 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		if rhs != nil && rhs.Kind() == "assignment_expression" {
 			prefix = append(prefix, c.exprStmt(rhs, L)...)
 		}
-		right := c.expr(rhs)
-		if left != nil && left.Kind() == "identifier" {
-			return append(prefix, nir.Assign{Targets: []string{c.text(left)}, Value: right})
+		if target, val, ok := c.jsAssignmentExpr(inner); ok {
+			return append(prefix, nir.Assign{Targets: []string{target}, Value: val})
 		}
+		right := c.expr(rhs)
 		// member-property write (e.g. obj.prop = x): model as a path call so adapter
 		// mappings can reason about the assigned value.
 		// Method is empty so it can never collide with method-name mappings.

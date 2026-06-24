@@ -67,6 +67,35 @@ const Model = {
 	}
 }
 
+func TestTypeScriptNestedScalarReassignmentIsExtracted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "table.ts")
+	src := []byte(`
+export function createTablePopper(popperContent: string) {
+  function renderContent() {
+    popperContent = escapeHtml(popperContent)
+    content.innerHTML = popperContent
+  }
+  return renderContent()
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := findFuncDef(prog, "renderContent")
+	if !ok {
+		t.Fatalf("nested function renderContent was not extracted; program=%#v", prog)
+	}
+	if !funcBodyHasAssignTarget(fn.Body, "popperContent") {
+		t.Fatalf("nested function body did not include popperContent reassignment; body=%#v", fn.Body)
+	}
+}
+
 func TestJavaScriptAnonymousDefaultExportFunctionIsExtracted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "index.js")
@@ -436,6 +465,41 @@ func funcBodyHasPath(stmts []nir.Stmt, path string) bool {
 			}
 			for _, h := range s.Handlers {
 				if funcBodyHasPath(h, path) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func funcBodyHasAssignTarget(stmts []nir.Stmt, target string) bool {
+	for _, st := range stmts {
+		switch s := st.(type) {
+		case nir.Assign:
+			for _, t := range s.Targets {
+				if t == target {
+					return true
+				}
+			}
+		case nir.Block:
+			if funcBodyHasAssignTarget(s.Stmts, target) {
+				return true
+			}
+		case nir.If:
+			if funcBodyHasAssignTarget(s.Then, target) || funcBodyHasAssignTarget(s.Else, target) {
+				return true
+			}
+		case nir.Loop:
+			if funcBodyHasAssignTarget(s.Body, target) {
+				return true
+			}
+		case nir.Try:
+			if funcBodyHasAssignTarget(s.Body, target) {
+				return true
+			}
+			for _, h := range s.Handlers {
+				if funcBodyHasAssignTarget(h, target) {
 					return true
 				}
 			}
