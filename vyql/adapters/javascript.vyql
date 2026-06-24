@@ -252,6 +252,15 @@ adapter javascript {
     lacks "SandboxEvents.PUBLIC_STATUS_UPDATED"
     lacks "PUBLIC_CACHE_PREFIX"
   }
+  flag code.EcdhPeerPublicKeyMissingCurveValidation in function {
+    has "lang=javascript"
+    has "name=deriveSharedSecret"
+    has "publicKey.Q.multiply(this.d)"
+    has "zeroBuffer(S.getX().toBigInteger().toString(16),this._size)"
+    lacks "onCurve(publicKey)"
+    lacks "validatePublicKey(publicKey)"
+    lacks "isOnCurve(publicKey)"
+  }
   flag code.TotalJsAdminThemeXss in module {
     has "lang=javascript"
     has "COMPONENT('grid'"

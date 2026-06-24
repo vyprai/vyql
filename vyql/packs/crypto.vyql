@@ -78,3 +78,8 @@ rule FastPasswordHash {
   meta { id: "VYQL-CRY-013", severity: high, cwe: [CWE_328], confidence_floor: high }
   match code.FastPasswordHash as h
 }
+
+rule EcdhPeerPublicKeyMissingCurveValidation {
+  meta { id: "VYQL-CRY-015", severity: high, cwe: [CWE_347, CWE_200], confidence_floor: high }
+  match code.EcdhPeerPublicKeyMissingCurveValidation as ecdh
+}

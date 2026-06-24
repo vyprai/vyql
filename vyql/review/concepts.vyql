@@ -903,6 +903,12 @@ review code.PublicKeyHashBindingReview {
   kind: "attention"
   text: "review signature verification flows that accept a public key without checking it matches the committed key hash"
 }
+review code.EcdhPeerPublicKeyMissingCurveValidation {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ECDH shared-secret derivation for peer public-key curve membership validation before scalar multiplication"
+}
 review code.ConstellationLuks2AttachedHeaderActivation {
   category: "crypto"
   kind: "attention"

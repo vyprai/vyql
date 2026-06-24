@@ -749,6 +749,15 @@ concept PublicKeyHashBindingReview : sink {
   review_assumption: "the script, witness, or signed payload can provide a public key that must match a committed key hash"
   review_confidence: medium
 }
+concept EcdhPeerPublicKeyMissingCurveValidation : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck, secrets.SecretLeak]
+  cwe: [CWE_347, CWE_200]
+  review_category: "crypto"
+  review_condition: "ECDH shared-secret derivation multiplies the private scalar by a peer public point without validating that point belongs to the curve"
+  review_evidence: "ECDH derivation context {pattern} uses publicKey.Q.multiply(this.d) without an observed on-curve check"
+  review_assumption: "an attacker can provide a malformed peer public key and observe derived-secret behavior"
+  review_confidence: high
+}
 
 concept AttestationPredicateVerificationBypass : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]
