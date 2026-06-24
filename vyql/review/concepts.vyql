@@ -1763,6 +1763,12 @@ review code.LeadingDotSegmentOnlyRouteFilter {
   expected: [core.InputValidation, core.PathAccessCheck]
   text: "review route path filters that block only leading dot segments but allow nested dot-segment traversal"
 }
+review code.TemplatePathComponentTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization]
+  text: "review template or resource path builders for basename canonicalization of interpolated path components before returning template paths"
+}
 review code.TemplateDirectoryHiddenGlobCopy {
   category: "path"
   kind: "attention"

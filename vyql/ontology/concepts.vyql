@@ -3077,6 +3077,15 @@ concept LeadingDotSegmentOnlyRouteFilter : sink {
   review_assumption: "request paths can contain nested '/.' or '/../' segments that reach later file resolution or package asset access"
   review_confidence: high
 }
+concept TemplatePathComponentTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "template or resource path builders interpolate path components before basename canonicalization"
+  review_evidence: "template path builder context {pattern} returns a templates/... path containing interpolated components without observed basename canonicalization for those components"
+  review_assumption: "at least one interpolated template path component can contain a path separator, absolute path, or parent-directory segment"
+  review_confidence: high
+}
 concept UnvalidatedDynamicRequirePathTraversal : sink {
   vulnerable_to: [path.PathTraversal, injection.UnsafeDynamicLoading]
   cwe: [CWE_22, CWE_829]

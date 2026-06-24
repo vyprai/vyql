@@ -596,6 +596,31 @@ adapter php {
     lacks "basename($rrd['filename'])"
     lacks "shell_safe"
   }
+  flag code.TemplatePathComponentTraversal in function {
+    lang "php"
+    has "templates/{$type}/{$language}"
+    has "{$name}.tpl"
+    lacks "basename($type)"
+  }
+  flag code.TemplatePathComponentTraversal in function {
+    lang "php"
+    has "templates/{$type}/{$language}"
+    has "{$name}.tpl"
+    lacks "basename($language)"
+  }
+  flag code.TemplatePathComponentTraversal in function {
+    lang "php"
+    has "templates/{$type}/{$language}"
+    has "{$name}.tpl"
+    lacks "basename($name)"
+  }
+  flag code.TemplatePathComponentTraversal in function {
+    lang "php"
+    has "templates/{$type}/{$language}"
+    has "{$entityType}"
+    has "{$name}.tpl"
+    lacks "basename($entityType)"
+  }
   flag code.UnescapedDiagnosticHtml in function {
     lang "php"
     has "$this->last_headers"

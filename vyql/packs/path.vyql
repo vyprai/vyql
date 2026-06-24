@@ -212,3 +212,8 @@ rule LeadingDotSegmentOnlyRouteFilter {
   meta { id: "VYQL-PATH-041", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
   match code.LeadingDotSegmentOnlyRouteFilter as sink
 }
+
+rule TemplatePathComponentTraversal {
+  meta { id: "VYQL-PATH-042", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.TemplatePathComponentTraversal as sink
+}
