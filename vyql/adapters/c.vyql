@@ -578,6 +578,16 @@ adapter c {
     lacks "strcmp(tmp_cipher,\"none\")!=0"
     lacks "strcmp(tmp_hash,\"none\")==0"
   }
+  flag code.RepeatedKeyfileSubstitutionTables in function {
+    lang "c"
+    has "keyFile!=NULL"
+    has "fread(extractedString,1,BUFFER_SIZE,keyFile)"
+    has "scrambleAsciiTables[j][i%256]=scrambleAsciiTables[j][(unsignedchar)(extractedString[i])]"
+    has "scrambleAsciiTables[j][(unsignedchar)(extractedString[i])]=temp"
+    lacks "generateNumber()^extractedString[i]"
+    lacks "scramblingTablesOrder"
+    lacks "usingKeyFile"
+  }
 
   // insecure randomness (CWE-330) — rand()/random() (presence); getrandom()/RAND_bytes safe
   flag code.WeakRandomValue on any {

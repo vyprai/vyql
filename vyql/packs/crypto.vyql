@@ -118,3 +118,8 @@ rule PublicWeakChecksumUtility {
   meta { id: "VYQL-CRY-022", severity: medium, cwe: [CWE_327, CWE_328], confidence_floor: high }
   match code.PublicWeakChecksumUtility as util
 }
+
+rule RepeatedKeyfileSubstitutionTables {
+  meta { id: "VYQL-CRY-023", severity: high, cwe: [CWE_327, CWE_326], confidence_floor: high }
+  match code.RepeatedKeyfileSubstitutionTables as table
+}

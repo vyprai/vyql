@@ -645,6 +645,15 @@ concept WeakCipher : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_327, CWE_326]
 }
+concept RepeatedKeyfileSubstitutionTables : sink {
+  vulnerable_to: [crypto.WeakCipher]
+  cwe: [CWE_327, CWE_326]
+  review_category: "crypto"
+  review_condition: "keyfile-driven substitution-table generation repeats the same table schedule or table order across encryption rounds"
+  review_evidence: "substitution-table setup context {pattern} reads keyfile bytes and uses them directly to swap table entries for each table without per-table PRNG mixing or a separate keyfile-derived table-order stream"
+  review_assumption: "an attacker with known plaintext or ciphertext samples can exploit repeated substitution-table order for frequency analysis or key recovery"
+  review_confidence: high
+}
 // A cryptographic operation (sign/verify/encrypt/decrypt/hash/key-derivation) whose
 // CORRECTNESS — algorithm choice, signature verification, key/IV handling — can't be
 // proven by static analysis. Surfaced only by the possibility tier for AI/triage review

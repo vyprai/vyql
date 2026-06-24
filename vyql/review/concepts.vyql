@@ -974,6 +974,11 @@ review code.PublicWeakChecksumUtility {
   kind: "attention"
   text: "review public checksum/hash utilities for weak algorithms and restrict non-cryptographic helpers to internal or package-private API"
 }
+review code.RepeatedKeyfileSubstitutionTables {
+  category: "crypto"
+  kind: "attention"
+  text: "review keyfile-based substitution-table generation for per-table mixing and keyfile-derived table order"
+}
 review code.EcdsaSignatureScalarBoundsMissing {
   category: "crypto"
   kind: "attention"
