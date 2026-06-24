@@ -1621,6 +1621,15 @@ concept ShopwareStoreApiManyToManyCriteriaBypass : sink {
   review_assumption: "extensions can define ManyToMany associations whose target entity exposes non-ApiAware fields through Store API criteria"
   review_confidence: high
 }
+concept PostEditReportPrivateContentLeak : sink {
+  vulnerable_to: [access_control.BrokenAccess, secrets.SecretLeak]
+  cwe: [CWE_200, CWE_863]
+  review_category: "access_control"
+  review_condition: "a post-edit report query returns revision/post data without filtering private messages and secure categories for the current user"
+  review_evidence: "post edit report context {pattern} queries post_revisions joined to posts before the private-message and secure-category visibility guards"
+  review_assumption: "moderators or staff users can request the report without admin-only visibility"
+  review_confidence: high
+}
 concept TimeBoundAccessTokenReview : sink {
   vulnerable_to: [access_control.BrokenAccess]
   cwe: [CWE_284]

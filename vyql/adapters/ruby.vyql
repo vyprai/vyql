@@ -241,6 +241,15 @@ adapter ruby {
     lacks "Shellwords"
     lacks "shellescape"
   }
+  flag code.PostEditReportPrivateContentLeak in function {
+    has "lang=ruby"
+    has "name=report_post_edits"
+    has "FROM post_revisions pr"
+    has "JOIN posts p"
+    has "report.data << revision"
+    lacks "Archetype.private_message"
+    lacks "secure_category"
+  }
   flag code.UnescapedQueueQueryStringXss in function {
     has "lang=ruby"
     has "name=url_path"

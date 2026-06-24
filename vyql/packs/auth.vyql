@@ -69,6 +69,11 @@ rule TokenCacheAuthorizationBypass {
   match code.TokenCacheAuthorizationBypass as cache
 }
 
+rule PostEditReportPrivateContentLeak {
+  meta { id: "VYQL-AUTH-040", severity: high, cwe: [CWE_200, CWE_863], confidence_floor: high }
+  match code.PostEditReportPrivateContentLeak as report
+}
+
 rule ChefUserManagementWithoutAdminGuard {
   meta { id: "VYQL-AUTH-016", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.ChefUserManagementWithoutAdminGuard as controller
