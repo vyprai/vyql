@@ -3095,6 +3095,15 @@ concept TemplatePathComponentTraversal : sink {
   review_assumption: "at least one interpolated template path component can contain a path separator, absolute path, or parent-directory segment"
   review_confidence: high
 }
+concept PrefixWildcardKeyEnumeration : sink {
+  vulnerable_to: [path.PathTraversal, secrets.SecretLeak]
+  cwe: [CWE_22, CWE_200]
+  review_category: "path"
+  review_condition: "key-value store wildcard enumeration appends '*' directly to an attacker-selected key prefix"
+  review_evidence: "key enumeration context {pattern} calls findKeys with a namespace prefix plus user key plus '*' and then reads each returned record"
+  review_assumption: "the requested key can be a prefix of other records that should not be included in the export or read response"
+  review_confidence: high
+}
 concept UnvalidatedDynamicRequirePathTraversal : sink {
   vulnerable_to: [path.PathTraversal, injection.UnsafeDynamicLoading]
   cwe: [CWE_22, CWE_829]

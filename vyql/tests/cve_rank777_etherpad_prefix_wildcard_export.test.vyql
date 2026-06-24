@@ -1,0 +1,75 @@
+# Rank 777 / CVE-2015-2298: Etherpad exported records for pad IDs sharing
+# the requested pad's prefix because the key glob used padId + "*".
+test "rank777: pad export wildcard is not delimiter bounded"
+  lang javascript
+  expect VYQL-PATH-043
+  expect_review code.PrefixWildcardKeyEnumeration
+  code
+  ```
+  var async = require("async");
+  var db = require("../db/DB").db;
+
+  exports.getPadRaw = function(padId, callback) {
+    async.waterfall([
+      function(cb) {
+        db.findKeys("pad:" + padId + "*", null, function(err, records) {
+          if (!err) cb(err, records);
+        });
+      },
+      function(records, cb) {
+        var data = {};
+        async.forEachSeries(Object.keys(records), function(key, r) {
+          db.get(records[key], function(err, entry) {
+            data[records[key]] = entry;
+            r(null);
+          });
+        }, function(err) {
+          cb(err, data);
+        });
+      }
+    ], function(err, data) {
+      callback(null, data);
+    });
+  };
+  ```
+
+test "rank777: pad export wildcard is delimiter bounded"
+  lang javascript
+  reject VYQL-PATH-043
+  reject_review code.PrefixWildcardKeyEnumeration
+  code
+  ```
+  var async = require("async");
+  var db = require("../db/DB").db;
+
+  exports.getPadRaw = function(padId, callback) {
+    async.waterfall([
+      function(cb) {
+        db.findKeys("pad:" + padId, null, function(err, padcontent) {
+          if (!err) cb(err, padcontent);
+        });
+      },
+      function(padcontent, cb) {
+        db.findKeys("pad:" + padId + ":*", null, function(err, records) {
+          if (!err) {
+            for (var key in padcontent) records.push(padcontent[key]);
+            cb(err, records);
+          }
+        });
+      },
+      function(records, cb) {
+        var data = {};
+        async.forEachSeries(Object.keys(records), function(key, r) {
+          db.get(records[key], function(err, entry) {
+            data[records[key]] = entry;
+            r(null);
+          });
+        }, function(err) {
+          cb(err, data);
+        });
+      }
+    ], function(err, data) {
+      callback(null, data);
+    });
+  };
+  ```

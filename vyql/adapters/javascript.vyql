@@ -364,6 +364,12 @@ adapter javascript {
   // ueberDB key-glob read: db.findKeys("pad:"+id+"*") — an unsanitized id in the key pattern
   // reads keys outside the intended namespace (CWE-22-style traversal of the kv store).
   sink method "findKeys" -> code.FilePathAccess
+  flag code.PrefixWildcardKeyEnumeration in function {
+    lang "javascript"
+    has "db.findKeys(\"pad:\"+padId+\"*\""
+    has "db.get(records[key]"
+    lacks "\"pad:\"+padId+\":*\""
+  }
   sink path "client.query" -> code.SqlExecution
   sink path "mysql.query" -> code.SqlExecution
   sink path "pg.query" -> code.SqlExecution

@@ -1775,6 +1775,12 @@ review code.TemplatePathComponentTraversal {
   expected: [core.PathCanonicalization]
   text: "review template or resource path builders for basename canonicalization of interpolated path components before returning template paths"
 }
+review code.PrefixWildcardKeyEnumeration {
+  category: "path"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review key-value wildcard enumeration for delimiter-bounded prefixes before reading all returned records"
+}
 review code.TemplateDirectoryHiddenGlobCopy {
   category: "path"
   kind: "attention"

@@ -217,3 +217,8 @@ rule TemplatePathComponentTraversal {
   meta { id: "VYQL-PATH-042", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.TemplatePathComponentTraversal as sink
 }
+
+rule PrefixWildcardKeyEnumeration {
+  meta { id: "VYQL-PATH-043", severity: high, cwe: [CWE_22, CWE_200], confidence_floor: high }
+  match code.PrefixWildcardKeyEnumeration as sink
+}
