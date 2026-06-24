@@ -956,6 +956,15 @@ adapter python {
     has "__default_field__"
     has "=ANY("
   }
+  flag code.UnvalidatedSqlIdentifierInterpolation on any {
+    path exact "analysis.function.context"
+    has "name=update_profile"
+    has "UPDATE users SET"
+    has "field[0]"
+    has "nonquery"
+    lacks "field[0] in [\"firstname\", \"lastname\"]"
+    lacks "field[0]in[\"firstname\",\"lastname\"]"
+  }
   flag code.AmbiguousQueryParameterSeparator in function {
     has "name=_parse_qsl"
     has "qs.replace(';','&').split('&')"

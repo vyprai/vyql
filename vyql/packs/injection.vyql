@@ -14,6 +14,11 @@ rule UnparameterizedSqlQueryParser {
   match code.UnparameterizedSqlQueryParser as sink
 }
 
+rule UnvalidatedSqlIdentifierInterpolation {
+  meta { id: "VYQL-INJ-152", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.UnvalidatedSqlIdentifierInterpolation as sink
+}
+
 rule UnvalidatedSqlOrderDirection {
   meta { id: "VYQL-INJ-124", severity: high, cwe: [CWE_89], confidence_floor: high }
   match code.UnvalidatedSqlOrderDirection as sink

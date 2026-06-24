@@ -800,6 +800,12 @@ review code.UnparameterizedSqlQueryParser {
   kind: "attention"
   text: "review SQL query builders for unparameterized fragments derived from caller-controlled values"
 }
+review code.UnvalidatedSqlIdentifierInterpolation {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review SQL builders that interpolate caller-selected table or column identifiers before an allowlist check"
+}
 review code.UnvalidatedSqlOrderDirection {
   category: "sql"
   kind: "target"
