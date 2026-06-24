@@ -909,6 +909,12 @@ review code.EcdhPeerPublicKeyMissingCurveValidation {
   expected: [core.InputValidation]
   text: "review ECDH shared-secret derivation for peer public-key curve membership validation before scalar multiplication"
 }
+review code.EcdsaSignatureScalarBoundsMissing {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ECDSA verification for r and s range checks before modular inverse and point arithmetic"
+}
 review code.ConstellationLuks2AttachedHeaderActivation {
   category: "crypto"
   kind: "attention"

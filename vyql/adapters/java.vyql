@@ -121,6 +121,16 @@ adapter java {
     has "M[0]"
     lacks "expr:m.length==48"
   }
+  flag code.EcdsaSignatureScalarBoundsMissing in function {
+    has "function_name:verify"
+    has "selector:signature.r"
+    has "selector:signature.s"
+    has "selector:publicKey.point"
+    has "call_path:Math.inv"
+    has "call_path:Math.multiply"
+    lacks "expr:r.compareTo(curve.N)>=0"
+    lacks "expr:s.compareTo(curve.N)>=0"
+  }
   flag code.RequestHostUrlValidationBypass in function {
     has "call:getServerName"
     has "call:getHost"

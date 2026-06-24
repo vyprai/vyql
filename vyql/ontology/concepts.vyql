@@ -758,6 +758,15 @@ concept EcdhPeerPublicKeyMissingCurveValidation : sink {
   review_assumption: "an attacker can provide a malformed peer public key and observe derived-secret behavior"
   review_confidence: high
 }
+concept EcdsaSignatureScalarBoundsMissing : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+  review_category: "crypto"
+  review_condition: "ECDSA verification uses signature r/s scalars without checking that both are in the valid range [1, n)"
+  review_evidence: "ECDSA verify context {pattern} computes s inverse and point multiplication before observed r/s bounds checks"
+  review_assumption: "an attacker can provide malformed signatures with out-of-range r or s values"
+  review_confidence: high
+}
 
 concept AttestationPredicateVerificationBypass : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]

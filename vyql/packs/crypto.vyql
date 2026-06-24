@@ -83,3 +83,8 @@ rule EcdhPeerPublicKeyMissingCurveValidation {
   meta { id: "VYQL-CRY-015", severity: high, cwe: [CWE_347, CWE_200], confidence_floor: high }
   match code.EcdhPeerPublicKeyMissingCurveValidation as ecdh
 }
+
+rule EcdsaSignatureScalarBoundsMissing {
+  meta { id: "VYQL-CRY-016", severity: high, cwe: [CWE_347], confidence_floor: high }
+  match code.EcdsaSignatureScalarBoundsMissing as ecdsa
+}
