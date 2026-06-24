@@ -171,6 +171,41 @@ func TestExtractAllSupportsPerlXSAsC(t *testing.T) {
 	}
 }
 
+func TestExtractAllRoutesCPPHeadersByContent(t *testing.T) {
+	dir := t.TempDir()
+	cppHeader := filepath.Join(dir, "web_server_base.h")
+	if err := os.WriteFile(cppHeader, []byte(`
+namespace esphome {
+class WebServerBase {
+ public:
+  void add_handler(AsyncWebHandler *handler) { handlers_.push_back(handler); }
+ private:
+  std::vector<AsyncWebHandler *> handlers_;
+};
+}
+`), 0o600); err != nil {
+		t.Fatalf("write c++ header: %v", err)
+	}
+	cHeader := filepath.Join(dir, "plain.h")
+	if err := os.WriteFile(cHeader, []byte(`
+#define FLAG 1
+int c_header_helper(char *value);
+`), 0o600); err != nil {
+		t.Fatalf("write c header: %v", err)
+	}
+
+	_, _, _, stats, err := extractAll([]string{dir})
+	if err != nil {
+		t.Fatalf("extractAll headers: %v", err)
+	}
+	if got := stats.files["cpp"]; got != 1 {
+		t.Fatalf("C++-looking .h should route through cpp frontend, got %d stats=%v", got, stats.files)
+	}
+	if got := stats.files["c"]; got != 1 {
+		t.Fatalf("plain .h should still route through c frontend, got %d stats=%v", got, stats.files)
+	}
+}
+
 // The full default rule library (vyql/packs/*.vyql) must parse and type-check
 // against the ontology with zero errors.
 func TestDefaultPacksCompile(t *testing.T) {

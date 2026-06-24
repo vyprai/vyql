@@ -63,6 +63,17 @@ adapter c {
     lacks "strstr(page,\"..\")"
     lacks "strchr(page,'/')"
   }
+  flag code.SharedOtaHandlerMissingAuthentication on any {
+    path exact "analysis.module.context"
+    has "classWebServerBase"
+    has "voidadd_handler(AsyncWebHandler*handler)"
+    has "handlers_.push_back(handler)"
+    has "classOTARequestHandler"
+    has "voidhandleUpload(AsyncWebServerRequest*request"
+    lacks "AuthMiddlewareHandler"
+    lacks "request->authenticate"
+    lacks "check_auth"
+  }
   flag code.RemoteListingDownloadPath in module {
     lang "c"
     has "sink(intargc,char**argv)"

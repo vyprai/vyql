@@ -65,6 +65,12 @@ review code.AuthenticationRequiredOp {
   expected: [core.AuthenticationCheck]
   text: "verify an authenticated user is required before this operation"
 }
+review code.SharedOtaHandlerMissingAuthentication {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck]
+  text: "verify shared web-server handler registration wraps OTA upload handlers in the same authentication middleware as normal request handlers"
+}
 review code.JmxRmiRegistryExposure {
   category: "auth"
   kind: "attention"

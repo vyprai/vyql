@@ -9,6 +9,11 @@ rule MissingAuthentication {
   unless guarded_by core.AuthenticationCheck
 }
 
+rule SharedOtaHandlerMissingAuthentication {
+  meta { id: "VYQL-AUTH-051", severity: high, cwe: [CWE_306, CWE_862], confidence_floor: high }
+  match code.SharedOtaHandlerMissingAuthentication as handler
+}
+
 rule JmxRmiRegistryExposure {
   meta { id: "VYQL-AUTH-013", severity: high, cwe: [CWE_306, CWE_94], confidence_floor: medium }
   match code.JmxRmiRegistryExposure as exposure

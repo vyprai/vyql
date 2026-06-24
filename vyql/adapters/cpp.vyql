@@ -158,6 +158,17 @@ adapter cpp {
     lacks "newByteLength>maxLength.value()"
     lacks "throwTypeErrorIfDetached(state);Optional"
   }
+  flag code.SharedOtaHandlerMissingAuthentication on any {
+    path exact "analysis.module.context"
+    has "classWebServerBase"
+    has "voidadd_handler(AsyncWebHandler*handler)"
+    has "handlers_.push_back(handler)"
+    has "classOTARequestHandler"
+    has "voidhandleUpload(AsyncWebServerRequest*request"
+    lacks "AuthMiddlewareHandler"
+    lacks "request->authenticate"
+    lacks "check_auth"
+  }
   flag code.PointerOffsetBoundsCheck in function {
     lang "cpp"
     has "start+len+1>end"

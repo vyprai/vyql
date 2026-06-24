@@ -86,7 +86,7 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
 		}
 		for _, lg := range languages {
-			files := treesitter.FilterEntries(entries, lg.exts)
+			files := filterEntriesForLanguage(entries, lg)
 			if len(files) == 0 {
 				continue
 			}
@@ -120,6 +120,51 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 		prog.Properties = props
 	}
 	return prog, ads, ctorTypes, stats, nil
+}
+
+func filterEntriesForLanguage(entries []treesitter.Entry, lg language) []string {
+	var out []string
+	for _, e := range entries {
+		if e.Ext == ".h" {
+			isCPP := headerLooksCPP(e.Path)
+			if lg.name == "cpp" && isCPP {
+				out = append(out, e.Path)
+			}
+			if lg.name == "c" && !isCPP && lg.exts[e.Ext] {
+				out = append(out, e.Path)
+			}
+			continue
+		}
+		if lg.exts[e.Ext] || lg.exts[e.Base] {
+			out = append(out, e.Path)
+		}
+	}
+	return out
+}
+
+func headerLooksCPP(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	text := string(b)
+	for _, marker := range []string{
+		"namespace ",
+		"class ",
+		"template<",
+		"template <",
+		"std::",
+		"::",
+		"public:",
+		"private:",
+		"protected:",
+		"new ",
+	} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // collectProperties parses every `.properties` file reachable from the scan paths into a

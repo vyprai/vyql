@@ -634,7 +634,7 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
-				if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
+				if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
 					continue
 				}
 				method, path := n.Prop("method"), n.Prop("callee_path")
@@ -682,7 +682,7 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
-				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
+				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
 					continue
 				}
 				method, path := n.Prop("method"), n.Prop("callee_path")
@@ -898,7 +898,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				if path == "" && method == "" {
 					return true
 				}
-				if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
+				if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
 					return true // only label this language's nodes (cross-language adapters skip this)
 				}
 				for _, ci := range inIdx.candidates(method, path) {
@@ -974,7 +974,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			var collectionIdx collectionFlowIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
-				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
+				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
 					continue // only label this language's nodes
 				}
 				isAttr := n.Type == "code.Attr"
@@ -1123,7 +1123,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 			var out []adapters.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
-				if t := nodeTech(n.Prop("loc")); t != "" && t != spec.Technology {
+				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
 					continue // only label this language's nodes
 				}
 				path, method := n.Prop("callee_path"), n.Prop("method")
@@ -1181,6 +1181,25 @@ func nodeTech(loc string) string {
 	return ""
 }
 
+func nodeTechFromNode(n usg.Node) string {
+	if t := contextNodeTech(n); t != "" {
+		return t
+	}
+	return nodeTech(n.Prop("loc"))
+}
+
+func contextNodeTech(n usg.Node) string {
+	if n.Type != "code.Call" || !strings.HasPrefix(n.Prop("callee_path"), "analysis.") {
+		return ""
+	}
+	for _, tok := range strings.Split(n.Prop("str_args"), "\x00") {
+		if strings.HasPrefix(tok, "lang=") {
+			return strings.TrimPrefix(tok, "lang=")
+		}
+	}
+	return ""
+}
+
 // rangeNodes streams every node to fn via the store's RangeNodes fast path (no full []Node copy)
 // when available, else falls back to AllNodes. Adapter passes iterate every node once; the slice
 // copy was a multi-GB transient on large graphs.
@@ -1223,7 +1242,7 @@ func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 			continue
 		}
 		if !crossLang {
-			if t := nodeTech(n.Prop("loc")); t != "" && t != tech {
+			if t := nodeTechFromNode(n); t != "" && t != tech {
 				continue
 			}
 		}
@@ -1308,7 +1327,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 					if err != nil || !ok {
 						continue
 					}
-					if t := nodeTech(n.Prop("loc")); !spec.crossLang && t != "" && t != spec.Technology {
+					if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
 						continue
 					}
 					for _, i := range flagIdx.candidates(n.Prop("method"), n.Prop("callee_path")) {
@@ -1469,7 +1488,7 @@ func flagPredicateMatches(s usg.Store, pred flagPredicate, n usg.Node, tech stri
 			if prefix != "" && locFile(cand.Prop("loc")) != prefix {
 				continue
 			}
-			if t := nodeTech(cand.Prop("loc")); !crossLang && t != "" && t != tech {
+			if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
 				continue
 			}
 			if flagPredicateMatchesNodeOnly(probe, cand) {
@@ -1598,7 +1617,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
 					n, _, _ := s.GetNode(id)
-					if t := nodeTech(n.Prop("loc")); !crossLang && t != "" && t != spec.Technology {
+					if t := nodeTechFromNode(n); !crossLang && t != "" && t != spec.Technology {
 						continue
 					}
 					path := n.Prop("callee_path")
@@ -1871,7 +1890,7 @@ func jsPathRegexGuardAdapter() adapters.Adapter {
 				if err != nil || !ok {
 					continue
 				}
-				if t := nodeTech(n.Prop("loc")); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+				if t := nodeTechFromNode(n); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
 					continue
 				}
 				method := n.Prop("method")
@@ -1901,7 +1920,7 @@ func jsSafePathResolverAdapter() adapters.Adapter {
 				if err != nil || !ok {
 					continue
 				}
-				if t := nodeTech(n.Prop("loc")); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+				if t := nodeTechFromNode(n); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
 					continue
 				}
 				if n.Prop("callee_path") != "analysis.function.context" {
@@ -1921,7 +1940,7 @@ func jsSafePathResolverAdapter() adapters.Adapter {
 				if err != nil || !ok {
 					continue
 				}
-				if t := nodeTech(n.Prop("loc")); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+				if t := nodeTechFromNode(n); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
 					continue
 				}
 				path := n.Prop("callee_path")
@@ -2059,7 +2078,7 @@ func processArgVectorAdapter(tech string) adapters.Adapter {
 				if err != nil || !ok {
 					continue
 				}
-				if t := nodeTech(n.Prop("loc")); t != "" && tech != "" && t != tech {
+				if t := nodeTechFromNode(n); t != "" && tech != "" && t != tech {
 					continue
 				}
 				if !safeProcessArgVectorSeq(s, &idx, id) {

@@ -1695,6 +1695,15 @@ concept AuthenticationRequiredOp : sink {
   review_assumption: "the enclosing endpoint or entry point can be reached by an unauthenticated actor"
   review_confidence: low
 }
+concept SharedOtaHandlerMissingAuthentication : sink {
+  vulnerable_to: [authentication.MissingAuthentication, access_control.MissingAuthorization]
+  cwe: [CWE_306, CWE_862]
+  review_category: "auth"
+  review_condition: "a shared web handler registry exposes an OTA upload handler without an observed authentication middleware"
+  review_evidence: "web-handler registry context {pattern} stores raw AsyncWebHandler instances while declaring an OTA upload handler"
+  review_assumption: "the OTA endpoint is reachable over the device web server when web authentication is configured for other handlers"
+  review_confidence: high
+}
 concept JmxRmiRegistryExposure : sink {
   vulnerable_to: [authentication.MissingAuthentication, injection.CodeInjection]
   cwe: [CWE_306, CWE_94]
