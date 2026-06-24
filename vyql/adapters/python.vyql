@@ -425,6 +425,17 @@ adapter python {
     lacks "is_safe_url"
     lacks "get_account_adapter"
   }
+  flag code.SnsCertificateUrlTrustBypass in function {
+    has "name=_get_cert_url"
+    has "SigningCertURL"
+    has "cert_url.startswith(\"https://\")"
+    has "urlparse(cert_url)"
+    has "settings.EVENT_CERT_DOMAINS"
+    has "url_obj.netloc.split(\".\")[-len(parts) :] == parts"
+    has "return cert_url"
+    lacks "SES_REGEX_CERT_URL.match(cert_url)"
+    lacks "SimpleNotificationService"
+  }
   flag code.SecretComparisonReview in function {
     has "name=validate_request"
     has "self.basic_auth"

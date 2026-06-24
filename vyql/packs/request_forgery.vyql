@@ -28,6 +28,11 @@ rule ChamiloUnsafeGuzzleUrlFetch {
   match code.ChamiloUnsafeGuzzleUrlFetch as fetch
 }
 
+rule SnsCertificateUrlTrustBypass {
+  meta { id: "VYQL-RF-025", severity: high, cwe: [CWE_295, CWE_918], confidence_floor: high }
+  match code.SnsCertificateUrlTrustBypass as verifier
+}
+
 rule ClockworkWebJobCsrf {
   meta { id: "VYQL-RF-015", severity: medium, cwe: [CWE_352], confidence_floor: high }
   match code.ClockworkWebJobCsrf as action

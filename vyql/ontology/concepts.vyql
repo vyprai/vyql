@@ -1936,6 +1936,15 @@ concept ChamiloUnsafeGuzzleUrlFetch : sink {
   review_assumption: "the URL argument can originate from social-wall or profile form input and can target internal services"
   review_confidence: medium
 }
+concept SnsCertificateUrlTrustBypass : sink {
+  vulnerable_to: [crypto.ImproperCertValidation, request_forgery.Ssrf]
+  cwe: [CWE_295, CWE_918]
+  review_category: "crypto"
+  review_condition: "SNS/SES message verification accepts a broad certificate URL host suffix before downloading and trusting the certificate"
+  review_evidence: "SNS certificate URL context {pattern} returns SigningCertURL after only HTTPS and trusted-domain suffix checks, without the strict SimpleNotificationService certificate URL allowlist"
+  review_assumption: "an attacker can provide a signed SNS/SES notification whose SigningCertURL points at an attacker-controlled matching cloud hostname"
+  review_confidence: high
+}
 concept CloudBaseOpenUrlSsrf : sink {
   vulnerable_to: [request_forgery.Ssrf]
   cwe: [CWE_918]
