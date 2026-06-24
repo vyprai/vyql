@@ -97,6 +97,30 @@ adapter csharp {
     lacks "path.Contains(\"..\")"
     lacks "path.Contains(':')"
   }
+  flag code.DotNetArchiveOrRenamePathTraversal in function {
+    lang "csharp"
+    name "ExtractAsync"
+    has "Path.Combine(rootPath,entry.FullName)"
+    has "entry.ExtractToFile(file,true)"
+    lacks "Path.GetFullPath(file)"
+    lacks "StartsWith(rootPath"
+  }
+  flag code.DotNetArchiveOrRenamePathTraversal in function {
+    lang "csharp"
+    name "RenameAsync"
+    has "Path.Combine(path.Directory.Parent.FullName,name)"
+    has "Directory.Move(path.Directory.FullName,newPath.FullName)"
+    lacks "Path.GetFullPath(newPath.FullName)"
+    lacks "StartsWith(path.RootVolume.RootDirectory"
+  }
+  flag code.DotNetArchiveOrRenamePathTraversal in function {
+    lang "csharp"
+    name "RenameAsync"
+    has "Path.Combine(path.File.DirectoryName,name)"
+    has "File.Move(path.File.FullName,newPath.FullName)"
+    lacks "Path.GetFullPath(newPath.FullName)"
+    lacks "StartsWith(path.RootVolume.RootDirectory"
+  }
   sink path "ExtractToFile" -> code.ArchiveEntryWrite
 
   // SSRF

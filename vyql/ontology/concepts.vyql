@@ -2858,6 +2858,15 @@ concept AssemblyLoadPathTraversal : sink {
   review_assumption: "library callers can pass type names containing assembly components such as '../payload' or drive-qualified paths"
   review_confidence: high
 }
+concept DotNetArchiveOrRenamePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: ".NET archive extraction or rename code joins caller-controlled names into filesystem paths without canonical containment under the root"
+  review_evidence: ".NET filesystem context {pattern} combines archive entry names or rename targets into destination paths before observed Path.GetFullPath plus StartsWith containment"
+  review_assumption: "archive entry names or rename names can contain traversal segments that escape the configured root directory"
+  review_confidence: high
+}
 concept UnvalidatedDynamicRequirePathTraversal : sink {
   vulnerable_to: [path.PathTraversal, injection.UnsafeDynamicLoading]
   cwe: [CWE_22, CWE_829]

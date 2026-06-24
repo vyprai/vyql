@@ -187,3 +187,8 @@ rule TempPathJoinBeforeSeparatorCheck {
   meta { id: "VYQL-PATH-036", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.TempPathJoinBeforeSeparatorCheck as sink
 }
+
+rule DotNetArchiveOrRenamePathTraversal {
+  meta { id: "VYQL-PATH-037", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.DotNetArchiveOrRenamePathTraversal as sink
+}
