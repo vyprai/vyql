@@ -1503,6 +1503,12 @@ review code.AssemblyLoadPathTraversal {
   expected: [core.PathAccessCheck]
   text: "reject traversal and drive-qualified assembly path components before dynamic assembly loading"
 }
+review code.TemplateDirectoryHiddenGlobCopy {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review downloaded template directory copies for hidden dot-glob recursion and disable hidden copy mode for untrusted template subdirectories"
+}
 review code.AmbiguousQueryParameterSeparator {
   category: "request"
   kind: "attention"

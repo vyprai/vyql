@@ -172,3 +172,8 @@ rule BoundRequestPathDeleteTraversal {
   meta { id: "VYQL-PATH-033", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.BoundRequestPathDeleteTraversal as sink
 }
+
+rule TemplateDirectoryHiddenGlobCopy {
+  meta { id: "VYQL-PATH-034", severity: medium, cwe: [CWE_22, CWE_200], confidence_floor: high }
+  match code.TemplateDirectoryHiddenGlobCopy as sink
+}

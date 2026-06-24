@@ -2804,6 +2804,15 @@ concept RelativeOnlyFilenameValidation : sink {
   review_assumption: "the validated filename may later be resolved by file access code that treats absolute paths as escaping the intended base directory"
   review_confidence: high
 }
+concept TemplateDirectoryHiddenGlobCopy : sink {
+  vulnerable_to: [path.PathTraversal, secrets.SecretLeak]
+  cwe: [CWE_22, CWE_200]
+  review_category: "path"
+  review_condition: "downloaded template directories are recursively copied with hidden dot-glob entries enabled"
+  review_evidence: "template copy context {pattern} passes a downloaded directory to a recursive copy helper without disabling hidden-entry glob copying"
+  review_assumption: "template contents or package extraction paths can include hidden entries that expose files outside the intended template directory"
+  review_confidence: high
+}
 concept ConvertSvgMultiSvgSanitizerBypass : sink {
   vulnerable_to: [path.PathTraversal, injection.Xss]
   cwe: [CWE_22, CWE_79]

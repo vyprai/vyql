@@ -1111,6 +1111,14 @@ adapter javascript {
     has "defaultsDeep(val,value)"
     lacks "key==='__proto__'"
   }
+  flag code.TemplateDirectoryHiddenGlobCopy on any {
+    path exact "analysis.function.context"
+    has "lang=javascript"
+    has "name=downloadTemplate"
+    has "fs.statSync(file).isDirectory()"
+    has "d.copy(file,dist)"
+    lacks "hide:false"
+  }
   flag code.NestedPathInheritedPropertyPrototypePollution in function {
     has "lang=javascript"
     has "currentKeyPath"
