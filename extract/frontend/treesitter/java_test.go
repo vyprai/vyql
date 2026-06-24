@@ -88,6 +88,58 @@ func TestJavaFunctionContextIncludesClassBases(t *testing.T) {
 	t.Fatalf("function context did not include enclosing class base; nodes=%#v", nodes)
 }
 
+func TestJavaFunctionContextIncludesModifierTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ChecksumCalculator.java")
+	src := []byte(`public final class ChecksumCalculator {
+  public static void digest() {
+    MessageDigest.getInstance("SHA-1");
+  }
+}
+class PackagePrivateChecksum {
+  void digest() {
+    MessageDigest.getInstance("SHA-1");
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawPublicDigest bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "class_name:ChecksumCalculator") &&
+			strings.Contains(args, "function_name:digest") &&
+			strings.Contains(args, "class_modifier:public") &&
+			strings.Contains(args, "class_modifier:final") &&
+			strings.Contains(args, "function_modifier:public") &&
+			strings.Contains(args, "function_modifier:static") {
+			sawPublicDigest = true
+		}
+		if strings.Contains(args, "class_name:PackagePrivateChecksum") &&
+			(strings.Contains(args, "class_modifier:public") || strings.Contains(args, "function_modifier:public")) {
+			t.Fatalf("package-private context unexpectedly had public modifier token: %s", args)
+		}
+	}
+	if !sawPublicDigest {
+		t.Fatalf("public digest context did not include expected modifier tokens; nodes=%#v", nodes)
+	}
+}
+
 func TestJavaThreadLocalLifecycleContextTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "RequestScopedCache.java")

@@ -178,6 +178,15 @@ adapter java {
     has "hashFor"
     not call "sha256hash160"
   }
+  flag code.PublicWeakChecksumUtility in class {
+    has "class_name:Checksum"
+    has "class_modifier:public"
+    literal "SHA-1"
+    literal "CRC32"
+    call path "MessageDigest.getInstance"
+    call path "res.setHash"
+    call path "res.setCrc"
+  }
   flag code.LdapCrlCredentialReuse in function {
     function "prepareConnectionFactory"
     call path "ConnectionConfig.copy"

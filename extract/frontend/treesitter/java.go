@@ -128,6 +128,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		prevContext := c.classContextTokens
 		c.classParamTokens = append(append([]string{}, prevParams...), c.jvAnnotationTokens(n, "class_annotation:")...)
 		c.classContextTokens = append(append([]string{}, prevContext...), javaClassContextTokens(name, bases)...)
+		c.classContextTokens = append(c.classContextTokens, c.jvModifierTokens(n, "class_modifier:")...)
 		cd := nir.ClassDef{Name: name, Body: c.decls(field(n, "body")), Loc: L, Bases: bases}
 		c.classParamTokens = prevParams
 		c.classContextTokens = prevContext
@@ -143,6 +144,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		tokens = append(tokens, annotationTokens...)
 		contextTokens := append([]string{}, c.classContextTokens...)
 		contextTokens = append(contextTokens, annotationTokens...)
+		contextTokens = append(contextTokens, c.jvModifierTokens(n, "function_modifier:")...)
 		contextTokens = append(contextTokens, c.jvFunctionTokens(name, n)...)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
 			ContextTokens: contextTokens,
@@ -517,6 +519,46 @@ func (c *jvConv) jvAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 		}
 	}
 	return out
+}
+
+func (c *jvConv) jvModifierTokens(n *tree_sitter.Node, prefix string) []string {
+	var mods string
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "modifiers" {
+			mods = c.text(ch)
+			break
+		}
+	}
+	if mods == "" {
+		return nil
+	}
+	var out []string
+	for _, mod := range []string{"public", "protected", "private", "static", "final", "abstract", "synchronized", "native", "strictfp"} {
+		if javaContainsWord(mods, mod) {
+			out = append(out, prefix+mod)
+		}
+	}
+	return out
+}
+
+func javaContainsWord(s, word string) bool {
+	for {
+		i := strings.Index(s, word)
+		if i < 0 {
+			return false
+		}
+		before := i == 0 || !javaIdentRune(rune(s[i-1]))
+		afterIdx := i + len(word)
+		after := afterIdx >= len(s) || !javaIdentRune(rune(s[afterIdx]))
+		if before && after {
+			return true
+		}
+		s = s[afterIdx:]
+	}
+}
+
+func javaIdentRune(r rune) bool {
+	return r == '_' || r == '$' || (r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')
 }
 
 func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {

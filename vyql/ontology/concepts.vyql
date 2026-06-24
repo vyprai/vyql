@@ -526,6 +526,15 @@ concept WeakHash : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_327]
 }
+concept PublicWeakChecksumUtility : sink {
+  vulnerable_to: [crypto.WeakHash]
+  cwe: [CWE_327, CWE_328]
+  review_category: "crypto"
+  review_condition: "public checksum or digest helper exposes weak general-purpose hash/checksum algorithms"
+  review_evidence: "public checksum utility context {pattern} exposes SHA-1, CRC32, or fuzzy-hash digest behavior through public API surface"
+  review_assumption: "external callers may use the public API for security-sensitive hashing, integrity, or identity decisions"
+  review_confidence: high
+}
 concept FastPasswordHash : sink {
   vulnerable_to: [crypto.WeakHash]
   cwe: [CWE_328]

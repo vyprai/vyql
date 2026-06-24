@@ -945,6 +945,11 @@ review code.JavaMailSmtpSslIdentityVerificationMissing {
   expected: [core.CertificateValidation]
   text: "review JavaMail SMTP SSL/TLS setup for mail.smtp.ssl.checkserveridentity=true before sending mail or credentials"
 }
+review code.PublicWeakChecksumUtility {
+  category: "crypto"
+  kind: "attention"
+  text: "review public checksum/hash utilities for weak algorithms and restrict non-cryptographic helpers to internal or package-private API"
+}
 review code.EcdsaSignatureScalarBoundsMissing {
   category: "crypto"
   kind: "attention"
