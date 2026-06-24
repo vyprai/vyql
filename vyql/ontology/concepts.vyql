@@ -1738,6 +1738,15 @@ concept JenkinsDescriptorConfigEnumerationMissingPermission : sink {
   review_assumption: "the doFill endpoint is reachable from users with less privilege than Item/Configure or Overall/Administer"
   review_confidence: high
 }
+concept JenkinsBuildScheduleMissingPermission : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+  review_category: "auth"
+  review_condition: "a Jenkins Stapler build endpoint schedules a project build without checking Item/Build permission"
+  review_evidence: "Jenkins build endpoint context {pattern} calls Jenkins queue schedule before an observed hasPermission/checkPermission Item.BUILD gate"
+  review_assumption: "callers with Item/Read or endpoint access can reach the Stapler action and queue builds"
+  review_confidence: high
+}
 concept JenkinsRemoteValidationMissingPermission : sink {
   vulnerable_to: [access_control.MissingAuthorization, request_forgery.Ssrf]
   cwe: [CWE_862, CWE_918]

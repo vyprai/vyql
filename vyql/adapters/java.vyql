@@ -570,6 +570,14 @@ adapter java {
     lacks "call:hasPermission"
     lacks "call:checkPermission"
   }
+  flag code.JenkinsBuildScheduleMissingPermission in function {
+    has "function_name:doBuild"
+    has "call_path:Jenkins.get.getQueue.schedule"
+    has "identifier:project"
+    lacks "call:hasPermission"
+    lacks "call:checkPermission"
+    lacks "selector:Item.BUILD"
+  }
   flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
     has "function_name:doCheckUrl"
     has "call:buildClient"

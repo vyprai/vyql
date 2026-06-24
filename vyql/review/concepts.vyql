@@ -169,6 +169,12 @@ review code.JenkinsDescriptorConfigEnumerationMissingPermission {
   expected: [core.AuthorizationCheck]
   text: "review Jenkins descriptor fill endpoint for missing Item/Configure or Overall/Administer permission checks before listing configuration or credential identifiers"
 }
+review code.JenkinsBuildScheduleMissingPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins Stapler build endpoints for Item/Build permission checks before queueing projects"
+}
 review code.JenkinsRemoteValidationMissingPermission {
   category: "auth"
   kind: "attention"

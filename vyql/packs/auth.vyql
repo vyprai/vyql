@@ -149,6 +149,11 @@ rule JenkinsRemoteValidationMissingPermission {
   match code.JenkinsRemoteValidationMissingPermission as endpoint
 }
 
+rule JenkinsBuildScheduleMissingPermission {
+  meta { id: "VYQL-AUTH-048", severity: medium, cwe: [CWE_862], confidence_floor: high }
+  match code.JenkinsBuildScheduleMissingPermission as endpoint
+}
+
 rule CommentUpdateMissingOwnershipConstraint {
   meta { id: "VYQL-AUTH-046", severity: high, cwe: [CWE_639, CWE_862], confidence_floor: high }
   match code.CommentUpdateMissingOwnershipConstraint as update
