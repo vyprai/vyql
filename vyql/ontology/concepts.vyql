@@ -3589,6 +3589,15 @@ concept SensitiveConfigInfoLog : sink {
   review_assumption: "operator configuration files may contain inline credentials or target resource secrets"
   review_confidence: medium
 }
+concept VerboseHttpClientAuthorizationLog : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_532]
+  review_category: "secret"
+  review_condition: "HTTP client logging is configured to include full request headers or bodies"
+  review_evidence: "HTTP client logging context {pattern} enables verbose/full logging with a request logger attached"
+  review_assumption: "outbound requests may carry authorization headers, bearer tokens, cookies, or other credentials"
+  review_confidence: high
+}
 concept KubernetesCurlAuthorizationHeaderLogLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]

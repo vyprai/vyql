@@ -1481,6 +1481,12 @@ review code.SensitiveConfigInfoLog {
   kind: "attention"
   text: "review configuration object logging above debug level for inline credentials or target resource secrets"
 }
+review code.VerboseHttpClientAuthorizationLog {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review verbose HTTP client logging for authorization-header, cookie, token, or request-body redaction before production use"
+}
 review code.AnsibleSnmpFactsCredentialsNoLogMissing {
   category: "secret"
   kind: "attention"

@@ -131,6 +131,14 @@ adapter java {
     lacks "expr:r.compareTo(curve.N)>=0"
     lacks "expr:s.compareTo(curve.N)>=0"
   }
+  flag code.VerboseHttpClientAuthorizationLog in function {
+    has "call_path:RestAdapter.Builder"
+    has "call:setLogLevel"
+    has "call:setLog"
+    has "selector:RestAdapter.LogLevel.FULL"
+    lacks "selector:RestAdapter.LogLevel.BASIC"
+    lacks "selector:RestAdapter.LogLevel.NONE"
+  }
   flag code.RequestHostUrlValidationBypass in function {
     has "call:getServerName"
     has "call:getHost"
