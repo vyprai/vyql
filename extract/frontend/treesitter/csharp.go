@@ -117,7 +117,7 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		exported := (n.Kind() == "method_declaration" || n.Kind() == "constructor_declaration") && csPublic(c, n)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
-			ParamEntries: c.csParamEntries(name, params, paramTypes, methodTokens), Exported: exported}}
+			ParamEntries: c.csParamEntries(name, params, paramTypes, methodTokens, exported), Exported: exported}}
 	case "property_declaration":
 		// accessor bodies may hold logic
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
@@ -262,7 +262,7 @@ func (c *csConv) csPropertyEntries(body *tree_sitter.Node) []csPropertyEntry {
 	return out
 }
 
-func (c *csConv) csParamEntries(name string, params []string, paramTypes map[string]string, base []string) []nir.ParamEntry {
+func (c *csConv) csParamEntries(name string, params []string, paramTypes map[string]string, base []string, exported bool) []nir.ParamEntry {
 	if len(base) == 0 {
 		return nil
 	}
@@ -273,6 +273,11 @@ func (c *csConv) csParamEntries(name string, params []string, paramTypes map[str
 		}
 		tokens := append([]string{}, base...)
 		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		if exported {
+			tokens = append(tokens, "function_visibility:public")
+		} else {
+			tokens = append(tokens, "function_visibility:private")
+		}
 		if typ := paramTypes[p]; typ != "" {
 			tokens = append(tokens, "param_type:"+typ)
 			if short := lastSeg(typ); short != "" && short != typ {

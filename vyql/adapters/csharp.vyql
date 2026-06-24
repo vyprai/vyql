@@ -15,10 +15,10 @@ adapter csharp {
   source path "analysis.parameter.entry" val "method_attribute:Route" -> code.HttpInput
   source path "analysis.parameter.entry" val "class_attribute:ApiController" -> code.HttpInput
   source path "analysis.parameter.entry" val "class_attribute:Route" -> code.HttpInput
-  source path "analysis.parameter.entry" val "class_name:" val "Controller" -> code.HttpInput
-  source path "analysis.parameter.entry" val "class_base:Controller" -> code.HttpInput
-  source path "analysis.parameter.entry" val "class_base:ControllerBase" -> code.HttpInput
-  source path "analysis.parameter.entry" val "class_base:ApiController" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_name:" val "Controller" val "function_visibility:public" nval "method_attribute:NonAction" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:Controller" val "function_visibility:public" nval "method_attribute:NonAction" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:ControllerBase" val "function_visibility:public" nval "method_attribute:NonAction" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:ApiController" val "function_visibility:public" nval "method_attribute:NonAction" -> code.HttpInput
   source path "analysis.property.entry" val "property_attribute:BindProperty" val "SupportsGet" val "true" -> code.HttpInput
   source path "analysis.property.entry" val "property_attribute:BindPropertyAttribute" val "SupportsGet" val "true" -> code.HttpInput
 
@@ -79,7 +79,9 @@ adapter csharp {
   sink path "File.WriteAllText" -> code.FilePathAccess
   sink path "File.WriteAllBytes" -> code.UnsafeUpload
   sink path "File.Delete" -> code.FilePathAccess
+  sink path "File.Exists" -> code.FilePathAccess
   sink path "File.Open" -> code.FilePathAccess
+  sink path "File.OpenText" -> code.FilePathAccess
   sink path "File.OpenRead" -> code.FilePathAccess
   sink path "File.Copy" -> code.FilePathAccess
   sink path "File.Move" -> code.FilePathAccess
