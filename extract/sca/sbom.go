@@ -26,8 +26,10 @@ type PkgKey struct {
 }
 
 // ParseRequirements is a minimal requirements.txt reader. Lines like
-// "name==1.2.3" produce (name, "1.2.3"); other non-comment lines produce
-// (name, "*"). Comments (#...) and option lines (-...) are skipped.
+// "name==1.2.3" produce (name, "==1.2.3"); other non-comment lines produce
+// (name, "*"). Comments (#...) and option lines (-...) are skipped. The
+// operator is intentionally preserved so advisory matching can distinguish an
+// exact pin from an open range that can resolve to a known-bad release.
 func ParseRequirements(content string) []Dep {
 	var out []Dep
 	for _, raw := range strings.Split(content, "\n") {
@@ -40,7 +42,7 @@ func ParseRequirements(content string) []Dep {
 			continue
 		}
 		if name, ver, ok := splitRequirement(line); ok {
-			out = append(out, Dep{NormalizePackageName(name), normalizeVersion(ver)})
+			out = append(out, Dep{NormalizePackageName(name), ver})
 		} else {
 			out = append(out, Dep{NormalizePackageName(line), "*"})
 		}
@@ -79,7 +81,7 @@ func ParseSetupPy(content string) []Dep {
 		off = end
 		for _, lit := range quotedLiterals(body) {
 			if name, ver, ok := splitRequirement(lit); ok {
-				out = append(out, Dep{NormalizePackageName(name), normalizeVersion(ver)})
+				out = append(out, Dep{NormalizePackageName(name), ver})
 			} else if lit = strings.TrimSpace(lit); lit != "" {
 				out = append(out, Dep{NormalizePackageName(lit), "*"})
 			}

@@ -32,6 +32,14 @@ adapter sca {
     path exact "analysis.sca.package"
     has "status=malicious"
   }
+  flag sbom.MaliciousDependency on any {
+    path exact "analysis.sca.package"
+    has "advisory_cwe=CWE-506"
+  }
+  flag sbom.MaliciousDependency on any {
+    path exact "analysis.sca.package"
+    has "advisory_cwe=CWE_506"
+  }
   flag sbom.ReachableSymbol on any {
     path exact "analysis.sca.package"
     has "reachable=true"

@@ -16,7 +16,7 @@ import (
 
 func TestParseRequirements(t *testing.T) {
 	got := ParseRequirements("Flask==2.0.1\n# a comment\nrequests\n-r dev.txt\n\n  django == 4.2  \npyyaml>=6.0\n")
-	want := []Dep{{"flask", "2.0.1"}, {"requests", "*"}, {"django", "4.2"}, {"pyyaml", "6.0"}}
+	want := []Dep{{"flask", "==2.0.1"}, {"requests", "*"}, {"django", "==4.2"}, {"pyyaml", ">=6.0"}}
 	if len(got) != len(want) {
 		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
 	}
@@ -38,7 +38,7 @@ setup(
     ],
 )
 `)
-	want := []Dep{{"awscrt", "0.11.20"}, {"requests", "2.31.0"}}
+	want := []Dep{{"awscrt", "==0.11.20"}, {"requests", ">=2.31.0"}}
 	if len(got) != len(want) {
 		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
 	}
@@ -98,6 +98,36 @@ func TestMinSafeAdvisoryMatch(t *testing.T) {
 	}
 	if _, ok := matchAdvisory(d, "npm", "tinymce", "5.10.1", "5.10.1"); ok {
 		t.Fatal("tinymce 5.10.1 should be clean for min_safe 5.10.0")
+	}
+}
+
+func TestMaxSafeAdvisoryMatchPreservesOpenRanges(t *testing.T) {
+	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"pypi": {
+		"requests": {{Version: "*", ID: "CVE-2023-48052", MaxSafe: "2.31.0"}},
+	}}}
+	if adv, ok := matchAdvisory(d, "pypi", "requests", "2.22.0", ">=2.22.0"); !ok || adv.ID != "CVE-2023-48052" {
+		t.Fatalf("open requests range should match max_safe advisory, got ok=%v adv=%+v", ok, adv)
+	}
+	if _, ok := matchAdvisory(d, "pypi", "requests", "2.31.0", "==2.31.0"); ok {
+		t.Fatal("pinned requests 2.31.0 should be clean for max_safe 2.31.0")
+	}
+}
+
+func TestExactAdvisoryMatchesSpecifierRanges(t *testing.T) {
+	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"pypi": {
+		"exotel": {{Version: "0.1.6", ID: "CVE-2022-38792", CWE: []string{"CWE-506"}}},
+	}}}
+	if adv, ok := matchAdvisory(d, "pypi", "exotel", "0.1.5", ">=0.1.5"); !ok || adv.ID != "CVE-2022-38792" {
+		t.Fatalf("exotel>=0.1.5 should allow known-bad 0.1.6, got ok=%v adv=%+v", ok, adv)
+	}
+	if _, ok := matchAdvisory(d, "pypi", "exotel", "0.1.5", "==0.1.5"); ok {
+		t.Fatal("exotel==0.1.5 should not match an advisory for 0.1.6")
+	}
+	if _, ok := matchAdvisory(d, "pypi", "exotel", "0.1.5", ">=0.1.5,<=0.1.5"); ok {
+		t.Fatal("exotel range capped at 0.1.5 should not allow known-bad 0.1.6")
+	}
+	if adv, ok := matchAdvisory(d, "pypi", "exotel", "*", "*"); !ok || adv.ID != "CVE-2022-38792" {
+		t.Fatalf("unpinned exotel should allow known-bad 0.1.6, got ok=%v adv=%+v", ok, adv)
 	}
 }
 

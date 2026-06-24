@@ -1,6 +1,7 @@
 {
   "pypi": {
     "awscrt": [{"version": "0.11.20", "id": "CVE-2021-40828", "cwe": ["CWE-295"]}],
+    "exotel": [{"version": "0.1.6", "id": "CVE-2022-38792", "cwe": ["CWE-506"]}],
     "flask": [{"version": "0.12.2", "id": "CVE-2018-1000656"}],
     "pyyaml": [{"version": "5.1", "id": "CVE-2020-1747"}],
     "requests": [{"version": "*", "id": "CVE-2023-48052", "cwe": ["CWE-295"], "max_safe": "2.31.0"}]

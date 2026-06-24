@@ -103,11 +103,63 @@ func matchAdvisory(d *scaData, eco, name, version, specifier string) (advisoryEn
 			}
 			continue
 		}
-		if a.Version == version || a.Version == "*" {
+		if a.Version == version || a.Version == "*" || specifierAllowsVersion(specifier, version, a.Version) {
 			return a, true
 		}
 	}
 	return advisoryEntry{}, false
+}
+
+func specifierAllowsVersion(specifier, version, target string) bool {
+	target = normalizeVersion(target)
+	if target == "" || target == "*" {
+		return false
+	}
+	specifier = strings.TrimSpace(specifier)
+	if specifier == "" {
+		specifier = version
+	}
+	if specifier == "" || specifier == "*" {
+		return true
+	}
+	for _, clause := range splitSpecifierClauses(specifier) {
+		op, v := splitSpecifierClause(clause)
+		if v == "" || v == "*" {
+			continue
+		}
+		cmp := compareVersions(target, v)
+		switch op {
+		case "", "==", "=":
+			if cmp != 0 {
+				return false
+			}
+		case "!=":
+			if cmp == 0 {
+				return false
+			}
+		case ">=":
+			if cmp < 0 {
+				return false
+			}
+		case ">":
+			if cmp <= 0 {
+				return false
+			}
+		case "<=":
+			if cmp > 0 {
+				return false
+			}
+		case "<":
+			if cmp >= 0 {
+				return false
+			}
+		case "~=":
+			if cmp < 0 {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func specifierCapsAtOrBelow(specifier, version, maxSafe string) bool {
