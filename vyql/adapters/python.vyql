@@ -144,6 +144,15 @@ adapter python {
     lacks "SAFE_SEED_RE.match(seed)"
     lacks "_safe_rmtree"
   }
+  flag code.EmailAttachmentFilenamePathTraversal in function {
+    has "include_attachment_data=True"
+    has "for a in m['attachment']:"
+    has "out_path / a['filename']"
+    has "out_filepath.open('wb')"
+    has "base64.b64decode(a['raw'])"
+    lacks "pathlib.Path(a['filename']).name"
+    lacks "os.path.basename(a['filename'])"
+  }
   flag code.AnsibleSnmpFactsCredentialsNoLogMissing in function {
     name "main"
     has "AnsibleModule"

@@ -2941,6 +2941,15 @@ concept DotNetArchiveOrRenamePathTraversal : sink {
   review_assumption: "archive entry names or rename names can contain traversal segments that escape the configured root directory"
   review_confidence: high
 }
+concept EmailAttachmentFilenamePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "email attachment filenames are joined into an output directory without basename canonicalization"
+  review_evidence: "attachment extraction context {pattern} writes decoded attachment data using attachment filename metadata before stripping directory components"
+  review_assumption: "email attachment filename metadata can contain path separators, traversal segments, or absolute paths"
+  review_confidence: high
+}
 concept UnvalidatedDynamicRequirePathTraversal : sink {
   vulnerable_to: [path.PathTraversal, injection.UnsafeDynamicLoading]
   cwe: [CWE_22, CWE_829]

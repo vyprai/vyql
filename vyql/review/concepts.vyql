@@ -1658,6 +1658,12 @@ review code.DotNetArchiveOrRenamePathTraversal {
   expected: [core.PathAccessCheck]
   text: "review .NET archive extraction or rename paths for Path.GetFullPath containment under the configured root"
 }
+review code.EmailAttachmentFilenamePathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization]
+  text: "review email attachment extraction for basename canonicalization before joining attachment filenames into output paths"
+}
 review code.TemplateDirectoryHiddenGlobCopy {
   category: "path"
   kind: "attention"
