@@ -802,6 +802,12 @@ review code.WerkzeugDebugConsoleExposure {
   expected: [core.AuthenticationCheck]
   text: "review Flask/Werkzeug debug servers bound to external interfaces unless the eval console is disabled"
 }
+review code.ElectronPrivilegedUrlNodeIntegration {
+  category: "desktop"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Electron privileged URL handling for Node integration being disabled on chrome-devtools URLs"
+}
 review code.CommandLineAssemblyReview {
   category: "command"
   kind: "attention"

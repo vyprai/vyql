@@ -516,6 +516,11 @@ adapter javascript {
     has "webPreferences.nodeIntegration=false"
     lacks "webPreferences.contextIsolation=true"
   }
+  flag code.ElectronPrivilegedUrlNodeIntegration in module {
+    has "lang=javascript"
+    has "expr:window.location.protocol==='chrome-devtools:'"
+    has "assign:nodeIntegration=true"
+  }
 
   sink path "child_process.exec" -> code.CommandExecution
   sink path "child_process.execSync" -> code.CommandExecution

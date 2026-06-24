@@ -396,17 +396,104 @@ func (c *jsConv) jsModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	}
 	loc := c.file + ":1"
 	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=javascript"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+	}
+	for _, tok := range c.jsStructuredContextTokens(root) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=javascript"},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
-		},
+		Args:   args,
 		Path:   "analysis.module.context",
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment_expression":
+			left, right := field(n, "left"), field(n, "right")
+			if lhs := c.jsContextPath(left); lhs != "" {
+				if rhs := jsContextValue(c.text(right)); rhs != "" {
+					add("assign:" + lhs + "=" + rhs)
+				}
+			}
+		case "binary_expression":
+			if expr := jsContextCompact(c.text(n)); expr != "" {
+				add("expr:" + expr)
+			}
+		case "member_expression":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "call_expression", "new_expression":
+			fn := field(n, "function")
+			if n.Kind() == "new_expression" {
+				fn = field(n, "constructor")
+			}
+			if path := c.dotted(fn); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+			}
+		case "string", "template_string":
+			if lit := jsContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *jsConv) jsContextPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if p := c.dotted(n); p != "" && p != "?" {
+		return p
+	}
+	return jsContextCompact(c.text(n))
+}
+
+func jsContextValue(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 2 {
+		if q := s[0]; (q == '\'' || q == '"' || q == '`') && s[len(s)-1] == q {
+			s = s[1 : len(s)-1]
+		}
+	}
+	return jsContextCompact(s)
+}
+
+func jsContextCompact(raw string) string {
+	s := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	if len(s) > 160 {
+		return ""
+	}
+	return s
 }
 
 func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
@@ -1128,11 +1215,15 @@ func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
 		return nil
 	}
 	bodyText := c.text(body)
-	return []string{
+	tokens := []string{
 		"lang=javascript\x00name=" + name,
 		bodyText,
 		strings.Join(strings.Fields(bodyText), ""),
 	}
+	for _, tok := range c.jsStructuredContextTokens(body) {
+		tokens = append(tokens, tok)
+	}
+	return tokens
 }
 
 func (c *jsConv) isFunctionLikeDeclarator(n *tree_sitter.Node) bool {

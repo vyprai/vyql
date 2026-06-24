@@ -208,6 +208,45 @@ export const middleware = createAuthMiddleware(async (ctx) => {
 	t.Fatalf("inline lambda context was not lowered; nodes=%#v", nodes)
 }
 
+func TestJavaScriptModuleContextIncludesStructuredTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "init.js")
+	src := []byte(`
+let nodeIntegration = 'false';
+if (window.location.protocol === 'chrome-devtools:') {
+  nodeIntegration = 'true';
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.module.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "expr:window.location.protocol==='chrome-devtools:'") &&
+			strings.Contains(tokens, "assign:nodeIntegration=true") &&
+			strings.Contains(tokens, "selector:window.location.protocol") {
+			return
+		}
+	}
+	t.Fatalf("module context did not include structured tokens; nodes=%#v", nodes)
+}
+
 func TestJavaScriptBrowserGlobalAssignmentLambdaParamEntry(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "origin.tsx")
