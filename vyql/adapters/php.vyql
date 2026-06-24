@@ -209,11 +209,12 @@ adapter php {
   }
   flag code.TempPathJoinBeforeSeparatorCheck in function {
     lang "php"
+    name "zipdl"
     token assign_call_method "getTempPath"
     token assign_literal "DIRECTORY_SEPARATOR"
     fact global_subscript_write "true"
-    not call "strpos"
-    not call "basename"
+    has "$GLOBALS['elFinderTempFiles'][$path]=true;"
+    lacks "strpos($file,DIRECTORY_SEPARATOR)"
   }
   flag code.CentreonMyAccountContactXss in module {
     lang "php"
