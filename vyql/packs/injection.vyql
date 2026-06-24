@@ -591,6 +591,11 @@ rule IncompleteMassAssignmentIdUnset {
   match code.IncompleteMassAssignmentIdUnset as sink
 }
 
+rule PythonDunderPathClassPollution {
+  meta { id: "VYQL-INJ-143", severity: critical, cwe: [CWE_915], confidence_floor: high }
+  match code.PythonDunderPathClassPollution as sink
+}
+
 // Untrusted object recursively merged into a target — prototype pollution (CWE-1321).
 rule PrototypePollution {
   meta { id: "VYQL-INJ-013", severity: medium, cwe: [CWE_1321] }

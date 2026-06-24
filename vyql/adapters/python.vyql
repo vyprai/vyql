@@ -455,6 +455,19 @@ adapter python {
     lacks "att.full_clean()"
     lacks "full_clean()"
   }
+  flag code.PythonDunderPathClassPollution in function {
+    has ".split(\".\")"
+    has "hasattr("
+    has "getattr("
+    has "setattr("
+    has "property_name_part"
+    lacks "part.startswith"
+    lacks "part.endswith"
+    lacks ".startswith(\"__\")"
+    lacks ".endswith(\"__\")"
+    lacks ".startswith('__')"
+    lacks ".endswith('__')"
+  }
   flag code.DocutilsRestUnsafeDirectiveRendering in function {
     has "name=render_rest"
     has "publish_parts"

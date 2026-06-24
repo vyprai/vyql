@@ -392,6 +392,15 @@ concept IncompleteMassAssignmentIdUnset : sink {
   review_assumption: "request normalization can reintroduce or preserve an attacker-supplied id field"
   review_confidence: high
 }
+concept PythonDunderPathClassPollution : sink {
+  vulnerable_to: [injection.MassAssignment]
+  cwe: [CWE_915]
+  review_category: "mass_assignment"
+  review_condition: "caller-controlled dotted attribute paths are traversed and written without rejecting Python magic attributes"
+  review_evidence: "property-path setter context {pattern} splits a property name, traverses attributes, and writes setattr without a __...__ segment guard"
+  review_assumption: "a remote component or API request can provide the property path and value"
+  review_confidence: high
+}
 
 concept ProtoPollute : sink {
   vulnerable_to: [injection.PrototypePollution]
