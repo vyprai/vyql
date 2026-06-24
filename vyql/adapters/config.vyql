@@ -84,7 +84,7 @@ adapter config {
       "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated",
       "index.html|Thelpers.encode(item.message)|common.notifications.template;item.message;refresh_notifications|msg = t.format('@(Navigation has been saved)', item.message)|analysis.config.totaljs_admin_notification_message_xss"
     ],
-    config_text_template_scopes: ["xwiki_velocity", "svelte", "django", "django_safe", "erb"],
+    config_text_template_scopes: ["xwiki_velocity", "svelte", "django", "django_session_key_exposure", "django_safe", "erb"],
     config_text_template_extensions_xwiki_velocity: [".xml"],
     config_text_template_required_contains_xwiki_velocity: ["<content", "$request.", "#"],
     config_text_template_line_events_xwiki_velocity: [
@@ -110,7 +110,13 @@ adapter config {
     config_text_template_extensions_django_safe: [".html"],
     config_text_template_required_contains_django_safe: ["{{", "|safe"],
     config_text_template_line_events_django_safe: [
-      "safe|analysis.template.django.safe_filter_raw_html"
+      "safe|analysis.template.django.safe_filter_raw_html",
+      "object.pk|analysis.template.django.session_key_action_exposure"
+    ],
+    config_text_template_extensions_django_session_key_exposure: [".html"],
+    config_text_template_required_contains_django_session_key_exposure: ["session_key", "{% url", "object.pk"],
+    config_text_template_line_events_django_session_key_exposure: [
+      "object.pk|analysis.template.django.session_key_action_exposure"
     ],
     config_text_template_extensions_erb: [".erb"],
     config_text_template_required_contains_erb: ["<%="],
@@ -218,6 +224,11 @@ adapter config {
   // normal autoescaping, so model fields rendered through it need sanitizer review.
   flag code.StoredHtmlWrite on any {
     path "analysis.template.django.safe_filter_raw_html"
+  }
+  // Django session keys are bearer tokens; templates should not expose them in
+  // action URLs or visible forms.
+  flag code.SessionKeyTemplateExposure on any {
+    path "analysis.template.django.session_key_action_exposure"
   }
   // Rails ERB raw comment rendering bypasses Rails' default output escaping.
   flag code.StoredHtmlWrite on any {
