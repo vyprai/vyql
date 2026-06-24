@@ -1,0 +1,64 @@
+test "rank685: Drools XML parser factories are created without XXE hardening"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.parsers.SAXParserFactory;
+  import org.xml.sax.InputSource;
+
+  public class ExtensibleXmlParser {
+      private javax.xml.parsers.SAXParser parser;
+      private org.w3c.dom.Document document;
+
+      public Object read(final InputSource in) throws Exception {
+          DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+          this.document = f.newDocumentBuilder().newDocument();
+
+          SAXParserFactory factory = SAXParserFactory.newInstance();
+          factory.setNamespaceAware(true);
+          this.parser = factory.newSAXParser();
+          this.parser.parse(in, null);
+          return document;
+      }
+  }
+  ```
+
+test "rank685: Drools XML parser factories disable external entities"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.parsers.ParserConfigurationException;
+  import javax.xml.parsers.SAXParserFactory;
+  import org.xml.sax.InputSource;
+
+  public class ExtensibleXmlParser {
+      private javax.xml.parsers.SAXParser parser;
+      private org.w3c.dom.Document document;
+
+      public Object read(final InputSource in) throws Exception {
+          DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+          try {
+              f.setFeature("http://xml.org/sax/features/external-general-entities", false);
+              f.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+          } catch (ParserConfigurationException e) {
+              throw new RuntimeException(e);
+          }
+          this.document = f.newDocumentBuilder().newDocument();
+
+          SAXParserFactory factory = SAXParserFactory.newInstance();
+          factory.setNamespaceAware(true);
+          try {
+              factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+              factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+          } catch (ParserConfigurationException e) {
+              throw new RuntimeException(e);
+          }
+          this.parser = factory.newSAXParser();
+          this.parser.parse(in, null);
+          return document;
+      }
+  }
+  ```
