@@ -178,6 +178,19 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	switch inner.Kind() {
+	case "print_intrinsic":
+		var args []nir.Expr
+		for _, a := range namedChildren(inner) {
+			args = append(args, c.expr(a))
+		}
+		L := c.loc(inner)
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: "print", Loc: L},
+			Args:   args,
+			Path:   "print",
+			Method: "print",
+			Loc:    L,
+		}}}
 	case "assignment_expression", "augmented_assignment_expression":
 		left := field(inner, "left")
 		right := c.expr(field(inner, "right"))
@@ -673,7 +686,11 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "conditional_expression":
-		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
+		then := field(n, "consequence")
+		if then == nil {
+			then = field(n, "body")
+		}
+		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(then), Else: c.expr(field(n, "alternative")), Loc: L}
 	case "anonymous_function", "anonymous_function_creation_expression":
 		// `function ($req, $res) use ($x) { … }` — a closure (the dominant PHP route-handler
 		// shape, e.g. Utopia/Slim `->action(function (...) { … })`). Without this it fell to the

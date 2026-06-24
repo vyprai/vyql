@@ -2932,6 +2932,15 @@ concept HighlightedSearchResultHtmlEscapeMissing : sink {
   review_assumption: "indexed title, body, or query text can contain attacker-controlled HTML rendered in the search UI"
   review_confidence: high
 }
+concept BufferedErrorPageRequestMetadataXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "a PHP error or diagnostic page buffers request metadata into HTML and prints it without escaping"
+  review_evidence: "buffered error-page context {pattern} appends request URI or referer server variables into an HTML string before printing the buffer"
+  review_assumption: "the request URI or referer header can contain attacker-controlled HTML rendered by the diagnostic response"
+  review_confidence: high
+}
 concept DocutilsRestUnsafeDirectiveRendering : sink {
   vulnerable_to: [injection.Xss, path.PathTraversal]
   cwe: [CWE_79, CWE_22]

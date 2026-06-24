@@ -673,6 +673,11 @@ rule HighlightedSearchResultHtmlEscapeMissing {
   match code.HighlightedSearchResultHtmlEscapeMissing as sink
 }
 
+rule BufferedErrorPageRequestMetadataXss {
+  meta { id: "VYQL-INJ-145", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.BufferedErrorPageRequestMetadataXss as sink
+}
+
 rule ContaoAjaxToggleSubpaletteSqlIdentifierInjection {
   meta { id: "VYQL-INJ-112", severity: high, cwe: [CWE_89], confidence_floor: high }
   match code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection as sink

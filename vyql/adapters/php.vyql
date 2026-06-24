@@ -956,6 +956,16 @@ adapter php {
   sink path "echo" -> code.HtmlRender
   sink path "print" -> code.HtmlRender
   sink path "printf" -> code.HtmlRender
+  flag code.BufferedErrorPageRequestMetadataXss in function {
+    has "lang=php"
+    has "$out.="
+    has "REQUEST_URI"
+    has "print$out"
+    lacks "dol_htmlentities"
+    lacks "htmlentities($_SERVER"
+    lacks "htmlspecialchars($_SERVER"
+    lacks "html_escape($_SERVER"
+  }
   // MediaWiki Html builder: rawElement emits its content arg RAW (unescaped) and both
   // element/rawElement pass the attributes array through WITHOUT validating attribute names,
   // so a tainted attributes array is attribute-injection XSS (CVE-2025-59332; the upstream fix
@@ -1009,6 +1019,7 @@ adapter php {
   }
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
+  control "dol_htmlentities" -> core.HtmlEscape
   control "e" -> core.HtmlEscape
   control "Tools.htmlentitiesUTF8" -> core.HtmlEscape
   control "html_escape" -> core.HtmlEscape
