@@ -1030,6 +1030,17 @@ adapter javascript {
     lacks "Object.getOwnPropertyNames(obj2)"
     lacks "allowedAttrs.includes(attr)"
   }
+  flag code.ControlledMergeInheritedKeyPrototypePollution in function {
+    has "lang=javascript"
+    has "for(varxinprops)"
+    has "obj[x]=props[x]"
+    has "obj[x]=jqMix(obj[x],props[x])"
+    lacks "__proto__"
+    lacks "constructor"
+    lacks "Object.keys(props)"
+    lacks "Object.getOwnPropertyNames(props)"
+    lacks "hasOwnProperty.call(props,x)"
+  }
   flag code.ChartkickRecursiveExtendPrototypePollution in function {
     has "lang=javascript"
     has "name=extend"
