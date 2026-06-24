@@ -1559,6 +1559,12 @@ review code.RawDatatablesAttributeXss {
   expected: [core.HtmlEscape]
   text: "verify server-side DataTables raw columns escape model fields before inserting them into HTML attributes"
 }
+review code.UnescapedLinterIssueMessageXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review generated linter HTML reports for escaping diagnostic message text before template rendering"
+}
 review code.DspaceJspuiAutocompleteLabelXss {
   category: "xss"
   kind: "attention"

@@ -3151,6 +3151,15 @@ concept RawDatatablesAttributeXss : sink {
   review_assumption: "the DataTables response is rendered into the browser as HTML, so attribute-breaking markup in stored model fields can execute script"
   review_confidence: high
 }
+concept UnescapedLinterIssueMessageXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "linter issue messages are rendered into an HTML report template without escaping"
+  review_evidence: "issue rendering context {pattern} passes message.message into an HTML template without _.escape or equivalent HTML escaping"
+  review_assumption: "lint rule messages or source-derived diagnostics can contain markup rendered in the generated report"
+  review_confidence: high
+}
 concept DspaceJspuiAutocompleteLabelXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

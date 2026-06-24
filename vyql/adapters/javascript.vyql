@@ -306,6 +306,13 @@ adapter javascript {
     has "builder.push(self.template(m,column))"
     lacks "Thelpers.encode((column.format?val.format(column.format):val))"
   }
+  flag code.UnescapedLinterIssueMessageXss in function {
+    lang "javascript"
+    name "renderIssue"
+    has "issueTemplate({"
+    has "message:message.message"
+    lacks "message:_.escape(message.message)"
+  }
   flag code.CocotaisEchoPlatformTagInjection in module {
     lang "javascript"
     token builtin "echo"
