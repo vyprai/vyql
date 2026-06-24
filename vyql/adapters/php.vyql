@@ -983,6 +983,8 @@ adapter php {
   sink path "echo" -> code.HtmlRender
   sink path "print" -> code.HtmlRender
   sink path "printf" -> code.HtmlRender
+  sink path "die" -> code.HtmlRender
+  sink path "exit" -> code.HtmlRender
   flag code.BufferedErrorPageRequestMetadataXss in function {
     has "lang=php"
     has "$out.="
@@ -1075,6 +1077,7 @@ adapter php {
   control "escapeshellarg" -> core.ShellEscape
   control "escapeshellcmd" -> core.ShellEscape
   control "mysqli_real_escape_string" -> core.SqlParameterization
+  control method "escape_string" -> core.SqlParameterization
   control "pg_escape_string" -> core.SqlParameterization
   // realpath canonicalizes `../` but does NOT bound the path to a base dir, so it is not a
   // sound traversal sanitizer on its own (only a following prefix/containment check is —
