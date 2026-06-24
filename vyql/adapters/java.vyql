@@ -705,6 +705,20 @@ adapter java {
     param type "String"
     not param type "Secret"
   }
+  flag code.JenkinsPlaintextDataboundCredential in function {
+    has "@DataBoundConstructor"
+    has "StringrepoPassword"
+    has "this.repoPassword=repoPassword;"
+    lacks "Secret.fromString(repoPassword)"
+    lacks "SecretrepoPassword"
+  }
+  flag code.JenkinsPlaintextDataboundCredential in function {
+    has "@DataBoundConstructor"
+    has "Stringpassword"
+    has "this.password=password;"
+    lacks "Secret.fromString(password)"
+    lacks "Secretpassword"
+  }
   flag code.JenkinsCredentialsStartupLoadContextExposure in class {
     class name "SystemCredentialsProvider"
     function "SystemCredentialsProvider"

@@ -145,7 +145,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		contextTokens := append([]string{}, c.classContextTokens...)
 		contextTokens = append(contextTokens, annotationTokens...)
 		contextTokens = append(contextTokens, c.jvModifierTokens(n, "function_modifier:")...)
-		contextTokens = append(contextTokens, c.jvFunctionTokens(name, n)...)
+		contextTokens = append(contextTokens, c.jvFunctionTokens(name, n, params, paramTypes)...)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
 			ContextTokens: contextTokens,
 			ParamEntries:  c.jvParamEntries(name, params, paramTypes, tokens, c.jvParamAnnotationTokens(paramsNode)), Exported: c.javaPublic(n)}}
@@ -561,7 +561,7 @@ func javaIdentRune(r rune) bool {
 	return r == '_' || r == '$' || (r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')
 }
 
-func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
+func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []string, paramTypes map[string]string) []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(tok string) {
@@ -573,6 +573,19 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node) []string {
 	}
 	if name != "" {
 		add("function_name:" + name)
+	}
+	text := c.text(n)
+	add(text)
+	add(javaCompactText(text))
+	for i, param := range params {
+		if param == "" {
+			continue
+		}
+		add("param_name:" + param)
+		add("param_index:" + itoa(i))
+		if typ := paramTypes[param]; typ != "" {
+			add("param_type:" + typ)
+		}
 	}
 	prevCall := ""
 	var walk func(*tree_sitter.Node)
@@ -645,6 +658,10 @@ func javaExprToken(raw string) string {
 		}
 	}
 	return b.String()
+}
+
+func javaCompactText(s string) string {
+	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
 }
 
 func javaStringToken(raw string) string {
