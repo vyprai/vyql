@@ -856,6 +856,7 @@ adapter python {
   sink path "make_response" -> code.HtmlRender
   sink path "Response" nval "text/plain" nval "application/json" -> code.HtmlRender
   sink path "HttpResponse" -> code.HtmlRender
+  sink path "HttpResponseBadRequest" -> code.HtmlRender
   sink path "Markup" -> code.HtmlRender
   sink path "markupsafe.Markup" -> code.HtmlRender
   sink path "mark_safe" -> code.HtmlRender
@@ -989,6 +990,7 @@ adapter python {
   control "xpath_literal" -> core.XpathEscape
   control "pipes.quote" -> core.ShellEscape
   control "html.escape" -> core.HtmlEscape
+  control "escape" -> core.HtmlEscape
   control "cgi.escape" -> core.HtmlEscape
   control "escape_for_html" -> core.HtmlEscape
   control "markupsafe.escape" -> core.HtmlEscape
