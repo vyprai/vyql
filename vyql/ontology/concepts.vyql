@@ -3076,6 +3076,15 @@ concept UnescapedQueueQueryStringXss : sink {
   review_assumption: "queue names can contain characters that break the query parameter or rendered link context"
   review_confidence: high
 }
+concept UnvalidatedRouteConfigKeyStoredXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79, CWE_20]
+  review_category: "xss"
+  review_condition: "route-derived configuration keys are persisted without identifier validation"
+  review_evidence: "configuration-key write context {pattern} forwards a route key into persisted connection configuration"
+  review_assumption: "the stored configuration key is later rendered by management UI or metadata responses"
+  review_confidence: high
+}
 concept ResponseWriterScriptWindowIdXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

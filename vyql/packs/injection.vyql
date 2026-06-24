@@ -285,6 +285,11 @@ rule UnescapedQueueQueryStringXss {
   match code.UnescapedQueueQueryStringXss as sink
 }
 
+rule UnvalidatedRouteConfigKeyStoredXss {
+  meta { id: "VYQL-INJ-159", severity: high, cwe: [CWE_79, CWE_20], confidence_floor: high }
+  match code.UnvalidatedRouteConfigKeyStoredXss as sink
+}
+
 rule ResponseWriterScriptWindowIdXss {
   meta { id: "VYQL-INJ-132", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.ResponseWriterScriptWindowIdXss as sink

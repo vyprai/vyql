@@ -1312,6 +1312,12 @@ review code.UnescapedQueueQueryStringXss {
   expected: [core.InputValidation]
   text: "review queue query-string helpers for URL escaping before embedding queue names in generated links"
 }
+review code.UnvalidatedRouteConfigKeyStoredXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation, core.HtmlEscape]
+  text: "review route-derived configuration key writes for identifier validation before persistence and later UI rendering"
+}
 review code.ResponseWriterScriptWindowIdXss {
   category: "xss"
   kind: "attention"

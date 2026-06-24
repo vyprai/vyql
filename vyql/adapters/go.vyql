@@ -569,6 +569,13 @@ adapter go {
     has "call_path:proxy.ServeHTTP"
     lacks "call_path:rewriteRequestSourceIP"
   }
+  flag code.UnvalidatedRouteConfigKeyStoredXss in function {
+    has "call_path:mux.Vars"
+    has "call_path:meta.AddConnectionConfKey"
+    has "call_path:json.Unmarshal"
+    lacks "call_path:validate.ValidateID"
+    lacks "call_path:ValidateID"
+  }
   flag code.UploadFilePathTraversalWrite in function {
     has "function_name:UploadFileSafe"
     has "call_path:uploadFile"
