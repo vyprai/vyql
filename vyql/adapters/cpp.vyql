@@ -243,6 +243,13 @@ adapter cpp {
     lacks "m_configFile.startsWith(QStringLiteral(\"\\\\\\\\\"))"
     lacks "m_configFile.startsWith(QStringLiteral(\"//\"))"
   }
+  flag code.SniffCsvExternalAccessBypass in function {
+    has "lang=cpp"
+    has "name=CSVSniffBind"
+    has "result->path=input.inputs[0].ToString();"
+    has "result->options.FromNamedParameters(input.named_parameters,context);"
+    lacks "enable_external_access"
+  }
   flag code.LibreOfficeEnhwmfDibHeaderSizeUnderflow in function {
     has "lang=cpp"
     has "EMR_ALPHABLEND"

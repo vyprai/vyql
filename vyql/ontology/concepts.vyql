@@ -3472,6 +3472,15 @@ concept ContainerdCriImageEnvAliasLeak : sink {
   review_assumption: "multiple CRI containers can be created from the same image config with different environment variables"
   review_confidence: high
 }
+concept SniffCsvExternalAccessBypass : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.BrokenAccess]
+  cwe: [CWE_200, CWE_284, CWE_552]
+  review_category: "access_control"
+  review_condition: "CSV sniffing or schema-detection table functions honor disabled external filesystem access before binding caller paths"
+  review_evidence: "CSV sniff bind context {pattern} stores the caller path and parses reader options without checking enable_external_access"
+  review_assumption: "callers can invoke the sniffing function with filesystem paths while external access is expected to be disabled"
+  review_confidence: high
+}
 concept ContainerPrimaryGidMissingSupplementalGroup : sink {
   vulnerable_to: [access_control.InsecurePermission, access_control.MissingAuthorization]
   cwe: [CWE_284, CWE_732]
