@@ -2851,6 +2851,15 @@ concept AjaxBackslashProtocolRelativeUrlXss : sink {
   review_assumption: "attacker-controlled links or hashes can supply a /\\ host-prefixed URL whose response is inserted into the page"
   review_confidence: high
 }
+concept DocutilsRestUnsafeDirectiveRendering : sink {
+  vulnerable_to: [injection.Xss, path.PathTraversal]
+  cwe: [CWE_79, CWE_22]
+  review_category: "xss"
+  review_condition: "reStructuredText markup is rendered to HTML with docutils raw or file insertion directives still enabled"
+  review_evidence: "docutils render context {pattern} calls publish_parts(..., writer_name=\"html4css1\") without raw_enabled=False and file_insertion_enabled=False"
+  review_assumption: "attacker-controlled markup can include raw HTML or file-inclusion directives and the returned fragment is rendered as trusted HTML"
+  review_confidence: high
+}
 concept CollectiveContactWidgetTitleXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

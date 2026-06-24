@@ -360,6 +360,11 @@ rule AjaxBackslashProtocolRelativeUrlXss {
   match code.AjaxBackslashProtocolRelativeUrlXss as sink
 }
 
+rule DocutilsRestUnsafeDirectiveRendering {
+  meta { id: "VYQL-INJ-142", severity: high, cwe: [CWE_79, CWE_22], confidence_floor: high }
+  match code.DocutilsRestUnsafeDirectiveRendering as sink
+}
+
 rule CraftAnonymousTemplateRenderActionXss {
   meta { id: "VYQL-INJ-076", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.CraftAnonymousTemplateRenderActionXss as sink

@@ -443,6 +443,18 @@ adapter python {
     lacks "att.full_clean()"
     lacks "full_clean()"
   }
+  flag code.DocutilsRestUnsafeDirectiveRendering in function {
+    has "name=render_rest"
+    has "publish_parts"
+    has "source=markup"
+    has "writer_name=\"html4css1\""
+    has "settings_overrides=overrides"
+    has "return parts[\"fragment\"]"
+    lacks "'raw_enabled': False"
+    lacks "\"raw_enabled\": False"
+    lacks "'file_insertion_enabled': False"
+    lacks "\"file_insertion_enabled\": False"
+  }
   flag code.PartiallyEscapedSshCommand in function {
     has "name=run_ssh_command_with_credentials"
     has "escaped_password"
