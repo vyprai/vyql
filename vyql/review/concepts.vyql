@@ -616,6 +616,12 @@ review code.CobblerDjangoStateChangeGetCsrf {
   expected: [core.CsrfProtection, core.AuthenticationCheck]
   text: "review Cobbler Django web actions for @require_POST plus CSRF-protected POST forms before state changes"
 }
+review code.JenkinsStaplerStateChangeMissingPost {
+  category: "csrf"
+  kind: "attention"
+  expected: [core.CsrfProtection]
+  text: "review Jenkins Stapler state-changing actions for @RequirePOST/@POST and POST-backed forms before mutating templates or configuration"
+}
 review code.InsecurePermission {
   category: "permission"
   kind: "target"

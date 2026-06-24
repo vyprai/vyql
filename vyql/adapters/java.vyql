@@ -637,6 +637,20 @@ adapter java {
     not call "checkPermission"
     not call "hasPermission"
   }
+  flag code.JenkinsStaplerStateChangeMissingPost in function {
+    function contains_any ["doSave", "doSubmit", "doConfigure"]
+    call contains_any ["bindJSON", "save", "configure"]
+    call "checkPermission"
+    not annotation "RequirePOST"
+    not annotation "POST"
+  }
+  flag code.JenkinsStaplerStateChangeMissingPost in function {
+    function contains_any ["doRemove", "doDelete"]
+    call contains_any ["removeTemplateById", "delete", "remove"]
+    call "checkPermission"
+    not annotation "RequirePOST"
+    not annotation "POST"
+  }
   flag code.JenkinsRemotingCallableSystemPropertiesLeak in class {
     class base "Callable"
     function "call"

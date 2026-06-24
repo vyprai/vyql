@@ -2225,6 +2225,16 @@ concept JenkinsRemoteValidationMissingPostPermission : sink {
   review_assumption: "a user with Overall/Read or a browser-backed request can invoke descriptor validation endpoints with attacker-controlled URL or proxy parameters"
   review_confidence: high
 }
+
+concept JenkinsStaplerStateChangeMissingPost : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352]
+  review_category: "csrf"
+  review_condition: "Jenkins Stapler state-changing endpoint is reachable without an explicit POST requirement"
+  review_evidence: "Jenkins Stapler action context {pattern} changes persisted configuration or deletes data without observed @RequirePOST/@POST"
+  review_assumption: "a browser-backed request can invoke the Stapler action with the caller's Jenkins session"
+  review_confidence: high
+}
 // Server/port validation that attempts to block privileged or out-of-range
 // outbound connections but can be bypassed by PHP string-to-number coercion.
 concept IncompleteServerPortValidation : sink {

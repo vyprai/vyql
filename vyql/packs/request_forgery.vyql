@@ -135,6 +135,11 @@ rule JenkinsRemoteValidationMissingPostPermission {
   match code.JenkinsRemoteValidationMissingPostPermission as endpoint
 }
 
+rule JenkinsStaplerStateChangeMissingPost {
+  meta { id: "VYQL-RF-028", severity: high, cwe: [CWE_352], confidence_floor: high }
+  match code.JenkinsStaplerStateChangeMissingPost as endpoint
+}
+
 rule Csrf {
   meta { id: "VYQL-RF-003", severity: medium, cwe: [CWE_352] }
   taint core.UserControlledData -> code.StateChangingOp
