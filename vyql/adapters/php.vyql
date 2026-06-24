@@ -760,6 +760,30 @@ adapter php {
     lacks "$doc=bp_docs_get_current_doc();if($doc&&!current_user_can('bp_docs_edit',$doc->ID))"
     lacks "elseif(!$doc&&!current_user_can('bp_docs_create'))"
   }
+  // WordPress media controllers that load an attachment/post selected from
+  // request data and then prepare or run a media replacement need an object
+  // permission check. The broad upload_files capability is not enough because
+  // it does not prove the current user may alter this attachment.
+  flag code.WordPressMediaMutationMissingObjectPermission in function {
+    lang "php"
+    has "$_REQUEST['attachment_id']"
+    has "get_post($attachment_id)"
+    has "ReplaceController($attachment_id)"
+    has "$this->loadView('prepare-remove-background')"
+    lacks "checkImagePermission"
+    lacks "current_user_can('edit_post'"
+    lacks "current_user_can(\"edit_post\""
+  }
+  flag code.WordPressMediaMutationMissingObjectPermission in function {
+    lang "php"
+    has "$_POST['ID']"
+    has "ReplaceController($post_id)"
+    has "'remove_background'=>true"
+    has "$replaceController->run()"
+    lacks "checkImagePermission"
+    lacks "current_user_can('edit_post'"
+    lacks "current_user_can(\"edit_post\""
+  }
   flag code.DisabledRelationshipMetadataExposure in function {
     lang "php"
     name "getRelatableResourceTypes"

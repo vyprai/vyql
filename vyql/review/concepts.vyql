@@ -523,6 +523,12 @@ review code.CollectivesPublicTrashMissingEditPermission {
   expected: [core.AuthorizationCheck]
   text: "review Nextcloud Collectives public trash index for edit-permission checks before listing deleted pages for shared collectives"
 }
+review code.WordPressMediaMutationMissingObjectPermission {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "review WordPress media mutation handlers for object-specific attachment permission checks before previewing or replacing media"
+}
 review code.UserIdentityMappingReview {
   category: "auth"
   kind: "attention"
