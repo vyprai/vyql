@@ -521,6 +521,15 @@ concept IncompleteFileExtensionValidation : sink {
   review_assumption: "an attacker can preserve or submit a stored filename value that later controls an uploaded or served file extension"
   review_confidence: medium
 }
+concept DjangoAttachmentSaveWithoutModelValidation : sink {
+  vulnerable_to: [injection.UnrestrictedUpload]
+  cwe: [CWE_434]
+  review_category: "upload"
+  review_condition: "uploaded attachment model is saved directly, bypassing Django model field validators"
+  review_evidence: "attachment processing context {pattern} builds an attachment model from uploaded file metadata and calls save() without full_clean()"
+  review_assumption: "the model FileField or clean method defines upload validation that is not enforced by Model.save() alone"
+  review_confidence: high
+}
 concept UncheckedUploadedImageProcessing : sink {
   vulnerable_to: [injection.UnrestrictedUpload]
   cwe: [CWE_434]

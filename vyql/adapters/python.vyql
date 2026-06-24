@@ -433,6 +433,16 @@ adapter python {
     lacks "hmac.compare_digest"
     lacks "secrets.compare_digest"
   }
+  flag code.DjangoAttachmentSaveWithoutModelValidation in function {
+    has "name=process_attachments"
+    has "attached_files"
+    has "FollowUpAttachment("
+    has "file=attached"
+    has "filename=filename"
+    has "att.save()"
+    lacks "att.full_clean()"
+    lacks "full_clean()"
+  }
   flag code.PartiallyEscapedSshCommand in function {
     has "name=run_ssh_command_with_credentials"
     has "escaped_password"

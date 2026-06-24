@@ -698,6 +698,11 @@ rule IncompleteFileExtensionValidation {
   match code.IncompleteFileExtensionValidation as validator
 }
 
+rule DjangoAttachmentSaveWithoutModelValidation {
+  meta { id: "VYQL-INJ-141", severity: medium, cwe: [CWE_434], confidence_floor: high }
+  match code.DjangoAttachmentSaveWithoutModelValidation as sink
+}
+
 rule UncheckedUploadedImageProcessing {
   meta { id: "VYQL-INJ-043", severity: medium, cwe: [CWE_434], confidence_floor: medium }
   match code.UncheckedUploadedImageProcessing as processor
