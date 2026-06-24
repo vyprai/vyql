@@ -39,6 +39,10 @@ adapter php {
   source method "getURI" -> code.HttpInput
   source method "getQuery" -> code.HttpInput
   source method "getPathInfo" -> code.HttpInput
+  // Drupal request helpers. current_path() can reflect the requested q/path
+  // value; URL helper consumers must reject absolute/external targets before
+  // using it as a redirect destination.
+  source path "current_path" -> code.HttpInput
   // Aimeos media uploads must derive the storage path from the uploaded file,
   // not from an existing item URL controlled through media metadata.
   source "$item.getUrl" -> code.FileUpload
@@ -974,6 +978,8 @@ adapter php {
 
   // HTTP response splitting / header injection (CWE-113) and log injection (CWE-117).
   sink path "header" -> code.ResponseHeaderWrite
+  sink path "overlay_close_dialog" -> code.RedirectTarget
+  control "url_is_external" -> core.RedirectAllowlist
   sink path "error_log" arg all -> code.LogOutput
   flag code.LogWrite on any {
     path "error_log"

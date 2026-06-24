@@ -132,6 +132,26 @@ func TestExtractAllSupportsPHPIncludes(t *testing.T) {
 	}
 }
 
+func TestExtractAllSupportsDrupalPHPExtensions(t *testing.T) {
+	dir := t.TempDir()
+	for _, ext := range []string{".module", ".install", ".profile", ".theme", ".engine", ".test"} {
+		src := filepath.Join(dir, "drupal"+ext)
+		if err := os.WriteFile(src, []byte("<?php function helper($p) { echo $p; }\n"), 0o600); err != nil {
+			t.Fatalf("write %s source: %v", ext, err)
+		}
+		prog, _, _, stats, err := extractAll([]string{src})
+		if err != nil {
+			t.Fatalf("extractAll %s: %v", ext, err)
+		}
+		if got := stats.files["php"]; got != 1 {
+			t.Fatalf("%s should route through php frontend, got count %d stats=%v", ext, got, stats.files)
+		}
+		if len(prog.Modules) != 1 || len(prog.Modules[0].Body) == 0 {
+			t.Fatalf("%s should extract php statements, got modules=%d body=%d", ext, len(prog.Modules), len(prog.Modules[0].Body))
+		}
+	}
+}
+
 func TestExtractAllSupportsPerlXSAsC(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "DBI.xs")
