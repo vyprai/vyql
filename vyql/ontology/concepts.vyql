@@ -2761,6 +2761,15 @@ concept CordysRequestParamXssFilterDisabled : sink {
   review_assumption: "stored request fields such as announcements or follow-up content can later be rendered to another user"
   review_confidence: high
 }
+concept RequestTextParamHtmlEscapeMissing : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "a PHP request-parameter helper returns text or alpha GET/POST data after weak validation without HTML escaping"
+  review_evidence: "request helper context {pattern} reads GET/POST values, applies an alpha/text branch, and returns the request value without htmlspecialchars or equivalent escaping"
+  review_assumption: "callers may render the returned text parameter into HTML because the helper advertises the value as checked"
+  review_confidence: high
+}
 concept FlarumTranslatorRawStringParameterXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

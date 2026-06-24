@@ -1,0 +1,46 @@
+# Rank 667 / CVE-2015-8685: Dolibarr GETPOST alpha data was returned
+# after weak checks, then fixed by escaping with htmlspecialchars(..., ENT_QUOTES).
+
+test "rank667: GETPOST alpha branch returns weakly checked request text"
+  lang php
+  expect VYQL-INJ-146
+  code
+  ```
+  <?php
+  function GETPOST($paramname, $check = '', $method = 0) {
+    if (empty($method)) $out = isset($_GET[$paramname]) ? $_GET[$paramname] : (isset($_POST[$paramname]) ? $_POST[$paramname] : '');
+    elseif ($method == 1) $out = isset($_GET[$paramname]) ? $_GET[$paramname] : '';
+    elseif ($method == 2) $out = isset($_POST[$paramname]) ? $_POST[$paramname] : '';
+    else return 'BadThirdParameterForGETPOST';
+    if (!empty($check)) {
+      if ($check == 'alpha') {
+        $out = trim($out);
+        if (preg_match('/"/', $out)) $out = '';
+        else if (preg_match('/\.\.\//', $out)) $out = '';
+      }
+    }
+    return $out;
+  }
+  ```
+
+test "rank667: GETPOST alpha branch escapes returned request text"
+  lang php
+  reject VYQL-INJ-146
+  code
+  ```
+  <?php
+  function GETPOST($paramname, $check = '', $method = 0) {
+    if (empty($method)) $out = isset($_GET[$paramname]) ? $_GET[$paramname] : (isset($_POST[$paramname]) ? $_POST[$paramname] : '');
+    elseif ($method == 1) $out = isset($_GET[$paramname]) ? $_GET[$paramname] : '';
+    elseif ($method == 2) $out = isset($_POST[$paramname]) ? $_POST[$paramname] : '';
+    else return 'BadThirdParameterForGETPOST';
+    if (!empty($check)) {
+      if ($check == 'alpha') {
+        $out = trim($out);
+        if (preg_match('/\.\.\//', $out)) $out = '';
+        $out = htmlspecialchars($out, ENT_QUOTES);
+      }
+    }
+    return $out;
+  }
+  ```

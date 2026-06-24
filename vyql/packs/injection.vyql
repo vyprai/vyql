@@ -658,6 +658,11 @@ rule CordysRequestParamXssFilterDisabled {
   match code.CordysRequestParamXssFilterDisabled as sink
 }
 
+rule RequestTextParamHtmlEscapeMissing {
+  meta { id: "VYQL-INJ-146", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RequestTextParamHtmlEscapeMissing as sink
+}
+
 rule FlarumTranslatorRawStringParameterXss {
   meta { id: "VYQL-INJ-111", severity: critical, cwe: [CWE_79], confidence_floor: high }
   match code.FlarumTranslatorRawStringParameterXss as sink

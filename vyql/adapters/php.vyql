@@ -510,6 +510,18 @@ adapter php {
     lacks "'text'=>htmlspecialchars($name)"
     lacks "'text'=>htmlentities($name)"
   }
+  flag code.RequestTextParamHtmlEscapeMissing in function {
+    has "lang=php"
+    has "$_GET[$paramname]"
+    has "$_POST[$paramname]"
+    has "$check=='alpha'"
+    has "$out=trim($out)"
+    has "return$out"
+    lacks "htmlspecialchars($out"
+    lacks "htmlentities($out"
+    lacks "dol_htmlentities($out"
+    lacks "html_escape($out"
+  }
   flag code.InstallerHiddenFieldXss in function {
     has "lang=php"
     has "name=show_next_step"
