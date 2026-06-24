@@ -53,6 +53,11 @@ rule ServerSideBrowserActiveHtmlRendering {
   match code.ServerSideBrowserActiveHtmlRendering as render
 }
 
+rule SvgNestedResourceValidationBypass {
+  meta { id: "VYQL-RF-027", severity: critical, cwe: [CWE_611, CWE_918, CWE_502, CWE_22], confidence_floor: high }
+  match code.SvgNestedResourceValidationBypass as render
+}
+
 rule CodeServerPathProxyPortConfusedProxy {
   meta { id: "VYQL-RF-019", severity: high, cwe: [CWE_441, CWE_918], confidence_floor: high }
   match code.CodeServerPathProxyPortConfusedProxy as proxy

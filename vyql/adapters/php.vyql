@@ -794,6 +794,16 @@ adapter php {
     lacks "FILTER_FLAG_NO_PRIV_RANGE"
     lacks "FILTER_FLAG_NO_RES_RANGE"
   }
+  flag code.SvgNestedResourceValidationBypass in function {
+    has "lang=php"
+    has "name=resolve_url"
+    has "Helpers::dompdf_getimagesize"
+    has "\"svg\""
+    has "file_put_contents($resolved_url,$image)"
+    lacks "$type===\"svg\""
+    lacks "xml_set_element_handler"
+    lacks "self::resolve_url($url"
+  }
   flag code.OwnCloudLoginRedirectUrlOpenRedirect in function {
     has "lang=php"
     has "name=redirectToDefaultPage"

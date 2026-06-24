@@ -1990,6 +1990,15 @@ concept ServerSideBrowserActiveHtmlRendering : sink {
   review_assumption: "the HTML input can be attacker-controlled and the renderer runs with server network or local file visibility"
   review_confidence: high
 }
+concept SvgNestedResourceValidationBypass : sink {
+  vulnerable_to: [request_forgery.Ssrf, deserialization.Xxe, path.PathTraversal]
+  cwe: [CWE_611, CWE_918, CWE_502, CWE_22]
+  review_category: "request_forgery"
+  review_condition: "SVG images are accepted after top-level URL validation without validating nested image href references"
+  review_evidence: "SVG image cache context {pattern} resolves and stores image content, accepts type svg, and lacks parsing of nested image href/xlink references through the same resource validation"
+  review_assumption: "attacker-controlled SVG content can contain nested image references to remote, local, or dangerous wrapper URLs that bypass top-level resource policy"
+  review_confidence: high
+}
 concept CodeServerPathProxyPortConfusedProxy : sink {
   vulnerable_to: [request_forgery.Ssrf]
   cwe: [CWE_441, CWE_918]
