@@ -1,0 +1,74 @@
+test "rank659: Playwright renders raw HTML with JavaScript and resource fetches enabled"
+  lang python
+  expect VYQL-RF-026
+  code
+  ```
+  from typing import Optional
+  from pathlib import Path
+  from playwright.sync_api import sync_playwright
+
+  class HTMLDocumentBackend:
+      def _get_render_html_text(self) -> str:
+          return self._raw_html_bytes.decode("utf-8", errors="replace")
+
+      def _render_with_browser(self) -> None:
+          width, height = 1024, 768
+          render_url: Optional[str] = None
+          render_html = self._get_render_html_text()
+          if isinstance(self.path_or_stream, Path):
+              render_url = self.path_or_stream.resolve().as_uri()
+
+          with sync_playwright() as playwright:
+              browser = playwright.chromium.launch(headless=True)
+              context = browser.new_context(
+                  viewport={"width": width, "height": height},
+                  device_scale_factor=self.options.render_device_scale,
+              )
+              page = context.new_page()
+              if render_url:
+                  page.goto(render_url, wait_until=self.options.render_wait_until)
+              else:
+                  page.set_content(render_html, wait_until=self.options.render_wait_until)
+  ```
+
+test "rank659: Playwright raw HTML render disables JavaScript and blocks resource fetches"
+  lang python
+  reject VYQL-RF-026
+  code
+  ```
+  from typing import Optional
+  from pathlib import Path
+  from playwright.sync_api import sync_playwright
+
+  class HTMLDocumentBackend:
+      def _get_render_html_text(self) -> str:
+          return self._raw_html_bytes.decode("utf-8", errors="replace")
+
+      def _render_with_browser(self) -> None:
+          width, height = 1024, 768
+          render_url: Optional[str] = None
+          render_html = self._get_render_html_text()
+          if isinstance(self.path_or_stream, Path):
+              render_url = self.path_or_stream.resolve().as_uri()
+
+          with sync_playwright() as playwright:
+              browser = playwright.chromium.launch(headless=True)
+              offline_mode = not self.options.enable_remote_fetch
+              context = browser.new_context(
+                  viewport={"width": width, "height": height},
+                  device_scale_factor=self.options.render_device_scale,
+                  java_script_enabled=False,
+                  offline=offline_mode,
+                  service_workers="block",
+              )
+
+              def _route_request(route, request) -> None:
+                  route.abort("blockedbyclient")
+
+              context.route("**/*", _route_request)
+              page = context.new_page()
+              if render_url:
+                  page.goto(render_url, wait_until=self.options.render_wait_until)
+              else:
+                  page.set_content(render_html, wait_until=self.options.render_wait_until)
+  ```

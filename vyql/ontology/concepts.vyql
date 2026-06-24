@@ -1963,6 +1963,15 @@ concept CloudBaseOpenUrlSsrf : sink {
   review_assumption: "the interactive open-url endpoint is reachable by a remote or browser-backed attacker"
   review_confidence: high
 }
+concept ServerSideBrowserActiveHtmlRendering : sink {
+  vulnerable_to: [request_forgery.Ssrf, injection.Xss, secrets.SecretLeak]
+  cwe: [CWE_918, CWE_79, CWE_200]
+  review_category: "request_forgery"
+  review_condition: "server-side browser rendering executes or fetches resources from untrusted HTML without sandbox restrictions"
+  review_evidence: "headless browser render context {pattern} loads raw HTML into Playwright/Chromium before disabling page JavaScript and browser resource fetches"
+  review_assumption: "the HTML input can be attacker-controlled and the renderer runs with server network or local file visibility"
+  review_confidence: high
+}
 concept CodeServerPathProxyPortConfusedProxy : sink {
   vulnerable_to: [request_forgery.Ssrf]
   cwe: [CWE_441, CWE_918]

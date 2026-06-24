@@ -553,6 +553,25 @@ adapter python {
     lacks "name=api_endpoint_wrapper"
     lacks "UNSUPPORTED_MEDIA_TYPE"
   }
+  flag code.ServerSideBrowserActiveHtmlRendering in function {
+    has "name=_render_with_browser"
+    has "sync_playwright"
+    has "chromium.launch"
+    has "browser.new_context("
+    has "render_html=self._get_render_html_text()"
+    has "page.set_content(render_html"
+    lacks "java_script_enabled=False"
+  }
+  flag code.ServerSideBrowserActiveHtmlRendering in function {
+    has "name=_render_with_browser"
+    has "sync_playwright"
+    has "chromium.launch"
+    has "browser.new_context("
+    has "render_html=self._get_render_html_text()"
+    has "page.set_content(render_html"
+    lacks "offline="
+    lacks "context.route"
+  }
   flag code.CinderUnsafeMinidomXmlDeserializer in function {
     has "class_bases=wsgi.MetadataXMLDeserializer"
     has "name=default"

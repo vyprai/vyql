@@ -48,6 +48,11 @@ rule CloudBaseOpenUrlSsrf {
   match code.CloudBaseOpenUrlSsrf as action
 }
 
+rule ServerSideBrowserActiveHtmlRendering {
+  meta { id: "VYQL-RF-026", severity: high, cwe: [CWE_918, CWE_79, CWE_200], confidence_floor: high }
+  match code.ServerSideBrowserActiveHtmlRendering as render
+}
+
 rule CodeServerPathProxyPortConfusedProxy {
   meta { id: "VYQL-RF-019", severity: high, cwe: [CWE_441, CWE_918], confidence_floor: high }
   match code.CodeServerPathProxyPortConfusedProxy as proxy
