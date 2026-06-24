@@ -74,6 +74,11 @@ rule TokenCacheAuthorizationBypass {
   match code.TokenCacheAuthorizationBypass as cache
 }
 
+rule ExpiredCachedAuthTokenReuse {
+  meta { id: "VYQL-AUTH-043", severity: medium, cwe: [CWE_613], confidence_floor: high }
+  match code.ExpiredCachedAuthTokenReuse as cache
+}
+
 rule PostEditReportPrivateContentLeak {
   meta { id: "VYQL-AUTH-040", severity: high, cwe: [CWE_200, CWE_863], confidence_floor: high }
   match code.PostEditReportPrivateContentLeak as report

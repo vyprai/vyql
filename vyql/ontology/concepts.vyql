@@ -1715,6 +1715,15 @@ concept TimeBoundAccessTokenReview : sink {
   vulnerable_to: [access_control.BrokenAccess]
   cwe: [CWE_284]
 }
+concept ExpiredCachedAuthTokenReuse : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_613]
+  review_category: "auth"
+  review_condition: "cached authentication or bearer-token material is only reused while its expiry/timeout is still after the current time"
+  review_evidence: "auth token cache context {pattern} returns cached token material from an expiry-before-now branch"
+  review_assumption: "the cached token is used for authenticated requests and becomes invalid or stale after its expiry time"
+  review_confidence: high
+}
 // Review-only: authentication challenge, retry, or attempt-limit logic. Used for
 // cases where static analysis should hand context to the AI/manual stage to verify
 // brute-force limits, rate limiting, and concurrency around failed-attempt counters.

@@ -141,6 +141,14 @@ adapter java {
     has "call:getSession"
     lacks "call:invalidate"
   }
+  flag code.ExpiredCachedAuthTokenReuse in function {
+    has "call_path:accessTokenCache.timeout.isBefore"
+    has "call_path:ZonedDateTime.now"
+    has "selector:accessTokenCache.resource"
+    has "call_path:accessToken.getExpiresAtAsInstant"
+    has "call_path:expiresAt.minus"
+    lacks "call_path:accessTokenCache.timeout.isAfter"
+  }
   flag code.PublicKeyHashBindingReview in function {
     has "function_name:correctlySpends"
     has "call:fromPublicOnly"
