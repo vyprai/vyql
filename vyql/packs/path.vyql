@@ -167,3 +167,8 @@ rule MimeSubtypeFileExtensionPathTraversal {
   meta { id: "VYQL-PATH-032", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.MimeSubtypeFileExtensionPathTraversal as sink
 }
+
+rule BoundRequestPathDeleteTraversal {
+  meta { id: "VYQL-PATH-033", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.BoundRequestPathDeleteTraversal as sink
+}

@@ -736,6 +736,15 @@ adapter go {
     has "call_path:s.cfg.FileStore.Delete"
     lacks "call_path:filepath.Clean"
   }
+  flag code.BoundRequestPathDeleteTraversal in function {
+    has "function_name:Delete"
+    has "call_path:self.Validate"
+    has "selector:params.Path"
+    has "call_path:GetSaveRealPath"
+    has "call_path:os.Remove"
+    lacks "call_path:filepath.IsLocal"
+    lacks "call_path:filepath.Clean"
+  }
   flag code.UnderwidthFormattedIndex in function {
     has "call_path:fmt.Sprintf"
     has "literal:%08b"

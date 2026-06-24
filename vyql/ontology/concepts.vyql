@@ -2633,6 +2633,15 @@ concept FilePathAccess : sink {
   cwe: [CWE_22]
   excluded_chars: "/\\"
 }
+concept BoundRequestPathDeleteTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "a bound request path is resolved into storage and deleted without a local-path check"
+  review_evidence: "delete handler context {pattern} validates request params, resolves params.Path with storage path helpers, and calls os.Remove without filepath.IsLocal and filepath.Clean"
+  review_assumption: "the binding helper populates params.Path from an HTTP request parameter and the storage resolver can be influenced by relative traversal segments"
+  review_confidence: high
+}
 concept MimeSubtypeFileExtensionPathTraversal : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]
