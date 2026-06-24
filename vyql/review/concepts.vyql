@@ -1222,6 +1222,12 @@ review code.CatastrophicRegex {
   kind: "attention"
   text: "review static regex complexity and attacker-controlled match input length"
 }
+review code.UnboundedEmailRegexValidation {
+  category: "resource"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review email validation regexes for maximum input length checks before matching attacker-controlled strings"
+}
 review code.RubyLineAnchorValidationBypass {
   category: "resource"
   kind: "attention"

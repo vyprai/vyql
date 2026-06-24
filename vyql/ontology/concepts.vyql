@@ -385,6 +385,15 @@ concept CatastrophicRegex : sink {
   review_assumption: "an attacker can supply input matched by this exported or reachable regex"
   review_confidence: medium
 }
+concept UnboundedEmailRegexValidation : sink {
+  vulnerable_to: [dos.ReDoS, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_1333, CWE_400]
+  review_category: "resource"
+  review_condition: "email syntax validation applies a broad regular expression before bounding input length"
+  review_evidence: "email validation context {pattern} tests email with /^\\S+@\\S+$/ and then performs MX lookup without an observed maximum email length check"
+  review_assumption: "attackers can submit very long email strings to the validator and consume regex or downstream processing resources"
+  review_confidence: high
+}
 
 concept RubyLineAnchorValidationBypass : sink {
   vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]

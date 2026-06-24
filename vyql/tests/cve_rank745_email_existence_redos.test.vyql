@@ -1,0 +1,49 @@
+# Rank 745 / CVE-2018-25049: email-existence applied a broad
+# email regex to unbounded input before MX lookup.
+
+test "rank745: email regex validation lacks maximum input length guard"
+  lang javascript
+  expect VYQL-DOS-023
+  expect_review code.UnboundedEmailRegexValidation
+  code
+  ```
+  var dns = require('dns');
+
+  module.exports = function (email, callback, timeout, from_email) {
+    timeout = timeout || 5000;
+    from_email = from_email || email;
+    if (!/^\S+@\S+$/.test(email)) {
+      callback(null, false);
+      return;
+    }
+    dns.resolveMx(email.split('@')[1], function(err, addresses) {
+      callback(err, addresses && addresses.length > 0);
+    });
+  };
+  ```
+
+test "rank745: email regex validation with length guard is clean"
+  lang javascript
+  reject VYQL-DOS-023
+  reject_review code.UnboundedEmailRegexValidation
+  code
+  ```
+  var dns = require('dns');
+
+  module.exports = function (email, callback, timeout, from_email) {
+    timeout = timeout || 5000;
+    from_email = from_email || email;
+    const MAX_EMAIL_LEN = 300;
+    if (MAX_EMAIL_LEN < email.length) {
+      callback(null, false);
+      return;
+    }
+    if (!/^\S+@\S+$/.test(email)) {
+      callback(null, false);
+      return;
+    }
+    dns.resolveMx(email.split('@')[1], function(err, addresses) {
+      callback(err, addresses && addresses.length > 0);
+    });
+  };
+  ```

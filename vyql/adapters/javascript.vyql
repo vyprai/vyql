@@ -1094,6 +1094,14 @@ adapter javascript {
     lacks "\\d{0,3}"
     lacks "(?:\\.\\d+)?"
   }
+  flag code.UnboundedEmailRegexValidation in function {
+    lang "javascript"
+    has "/^\\S+@\\S+$/.test(email)"
+    has "dns.resolveMx(email.split('@')[1]"
+    lacks "MAX_EMAIL_LEN<email.length"
+    lacks "email.length>300"
+    lacks "email.length>=300"
+  }
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "bulkCreate" -> code.MassAssign

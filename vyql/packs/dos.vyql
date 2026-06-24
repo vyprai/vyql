@@ -113,3 +113,8 @@ rule JpegSetjmpConstructorEscape {
   meta { id: "VYQL-DOS-022", severity: high, cwe: [CWE_248, CWE_400, CWE_755], confidence_floor: high }
   match code.JpegSetjmpConstructorEscape as s
 }
+
+rule UnboundedEmailRegexValidation {
+  meta { id: "VYQL-DOS-023", severity: high, cwe: [CWE_1333, CWE_400], confidence_floor: high }
+  match code.UnboundedEmailRegexValidation as email
+}
