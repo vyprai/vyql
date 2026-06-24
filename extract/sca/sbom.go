@@ -144,6 +144,61 @@ func ParseSetupCfg(content string) []Dep {
 	return out
 }
 
+// ParseGoMod reads direct and block-form require directives from go.mod.
+// It deliberately ignores replace/exclude directives: the required module/version
+// is the dependency identity scanned by the SCA advisory feed.
+func ParseGoMod(content string) []Dep {
+	var out []Dep
+	inRequireBlock := false
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(stripLineComment(raw))
+		if line == "" {
+			continue
+		}
+		if inRequireBlock {
+			if line == ")" {
+				inRequireBlock = false
+				continue
+			}
+			if dep, ok := parseGoRequireLine(line); ok {
+				out = append(out, dep)
+			}
+			continue
+		}
+		if line == "require (" {
+			inRequireBlock = true
+			continue
+		}
+		if strings.HasPrefix(line, "require ") {
+			rest := strings.TrimSpace(strings.TrimPrefix(line, "require "))
+			if dep, ok := parseGoRequireLine(rest); ok {
+				out = append(out, dep)
+			}
+		}
+	}
+	return out
+}
+
+func stripLineComment(line string) string {
+	if i := strings.Index(line, "//"); i >= 0 {
+		return line[:i]
+	}
+	return line
+}
+
+func parseGoRequireLine(line string) (Dep, bool) {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return Dep{}, false
+	}
+	name := strings.Trim(fields[0], `"`)
+	version := strings.Trim(fields[1], `"`)
+	if name == "" || version == "" || strings.Contains(name, "=>") || strings.Contains(version, "=>") {
+		return Dep{}, false
+	}
+	return Dep{NormalizePackageName(name), version}, true
+}
+
 func identifierBoundary(s string, start, end int) bool {
 	isIdent := func(b byte) bool {
 		return b == '_' || ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || ('0' <= b && b <= '9')

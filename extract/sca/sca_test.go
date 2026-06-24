@@ -74,6 +74,35 @@ dev =
 	}
 }
 
+func TestParseGoModRequires(t *testing.T) {
+	got := ParseGoMod(`module example.com/app
+
+go 1.21
+
+require github.com/One/Direct v1.2.3
+
+require (
+    github.com/ElrondNetwork/elrond-vm-common v1.3.6
+    github.com/pkg/errors v0.9.1 // indirect
+)
+
+replace github.com/ElrondNetwork/elrond-vm-common v1.3.6 => github.com/example/fork v1.3.7
+`)
+	want := []Dep{
+		{"github.com/one/direct", "v1.2.3"},
+		{"github.com/elrondnetwork/elrond-vm-common", "v1.3.6"},
+		{"github.com/pkg/errors", "v0.9.1"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestParseVendoredJSTinyMCEBanner(t *testing.T) {
 	got := ParseVendoredJS("tinymce/static/tinymce/plugins/image/plugin.min.js", `/**
  * Version: 5.5.0 (2020-09-29)

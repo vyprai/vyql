@@ -21,6 +21,7 @@ var manifestParsers = []struct {
 	{"setup.py", "pypi", sca.ParseSetupPy},
 	{"setup.cfg", "pypi", sca.ParseSetupCfg},
 	{"package.json", "npm", sca.ParsePackageJSON},
+	{"go.mod", "go", sca.ParseGoMod},
 }
 
 // applySCA discovers dependency manifests under the scanned paths, adds SBOM nodes to the

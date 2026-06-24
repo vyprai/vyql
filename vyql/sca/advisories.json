@@ -19,5 +19,15 @@
         "cwe": ["CWE_444"]
       }
     ]
+  },
+  "go": {
+    "github.com/elrondnetwork/elrond-vm-common": [
+      {
+        "version": "*",
+        "id": "CVE-2022-36058",
+        "cwe": ["CWE-20", "CWE-703"],
+        "min_safe": "v1.3.10"
+      }
+    ]
   }
 }
