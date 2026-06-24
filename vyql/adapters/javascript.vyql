@@ -1094,6 +1094,15 @@ adapter javascript {
     lacks "\\d{0,3}"
     lacks "(?:\\.\\d+)?"
   }
+  flag code.CatastrophicRegex in module {
+    lang "javascript"
+    has "String(validFunction(this)).match(re)"
+    has "([\\0-')-\\uffff]+)*"
+    has "([\\0-(*-\\uffff]*)"
+    lacks "this.name||\"\""
+    lacks "args.join(\",\")"
+    lacks "args.join(\", \")"
+  }
   flag code.UnboundedEmailRegexValidation in function {
     lang "javascript"
     has "/^\\S+@\\S+$/.test(email)"
