@@ -263,6 +263,16 @@ adapter java {
     not call path "StringEscapeUtils.escapeHtml"
     not call path "HtmlUtils.htmlEscape"
   }
+  flag code.SvgOnclickWindowOpenLinkXss in function {
+    has "identifier:link"
+    has "window.open"
+    has "cursor: pointer"
+    call "escapeHtml"
+    call "replace"
+    call "getBytes"
+    not call "getProtocol"
+    lacks "&quot;"
+  }
   flag code.JenkinsProjectDisplayNameXss in function {
     function "getName"
     call path "project.getFullDisplayName"

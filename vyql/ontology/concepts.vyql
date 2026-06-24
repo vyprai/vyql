@@ -3330,6 +3330,15 @@ concept RequestViewVariableHtmlEscapeMissing : sink {
   review_assumption: "the receiving view renders the variable in HTML or JavaScript where caller-side escaping is required"
   review_confidence: high
 }
+concept SvgOnclickWindowOpenLinkXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "SVG response builder concatenates a dynamic link into an onclick window.open JavaScript string"
+  review_evidence: "SVG response context {pattern} builds an onclick window.open handler from a link value without URL protocol allowlisting or JavaScript-string-safe quoting"
+  review_assumption: "the link value can be configured or requested by a lower-trust user and the generated SVG is rendered by a browser"
+  review_confidence: high
+}
 concept GouniverseCmsAliasXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

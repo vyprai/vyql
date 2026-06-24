@@ -1426,6 +1426,12 @@ review code.RequestViewVariableHtmlEscapeMissing {
   expected: [core.HtmlEscape]
   text: "review request-derived view variables for htmlentities/htmlspecialchars before passing them into HTML view rendering"
 }
+review code.SvgOnclickWindowOpenLinkXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review SVG onclick/window.open link rendering for protocol allowlisting and JavaScript-string-safe quoting"
+}
 review code.GouniverseCmsAliasXss {
   category: "xss"
   kind: "attention"

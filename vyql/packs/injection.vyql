@@ -490,6 +490,11 @@ rule RequestViewVariableHtmlEscapeMissing {
   match code.RequestViewVariableHtmlEscapeMissing as sink
 }
 
+rule SvgOnclickWindowOpenLinkXss {
+  meta { id: "VYQL-INJ-163", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.SvgOnclickWindowOpenLinkXss as sink
+}
+
 rule GouniverseCmsAliasXss {
   meta { id: "VYQL-INJ-079", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.GouniverseCmsAliasXss as sink
