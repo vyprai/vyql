@@ -234,6 +234,32 @@ adapter javascript {
     lacks "stripEventHandlers"
     lacks "_stripEventHandlers"
   }
+  flag code.ClientLightboxOptionXss in module {
+    has "lang=javascript"
+    has "setHTMLContent"
+    has "setMessage(html)"
+    lacks "DOMPurify"
+    lacks "sanitize(html)"
+    lacks "sanitizeHtml(html)"
+  }
+  flag code.ClientLightboxOptionXss in module {
+    has "lang=javascript"
+    has "setVideoContent"
+    has "options.videoParams"
+    has "$('<video>',videoParams)"
+    lacks "startsWith('on')"
+    lacks "startsWith(\"on\")"
+    lacks "deletevideoParams[key]"
+  }
+  flag code.ClientLightboxOptionXss in module {
+    has "lang=javascript"
+    has "setSlideshowContent"
+    has "options.slides.forEach"
+    has "data-elementor-slideshow-video"
+    has "slide.image"
+    lacks "isValidUrl"
+    lacks "startsWith(protocol)"
+  }
   flag code.AjaxBackslashProtocolRelativeUrlXss in module {
     has "lang=javascript"
     has "function ajax(url, handler)"

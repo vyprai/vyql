@@ -1378,6 +1378,12 @@ review code.ElefantAdminPreviewMissingAdminXss {
   expected: [core.AuthenticationCheck, core.AuthorizationCheck, core.HtmlEscape]
   text: "review Elefant admin preview for require_admin before rendering POST-supplied preview fields"
 }
+review code.ClientLightboxOptionXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review client lightbox option rendering for HTML sanitization, event-attribute filtering, and URL protocol allowlisting"
+}
 review code.GouniverseCmsAliasXss {
   category: "xss"
   kind: "attention"
