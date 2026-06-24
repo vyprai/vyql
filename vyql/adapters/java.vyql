@@ -376,6 +376,13 @@ adapter java {
     method "newTransformer"
   }
   flag code.XmlParserCreate in function {
+    has "call_path:SAXReader"
+    has "call_path:reader.read"
+    lacks "literal:http://apache.org/xml/features/nonvalidating/load-external-dtd"
+    lacks "literal:http://xml.org/sax/features/external-general-entities"
+    lacks "literal:http://xml.org/sax/features/external-parameter-entities"
+  }
+  flag code.XmlParserCreate in function {
     has "call_path:getTaskUnmarshaller.unmarshal"
     lacks "call_path:getXMLStreamReader"
   }
