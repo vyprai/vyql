@@ -199,6 +199,14 @@ adapter python {
   sink path "cursor.execute" -> code.SqlExecution
   sink path "RawSQL" -> code.SqlExecution
   sink path "django.db.connection.cursor" -> code.SqlExecution
+  flag code.McpSqlExecutionMissingValidation in function {
+    has "name=execute_sql_for_mcp"
+    has "QueryRequest("
+    has "sql=sql"
+    has "self.execute_query(query_request,auth_context)"
+    lacks "validate_sql_security"
+    lacks "DorisSecurityManager"
+  }
   // asyncpg raw query methods (CWE-89)
   sink method "fetch" -> code.SqlExecution
   sink method "fetchrow" -> code.SqlExecution

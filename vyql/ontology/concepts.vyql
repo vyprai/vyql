@@ -331,6 +331,15 @@ concept McpToolCommandTemplateExecution : sink {
   review_assumption: "MCP tool callers can provide argument values that reach the handler"
   review_confidence: high
 }
+concept McpSqlExecutionMissingValidation : sink {
+  vulnerable_to: [injection.SqlInjection, access_control.IncorrectAuthorization]
+  cwe: [CWE_89, CWE_863]
+  review_category: "sql"
+  review_condition: "an MCP SQL helper executes caller-provided SQL through an internal query executor without applying the configured SQL security policy"
+  review_evidence: "MCP SQL execution context {pattern} builds a QueryRequest from sql and executes it before validate_sql_security or equivalent authorization/operation checks"
+  review_assumption: "MCP clients can provide SQL text to the helper and the backing database permissions exceed the intended read-only tool surface"
+  review_confidence: high
+}
 concept ConnectCmsCodestudiesPluginCodeExecution : sink {
   vulnerable_to: [injection.CodeInjection, injection.CommandInjection]
   cwe: [CWE_94, CWE_78]
