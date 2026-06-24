@@ -569,6 +569,22 @@ adapter java {
     lacks "annotation:POST"
     lacks "call:checkPermissionForRemoteRequests"
   }
+  flag code.JenkinsRemoteValidationMissingPermission in function {
+    has "function_name:doTestDynatraceConnection"
+    has "annotation:RequirePOST"
+    has "call:DynatraceClient"
+    has "call:getSystemProfiles"
+    lacks "call:checkPermission"
+    lacks "call:hasPermission"
+  }
+  flag code.JenkinsRemoteValidationMissingPermission in function {
+    has "function_name:doCheck"
+    has "annotation:RequirePOST"
+    has "call:DynatraceClient"
+    has "call:getSystemProfiles"
+    lacks "call:checkPermission"
+    lacks "call:hasPermission"
+  }
   flag code.JenkinsRemoteValidationMissingPostPermission in function {
     has "function_name:doTest"
     has "call:testConnection"

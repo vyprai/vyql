@@ -144,6 +144,11 @@ rule JenkinsDescriptorConfigEnumerationMissingPermission {
   match code.JenkinsDescriptorConfigEnumerationMissingPermission as endpoint
 }
 
+rule JenkinsRemoteValidationMissingPermission {
+  meta { id: "VYQL-AUTH-045", severity: medium, cwe: [CWE_862, CWE_918], confidence_floor: high }
+  match code.JenkinsRemoteValidationMissingPermission as endpoint
+}
+
 rule ShopwareStoreApiManyToManyCriteriaBypass {
   meta { id: "VYQL-AUTH-026", severity: medium, cwe: [CWE_284], confidence_floor: high }
   match code.ShopwareStoreApiManyToManyCriteriaBypass as criteria

@@ -1702,6 +1702,15 @@ concept JenkinsDescriptorConfigEnumerationMissingPermission : sink {
   review_assumption: "the doFill endpoint is reachable from users with less privilege than Item/Configure or Overall/Administer"
   review_confidence: high
 }
+concept JenkinsRemoteValidationMissingPermission : sink {
+  vulnerable_to: [access_control.MissingAuthorization, request_forgery.Ssrf]
+  cwe: [CWE_862, CWE_918]
+  review_category: "auth"
+  review_condition: "Jenkins descriptor form-validation endpoint connects to a supplied remote service without an administrator permission check"
+  review_evidence: "descriptor endpoint context {pattern} accepts QueryParameter values, builds a remote client, and performs a connection test before observed checkPermission or hasPermission gates"
+  review_assumption: "users with Overall/Read can invoke descriptor validation endpoints with attacker-controlled host and credential parameters"
+  review_confidence: high
+}
 concept ShopwareStoreApiManyToManyCriteriaBypass : sink {
   vulnerable_to: [access_control.BrokenAccess]
   cwe: [CWE_284]

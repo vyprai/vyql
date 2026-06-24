@@ -163,6 +163,12 @@ review code.JenkinsDescriptorConfigEnumerationMissingPermission {
   expected: [core.AuthorizationCheck]
   text: "review Jenkins descriptor fill endpoint for missing Item/Configure or Overall/Administer permission checks before listing configuration or credential identifiers"
 }
+review code.JenkinsRemoteValidationMissingPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins remote form-validation endpoints for Overall/Administer permission checks before connecting to supplied services"
+}
 review code.ShopwareStoreApiManyToManyCriteriaBypass {
   category: "access_control"
   kind: "attention"
