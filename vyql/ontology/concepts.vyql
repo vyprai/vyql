@@ -3777,6 +3777,15 @@ concept UnvalidatedSqlIdentifierInterpolation : sink {
   review_assumption: "attackers can control the identifier value passed into the update or query helper"
   review_confidence: high
 }
+concept PgEscapeStringSqlFilterInjection : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "PostgreSQL filter fragments are built with pg_escape_string instead of pg_escape_literal before query composition"
+  review_evidence: "Search/filter builder context {pattern} concatenates pg_escape_string output into SQL fragments that are later added to a search query"
+  review_assumption: "HTTP parameters can control the escaped filter value"
+  review_confidence: high
+}
 concept UnvalidatedSqlOrderDirection : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]
