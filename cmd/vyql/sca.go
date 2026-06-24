@@ -68,6 +68,21 @@ func applySCA(g usg.Store, paths []string) {
 				ecos["git"] = true
 			}
 		}
+		for _, f := range vendoredJSFiles(p, info) {
+			root := scanRootFor(p, info)
+			loc := relFrom(root, f)
+			b, err := os.ReadFile(f)
+			if err != nil {
+				continue
+			}
+			deps := sca.ParseVendoredJS(f, string(b))
+			if len(deps) == 0 {
+				continue
+			}
+			if sca.BuildSBOM(g, "npm", deps, loc) == nil {
+				ecos["npm"] = true
+			}
+		}
 	}
 	if len(ecos) == 0 {
 		return
@@ -86,6 +101,44 @@ func scaRoots(p string, info os.FileInfo) []string {
 		return []string{filepath.Dir(p)}
 	}
 	return nil
+}
+
+func vendoredJSFiles(p string, info os.FileInfo) []string {
+	const maxVendoredJSSize = 4 << 20
+	if !info.IsDir() {
+		if strings.EqualFold(filepath.Ext(p), ".js") && info.Size() <= maxVendoredJSSize {
+			return []string{p}
+		}
+		return nil
+	}
+	var out []string
+	_ = filepath.WalkDir(p, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", "node_modules", ".venv", "venv":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.EqualFold(filepath.Ext(path), ".js") {
+			return nil
+		}
+		if info, err := d.Info(); err == nil && info.Size() <= maxVendoredJSSize {
+			out = append(out, path)
+		}
+		return nil
+	})
+	return out
+}
+
+func scanRootFor(p string, info os.FileInfo) string {
+	if info.IsDir() {
+		return p
+	}
+	return filepath.Dir(p)
 }
 
 func gitSubmoduleCommits(root string) map[string]string {

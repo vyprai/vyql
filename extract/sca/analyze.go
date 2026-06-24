@@ -91,6 +91,12 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 // release for the ecosystem, else "".
 func matchAdvisory(d *scaData, eco, name, version, specifier string) (advisoryEntry, bool) {
 	for _, a := range d.advisories[eco][name] {
+		if a.MinSafe != "" {
+			if version == "*" || compareVersions(version, a.MinSafe) < 0 {
+				return a, true
+			}
+			continue
+		}
 		if a.MaxSafe != "" {
 			if !specifierCapsAtOrBelow(specifier, version, a.MaxSafe) {
 				return a, true

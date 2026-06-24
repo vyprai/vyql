@@ -74,6 +74,33 @@ dev =
 	}
 }
 
+func TestParseVendoredJSTinyMCEBanner(t *testing.T) {
+	got := ParseVendoredJS("tinymce/static/tinymce/plugins/image/plugin.min.js", `/**
+ * Version: 5.5.0 (2020-09-29)
+ */
+!function(){}();
+`)
+	want := []Dep{{"tinymce", "5.5.0"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseVendoredJS() = %+v, want %+v", got, want)
+	}
+	if got := ParseVendoredJS("static/app.js", `/* Version: 5.5.0 */`); len(got) != 0 {
+		t.Fatalf("unrecognized vendored JS path should not emit deps, got %+v", got)
+	}
+}
+
+func TestMinSafeAdvisoryMatch(t *testing.T) {
+	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"npm": {
+		"tinymce": {{Version: "*", ID: "CVE-2024-21910", MinSafe: "5.10.0"}},
+	}}}
+	if adv, ok := matchAdvisory(d, "npm", "tinymce", "5.5.0", "5.5.0"); !ok || adv.ID != "CVE-2024-21910" {
+		t.Fatalf("tinymce 5.5.0 should match min_safe advisory, got ok=%v adv=%+v", ok, adv)
+	}
+	if _, ok := matchAdvisory(d, "npm", "tinymce", "5.10.1", "5.10.1"); ok {
+		t.Fatal("tinymce 5.10.1 should be clean for min_safe 5.10.0")
+	}
+}
+
 func TestPackageMatchesRepositorySlugInImportPath(t *testing.T) {
 	cases := []struct {
 		observed string

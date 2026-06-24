@@ -7,7 +7,8 @@
   },
   "npm": {
     "lodash": [{"version": "4.17.4", "id": "CVE-2019-10744"}],
-    "minimist": [{"version": "1.2.0", "id": "CVE-2020-7598"}]
+    "minimist": [{"version": "1.2.0", "id": "CVE-2020-7598"}],
+    "tinymce": [{"version": "*", "id": "CVE-2024-21910", "cwe": ["CWE-79"], "min_safe": "5.10.0"}]
   },
   "git": {
     "github.com/nodejs/llhttp": [
