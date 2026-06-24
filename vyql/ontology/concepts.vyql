@@ -863,6 +863,15 @@ concept CryptoImproperBlinding : sink {
   review_assumption: "an attacker can request repeated private-key operations and observe timing or signature differences"
   review_confidence: high
 }
+concept EcdsaNonceBitLengthTimingLeak : sink {
+  vulnerable_to: [crypto.ObservableDiscrepancy]
+  cwe: [CWE_200, CWE_203, CWE_208]
+  review_category: "crypto"
+  review_condition: "ECDSA signing uses a variable-bit-length nonce in scalar multiplication"
+  review_evidence: "ECDSA sign context {pattern} generates an HMAC-DRBG nonce, truncates it to n, multiplies the generator by k, and inverts k without fixed-bit-length mitigation"
+  review_assumption: "an attacker can request repeated signatures and observe timing differences correlated with nonce bit length"
+  review_confidence: high
+}
 concept CryptoMissingOptimizationBarrier : sink {
   vulnerable_to: [crypto.ObservableDiscrepancy]
   cwe: [CWE_200, CWE_203, CWE_208, CWE_733]

@@ -979,6 +979,12 @@ review code.CryptoImproperBlinding {
   kind: "attention"
   text: "review private-key blinding code for required subgroup/Jacobi/square hardening before inverse or unblinding use"
 }
+review code.EcdsaNonceBitLengthTimingLeak {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ECDSA signing for fixed-bit-length nonce scalar multiplication before using k in generator multiplication and inversion"
+}
 review code.CryptoMissingOptimizationBarrier {
   category: "crypto"
   kind: "attention"

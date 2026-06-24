@@ -103,3 +103,8 @@ rule CryptoScalarRandomBitsByteLengthConfusion {
   meta { id: "VYQL-CRY-019", severity: high, cwe: [CWE_331, CWE_330], confidence_floor: high }
   match code.CryptoScalarRandomBitsByteLengthConfusion as scalar
 }
+
+rule EcdsaNonceBitLengthTimingLeak {
+  meta { id: "VYQL-CRY-020", severity: high, cwe: [CWE_200, CWE_203, CWE_208], confidence_floor: high }
+  match code.EcdsaNonceBitLengthTimingLeak as nonce
+}

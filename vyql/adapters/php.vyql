@@ -209,6 +209,18 @@ adapter php {
     lacks "$internalname=htmlspecialchars($internalname)"
     lacks "$internalname=esc_html($internalname)"
   }
+  flag code.EcdsaNonceBitLengthTimingLeak in function {
+    lang "php"
+    name "sign"
+    has "HmacDRBG"
+    has "$drbg->generate($bytes)"
+    has "$k=$this->_truncateToN($k,true)"
+    has "$kp=$this->g->mul($k)"
+    has "$s=$k->invm($this->n)"
+    lacks "$ks=$k->add($this->n)"
+    lacks "$kt=$ks->add($this->n)"
+    lacks "$ks->bitLength()===$this->n->bitLength()"
+  }
   flag code.ElefantAdminPreviewMissingAdminXss in module {
     lang "php"
     has "$wp=newWebpage($_POST);"
