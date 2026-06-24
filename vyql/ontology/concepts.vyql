@@ -1686,6 +1686,15 @@ concept MfaRedirectBypass : sink {
   vulnerable_to: [authentication.AuthenticationBypass]
   cwe: [CWE_288]
 }
+concept RequestControlledMfaSecretBypass : sink {
+  vulnerable_to: [authentication.AuthenticationBypass]
+  cwe: [CWE_287, CWE_288]
+  review_category: "auth"
+  review_condition: "MFA verification accepts a secret from request data when the trusted session secret is missing"
+  review_evidence: "MFA service construction context {pattern} falls back from session state to request data for the TOTP secret"
+  review_assumption: "an attacker can supply the request secret and corresponding code during the MFA step"
+  review_confidence: high
+}
 concept AutoActiveSignupAccount : sink {
   vulnerable_to: [authentication.MissingAuthentication, access_control.MissingAuthorization]
   cwe: [CWE_306, CWE_862]

@@ -195,6 +195,11 @@ rule MfaRedirectBypass {
   match code.MfaRedirectBypass as bypass
 }
 
+rule RequestControlledMfaSecretBypass {
+  meta { id: "VYQL-AUTH-047", severity: critical, cwe: [CWE_287, CWE_288], confidence_floor: high }
+  match code.RequestControlledMfaSecretBypass as bypass
+}
+
 rule AutoActiveSignupAccount {
   meta { id: "VYQL-AUTH-005", severity: high, cwe: [CWE_306, CWE_862], confidence_floor: medium }
   match code.AutoActiveSignupAccount as signup

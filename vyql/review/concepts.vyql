@@ -115,6 +115,12 @@ review code.MissingGuestFallbackForWebAuth {
   expected: [core.AuthenticationCheck]
   text: "review web-server authentication flows that can exit or create users before applying the configured guest fallback"
 }
+review code.RequestControlledMfaSecretBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.MfaRequirement, core.AuthenticationCheck]
+  text: "review MFA verification flows for request-controlled TOTP secrets instead of session- or user-record-backed secrets"
+}
 review code.MissingSessionRotationAfterAuthentication {
   category: "auth"
   kind: "attention"

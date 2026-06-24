@@ -811,6 +811,14 @@ adapter php {
     has "!$mfaRequested"
     has "!$this->isLoggedInBackendUserRequired"
   }
+  flag code.RequestControlledMfaSecretBypass in function {
+    has "lang=php"
+    has "name=getAuthService"
+    has "MfaHelper"
+    has "$this->Session->get('mfa_secret')"
+    has "$this->Request->request->get('mfa_secret')"
+    lacks "newMfaHelper($this->Session->get('mfa_secret'))"
+  }
   // Review-only HTML attribute rewrites: string/regex-based lazyload rewrites that splice a
   // dynamic placeholder into generated image markup should be inspected for attribute breakouts.
   flag code.HtmlAttributeRewriteReview in function {
