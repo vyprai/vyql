@@ -1014,6 +1014,8 @@ adapter javascript {
   control "analysis.function.context" val "curr[prop]===constructor.prototype" val "curr[prop]={}" -> core.PrototypePollutionGuard
   control "analysis.function.context" val "Object.prototype.hasOwnProperty.call(pointer,key)" -> core.PrototypePollutionGuard
   control "analysis.function.context" val "lang=javascript" val "name=getPaths" val "segment !== '__proto__'" val "segment !== 'constructor'" val "segment !== 'prototype'" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "k=='__proto__'||k=='constructor'||k=='prototype'" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "k==='__proto__'||k==='constructor'||k==='prototype'" -> core.PrototypePollutionGuard
   flag code.UncheckedPrototypeConfigKey in function {
     has "name=separateExposeGlobals"
     has "Object.keys(shims).forEach"

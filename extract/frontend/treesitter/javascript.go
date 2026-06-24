@@ -592,6 +592,19 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				out = append(out, c.objectMethodFuncDefs(ch, true)...)
 				continue
 			}
+			if isJsFuncNode(ch) {
+				name := c.text(field(ch, "name"))
+				if name == "" {
+					name = "__default_export__"
+				}
+				params := c.funcParams(ch)
+				paramTypes := c.funcParamTypes(ch)
+				if len(params) == 0 {
+					params = c.paramsFromFunctionText(n)
+				}
+				out = append(out, nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(ch), Loc: L, ContextTokens: c.jsFunctionContext(name, ch), Exported: true})
+				continue
+			}
 			out = append(out, c.stmt(ch)...)
 		}
 		return out
@@ -820,9 +833,13 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				return out
 			}
 		}
+		var prefix []nir.Stmt
+		if rhs != nil && rhs.Kind() == "assignment_expression" {
+			prefix = append(prefix, c.exprStmt(rhs, L)...)
+		}
 		right := c.expr(rhs)
 		if left != nil && left.Kind() == "identifier" {
-			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+			return append(prefix, nir.Assign{Targets: []string{c.text(left)}, Value: right})
 		}
 		// member-property write (e.g. obj.prop = x): model as a path call so adapter
 		// mappings can reason about the assigned value.
@@ -845,7 +862,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 			}
 		}
 		// other assignment: still evaluate RHS for effect
-		return []nir.Stmt{nir.ExprStmt{Value: right}}
+		return append(prefix, nir.ExprStmt{Value: right})
 	case "augmented_assignment_expression":
 		left := field(inner, "left")
 		right := c.expr(field(inner, "right"))

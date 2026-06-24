@@ -67,6 +67,38 @@ const Model = {
 	}
 }
 
+func TestJavaScriptAnonymousDefaultExportFunctionIsExtracted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "index.js")
+	src := []byte(`
+export default function (obj, keys, val) {
+  keys.split && (keys = keys.split('.'));
+  obj[keys[0]] = val;
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := findFuncDef(prog, "__default_export__")
+	if !ok {
+		t.Fatalf("anonymous default export function was not extracted; program=%#v", prog)
+	}
+	if !fn.Exported {
+		t.Fatalf("anonymous default export should be marked exported; fn=%#v", fn)
+	}
+	if len(fn.Params) != 3 || fn.Params[0] != "obj" || fn.Params[1] != "keys" || fn.Params[2] != "val" {
+		t.Fatalf("anonymous default export params not preserved; params=%#v", fn.Params)
+	}
+	if !funcBodyHasPath(fn.Body, "__js_dynamic_property_write") {
+		t.Fatalf("anonymous default export body did not include dynamic property write; body=%#v", fn.Body)
+	}
+}
+
 func TestTypeScriptImportsAreExtracted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.ts")
