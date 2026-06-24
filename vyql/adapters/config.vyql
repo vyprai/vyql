@@ -84,7 +84,7 @@ adapter config {
       "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated",
       "index.html|Thelpers.encode(item.message)|common.notifications.template;item.message;refresh_notifications|msg = t.format('@(Navigation has been saved)', item.message)|analysis.config.totaljs_admin_notification_message_xss"
     ],
-    config_text_template_scopes: ["xwiki_velocity", "svelte", "django", "erb"],
+    config_text_template_scopes: ["xwiki_velocity", "svelte", "django", "django_safe", "erb"],
     config_text_template_extensions_xwiki_velocity: [".xml"],
     config_text_template_required_contains_xwiki_velocity: ["<content", "$request.", "#"],
     config_text_template_line_events_xwiki_velocity: [
@@ -106,6 +106,11 @@ adapter config {
     config_text_template_required_contains_django: ["{% autoescape off %}"],
     config_text_template_line_events_django: [
       "{% autoescape off %}|analysis.template.django.autoescape_off"
+    ],
+    config_text_template_extensions_django_safe: [".html"],
+    config_text_template_required_contains_django_safe: ["{{", "|safe"],
+    config_text_template_line_events_django_safe: [
+      "safe|analysis.template.django.safe_filter_raw_html"
     ],
     config_text_template_extensions_erb: [".erb"],
     config_text_template_required_contains_erb: ["<%="],
@@ -208,6 +213,11 @@ adapter config {
   // Django templates can locally disable autoescaping around model fields.
   flag code.StoredHtmlWrite on any {
     path "analysis.template.django.autoescape_off"
+  }
+  // Django's `safe` filter marks a template expression as trusted HTML and bypasses
+  // normal autoescaping, so model fields rendered through it need sanitizer review.
+  flag code.StoredHtmlWrite on any {
+    path "analysis.template.django.safe_filter_raw_html"
   }
   // Rails ERB raw comment rendering bypasses Rails' default output escaping.
   flag code.StoredHtmlWrite on any {
