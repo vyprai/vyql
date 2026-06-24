@@ -77,6 +77,11 @@ rule CommandLineAssembly {
   match code.CommandLineAssemblyReview as sink
 }
 
+rule MsgfmtPathShellCommandInterpolation {
+  meta { id: "VYQL-INJ-139", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.MsgfmtPathShellCommandInterpolation as sink
+}
+
 rule UnsafeBuildClientCommandAssembly {
   meta { id: "VYQL-INJ-060", severity: critical, cwe: [CWE_78], confidence_floor: high }
   match code.UnsafeBuildClientCommandAssembly as sink

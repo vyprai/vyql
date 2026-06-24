@@ -169,6 +169,15 @@ concept CommandLineAssemblyReview : sink {
   review_assumption: "the appended value can be influenced through a document, URI, desktop action, or caller-controlled parameter"
   review_confidence: medium
 }
+concept MsgfmtPathShellCommandInterpolation : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "message compilation command text interpolates filesystem-derived .po/.mo paths before shell execution"
+  review_evidence: "msgfmt command context {pattern} formats a path-derived stem into os.system(cmd)"
+  review_assumption: "an attacker can introduce a translation filename or directory containing shell metacharacters"
+  review_confidence: high
+}
 concept UnsafeBuildClientCommandAssembly : sink {
   vulnerable_to: [injection.CommandInjection]
   cwe: [CWE_78]

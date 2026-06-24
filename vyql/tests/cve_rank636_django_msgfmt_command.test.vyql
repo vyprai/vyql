@@ -1,0 +1,44 @@
+# Rank 636 / CVE-2007-0404: Django compile-messages interpolated .po file
+# paths into a msgfmt shell command before os.system.
+test "rank636: msgfmt command formats path-derived po stem into os.system"
+  lang python
+  file compile-messages.py
+  expect VYQL-INJ-139
+  code
+  ```
+  import os
+  import sys
+
+  def compile_messages():
+      basedir = os.path.abspath('locale')
+      for (dirpath, dirnames, filenames) in os.walk(basedir):
+          for f in filenames:
+              if f.endswith('.po'):
+                  pf = os.path.splitext(os.path.join(dirpath, f))[0]
+                  cmd = 'msgfmt -o "%s.mo" "%s.po"' % (pf, pf)
+                  os.system(cmd)
+  ```
+
+test "rank636: msgfmt command uses environment variables for paths"
+  lang python
+  file compile-messages.py
+  reject VYQL-INJ-139
+  code
+  ```
+  import os
+  import sys
+
+  def compile_messages():
+      basedir = os.path.abspath('locale')
+      for (dirpath, dirnames, filenames) in os.walk(basedir):
+          for f in filenames:
+              if f.endswith('.po'):
+                  pf = os.path.splitext(os.path.join(dirpath, f))[0]
+                  os.environ['djangocompilemo'] = pf + '.mo'
+                  os.environ['djangocompilepo'] = pf + '.po'
+                  if sys.platform == 'win32':
+                      cmd = 'msgfmt -o "%djangocompilemo%" "%djangocompilepo%"'
+                  else:
+                      cmd = 'msgfmt -o "$djangocompilemo" "$djangocompilepo"'
+                  os.system(cmd)
+  ```

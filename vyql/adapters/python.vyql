@@ -403,6 +403,18 @@ adapter python {
     has "\"-c\""
     lacks "shlex.quote(href)"
   }
+  flag code.MsgfmtPathShellCommandInterpolation in function {
+    has "name=compile_messages"
+    has "os.walk(basedir)"
+    has "os.path.splitext(os.path.join"
+    has "msgfmt -o"
+    has "% (pf, pf)"
+    has "os.system(cmd)"
+    lacks "os.environ['djangocompilemo']"
+    lacks "os.environ['djangocompilepo']"
+    lacks "$djangocompilemo"
+    lacks "%djangocompilemo%"
+  }
   flag code.PartiallyEscapedSshCommand in function {
     has "name=run_ssh_command_with_credentials"
     has "escaped_password"
