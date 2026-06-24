@@ -1298,6 +1298,15 @@ concept ReconfirmationDirtyTrackingRace : sink {
   review_assumption: "concurrent attacker-triggered reconfirmation requests can interleave writes to the confirmation token and pending email"
   review_confidence: high
 }
+concept PortRequestResponseCorrelationMissing : sink {
+  vulnerable_to: [concurrency.RaceCondition, secrets.SecretLeak]
+  cwe: [CWE_362, CWE_200]
+  review_category: "concurrency"
+  review_condition: "a worker sends requests to an async port process and accepts the next protocol response without binding it to the active request"
+  review_evidence: "port worker context {pattern} writes requests with Port.command and waits for get_response without a UID/correlation field"
+  review_assumption: "a timed-out or delayed prior response can remain in the worker mailbox and be returned to a later caller"
+  review_confidence: high
+}
 concept IndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   enabled_by: [taint.UntrustedData]

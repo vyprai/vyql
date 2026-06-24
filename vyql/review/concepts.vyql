@@ -1752,6 +1752,12 @@ review code.LocklessSharedMutation {
   expected: [core.LockRelease]
   text: "review shared mutable state writes and confirm they are protected by a lock or atomic guard"
 }
+review code.PortRequestResponseCorrelationMissing {
+  category: "concurrency"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review async port request/response loops for per-request correlation identifiers and stale-response discard"
+}
 review code.XmlParserCreate {
   category: "xml"
   kind: "target"

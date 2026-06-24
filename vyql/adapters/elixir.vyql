@@ -56,6 +56,15 @@ adapter elixir {
   flag code.AuthenticationRequiredOp on any {
     path "make_admin"
   }
+  flag code.PortRequestResponseCorrelationMissing in function {
+    lang "elixir"
+    call path "Port.command"
+    call path "Jason.encode!"
+    call path "get_response"
+    lacks "uid_counter"
+    lacks "expected_uid"
+    lacks "extract_uid"
+  }
 
   // code evaluation / dynamic (CWE-95) + deserialization (CWE-502)
   sink path "Code.eval_string" -> code.CodeEval
