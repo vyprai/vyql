@@ -66,6 +66,15 @@ concept RequestReferenceEval : sink {
   review_assumption: "an attacker can submit batch request paths containing reference expressions"
   review_confidence: high
 }
+concept DynamicFunctionMutableObjectEval : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94]
+  review_category: "code_execution"
+  review_condition: "a string expression is compiled with the Function constructor and evaluated against a mutable object"
+  review_evidence: "dynamic predicate context {pattern} builds a Function body from an expression and object property expansion without freezing or isolating the object first"
+  review_assumption: "attacker-controlled expression text or object properties can influence generated code or mutate the evaluated object"
+  review_confidence: high
+}
 concept WerkzeugDebugConsoleExposure : sink {
   vulnerable_to: [injection.CodeInjection, injection.CommandInjection]
   cwe: [CWE_94, CWE_77]

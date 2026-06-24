@@ -193,6 +193,11 @@ rule RequestReferenceEval {
   match code.RequestReferenceEval as sink
 }
 
+rule DynamicFunctionMutableObjectEval {
+  meta { id: "VYQL-INJ-147", severity: critical, cwe: [CWE_94], confidence_floor: high }
+  match code.DynamicFunctionMutableObjectEval as sink
+}
+
 rule WerkzeugDebugConsoleExposure {
   meta { id: "VYQL-INJ-057", severity: critical, cwe: [CWE_94, CWE_77], confidence_floor: medium }
   match code.WerkzeugDebugConsoleExposure as sink

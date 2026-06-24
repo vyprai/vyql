@@ -576,6 +576,12 @@ adapter javascript {
     lacks "shell-quote"
     lacks "shellQuote.quote"
   }
+  flag code.DynamicFunctionMutableObjectEval in function {
+    has "lang=javascript"
+    has "newFunction('node'"
+    has "props(expr,'node.')"
+    lacks "Object.freeze(node)"
+  }
   sink path "eval" -> code.CodeEval
   sink path "Function" -> code.CodeEval
   sink path "vm.runInNewContext" -> code.CodeEval
