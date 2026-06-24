@@ -72,6 +72,13 @@ adapter go {
     has "PermRestore"
     lacks "RoleAdmin:{PermBackup,PermRestore"
   }
+  flag code.TpmDiskKeyWeakPcrSealing in module {
+    var "DiskKeySealingPCRs"
+    has "tpm2.PCRSelection"
+    has "Hash:tpm2.AlgSHA1"
+    has "PCRs:[]int{0,1,2,3,4,6,7,8,9,13}"
+    lacks "AlgSHA256"
+  }
 
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution

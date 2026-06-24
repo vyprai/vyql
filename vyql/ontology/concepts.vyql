@@ -572,6 +572,15 @@ concept PublicWeakChecksumUtility : sink {
   review_assumption: "external callers may use the public API for security-sensitive hashing, integrity, or identity decisions"
   review_confidence: high
 }
+concept TpmDiskKeyWeakPcrSealing : sink {
+  vulnerable_to: [crypto.WeakHash, crypto.ImproperSignatureCheck]
+  cwe: [CWE_327, CWE_347]
+  review_category: "crypto"
+  review_condition: "disk-key TPM sealing binds to SHA1 PCR selections and omits the measured PCR used by the secure boot chain"
+  review_evidence: "TPM sealing context {pattern} initializes DiskKeySealingPCRs with tpm2.AlgSHA1 and the pre-fix PCR list"
+  review_assumption: "disk-key unsealing relies on this PCR selection to bind the key to measured boot state"
+  review_confidence: high
+}
 concept FastPasswordHash : sink {
   vulnerable_to: [crypto.WeakHash]
   cwe: [CWE_328]

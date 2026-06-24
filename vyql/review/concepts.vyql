@@ -1008,6 +1008,12 @@ review code.RsaPkcs1DigestSuffixOnlyVerification {
   expected: [core.InputValidation]
   text: "review RSA PKCS#1 signature verification for full padding, separator, DigestInfo, and digest checks"
 }
+review code.TpmDiskKeyWeakPcrSealing {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.StrongCrypto, core.InputValidation]
+  text: "review TPM disk-key sealing PCR selections for SHA256 PCR banks and inclusion of the secure-boot measurement PCR"
+}
 review code.EcdsaSignatureScalarBoundsMissing {
   category: "crypto"
   kind: "attention"

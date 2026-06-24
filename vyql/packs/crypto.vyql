@@ -128,3 +128,8 @@ rule RsaPkcs1DigestSuffixOnlyVerification {
   meta { id: "VYQL-CRY-024", severity: high, cwe: [CWE_347], confidence_floor: high }
   match code.RsaPkcs1DigestSuffixOnlyVerification as verifier
 }
+
+rule TpmDiskKeyWeakPcrSealing {
+  meta { id: "VYQL-CRY-025", severity: high, cwe: [CWE_327, CWE_347], confidence_floor: high }
+  match code.TpmDiskKeyWeakPcrSealing as sealing
+}
