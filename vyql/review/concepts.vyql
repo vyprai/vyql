@@ -879,6 +879,12 @@ review code.ConstellationLuks2AttachedHeaderActivation {
   expected: [core.InputValidation]
   text: "review Constellation LUKS2 persistent-storage activation for detached-header metadata validation before opening host-provided volumes"
 }
+review code.Luks2AttachedHeaderActivation {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review LUKS2 persistent-storage activation for detached-header metadata validation before opening host-provided volumes"
+}
 review code.SecretComparisonReview {
   category: "crypto"
   kind: "attention"

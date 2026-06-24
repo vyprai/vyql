@@ -189,6 +189,15 @@ adapter rust {
     lacks "read_volatile"
     lacks "black_box(underflow_mask)"
   }
+  flag code.Luks2AttachedHeaderActivation in function {
+    has "lang=rust"
+    has "name=mount_data_disk"
+    has "cryptsetupluksOpen--typeluks2-d-$root_hd$name"
+    lacks "open_encrypted_volume"
+    lacks "--header"
+    lacks "luksHeaderBackup"
+    lacks "validate_luks2_headers"
+  }
 
   // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
   sink path "reqwest.get" -> code.UrlFetch

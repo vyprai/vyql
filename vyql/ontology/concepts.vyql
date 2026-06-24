@@ -769,6 +769,15 @@ concept ConstellationLuks2AttachedHeaderActivation : sink {
   review_assumption: "the encrypted persistent-storage device is supplied by an untrusted host to the confidential guest"
   review_confidence: high
 }
+concept Luks2AttachedHeaderActivation : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck, secrets.SecretLeak]
+  cwe: [CWE_347, CWE_200]
+  review_category: "crypto"
+  review_condition: "confidential-guest persistent storage opens host-provided LUKS2 volumes only after detached-header extraction and metadata validation"
+  review_evidence: "cryptsetup activation context {pattern} opens a LUKS2 data device directly without detached-header validation"
+  review_assumption: "the block device and attached LUKS2 metadata may be supplied by an untrusted host while guest secrets are written after mount"
+  review_confidence: high
+}
 
 concept ShortSecurityIdentifier : source {
   taint: [taint.WeakSecurityIdentifier]

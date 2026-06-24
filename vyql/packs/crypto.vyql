@@ -49,6 +49,11 @@ rule ConstellationLuks2AttachedHeaderActivation {
   match code.ConstellationLuks2AttachedHeaderActivation as c
 }
 
+rule Luks2AttachedHeaderActivation {
+  meta { id: "VYQL-CRY-014", severity: high, cwe: [CWE_347, CWE_200], confidence_floor: high }
+  match code.Luks2AttachedHeaderActivation as c
+}
+
 rule CipherWithoutIntegrityHash {
   meta { id: "VYQL-CRY-009", severity: high, cwe: [CWE_665], confidence_floor: high }
   match code.CipherWithoutIntegrityHash as c
