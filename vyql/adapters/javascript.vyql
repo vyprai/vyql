@@ -605,6 +605,18 @@ adapter javascript {
     not selector "data.Path"
     not call path "path.normalize"
   }
+  flag code.DerSignatureNonCanonicalImport in function {
+    lang "javascript"
+    call path "getLength"
+    call path "data.slice"
+    has "newBN(r)"
+    has "newBN(s)"
+    has "r[0]===0&&(r[1]&0x80)"
+    has "s[0]===0&&(s[1]&0x80)"
+    lacks "else{returnfalse;}"
+    lacks "val>>>=0"
+    lacks "val<=0x7f"
+  }
   flag code.ClamscanBinaryPathShellCommandInjection in function {
     lang "javascript"
     name "_is_clamav_binary"

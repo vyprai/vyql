@@ -93,3 +93,8 @@ rule AuthenticodeSignaturePathBindingBypass {
   meta { id: "VYQL-CRY-017", severity: high, cwe: [CWE_347, CWE_154], confidence_floor: high }
   match code.AuthenticodeSignaturePathBindingBypass as verifier
 }
+
+rule DerSignatureNonCanonicalImport {
+  meta { id: "VYQL-CRY-018", severity: high, cwe: [CWE_347, CWE_20], confidence_floor: high }
+  match code.DerSignatureNonCanonicalImport as der
+}

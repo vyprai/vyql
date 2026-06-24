@@ -945,6 +945,12 @@ review code.AuthenticodeSignaturePathBindingBypass {
   expected: [core.CertificateValidation, core.InputValidation]
   text: "review Authenticode update verification for comparing Get-AuthenticodeSignature data.Path with the intended update file before accepting publisher names"
 }
+review code.DerSignatureNonCanonicalImport {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review DER/ECDSA signature import for canonical length parsing and rejection of unnecessary leading zeroes before BN construction"
+}
 review code.ConstellationLuks2AttachedHeaderActivation {
   category: "crypto"
   kind: "attention"

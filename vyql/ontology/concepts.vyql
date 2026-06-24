@@ -776,6 +776,15 @@ concept AuthenticodeSignaturePathBindingBypass : sink {
   review_assumption: "the update path can contain shell-expanded environment-variable syntax or other manifest-controlled path tricks that make PowerShell verify a different file"
   review_confidence: high
 }
+concept DerSignatureNonCanonicalImport : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck, validation.ImproperInputValidation]
+  cwe: [CWE_347, CWE_20]
+  review_category: "crypto"
+  review_condition: "DER/ECDSA signature import accepts non-canonical integer lengths or unnecessary leading zeroes"
+  review_evidence: "DER signature import context {pattern} parses getLength/data slices into BN(r)/BN(s) before canonical long-form length and leading-zero rejection"
+  review_assumption: "attackers can supply encoded signatures and exploit alternative encodings for malleability or parser-confusion behavior"
+  review_confidence: high
+}
 
 concept AttestationPredicateVerificationBypass : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]
