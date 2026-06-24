@@ -603,6 +603,11 @@ adapter go {
     lacks "call:ByteLen"
     lacks "mh.IDENTITY"
   }
+  flag code.BlockingReadInAcceptLoop in function {
+    has "call:Accept"
+    has "call:ReadTCP"
+    has "call:serve"
+  }
   flag code.UnderboundedProtocolCountLimit in function {
     has "function_name:BtcDecode"
     has "call:ReadVarInt"
