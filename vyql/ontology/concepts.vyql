@@ -1435,6 +1435,15 @@ concept PortRequestResponseCorrelationMissing : sink {
   review_assumption: "a timed-out or delayed prior response can remain in the worker mailbox and be returned to a later caller"
   review_confidence: high
 }
+concept OcppEvccIdSharedMapRace : sink {
+  vulnerable_to: [concurrency.RaceCondition, memory.UseAfterFree]
+  cwe: [CWE_362, CWE_416]
+  review_category: "concurrency"
+  review_condition: "OCPP EVCCID state is stored in a shared std::map of std::string values without a monitor or lock wrapper"
+  review_evidence: "OCPP module context {pattern} declares EVCCID state as a raw std::map keyed by EVSE id"
+  review_assumption: "EV information callbacks and transaction/session handlers can concurrently update and read EVCCID strings"
+  review_confidence: high
+}
 concept IndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   enabled_by: [taint.UntrustedData]

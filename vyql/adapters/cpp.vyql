@@ -370,6 +370,14 @@ adapter cpp {
   flag code.LocklessSharedMutation on any {
     path "std.thread"
   }
+  flag code.OcppEvccIdSharedMapRace on any {
+    path exact "analysis.module.context"
+    lang "cpp"
+    has "classOCPP201"
+    has "std::map<int32_t,std::string>evse_evcc_id"
+    lacks "monitor<std::map<int32_t,std::string>>evse_evcc_id"
+    lacks "evse_evcc_id.handle()"
+  }
 
   // XSS (CWE-79) — writing untrusted HTML to an output stream (arg0 is the text)
   sink path "fputs" -> code.HtmlRender

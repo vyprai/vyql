@@ -31,3 +31,8 @@ rule PortRequestResponseCorrelationMissing {
   meta { id: "VYQL-RACE-006", severity: high, cwe: [CWE_362, CWE_200], confidence_floor: high }
   match code.PortRequestResponseCorrelationMissing as m
 }
+
+rule OcppEvccIdSharedMapRace {
+  meta { id: "VYQL-RACE-007", severity: high, cwe: [CWE_362, CWE_416], confidence_floor: high }
+  match code.OcppEvccIdSharedMapRace as m
+}
