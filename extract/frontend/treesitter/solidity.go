@@ -71,14 +71,17 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(c.solBody(n)), Loc: L}}
 	case "function_definition", "modifier_definition", "constructor_definition", "fallback_receive_definition":
 		params := c.params(n)
-		body := c.block(c.solBody(n))
+		bodyNode := c.solBody(n)
+		body := c.block(bodyNode)
+		name := c.text(field(n, "name"))
 		return []nir.Stmt{nir.FuncDef{
-			Name:         c.text(field(n, "name")),
+			Name:         name,
 			Params:       params,
 			ParamTypes:   c.paramTypes(n),
 			ParamEntries: c.solParamEntries(n, params),
 			Body:         body,
 			Loc:          L,
+			ContextTokens: c.solFunctionContext(name, bodyNode),
 		}}
 	case "statement":
 		var out []nir.Stmt
@@ -296,6 +299,23 @@ func (c *solConv) solParamEntries(fn *tree_sitter.Node, params []string) []nir.P
 		}})
 	}
 	return out
+}
+
+func (c *solConv) solFunctionContext(name string, body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	text := c.text(body)
+	return []string{
+		"lang=solidity",
+		"name=" + name,
+		text,
+		solCompactText(text),
+	}
+}
+
+func solCompactText(s string) string {
+	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
 }
 
 func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {

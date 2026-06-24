@@ -654,6 +654,15 @@ concept RepeatedKeyfileSubstitutionTables : sink {
   review_assumption: "an attacker with known plaintext or ciphertext samples can exploit repeated substitution-table order for frequency analysis or key recovery"
   review_confidence: high
 }
+concept RsaPkcs1DigestSuffixOnlyVerification : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+  review_category: "crypto"
+  review_condition: "RSA PKCS#1 v1.5 signature verification accepts a recovered block when only its trailing digest matches"
+  review_evidence: "RSA verification context {pattern} recovers the signature block and compares SHA-1/SHA-256 data with the final digest bytes without validating leading bytes, padding, separator, or DigestInfo"
+  review_assumption: "an attacker can provide low-exponent RSA signatures and exploit lax PKCS#1 v1.5 padding validation"
+  review_confidence: high
+}
 // A cryptographic operation (sign/verify/encrypt/decrypt/hash/key-derivation) whose
 // CORRECTNESS — algorithm choice, signature verification, key/IV handling — can't be
 // proven by static analysis. Surfaced only by the possibility tier for AI/triage review

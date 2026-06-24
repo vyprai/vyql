@@ -979,6 +979,12 @@ review code.RepeatedKeyfileSubstitutionTables {
   kind: "attention"
   text: "review keyfile-based substitution-table generation for per-table mixing and keyfile-derived table order"
 }
+review code.RsaPkcs1DigestSuffixOnlyVerification {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review RSA PKCS#1 signature verification for full padding, separator, DigestInfo, and digest checks"
+}
 review code.EcdsaSignatureScalarBoundsMissing {
   category: "crypto"
   kind: "attention"

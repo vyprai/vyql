@@ -123,3 +123,8 @@ rule RepeatedKeyfileSubstitutionTables {
   meta { id: "VYQL-CRY-023", severity: high, cwe: [CWE_327, CWE_326], confidence_floor: high }
   match code.RepeatedKeyfileSubstitutionTables as table
 }
+
+rule RsaPkcs1DigestSuffixOnlyVerification {
+  meta { id: "VYQL-CRY-024", severity: high, cwe: [CWE_347], confidence_floor: high }
+  match code.RsaPkcs1DigestSuffixOnlyVerification as verifier
+}
