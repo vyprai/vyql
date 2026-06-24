@@ -738,6 +738,11 @@ rule NestedPathInheritedPropertyPrototypePollution {
   match code.NestedPathInheritedPropertyPrototypePollution as sink
 }
 
+rule CoerciblePathSegmentPrototypePollution {
+  meta { id: "VYQL-INJ-165", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.CoerciblePathSegmentPrototypePollution as sink
+}
+
 rule CordysRequestParamXssFilterDisabled {
   meta { id: "VYQL-INJ-108", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.CordysRequestParamXssFilterDisabled as sink

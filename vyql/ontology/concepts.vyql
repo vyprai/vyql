@@ -525,6 +525,15 @@ concept NestedPathInheritedPropertyPrototypePollution : sink {
   review_assumption: "a caller can provide dotted path segments such as __proto__ or constructor.prototype"
   review_confidence: high
 }
+concept CoerciblePathSegmentPrototypePollution : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "nested path assignment rejects literal prototype-mutating strings but indexes objects with non-primitive path segments that JavaScript can coerce to prototype names"
+  review_evidence: "path setter context {pattern} compares each path segment to prototype-sensitive strings, then uses the same segment in obj[segment] reads/writes without a string/number type guard"
+  review_assumption: "a caller can provide a path array containing objects whose toString/valueOf result is __proto__, constructor, or prototype"
+  review_confidence: high
+}
 concept SchemaCodegenValidationBypass : sink {
   vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
   cwe: [CWE_1321, CWE_915]

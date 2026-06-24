@@ -772,6 +772,12 @@ review code.ForOwnRecursiveDefaultsPrototypePollution {
   expected: [core.PrototypePollutionGuard]
   text: "review recursive defaults merge keys for __proto__ filtering before assigning target[key]"
 }
+review code.CoerciblePathSegmentPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review nested path setters for primitive path-segment validation before bracket property access"
+}
 review code.McpToolCommandTemplateExecution {
   category: "command"
   kind: "attention"

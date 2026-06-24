@@ -1243,6 +1243,18 @@ adapter javascript {
     lacks "hasOwn(obj,currentKeyPath)"
     lacks "Object.prototype.hasOwnProperty.call(obj,currentKeyPath)"
   }
+  flag code.CoerciblePathSegmentPrototypePollution in function {
+    lang "javascript"
+    has "path.length-1"
+    has "temp=path[i]"
+    has "temp===\"constructor\"||temp===\"__proto__\"||temp===\"prototype\""
+    has "obj[temp]===void0"
+    has "obj=obj[temp]"
+    has "obj[temp]=value"
+    lacks "temp.constructor!==String&&temp.constructor!==Number"
+    lacks "typeof temp"
+    lacks "String(temp)"
+  }
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute
