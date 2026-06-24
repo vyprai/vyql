@@ -218,6 +218,15 @@ adapter c {
     lacks "destsize"
     lacks "ntbytes>destsize"
   }
+  flag code.LengthDerivedAllocation in function {
+    has "lang=c"
+    has "read_and_decode_block_header"
+    has "blockSize"
+    has "malloc_from_callbacks(blockSize"
+    has "onRead(pUserData,pRawData,blockSize)"
+    lacks "hasKnownFileSize"
+    lacks "fileSize-runningFilePos"
+  }
   flag code.UncheckedPythonCapiHashError in function {
     has "lang=c"
     has "name=CBORTag_hash"

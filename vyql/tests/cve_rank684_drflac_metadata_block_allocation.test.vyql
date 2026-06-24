@@ -1,0 +1,101 @@
+test "rank684: dr_flac metadata block size is allocated before file bound check"
+  lang c
+  expect VYQL-DOS-006
+  code
+  ```
+  typedef unsigned int drflac_uint32;
+  typedef int drflac_bool32;
+  typedef int (*drflac_read_proc)(void*, void*, drflac_uint32);
+  typedef int (*drflac_seek_proc)(void*, int, int);
+  typedef struct drflac_allocation_callbacks drflac_allocation_callbacks;
+  #define DRFLAC_FALSE 0
+  #define DRFLAC_METADATA_BLOCK_TYPE_APPLICATION 2
+
+  drflac_bool32 drflac__read_and_decode_block_header(drflac_read_proc onRead, void* pUserData, int* isLastBlock, int* blockType, drflac_uint32* blockSize);
+  void* drflac__malloc_from_callbacks(drflac_uint32 sz, drflac_allocation_callbacks* pAllocationCallbacks);
+  void drflac__free_from_callbacks(void* p, drflac_allocation_callbacks* pAllocationCallbacks);
+
+  static drflac_bool32 drflac__read_and_decode_metadata(drflac_read_proc onRead, drflac_seek_proc onSeek, void* pUserData, drflac_allocation_callbacks* pAllocationCallbacks)
+  {
+      drflac_uint32 blockSize;
+      int isLastBlock = 0;
+      int blockType = 0;
+      if (drflac__read_and_decode_block_header(onRead, pUserData, &isLastBlock, &blockType, &blockSize) == DRFLAC_FALSE) {
+          return DRFLAC_FALSE;
+      }
+
+      if (blockType == DRFLAC_METADATA_BLOCK_TYPE_APPLICATION) {
+          void* pRawData = drflac__malloc_from_callbacks(blockSize, pAllocationCallbacks);
+          if (pRawData == 0) {
+              return DRFLAC_FALSE;
+          }
+          if (onRead(pUserData, pRawData, blockSize) != blockSize) {
+              drflac__free_from_callbacks(pRawData, pAllocationCallbacks);
+              return DRFLAC_FALSE;
+          }
+      }
+      return 1;
+  }
+  ```
+
+test "rank684: dr_flac metadata block size is bounded by remaining file size"
+  lang c
+  reject VYQL-DOS-006
+  code
+  ```
+  typedef unsigned long long drflac_uint64;
+  typedef unsigned int drflac_uint32;
+  typedef long long drflac_int64;
+  typedef int drflac_bool32;
+  typedef int (*drflac_read_proc)(void*, void*, drflac_uint32);
+  typedef int (*drflac_seek_proc)(void*, int, int);
+  typedef int (*drflac_tell_proc)(void*, drflac_int64*);
+  typedef struct drflac_allocation_callbacks drflac_allocation_callbacks;
+  #define DRFLAC_FALSE 0
+  #define DRFLAC_TRUE 1
+  #define DRFLAC_SEEK_END 2
+  #define DRFLAC_SEEK_SET 0
+  #define DRFLAC_METADATA_BLOCK_TYPE_APPLICATION 2
+
+  drflac_bool32 drflac__read_and_decode_block_header(drflac_read_proc onRead, void* pUserData, int* isLastBlock, int* blockType, drflac_uint32* blockSize);
+  void* drflac__malloc_from_callbacks(drflac_uint32 sz, drflac_allocation_callbacks* pAllocationCallbacks);
+  void drflac__free_from_callbacks(void* p, drflac_allocation_callbacks* pAllocationCallbacks);
+
+  static drflac_bool32 drflac__read_and_decode_metadata(drflac_read_proc onRead, drflac_seek_proc onSeek, drflac_tell_proc onTell, void* pUserData, drflac_allocation_callbacks* pAllocationCallbacks)
+  {
+      drflac_uint64 runningFilePos = 42;
+      drflac_int64 fileSize = 0;
+      drflac_bool32 hasKnownFileSize = DRFLAC_FALSE;
+      drflac_uint32 blockSize;
+      int isLastBlock = 0;
+      int blockType = 0;
+
+      if (onTell != 0 && onSeek != 0) {
+          if (onSeek(pUserData, 0, DRFLAC_SEEK_END)) {
+              if (onTell(pUserData, &fileSize)) {
+                  hasKnownFileSize = DRFLAC_TRUE;
+              }
+              onSeek(pUserData, runningFilePos, DRFLAC_SEEK_SET);
+          }
+      }
+
+      if (drflac__read_and_decode_block_header(onRead, pUserData, &isLastBlock, &blockType, &blockSize) == DRFLAC_FALSE) {
+          return DRFLAC_FALSE;
+      }
+      if (hasKnownFileSize && (blockSize > ((drflac_uint64)fileSize - runningFilePos))) {
+          return DRFLAC_FALSE;
+      }
+
+      if (blockType == DRFLAC_METADATA_BLOCK_TYPE_APPLICATION) {
+          void* pRawData = drflac__malloc_from_callbacks(blockSize, pAllocationCallbacks);
+          if (pRawData == 0) {
+              return DRFLAC_FALSE;
+          }
+          if (onRead(pUserData, pRawData, blockSize) != blockSize) {
+              drflac__free_from_callbacks(pRawData, pAllocationCallbacks);
+              return DRFLAC_FALSE;
+          }
+      }
+      return 1;
+  }
+  ```
