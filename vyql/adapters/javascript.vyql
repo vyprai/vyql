@@ -619,6 +619,15 @@ adapter javascript {
     lacks "'eval'"
     lacks "'arguments'"
   }
+  flag code.UnfilteredAgentCommandTag on any {
+    path exact "analysis.function.context"
+    has "name=parseCustomTags"
+    has "customTagNames"
+    has "dyad-execute-sql"
+    has "dyad-codebase-context"
+    has "tagPattern"
+    lacks "dyad-command"
+  }
   sink path "globalEval" -> code.CodeEval
   sink path "require" -> code.DynamicCodeLoad
   sink path "import" -> code.DynamicCodeLoad

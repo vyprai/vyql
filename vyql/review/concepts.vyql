@@ -1412,6 +1412,12 @@ review code.IncompleteGeneratedJsIdentifierReservedWords {
   expected: [core.InputValidation]
   text: "verify generated JavaScript identifier validation rejects eval and arguments before names enter generated source"
 }
+review code.UnfilteredAgentCommandTag {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review AI output custom-tag parsers for command/control tags that must be consumed or hidden instead of rendered as markdown"
+}
 review code.LdapCrlCredentialReuse {
   category: "secret"
   kind: "attention"

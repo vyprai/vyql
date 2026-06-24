@@ -3358,6 +3358,15 @@ concept IncompleteGeneratedJsIdentifierReservedWords : sink {
   review_assumption: "validated names can be inserted into generated JavaScript source as bindings or callable identifiers"
   review_confidence: high
 }
+concept UnfilteredAgentCommandTag : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94]
+  review_category: "code_execution"
+  review_condition: "AI/agent command tags are not included in the custom-tag parser allowlist and can fall through to rendered markdown or output"
+  review_evidence: "custom tag parser context {pattern} handles write/edit/SQL-style control tags but omits the command tag from parser and render suppression"
+  review_assumption: "model output or imported content can contain command tags that later drive agent/tool execution or unsafe preview behavior"
+  review_confidence: high
+}
 concept PdfJsEvalSupported : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_79]

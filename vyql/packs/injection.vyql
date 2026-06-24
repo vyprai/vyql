@@ -285,6 +285,11 @@ rule IncompleteGeneratedJsIdentifierReservedWords {
   match code.IncompleteGeneratedJsIdentifierReservedWords as validator
 }
 
+rule UnfilteredAgentCommandTag {
+  meta { id: "VYQL-INJ-153", severity: critical, cwe: [CWE_94], confidence_floor: high }
+  match code.UnfilteredAgentCommandTag as sink
+}
+
 rule JenkinsComputerQueueUnescapedTooltipXss {
   meta { id: "VYQL-INJ-097", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.JenkinsComputerQueueUnescapedTooltipXss as sink
