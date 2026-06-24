@@ -1303,6 +1303,15 @@ concept Fat12SuccessorEntryBoundsBypass : sink {
   review_assumption: "a crafted FAT12 filesystem can drive writes near the last FAT entry and make the stale successor entry corrupt later memory accesses"
   review_confidence: high
 }
+concept JpegSubsamplingRatioValidationMissing : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "JPEG component sampling factors divide the maximum horizontal and vertical sampling factors before component dimensions are derived"
+  review_evidence: "JPEG frame-header context {pattern} derives component dimensions from h_max/v_max and allocates component buffers without observed modulo-ratio validation"
+  review_assumption: "a crafted JPEG frame can choose sampling factors that produce fractional resampling ratios and inconsistent component dimensions"
+  review_confidence: high
+}
 concept CountDerivedElementAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   cwe: [CWE_129, CWE_125, CWE_787]

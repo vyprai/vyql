@@ -436,6 +436,17 @@ adapter c {
   flag code.IntegerSizeArithmetic on any {
     path "__binop.shl"
   }
+  flag code.JpegSubsamplingRatioValidationMissing in function {
+    has "lang=c"
+    has "name=stbi__process_frame_header"
+    has "if(z->img_comp[i].h>h_max)h_max=z->img_comp[i].h;"
+    has "if(z->img_comp[i].v>v_max)v_max=z->img_comp[i].v;"
+    has "z->img_comp[i].x=(s->img_x*z->img_comp[i].h+h_max-1)/h_max;"
+    has "z->img_comp[i].y=(s->img_y*z->img_comp[i].v+v_max-1)/v_max;"
+    has "stbi__malloc_mad2(z->img_comp[i].w2,z->img_comp[i].h2,15)"
+    lacks "h_max%z->img_comp[i].h"
+    lacks "v_max%z->img_comp[i].v"
+  }
   control "analysis.function.context" val "(int)size<0" val "save+size<save" -> core.IntegerOverflowGuard
   control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 

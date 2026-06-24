@@ -93,6 +93,11 @@ rule Fat12SuccessorEntryBoundsBypass {
   match code.Fat12SuccessorEntryBoundsBypass as c
 }
 
+rule JpegSubsamplingRatioValidationMissing {
+  meta { id: "VYQL-MEM-035", severity: high, cwe: [CWE_125, CWE_787], confidence_floor: high }
+  match code.JpegSubsamplingRatioValidationMissing as c
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse
