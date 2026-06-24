@@ -169,6 +169,34 @@ adapter python {
   source "os.getenv" -> code.SecretValue
   source "config.get" -> code.SecretValue
   source "settings.SECRET_KEY" -> code.SecretValue
+  flag code.HardcodedSecret in function {
+    has "app.config[\"SECRET_KEY\"]=\""
+    lacks "os.environ"
+    lacks "os.getenv"
+    lacks "secrets."
+    lacks "build_secret_key()"
+  }
+  flag code.HardcodedSecret in function {
+    has "app.config['SECRET_KEY']=\""
+    lacks "os.environ"
+    lacks "os.getenv"
+    lacks "secrets."
+    lacks "build_secret_key()"
+  }
+  flag code.HardcodedSecret in function {
+    has "app.config[\"SECRET_KEY\"]='"
+    lacks "os.environ"
+    lacks "os.getenv"
+    lacks "secrets."
+    lacks "build_secret_key()"
+  }
+  flag code.HardcodedSecret in function {
+    has "app.config['SECRET_KEY']='"
+    lacks "os.environ"
+    lacks "os.getenv"
+    lacks "secrets."
+    lacks "build_secret_key()"
+  }
   flag code.AutoActiveSignupAccount in function {
     has "name=signup"
     has "UserStatus.ACTIVE"
