@@ -3007,6 +3007,15 @@ concept UnescapedChartTooltipHtml : sink {
   review_assumption: "tooltip labels or legends can contain stored project data controlled by an editor"
   review_confidence: high
 }
+concept DropdownEntryLabelInnerHtmlXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "dropdown entry helper interpolates a label into innerHTML without sanitizing the label"
+  review_evidence: "dropdown entry context {pattern} builds li.innerHTML from label before sanitizeHTML(label)"
+  review_assumption: "dropdown labels can originate from user-controlled names or external API data"
+  review_confidence: high
+}
 concept IncompleteHtmlEventHandlerStrip : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

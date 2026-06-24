@@ -345,6 +345,11 @@ rule IncompleteHtmlEventHandlerStrip {
   match code.IncompleteHtmlEventHandlerStrip as sink
 }
 
+rule DropdownEntryLabelInnerHtmlXss {
+  meta { id: "VYQL-INJ-138", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.DropdownEntryLabelInnerHtmlXss as sink
+}
+
 rule CraftAnonymousTemplateRenderActionXss {
   meta { id: "VYQL-INJ-076", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.CraftAnonymousTemplateRenderActionXss as sink

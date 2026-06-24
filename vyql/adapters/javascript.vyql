@@ -169,6 +169,15 @@ adapter javascript {
     lacks "replaceChildren"
     lacks "textContent"
   }
+  flag code.DropdownEntryLabelInnerHtmlXss in function {
+    has "lang=javascript"
+    has "name=addDropDownEntry"
+    has "li.innerHTML"
+    has "dropdown-item"
+    has "label"
+    lacks "sanitizeHTML(label)"
+    lacks "textContent"
+  }
   flag code.DefaultPermissiveCorsConfig in module {
     has "lang=javascript"
     has "CORS_ENABLED:true"
