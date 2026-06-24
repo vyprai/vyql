@@ -128,3 +128,8 @@ rule CsharpEnumParseMissCacheGrowth {
   meta { id: "VYQL-DOS-025", severity: high, cwe: [CWE_400, CWE_770], confidence_floor: high }
   match code.CsharpEnumParseMissCacheGrowth as cache
 }
+
+rule DnsUdpResponseValidationAfterLoop {
+  meta { id: "VYQL-DOS-026", severity: high, cwe: [CWE_400, CWE_248], confidence_floor: high }
+  match code.DnsUdpResponseValidationAfterLoop as response
+}

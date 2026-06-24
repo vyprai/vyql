@@ -74,6 +74,16 @@ adapter python {
     lacks "exceptException"
     lacks "continue"
   }
+  flag code.DnsUdpResponseValidationAfterLoop in function {
+    name "udp"
+    has ".recvfrom"
+    has "dns.message.from_wire"
+    has "q.is_response"
+    has "from_address==destination"
+    has "break"
+    lacks "ignore_errors"
+    lacks "exceptdns.message.Truncated"
+  }
   source "request.META" -> code.HttpInput
   source "request.FILES" -> code.HttpInput
   source "request.path_info" -> code.HttpInput
