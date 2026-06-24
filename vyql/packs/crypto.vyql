@@ -68,3 +68,8 @@ rule CryptoMissingOptimizationBarrier {
   meta { id: "VYQL-CRY-012", severity: high, cwe: [CWE_200, CWE_203, CWE_208, CWE_733], confidence_floor: high }
   match code.CryptoMissingOptimizationBarrier as barrier
 }
+
+rule FastPasswordHash {
+  meta { id: "VYQL-CRY-013", severity: high, cwe: [CWE_328], confidence_floor: high }
+  match code.FastPasswordHash as h
+}

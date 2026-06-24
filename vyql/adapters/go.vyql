@@ -845,6 +845,24 @@ adapter go {
     }
     lacks call contains_any ["ConstantTimeCompare", "hmac.Equal", "subtle.ConstantTimeCompare", "CompareHashAndPassword"]
   }
+  flag code.FastPasswordHash in function {
+    has "function_name:GenerateUsers"
+    has "user.Password"
+    has "sha256sum"
+    lacks "GenerateFromPassword"
+    lacks "bcrypt"
+    lacks "argon2"
+    lacks "scrypt"
+  }
+  flag code.FastPasswordHash in function {
+    has "function_name:FindByPassword"
+    has "user.Password"
+    has "sha256sum"
+    lacks "CompareHashAndPassword"
+    lacks "bcrypt"
+    lacks "argon2"
+    lacks "scrypt"
+  }
   flag code.InsecurePermission on any {
     path "os.WriteFile"
     has "0666"

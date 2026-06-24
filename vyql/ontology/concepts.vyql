@@ -517,6 +517,15 @@ concept WeakHash : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_327]
 }
+concept FastPasswordHash : sink {
+  vulnerable_to: [crypto.WeakHash]
+  cwe: [CWE_328]
+  review_category: "crypto"
+  review_condition: "stored passwords are generated or verified with a fast general-purpose hash instead of a password hashing KDF"
+  review_evidence: "password hashing context {pattern} uses SHA-style hashing for password storage or comparison without bcrypt, scrypt, or Argon2"
+  review_assumption: "an attacker who obtains the stored hash can perform offline guessing more cheaply than with a password hashing KDF"
+  review_confidence: high
+}
 
 concept CsrfDisabled : sink {
   vulnerable_to: [access_control.CsrfDisabled]
