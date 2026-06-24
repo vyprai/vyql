@@ -377,6 +377,34 @@ adapter php {
     has "Xml::escape($inline->getUrl(),true)"
     lacks "Xml::escape($inline->getUrl())"
   }
+  flag code.BladeRawMarkdownRenderWithoutSanitizer on any {
+    path exact "analysis.module.context"
+    has "lang=php"
+    has "{!!"
+    has "->markdown("
+    has "data['content']"
+    lacks "strip_tags"
+    lacks "htmlspecialchars"
+    lacks "htmlentities"
+    lacks " e("
+    lacks "sanitize"
+    lacks "purify"
+    lacks "HtmlString"
+  }
+  flag code.BladeRawMarkdownRenderWithoutSanitizer on any {
+    path exact "analysis.module.context"
+    has "lang=php"
+    has "{!!"
+    has "->markdown("
+    has "data[\"content\"]"
+    lacks "strip_tags"
+    lacks "htmlspecialchars"
+    lacks "htmlentities"
+    lacks " e("
+    lacks "sanitize"
+    lacks "purify"
+    lacks "HtmlString"
+  }
   flag code.StoredHtmlWrite in function {
     has "lang=php"
     has "name=save"

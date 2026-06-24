@@ -430,6 +430,11 @@ rule DocumizeMarkdownRenderWithoutSanitizer {
   match code.DocumizeMarkdownRenderWithoutSanitizer as sink
 }
 
+rule BladeRawMarkdownRenderWithoutSanitizer {
+  meta { id: "VYQL-INJ-155", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.BladeRawMarkdownRenderWithoutSanitizer as sink
+}
+
 rule CompassCsfleEjsonParserMissingStrictMode {
   meta { id: "VYQL-INJ-094", severity: high, cwe: [CWE_94, CWE_20], confidence_floor: high }
   match code.CompassCsfleEjsonParserMissingStrictMode as sink

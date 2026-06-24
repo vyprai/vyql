@@ -3340,6 +3340,15 @@ concept DocumizeMarkdownRenderWithoutSanitizer : sink {
   review_assumption: "Markdown section content can be authored by a lower-trust user and later rendered in another user's browser"
   review_confidence: high
 }
+concept BladeRawMarkdownRenderWithoutSanitizer : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Blade templates render content-like data through Markdown in a raw echo without stripping or escaping HTML"
+  review_evidence: "Blade template context {pattern} uses raw echo Markdown rendering for stored content without strip_tags, htmlspecialchars, e(), or a sanitizer"
+  review_assumption: "the rendered content can be supplied by a lower-trust dashboard/editor user and viewed by another user"
+  review_confidence: high
+}
 concept CompassCsfleEjsonParserMissingStrictMode : sink {
   vulnerable_to: [injection.CodeInjection, validation.ImproperInputValidation]
   cwe: [CWE_94, CWE_20]

@@ -1406,6 +1406,12 @@ review code.DocumizeMarkdownRenderWithoutSanitizer {
   expected: [core.HtmlEscape]
   text: "review Markdown-to-HTML rendering for an HTML sanitizer such as bluemonday before browser output"
 }
+review code.BladeRawMarkdownRenderWithoutSanitizer {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Blade raw echo Markdown rendering for strip_tags, escaping, or HTML sanitization before browser output"
+}
 review code.CompassCsfleEjsonParserMissingStrictMode {
   category: "injection"
   kind: "attention"
