@@ -565,6 +565,17 @@ adapter javascript {
     has "ps -p ${pid} -o comm="
     lacks "execFile("
   }
+  flag code.CommandStringWrapperExecution in function {
+    has "lang=javascript"
+    has "name=writeConfigRemote"
+    has "execAsyncRemote"
+    has "echo'${traefikConfig}'"
+    has ">${configPath}"
+    lacks "encodeBase64(traefikConfig)"
+    lacks "base64 -d"
+    lacks "shell-quote"
+    lacks "shellQuote.quote"
+  }
   sink path "eval" -> code.CodeEval
   sink path "Function" -> code.CodeEval
   sink path "vm.runInNewContext" -> code.CodeEval
