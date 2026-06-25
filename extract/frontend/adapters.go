@@ -175,6 +175,19 @@ func valCondsForSink(s usg.Store, idx *flowTokenIndex, call usg.Node, sk sinkSpe
 	if len(sk.ValMatches) == 0 && len(sk.ValAbsents) == 0 {
 		return true
 	}
+	// `nval` is a suppression over the call's AGGREGATED arg/option literals: no arg/option
+	// literal may contain the substring. It must be evaluated on the call, not per-arg — an
+	// isolated arg node never carries a sibling keyword arg (e.g. mimetype="text/plain"), so
+	// the per-arg fallback below would let a guarded sink (Response nval "text/plain") slip
+	// through. If any forbidden literal is present on the call, suppress outright.
+	if len(sk.ValAbsents) > 0 {
+		callLits := strings.ToLower(call.Prop("str_args"))
+		for _, nv := range sk.ValAbsents {
+			if valContainsLower(callLits, nv) {
+				return false
+			}
+		}
+	}
 	if valCondsForNode(s, idx, call, sk.ValMatches, sk.ValAbsents) {
 		return true
 	}

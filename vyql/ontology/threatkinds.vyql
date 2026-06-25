@@ -78,6 +78,7 @@ threat XpathInjection { cwe: [CWE_643], desc: "Untrusted data in an XPath query"
 threat Xss { cwe: [CWE_79], desc: "Untrusted data in rendered HTML (cross-site scripting)" }
 
 module memory;
+threat BoundsError { cwe: [CWE_125], desc: "Index/access outside the valid bounds of a buffer or formatted value" }
 threat BufferOverflow { cwe: [CWE_120], desc: "Classic buffer copy without size check" }
 threat DoubleFree { cwe: [CWE_415], desc: "Double free" }
 threat IntegerOverflow { cwe: [CWE_190], desc: "Integer overflow/wraparound" }

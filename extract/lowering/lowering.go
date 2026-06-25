@@ -386,8 +386,66 @@ func (l *lowerer) constStrVal(e nir.Expr, sc *scope) (string, bool) {
 				}
 			}
 		}
+		// array-literal join: fold `['a','b'].join('|')` (JS/Ruby) and `'|'.join(['a','b'])`
+		// (Python) of constant string elements to the joined string — so a pattern built from an
+		// array (e.g. a multi-line regex) value-matches just like the inline literal.
+		if v.Method == "join" {
+			if attr, ok := v.Callee.(nir.Attr); ok {
+				// JS/Ruby: <array>.join(<sep>)
+				if seq, ok := l.seqOf(attr.Base); ok {
+					sep := ""
+					if len(v.Args) >= 1 {
+						sep, _ = l.constStrVal(v.Args[0], sc)
+					}
+					if joined, ok := l.joinConstSeq(seq, sep, sc); ok {
+						return joined, true
+					}
+				}
+				// Python: <sep>.join(<array>)
+				if sep, ok := l.constStrVal(attr.Base, sc); ok && len(v.Args) == 1 {
+					if seq, ok := l.seqOf(v.Args[0]); ok {
+						if joined, ok := l.joinConstSeq(seq, sep, sc); ok {
+							return joined, true
+						}
+					}
+				}
+			}
+			// os.path.join(a, b, …): the LEADING run of constant path components forms a constant
+			// prefix (joined with "/"), even when a later component is dynamic — enough for path
+			// value-matching (e.g. an insecure /var/tmp/ write location).
+			if strings.HasSuffix(v.Path, "path.join") {
+				var parts []string
+				for _, a := range v.Args {
+					s, ok := l.constStrVal(a, sc)
+					if !ok {
+						break // stop at the first dynamic component; the prefix so far is constant
+					}
+					parts = append(parts, s)
+				}
+				if len(parts) > 0 {
+					return strings.Join(parts, "/"), true
+				}
+			}
+		}
 	}
 	return "", false
+}
+
+// joinConstSeq joins a sequence of constant string elements with sep, returning ok=false if
+// any element is not a constant string (so a partly-dynamic array does not fold to a literal).
+func (l *lowerer) joinConstSeq(seq []nir.Expr, sep string, sc *scope) (string, bool) {
+	if len(seq) == 0 {
+		return "", false
+	}
+	parts := make([]string, 0, len(seq))
+	for _, el := range seq {
+		s, ok := l.constStrVal(el, sc)
+		if !ok {
+			return "", false
+		}
+		parts = append(parts, s)
+	}
+	return strings.Join(parts, sep), true
 }
 
 // constBool evaluates a boolean-constant expression (comparisons of integer/string
