@@ -352,14 +352,14 @@ adapter php {
   }
   flag code.PersistentModelTitleStoredXss in function {
     lang "php"
-    function "setColumnOption"
-    call path "$this.request.request.get"
-    token assign "$column[$key]=$newValue"
-    token assign "$column['children'][0][$key]=$newValue"
-    not call "noHtml"
-    not call "htmlspecialchars"
-    not call "htmlentities"
-    not call "strip_tags"
+    name "setColumnOption"
+    has "$newValue=$this->request->request->get($name.'-'.$key)"
+    has "$column[$key]=$newValue"
+    has "$column['children'][0][$key]=$newValue"
+    lacks "noHtml($this->request->request->get($name.'-'.$key))"
+    lacks "htmlspecialchars($this->request->request->get($name.'-'.$key))"
+    lacks "htmlentities($this->request->request->get($name.'-'.$key))"
+    lacks "strip_tags($this->request->request->get($name.'-'.$key))"
   }
   flag code.QuickAppsUserRealNameStoredXss in class {
     lang "php"

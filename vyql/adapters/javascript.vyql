@@ -37,6 +37,7 @@ adapter javascript {
   source "req.header" -> code.HttpInput
   source "req.param" -> code.HttpInput
   source "req.files" -> code.HttpInput
+  source "file.name" -> code.FileUpload
   source "req.file" -> code.FileUpload
   source "req.files" -> code.FileUpload
   source "req.rawBody" -> code.HttpInput
