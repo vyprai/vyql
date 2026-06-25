@@ -2300,6 +2300,12 @@ review code.EncodedDotSegmentStaticPathBypass {
   expected: [core.InputValidation, core.PathAccessCheck]
   text: "review static-file path filters for percent-decoding or explicit %2e dot-segment rejection before serving files"
 }
+review code.DecodedRequestStaticPathTraversal {
+  category: "path"
+  kind: "target"
+  expected: [core.PathCanonicalization, core.PathAccessCheck]
+  text: "review decoded request paths appended to static-file roots for canonical containment before serving files"
+}
 review code.TemplatePathComponentTraversal {
   category: "path"
   kind: "attention"

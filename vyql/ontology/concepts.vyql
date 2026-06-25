@@ -3851,6 +3851,15 @@ concept EncodedDotSegmentStaticPathBypass : sink {
   review_assumption: "request paths can contain percent-encoded dot segments that downstream URL or filesystem handling normalizes before static file resolution"
   review_confidence: high
 }
+concept DecodedRequestStaticPathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "decoded request paths are appended to a static-file root and served without canonical containment"
+  review_evidence: "static-file context {pattern} decodes a request path, checks the resulting static path with existsSync, and serves it without an observed root containment check"
+  review_assumption: "the request path can contain encoded parent-directory separators that decode before filesystem lookup"
+  review_confidence: high
+}
 concept TemplatePathComponentTraversal : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]

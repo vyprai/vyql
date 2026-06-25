@@ -262,3 +262,8 @@ rule EncodedDotSegmentStaticPathBypass {
   meta { id: "VYQL-PATH-050", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
   match code.EncodedDotSegmentStaticPathBypass as sink
 }
+
+rule DecodedRequestStaticPathTraversal {
+  meta { id: "VYQL-PATH-052", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.DecodedRequestStaticPathTraversal as sink
+}

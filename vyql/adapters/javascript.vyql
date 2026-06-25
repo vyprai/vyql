@@ -1735,6 +1735,16 @@ adapter javascript {
     not call path "decodeURIComponent"
     not call path "decodeURI"
   }
+  flag code.DecodedRequestStaticPathTraversal in function {
+    lang "javascript"
+    attr path "config.staticFilePath"
+    call path "decodeURIComponent"
+    call path "utils.file.existsSync"
+    call path "handleStaticFile"
+    not call path "indexOf"
+    not call path "startsWith"
+    not call path "path.relative"
+  }
   flag code.ClientAuthFailureResponseReview in function {
     name "<lambda>"
     has "callbackData.hasOwnProperty(\"status\")"
