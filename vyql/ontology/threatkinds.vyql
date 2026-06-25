@@ -55,11 +55,13 @@ threat XxeUnhardened { cwe: [CWE_611], desc: "XML parser created without entity 
 module dos;
 threat ReDoS { cwe: [CWE_1333], desc: "Untrusted data compiled as a regular expression (catastrophic backtracking)" }
 threat UncontrolledResourceConsumption { cwe: [CWE_400], desc: "Uncontrolled resource consumption (DoS)" }
+threat StackExhaustion { cwe: [CWE_674], desc: "Recursive or nested processing can exhaust the call stack" }
 
 module injection;
 threat ArgumentInjection { cwe: [CWE_88], desc: "Untrusted data injected as command arguments" }
 threat CodeInjection { cwe: [CWE_94], desc: "Untrusted data evaluated as code" }
 threat CommandInjection { cwe: [CWE_78], desc: "Untrusted data in an OS command" }
+threat ConfigurationInjection { cwe: [CWE_74], desc: "Untrusted data injected into generated configuration syntax" }
 threat MassAssignment { cwe: [CWE_915], desc: "Untrusted request body bulk-bound to object attributes (mass assignment)" }
 threat CsvInjection { cwe: [CWE_1236], desc: "Untrusted data written to a spreadsheet/CSV cell (formula injection)" }
 threat UnsafeDynamicLoading { cwe: [CWE_829], desc: "Untrusted data selecting a module, package, or native library to load dynamically" }
