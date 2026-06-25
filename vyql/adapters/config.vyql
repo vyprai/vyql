@@ -169,6 +169,9 @@ adapter config {
   flag code.UnboundedJupyterKernelDependency on any {
     path "analysis.config.python.jupyter_kernel_dependency_unbounded"
   }
+  flag code.NodePreGypRemoteBinaryInstall on any {
+    path "analysis.config.npm.node_pre_gyp_remote_binary_install"
+  }
   flag code.HostNamespaceShare on any {
     path "analysis.config.k8s.host_namespace"
   }

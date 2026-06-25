@@ -238,6 +238,11 @@ rule PackageInstallCodeExecution {
   match code.PackageInstallExecution as sink
 }
 
+rule NodePreGypRemoteBinaryInstall {
+  meta { id: "VYQL-INJ-181", severity: high, cwe: [CWE_829, CWE_494], confidence_floor: high }
+  match code.NodePreGypRemoteBinaryInstall as sink
+}
+
 rule PrivilegedWorkflowUntrustedCodeExecution {
   meta { id: "VYQL-INJ-044", severity: critical, cwe: [CWE_94, CWE_95], confidence_floor: medium }
   match code.PrivilegedWorkflowUntrustedCodeExecution as sink

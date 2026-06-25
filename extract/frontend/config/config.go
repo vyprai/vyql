@@ -5,6 +5,7 @@ package config
 
 import (
 	"bytes"
+	"encoding/json"
 	"encoding/xml"
 	"os"
 	"path/filepath"
@@ -49,6 +50,8 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanTerraform(src, rel)
 		case k == "setupcfg":
 			body = scanSetupCfg(src, rel)
+		case k == "npm_package":
+			body = scanNpmPackage(src, rel)
 		case k == "pest":
 			body = scanPest(src, rel)
 		case k == "schematron":
@@ -99,6 +102,9 @@ func kind(path string, src []byte) string {
 	}
 	if base == "setup.cfg" {
 		return "setupcfg"
+	}
+	if base == "package.json" {
+		return "npm_package"
 	}
 	if ext == ".jelly" {
 		return "jelly"
@@ -806,6 +812,78 @@ func scanYaml(src []byte, file string) []nir.Stmt {
 		out = append(out, scopedCompactEvents(cfg.LinePrefixCompact, "yaml", line, true, file, i+1)...)
 	}
 	return out
+}
+
+func scanNpmPackage(src []byte, file string) []nir.Stmt {
+	var manifest map[string]any
+	if err := json.Unmarshal(src, &manifest); err != nil {
+		return nil
+	}
+	if !npmPackageUsesNodePreGypRemoteBinary(manifest) {
+		return nil
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: call(
+		"analysis.config.npm.node_pre_gyp_remote_binary_install",
+		file,
+		firstLineContainingFold(string(src), "node-pre-gyp"),
+	)}}
+}
+
+func npmPackageUsesNodePreGypRemoteBinary(manifest map[string]any) bool {
+	return npmManifestHasNodePreGyp(manifest) &&
+		npmManifestHasInstallScript(manifest) &&
+		npmManifestHasBinaryHost(manifest)
+}
+
+func npmManifestHasNodePreGyp(manifest map[string]any) bool {
+	for _, field := range []string{"dependencies", "devDependencies", "optionalDependencies", "peerDependencies"} {
+		if obj, ok := manifest[field].(map[string]any); ok {
+			for name := range obj {
+				if strings.EqualFold(name, "node-pre-gyp") {
+					return true
+				}
+			}
+		}
+	}
+	if arr, ok := manifest["bundledDependencies"].([]any); ok {
+		for _, item := range arr {
+			if s, ok := item.(string); ok && strings.EqualFold(s, "node-pre-gyp") {
+				return true
+			}
+		}
+	}
+	if arr, ok := manifest["bundleDependencies"].([]any); ok {
+		for _, item := range arr {
+			if s, ok := item.(string); ok && strings.EqualFold(s, "node-pre-gyp") {
+				return true
+			}
+		}
+	}
+	if scripts, ok := manifest["scripts"].(map[string]any); ok {
+		if v, ok := scripts["node-pre-gyp"].(string); ok && strings.Contains(strings.ToLower(v), "node-pre-gyp") {
+			return true
+		}
+	}
+	return false
+}
+
+func npmManifestHasInstallScript(manifest map[string]any) bool {
+	scripts, ok := manifest["scripts"].(map[string]any)
+	if !ok {
+		return false
+	}
+	install, ok := scripts["install"].(string)
+	return ok && strings.TrimSpace(install) != ""
+}
+
+func npmManifestHasBinaryHost(manifest map[string]any) bool {
+	binary, ok := manifest["binary"].(map[string]any)
+	if !ok {
+		return false
+	}
+	host, ok := binary["host"].(string)
+	host = strings.TrimSpace(host)
+	return ok && (strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") || strings.HasPrefix(host, "//"))
 }
 
 func scanTerraform(src []byte, file string) []nir.Stmt {

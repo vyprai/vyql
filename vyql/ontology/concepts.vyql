@@ -116,6 +116,15 @@ concept PackageInstallExecution : sink {
   vulnerable_to: [injection.CodeInjection]
   cwe: [CWE_94]
 }
+concept NodePreGypRemoteBinaryInstall : sink {
+  vulnerable_to: [injection.UnsafeDynamicLoading, injection.CodeInjection]
+  cwe: [CWE_829, CWE_494]
+  review_category: "supply_chain"
+  review_condition: "an npm package lifecycle install script invokes node-pre-gyp to download and load a prebuilt native binary from a remote host"
+  review_evidence: "npm package manifest context {pattern} declares node-pre-gyp, a binary host, and an install lifecycle script"
+  review_assumption: "installing the package can fetch and execute a remote native binary outside the package tarball's integrity boundary"
+  review_confidence: high
+}
 concept PrivilegedWorkflowUntrustedCodeExecution : sink {
   vulnerable_to: [injection.CodeInjection]
   cwe: [CWE_94, CWE_95]

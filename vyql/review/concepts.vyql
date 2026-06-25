@@ -940,6 +940,12 @@ review code.PackageVersionSpecifierValidationReview {
   expected: [core.InputValidation]
   text: "review package version specifier validation before using the specifier in package installation"
 }
+review code.NodePreGypRemoteBinaryInstall {
+  category: "supply_chain"
+  kind: "target"
+  expected: [core.CodeExecutionValidation]
+  text: "review npm native module install manifests for remote node-pre-gyp binary downloads outside the package tarball"
+}
 review code.UnboundedJupyterKernelDependency {
   category: "supply_chain"
   kind: "attention"

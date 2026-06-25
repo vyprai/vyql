@@ -83,3 +83,43 @@ func TestSchematronLinkHrefDenylistSignature(t *testing.T) {
 	}
 	t.Fatalf("schematron signature event not emitted; nodes=%#v", nodes)
 }
+
+func TestNpmPackageNodePreGypRemoteBinarySignature(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "package.json")
+	src := []byte(`{
+  "name": "fsevents",
+  "scripts": {
+    "install": "node install",
+    "node-pre-gyp": "node-pre-gyp"
+  },
+  "dependencies": {
+    "node-pre-gyp": "^0.12.0"
+  },
+  "binary": {
+    "module_name": "fse",
+    "host": "https://fsevents-binaries.s3-us-west-2.amazonaws.com"
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Prop("callee_path") == "analysis.config.npm.node_pre_gyp_remote_binary_install" {
+			return
+		}
+	}
+	t.Fatalf("npm node-pre-gyp remote binary signature event not emitted; nodes=%#v", nodes)
+}
