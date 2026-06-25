@@ -129,6 +129,8 @@ static void merge_param(HashTable *params, zval *zdata) {
 		tokens := strings.Join(fn.ContextTokens, "\x00")
 		for _, want := range []string{
 			"name=merge_param",
+			"param_type:HashTable",
+			"param_type:zval",
 			"call_path:Z_TYPE_PP",
 			"call_path:zend_hash_find",
 			"call_arg:zend_hash_find:Z_ARRVAL_PP",

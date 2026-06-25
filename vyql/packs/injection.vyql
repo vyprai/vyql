@@ -627,6 +627,7 @@ rule Xpath {
 rule Nosql {
   meta { id: "VYQL-INJ-007", severity: high, cwe: [CWE_943] }
   taint core.UserControlledData -> code.NosqlQuery
+  unless sanitized_by core.NosqlParameterization
 }
 
 rule CockpitAuthArrayNosqlInjection {

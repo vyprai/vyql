@@ -501,7 +501,7 @@ adapter java {
   flag custom.WorldAccess in function {
     function "safe"
     call path "world.getBlockAt"
-    not call "testCoords"
+    not call contains_any ["testCoord"]
   }
 }
 `)

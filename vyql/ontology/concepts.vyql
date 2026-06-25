@@ -4906,6 +4906,10 @@ concept SqlParameterization : control {
   neutralizes: [injection.SqlInjection]
   applies: path
 }
+concept NosqlParameterization : control {
+  neutralizes: [injection.NosqlInjection]
+  applies: path
+}
 concept StrongHashing : control {
   neutralizes: [crypto.WeakHash]
   cwe: [CWE_328]

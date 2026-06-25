@@ -220,25 +220,26 @@ adapter c {
   }
   flag code.EcPointIdentityElementMissing in function {
     lang "c"
-    name "pointZZ_pDouble"
+    param type "PointZZ_p"
+    name contains_any ["pointZZ_pDouble", "pointZZ_pAdd"]
     call path "mpz_invert"
-    lacks "pointZZ_pIsIdentityElement"
-    lacks "pointZZ_pSetToIdentityElement"
+    not call contains_any [
+      "IsIdentityElement", "SetToIdentityElement",
+      "is_at_infinity", "set_at_infinity",
+      "isInfinity", "setInfinity"
+    ]
   }
   flag code.EcPointIdentityElementMissing in function {
     lang "c"
-    name "pointZZ_pAdd"
-    call path "mpz_invert"
-    lacks "pointZZ_pIsIdentityElement"
-    lacks "pointZZ_pSetToIdentityElement"
-  }
-  flag code.EcPointIdentityElementMissing in function {
-    lang "c"
-    name "pointZZ_pMul"
+    param type "PointZZ_p"
+    name contains_any ["pointZZ_pMul"]
     call path "pointZZ_pDouble"
     call path "pointZZ_pAdd"
-    lacks "pointZZ_pIsIdentityElement"
-    lacks "pointZZ_pSetToIdentityElement"
+    not call contains_any [
+      "IsIdentityElement", "SetToIdentityElement",
+      "is_at_infinity", "set_at_infinity",
+      "isInfinity", "setInfinity"
+    ]
   }
   flag code.UnderallocatedFormattedAddressList in function {
     lang "c"

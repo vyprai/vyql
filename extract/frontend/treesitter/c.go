@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -189,6 +190,22 @@ func minInt(a, b int) int {
 	return b
 }
 
+func sortedMapValues(m map[string]string) []string {
+	if len(m) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, m[k])
+	}
+	return out
+}
+
 func ccLang(ext string) string {
 	switch ext {
 	case ".cpp":
@@ -200,11 +217,16 @@ func ccLang(ext string) string {
 	}
 }
 
-func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node) []string {
+func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node, paramTypes map[string]string) []string {
 	if body == nil {
 		return nil
 	}
 	tokens := []string{"lang=" + c.lang, "name=" + name, compactCExprText(c.text(body))}
+	for _, typ := range sortedMapValues(paramTypes) {
+		if typ != "" {
+			tokens = append(tokens, "param_type:"+typ)
+		}
+	}
 	tokens = append(tokens, c.ccStructuredContextTokens(body)...)
 	return tokens
 }
@@ -382,7 +404,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			ParamTypes:    paramTypes,
 			Body:          append(c.block(field(n, "body")), c.ccIndexAccessObservations(n)...),
 			Loc:           L,
-			ContextTokens: c.ccFunctionContext(name, field(n, "body")),
+			ContextTokens: c.ccFunctionContext(name, field(n, "body"), paramTypes),
 		}}
 	case "struct_specifier":
 		if c.lang == "cpp" {
@@ -401,7 +423,8 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return out
 	case "method_definition", "method_declaration": // ObjC method
 		name, params, body := c.objcMethod(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: c.objcParamTypes(n, params), Body: c.block(body), Loc: L, ContextTokens: c.ccFunctionContext(name, body)}}
+		paramTypes := c.objcParamTypes(n, params)
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.block(body), Loc: L, ContextTokens: c.ccFunctionContext(name, body, paramTypes)}}
 	case "namespace_definition", "linkage_specification", "declaration_list": // C++
 		if b := field(n, "body"); b != nil {
 			return c.decls(b)

@@ -1039,6 +1039,9 @@ adapter javascript {
   control "validator.isAlphanumeric" -> core.InputValidation
   control "validator.isInt" -> core.InputValidation
   control "validator.isNumeric" -> core.InputValidation
+  control "BodySchema.parse" -> core.NosqlParameterization
+  control "ParamsSchema.parse" -> core.NosqlParameterization
+  control "QuerySchema.parse" -> core.NosqlParameterization
   flag code.IncompleteHtmlEntityEscape on any {
     path "string.replace"
     has "&amp;"

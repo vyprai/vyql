@@ -808,6 +808,9 @@ func (p *parser) parseAdapterFlagItem(f *AdapterFlag) {
 func (p *parser) parseAdapterFlagPredicate(subject string) AdapterFlagPredicate {
 	if p.atWord("not") {
 		p.next()
+		if !p.atWord("has") && !p.atWord("lacks") && !p.atWord("flows") {
+			return p.parseAdapterFlagStructuredPredicate(subject, true)
+		}
 		pred := p.parseAdapterFlagPredicate(subject)
 		pred.Negative = !pred.Negative
 		return pred
