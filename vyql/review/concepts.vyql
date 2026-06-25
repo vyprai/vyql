@@ -955,6 +955,12 @@ review code.ForOwnRecursiveDefaultsPrototypePollution {
   expected: [core.PrototypePollutionGuard]
   text: "review recursive defaults merge keys for __proto__ filtering before assigning target[key]"
 }
+review code.NestedPathInheritedPropertyPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review nested path setters for __proto__/constructor/prototype filtering or own-property checks before assigning path segments"
+}
 review code.CoerciblePathSegmentPrototypePollution {
   category: "prototype_pollution"
   kind: "attention"

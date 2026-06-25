@@ -1252,6 +1252,7 @@ adapter javascript {
   control "analysis.function.context" val "lang=javascript" val "name=getPaths" val "segment !== '__proto__'" val "segment !== 'constructor'" val "segment !== 'prototype'" -> core.PrototypePollutionGuard
   control "analysis.function.context" val "k=='__proto__'||k=='constructor'||k=='prototype'" -> core.PrototypePollutionGuard
   control "analysis.function.context" val "k==='__proto__'||k==='constructor'||k==='prototype'" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "key1==='__proto__'" -> core.PrototypePollutionGuard
   flag code.UncheckedPrototypeConfigKey in function {
     name "separateExposeGlobals"
     has "Object.keys(shims).forEach"
@@ -1365,6 +1366,13 @@ adapter javascript {
     has "setByKeyPath(innerObj,remainingKeyPath,value)"
     lacks "hasOwn(obj,currentKeyPath)"
     lacks "Object.prototype.hasOwnProperty.call(obj,currentKeyPath)"
+  }
+  flag code.NestedPathInheritedPropertyPrototypePollution in function {
+    lang "javascript"
+    call path "key.split"
+    call path "split.shift"
+    call path "__js_dynamic_property_write"
+    not literal "__proto__"
   }
   flag code.CoerciblePathSegmentPrototypePollution in function {
     lang "javascript"
