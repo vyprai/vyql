@@ -85,6 +85,20 @@ adapter c {
     lacks "strcmp(cp,\".\")==0"
     lacks "*cp=='\\0'"
   }
+  flag code.FlatpakPortalSandboxExposePathRace in module {
+    lang "c"
+    call path "g_variant_lookup"
+    literal "sandbox-expose"
+    call path "filesystem_sandbox_arg"
+    call path "get_path_for_fd"
+    call path "filesystem_arg"
+    call path "g_ptr_array_add"
+    not call path "fd_map_remap_fd"
+    not call path "validate_opath_fd"
+    not call path "glnx_chaseat"
+    not literal "--bind-fd=%d"
+    not literal "--ro-bind-fd=%d"
+  }
 
   // dynamic loading (untrusted path -> code load)
   sink path "dlopen" -> code.DynamicCodeLoad

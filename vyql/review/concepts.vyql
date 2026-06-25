@@ -1501,6 +1501,12 @@ review code.ContainersCommonFipsModeMountSymlink {
   expected: [core.PathAccessCheck]
   text: "review FIPS subscription bind-mount sources for symlink-safe resolution inside the container root before mounting"
 }
+review code.FlatpakPortalSandboxExposePathRace {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review portal sandbox-expose handling for fd-based bind mounting instead of path-based --filesystem arguments"
+}
 review code.ArchiveMarkerSymlinkOverwrite {
   category: "path"
   kind: "attention"
