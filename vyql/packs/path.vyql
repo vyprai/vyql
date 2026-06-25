@@ -227,3 +227,8 @@ rule RubyFfiWindowsPosixLibrarySearchPath {
   meta { id: "VYQL-PATH-044", severity: high, cwe: [CWE_427], confidence_floor: high }
   match code.RubyFfiWindowsPosixLibrarySearchPath as sink
 }
+
+rule LockFileCreateMissingNoFollow {
+  meta { id: "VYQL-PATH-045", severity: high, cwe: [CWE_59, CWE_367], confidence_floor: medium }
+  match code.LockFileCreateMissingNoFollow as sink
+}

@@ -45,6 +45,7 @@ func TestPythonFunctionContextIncludesStructuredTokens(t *testing.T) {
 			continue
 		}
 		for _, want := range []string{
+			"lang=python",
 			"function_name:verify_and_process",
 			"param_name:request",
 			"assign:self._state=request.query_params.get(\"state\")",

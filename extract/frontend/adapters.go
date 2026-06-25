@@ -1628,7 +1628,11 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 			if strings.HasPrefix(v, "attr_path:") {
 				prefix = "attr_path:"
 			}
-			probe = flagPredicate{Property: "path", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, prefix), Exact: pred.Exact}
+			prop := "path"
+			if pred.Op == "contains_any" {
+				prop = "any"
+			}
+			probe = flagPredicate{Property: prop, Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, prefix), Exact: pred.Exact}
 			nodeTypes = []string{"code.Attr"}
 		case strings.HasPrefix(v, "index:"), strings.HasPrefix(v, "subscript:"):
 			prefix := "index:"

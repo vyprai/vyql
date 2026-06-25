@@ -507,6 +507,7 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	bodyText := c.text(body)
 	loc := c.loc(fn)
 	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=python"},
 		nir.Const{Loc: loc, Value: "name=" + name},
 		nir.Const{Loc: loc, Value: bodyText},
 		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},

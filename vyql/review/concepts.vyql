@@ -1393,6 +1393,12 @@ review code.ArchiveSymlinkFilterBypass {
   kind: "attention"
   text: "review archive extraction for symlink and hard-link target validation before writing entries"
 }
+review code.LockFileCreateMissingNoFollow {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review lock-file creation for no-follow or equivalent symlink-safe open behavior"
+}
 review code.ContainersCommonFipsModeMountSymlink {
   category: "path"
   kind: "attention"

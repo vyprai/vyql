@@ -3034,6 +3034,15 @@ concept ArchiveSymlinkFilterBypass : sink {
   review_assumption: "archive entries may contain symlinks that redirect later writes outside the intended extraction directory"
   review_confidence: medium
 }
+concept LockFileCreateMissingNoFollow : sink {
+  vulnerable_to: [path.LinkFollowing, concurrency.Toctou]
+  cwe: [CWE_59, CWE_367]
+  review_category: "path"
+  review_condition: "a lock file is created with exclusive open semantics without no-follow protection"
+  review_evidence: "lock acquisition context {pattern} creates a lock file with os.open and exclusive create flags without an observed O_NOFOLLOW guard"
+  review_assumption: "the lock-file path may reside in a directory where an attacker can race or place symlinks"
+  review_confidence: medium
+}
 concept ArchiveMarkerSymlinkOverwrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   cwe: [CWE_22, CWE_59]

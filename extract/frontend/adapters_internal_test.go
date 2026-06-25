@@ -713,7 +713,7 @@ adapter javascript {
 		Type:  "code.Subscript",
 		Loc:   "merge.js:6",
 		Scope: "merge.js/fn1/loop",
-		Props: map[string]string{"callee_path": "obj.__subscript", "method": "[]"},
+		Props: map[string]string{"callee_path": "obj.__subscript", "method": "[]", "str_args": "key"},
 	})
 	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context AST flag did not match scoped subscript nodes: %+v", got)
@@ -728,6 +728,108 @@ adapter javascript {
 	})
 	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
 		t.Fatalf("context AST flag should skip scoped prototype literal guard: %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedSelectorContainsAny(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter python {
+  flag custom.LockOpen in function {
+    lang "python"
+    selector contains_any ["lock_file", ".lock", "lock"]
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context ast selector flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "lock.py:1",
+		Scope: "lock.py/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=python",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "lock-attr",
+		Type:  "code.Attr",
+		Loc:   "lock.py:9",
+		Scope: "lock.py/fn1",
+		Props: map[string]string{
+			"callee_path": "self.lock_file",
+			"method":      "lock_file",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST flag did not match selector contains_any text: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "other-ctx",
+		Type:  "code.Call",
+		Loc:   "other.py:1",
+		Scope: "other.py/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=python",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 {
+		t.Fatalf("context AST flag should stay file/scope-local, got %+v", got)
+	}
+}
+
+func TestContextFlagAstSoftLockNoFollowPredicateMix(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter python {
+  flag custom.LockNoFollow in function {
+    lang "python"
+    call path "os.open"
+    selector "os.O_CREAT"
+    selector "os.O_EXCL"
+    selector contains_any ["lock_file", ".lock", "lock"]
+    not literal "O_NOFOLLOW"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse soft-lock context flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "lock.py:1",
+		Scope: "lock.py/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=python",
+		},
+	})
+	for _, node := range []usg.Node{
+		{ID: "open", Type: "code.Call", Loc: "lock.py:9", Scope: "lock.py/fn1/try2", Props: map[string]string{"callee_path": "os.open", "method": "open"}},
+		{ID: "create", Type: "code.Attr", Loc: "lock.py:5", Scope: "lock.py/fn1", Props: map[string]string{"callee_path": "os.O_CREAT", "method": "O_CREAT"}},
+		{ID: "excl", Type: "code.Attr", Loc: "lock.py:6", Scope: "lock.py/fn1", Props: map[string]string{"callee_path": "os.O_EXCL", "method": "O_EXCL"}},
+		{ID: "lock", Type: "code.Attr", Loc: "lock.py:9", Scope: "lock.py/fn1/try2", Props: map[string]string{"callee_path": "self.lock_file", "method": "lock_file"}},
+	} {
+		store.AddNode(node)
+	}
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("soft-lock context flag did not match AST predicate mix: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "nofollow", Type: "code.Const", Loc: "lock.py:7", Scope: "lock.py/fn1", Props: map[string]string{"str_args": "O_NOFOLLOW"}})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("soft-lock context flag should skip no-follow hardening: %+v", got)
 	}
 }
 

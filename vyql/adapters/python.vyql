@@ -65,6 +65,14 @@ adapter python {
     lacks "member.islnk()"
     lacks "member.linkname"
   }
+  flag code.LockFileCreateMissingNoFollow in function {
+    lang "python"
+    function contains_any ["acquire", "lock"]
+    call path "os.open"
+    selector "os.O_CREAT"
+    selector "os.O_EXCL"
+    not literal "O_NOFOLLOW"
+  }
   source path "analysis.function.context.source" val "name=generate_auth_token" val "RemoteAuthToken.user_id==user_id" val "auth_token.user_id=user_id" nval "current_user.id!=user_id" -> code.HttpInput
   source path "analysis.function.context.source" val "name=delete_auth_token" val "RemoteAuthToken.user_id==user_id" val "delete()" nval "current_user.id!=user_id" -> code.HttpInput
   flag code.EmmettUnhandledCookieParseException in function {
