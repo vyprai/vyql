@@ -348,6 +348,15 @@ adapter python {
   flag code.TokenCacheAuthorizationBypass on any {
     path "DIRAC.FrameworkSystem.Utilities.TokenManagementUtilities.getCachedToken"
   }
+  flag code.FlaskEntityDetailMissingAuthorization in function {
+    has "decorator_method:route"
+    has ".query.get_or_404"
+    has "jsonify"
+    has "permissions"
+    lacks "current_user.admin"
+    lacks "has_permission"
+    lacks "permission_required"
+  }
   control method "check_ownership" -> core.OwnershipCheck
   control method "require_owner" -> core.OwnershipCheck
   control method "is_owner" -> core.OwnershipCheck

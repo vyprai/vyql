@@ -19,6 +19,11 @@ rule GrpcGatewayCommonNameAuthenticationBypass {
   match code.GrpcGatewayCommonNameAuthenticationBypass as auth
 }
 
+rule FlaskEntityDetailMissingAuthorization {
+  meta { id: "VYQL-AUTH-053", severity: high, cwe: [CWE_862, CWE_200], confidence_floor: high }
+  match code.FlaskEntityDetailMissingAuthorization as endpoint
+}
+
 rule JmxRmiRegistryExposure {
   meta { id: "VYQL-AUTH-013", severity: high, cwe: [CWE_306, CWE_94], confidence_floor: medium }
   match code.JmxRmiRegistryExposure as exposure

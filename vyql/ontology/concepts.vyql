@@ -1731,6 +1731,15 @@ concept GrpcGatewayCommonNameAuthenticationBypass : sink {
   review_assumption: "the gRPC-gateway proxy uses a client certificate whose CommonName must not authenticate the proxied HTTP caller"
   review_confidence: high
 }
+concept FlaskEntityDetailMissingAuthorization : sink {
+  vulnerable_to: [access_control.MissingAuthorization, secrets.SecretLeak]
+  cwe: [CWE_862, CWE_200]
+  review_category: "access_control"
+  review_condition: "a Flask entity-detail route returns user or group metadata without an observed authorization guard"
+  review_evidence: "Flask route context {pattern} loads an entity by route id and returns permissions, membership, or request details as JSON before an admin/permission check"
+  review_assumption: "callers can directly request the entity-detail route for another user or group"
+  review_confidence: high
+}
 concept JmxRmiRegistryExposure : sink {
   vulnerable_to: [authentication.MissingAuthentication, injection.CodeInjection]
   cwe: [CWE_306, CWE_94]
