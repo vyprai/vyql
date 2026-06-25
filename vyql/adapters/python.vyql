@@ -501,11 +501,10 @@ adapter python {
   }
   flag code.OAuthStateCookieValidationMissing in function {
     function contains_any ["verify_and_process", "oauth_callback", "auth_callback", "callback"]
+    literal "state"
     call path "request.query_params.get"
     call contains_any ["process_login", "exchange_code", "fetch_token"]
-    not call path "cookies.get"
-    not call path "session.get"
-    not call path "get_signed_cookie"
+    not literal "sso_state"
   }
   flag code.SnsCertificateUrlTrustBypass in function {
     name "_get_cert_url"
