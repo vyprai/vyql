@@ -182,9 +182,9 @@ func TestValidateProposalRejectsBroadDefaultRelaySecretMark(t *testing.T) {
 		Language: "go",
 		Source: `adapter go {
   flag code.DefaultExternalRelaySecretExposure in function {
-    has "name=NewAPIC"
-    has "apiclient.NewClient"
-    has "dbClient.SaveAPICToken"
+    function "NewAPIC"
+    call path "apiclient.NewClient"
+    call path "dbClient.SaveAPICToken"
   }
 }
 `,
@@ -203,12 +203,12 @@ func TestValidateProposalAllowsNarrowDefaultRelaySecretMark(t *testing.T) {
 		Language: "typescript",
 		Source: `adapter typescript {
   flag code.DefaultExternalRelaySecretExposure in function {
-    has "name=buildRelayUrl"
-    has "relay"
-    has "herokuapp.com"
-    has "encodeURIComponent(gurl)"
-    has "token"
-    lacks "configured relay host"
+    function "buildRelayUrl"
+    literal "relay"
+    literal "herokuapp.com"
+    call path "encodeURIComponent"
+    token identifier "token"
+    not literal "configured relay host"
   }
 }
 `,
@@ -562,10 +562,10 @@ func TestPrepRejectsBroadCommandWrapperSink(t *testing.T) {
 		Language: "php",
 		Source: `adapter php {
   flag code.CommandStringWrapperExecution in function {
-    has "name=f"
-    has "$cmd_string"
-    has "$this->cmd->execute($cmd)"
-    lacks "$cmd=array_merge"
+    function "f"
+    token identifier "$cmd_string"
+    call "execute"
+    not assign "$cmd=array_merge"
   }
 }
 `,
@@ -649,11 +649,11 @@ func RunPowershellCmd(command string, envs ...string) ([]byte, error) {
 		Language: "go",
 		Source: `adapter go {
   flag code.CommandStringWrapperExecution in function {
-    has "function_name:MountVolume"
-    has "fmt.Sprintf"
-    has "Get-Volume"
-    has "RunPowershellCmd(cmd)"
-    lacks "$Env:"
+    function "MountVolume"
+    call path "fmt.Sprintf"
+    literal "Get-Volume"
+    call "RunPowershellCmd"
+    not literal "$Env:"
   }
 }
 `,
@@ -695,10 +695,10 @@ func RunPowershellCmd(command string, envs ...string) ([]byte, error) {
 		Language: "go",
 		Source: `adapter go {
   flag code.CommandStringWrapperExecution in function {
-    has "function_name:MountVolume"
-    has "fmt.Sprintf"
-    has "utils.RunPowershellCmd"
-    has "Get-Volume"
+    function "MountVolume"
+    call path "fmt.Sprintf"
+    call path "utils.RunPowershellCmd"
+    literal "Get-Volume"
   }
 }
 `,
@@ -1045,9 +1045,10 @@ await server.connect(new StdioServerTransport());
 		Language: "javascript",
 		Source: `adapter javascript {
   flag code.McpToolCommandTemplateExecution in module {
-    has "server.tool"
-    has "exec(` + "`lsof-t-itcp:${port}`" + `"
-    lacks "execFile("
+    call path "server.tool"
+    call "exec"
+    literal "lsof-t-itcp"
+    not call path "execFile"
   }
 }
 `,
@@ -1251,12 +1252,12 @@ public class SystemCredentialsProvider {
 		Language: "java",
 		Source: `adapter java {
   flag code.JenkinsCredentialsStartupLoadContextExposure in class {
-    has "class_name:SystemCredentialsProvider"
-    has "function_name:SystemCredentialsProvider"
-    has "call_path:xml.unmarshal"
-    has "call_path:DomainCredentials.migrateListToMap"
-    has "function_name:getInstance"
-    lacks "annotation:Initializer"
+    class name "SystemCredentialsProvider"
+    function "SystemCredentialsProvider"
+    call path "xml.unmarshal"
+    call path "DomainCredentials.migrateListToMap"
+    function "getInstance"
+    not annotation "Initializer"
   }
 }
 `,
@@ -1356,11 +1357,11 @@ class CrowdSecurityRealm {
 		Language: "java",
 		Source: `adapter java {
   flag code.JenkinsRemoteValidationMissingPostPermission in function {
-    has "function_name:doTestConnection"
-    has "call:testConnection"
-    has "call:CrowdConfigurationService"
-    lacks "annotation:POST"
-    lacks "call:checkPermission"
+    function "doTestConnection"
+    call "testConnection"
+    call "CrowdConfigurationService"
+    not annotation "POST"
+    not call path "checkPermission"
   }
 }
 `,
@@ -1727,11 +1728,11 @@ module.exports = Class.create({
 		Language: "javascript",
 		Source: `adapter javascript {
   flag code.JobOutputEventUpdateAuthorizationBypass in function {
-    has "Got job update from child"
-    has "update_event"
-    has "job[key]=data[key]"
-    lacks "allow_event_updates_from_jobs"
-    lacks "delete data.update_event"
+    literal "Got job update from child"
+    token identifier "update_event"
+    assign "job[key]=data[key]"
+    not token identifier "allow_event_updates_from_jobs"
+    not assign "delete data.update_event"
   }
 }
 `,
@@ -2565,13 +2566,13 @@ func TestPrepRejectsBroadCryptoBlindingMark(t *testing.T) {
 		Language: "cpp",
 		Source: `adapter cpp {
   flag code.CryptoImproperBlinding in function {
-    has "lang=cpp"
-    has "r.Randomize"
-    has "MultiplicativeInverse(r)"
-    has "Jacobi"
-    has "modn.Square(r)"
-    has "modn.Multiply(y,rInv)"
-    lacks "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)"
+    lang "cpp"
+    call path "r.Randomize"
+    call "MultiplicativeInverse"
+    call "Jacobi"
+    call path "modn.Square"
+    expr "modn.Multiply(y,rInv)"
+    not token expr "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)"
   }
 }`,
 		Evidence: []string{"rw.cpp"},
@@ -2828,7 +2829,7 @@ func TestOverlayHintsWarnWhenEvidenceOutsideTarget(t *testing.T) {
 	}
 	proposal := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "php",
-		Source:   "adapter php {\n  flag code.SecretComparisonReview in function {\n    has \"name=verifyUser\"\n  }\n}\n",
+		Source:   "adapter php {\n  flag code.SecretComparisonReview in function {\n    function \"verifyUser\"\n  }\n}\n",
 		Evidence: []string{"src/Utility/JWTUtilities.php"},
 	}}}
 	hints := overlayHints(profile, proposal)
@@ -2888,9 +2889,15 @@ func TestPrepProbeSummariesDetectLift(t *testing.T) {
 	proposal := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "javascript",
 		Source: `adapter javascript {
-  flag code.SecretComparisonReview in function {
-    has "token"
-    lacks "timingSafeEqual"
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "==="]
+    operand {
+      identifier contains_any ["token", "secret", "key"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "key"]
+    }
+    lacks call contains_any ["timingSafeEqual", "scmp"]
   }
 }
 `,

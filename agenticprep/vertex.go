@@ -190,7 +190,7 @@ Rules:
   }
   flag code.UnparameterizedSqlQueryParser in function {
     function "orderBy"
-    identifier "$direction"
+    token identifier "$direction"
     call "processOrderBy"
     not token identifier "QUERY_ORDER_DESC"
   }
@@ -237,16 +237,19 @@ Rules:
   adapter by itself.
 - Before writing flag <concept> in function, call function_context
   for the target function and choose structured predicates from suggested_vals
-  when available: function, call, call path, selector, identifier, literal,
-  assign, binary, param, token, or fact. Use has/lacks only for evidence that
-  cannot be represented structurally. Do not combine values from different
-  functions. For Go function contexts, use the returned suggested_vals token
-  function_name:<Name>; do not use name=<Name>, which is not emitted by the Go
-  frontend and will not match.
+  when available: function, call, call path, selector, literal, assign,
+  binary, param, token identifier, token subscript, token property, or fact.
+  Do not write raw has/lacks text for
+  comparisons, calls, identifiers, literals, assignments, or emitted context
+  tokens; if no structured predicate can express the evidence, finish empty and
+  note the missing scanner/prep mechanic. Do not combine values from different
+  functions. For Go function contexts, write function "<Name>"; do not use
+  name=<Name>, which is not emitted by the Go frontend and will not match.
 - Before writing flag <concept> in module, call module_context
   for the target file and choose structured predicates from one returned
-  top-level declaration context. Use has/lacks only when no structured predicate
-  exists. Use this for static role, permission, route, or policy maps.
+  top-level declaration context. Do not use raw has/lacks when a structured
+  token, call, literal, assign, binary, token identifier, or fact predicate exists.
+  Use this for static role, permission, route, or policy maps.
 - Before writing flag <concept> in class, call class_context
   for the target class and choose structured tokens from one returned class
   context. Prefer structured tokens such as class_name:, class_base:,
@@ -2797,8 +2800,9 @@ Use flag <concept> in class for class-level evidence that spans multiple methods
 Call function_context before function flags and copy structured suggested_vals from one context only.
 Call class_context before class flags and copy structured tokens from one context only.
 Call module_context before module flags and copy structured suggested_vals from one context only.
-For context flags, prefer function/call/call path/selector/identifier/literal/assign/binary/param/token/fact predicates.
-Use has/lacks only when the context evidence has no structured predicate.
+For context flags, prefer function/call/call path/selector/literal/assign/binary/param/token identifier/token subscript/token property/fact predicates.
+Do not use raw has/lacks for comparisons, calls, identifiers, literals, assignments, or emitted context tokens.
+If only raw text would work, finish empty and say which scanner/prep mechanic is missing.
 Use existing code.* concepts only. Common target concepts include:
 code.CommandExecution, code.CodeEval, code.FilePathAccess, code.SqlExecution,
 code.HtmlRender, code.UrlFetch, code.Deserialization, code.RedirectTarget,
