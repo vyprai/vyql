@@ -668,6 +668,110 @@ adapter javascript {
 	}
 }
 
+func TestContextFlagAstScopedCallArgPredicates(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter php {
+  flag custom.DirectJsonEncode in function {
+    lang "php"
+    call arg "json_encode:$data[$field_name]"
+    not call arg "json_encode:$value"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "fields.php:1",
+		Scope: "fields.php/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=php",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "encode",
+		Type:  "code.Call",
+		Loc:   "fields.php:9",
+		Scope: "fields.php/fn1/if2",
+		Props: map[string]string{
+			"callee_path": "json_encode",
+			"method":      "json_encode",
+			"str_args":    "$data[$field_name]",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST call-arg flag did not match scoped call argument: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "fixed",
+		Type:  "code.Call",
+		Loc:   "fields.php:10",
+		Scope: "fields.php/fn1",
+		Props: map[string]string{
+			"callee_path": "json_encode",
+			"method":      "json_encode",
+			"str_args":    "$value",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context AST call-arg flag should honor excluded scoped argument: %+v", got)
+	}
+}
+
+func TestContextFlagAstPredicatesUseRegionWhenScopeIsEmpty(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter php {
+  flag custom.ScopedLiteral in function {
+    lang "php"
+    literal "multiple_dropdown_action"
+    call arg "json_encode:$data[$field_name]"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse region-scoped context flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "target-ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "fields.php:10",
+		"region":      "fields.php/fn1",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=php",
+	}})
+	store.AddNode(usg.Node{ID: "other-ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "fields.php:30",
+		"region":      "fields.php/fn2",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=php",
+	}})
+	store.AddNode(usg.Node{ID: "lit", Type: "code.Const", Props: map[string]string{
+		"loc":      "fields.php:11",
+		"region":   "fields.php/fn1",
+		"str_args": "multiple_dropdown_action",
+	}})
+	store.AddNode(usg.Node{ID: "encode", Type: "code.Call", Props: map[string]string{
+		"loc":         "fields.php:12",
+		"region":      "fields.php/fn1/if1",
+		"callee_path": "json_encode",
+		"method":      "json_encode",
+		"str_args":    "$data[$field_name]",
+	}})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "target-ctx" {
+		t.Fatalf("context AST flag should use region as lexical scope, got %+v", got)
+	}
+}
+
 func TestContextFlagStructuredTokenContainsSearchesTokenPayload(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter ruby {

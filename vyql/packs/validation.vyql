@@ -47,3 +47,8 @@ rule UnicodeNormalizationAfterFilterBypass {
   meta { id: "VYQL-VAL-009", severity: medium, cwe: [CWE_176, CWE_74], confidence_floor: high }
   match code.UnicodeNormalizationAfterFilterBypass as normalizer
 }
+
+rule MultipleDropdownScalarFallbackMissing {
+  meta { id: "VYQL-VAL-010", severity: high, cwe: [CWE_20], confidence_floor: high }
+  match code.MultipleDropdownScalarFallbackMissing as dropdown
+}

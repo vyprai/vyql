@@ -1206,6 +1206,15 @@ concept UnicodeNormalizationAfterFilterBypass : sink {
   review_assumption: "callers can supply Unicode compatibility characters that normalize into characters the filter intended to remove"
   review_confidence: high
 }
+concept MultipleDropdownScalarFallbackMissing : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "multiple-select dropdown handlers should normalize scalar or malformed JSON values to an array before storing or rendering them"
+  review_evidence: "multiple dropdown context {pattern} encodes or decodes dropdown values without an array fallback"
+  review_assumption: "callers or persisted defaults can provide scalar/empty values where downstream dropdown code expects arrays"
+  review_confidence: high
+}
 concept OwnerFieldClear : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_401]

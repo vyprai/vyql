@@ -1592,6 +1592,8 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 	var nodeTypes []string
 	for _, v := range pred.Values {
 		switch {
+		case strings.HasPrefix(v, "call_arg:"):
+			return true, flagScopeCallArgHit(s, pred, n, tech, crossLang)
 		case strings.HasPrefix(v, "call_path:"):
 			probe = flagPredicate{Property: "path", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "call_path:"), Exact: pred.Exact}
 			nodeTypes = []string{"code.Call"}
@@ -1620,6 +1622,53 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 	return true, flagScopeNodeHit(s, probe, n, nodeTypes, tech, crossLang)
 }
 
+func flagScopeCallArgHit(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) bool {
+	prefix := locFile(n.Prop("loc"))
+	scope := nodeLexicalScope(n)
+	ids, _ := s.NodesOfType("code.Call")
+	for _, id := range ids {
+		cand, ok, err := s.GetNode(id)
+		if err != nil || !ok || cand.ID == n.ID {
+			continue
+		}
+		candScope := nodeLexicalScope(cand)
+		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
+			continue
+		}
+		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
+			continue
+		}
+		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
+			continue
+		}
+		if contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokens(cand)) {
+			return true
+		}
+	}
+	return false
+}
+
+func callArgContextTokens(n usg.Node) string {
+	path := n.Prop("callee_path")
+	method := n.Prop("method")
+	if path == "" && method == "" {
+		return ""
+	}
+	var out []string
+	for _, arg := range strings.Split(n.Prop("str_args"), "\x00") {
+		if arg == "" {
+			continue
+		}
+		if path != "" {
+			out = append(out, "call_arg:"+path+":"+arg)
+		}
+		if method != "" {
+			out = append(out, "call_arg_method:"+method+":"+arg)
+		}
+	}
+	return strings.Join(out, "\x00")
+}
+
 func trimFlagValuePrefix(values []string, prefix string) []string {
 	out := make([]string, 0, len(values))
 	for _, v := range values {
@@ -1645,7 +1694,7 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 	probe := pred
 	probe.Negative = false
 	prefix := locFile(n.Prop("loc"))
-	scope := n.Scope
+	scope := nodeLexicalScope(n)
 	for _, nodeType := range nodeTypes {
 		ids, _ := s.NodesOfType(nodeType)
 		for _, id := range ids {
@@ -1653,7 +1702,8 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 			if err != nil || !ok || cand.ID == n.ID {
 				continue
 			}
-			if scope != "" && cand.Scope != "" && !sameOrNestedScope(cand.Scope, scope) {
+			candScope := nodeLexicalScope(cand)
+			if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
 				continue
 			}
 			if prefix != "" && locFile(cand.Prop("loc")) != prefix {
@@ -1668,6 +1718,13 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 		}
 	}
 	return false
+}
+
+func nodeLexicalScope(n usg.Node) string {
+	if n.Scope != "" {
+		return n.Scope
+	}
+	return n.Prop("region")
 }
 
 func sameOrNestedScope(candidate, anchor string) bool {

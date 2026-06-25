@@ -984,6 +984,22 @@ adapter php {
     lacks "__selector__"
     lacks "hasAccess($dc->table.'::'.$this->Input->post('field'),'alexf')"
   }
+  flag code.MultipleDropdownScalarFallbackMissing in function {
+    lang "php"
+    name "updateFieldsValues"
+    literal "multiple_dropdown_action"
+    token subscript "$data['multiple_dropdown_action']"
+    call arg "json_encode:$data[$field_name]"
+  }
+  flag code.MultipleDropdownScalarFallbackMissing in function {
+    lang "php"
+    name "prepareHtmlFields"
+    call arg "json_decode:(string)$value"
+    token subscript "$field['multiple']"
+    token subscript "$field['default_value']"
+    not call arg "json_decode:true"
+    not token identifier "$decoded"
+  }
   // Review-only credentialed cloud-resource endpoint: posted credentials used to enumerate
   // buckets should have an admin/authorization gate before returning JSON.
   flag code.CredentialedEndpointReview in function {

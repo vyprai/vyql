@@ -390,6 +390,12 @@ review code.UnicodeNormalizationAfterFilterBypass {
   expected: [core.InputValidation]
   text: "review Unicode normalization order; compatibility normalization should happen before character filtering used by lookups or allowlists"
 }
+review code.MultipleDropdownScalarFallbackMissing {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review multiple-select dropdown value handling for scalar and malformed JSON fallback to an array"
+}
 review code.WindowsReservedDeviceNameBypass {
   category: "path"
   kind: "attention"
