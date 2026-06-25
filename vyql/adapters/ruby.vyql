@@ -444,6 +444,12 @@ adapter ruby {
     call path "detect_version"
     call path "Kubeclient.Client.new"
   }
+  flag code.CertValidationDisabled in function {
+    lang "ruby"
+    call path "Fog.Kubevirt.Compute.new"
+    field "kubevirt_verify_ssl=ca_cert.present?"
+    lacks field "kubevirt_verify_ssl=true"
+  }
   flag code.InsecurePermission on any {
     path "File.chmod"
     has "0777"
