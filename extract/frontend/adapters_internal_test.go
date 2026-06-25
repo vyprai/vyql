@@ -668,6 +668,44 @@ adapter javascript {
 	}
 }
 
+func TestContextFlagStructuredTokenContainsSearchesTokenPayload(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter ruby {
+  flag custom.RailsSecretToken in module {
+    lang "ruby"
+    assign contains_any [".config.secret_token="]
+    not expr "Rails.env=='test'"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context structured-token flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "secret_token.rb:1",
+		"callee_path": "analysis.module.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00assign:FatFreeCRM.Application.config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
+	}})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.RailsSecretToken" {
+		t.Fatalf("context structured-token flag did not search token payload: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
+		"loc":         "secret_token_fixed.rb:1",
+		"callee_path": "analysis.module.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00expr:Rails.env=='test'\x00assign:FatFreeCRM.Application.config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
+	}})
+	got = spec.flagAdapter().Apply(store)
+	if len(got) != 1 {
+		t.Fatalf("context structured-token flag should skip test-only guarded scope, got %+v", got)
+	}
+}
+
 func TestAstFlagMatchesDownstreamFlowPredicate(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter cpp {

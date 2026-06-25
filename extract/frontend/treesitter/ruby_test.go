@@ -3,9 +3,11 @@ package treesitter_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
+	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/nir"
 )
 
@@ -31,6 +33,53 @@ end
 	if !rubyHasFuncWithParam(prog.Modules, "open", "path") {
 		t.Fatalf("singleton class method open(path) was not extracted; program=%#v", prog)
 	}
+}
+
+func TestRubyModuleContextIncludesStructuredTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "secret_token.rb")
+	src := []byte(`if defined?(FatFreeCRM::Application)
+  if Rails.env == 'test'
+    FatFreeCRM::Application.config.secret_token = '51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6'
+  end
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.module.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		for _, want := range []string{
+			"lang=ruby",
+			"assign:FatFreeCRM.Application.config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
+			"assign:config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
+			"selector:FatFreeCRM.Application.config.secret_token",
+			"selector:config.secret_token",
+			"expr:Rails.env=='test'",
+			"literal:test",
+		} {
+			if !strings.Contains(args, want) {
+				t.Fatalf("ruby module context missing %q; context=%q", want, args)
+			}
+		}
+		return
+	}
+	t.Fatalf("analysis.module.context not found; nodes=%#v", nodes)
 }
 
 func rubyHasFuncWithParam(mods []nir.Module, name, param string) bool {

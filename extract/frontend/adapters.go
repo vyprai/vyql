@@ -1528,6 +1528,9 @@ func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, 
 		n.Prop("callee_path") == "analysis.module.context" ||
 		n.Prop("callee_path") == "analysis.class.context" {
 		if ok, hit := flagContextPredicateMatchesAST(s, pred, n, tech, crossLang); ok {
+			probe := pred
+			probe.Negative = false
+			hit = hit || flagPredicateMatchesNodeOnly(probe, n)
 			if pred.Negative {
 				return !hit
 			}
@@ -1694,7 +1697,7 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 	case "op":
 		return valuePredicate(pred.Op, pred.Values, n.Prop("op"))
 	case "tokens":
-		return valuePredicate(pred.Op, pred.Values, n.Prop("str_args"))
+		return contextTokenValuePredicate(pred.Op, pred.Values, n.Prop("str_args"))
 	case "identifier":
 		if n.Type != "code.Name" && n.Type != "code.Param" {
 			return false
@@ -1712,6 +1715,50 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 	default:
 		return valuePredicate(pred.Op, pred.Values, n.Prop(pred.Property))
 	}
+}
+
+func contextTokenValuePredicate(op string, values []string, text string) bool {
+	if op == "contains" || op == "" || op == "contains_any" {
+		if contextTokenContainsPredicate(op, values, text) {
+			return true
+		}
+	}
+	return valuePredicate(op, values, text)
+}
+
+func contextTokenContainsPredicate(op string, values []string, text string) bool {
+	if len(values) == 0 {
+		return false
+	}
+	all := op != "contains_any"
+	for _, v := range values {
+		prefix, want, ok := splitContextTokenPredicateValue(v)
+		hit := false
+		if ok {
+			for _, tok := range strings.Split(text, "\x00") {
+				if strings.HasPrefix(tok, prefix) && valContains(strings.TrimPrefix(tok, prefix), want) {
+					hit = true
+					break
+				}
+			}
+		}
+		if all && !hit {
+			return false
+		}
+		if !all && hit {
+			return true
+		}
+	}
+	return all
+}
+
+func splitContextTokenPredicateValue(v string) (prefix, want string, ok bool) {
+	for _, sep := range []string{":", "="} {
+		if i := strings.Index(v, sep); i > 0 {
+			return v[:i+1], v[i+1:], true
+		}
+	}
+	return "", "", false
 }
 
 func valuePredicate(op string, values []string, text string) bool {

@@ -31,6 +31,15 @@ adapter ruby {
   source "ENV" -> code.SecretValue
   source "Rails.application.secrets" -> code.SecretValue
   source "credentials" -> code.SecretValue
+  flag code.HardcodedSecret in module {
+    lang "ruby"
+    assign contains_any ["config.secret_token="]
+    not assign contains_any ["config.secret_token=ENV", "config.secret_token=Rails.application.credentials", "config.secret_token=credentials"]
+    not expr "Rails.env=='test'"
+    not call path "ENV.fetch"
+    not call path "ENV.[]"
+    not call path "SecureRandom.hex"
+  }
 
   sink method "where" -> code.SqlExecution
   sink method "execute" -> code.SqlExecution

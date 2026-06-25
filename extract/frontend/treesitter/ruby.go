@@ -36,7 +36,8 @@ func ExtractRuby(files []string, root string) (nir.Program, error) {
 	}
 	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 		c := &rbConv{src: src, root: root, file: rel}
-		return nir.Module{Key: "", File: rel, Body: c.blockChildren(tree.RootNode())}, true
+		body := append(c.rubyModuleContext(tree.RootNode()), c.blockChildren(tree.RootNode())...)
+		return nir.Module{Key: "", File: rel, Body: body}, true
 	}
 	mods := parseModules(ruby, root,
 		func() *tree_sitter.Parser {
@@ -294,6 +295,29 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	}}}
 }
 
+func (c *rbConv) rubyModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=ruby"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	for _, tok := range c.rbStructuredContextTokens(root) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
 func (c *rbConv) rubyClassContext(cls *tree_sitter.Node) []nir.Stmt {
 	body := field(cls, "body")
 	if body == nil {
@@ -314,6 +338,111 @@ func (c *rbConv) rubyClassContext(cls *tree_sitter.Node) []nir.Stmt {
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment":
+			left, right := field(n, "left"), field(n, "right")
+			if lhs := c.rbContextPath(left); lhs != "" {
+				if rhs := rbContextValue(c.text(right)); rhs != "" {
+					add("assign:" + lhs + "=" + rhs)
+					for _, suffix := range rbDottedSuffixes(lhs) {
+						add("assign:" + suffix + "=" + rhs)
+					}
+				}
+				add("selector:" + lhs)
+				for _, suffix := range rbDottedSuffixes(lhs) {
+					add("selector:" + suffix)
+				}
+			}
+		case "binary":
+			if expr := rbCompactText(c.text(n)); expr != "" {
+				add("expr:" + expr)
+			}
+		case "pair":
+			if key := rbCompactText(c.keyName(field(n, "key"))); key != "" {
+				if val := rbContextValue(c.text(field(n, "value"))); val != "" {
+					add("field:" + key + "=" + val)
+				}
+			}
+		case "call", "method_call", "command", "command_call":
+			if path := c.dotted(n); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+				add("selector:" + path)
+			}
+		case "element_reference":
+			if idx := c.dotted(n); idx != "" && idx != "?" {
+				add("index:" + idx)
+			}
+			if base := c.dotted(field(n, "object")); base != "" && base != "?" {
+				add("index_base:" + base)
+			}
+		case "string", "heredoc_body", "heredoc_content":
+			if lit := rbContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		case "regex":
+			if lit := rubyRegexPattern(c.text(n)); lit != "" {
+				add("regex:" + rbCompactText(lit))
+				add("literal:" + rbCompactText(lit))
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *rbConv) rbContextPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if p := c.dotted(n); p != "" && p != "?" {
+		return p
+	}
+	return rbCompactText(c.text(n))
+}
+
+func rbDottedSuffixes(path string) []string {
+	parts := strings.Split(path, ".")
+	if len(parts) < 3 {
+		return nil
+	}
+	out := make([]string, 0, len(parts)-2)
+	for i := 1; i < len(parts)-1; i++ {
+		out = append(out, strings.Join(parts[i:], "."))
+	}
+	return out
+}
+
+func rbContextValue(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 2 {
+		if q := s[0]; (q == '\'' || q == '"' || q == '`') && s[len(s)-1] == q {
+			s = s[1 : len(s)-1]
+		}
+	}
+	return rbCompactText(s)
 }
 
 func (c *rbConv) rbParamEntries(name string, params []string) []nir.ParamEntry {
