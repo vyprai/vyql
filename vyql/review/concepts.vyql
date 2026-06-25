@@ -426,6 +426,12 @@ review code.MultipleDropdownScalarFallbackMissing {
   expected: [core.InputValidation]
   text: "review multiple-select dropdown value handling for scalar and malformed JSON fallback to an array"
 }
+review code.DeviceStatusStateMachineBypass {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation, core.MemoryBoundsCheck]
+  text: "review device status register writes for required state-machine transition validation before updating stored status bits"
+}
 review code.WindowsReservedDeviceNameBypass {
   category: "path"
   kind: "attention"

@@ -1,0 +1,83 @@
+# Rank 858 / CVE-2026-5747: Firecracker accepted arbitrary virtio
+# device-status bit transitions instead of enforcing the required state machine.
+
+test "rank858: Rust virtio status register write stores arbitrary guest status"
+  lang rust
+  file common_config.rs
+  expect VYQL-VAL-011
+  expect_review code.DeviceStatusStateMachineBypass
+  code
+  ```
+  const DEVICE_STATUS: u64 = 20;
+
+  struct VirtioPciCommonConfig {
+      driver_status: u8,
+  }
+
+  impl VirtioPciCommonConfig {
+      fn write_common_config_byte(&mut self, offset: u64, value: u8) {
+          match offset {
+              DEVICE_STATUS => self.driver_status = value,
+              _ => {
+                  warn!("pci: invalid virtio config byte write");
+              }
+          }
+      }
+  }
+  ```
+
+test "rank858: Rust virtio status register write delegates to state machine"
+  lang rust
+  file common_config.rs
+  reject VYQL-VAL-011
+  reject_review code.DeviceStatusStateMachineBypass
+  code
+  ```
+  const DEVICE_STATUS: u64 = 20;
+  const INIT: u8 = 0;
+  const ACKNOWLEDGE: u8 = 1;
+  const DRIVER: u8 = 2;
+  const FEATURES_OK: u8 = 8;
+  const DRIVER_OK: u8 = 4;
+  const FAILED: u8 = 128;
+
+  struct VirtioPciCommonConfig {
+      driver_status: u8,
+  }
+
+  impl VirtioPciCommonConfig {
+      fn write_common_config_byte(&mut self, offset: u64, value: u8) {
+          match offset {
+              DEVICE_STATUS => self.set_device_status(value),
+              _ => {
+                  warn!("pci: invalid virtio config byte write");
+              }
+          }
+      }
+
+      fn set_device_status(&mut self, status: u8) {
+          const VALID_TRANSITIONS: &[(u8, u8)] = &[
+              (INIT, ACKNOWLEDGE),
+              (ACKNOWLEDGE, ACKNOWLEDGE | DRIVER),
+              (ACKNOWLEDGE | DRIVER, ACKNOWLEDGE | DRIVER | FEATURES_OK),
+              (
+                  ACKNOWLEDGE | DRIVER | FEATURES_OK,
+                  ACKNOWLEDGE | DRIVER | FEATURES_OK | DRIVER_OK,
+              ),
+          ];
+
+          if (status & FAILED) != 0 {
+              self.driver_status |= FAILED;
+          } else if status == INIT {
+              self.driver_status = INIT;
+          } else if VALID_TRANSITIONS
+              .iter()
+              .any(|&(from, to)| self.driver_status == from && status == to)
+          {
+              self.driver_status = status;
+          } else {
+              warn!("pci: invalid virtio device status transition");
+          }
+      }
+  }
+  ```

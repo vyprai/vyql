@@ -1224,6 +1224,15 @@ concept MultipleDropdownScalarFallbackMissing : sink {
   review_assumption: "callers or persisted defaults can provide scalar/empty values where downstream dropdown code expects arrays"
   review_confidence: high
 }
+concept DeviceStatusStateMachineBypass : sink {
+  vulnerable_to: [validation.ImproperInputValidation, business_logic.BusinessLogic, memory.OobWrite]
+  cwe: [CWE_20, CWE_841, CWE_787]
+  review_category: "input_validation"
+  review_condition: "guest- or device-controlled status writes update device state directly instead of enforcing the required state-machine transition"
+  review_evidence: "device status write context {pattern} handles a status register arm and assigns the driver/device status field from the supplied value without a validation helper"
+  review_assumption: "a guest or peer can write arbitrary status bits and downstream device behavior trusts the stored status state"
+  review_confidence: high
+}
 concept OwnerFieldClear : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_401]

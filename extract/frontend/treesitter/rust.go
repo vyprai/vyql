@@ -266,18 +266,95 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	loc := c.loc(fn)
 	text := c.text(body)
 	path := "analysis.function.context"
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=rust"},
+		nir.Const{Loc: loc, Value: "name=" + c.text(field(fn, "name"))},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: rustCompactText(text)},
+	}
+	for _, tok := range c.rsStructuredContextTokens(body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=rust"},
-			nir.Const{Loc: loc, Value: "name=" + c.text(field(fn, "name"))},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: rustCompactText(text)},
-		},
+		Args:   args,
 		Path:   path,
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	atom := func(n *tree_sitter.Node) string {
+		if n == nil {
+			return ""
+		}
+		if p := c.dotted(n); p != "" && p != "?" {
+			return p
+		}
+		return rustCompactText(c.text(n))
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment_expression":
+			left := atom(field(n, "left"))
+			right := atom(field(n, "right"))
+			if left != "" && right != "" {
+				add("assign:" + left + "=" + right)
+			}
+		case "call_expression":
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+				add("call_path:" + path)
+				add("call:" + lastSeg(path))
+				for _, arg := range namedChildren(field(n, "arguments")) {
+					if a := atom(arg); a != "" {
+						add("call_arg:" + path + ":" + a)
+					}
+				}
+			}
+		case "field_expression":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "match_arm":
+			if pat := rustMatchArmPattern(n); pat != nil {
+				if label := atom(pat); label != "" {
+					add("match_arm:" + label)
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func rustMatchArmPattern(n *tree_sitter.Node) *tree_sitter.Node {
+	if p := field(n, "pattern"); p != nil {
+		return p
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "identifier", "scoped_identifier", "match_pattern", "tuple_struct_pattern", "literal_pattern":
+			return ch
+		}
+	}
+	return nil
 }
 
 func rustCompactText(s string) string {

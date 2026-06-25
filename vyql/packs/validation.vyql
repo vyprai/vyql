@@ -52,3 +52,8 @@ rule MultipleDropdownScalarFallbackMissing {
   meta { id: "VYQL-VAL-010", severity: high, cwe: [CWE_20], confidence_floor: high }
   match code.MultipleDropdownScalarFallbackMissing as dropdown
 }
+
+rule DeviceStatusStateMachineBypass {
+  meta { id: "VYQL-VAL-011", severity: high, cwe: [CWE_20, CWE_841, CWE_787], confidence_floor: high }
+  match code.DeviceStatusStateMachineBypass as status
+}

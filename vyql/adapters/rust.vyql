@@ -117,6 +117,13 @@ adapter rust {
     lacks "buf.is_empty()"
     lacks "UnexpectedEof"
   }
+  flag code.DeviceStatusStateMachineBypass in function {
+    lang "rust"
+    name contains_any ["write_common_config", "write_device_status", "write_config_byte"]
+    token match_arm "DEVICE_STATUS"
+    token assign "self.driver_status=value"
+    not call path "self.set_device_status"
+  }
   flag code.ConduitHyperUnboundedBodyToBytes in function {
     lang "rust"
     name "blocking_handler"
