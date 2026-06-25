@@ -1295,6 +1295,17 @@ adapter javascript {
     lacks "typeof temp"
     lacks "String(temp)"
   }
+  flag code.ExpressionEvaluatorPrototypeNameAccess in function {
+    lang "javascript"
+    expr "type===IVAR"
+    expr "type===IMEMBER"
+    expr "item.valueinexpr.functions"
+    selector "item.value"
+    selector "expr.functions"
+    token index_base "values"
+    token index_key "item.value"
+    lacks fact prototype_name_guard "true"
+  }
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute

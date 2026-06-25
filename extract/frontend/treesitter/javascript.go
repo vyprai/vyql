@@ -450,6 +450,19 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 			if sel := c.dotted(n); sel != "" && sel != "?" {
 				add("selector:" + sel)
 			}
+		case "subscript_expression":
+			if idx := c.dotted(n); idx != "" && idx != "?" {
+				add("index:" + idx)
+			}
+			if base := c.dotted(field(n, "object")); base != "" && base != "?" {
+				add("index_base:" + base)
+			}
+			if key := c.jsContextPath(field(n, "index")); key != "" {
+				add("index_key:" + key)
+			}
+			if sub := jsContextCompact(c.text(n)); sub != "" {
+				add("subscript:" + sub)
+			}
 		case "call_expression", "new_expression":
 			fn := field(n, "function")
 			if n.Kind() == "new_expression" {
@@ -464,6 +477,14 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 		case "string", "template_string":
 			if lit := jsContextValue(c.text(n)); lit != "" {
 				add("literal:" + lit)
+			}
+		case "regex":
+			if lit := jsContextRegex(c.text(n)); lit != "" {
+				add("regex:" + lit)
+				add("literal:" + lit)
+				if jsPrototypeNameGuard(lit) {
+					add("prototype_name_guard=true")
+				}
 			}
 		}
 		for _, ch := range namedChildren(n) {
@@ -492,6 +513,22 @@ func jsContextValue(raw string) string {
 		}
 	}
 	return jsContextCompact(s)
+}
+
+func jsContextRegex(raw string) string {
+	s := strings.TrimSpace(raw)
+	if strings.HasPrefix(s, "/") {
+		if i := strings.LastIndex(s[1:], "/"); i >= 0 {
+			s = s[1 : i+1]
+		}
+	}
+	return jsContextCompact(s)
+}
+
+func jsPrototypeNameGuard(pattern string) bool {
+	return strings.Contains(pattern, "__proto__") &&
+		strings.Contains(pattern, "prototype") &&
+		strings.Contains(pattern, "constructor")
 }
 
 func jsContextCompact(raw string) string {

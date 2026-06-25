@@ -829,6 +829,12 @@ review code.CoerciblePathSegmentPrototypePollution {
   expected: [core.PrototypePollutionGuard]
   text: "review nested path setters for primitive path-segment validation before bracket property access"
 }
+review code.ExpressionEvaluatorPrototypeNameAccess {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review expression evaluators for __proto__/constructor/prototype rejection before resolving variable or member tokens"
+}
 review code.McpToolCommandTemplateExecution {
   category: "command"
   kind: "attention"

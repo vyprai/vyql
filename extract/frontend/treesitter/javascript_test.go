@@ -278,6 +278,51 @@ execFile("powershell.exe", ["-Command", "echo ok"], { shell: true });
 	t.Fatalf("module context did not include structured tokens; nodes=%#v", nodes)
 }
 
+func TestJavaScriptFunctionContextIncludesSubscriptAndRegexTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "evaluate.js")
+	src := []byte(`
+function evaluate(tokens, expr, values) {
+  for (var i = 0; i < tokens.length; i++) {
+    var item = tokens[i];
+    if (/^__proto__|prototype|constructor$/.test(item.value)) throw new Error("prototype access detected");
+    if (item.value in expr.functions) return values[item.value];
+    return nstack.pop()[item.value];
+  }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "index_base:values") &&
+			strings.Contains(tokens, "index_key:item.value") &&
+			strings.Contains(tokens, "subscript:values[item.value]") &&
+			strings.Contains(tokens, "regex:^__proto__|prototype|constructor$") &&
+			strings.Contains(tokens, "prototype_name_guard=true") {
+			return
+		}
+	}
+	t.Fatalf("function context did not include subscript/regex tokens; nodes=%#v", nodes)
+}
+
 func TestJavaScriptBrowserGlobalAssignmentLambdaParamEntry(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "origin.tsx")

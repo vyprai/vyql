@@ -553,6 +553,15 @@ concept CoerciblePathSegmentPrototypePollution : sink {
   review_assumption: "a caller can provide a path array containing objects whose toString/valueOf result is __proto__, constructor, or prototype"
   review_confidence: high
 }
+concept ExpressionEvaluatorPrototypeNameAccess : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "expression evaluator resolves variable or member tokens against JavaScript objects without rejecting prototype-sensitive names"
+  review_evidence: "expression evaluator context {pattern} resolves item.value from expression tokens through values[item.value] and object[item.value] without filtering __proto__/constructor/prototype"
+  review_assumption: "a caller can evaluate attacker-controlled expressions containing variable or member names"
+  review_confidence: high
+}
 concept SchemaCodegenValidationBypass : sink {
   vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
   cwe: [CWE_1321, CWE_915]
