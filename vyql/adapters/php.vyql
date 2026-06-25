@@ -1539,6 +1539,7 @@ adapter php {
   control "e" -> core.HtmlEscape
   control "Tools.htmlentitiesUTF8" -> core.HtmlEscape
   control "html_escape" -> core.HtmlEscape
+  control "escape" -> core.HtmlEscape
   control "esc_html" -> core.HtmlEscape
   control "esc_attr" -> core.HtmlEscape
   control "esc_url" -> core.HtmlEscape
