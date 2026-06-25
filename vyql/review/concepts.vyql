@@ -2247,6 +2247,12 @@ review code.VerboseHttpClientAuthorizationLog {
   expected: [core.SecretRedaction]
   text: "review verbose HTTP client logging for authorization-header, cookie, token, or request-body redaction before production use"
 }
+review code.VerboseHttpErrorObjectDisclosure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review HTTP error messages for verbose request, response-body, or TLS object formatting before the error can reach logs or callers"
+}
 review code.KubernetesTemplateSecretLookupExposure {
   category: "secret"
   kind: "attention"

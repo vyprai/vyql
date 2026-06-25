@@ -89,6 +89,14 @@ adapter go {
     call arg "getShareURL:shareLink.Token"
     call path "renderJSON"
   }
+  flag code.VerboseHttpErrorObjectDisclosure in function {
+    lang "go"
+    call path "fmt.Errorf"
+    literal contains "%+v"
+    selector contains ".Request"
+    selector contains ".Body"
+    selector contains ".TLS"
+  }
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution

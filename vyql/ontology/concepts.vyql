@@ -4957,6 +4957,15 @@ concept VerboseHttpClientAuthorizationLog : sink {
   review_assumption: "outbound requests may carry authorization headers, bearer tokens, cookies, or other credentials"
   review_confidence: high
 }
+concept VerboseHttpErrorObjectDisclosure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_209, CWE_532]
+  review_category: "secret"
+  review_condition: "HTTP error construction formats full request, response body, or TLS objects with verbose struct formatting"
+  review_evidence: "HTTP error context {pattern} builds an error with %+v formatting over response request/body/TLS internals"
+  review_assumption: "returned errors may be logged or shown to callers and outbound request objects can contain authorization headers, tokens, cookies, or TLS peer details"
+  review_confidence: high
+}
 concept KubernetesCurlAuthorizationHeaderLogLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]
