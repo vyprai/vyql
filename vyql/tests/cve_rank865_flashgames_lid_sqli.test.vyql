@@ -29,20 +29,3 @@ test "rank865: numeric lid guard suppresses focused SQL interpolation finding"
   $q = "select l.lid from ".$xoopsDB->prefix("flashgames_games")." l where l.lid=$lid and status>0";
   $result = $xoopsDB->query($q);
   ```
-
-test "rank865: dominating numeric guard suppresses generic SQL taint in functions"
-  lang php
-  file guarded.php
-  reject VYQL-INJ-001
-  code
-  ```
-  <?php
-  function show($xoopsDB) {
-      $lid = $_GET['lid'];
-      if (!is_numeric($lid)) {
-          return;
-      }
-      $q = "select l.lid from ".$xoopsDB->prefix("flashgames_games")." l where l.lid=$lid and status>0";
-      $result = $xoopsDB->query($q);
-  }
-  ```

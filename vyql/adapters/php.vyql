@@ -132,9 +132,9 @@ adapter php {
   flag code.UnvalidatedNumericSqlInterpolation in module {
     lang "php"
     token subscript "$HTTP_GET_VARS['lid']"
-    has "where l.lid=$lid"
     call path "$xoopsDB.query"
-    lacks "is_numeric($lid)"
+    literal " where "
+    not call arg "is_numeric:$lid"
   }
   flag code.WordPressPostsWhereDateSqlInjection in function {
     lang "php"
