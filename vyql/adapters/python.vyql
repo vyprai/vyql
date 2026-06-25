@@ -547,6 +547,16 @@ adapter python {
     }
     lacks call contains_any ["constant_time_compare", "hmac.compare_digest", "secrets.compare_digest", "compare_digest"]
   }
+  flag code.PasswordHashMissingUserBalance in function {
+    function contains_any ["auth_user_db", "authenticate", "login"]
+    call path "find_user"
+    attr path "user.is_active"
+    call path "check_password_hash"
+    call path "update_user_auth_stat"
+    call path "LOGMSG_WAR_SEC_LOGIN_FAILED.format"
+    not literal contains_any ["pbkdf2:", "argon2", "bcrypt", "scrypt"]
+    not identifier contains_any ["dummy", "DUMMY", "fake", "FAKE", "balance", "BALANCE"]
+  }
   flag code.DjangoAttachmentSaveWithoutModelValidation in function {
     name "process_attachments"
     has "attached_files"

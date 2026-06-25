@@ -75,6 +75,12 @@ review code.AuthenticationRequiredOp {
   expected: [core.AuthenticationCheck]
   text: "verify an authenticated user is required before this operation"
 }
+review code.PasswordHashMissingUserBalance {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review login failure paths for a dummy password-hash verification that balances missing or inactive users against real password checks"
+}
 review code.SharedOtaHandlerMissingAuthentication {
   category: "auth"
   kind: "target"

@@ -1848,6 +1848,15 @@ concept AuthenticationRequiredOp : sink {
   review_assumption: "the enclosing endpoint or entry point can be reached by an unauthenticated actor"
   review_confidence: low
 }
+concept PasswordHashMissingUserBalance : sink {
+  vulnerable_to: [crypto.ObservableDiscrepancy, authentication.ImproperAuthentication]
+  cwe: [CWE_203, CWE_208]
+  review_category: "auth"
+  review_condition: "database-backed login checks a password hash only for existing active users"
+  review_evidence: "auth context {pattern} looks up a user and verifies the real password hash without an observed dummy hash check for missing or inactive users"
+  review_assumption: "an attacker can repeatedly attempt login for chosen usernames and observe timing or response differences"
+  review_confidence: high
+}
 concept SharedOtaHandlerMissingAuthentication : sink {
   vulnerable_to: [authentication.MissingAuthentication, access_control.MissingAuthorization]
   cwe: [CWE_306, CWE_862]

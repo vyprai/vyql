@@ -234,6 +234,11 @@ rule RefererBasedAdminUserCreation {
   match code.RefererBasedAdminUserCreation as handler
 }
 
+rule PasswordHashMissingUserBalance {
+  meta { id: "VYQL-AUTH-055", severity: medium, cwe: [CWE_203, CWE_208], confidence_floor: high }
+  match code.PasswordHashMissingUserBalance as auth
+}
+
 rule JobOutputEventUpdateAuthorizationBypass {
   meta { id: "VYQL-AUTH-030", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.JobOutputEventUpdateAuthorizationBypass as handler
