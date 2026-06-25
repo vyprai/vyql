@@ -79,6 +79,11 @@ adapter javascript {
   // function application are attacker-controlled by sandbox code.
   source "otherFromThisArguments" -> core.UserControlledData
 
+  flag code.NuxtPublicRuntimeConfigSecretExposure in module {
+    call path "defineNuxtModule"
+    literal "public_runtime_secret_config"
+  }
+
   // Browser / SPA DOM entry points (attacker-controlled URL / storage / window state)
   source "location.search" -> code.DomInput
   source "location.hash" -> code.DomInput

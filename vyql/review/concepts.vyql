@@ -2517,6 +2517,12 @@ review code.DefaultExternalRelaySecretExposure {
   expected: [core.AllowlistValidation]
   text: "review default relay/proxy/websocket hosts for product-owned trust boundaries before embedding tokens or upstream URLs"
 }
+review code.NuxtPublicRuntimeConfigSecretExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "keep tokens and credentials out of Nuxt public runtime config; merge them only into private runtimeConfig"
+}
 review code.ExternalSettingTokenSyncUrlExposure {
   category: "secret"
   kind: "target"

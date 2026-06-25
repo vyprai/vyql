@@ -449,6 +449,7 @@ func (c *jsConv) jsModuleContext(root *tree_sitter.Node) []nir.Stmt {
 
 func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 	seen := map[string]bool{}
+	secretConfigVars := c.jsSecretConfigObjectVars(root)
 	var out []string
 	add := func(tok string) {
 		if tok == "" || seen[tok] || len(out) >= 512 {
@@ -468,6 +469,14 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 			if lhs := c.jsContextPath(left); lhs != "" {
 				if rhs := jsContextValue(c.text(right)); rhs != "" {
 					add("assign:" + lhs + "=" + rhs)
+				}
+				if c.isJsPublicRuntimeConfigPath(lhs) {
+					if ok, name := c.jsCallArgsContainSecretConfig(right, secretConfigVars); ok {
+						add("public_runtime_secret_config")
+						if name != "" {
+							add("public_runtime_secret_config_var:" + name)
+						}
+					}
 				}
 			}
 		case "binary_expression":
@@ -531,6 +540,109 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 	}
 	walk(root)
 	return out
+}
+
+func (c *jsConv) jsSecretConfigObjectVars(root *tree_sitter.Node) map[string]bool {
+	out := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "variable_declarator" {
+			name := field(n, "name")
+			val := c.unwrapJsTransparentExpr(field(n, "value"))
+			if name != nil && name.Kind() == "identifier" && c.jsObjectHasSecretConfigPair(val) {
+				out[c.text(name)] = true
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *jsConv) jsObjectHasSecretConfigPair(n *tree_sitter.Node) bool {
+	n = c.unwrapJsTransparentExpr(n)
+	if n == nil || n.Kind() != "object" {
+		return false
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "pair":
+			key := strings.ToLower(c.keyName(field(ch, "key")))
+			val := strings.ToLower(c.text(field(ch, "value")))
+			if jsSecretConfigKey(key) && jsSecretConfigValue(val) {
+				return true
+			}
+		case "object":
+			if c.jsObjectHasSecretConfigPair(ch) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func jsSecretConfigKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for _, part := range []string{"token", "secret", "password", "passwd", "credential", "apikey", "api_key", "accesskey"} {
+		if strings.Contains(key, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func jsSecretConfigValue(val string) bool {
+	if val == "" || val == "undefined" || val == "null" {
+		return false
+	}
+	return strings.Contains(val, "process.env") ||
+		strings.Contains(val, "token") ||
+		strings.Contains(val, "secret") ||
+		strings.Contains(val, "password") ||
+		strings.Contains(val, "credential") ||
+		strings.Contains(val, "key")
+}
+
+func (c *jsConv) isJsPublicRuntimeConfigPath(path string) bool {
+	return strings.Contains(path, "runtimeConfig.public")
+}
+
+func (c *jsConv) jsCallArgsContainSecretConfig(n *tree_sitter.Node, secretVars map[string]bool) (bool, string) {
+	n = c.unwrapJsTransparentExpr(n)
+	if n == nil || n.Kind() != "call_expression" {
+		return false, ""
+	}
+	fn := c.dotted(field(n, "function"))
+	if fn != "defu" && !strings.HasSuffix(fn, ".defu") && fn != "Object.assign" {
+		return false, ""
+	}
+	args := field(n, "arguments")
+	if args == nil {
+		return false, ""
+	}
+	for _, a := range namedChildren(args) {
+		a = c.unwrapJsTransparentExpr(a)
+		if a == nil {
+			continue
+		}
+		if a.Kind() == "identifier" {
+			name := c.text(a)
+			if secretVars[name] {
+				return true, name
+			}
+		}
+		if c.jsObjectHasSecretConfigPair(a) {
+			return true, ""
+		}
+	}
+	return false, ""
 }
 
 func (c *jsConv) jsContextPath(n *tree_sitter.Node) string {
@@ -1048,6 +1160,10 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// declaration inside is analyzed (Next.js route handlers are all exports).
 		var out []nir.Stmt
 		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "call_expression" {
+				out = append(out, c.exprStmt(ch, L)...)
+				continue
+			}
 			if ch.Kind() == "object" {
 				out = append(out, c.objectMethodFuncDefs(ch, true)...)
 				continue

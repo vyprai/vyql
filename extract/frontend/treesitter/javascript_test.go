@@ -733,6 +733,76 @@ function exportTable () {
 	t.Fatalf("module context was not lowered with file-level tokens; nodes=%#v", nodes)
 }
 
+func TestTypeScriptNuxtPublicRuntimeSecretConfigToken(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "vuln.ts")
+	fixed := filepath.Join(dir, "fixed.ts")
+	if err := os.WriteFile(vuln, []byte(`
+export default defineNuxtModule({
+  setup (options, nuxt) {
+    const config = {
+      owner: options.owner || process.env.GITHUB_OWNER,
+      token: options.token || process.env.GITHUB_TOKEN
+    }
+    nuxt.options.runtimeConfig.public.github = defu(nuxt.options.runtimeConfig.public.github, config)
+  }
+})
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`
+export default defineNuxtModule({
+  setup (options, nuxt) {
+    const config = {
+      owner: options.owner || process.env.GITHUB_OWNER
+    }
+    nuxt.options.runtimeConfig.public.github = defu(nuxt.options.runtimeConfig.public.github, config)
+    nuxt.options.runtimeConfig.github = defu(nuxt.options.runtimeConfig.github, {
+      token: options.token || process.env.GITHUB_TOKEN
+    }, config)
+  }
+})
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{vuln, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seenVulnToken := false
+	seenVulnCall := false
+	for _, n := range nodes {
+		if strings.Contains(n.Prop("loc"), "vuln.ts") && n.Type == "code.Call" && n.Prop("callee_path") == "defineNuxtModule" {
+			seenVulnCall = true
+		}
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.module.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(n.Prop("loc"), "vuln.ts") && strings.Contains(tokens, "public_runtime_secret_config") {
+			seenVulnToken = true
+		}
+		if strings.Contains(n.Prop("loc"), "fixed.ts") && strings.Contains(tokens, "public_runtime_secret_config") {
+			t.Fatalf("fixed private runtime config should not emit public secret token: %s", tokens)
+		}
+	}
+	if !seenVulnCall {
+		t.Fatalf("default-export defineNuxtModule call was not extracted; nodes=%#v", nodes)
+	}
+	if !seenVulnToken {
+		t.Fatalf("vulnerable public runtime secret config token was not emitted; nodes=%#v", nodes)
+	}
+}
+
 func findFuncDef(prog nir.Program, name string) (nir.FuncDef, bool) {
 	for _, mod := range prog.Modules {
 		if fn, ok := findFuncDefInStmts(mod.Body, name); ok {
