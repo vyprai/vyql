@@ -99,6 +99,15 @@ adapter c {
     not literal "--bind-fd=%d"
     not literal "--ro-bind-fd=%d"
   }
+  flag code.DnsInterfaceNewlineValidationMissing in function {
+    lang "c"
+    name "initConfig"
+    literal "dns.interface"
+    attr path "conf.dns.interface.c"
+    attr path "conf.dns.interface.t"
+    assign contains "conf.dns.interface.c=validate_stub"
+    not assign contains_any ["conf.dns.interface.c=validate_str_no_newline"]
+  }
 
   // dynamic loading (untrusted path -> code load)
   sink path "dlopen" -> code.DynamicCodeLoad

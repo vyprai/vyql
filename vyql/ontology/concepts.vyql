@@ -1242,6 +1242,15 @@ concept XmlLeadByteNameValidationMissing : sink {
   review_assumption: "attacker-controlled XML input can contain invalid multibyte lead-byte sequences that reach these tokenizer paths"
   review_confidence: high
 }
+concept DnsInterfaceNewlineValidationMissing : sink {
+  vulnerable_to: [validation.ImproperInputValidation, injection.ConfigurationInjection]
+  cwe: [CWE_20, CWE_74]
+  review_category: "input_validation"
+  review_condition: "DNS interface configuration accepts newline characters before being used in resolver configuration syntax"
+  review_evidence: "DNS interface config context {pattern} registers the interface option with a stub validator instead of a no-newline validator"
+  review_assumption: "the interface setting can be written through configuration input and later rendered into dnsmasq or resolver configuration"
+  review_confidence: high
+}
 concept RegexLineCommentStripWithoutCharWhitelist : sink {
   vulnerable_to: [validation.ImproperInputValidation]
   cwe: [CWE_20]

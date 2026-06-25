@@ -1563,6 +1563,12 @@ review code.XmlLeadByteNameValidationMissing {
   expected: [core.InputValidation]
   text: "review XML tokenizer lead-byte name parsing for invalid-character rejection before accepting name characters"
 }
+review code.DnsInterfaceNewlineValidationMissing {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review DNS interface config validators for newline rejection before writing resolver configuration syntax"
+}
 review code.UnvalidatedChoiceControlField {
   category: "input_validation"
   kind: "attention"
