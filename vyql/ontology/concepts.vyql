@@ -4732,6 +4732,15 @@ concept RemoteUrlObjectDebugLog : sink {
   review_assumption: "remote source URLs may contain credentials, tokens, query strings, or fragments supplied by users or package metadata"
   review_confidence: high
 }
+concept RawDatabaseExceptionLog : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_532]
+  review_category: "secret"
+  review_condition: "database exception messages or traces are written to logs before credential redaction"
+  review_evidence: "database error handler context {pattern} passes raw exception getMessage/getTraceAsString values to a file log"
+  review_assumption: "database exception messages or traces can contain connection usernames, passwords, DSNs, or SQL credential material"
+  review_confidence: high
+}
 concept VerboseHttpClientAuthorizationLog : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]

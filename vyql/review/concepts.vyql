@@ -2134,6 +2134,12 @@ review code.RepositorySourceMetadataExposure {
   expected: [core.SecretRedaction]
   text: "verify repository or Git remote URLs are redacted before being written to durable metadata outputs"
 }
+review code.RawDatabaseExceptionLog {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify database exception messages and traces are redacted before being written to error logs"
+}
 review code.AnsibleSnmpFactsCredentialsNoLogMissing {
   category: "secret"
   kind: "attention"

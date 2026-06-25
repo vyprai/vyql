@@ -125,6 +125,16 @@ adapter php {
     call arg contains "../Adminer/Adminer.php"
     not token subscript "$_SESSION['frosh_adminer_authenticated']"
   }
+  flag code.RawDatabaseExceptionLog on call {
+    path exact "$error.getMessage"
+    flows to path "fwrite"
+    not flows to path "str_replace"
+  }
+  flag code.RawDatabaseExceptionLog on call {
+    path exact "$error.getTraceAsString"
+    flows to path "fwrite"
+    not flows to path "str_replace"
+  }
   flag code.ShareLinkDeletionMissingAuthGuard in function {
     lang "php"
     name "deleteShareLink"
