@@ -2900,6 +2900,15 @@ concept DeflateDecompressionMaxSafeIntegerLimit : sink {
   review_assumption: "attacker-controlled compressed input can understate or hide its final expanded size and force excessive memory or CPU before rejection"
   review_confidence: high
 }
+concept RecursiveCompressedPacketDecompression : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption, dos.StackExhaustion]
+  cwe: [CWE_400, CWE_674]
+  review_category: "resource"
+  review_condition: "compressed packet handling recursively re-enters packet parsing after decompression without rejecting nested compressed packet headers"
+  review_evidence: "packet decompression context {pattern} inflates a compressed packet into the input buffer and calls the packet reader again"
+  review_assumption: "a peer can send nested compressed or jumbo packets that repeatedly trigger decompression and recursive parsing"
+  review_confidence: high
+}
 concept UnstoppedLimitedStream : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_772]

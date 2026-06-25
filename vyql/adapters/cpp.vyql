@@ -218,6 +218,16 @@ adapter cpp {
     has "ListReader"
     lacks "amplifiedRead"
   }
+  flag code.RecursiveCompressedPacketDecompression in function {
+    lang "cpp"
+    token identifier "COMPRESSION_BORDER"
+    token identifier "JUMBO_SIZE"
+    call path "uncompress"
+    call path "fc_realloc"
+    call path "memmove"
+    call path "memcpy"
+    call path "get_packet_from_connection"
+  }
   flag code.ProtocolStatusVectorUnknownArgumentFallback in function {
     lang "cpp"
     name "xdr_status_vector"

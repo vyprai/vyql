@@ -1404,6 +1404,12 @@ review code.DeflateDecompressionMaxSafeIntegerLimit {
   expected: [core.InputValidation]
   text: "verify deflate decompression output is capped to a small archive-entry limit instead of Number.MAX_SAFE_INTEGER"
 }
+review code.RecursiveCompressedPacketDecompression {
+  category: "resource"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review compressed packet handlers for nested compressed or jumbo packet rejection before re-entering packet parsing"
+}
 review code.BufReadDiscardLoopWithoutEofGuard {
   category: "resource"
   kind: "target"
