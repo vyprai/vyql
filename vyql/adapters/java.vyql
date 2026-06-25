@@ -1174,6 +1174,13 @@ adapter java {
     call path "token.equals"
     not call path "MessageDigest.isEqual"
   }
+  flag code.SecretComparisonReview in function {
+    function contains_any ["validate", "verify", "check", "authenticate"]
+    call path "computeSignature"
+    call path "signature.equals"
+    not call path "constantTimeEquals"
+    not call path "MessageDigest.isEqual"
+  }
 
   // server-side template injection (CWE-1336) — unambiguous engine entrypoints that
   // evaluate a STRING template (not load-by-name): Velocity static evaluate, Pebble
