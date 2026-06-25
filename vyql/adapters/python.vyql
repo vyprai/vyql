@@ -1244,6 +1244,9 @@ adapter python {
   // CairoSVG rgb()/rgba() ReDoS: whitespace-star groups on both sides of a lazy
   // capture let long unterminated whitespace inputs backtrack catastrophically.
   sink path "re.compile" val "[ \\n\\r\\t]*(.+?)[ \\n\\r\\t]*" -> code.CatastrophicRegex
+  // Flask-RESTX email regex ReDoS: [^@]+ can consume dots both outside and
+  // inside a repeated dot-label group, creating ambiguous domain partitions.
+  sink path "re.compile" val "[^@]+(?:\\.[^@]+)*" -> code.CatastrophicRegex
 
   // weak crypto (CWE-327/328) — presence marker on the call node
   flag code.WeakHash on any {

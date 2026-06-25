@@ -1,0 +1,31 @@
+# Rank 870 / CVE-2021-32838: Flask-RESTX email validation allowed the
+# repeated domain label atom to consume dots, producing catastrophic
+# backtracking on crafted email-like input.
+
+test "rank870: email regex has ambiguous repeated domain labels"
+  lang python
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  import re
+
+  email_regex = re.compile(
+      r"^" "(?P<local>[^@]*[^@.])" r"@" r"(?P<server>[^@]+(?:\.[^@]+)*)" r"$",
+      re.IGNORECASE,
+  )
+  ```
+
+test "rank870: email regex excludes dot inside each repeated label"
+  lang python
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  import re
+
+  email_regex = re.compile(
+      r"^" "(?P<local>[^@]*[^@.])" r"@" r"(?P<server>[^@\.]+(?:\.[^@\.]+)*)" r"$",
+      re.IGNORECASE,
+  )
+  ```
