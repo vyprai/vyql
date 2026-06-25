@@ -25,6 +25,7 @@ adapter php {
   source path "Request.post" -> code.HttpInput
   // Symfony/Pimcore request parameter bags. query/request/filter accessors return
   // attacker-controlled request values even when used through object-property chains.
+  source path "$request.getQueryParams" -> code.HttpInput
   source path "$request.query.get" -> code.HttpInput
   source path "$request.query.all" -> code.HttpInput
   source path "$request.query.filter" -> code.HttpInput
@@ -1171,6 +1172,17 @@ adapter php {
     has "header('Location:/'.htmlentities($_REQUEST['redirect_url']))"
     lacks "substr($_REQUEST['redirect_url'],0,strlen(OC::$WEBROOT))==OC::$WEBROOT"
   }
+  flag code.LogoutReturnUrlRedirectWithoutAllowlist in function {
+    lang "php"
+    name contains_any ["handle", "logout", "logOut", "redirect"]
+    call path "$request.getQueryParams"
+    call path "Arr.get"
+    call path "RedirectResponse"
+    not call path "sanitizeReturnUrl"
+    not call path "url_is_external"
+    not call path "is_safe_url"
+    not call path "getAllowedRedirectDomains"
+  }
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
   flag code.UnparameterizedSqlQueryParser in function {
@@ -1338,7 +1350,9 @@ adapter php {
 
   // HTTP response splitting / header injection (CWE-113) and log injection (CWE-117).
   sink path "header" -> code.ResponseHeaderWrite
+  sink path "RedirectResponse" -> code.RedirectTarget
   sink path "overlay_close_dialog" -> code.RedirectTarget
+  control method "sanitizeReturnUrl" -> core.RedirectAllowlist
   control "url_is_external" -> core.RedirectAllowlist
   control method "is_safe_url" -> core.AllowlistValidation
   control method "is_safe_host" -> core.AllowlistValidation

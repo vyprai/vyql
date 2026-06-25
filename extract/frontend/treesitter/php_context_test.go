@@ -8,6 +8,7 @@ import (
 
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/lowering"
+	"github.com/vyprai/vyql/usg"
 )
 
 func TestPHPFunctionContextIncludesAstInventory(t *testing.T) {
@@ -99,6 +100,55 @@ function zipdl($args) {
 		}
 	}
 	t.Fatalf("analysis.function.context for zipdl not found")
+}
+
+func TestPHPObjectCreationArgumentsCarryAssignedTaint(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Redirect.php")
+	src := []byte(`<?php
+function handle($request) {
+  $url = Arr::get($request->getQueryParams(), 'return', '/');
+  return new RedirectResponse($url);
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source, sink string
+	for _, n := range nodes {
+		switch n.Prop("callee_path") {
+		case "$request.getQueryParams":
+			source = n.ID
+		case "RedirectResponse":
+			if n.Prop("arg0") == "" {
+				t.Fatalf("RedirectResponse constructor is missing arg0: %#v", n)
+			}
+			sink = n.Prop("arg0")
+		}
+	}
+	if source == "" || sink == "" {
+		t.Fatalf("missing source or RedirectResponse arg; source=%q sink=%q nodes=%#v", source, sink, nodes)
+	}
+	reachable, err := usg.BFS(g, source, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[sink] {
+		return
+	}
+	t.Fatalf("query params did not flow into RedirectResponse arg; source=%q sink=%q reachable=%v", source, sink, reachable)
 }
 
 func TestPHPModuleContextIncludesAstInventory(t *testing.T) {

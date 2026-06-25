@@ -414,6 +414,12 @@ review code.OwnCloudLoginRedirectUrlOpenRedirect {
   expected: [core.RedirectAllowlist]
   text: "review ownCloud login redirect_url handling for same-webroot validation before writing a Location header"
 }
+review code.LogoutReturnUrlRedirectWithoutAllowlist {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.RedirectAllowlist]
+  text: "verify logout return-url redirects use same-origin or configured-domain allowlist validation before constructing RedirectResponse"
+}
 review code.PathMatcherNormalizationOrderBypass {
   category: "request_forgery"
   kind: "attention"

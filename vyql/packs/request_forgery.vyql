@@ -135,6 +135,11 @@ rule OwnCloudLoginRedirectUrlOpenRedirect {
   match code.OwnCloudLoginRedirectUrlOpenRedirect as redirect
 }
 
+rule LogoutReturnUrlRedirectWithoutAllowlist {
+  meta { id: "VYQL-RF-037", severity: medium, cwe: [CWE_601], confidence_floor: high }
+  match code.LogoutReturnUrlRedirectWithoutAllowlist as redirect
+}
+
 rule SamlRelayStateOpenRedirect {
   meta { id: "VYQL-RF-024", severity: medium, cwe: [CWE_601], confidence_floor: high }
   match code.SamlRelayStateOpenRedirect as redirect

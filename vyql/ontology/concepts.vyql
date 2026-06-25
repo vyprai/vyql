@@ -4647,6 +4647,15 @@ concept OwnCloudLoginRedirectUrlOpenRedirect : sink {
   review_assumption: "an attacker can place an absolute or scheme-relative URL in redirect_url and induce a victim to complete the login flow"
   review_confidence: high
 }
+concept LogoutReturnUrlRedirectWithoutAllowlist : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "logout or redirect handling sends a request return URL to RedirectResponse without a same-origin allowlist"
+  review_evidence: "logout redirect context {pattern} reads a return query parameter and constructs RedirectResponse before sanitizeReturnUrl or equivalent allowlist validation"
+  review_assumption: "an attacker can place an absolute or scheme-relative URL in the return query parameter and cause the browser to follow the logout redirect"
+  review_confidence: high
+}
 concept SamlRelayStateOpenRedirect : sink {
   vulnerable_to: [request_forgery.OpenRedirect]
   cwe: [CWE_601]

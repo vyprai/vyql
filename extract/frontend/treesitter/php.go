@@ -859,13 +859,19 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: path, Method: name, Loc: L}
 	case "object_creation_expression":
 		var typ string
+		var argsNode *tree_sitter.Node
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "name" || ch.Kind() == "qualified_name" {
 				typ = c.text(ch)
-				break
+			}
+			if ch.Kind() == "arguments" {
+				argsNode = ch
 			}
 		}
-		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
+		if argsNode == nil {
+			argsNode = field(n, "arguments")
+		}
+		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(argsNode), Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
