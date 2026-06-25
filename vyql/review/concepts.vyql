@@ -334,6 +334,12 @@ review code.CustomerThreadEditMissingMailboxAuthorization {
   expected: [core.AuthorizationCheck]
   text: "review customer-thread edit policies for mailbox or conversation access checks before allowing customer-originated thread edits"
 }
+review code.UnauthenticatedAdminerIncludeRoute {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "review Adminer UI routes for an authenticated session gate before including the Adminer application"
+}
 review code.DeserializableInvocationHandler {
   category: "deserialization"
   kind: "attention"

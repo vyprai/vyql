@@ -274,6 +274,11 @@ rule CustomerThreadEditMissingMailboxAuthorization {
   match code.CustomerThreadEditMissingMailboxAuthorization as policy
 }
 
+rule UnauthenticatedAdminerIncludeRoute {
+  meta { id: "VYQL-AUTH-067", severity: critical, cwe: [CWE_306, CWE_862], confidence_floor: high }
+  match code.UnauthenticatedAdminerIncludeRoute as route
+}
+
 rule InsecureDirectObjectReference {
   meta { id: "VYQL-AUTH-002", severity: high, cwe: [CWE_639] }
   taint core.UserControlledData -> code.ObjectLookupByUserInput

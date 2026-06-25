@@ -114,6 +114,17 @@ adapter php {
     has "returntrue;"
     not call path "userHasAccessToMailbox"
   }
+  flag code.UnauthenticatedAdminerIncludeRoute in function {
+    lang "php"
+    name "index"
+    annotation "Route"
+    token annotation_arg contains "adminer"
+    token annotation_arg contains "auth_required'=>false"
+    call path "chdir"
+    call path "include"
+    call arg contains "../Adminer/Adminer.php"
+    not token subscript "$_SESSION['frosh_adminer_authenticated']"
+  }
   flag code.ShareLinkDeletionMissingAuthGuard in function {
     lang "php"
     name "deleteShareLink"

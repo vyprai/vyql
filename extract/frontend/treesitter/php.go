@@ -343,6 +343,7 @@ func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 	}
+	tokens = append(tokens, c.phpAstContextTokens(field(fn, "attributes"))...)
 	tokens = append(tokens, c.phpAstContextTokens(body)...)
 	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", tokens, c.text(body))
 }
@@ -353,6 +354,7 @@ func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt 
 		return nil
 	}
 	tokens := []string{"lang=php", "name=" + name}
+	tokens = append(tokens, c.phpAstContextTokens(field(cls, "attributes"))...)
 	tokens = append(tokens, c.phpAstContextTokens(body)...)
 	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", tokens, c.text(body))
 }
@@ -400,6 +402,32 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 		case "function_definition", "method_declaration":
 			if name := c.text(field(cur, "name")); name != "" {
 				add("function_name:" + name)
+			}
+		case "attribute":
+			name, short := c.phpAttributeName(cur)
+			if name != "" {
+				add("annotation:" + name)
+				if short != "" && short != name {
+					add("annotation:" + short)
+				}
+			}
+			if text := phpCompactText(c.text(cur)); text != "" {
+				add("annotation_text:" + text)
+			}
+			if args := field(cur, "parameters"); args != nil {
+				for _, arg := range namedChildren(args) {
+					argText := phpCompactText(c.text(arg))
+					if argText == "" {
+						continue
+					}
+					add("annotation_arg:" + argText)
+					if name != "" {
+						add("annotation_arg:" + name + ":" + argText)
+					}
+					if short != "" && short != name {
+						add("annotation_arg:" + short + ":" + argText)
+					}
+				}
 			}
 		case "property_declaration":
 			prop := phpCompactText(c.text(cur))
@@ -456,6 +484,17 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 					}
 				}
 			}
+		case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
+			add("call_path:include")
+			add("call:include")
+			for _, arg := range namedChildren(cur) {
+				argText := phpCompactText(c.text(arg))
+				if argText == "" {
+					continue
+				}
+				add("call_arg:include:" + argText)
+				add("call_arg_method:include:" + argText)
+			}
 		case "member_access_expression":
 			add("attr_path:" + c.dotted(cur))
 		case "subscript_expression":
@@ -488,6 +527,23 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 	}
 	walk(n)
 	return out
+}
+
+func (c *phConv) phpAttributeName(n *tree_sitter.Node) (string, string) {
+	if n == nil || n.Kind() != "attribute" {
+		return "", ""
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "arguments" {
+			continue
+		}
+		name := strings.TrimPrefix(c.text(ch), "\\")
+		if name == "" {
+			continue
+		}
+		return name, lastSeg(name)
+	}
+	return "", ""
 }
 
 func phpCastType(text string) string {
