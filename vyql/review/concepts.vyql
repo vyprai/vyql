@@ -2289,6 +2289,12 @@ review code.UnsafeYamlConstructor {
   kind: "attention"
   text: "review SnakeYAML Constructor usage on untrusted YAML; prefer SafeConstructor"
 }
+review code.UnsafeYamlLoad {
+  category: "deserialization"
+  kind: "attention"
+  expected: [core.SafeDeserialization]
+  text: "review PyYAML unsafe load calls; prefer safe_load or an explicit SafeLoader/CSafeLoader/BaseLoader"
+}
 review code.CsvFormulaProneExportRow {
   category: "injection"
   kind: "attention"

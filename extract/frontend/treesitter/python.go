@@ -41,7 +41,8 @@ func ExtractPython(files []string, root string) (nir.Program, error) {
 			root0 := tree.RootNode()
 			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
 			c.moduleContext = c.pyModuleLiteralContext(root0)
-			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+			body := append(c.pyModuleContext(root0), c.blockChildren(root0)...)
+			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: body}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
@@ -550,6 +551,29 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	}
 }
 
+func (c *pyConv) pyModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=python"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+	}
+	for _, tok := range c.pyStructuredContextTokens(root, "module") {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
 func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -560,10 +584,14 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 		seen[tok] = true
 		out = append(out, tok)
 	}
-	add("function_name:" + name)
-	for i, p := range c.params(field(fn, "parameters")) {
-		add("param_name:" + p)
-		add("param_index:" + itoa(i))
+	if name != "" {
+		add("function_name:" + name)
+	}
+	if params := field(fn, "parameters"); params != nil {
+		for i, p := range c.params(params) {
+			add("param_name:" + p)
+			add("param_index:" + itoa(i))
+		}
 	}
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
@@ -617,7 +645,11 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 			walk(ch)
 		}
 	}
-	walk(field(fn, "body"))
+	body := field(fn, "body")
+	if body == nil {
+		body = fn
+	}
+	walk(body)
 	return out
 }
 

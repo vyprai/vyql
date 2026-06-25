@@ -62,3 +62,49 @@ func TestPythonFunctionContextIncludesStructuredTokens(t *testing.T) {
 	}
 	t.Fatalf("python function context for verify_and_process not found; nodes=%#v", nodes)
 }
+
+func TestPythonModuleContextIncludesStructuredTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "main.py")
+	src := []byte(`import yaml
+
+with open("/var/feast/feature_store.yaml") as f:
+    feast_config = yaml.load(f, Loader=yaml.Loader)
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPython([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.module.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		for _, want := range []string{
+			"lang=python",
+			"function_name:module",
+			"assign:feast_config=yaml.load(f,Loader=yaml.Loader)",
+			"assign_call:feast_config:yaml.load",
+			"call_path:yaml.load",
+			"selector:yaml.Loader",
+			"literal:/var/feast/feature_store.yaml",
+		} {
+			if !strings.Contains(args, want) {
+				t.Fatalf("python module context missing %q in %q", want, args)
+			}
+		}
+		return
+	}
+	t.Fatalf("python module context not found; nodes=%#v", nodes)
+}

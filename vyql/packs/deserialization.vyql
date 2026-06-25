@@ -84,3 +84,8 @@ rule PhpSimplexmlEntityLoaderXxe {
   meta { id: "VYQL-DESER-015", severity: high, cwe: [CWE_611], confidence_floor: medium }
   match code.PhpSimplexmlEntityLoaderXxe as parser
 }
+
+rule UnsafeYamlLoad {
+  meta { id: "VYQL-DESER-016", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.UnsafeYamlLoad as loader
+}

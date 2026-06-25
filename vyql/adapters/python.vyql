@@ -610,6 +610,36 @@ adapter python {
   sink path "yaml.full_load" -> code.Deserialization
   sink path "yaml.unsafe_load" -> code.Deserialization
   sink path "yaml.load_all" -> code.Deserialization
+  flag code.UnsafeYamlLoad on call {
+    path exact "yaml.unsafe_load"
+  }
+  flag code.UnsafeYamlLoad on call {
+    path exact "yaml.unsafe_load_all"
+  }
+  flag code.UnsafeYamlLoad on call {
+    path exact "yaml.load"
+    operand {
+      path exact "yaml.Loader"
+    }
+  }
+  flag code.UnsafeYamlLoad on call {
+    path exact "yaml.load_all"
+    operand {
+      path exact "yaml.Loader"
+    }
+  }
+  flag code.UnsafeYamlLoad on call {
+    path exact "yaml.load"
+    operand {
+      path exact "yaml.UnsafeLoader"
+    }
+  }
+  flag code.UnsafeYamlLoad on call {
+    path exact "yaml.load_all"
+    operand {
+      path exact "yaml.UnsafeLoader"
+    }
+  }
   sink path "pickle.load" -> code.Deserialization
   sink path "pickle.loads" -> code.Deserialization
   sink path "cPickle.load" -> code.Deserialization
