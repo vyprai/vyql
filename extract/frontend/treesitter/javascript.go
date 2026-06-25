@@ -563,6 +563,273 @@ func jsContextRegex(raw string) string {
 	return jsContextCompact(s)
 }
 
+func jsRegexMayBacktrack(raw string) bool {
+	pat := jsRegexPattern(raw)
+	if pat == "" {
+		return false
+	}
+	return hasNestedBacktrackingQuantifier(pat) || hasAmbiguousAdjacentRegexQuantifiers(pat)
+}
+
+func jsRegexPattern(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) < 2 || raw[0] != '/' {
+		return raw
+	}
+	for i := len(raw) - 1; i > 0; i-- {
+		if raw[i] != '/' || isEscaped(raw, i) {
+			continue
+		}
+		return raw[1:i]
+	}
+	return strings.Trim(raw, "/")
+}
+
+type jsRegexAtom struct {
+	key   string
+	quant byte
+	group bool
+}
+
+func hasAmbiguousAdjacentRegexQuantifiers(pat string) bool {
+	for _, branch := range splitTopLevelRegexBranches(pat) {
+		if hasAmbiguousAdjacentRegexQuantifiersInSeq(branch) {
+			return true
+		}
+	}
+	for _, inner := range regexGroupBodies(pat) {
+		if hasAmbiguousAdjacentRegexQuantifiers(inner) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAmbiguousAdjacentRegexQuantifiersInSeq(pat string) bool {
+	atoms := jsRegexAtoms(pat)
+	for i := 0; i+1 < len(atoms); i++ {
+		if isBacktrackingRepeat(atoms[i].quant) &&
+			isBacktrackingRepeat(atoms[i+1].quant) &&
+			regexAtomsOverlap(atoms[i].key, atoms[i+1].key) {
+			return true
+		}
+	}
+	for i := 0; i+2 < len(atoms); i++ {
+		if isBacktrackingRepeat(atoms[i].quant) &&
+			atoms[i+1].quant == '?' &&
+			!atoms[i+1].group &&
+			isBacktrackingRepeat(atoms[i+2].quant) &&
+			regexAtomsOverlap(atoms[i].key, atoms[i+2].key) {
+			return true
+		}
+	}
+	return false
+}
+
+func jsRegexAtoms(pat string) []jsRegexAtom {
+	var out []jsRegexAtom
+	for i := 0; i < len(pat); {
+		if isEscaped(pat, i) {
+			i++
+			continue
+		}
+		switch pat[i] {
+		case '^', '$':
+			i++
+			continue
+		case '|':
+			i++
+			continue
+		case '[':
+			end := regexCharClassEnd(pat, i)
+			if end <= i {
+				i++
+				continue
+			}
+			key := regexAtomKey(pat[i : end+1])
+			quant, next := jsRegexQuantifier(pat, end+1)
+			out = append(out, jsRegexAtom{key: key, quant: quant})
+			i = next
+			continue
+		case '(':
+			end := regexGroupEnd(pat, i)
+			if end <= i {
+				i++
+				continue
+			}
+			quant, next := jsRegexQuantifier(pat, end+1)
+			out = append(out, jsRegexAtom{key: "group", quant: quant, group: true})
+			i = next
+			continue
+		case '\\':
+			if i+1 >= len(pat) {
+				i++
+				continue
+			}
+			key := regexAtomKey(pat[i : i+2])
+			quant, next := jsRegexQuantifier(pat, i+2)
+			out = append(out, jsRegexAtom{key: key, quant: quant})
+			i = next
+			continue
+		default:
+			if strings.ContainsRune(".*+?{}]", rune(pat[i])) {
+				i++
+				continue
+			}
+			key := regexAtomKey(pat[i : i+1])
+			quant, next := jsRegexQuantifier(pat, i+1)
+			out = append(out, jsRegexAtom{key: key, quant: quant})
+			i = next
+		}
+	}
+	return out
+}
+
+func splitTopLevelRegexBranches(pat string) []string {
+	var out []string
+	start := 0
+	depth := 0
+	inClass := false
+	for i := 0; i < len(pat); i++ {
+		if isEscaped(pat, i) {
+			continue
+		}
+		switch pat[i] {
+		case '[':
+			if !inClass {
+				inClass = true
+			}
+		case ']':
+			inClass = false
+		case '(':
+			if !inClass {
+				depth++
+			}
+		case ')':
+			if !inClass && depth > 0 {
+				depth--
+			}
+		case '|':
+			if !inClass && depth == 0 {
+				out = append(out, pat[start:i])
+				start = i + 1
+			}
+		}
+	}
+	out = append(out, pat[start:])
+	return out
+}
+
+func regexGroupBodies(pat string) []string {
+	var out []string
+	for i := 0; i < len(pat); i++ {
+		if pat[i] != '(' || isEscaped(pat, i) {
+			continue
+		}
+		end := regexGroupEnd(pat, i)
+		if end <= i {
+			continue
+		}
+		body := pat[i+1 : end]
+		if strings.HasPrefix(body, "?:") || strings.HasPrefix(body, "?=") || strings.HasPrefix(body, "?!") {
+			body = body[2:]
+		} else if strings.HasPrefix(body, "?<=") || strings.HasPrefix(body, "?<!") {
+			body = body[3:]
+		} else if strings.HasPrefix(body, "?<") {
+			if close := strings.IndexByte(body, '>'); close >= 0 {
+				body = body[close+1:]
+			}
+		}
+		out = append(out, body)
+		i = end
+	}
+	return out
+}
+
+func regexCharClassEnd(pat string, start int) int {
+	for i := start + 1; i < len(pat); i++ {
+		if pat[i] == ']' && !isEscaped(pat, i) {
+			return i
+		}
+	}
+	return -1
+}
+
+func regexGroupEnd(pat string, start int) int {
+	depth := 0
+	inClass := false
+	for i := start; i < len(pat); i++ {
+		if isEscaped(pat, i) {
+			continue
+		}
+		switch pat[i] {
+		case '[':
+			if !inClass {
+				inClass = true
+			}
+		case ']':
+			inClass = false
+		case '(':
+			if !inClass {
+				depth++
+			}
+		case ')':
+			if !inClass {
+				depth--
+				if depth == 0 {
+					return i
+				}
+			}
+		}
+	}
+	return -1
+}
+
+func jsRegexQuantifier(pat string, start int) (byte, int) {
+	if start >= len(pat) {
+		return 0, start
+	}
+	switch pat[start] {
+	case '*', '+', '?':
+		return pat[start], start + 1
+	case '{':
+		end := strings.IndexByte(pat[start:], '}')
+		if end < 0 {
+			return 0, start
+		}
+		body := strings.ReplaceAll(strings.TrimSpace(pat[start+1:start+end]), " ", "")
+		next := start + end + 1
+		switch body {
+		case "1":
+			return 0, next
+		case "0,1":
+			return '?', next
+		default:
+			return '*', next
+		}
+	default:
+		return 0, start
+	}
+}
+
+func isBacktrackingRepeat(q byte) bool {
+	return q == '*' || q == '+'
+}
+
+func regexAtomKey(atom string) string {
+	switch atom {
+	case "\\d", "[0-9]", "[\\d]":
+		return "digit"
+	case ".":
+		return "any"
+	}
+	return atom
+}
+
+func regexAtomsOverlap(a, b string) bool {
+	return a == b || a == "any" || b == "any"
+}
+
 func jsPrototypeNameGuard(pattern string) bool {
 	return strings.Contains(pattern, "__proto__") &&
 		strings.Contains(pattern, "prototype") &&
@@ -1757,6 +2024,15 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "number":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "regex":
+		if jsRegexMayBacktrack(c.text(n)) {
+			return nir.Call{
+				Callee: nir.Name{ID: "__regex.match", Loc: L},
+				Args:   []nir.Expr{nir.Const{Loc: L, Value: c.text(n)}},
+				Path:   "__regex.match",
+				Method: "match",
+				Loc:    L,
+			}
+		}
 		// carry the literal `/pattern/flags` so a `filter` directive can analyze the
 		// output alphabet of x.replace(/…/g, repl).
 		return nir.Const{Loc: L, Value: c.text(n)}

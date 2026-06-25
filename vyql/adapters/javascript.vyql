@@ -1148,6 +1148,9 @@ adapter javascript {
   control method "escapeStringRegexp" -> core.RegexEscape
   control method "replace" val "\\$&" -> core.RegexEscape
   control method "replace" val "[.\\-+*:]" val "\\\\." -> core.RegexEscape
+  flag code.CatastrophicRegex on any {
+    path "__regex.match"
+  }
   sink receiver "replace" val "+)*m" -> code.RegexMatch
   flag code.CatastrophicRegex on any {
     path "RegExp"

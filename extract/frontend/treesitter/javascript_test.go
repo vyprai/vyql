@@ -495,6 +495,58 @@ function evaluate(tokens, expr, values) {
 	t.Fatalf("function context did not include subscript/regex tokens; nodes=%#v", nodes)
 }
 
+func TestJavaScriptRegexMayBacktrackAmbiguousAdjacentQuantifiers(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want bool
+	}{
+		{
+			name: "ambiguous numeric halves with optional decimal",
+			src:  `const numberRx = /^(?:[0-9]*\.?[0-9]*){1}$/;`,
+			want: true,
+		},
+		{
+			name: "decimal suffix grouped as a single optional branch",
+			src:  `const numberRx = /^(?:[0-9]*(\.[0-9]*)?){1}$/;`,
+			want: false,
+		},
+		{
+			name: "classic nested quantified group",
+			src:  `const nested = /^(a+)+$/;`,
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "regex.js")
+			if err := os.WriteFile(path, []byte(tt.src), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			g, err := lowering.Lower(prog, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodes, err := g.AllNodes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := false
+			for _, n := range nodes {
+				got = got || n.Type == "code.Call" && n.Prop("callee_path") == "__regex.match"
+			}
+			if got != tt.want {
+				t.Fatalf("synthetic regex match = %v, want %v; nodes=%#v", got, tt.want, nodes)
+			}
+		})
+	}
+}
+
 func TestJavaScriptBrowserGlobalAssignmentLambdaParamEntry(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "origin.tsx")
