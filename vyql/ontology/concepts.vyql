@@ -1848,6 +1848,15 @@ concept FlaskEntityDetailMissingAuthorization : sink {
   review_assumption: "callers can directly request the entity-detail route for another user or group"
   review_confidence: high
 }
+concept UnsignedStorageDownloadRoute : sink {
+  vulnerable_to: [access_control.MissingAuthorization, path.PathTraversal, secrets.SecretLeak]
+  cwe: [CWE_22, CWE_862, CWE_200, CWE_552]
+  review_category: "access_control"
+  review_condition: "a wildcard web route downloads framework storage files without an observed route signature or authorization middleware"
+  review_evidence: "storage download route context {pattern} routes a wildcard path parameter into Storage::disk(...)->path(...) and response()->download(...) without signed/auth middleware"
+  review_assumption: "exported or generated storage files can contain sensitive application data and callers can guess or reuse download paths"
+  review_confidence: high
+}
 concept JmxRmiRegistryExposure : sink {
   vulnerable_to: [authentication.MissingAuthentication, injection.CodeInjection]
   cwe: [CWE_306, CWE_94]

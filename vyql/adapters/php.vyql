@@ -70,6 +70,18 @@ adapter php {
     has "server"
     has "1024>$port"
   }
+  flag code.UnsignedStorageDownloadRoute in module {
+    lang "php"
+    call path "Route.get"
+    call path "Route.get.where"
+    call arg "Route.get.where:.*"
+    call path "Storage.disk.path"
+    call path "response.download"
+    call path "response.download.deleteFileAfterSend"
+    literal contains_any ["{path}", "{file}", "{filename}"]
+    not call path "Route.get.middleware"
+    not literal contains_any ["signed", "auth", "can:"]
+  }
   flag code.UnvalidatedNumericSqlInterpolation in class {
     lang "php"
     has "getMessageParam('iid'"

@@ -93,6 +93,12 @@ review code.FlaskEntityDetailMissingAuthorization {
   expected: [core.AuthenticationCheck, core.AuthorizationCheck]
   text: "verify Flask entity-detail JSON routes require authentication and an authorization check before returning user or group metadata"
 }
+review code.UnsignedStorageDownloadRoute {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "verify wildcard storage download routes require signed URLs or authorization middleware before returning framework storage files"
+}
 review code.JmxRmiRegistryExposure {
   category: "auth"
   kind: "attention"

@@ -24,6 +24,11 @@ rule FlaskEntityDetailMissingAuthorization {
   match code.FlaskEntityDetailMissingAuthorization as endpoint
 }
 
+rule UnsignedStorageDownloadRoute {
+  meta { id: "VYQL-AUTH-055", severity: high, cwe: [CWE_22, CWE_862, CWE_200, CWE_552], confidence_floor: high }
+  match code.UnsignedStorageDownloadRoute as route
+}
+
 rule JmxRmiRegistryExposure {
   meta { id: "VYQL-AUTH-013", severity: high, cwe: [CWE_306, CWE_94], confidence_floor: medium }
   match code.JmxRmiRegistryExposure as exposure
