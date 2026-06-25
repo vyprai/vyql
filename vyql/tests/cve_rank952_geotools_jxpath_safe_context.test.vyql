@@ -1,0 +1,62 @@
+# Rank 952 / CVE-2024-36401: GeoTools created JXPath contexts that
+# allowed Java method invocation from XPath expressions.
+
+test "rank952: JXPath context evaluates expressions without disabling Java functions"
+  lang java
+  profile api
+  file XmlXpathUtilites.java
+  expect VYQL-INJ-189
+  expect_review code.UnsafeJXPathContextEvaluation
+  code
+  ```
+  import org.apache.commons.jxpath.JXPathContext;
+  import org.jdom2.Document;
+
+  public class XmlXpathUtilites {
+    public static String getSingleXPathValue(String xpathString, Document doc) {
+      JXPathContext context = JXPathContext.newContext(doc);
+      context.setLenient(true);
+      return (String) context.getValue(xpathString);
+    }
+  }
+  ```
+
+test "rank952: JXPath context factory evaluates expressions without disabling Java functions"
+  lang java
+  profile api
+  file JXPathStreamingParserHandler.java
+  expect VYQL-INJ-189
+  expect_review code.UnsafeJXPathContextEvaluation
+  code
+  ```
+  import java.util.Iterator;
+  import org.apache.commons.jxpath.JXPathContext;
+  import org.apache.commons.jxpath.JXPathContextFactory;
+
+  public class JXPathStreamingParserHandler {
+    protected boolean stream(Object root, String xpath) {
+      JXPathContext context = JXPathContextFactory.newInstance().newContext(null, root);
+      context.setLenient(true);
+      Iterator itr = context.iterate(xpath);
+      return itr.hasNext();
+    }
+  }
+  ```
+
+test "rank952: safe JXPath helper suppresses Java method invocation finding"
+  lang java
+  profile api
+  file XmlXpathUtilites.java
+  reject VYQL-INJ-189
+  reject_review code.UnsafeJXPathContextEvaluation
+  code
+  ```
+  import org.jdom2.Document;
+  import org.geotools.xsd.impl.jxpath.JXPathUtils;
+
+  public class XmlXpathUtilites {
+    public static String getSingleXPathValue(String xpathString, Document doc) {
+      return (String) JXPathUtils.newSafeContext(doc, true).getValue(xpathString);
+    }
+  }
+  ```

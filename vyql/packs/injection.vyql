@@ -235,6 +235,11 @@ rule DynamicFunctionMutableObjectEval {
   match code.DynamicFunctionMutableObjectEval as sink
 }
 
+rule UnsafeJXPathContextEvaluation {
+  meta { id: "VYQL-INJ-189", severity: critical, cwe: [CWE_94, CWE_95], confidence_floor: high }
+  match code.UnsafeJXPathContextEvaluation as sink
+}
+
 rule WerkzeugDebugConsoleExposure {
   meta { id: "VYQL-INJ-057", severity: critical, cwe: [CWE_94, CWE_77], confidence_floor: medium }
   match code.WerkzeugDebugConsoleExposure as sink

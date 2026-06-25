@@ -75,6 +75,15 @@ concept DynamicFunctionMutableObjectEval : sink {
   review_assumption: "attacker-controlled expression text or object properties can influence generated code or mutate the evaluated object"
   review_confidence: high
 }
+concept UnsafeJXPathContextEvaluation : sink {
+  vulnerable_to: [injection.CodeInjection, injection.ExpressionLanguageInjection]
+  cwe: [CWE_94, CWE_95]
+  review_category: "code_execution"
+  review_condition: "JXPath expressions are evaluated with a context that still exposes Java method/function invocation"
+  review_evidence: "JXPath context {pattern} is created and used for getValue/selectNodes/iterate without an empty FunctionLibrary or safe context helper"
+  review_assumption: "the XPath expression can be influenced by service filters, property names, or XML/query inputs"
+  review_confidence: high
+}
 concept WerkzeugDebugConsoleExposure : sink {
   vulnerable_to: [injection.CodeInjection, injection.CommandInjection]
   cwe: [CWE_94, CWE_77]

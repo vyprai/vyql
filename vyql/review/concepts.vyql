@@ -1134,6 +1134,12 @@ review code.IncompleteMassAssignmentIdUnset {
   expected: [core.InputValidation]
   text: "review generic add handlers that unset identifier fields before request normalization rather than from the normalized input"
 }
+review code.UnsafeJXPathContextEvaluation {
+  category: "code_execution"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify JXPath contexts disable Java functions before evaluating externally influenced XPath expressions"
+}
 review code.WerkzeugDebugConsoleExposure {
   category: "code_execution"
   kind: "attention"

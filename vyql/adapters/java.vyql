@@ -1197,6 +1197,12 @@ adapter java {
     not call path "constantTimeEquals"
     not call path "MessageDigest.isEqual"
   }
+  flag code.UnsafeJXPathContextEvaluation in function {
+    call path contains_any ["JXPathContext.newContext", "JXPathContextFactory.newInstance.newContext"]
+    call path contains_any ["getValue", "selectNodes", "iterate"]
+    not call path "JXPathUtils.newSafeContext"
+    not call path "setFunctions"
+  }
 
   // server-side template injection (CWE-1336) — unambiguous engine entrypoints that
   // evaluate a STRING template (not load-by-name): Velocity static evaluate, Pebble
