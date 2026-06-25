@@ -436,6 +436,14 @@ adapter ruby {
     has "ca_file"
     lacks "verify_mode"
   }
+  flag code.CertValidationDisabled in function {
+    lang "ruby"
+    token function_name "create_client_from_token"
+    selector "@opts"
+    field "verify_ssl=OpenSSL::SSL::VERIFY_NONE"
+    call path "detect_version"
+    call path "Kubeclient.Client.new"
+  }
   flag code.InsecurePermission on any {
     path "File.chmod"
     has "0777"
