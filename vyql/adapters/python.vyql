@@ -144,6 +144,12 @@ adapter python {
     has "Config file:"
     lacks "LOG.debug(\"Config file:"
   }
+  flag code.TyperPrettyExceptionLocalsSecretExposure in module {
+    lang "python"
+    call path "typer.Typer"
+    literal contains_any ["GH_TOKEN", "GITHUB_TOKEN", "TOKEN"]
+    not call arg contains "typer.Typer:pretty_exceptions_show_locals=False"
+  }
   flag code.CkanSolrConnectionErrorDisclosure in function {
     name "run"
     has "conn.search(**query)"

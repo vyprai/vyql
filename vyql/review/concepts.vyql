@@ -2211,6 +2211,12 @@ review code.SensitiveConfigInfoLog {
   kind: "attention"
   text: "review configuration object logging above debug level for inline credentials or target resource secrets"
 }
+review code.TyperPrettyExceptionLocalsSecretExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify Typer/Rich pretty exceptions hide local variables when token values are kept in CLI locals"
+}
 review code.RemoteUrlObjectDebugLog {
   category: "secret"
   kind: "target"

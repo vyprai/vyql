@@ -4912,6 +4912,15 @@ concept SensitiveConfigInfoLog : sink {
   review_assumption: "operator configuration files may contain inline credentials or target resource secrets"
   review_confidence: medium
 }
+concept TyperPrettyExceptionLocalsSecretExposure : sink {
+  vulnerable_to: [secrets.SecretLeak, secrets.SensitiveLog]
+  cwe: [CWE_200, CWE_209, CWE_532]
+  review_category: "secret"
+  review_condition: "Typer/Rich pretty exceptions can display local variables while the CLI keeps bearer tokens in locals"
+  review_evidence: "Typer application context {pattern} reads token-like environment variables without pretty_exceptions_show_locals=False"
+  review_assumption: "exceptions may be surfaced in GitHub Actions logs or other CI output where local variables become visible"
+  review_confidence: high
+}
 concept RemoteUrlObjectDebugLog : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_200, CWE_532, CWE_598]
