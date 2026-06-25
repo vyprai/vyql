@@ -101,7 +101,7 @@ func main() {
 func cmdScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
-	format := fs.String("format", "text", "output format: text | sarif | json")
+	format := fs.String("format", "text", "output format: text | sarif | json | graph-json")
 	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
@@ -208,35 +208,48 @@ func profileNames() string {
 }
 
 // scanPaths runs the full pipeline (extract → lower → adapters → compile →
-// evaluate) and returns the findings + a scan summary. Multi-language: each file
-// is routed to its real frontend and the matching framework adapters.
+// evaluate) and returns the findings + a scan summary + the lowered graph. Multi-language:
+// each file is routed to its real frontend and the matching framework adapters.
 func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, usg.Store, error) {
+	all, g, _, stats, err := scanPathsFull(paths, rulesSrc)
+	return all, stats, g, err
+}
+
+// scanPathsFull is scanPaths plus the per-rule meta (keyed by the finding's RuleID), which
+// the graph-json export needs for CWE. Same pipeline — it just retains the rule meta map.
+func scanPathsFull(paths []string, rulesSrc string) ([]*findings.Finding, usg.Store, map[string]map[string]any, scanStats, error) {
 	g, stats, err := buildGraph(paths)
 	if err != nil {
-		return nil, stats, nil, err
+		return nil, nil, nil, stats, err
 	}
 	if g == nil {
-		return nil, stats, nil, nil // recognized files, but nothing to analyze
+		return nil, nil, nil, stats, nil // recognized files, but nothing to analyze
 	}
 	onto := ontology.Seed()
 	decls, err := parser.Parse(rulesSrc)
 	if err != nil {
-		return nil, stats, g, fmt.Errorf("rule parse: %w", err)
+		return nil, nil, nil, stats, fmt.Errorf("rule parse: %w", err)
 	}
 	compiled, cerrs := engine.CompileRules(decls, onto)
 	if len(cerrs) != 0 {
 		for _, e := range cerrs {
 			fmt.Fprintln(os.Stderr, "rule error: "+e.Error())
 		}
-		return nil, stats, g, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
+		return nil, nil, nil, stats, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
 	}
 	eng := engine.New(onto, g)
 	var all []*findings.Finding
+	meta := map[string]map[string]any{}
 	tk := newTimer()
 	for _, cr := range compiled {
+		id, _ := cr.Rule.Meta["id"].(string)
+		if id == "" {
+			id = cr.Rule.QualifiedName()
+		}
+		meta[id] = cr.Rule.Meta
 		got, err := eng.Evaluate(cr)
 		if err != nil {
-			return nil, stats, g, err
+			return nil, nil, nil, stats, err
 		}
 		all = append(all, got...)
 	}
@@ -247,7 +260,7 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 		all = append(all, eng.PossibilityFindings(all)...)
 	}
 	tk.mark("evaluate")
-	return all, stats, g, nil
+	return all, g, meta, stats, nil
 }
 
 func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
@@ -262,46 +275,57 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	if err != nil {
 		return err
 	}
-	// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
-	// changed — no source file edit and no vyql/ data change — replay the cached findings and
-	// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
-	// reparse only the files that actually changed.
-	cache := parsecache.Shared()
-	tk := newTimer()
-	// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force the
-	// full pipeline (skip the whole-scan findings cache) so the collector is populated.
-	syncPath := syncOutputPath()
-	if syncPath != "" {
-		syncCollector = graphsync.New()
-	}
-	var rkey string
 	var all []*findings.Finding
 	var stats scanStats
 	var graph usg.Store
-	hit := false
-	if cache != nil && syncCollector == nil {
-		rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
-		if cs, ok := loadCachedScan(cache, rkey); ok {
-			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
-		}
-	}
-	tk.mark("fingerprint")
-	if !hit {
-		all, stats, graph, err = scanPaths(paths, src)
+	var ruleMeta map[string]map[string]any
+
+	if format == "graph-json" {
+		// graph-json needs the live graph + per-rule meta; the whole-scan findings cache can't
+		// serve those, so always run the full pipeline for it (no cache replay).
+		all, graph, ruleMeta, stats, err = scanPathsFull(paths, src)
 		if err != nil {
 			return err
 		}
+	} else {
+		// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
+		// changed — no source file edit and no vyql/ data change — replay the cached findings and
+		// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
+		// reparse only the files that actually changed.
+		cache := parsecache.Shared()
+		tk := newTimer()
+		// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force
+		// the full pipeline (skip the whole-scan findings cache) so the collector is populated.
+		syncPath := syncOutputPath()
+		if syncPath != "" {
+			syncCollector = graphsync.New()
+		}
+		var rkey string
+		hit := false
 		if cache != nil && syncCollector == nil {
-			storeCachedScan(cache, rkey, all, stats)
+			rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
+			if cs, ok := loadCachedScan(cache, rkey); ok {
+				all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
+			}
 		}
-	}
-	if syncPath != "" {
-		n, e, l, d, serr := writeSyncDelta(syncPath)
-		if serr != nil {
-			return fmt.Errorf("graph sync: %w", serr)
+		tk.mark("fingerprint")
+		if !hit {
+			all, stats, graph, err = scanPaths(paths, src)
+			if err != nil {
+				return err
+			}
+			if cache != nil && syncCollector == nil {
+				storeCachedScan(cache, rkey, all, stats)
+			}
 		}
-		fmt.Fprintf(os.Stderr, "[sync] wrote %s: %d node, %d edge, %d label upserts; %d module tombstones\n",
-			syncPath, n, e, l, d)
+		if syncPath != "" {
+			n, e, l, d, serr := writeSyncDelta(syncPath)
+			if serr != nil {
+				return fmt.Errorf("graph sync: %w", serr)
+			}
+			fmt.Fprintf(os.Stderr, "[sync] wrote %s: %d node, %d edge, %d label upserts; %d module tombstones\n",
+				syncPath, n, e, l, d)
+		}
 	}
 
 	// output
@@ -312,6 +336,19 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		fmt.Println(string(b))
 	case "json":
 		b, _ := json.MarshalIndent(findingsJSON(all), "", "  ")
+		fmt.Println(string(b))
+	case "graph-json":
+		root := ""
+		if len(paths) > 0 {
+			root = paths[0]
+		}
+		var doc gjDocument
+		if graph != nil {
+			doc = buildGraphJSON(graph, all, ruleMeta, root)
+		} else {
+			doc = gjDocument{SchemaVersion: gjSchemaVersion, Tool: gjTool{Name: "VyQL", Version: version}, Concepts: conceptLegend(), CodeMap: gjCodeMap{Root: root}}
+		}
+		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	default:
 		fmt.Printf("analysis profile: %s (%s)\n\n", prof.Title, prof.Name)
@@ -400,7 +437,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json|graph-json -profile -stats -exclude]")
 	fmt.Fprintln(os.Stderr, "  review     list non-finding review targets and supporting checks for AI/manual review   [-format text|json]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")

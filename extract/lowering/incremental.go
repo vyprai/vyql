@@ -292,9 +292,18 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 	}
 	l.importTables[modkey] = tbl
 	for _, f := range d.Funcs {
+		// funcID is deterministic (sigID over ns + qualified name), so recompute it on replay
+		// rather than serializing it — it must match what makeFuncInfo minted, so a re-lowered
+		// body (pass 2) can stamp `func_id` on its nodes (the graph-json node→function map). The
+		// code.Function node itself is replayed from d.Nodes (captured during pass 1).
+		rel := f.Name
+		if f.Cls != "" {
+			rel = f.Cls + "." + f.Name
+		}
 		fi := &funcInfo{
 			paramNames: f.ParamNames, params: f.Params, paramTypes: f.ParamTypes, ret: f.Ret,
-			module: f.Module, cls: f.Cls, name: f.Name, paramEntries: f.ParamEntries,
+			module: f.Module, cls: f.Cls, name: f.Name, funcID: sigID(ns, rel, "func", ""),
+			paramEntries:  f.ParamEntries,
 			resultEntries: f.ResultEntries, abstract: f.Abstract,
 		}
 		l.funcQual[f.Qual] = fi

@@ -28,6 +28,7 @@ type funcInfo struct {
 	module        string
 	cls           string
 	name          string
+	funcID        string // id of this function's code.Function node; stamped as `func_id` on its nodes (graph-json node→function map)
 	paramEntries  []nir.ParamEntry
 	resultEntries []nir.ResultEntry
 	abstract      bool   // an interface/abstract method (empty body) — dispatch to concrete impls
@@ -69,6 +70,7 @@ type lowerer struct {
 	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
 	curClass      string   // "" = none
+	curFunc       string   // id of the code.Function node enclosing the nodes being lowered ("" = top level); stamped as `func_id` (graph-json node→function map)
 	curDecorators []string // syntax annotations/decorators on the enclosing function
 
 	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
@@ -1168,6 +1170,16 @@ func ModuleNS(m nir.Module) string {
 }
 
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
+	if l.curFunc != "" {
+		// stamp the enclosing code.Function id on every body node (the node→function map the
+		// graph-json export keys off). Copy so the caller's props map is never mutated.
+		merged := make(map[string]string, len(props)+1)
+		for k, v := range props {
+			merged[k] = v
+		}
+		merged["func_id"] = l.curFunc
+		props = merged
+	}
 	return l.nodeWithID(l.nid(kind), kind, loc, props)
 }
 
@@ -1353,10 +1365,19 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 	// signature node ids use the per-FILE namespace (curNS), so they are file-local and stable
 	// even when the resolution key (modkey) is shared ("") across files.
 	ns := l.curNS
+	// code.Function node + per-node `func_id` stamp: the node→function map the graph-json
+	// CODE_MAPPER export keys off. The id is name-derived (sigID) — stable, module-namespaced,
+	// and it does NOT consume the body node-id counter (added straight to the store, not via
+	// nodeWithID), so existing node ids/order stay byte-identical (taint-inert; the NIR goldens
+	// dump only Call/Attr, so it is invisible there). Kept SEPARATE from `func` (=function name),
+	// which the function-context analysis and rules read.
+	fid := sigID(ns, rel, "func", "")
+	l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Loc: st.Loc, Region: l.region,
+		Props: map[string]string{"name": rel, "module": modkey, "class": cls}})
 	params := map[string]string{}
 	order := make([]string, 0, len(st.Params))
 	for _, p := range st.Params {
-		props := map[string]string{"name": p, "func": st.Name}
+		props := map[string]string{"name": p, "func": st.Name, "func_id": fid}
 		if typ := st.ParamTypes[p]; typ != "" {
 			props["decl_type"] = typ
 		}
@@ -1371,8 +1392,9 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		paramNames: order,
 		params:     params,
 		paramTypes: st.ParamTypes,
-		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
+		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name, "func_id": fid}),
 		module:     modkey, cls: cls, name: st.Name,
+		funcID:        fid,
 		paramEntries:  st.ParamEntries,
 		resultEntries: st.ResultEntries,
 		// an empty body marks an interface/abstract method: a call typed to it must dispatch
@@ -1384,7 +1406,7 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 	// object-sensitivity for fluent/builder mutators). Languages with an explicit self param
 	// (Python/Go) keep param[0]; this is the C#-style implicit-this case.
 	if cls != "" && (len(order) == 0 || order[0] != l.selfName) {
-		fi.selfNode = l.nodeWithID(sigID(ns, rel, "self", ""), "Param", st.Loc, map[string]string{"name": "this", "func": st.Name})
+		fi.selfNode = l.nodeWithID(sigID(ns, rel, "self", ""), "Param", st.Loc, map[string]string{"name": "this", "func": st.Name, "func_id": fid})
 	}
 	return fi
 }
@@ -1602,8 +1624,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.region = l.curNS + "/fn" + l.nextBranch()
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
+		saveFunc := l.curFunc
+		if info != nil {
+			l.curFunc = info.funcID
+		}
 		l.functionContextAnalysisEvent(st.Loc, st.ContextTokens)
 		l.block(st.Body, inner)
+		l.curFunc = saveFunc
 		l.curDecorators = saveDecorators
 		l.region = saveRegion
 	case nir.Assign:
