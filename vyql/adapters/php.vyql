@@ -82,6 +82,16 @@ adapter php {
     not call path "Route.get.middleware"
     not literal contains_any ["signed", "auth", "can:"]
   }
+  flag code.SessionHashMissingAuthorizationState in function {
+    lang "php"
+    name "authenticate"
+    call path "$this.session.set"
+    call arg "$this.session.set:SESSION_HASH"
+    token subscript "$u['password']"
+    not token subscript "$u['permissions']"
+    not token subscript "$u['homedir']"
+    not token subscript "$u['role']"
+  }
   flag code.UnvalidatedNumericSqlInterpolation in class {
     lang "php"
     has "getMessageParam('iid'"

@@ -1974,6 +1974,15 @@ concept CommandAllowlistBeforeParsing : sink {
   review_assumption: "the parser can reinterpret quoting, escaping, or command boundaries so the executed command differs from the raw split token"
   review_confidence: high
 }
+concept SessionHashMissingAuthorizationState : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization, session.SessionFixation]
+  cwe: [CWE_863, CWE_613]
+  review_category: "auth"
+  review_condition: "session validity hashes omit authorization state that can change while a session remains active"
+  review_evidence: "authentication context {pattern} stores a session hash from the password only while role, home directory, or permissions can be updated separately"
+  review_assumption: "existing sessions are accepted until the stored hash changes, so changing authorization fields should invalidate or rebind the session"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]

@@ -788,6 +788,55 @@ adapter php {
 	}
 }
 
+func TestContextFlagAstSubscriptPredicatesHonorKeys(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter php {
+  flag custom.PasswordOnlySessionHash in function {
+    lang "php"
+    name "authenticate"
+    token subscript "$u['password']"
+    not token subscript "$u['permissions']"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context subscript flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "auth.php:10",
+		Scope: "auth.php/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=php\x00name=authenticate",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "password",
+		Type:  "code.Subscript",
+		Loc:   "auth.php:12",
+		Scope: "auth.php/fn1",
+		Props: map[string]string{"callee_path": "$u.__subscript", "str_args": "password"},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context subscript flag should match password without permissions: %+v", got)
+	}
+	store.AddNode(usg.Node{
+		ID:    "permissions",
+		Type:  "code.Subscript",
+		Loc:   "auth.php:12",
+		Scope: "auth.php/fn1",
+		Props: map[string]string{"callee_path": "$u.__subscript", "str_args": "permissions"},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context subscript flag should reject matching permissions key: %+v", got)
+	}
+}
+
 func TestContextFlagCallArgDoesNotUseCompactTokenFallback(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter php {

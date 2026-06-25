@@ -1635,8 +1635,7 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 			if strings.HasPrefix(v, "subscript:") {
 				prefix = "subscript:"
 			}
-			probe = flagPredicate{Property: "path", Op: pred.Op, Values: normalizeSubscriptFlagValues(trimFlagValuePrefix(pred.Values, prefix)), Exact: pred.Exact}
-			nodeTypes = []string{"code.Subscript"}
+			return true, flagScopeSubscriptHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
 		case strings.HasPrefix(v, "name="), strings.HasPrefix(v, "function_name:"):
 			return false, false
 		default:
@@ -1644,6 +1643,74 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 		}
 	}
 	return true, flagScopeNodeHit(s, probe, n, nodeTypes, tech, crossLang)
+}
+
+func flagScopeSubscriptHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
+	prefix := locFile(n.Prop("loc"))
+	scope := nodeLexicalScope(n)
+	ids, _ := s.NodesOfType("code.Subscript")
+	for _, id := range ids {
+		cand, ok, err := s.GetNode(id)
+		if err != nil || !ok || cand.ID == n.ID {
+			continue
+		}
+		candScope := nodeLexicalScope(cand)
+		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
+			continue
+		}
+		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
+			continue
+		}
+		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
+			continue
+		}
+		if subscriptPredicateMatches(pred.Op, values, cand) {
+			return true
+		}
+	}
+	return false
+}
+
+func subscriptPredicateMatches(op string, values []string, n usg.Node) bool {
+	if len(values) == 0 {
+		return false
+	}
+	all := op != "contains_any" && op != "any"
+	for _, value := range values {
+		base, key := splitSubscriptPredicate(value)
+		hit := false
+		if base != "" && matchSinkPath(n.Prop("callee_path"), base) {
+			hit = key == "" || subscriptKeyMatches(n, key)
+		}
+		if all && !hit {
+			return false
+		}
+		if !all && hit {
+			return true
+		}
+	}
+	return all
+}
+
+func splitSubscriptPredicate(value string) (base, key string) {
+	if i := strings.LastIndex(value, "["); i > 0 && strings.HasSuffix(value, "]") {
+		base = value[:i] + ".__subscript"
+		key = strings.Trim(value[i+1:len(value)-1], `"'`)
+		return base, key
+	}
+	return normalizeSubscriptFlagValues([]string{value})[0], ""
+}
+
+func subscriptKeyMatches(n usg.Node, key string) bool {
+	if key == "" {
+		return true
+	}
+	for _, text := range []string{n.Prop("str_args"), nodeSearchText(n), n.ID} {
+		if valContains(text, key) {
+			return true
+		}
+	}
+	return false
 }
 
 func flagScopeCallArgHit(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) bool {

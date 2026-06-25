@@ -233,6 +233,12 @@ review code.CommandAllowlistBeforeParsing {
   expected: [core.AuthorizationCheck]
   text: "verify command allowlists and execution permission checks run on the canonical parsed command that is later executed"
 }
+review code.SessionHashMissingAuthorizationState {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify session validity hashes include mutable authorization state such as role, permissions, and home directory"
+}
 review code.ShopwareStoreApiManyToManyCriteriaBypass {
   category: "access_control"
   kind: "attention"

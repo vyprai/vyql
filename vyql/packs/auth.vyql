@@ -104,6 +104,11 @@ rule CommandAllowlistBeforeParsing {
   match code.CommandAllowlistBeforeParsing as command
 }
 
+rule SessionHashMissingAuthorizationState {
+  meta { id: "VYQL-AUTH-058", severity: high, cwe: [CWE_863, CWE_613], confidence_floor: high }
+  match code.SessionHashMissingAuthorizationState as session
+}
+
 rule ExpiredCachedAuthTokenReuse {
   meta { id: "VYQL-AUTH-043", severity: medium, cwe: [CWE_613], confidence_floor: high }
   match code.ExpiredCachedAuthTokenReuse as cache
