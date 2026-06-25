@@ -241,11 +241,15 @@ adapter cpp {
     lacks "std::memcpy(jerr_.setjmp_buffer,setjmp_buffer"
     lacks "DIP__DECLARE_JPEG_EXIT"
   }
-  flag code.SecretComparisonReview in function {
-    lang "cpp"
-    name "HTTPAuthorized"
-    has "strUserPass==strRPCUserColonPass"
-    lacks "nResult|="
+  flag code.SecretComparisonReview on binop {
+    op "=="
+    operand {
+      path "DecodeBase64"
+    }
+    operand {
+      identifier contains_any ["pass", "password", "secret", "token", "key", "auth"]
+    }
+    lacks call contains_any ["CRYPTO_memcmp", "timingsafe_bcmp", "constant_time"]
   }
   flag code.CryptoImproperBlinding in function {
     lang "cpp"

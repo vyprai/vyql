@@ -474,14 +474,18 @@ adapter javascript {
   }
   flag code.SecretComparisonReview in function {
     lang "javascript"
-    has "user==username&&pass==password"
-    lacks "timingSafeCompare"
-    lacks "tsscmp"
-  }
-  flag code.SecretComparisonReview in function {
-    lang "javascript"
     call path "secure-compare"
     call path "keys.findIndex"
+  }
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "==="]
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key", "password", "pass", "username", "user"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key", "password", "pass", "username", "user"]
+    }
+    lacks call contains_any ["scmp", "tsscmp", "timingSafeEqual", "safeCompare", "timingSafeCompare"]
   }
   flag code.SecretComparisonReview on binop {
     op any ["==", "==="]

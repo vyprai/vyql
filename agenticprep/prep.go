@@ -1150,20 +1150,30 @@ func invalidSecretComparisonContextMark(m parser.AdapterMapping) bool {
 	if m.Concept != "code.SecretComparisonReview" {
 		return false
 	}
-	scope, vals, _, ok := contextFlagParts(m)
+	scope, vals, nvals, ok := contextFlagParts(m)
 	if !ok || scope != "function" {
 		return false
 	}
 	for _, v := range vals {
 		lv := strings.ToLower(v)
-		if strings.Contains(lv, "==") ||
+		if !structuredFlagTokenValue(v) ||
+			strings.Contains(lv, "==") ||
 			strings.Contains(lv, "!=") ||
 			strings.Contains(lv, ".equals(") ||
 			strings.Contains(lv, "equals(") {
 			return true
 		}
 	}
+	for _, v := range nvals {
+		if !structuredFlagTokenValue(v) {
+			return true
+		}
+	}
 	return false
+}
+
+func structuredFlagTokenValue(v string) bool {
+	return strings.Contains(v, ":") || strings.Contains(v, "=")
 }
 
 func contextFlagParts(m parser.AdapterMapping) (scope string, vals, nvals []string, ok bool) {

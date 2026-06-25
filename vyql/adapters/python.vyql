@@ -517,14 +517,15 @@ adapter python {
     lacks "SES_REGEX_CERT_URL.match(cert_url)"
     lacks "SimpleNotificationService"
   }
-  flag code.SecretComparisonReview in function {
-    name "validate_request"
-    has "self.basic_auth"
-    has "get_request_basic_auth(request)"
-    has "basic_auth not in self.basic_auth"
-    lacks "constant_time_compare"
-    lacks "hmac.compare_digest"
-    lacks "secrets.compare_digest"
+  flag code.SecretComparisonReview on binop {
+    op "not in"
+    operand {
+      path "get_request_basic_auth"
+    }
+    operand {
+      path "basic_auth"
+    }
+    lacks call contains_any ["constant_time_compare", "hmac.compare_digest", "secrets.compare_digest", "compare_digest"]
   }
   flag code.DjangoAttachmentSaveWithoutModelValidation in function {
     name "process_attachments"

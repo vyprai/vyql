@@ -877,6 +877,21 @@ csrf.valid = csrf.validate = function (data, token) {
 	if err := ValidateProposal(profile, brittle, Config{}); err == nil || !strings.Contains(err.Error(), "AST flag form") {
 		t.Fatalf("expected brittle secret-comparison context flag rejection, got %v", err)
 	}
+	rawToken := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
+  flag code.SecretComparisonReview in function {
+    lang "javascript"
+    has "token"
+    lacks "timingSafeEqual"
+  }
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, rawToken, Config{}); err == nil || !strings.Contains(err.Error(), "AST flag form") {
+		t.Fatalf("expected raw secret-comparison context token rejection, got %v", err)
+	}
 }
 
 func TestPrepDoesNotTreatParserTokenEqualsAsSecretComparison(t *testing.T) {
