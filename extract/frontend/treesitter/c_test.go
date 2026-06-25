@@ -512,6 +512,42 @@ void fixed(struct Ctx *ctx) {
 	}
 }
 
+func TestCPPExtractsReallocFailureInputFreeObservation(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "realloc.cpp")
+	src := []byte(`
+static bool CanAlloc(unsigned long size);
+
+static void* OGRExpatRealloc(void *ptr, unsigned long size)
+{
+    if (CanAlloc(size))
+        return realloc(ptr, size);
+
+    free(ptr);
+    return nullptr;
+}
+
+static void* SafeRealloc(void *ptr, unsigned long size)
+{
+    if (CanAlloc(size))
+        return realloc(ptr, size);
+
+    return nullptr;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractCPP([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cModuleHasAnalysisCall(prog.Modules[0].Body, "analysis.lifetime.realloc_failure_input_free") {
+		t.Fatalf("realloc failure input free observation missing: %#v", prog.Modules[0].Body)
+	}
+}
+
 func hasCFuncCall(stmts []nir.Stmt, funcName, method string) bool {
 	for _, st := range stmts {
 		fn, ok := st.(nir.FuncDef)
@@ -552,6 +588,20 @@ func cModuleContextTokens(stmts []nir.Stmt) string {
 		}
 	}
 	return ""
+}
+
+func cModuleHasAnalysisCall(stmts []nir.Stmt, path string) bool {
+	for _, st := range stmts {
+		expr, ok := st.(nir.ExprStmt)
+		if !ok {
+			continue
+		}
+		call, ok := expr.Value.(nir.Call)
+		if ok && call.Path == path {
+			return true
+		}
+	}
+	return false
 }
 
 func cFuncHasAnalysisToken(stmts []nir.Stmt, funcName, path, token string) bool {
