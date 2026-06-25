@@ -1,0 +1,34 @@
+test "rank830 felix webconsole: HTML escaping request filter is unsafe for JavaScript template string"
+  lang java
+  expect VYQL-INJ-171
+  expect_review code.JavaScriptTemplateHtmlEscapeMismatch
+  code
+  ```
+  import jakarta.servlet.http.HttpServletRequest;
+  import org.apache.felix.webconsole.servlet.RequestVariableResolver;
+  import org.owasp.encoder.Encode;
+
+  class ServicesServlet {
+      void renderContent(HttpServletRequest request, RequestVariableResolver vars) {
+          final String filter = request.getParameter("filter");
+          vars.put("filter", filter == null ? "" : Encode.forHtmlContent(filter));
+      }
+  }
+  ```
+
+test "rank830 felix webconsole: JavaScript escaping request filter is safe for JavaScript template string"
+  lang java
+  reject VYQL-INJ-171
+  code
+  ```
+  import jakarta.servlet.http.HttpServletRequest;
+  import org.apache.felix.webconsole.servlet.RequestVariableResolver;
+  import org.owasp.encoder.Encode;
+
+  class ServicesServlet {
+      void renderContent(HttpServletRequest request, RequestVariableResolver vars) {
+          final String filter = request.getParameter("filter");
+          vars.put("filter", filter == null ? "" : Encode.forJavaScript(filter));
+      }
+  }
+  ```

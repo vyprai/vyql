@@ -293,6 +293,13 @@ adapter java {
     not call "getProtocol"
     lacks "&quot;"
   }
+  flag code.JavaScriptTemplateHtmlEscapeMismatch in function {
+    function "renderContent"
+    call path "request.getParameter"
+    call path "vars.put"
+    call path "Encode.forHtmlContent"
+    not call path "Encode.forJavaScript"
+  }
   flag code.JenkinsProjectDisplayNameXss in function {
     function "getName"
     call path "project.getFullDisplayName"

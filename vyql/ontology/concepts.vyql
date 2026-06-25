@@ -3632,6 +3632,15 @@ concept JavaScriptUrlRedirectXss : sink {
   review_assumption: "a victim can be induced to visit the login or redirect URL and complete the action that triggers navigation"
   review_confidence: high
 }
+concept JavaScriptTemplateHtmlEscapeMismatch : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79, CWE_116]
+  review_category: "xss"
+  review_condition: "request-derived template variables are HTML-escaped but rendered inside a JavaScript string context"
+  review_evidence: "template variable context {pattern} reads a request parameter and stores it through an HTML-content encoder before a server-side template renders it as JavaScript string data"
+  review_assumption: "the receiving template substitutes the variable into an inline script or JavaScript string literal"
+  review_confidence: high
+}
 concept AjaxBackslashProtocolRelativeUrlXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

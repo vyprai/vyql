@@ -250,6 +250,11 @@ rule Xss {
   unless guarded_by core.SafeResponseContentType
 }
 
+rule JavaScriptTemplateHtmlEscapeMismatch {
+  meta { id: "VYQL-INJ-171", severity: high, cwe: [CWE_79, CWE_116], confidence_floor: high }
+  match code.JavaScriptTemplateHtmlEscapeMismatch as sink
+}
+
 rule UnsafeEmbeddableAllowlist {
   meta { id: "VYQL-INJ-020", severity: high, cwe: [CWE_79] }
   match code.UnsafeEmbeddableAllowlist as sink
