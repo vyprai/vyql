@@ -761,6 +761,16 @@ adapter go {
     not call "len"
     not call path "c.Query"
   }
+  flag code.UnboundedDelimiterSplitCount in function {
+    lang "go"
+    call path "strings.Split"
+    literal "."
+    call path "len"
+    index "parts:1"
+    call path "base64.RawURLEncoding.DecodeString"
+    not call path "strings.Count"
+    not call path "strings.SplitN"
+  }
   flag code.NilMapMergeWritePanic in function {
     lang "go"
     selector "options.Helm.Values"
