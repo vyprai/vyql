@@ -755,6 +755,12 @@ adapter javascript {
     call arg contains_any ["utils.run:gitclone", "utils.run:git clone", "run:gitclone", "run:git clone"]
     not call path contains_any ["runWithSpawn", "spawn", "execFile"]
   }
+  flag code.CommandOptionInjection in function {
+    name "clone"
+    call path "?.gitExec"
+    literal contains_any ["clone${repository}", "clone${remote}", "clone${url}"]
+    not literal contains_any ["--${repository}", "--${remote}", "--${url}"]
+  }
   flag code.GitDirShellCommandStringExecution in class {
     lang "javascript"
     call path "child_process.exec"

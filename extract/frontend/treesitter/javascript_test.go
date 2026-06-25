@@ -579,6 +579,75 @@ async function clone(remoteUrl, tmpDir) {
 	t.Fatalf("template format did not carry static command text")
 }
 
+func TestJavaScriptGitCloneContextTokensShowEndOfOptionsDelimiter(t *testing.T) {
+	dir := t.TempDir()
+	vulnerable := filepath.Join(dir, "vulnerable.ts")
+	fixed := filepath.Join(dir, "fixed.ts")
+	vulnerableSrc := []byte(`
+export class Git {
+  protected gitExec(cmd: string): Promise<string> {
+    return Promise.resolve(cmd);
+  }
+
+  public clone(repository: string, dest: string, options?: { depth?: number }) {
+    const opt = options || { depth: Infinity };
+    const depthOption = opt.depth !== Infinity ? ` + "` --depth=${opt.depth}`" + ` : '';
+    return this.gitExec(` + "`clone ${repository} ${dest}${depthOption}`" + `);
+  }
+}
+`)
+	fixedSrc := []byte(`
+export class Git {
+  protected gitExec(cmd: string): Promise<string> {
+    return Promise.resolve(cmd);
+  }
+
+  public clone(repository: string, dest: string, options?: { depth?: number }) {
+    const opt = options || { depth: Infinity };
+    const depthOption = opt.depth !== Infinity ? ` + "`--depth=${opt.depth}`" + ` : '';
+    return this.gitExec(` + "`clone ${depthOption} -- ${repository} ${dest}`" + `);
+  }
+}
+`)
+	if err := os.WriteFile(vulnerable, vulnerableSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, fixedSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{vulnerable, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVulnerable, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		switch {
+		case strings.Contains(n.Prop("loc"), "vulnerable.ts") &&
+			strings.Contains(tokens, "literal:clone${repository}${dest}${depthOption}") &&
+			!strings.Contains(tokens, "--${repository}"):
+			sawVulnerable = true
+		case strings.Contains(n.Prop("loc"), "fixed.ts") &&
+			strings.Contains(tokens, "literal:clone${depthOption}--${repository}${dest}"):
+			sawFixed = true
+		}
+	}
+	if !sawVulnerable || !sawFixed {
+		t.Fatalf("git clone context tokens did not distinguish delimiter: vulnerable=%v fixed=%v nodes=%#v", sawVulnerable, sawFixed, nodes)
+	}
+}
+
 func TestJavaScriptRegexMayBacktrackAmbiguousAdjacentQuantifiers(t *testing.T) {
 	tests := []struct {
 		name string
