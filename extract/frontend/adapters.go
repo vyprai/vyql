@@ -1943,6 +1943,7 @@ func callArgContextTokensScoped(s usg.Store, n usg.Node, tech string, crossLang 
 			add(part)
 		}
 		add(node.Prop("name"))
+		add(node.Prop("path"))
 		add(node.ID)
 	}
 	argIDs, _ := s.NodesOfType("code.Arg")
@@ -1952,7 +1953,7 @@ func callArgContextTokensScoped(s usg.Store, n usg.Node, tech string, crossLang 
 			continue
 		}
 		addNode(arg)
-		for _, nodeType := range []string{"code.Format", "code.Const", "code.Name", "code.Attr", "code.Seq"} {
+		for _, nodeType := range []string{"code.Format", "code.Const", "code.Name", "code.Attr", "code.Seq", "code.Call"} {
 			ids, _ := s.NodesOfType(nodeType)
 			for _, srcID := range ids {
 				src, ok, err := s.GetNode(srcID)

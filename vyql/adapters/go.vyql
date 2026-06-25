@@ -97,6 +97,24 @@ adapter go {
     selector contains ".Body"
     selector contains ".TLS"
   }
+  flag code.BulkEmailRecipientDisclosure in function {
+    call path contains_any ["SendIssueCommentMail", "SendIssueMentionMail", "SendMail", "SendEmail", "SendNotification", "SendNotificationMail", "SendNotificationEmail"]
+    call path "append"
+    selector contains ".Email"
+    call arg contains_any [
+      "SendIssueCommentMail:tos",
+      "SendIssueMentionMail:getUserEmailsByNames",
+      "SendMail:tos",
+      "SendMail:recipients",
+      "SendEmail:recipients",
+      "SendEmail:emails",
+      "SendNotification:recipients",
+      "SendNotificationMail:recipients",
+      "SendNotificationEmail:recipients"
+    ]
+    not call arg contains "__object_literal"
+    not call path contains_any ["Bcc", "BlindCopy"]
+  }
   flag code.UnescapedMysqlDsnDatabaseName in function {
     lang "go"
     call path "sql.NewParserFromAlterStatement"

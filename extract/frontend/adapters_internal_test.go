@@ -1040,6 +1040,88 @@ adapter javascript {
 	}
 }
 
+func TestContextFlagAstScopedCallArgPredicatesInspectNestedCallArguments(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter go {
+  flag custom.BulkMailRecipients in function {
+    call path "SendMail"
+    call arg contains "SendMail:getUserEmailsByNames"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context nested call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "mail.go:1", Scope: "mail.go/fn1", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+	}})
+	store.AddNode(usg.Node{ID: "send", Type: "code.Call", Loc: "mail.go:20", Scope: "mail.go/fn1", Props: map[string]string{
+		"callee_path": "SendMail",
+		"method":      "SendMail",
+	}})
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Loc: "mail.go:20", Scope: "mail.go/fn1"})
+	store.AddNode(usg.Node{ID: "lookup", Type: "code.Call", Loc: "mail.go:20", Scope: "mail.go/fn1", Props: map[string]string{
+		"callee_path": "getUserEmailsByNames",
+		"method":      "getUserEmailsByNames",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "lookup", Dst: "arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "send"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST call-arg flag did not inspect nested call argument: %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedCallArgPredicatesInspectNamePath(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter go {
+  flag custom.BulkMailRecipients in function {
+    call path "SendMail"
+    call arg "SendMail:tos"
+    not call arg "SendMail:__object_literal"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "issue_mail.go:1", Scope: "issue_mail.go/fn1", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+	}})
+	store.AddNode(usg.Node{ID: "send", Type: "code.Call", Loc: "issue_mail.go:20", Scope: "issue_mail.go/fn1", Props: map[string]string{
+		"callee_path": "SendMail",
+		"method":      "SendMail",
+	}})
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Loc: "issue_mail.go:20", Scope: "issue_mail.go/fn1"})
+	store.AddNode(usg.Node{ID: "tos", Type: "code.Name", Loc: "issue_mail.go:20", Scope: "issue_mail.go/fn1", Props: map[string]string{
+		"path": "tos",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "tos", Dst: "arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "send"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST call-arg flag did not inspect Go name path: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Loc: "issue_mail.go:24", Scope: "issue_mail.go/fn1/loop2", Props: map[string]string{
+		"callee_path": "SendMail",
+		"method":      "SendMail",
+	}})
+	store.AddNode(usg.Node{ID: "fixedArg", Type: "code.Arg", Loc: "issue_mail.go:24", Scope: "issue_mail.go/fn1/loop2"})
+	store.AddNode(usg.Node{ID: "single", Type: "code.Seq", Loc: "issue_mail.go:24", Scope: "issue_mail.go/fn1/loop2", Props: map[string]string{
+		"path": "__object_literal",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "single", Dst: "fixedArg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixedArg", Dst: "fixed"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context AST call-arg flag should honor object-literal exclusion: %+v", got)
+	}
+}
+
 func TestDirectFlagCallArgPredicatesUseCallArguments(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter python {

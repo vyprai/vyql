@@ -2283,6 +2283,12 @@ review code.SensitiveTempFileDefaultPermission {
   expected: [core.SecretRedaction, core.PathAccessCheck]
   text: "create credential or private-key temporary files with owner-only permissions before writing secret material"
 }
+review code.BulkEmailRecipientDisclosure {
+  category: "privacy"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "send notification emails per recipient or through blind-copy semantics so recipient addresses are not disclosed to other recipients"
+}
 review code.KubernetesTemplateSecretLookupExposure {
   category: "secret"
   kind: "attention"

@@ -5012,6 +5012,15 @@ concept SensitiveTempFileDefaultPermission : sink {
   review_assumption: "the temporary directory may be shared with local users while the helper file exists"
   review_confidence: high
 }
+concept BulkEmailRecipientDisclosure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200]
+  review_category: "privacy"
+  review_condition: "notification email is sent once with a collected multi-recipient address list"
+  review_evidence: "mail recipient context {pattern} collects user Email fields and passes the recipient slice to a mail sender instead of a one-recipient send or blind-copy path"
+  review_assumption: "the mail sender exposes recipient addresses in visible To or Cc headers to every recipient"
+  review_confidence: high
+}
 concept KubernetesCurlAuthorizationHeaderLogLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]
