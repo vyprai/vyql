@@ -805,7 +805,7 @@ adapter javascript {
     not call contains_any ["stringify", "JSON.stringify"]
   }
   sink path "globalEval" -> code.CodeEval
-  sink path "require" -> code.DynamicCodeLoad
+  sink exact "require" -> code.DynamicCodeLoad
   sink path "import" -> code.DynamicCodeLoad
   sink path "pdfjs.getDocument" -> code.PdfJsDocumentLoad
   // vm2-style bridge boundary: applying a host function with sandbox-provided args
@@ -1138,6 +1138,7 @@ adapter javascript {
   control "validateHost" -> core.CommandArgumentValidation
   control "validator.isFQDN" -> core.CommandArgumentValidation
   control "net.isIP" -> core.CommandArgumentValidation
+  control "analysis.javascript.command_argument_regex_guard" -> core.CommandArgumentValidation
 
   // ── UNSOUND neutralizers (`assume`) ───────────────────────────────────────────────
   // These MIGHT defuse the threat but cannot be proven to, so they NEVER suppress a flow.

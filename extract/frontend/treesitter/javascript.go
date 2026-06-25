@@ -1002,10 +1002,22 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// separate Then/Else branches so the join-merge keeps a value tainted on the live
 		// path even when the other arm overwrites it, and a constant condition prunes.
 		var cond nir.Expr
-		if cn := field(n, "condition"); cn != nil {
+		cn := field(n, "condition")
+		if cn != nil {
 			cond = c.expr(cn)
 		}
-		return []nir.Stmt{nir.If{Cond: cond, Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
+		thenBody := c.branchBody(field(n, "consequence"))
+		out := make([]nir.Stmt, 0, 2)
+		if jsRejectingCommandRegexGuard(c, cn) && jsBranchReturns(thenBody) {
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "analysis.javascript.command_argument_regex_guard", Loc: L},
+				Path:   "analysis.javascript.command_argument_regex_guard",
+				Method: "command_argument_regex_guard",
+				Loc:    L,
+			}})
+		}
+		out = append(out, nir.If{Cond: cond, Then: thenBody, Else: c.branchBody(field(n, "alternative"))})
+		return out
 	case "while_statement", "for_statement":
 		var cond nir.Expr
 		body := c.collectStatementBlocks(n)
@@ -1081,6 +1093,72 @@ func (c *jsConv) jsAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) 
 		return "", nil, false
 	}
 	return c.text(left), c.expr(right), true
+}
+
+func jsBranchReturns(stmts []nir.Stmt) bool {
+	for _, st := range stmts {
+		switch v := st.(type) {
+		case nir.Return:
+			return true
+		case nir.Block:
+			if jsBranchReturns(v.Stmts) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func jsRejectingCommandRegexGuard(c *jsConv, n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	if n.Kind() == "parenthesized_expression" {
+		kids := namedChildren(n)
+		if len(kids) == 1 {
+			return jsRejectingCommandRegexGuard(c, kids[0])
+		}
+	}
+	if n.Kind() == "binary_expression" {
+		text := c.text(field(n, "operator"))
+		if text == "||" || text == "&&" {
+			return jsRejectingCommandRegexGuard(c, field(n, "left")) ||
+				jsRejectingCommandRegexGuard(c, field(n, "right"))
+		}
+	}
+	if n.Kind() != "call_expression" {
+		return false
+	}
+	fn := field(n, "function")
+	if fn == nil || fn.Kind() != "member_expression" || c.text(field(fn, "property")) != "test" {
+		return false
+	}
+	if args := field(n, "arguments"); args == nil || len(namedChildren(args)) == 0 {
+		return false
+	}
+	return safeJSCommandRejectRegex(c.text(field(fn, "object")))
+}
+
+func safeJSCommandRejectRegex(lit string) bool {
+	inner := jsRegexPattern(lit)
+	if inner == "" {
+		return false
+	}
+	start := strings.Index(inner, "[")
+	end := strings.LastIndex(inner, "]")
+	if start < 0 || end <= start+1 {
+		return false
+	}
+	body := inner[start+1 : end]
+	if strings.HasPrefix(body, "^") {
+		return false
+	}
+	for _, required := range []rune{'`', '$', '&', ';', '|'} {
+		if !strings.ContainsRune(body, required) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []nir.Stmt {

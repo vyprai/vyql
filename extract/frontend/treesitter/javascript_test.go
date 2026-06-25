@@ -38,6 +38,56 @@ export abstract class AssetGroup {
 	}
 }
 
+func TestJavaScriptCommandRegexRejectGuardObservation(t *testing.T) {
+	dir := t.TempDir()
+	guarded := filepath.Join(dir, "guarded.js")
+	unguarded := filepath.Join(dir, "unguarded.js")
+	if err := os.WriteFile(guarded, []byte("module.exports = function (packageName, registry = '') {\n"+
+		"  if (/[`$&{}[;|]/g.test(packageName) || /[`$&{}[;|]/g.test(registry)) {\n"+
+		"    return null;\n"+
+		"  }\n"+
+		"  return require('child_process').execSync(`npm view ${packageName} --registry ${registry}`);\n"+
+		"};\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(unguarded, []byte("module.exports = function (packageName) {\n"+
+		"  if (/[`$&{}[;|]/g.test(packageName)) {\n"+
+		"    console.warn('bad package name');\n"+
+		"  }\n"+
+		"  return require('child_process').execSync(`npm view ${packageName}`);\n"+
+		"};\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{guarded, unguarded}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := graph.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seenGuarded := false
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.javascript.command_argument_regex_guard" {
+			continue
+		}
+		if strings.Contains(n.Prop("loc"), "unguarded.js") {
+			t.Fatalf("non-terminating regex check emitted command guard at %s", n.Prop("loc"))
+		}
+		if strings.Contains(n.Prop("loc"), "guarded.js") {
+			seenGuarded = true
+		}
+	}
+	if !seenGuarded {
+		t.Fatalf("terminating command regex reject guard was not emitted; nodes=%#v", nodes)
+	}
+}
+
 func TestTypeScriptObjectGeneratorMethodsAreExtracted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "login.ts")
