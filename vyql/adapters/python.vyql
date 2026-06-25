@@ -849,11 +849,11 @@ adapter python {
   sink path "lxml.objectify.parse" -> code.XmlParse
   flag code.XmlParserCreate on any {
     path "etree.XMLParser"
-    not prop "str_args" contains_any ["resolve_entities=False", "no_network=True"]
+    not call arg contains_any ["etree.XMLParser:resolve_entities=False", "etree.XMLParser:no_network=True"]
   }
   flag code.XmlParserCreate on any {
     path "lxml.etree.XMLParser"
-    not prop "str_args" contains_any ["resolve_entities=False", "no_network=True"]
+    not call arg contains_any ["lxml.etree.XMLParser:resolve_entities=False", "lxml.etree.XMLParser:no_network=True"]
   }
   flag code.XmlParserCreate on any { path "objectify.parse" }
   flag code.XmlParserCreate on any { path "lxml.objectify.parse" }
