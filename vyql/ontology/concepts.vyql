@@ -5003,6 +5003,15 @@ concept VerboseHttpErrorObjectDisclosure : sink {
   review_assumption: "returned errors may be logged or shown to callers and outbound request objects can contain authorization headers, tokens, cookies, or TLS peer details"
   review_confidence: high
 }
+concept SensitiveTempFileDefaultPermission : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.InsecurePermission]
+  cwe: [CWE_200, CWE_522, CWE_732]
+  review_category: "secret"
+  review_condition: "credential or private-key helper material is written to a temporary file without owner-only permissions"
+  review_evidence: "sensitive temp-file context {pattern} creates a default-permission temporary file and writes private key, passphrase, or password material before an observed owner-only permission setting"
+  review_assumption: "the temporary directory may be shared with local users while the helper file exists"
+  review_confidence: high
+}
 concept KubernetesCurlAuthorizationHeaderLogLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]

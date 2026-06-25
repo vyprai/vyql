@@ -2277,6 +2277,12 @@ review code.VerboseHttpErrorObjectDisclosure {
   expected: [core.SecretRedaction]
   text: "review HTTP error messages for verbose request, response-body, or TLS object formatting before the error can reach logs or callers"
 }
+review code.SensitiveTempFileDefaultPermission {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction, core.PathAccessCheck]
+  text: "create credential or private-key temporary files with owner-only permissions before writing secret material"
+}
 review code.KubernetesTemplateSecretLookupExposure {
   category: "secret"
   kind: "attention"

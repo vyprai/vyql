@@ -1052,6 +1052,12 @@ adapter java {
     not call path "setWritable"
     not call path "Files.setPosixFilePermissions"
   }
+  flag code.SensitiveTempFileDefaultPermission in function {
+    call path "File.createTempFile"
+    call path contains_any ["java.io.PrintWriter", "PrintWriter"]
+    call path contains_any ["Secret.toString", "getPrivateKeys"]
+    not call path contains_any ["Files.createTempFile", "setReadable", "setWritable", "Files.setPosixFilePermissions", "PosixFilePermissions.asFileAttribute"]
+  }
   flag code.InsecureTempFile on any {
     path "Files.createFile"
     has "/tmp/"
