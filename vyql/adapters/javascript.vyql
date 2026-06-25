@@ -756,7 +756,6 @@ adapter javascript {
     not call path contains_any ["runWithSpawn", "spawn", "execFile"]
   }
   flag code.CommandStringWrapperExecution in function {
-    name contains_any ["executeGit", "runGit", "git"]
     call path contains_any ["child_process.execSync", "execSync"]
     token identifier contains_any ["command", "cmd"]
     not call path contains_any ["execFile", "execFileSync", "spawn", "spawnSync"]
