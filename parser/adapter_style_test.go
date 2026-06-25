@@ -225,6 +225,83 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 	}
 }
 
+func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	adapterRoot := filepath.Join(root, "vyql", "adapters")
+
+	var hits []string
+	err := filepath.WalkDir(adapterRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".vyql" {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		decls, err := Parse(string(data))
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		for _, decl := range decls {
+			ad, ok := decl.(*AdapterDecl)
+			if !ok {
+				continue
+			}
+			for _, mapping := range ad.Mappings {
+				if mapping.Flag == nil || !flagHasFlowPredicate(mapping.Flag) {
+					continue
+				}
+				for _, pred := range mapping.Flag.Predicates {
+					if pred.Property != "tokens" {
+						continue
+					}
+					for _, value := range pred.Values {
+						if !isStructuredFlagToken(value) {
+							hits = append(hits, rel+": flow-aware flag "+mapping.Concept+" uses raw token predicate "+strconv.Quote(value))
+						}
+					}
+				}
+				for _, operand := range mapping.Flag.Operands {
+					for _, pred := range operand.Predicates {
+						if pred.Property != "tokens" {
+							continue
+						}
+						for _, value := range pred.Values {
+							if !isStructuredFlagToken(value) {
+								hits = append(hits, rel+": flow-aware flag "+mapping.Concept+" uses raw operand token predicate "+strconv.Quote(value))
+							}
+						}
+					}
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) > 0 {
+		t.Fatalf("flow-aware flags must use AST/structured predicates around `flows to`, not raw has/lacks text:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func flagHasFlowPredicate(flag *AdapterFlag) bool {
+	for _, pred := range flag.Predicates {
+		if pred.Subject == "flow_to" {
+			return true
+		}
+	}
+	return false
+}
+
 func isStructuredFlagToken(value string) bool {
 	return strings.Contains(value, ":") || strings.Contains(value, "=")
 }
