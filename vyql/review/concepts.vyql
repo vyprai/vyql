@@ -2354,6 +2354,12 @@ review code.CsvFormulaProneExportRow {
   expected: [core.CsvEscape]
   text: "review CSV/export row construction from object fields and ensure formula-prone cells are escaped before export"
 }
+review code.ExportDefaultPublicFilesystemDisk {
+  category: "secret"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review export filesystem disk selection and remap public default disks to a private disk unless public export storage is explicit"
+}
 review code.UnderwidthFormattedIndex {
   category: "numeric"
   kind: "attention"

@@ -4222,6 +4222,15 @@ concept SniffCsvExternalAccessBypass : sink {
   review_assumption: "callers can invoke the sniffing function with filesystem paths while external access is expected to be disabled"
   review_confidence: high
 }
+concept ExportDefaultPublicFilesystemDisk : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_1188, CWE_552]
+  review_category: "secret"
+  review_condition: "export storage helpers inherit the default filesystem disk without remapping a public default to a private disk"
+  review_evidence: "export filesystem context {pattern} returns the default filesystem disk configuration without a public-disk fallback guard"
+  review_assumption: "exported files can contain sensitive application data and the framework default disk may be public in development-derived deployments"
+  review_confidence: high
+}
 concept ExternalLinkReferrerLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_200, CWE_598]

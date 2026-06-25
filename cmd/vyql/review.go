@@ -182,14 +182,14 @@ func collectReviewItems(g usg.Store) []reviewItem {
 
 func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConceptInfo) []reviewItem {
 	if g == nil {
-		return nil
+		return []reviewItem{}
 	}
 	nodes, _ := g.AllNodes()
 	byID := map[string]usg.Node{}
 	for _, n := range nodes {
 		byID[n.ID] = n
 	}
-	var out []reviewItem
+	out := []reviewItem{}
 	seen := map[string]bool{}
 	for _, n := range nodes {
 		labels, _ := g.Labels(n.ID)

@@ -1392,6 +1392,14 @@ adapter php {
     lacks "escapeCsvRecord"
     lacks "esc_csv"
   }
+  flag code.ExportDefaultPublicFilesystemDisk in function {
+    lang "php"
+    name "getFileDisk"
+    call path "config"
+    literal "filament.default_filesystem_disk"
+    not literal "local"
+    not call path "array_key_exists"
+  }
   control method "purify" -> core.HtmlEscape
   control "escapeshellarg" -> core.ShellEscape
   control "escapeshellcmd" -> core.ShellEscape

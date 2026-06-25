@@ -29,6 +29,11 @@ rule DefaultPermissiveCorsConfig {
   match code.DefaultPermissiveCorsConfig as c
 }
 
+rule ExportDefaultPublicFilesystemDisk {
+  meta { id: "VYQL-CFG-021", severity: medium, cwe: [CWE_1188, CWE_552], confidence_floor: high }
+  match code.ExportDefaultPublicFilesystemDisk as c
+}
+
 // TLS certificate validation disabled — verify=False / rejectUnauthorized:false /
 // InsecureSkipVerify:true (CWE-295), named-value presence.
 rule CertValidationDisabled {
