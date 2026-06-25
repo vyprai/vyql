@@ -101,6 +101,7 @@ func TestCFunctionContextIncludesStructuredTokens(t *testing.T) {
 	src := []byte(`
 static void merge_param(HashTable *params, zval *zdata) {
   zval **ptr, **test_ptr;
+  uint8_t *tmp = pos;
   php_http_array_hashkey_t hkey;
   if (Z_TYPE_PP(test_ptr) == IS_ARRAY) {
     if (SUCCESS == zend_hash_find(Z_ARRVAL_PP(ptr), hkey.str, hkey.len, (void *) &ptr)) {
@@ -136,6 +137,7 @@ static void merge_param(HashTable *params, zval *zdata) {
 			"selector:secret.Data",
 			"index:secret.Data[]",
 			"index_key:keyName",
+			"assign:tmp=pos",
 			"assign:secret.Data[]=value",
 		} {
 			if !strings.Contains(tokens, want) {

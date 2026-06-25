@@ -264,6 +264,12 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			if left != "" && right != "" {
 				add("assign:" + left + "=" + right)
 			}
+		case "init_declarator":
+			left := c.declName(field(n, "declarator"))
+			right := atom(field(n, "value"))
+			if left != "" && right != "" {
+				add("assign:" + left + "=" + right)
+			}
 		case "binary_expression":
 			if expr := compactCExprText(c.text(n)); expr != "" {
 				add("binary:" + expr)

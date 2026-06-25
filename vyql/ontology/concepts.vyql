@@ -2499,6 +2499,15 @@ concept BufReadDiscardLoopWithoutEofGuard : sink {
   review_assumption: "the input can end before the requested discard length, making fill_buf return an empty buffer while the loop condition remains true"
   review_confidence: high
 }
+concept NumericParserMissingProgressCheck : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_835]
+  review_category: "resource"
+  review_condition: "a numeric parser can retry parsing without verifying that the parse cursor advanced"
+  review_evidence: "numeric parser context {pattern} calls integer and floating-point parsers and checks numeral-class continuation without a tmp == pos progress guard"
+  review_assumption: "malformed numeric input can leave the parse cursor unchanged and cause repeated parser work or an infinite loop"
+  review_confidence: high
+}
 concept BlockingReadInAcceptLoop : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_667]

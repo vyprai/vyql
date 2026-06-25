@@ -143,3 +143,8 @@ rule BufReadDiscardLoopWithoutEofGuard {
   meta { id: "VYQL-DOS-028", severity: high, cwe: [CWE_400, CWE_835], confidence_floor: high }
   match code.BufReadDiscardLoopWithoutEofGuard as discard
 }
+
+rule NumericParserMissingProgressCheck {
+  meta { id: "VYQL-DOS-029", severity: high, cwe: [CWE_400, CWE_835], confidence_floor: high }
+  match code.NumericParserMissingProgressCheck as parser
+}

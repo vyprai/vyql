@@ -210,6 +210,14 @@ adapter c {
     binary "Z_TYPE_PP(test_ptr)==IS_ARRAY"
     not binary "Z_TYPE_PP(test_ptr)==IS_ARRAY&&Z_TYPE_PP(ptr)==IS_ARRAY"
   }
+  flag code.NumericParserMissingProgressCheck in function {
+    lang "c"
+    has "fio_atol((char**)&tmp)"
+    has "fio_atof((char**)&tmp)"
+    has "JSON_NUMERAL[*tmp]"
+    has "tmp=pos"
+    lacks "tmp==pos"
+  }
   flag code.UnderallocatedFormattedAddressList in function {
     lang "c"
     name "option_to_env"
