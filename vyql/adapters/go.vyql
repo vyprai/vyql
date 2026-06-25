@@ -79,6 +79,16 @@ adapter go {
     has "PCRs:[]int{0,1,2,3,4,6,7,8,9,13}"
     lacks "AlgSHA256"
   }
+  flag code.ShareInfoDirectDownloadTokenExposure in function {
+    lang "go"
+    function "shareInfoHandler"
+    call path "store.Share.GetByHash"
+    selector "commonShare.DownloadURL"
+    selector "shareLink.Token"
+    call arg "getShareURL:true"
+    call arg "getShareURL:shareLink.Token"
+    call path "renderJSON"
+  }
 
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution

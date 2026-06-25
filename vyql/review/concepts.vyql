@@ -221,6 +221,12 @@ review code.JenkinsRemoteValidationMissingPermission {
   expected: [core.AuthorizationCheck]
   text: "review Jenkins remote form-validation endpoints for Overall/Administer permission checks before connecting to supplied services"
 }
+review code.ShareInfoDirectDownloadTokenExposure {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "verify public share-info responses do not include tokenized direct-download URLs before the share password or access challenge"
+}
 review code.ShopwareStoreApiManyToManyCriteriaBypass {
   category: "access_control"
   kind: "attention"
@@ -1288,6 +1294,12 @@ review code.LengthDerivedAllocation {
   category: "resource"
   kind: "attention"
   text: "review length-derived allocation for a dominating remaining-buffer or maximum-size check"
+}
+review code.FixedChunkCapacityGrowthIndex {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review fixed-chunk capacity growth to ensure the allocation is sized at least to the requested index before indexing"
 }
 review code.ReachableAssertionReview {
   category: "resource"

@@ -1956,6 +1956,15 @@ concept TokenCacheAuthorizationBypass : sink {
   review_assumption: "cached tokens may correspond to users, groups, scopes, or audiences that the current authenticated caller is not authorized to obtain"
   review_confidence: high
 }
+concept ShareInfoDirectDownloadTokenExposure : sink {
+  vulnerable_to: [authentication.MissingAuthentication, access_control.MissingAuthorization, secrets.SecretLeak]
+  cwe: [CWE_306, CWE_862, CWE_200]
+  review_category: "auth"
+  review_condition: "a public share-info endpoint returns a tokenized direct-download URL before the share password challenge"
+  review_evidence: "share-info context {pattern} looks up a share by hash and sets DownloadURL with a direct getShareURL call using the share token"
+  review_assumption: "the public share-info response is reachable with only the share hash and its direct download URL bypasses password-gated share access"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]
@@ -2753,6 +2762,15 @@ concept LengthDerivedAllocation : sink {
   review_evidence: "length-derived allocation context {pattern} allocates a buffer and then reads bytes into it"
   review_assumption: "the encoded length can be attacker-controlled and larger than the remaining input"
   review_confidence: medium
+}
+concept FixedChunkCapacityGrowthIndex : sink {
+  vulnerable_to: [memory.OobWrite, memory.OobRead]
+  cwe: [CWE_119, CWE_787]
+  review_category: "memory"
+  review_condition: "capacity grows by a fixed chunk even though the requested index or level may jump beyond the new capacity"
+  review_evidence: "capacity-growth context {pattern} compares the requested index with capacity, reallocates after a fixed-size growth assignment, and later indexes by the requested value"
+  review_assumption: "crafted input can select a requested index or continuation level larger than the fixed growth step"
+  review_confidence: high
 }
 concept ReachableAssertionReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]

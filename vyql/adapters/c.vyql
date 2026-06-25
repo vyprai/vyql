@@ -291,6 +291,32 @@ adapter c {
     lacks "hasKnownFileSize"
     lacks "fileSize-runningFilePos"
   }
+  flag code.FixedChunkCapacityGrowthIndex in function {
+    lang "c"
+    binary contains_any [
+      "level>=ms->c.len",
+      "level>=ctx->c.len",
+      "level>=state->c.len",
+      "idx>=capacity",
+      "index>=capacity",
+      "level>=capacity"
+    ]
+    assign contains_any [
+      ".len=20",
+      "capacity=16",
+      "capacity=32",
+      "capacity=64"
+    ]
+    call path "realloc"
+    token index_key contains_any ["level", "idx", "index"]
+    not assign contains_any [
+      ".len=20+level",
+      ".len=level+20",
+      "capacity=idx+1",
+      "capacity=index+1",
+      "capacity=level+1"
+    ]
+  }
   flag code.UncheckedPythonCapiHashError in function {
     lang "c"
     name "CBORTag_hash"

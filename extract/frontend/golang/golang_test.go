@@ -43,7 +43,8 @@ func parse(readBuffer []byte) string {
 			continue
 		}
 		tokens := n.Prop("str_args")
-		if strings.Contains(tokens, "function_name:parse") &&
+		if strings.Contains(tokens, "lang=go") &&
+			strings.Contains(tokens, "function_name:parse") &&
 			strings.Contains(tokens, "index:readBuffer:4") &&
 			strings.Contains(tokens, "index:capabilities:8") &&
 			strings.Contains(tokens, "slice:readBuffer:36:") {

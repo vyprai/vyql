@@ -205,6 +205,11 @@ rule ZeroCountLastElementAccess {
   match code.ZeroCountLastElementAccess as idx
 }
 
+rule FixedChunkCapacityGrowthIndex {
+  meta { id: "VYQL-MEM-042", severity: high, cwe: [CWE_119, CWE_787], confidence_floor: high }
+  match code.FixedChunkCapacityGrowthIndex as idx
+}
+
 rule UncheckedNullableResultDeref {
   meta { id: "VYQL-MEM-018", severity: medium, cwe: [CWE_476], confidence_floor: medium }
   match code.UncheckedNullableResultDeref as deref

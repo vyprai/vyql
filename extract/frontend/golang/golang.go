@@ -465,6 +465,7 @@ func (c *conv) goFunctionTokens(name string, typ *ast.FuncType, body *ast.BlockS
 		seen[tok] = true
 		out = append(out, tok)
 	}
+	add("lang=go")
 	if name != "" {
 		add("function_name:" + name)
 	}

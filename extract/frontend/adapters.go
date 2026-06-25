@@ -1340,6 +1340,9 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 				allowed[i] = packageAllowed(spec.Flags[i].Packages, pkgs)
 			}
 			flagIdx := buildSpecIndex(len(spec.Flags), func(i int) (methods, paths []string, loose bool) {
+				if spec.Flags[i].Scope != "" {
+					return nil, []string{"analysis." + strings.ToLower(spec.Flags[i].Scope) + ".context"}, false
+				}
 				for _, pred := range spec.Flags[i].Predicates {
 					switch pred.Property {
 					case "path":
@@ -1620,6 +1623,13 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 		case strings.HasPrefix(v, "identifier:"):
 			probe = flagPredicate{Property: "identifier", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "identifier:"), Exact: pred.Exact}
 			nodeTypes = []string{"code.Name", "code.Param"}
+		case strings.HasPrefix(v, "selector:"), strings.HasPrefix(v, "attr_path:"):
+			prefix := "selector:"
+			if strings.HasPrefix(v, "attr_path:") {
+				prefix = "attr_path:"
+			}
+			probe = flagPredicate{Property: "path", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, prefix), Exact: pred.Exact}
+			nodeTypes = []string{"code.Attr"}
 		case strings.HasPrefix(v, "index:"), strings.HasPrefix(v, "subscript:"):
 			prefix := "index:"
 			if strings.HasPrefix(v, "subscript:") {
@@ -1742,7 +1752,22 @@ func nodeLexicalScope(n usg.Node) string {
 }
 
 func sameOrNestedScope(candidate, anchor string) bool {
+	candidate = scopeWithoutOrder(candidate)
+	anchor = scopeWithoutOrder(anchor)
 	return candidate == anchor || strings.HasPrefix(candidate, anchor+"/")
+}
+
+func scopeWithoutOrder(scope string) string {
+	if scope == "" {
+		return ""
+	}
+	parts := strings.Split(scope, "/")
+	for i, part := range parts {
+		if at := strings.Index(part, "@"); at >= 0 {
+			parts[i] = part[:at]
+		}
+	}
+	return strings.Join(parts, "/")
 }
 
 func flagPredicateMatchesNodeOnly(pred flagPredicate, n usg.Node) bool {

@@ -94,6 +94,11 @@ rule TokenCacheAuthorizationBypass {
   match code.TokenCacheAuthorizationBypass as cache
 }
 
+rule ShareInfoDirectDownloadTokenExposure {
+  meta { id: "VYQL-AUTH-056", severity: high, cwe: [CWE_306, CWE_862, CWE_200], confidence_floor: high }
+  match code.ShareInfoDirectDownloadTokenExposure as endpoint
+}
+
 rule ExpiredCachedAuthTokenReuse {
   meta { id: "VYQL-AUTH-043", severity: medium, cwe: [CWE_613], confidence_floor: high }
   match code.ExpiredCachedAuthTokenReuse as cache

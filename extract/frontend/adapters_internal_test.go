@@ -564,6 +564,69 @@ adapter java {
 	}
 }
 
+func TestContextFlagIndexesScopedContextAndMatchesOrderedSelectorScope(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter go {
+  flag custom.ShareInfoLeak in function {
+    function "shareInfoHandler"
+    call path "store.Share.GetByHash"
+    call path "getShareURL"
+    selector "shareLink.Token"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse scoped selector flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "share.go:610",
+		Scope: "share.go/fn77@1361",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "function_name:shareInfoHandler",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "lookup",
+		Type:  "code.Call",
+		Loc:   "share.go:613",
+		Scope: "share.go/fn77@1370",
+		Props: map[string]string{
+			"callee_path": "store.Share.GetByHash",
+			"method":      "GetByHash",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "token",
+		Type:  "code.Attr",
+		Loc:   "share.go:618",
+		Scope: "share.go/fn77@1384",
+		Props: map[string]string{
+			"callee_path": "shareLink.Token",
+			"method":      "Token",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "url",
+		Type:  "code.Call",
+		Loc:   "share.go:618",
+		Scope: "share.go/fn77@1386",
+		Props: map[string]string{
+			"callee_path": "getShareURL",
+			"method":      "getShareURL",
+		},
+	})
+
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.ShareInfoLeak" {
+		t.Fatalf("context flag did not match ordered same-function call and selector evidence: %+v", got)
+	}
+}
+
 func TestAstFlagMatchesUnorderedBinopOperands(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter javascript {
