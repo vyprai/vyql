@@ -784,6 +784,8 @@ adapter python {
   sink path "marshal.loads" -> code.Deserialization
   sink path "dill.load" -> code.Deserialization
   sink path "dill.loads" -> code.Deserialization
+  sink path "cloudpickle.load" -> code.Deserialization
+  sink path "cloudpickle.loads" -> code.Deserialization
   sink path "jsonpickle.decode" -> code.Deserialization
   sink path "shelve.open" -> code.Deserialization
   sink path "joblib.load" -> code.Deserialization
