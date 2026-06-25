@@ -4867,6 +4867,15 @@ concept ExternalSettingTokenSyncUrlExposure : sink {
   review_assumption: "an attacker can preset or influence the runtime/default setting and receive token-bearing synchronization requests"
   review_confidence: high
 }
+concept RuntimeSettingsNestedCredentialsExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "a settings API serializes cloned runtime configuration after redacting one credential subtree while leaving a sibling nested credentials object unredacted"
+  review_evidence: "settings response context {pattern} clones runtime settings, deletes a known password field, and returns the settings object without deleting the nested credentials field"
+  review_assumption: "the settings response is reachable by users that should not receive stored integration credentials"
+  review_confidence: high
+}
 concept AnsibleSnmpFactsCredentialsNoLogMissing : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]

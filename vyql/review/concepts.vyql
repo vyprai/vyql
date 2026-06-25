@@ -2380,6 +2380,12 @@ review code.ExternalSettingTokenSyncUrlExposure {
   expected: [core.AllowlistValidation]
   text: "verify auth/session synchronization URLs read from runtime defaults are constrained to same-origin paths before token-bearing requests"
 }
+review code.RuntimeSettingsNestedCredentialsExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify settings responses remove every nested credentials object, not only the first known password field"
+}
 review code.CinnyServiceWorkerMediaAuthLeak {
   category: "secret"
   kind: "attention"

@@ -1576,6 +1576,20 @@ adapter javascript {
     call path contains_any ["mintCookieFactory", "syncToken", "syncSession", "tokenSync", "sessionSync"]
     not call path "startsWith"
   }
+  // Settings APIs that clone runtime configuration and redact one known secret
+  // subtree can still leak sibling nested credential objects.
+  flag code.RuntimeSettingsNestedCredentialsExposure in module {
+    lang "javascript"
+    call path "apiApp.get"
+    literal "/api/settings"
+    call path "JSON.parse"
+    call path "JSON.stringify"
+    selector "runtime.settings"
+    selector "tosend.smtp.password"
+    selector "settings.daqstore"
+    call path "res.json"
+    not selector "tosend.daqstore.credentials"
+  }
 
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.
