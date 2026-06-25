@@ -284,6 +284,14 @@ adapter php {
     has "'extensions_blacklist'=>'*.php;*.php2;*.php3;*.php4;*.php5;*.php7;*.phtml'"
     lacks "*.phar"
   }
+  flag code.AbsolutePathDisclosure in module {
+    lang "php"
+    has "PluginName:"
+    has "add_action"
+    lacks "ABSPATH"
+    lacks "function_exists('add_action')"
+    lacks "function_exists(\"add_action\")"
+  }
   flag code.StatamicAssetUploadPhpExtensionValidationBypass in function {
     lang "php"
     name "extraRules"
