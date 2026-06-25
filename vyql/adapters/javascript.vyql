@@ -306,6 +306,15 @@ adapter javascript {
     has "builder.push(self.template(m,column))"
     lacks "Thelpers.encode((column.format?val.format(column.format):val))"
   }
+  flag code.RefererBasedAdminUserCreation in function {
+    lang "javascript"
+    has "req.header('Referer')"
+    has "urlParts.path==='/admin/setup'"
+    has "isAdmin=true"
+    has "db.users.insert(doc"
+    lacks "db.users.count"
+    lacks "userCount===0"
+  }
   flag code.UnescapedLinterIssueMessageXss in function {
     lang "javascript"
     name "renderIssue"
@@ -406,6 +415,17 @@ adapter javascript {
   }
   flag code.AuthenticationRequiredOp on any {
     path "makeAdmin"
+  }
+  flag code.RefererBasedAdminUserCreation in function {
+    lang "javascript"
+    call path "req.header"
+    call path "url.parse"
+    literal "Referer"
+    literal "/admin/setup"
+    selector "urlParts.path"
+    assign "isAdmin=true"
+    call path "db.users.insert"
+    lacks call path "db.users.count"
   }
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verifyCsrfToken" -> core.CsrfProtection

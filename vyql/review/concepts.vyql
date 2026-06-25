@@ -697,6 +697,12 @@ review code.OverbroadRolePermissionGrant {
   expected: [core.AuthorizationCheck]
   text: "review non-admin role permission tables for backup, restore, or privileged operation grants"
 }
+review code.RefererBasedAdminUserCreation {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck, core.InputValidation]
+  text: "review user creation flows for admin privilege derived from HTTP Referer instead of server-side setup state"
+}
 review code.JobOutputEventUpdateAuthorizationBypass {
   category: "auth"
   kind: "target"

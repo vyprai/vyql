@@ -199,6 +199,11 @@ rule OverbroadRolePermissionGrant {
   match code.OverbroadRolePermissionGrant as grant
 }
 
+rule RefererBasedAdminUserCreation {
+  meta { id: "VYQL-AUTH-054", severity: high, cwe: [CWE_290, CWE_269, CWE_863], confidence_floor: high }
+  match code.RefererBasedAdminUserCreation as handler
+}
+
 rule JobOutputEventUpdateAuthorizationBypass {
   meta { id: "VYQL-AUTH-030", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.JobOutputEventUpdateAuthorizationBypass as handler
