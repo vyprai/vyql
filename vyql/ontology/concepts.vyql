@@ -2623,6 +2623,15 @@ concept SamlFirstSignatureOnlyBypass : sink {
   review_assumption: "an attacker can submit a SAML response containing an attacker-chosen signed element before unsigned or differently signed assertion data"
   review_confidence: high
 }
+concept OptionalClientSignatureVerification : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+  cwe: [CWE_287, CWE_347]
+  review_category: "auth"
+  review_condition: "client authentication verifies a signature only when a supplied signature value is non-null"
+  review_evidence: "authentication context {pattern} obtains a client signature and runs Signature.verify from a non-null signature branch without an observed fail-closed null-signature check"
+  review_assumption: "a missing client signature can reach the authentication path while other certificate or token checks still permit a user mapping"
+  review_confidence: high
+}
 concept SamlXmlRoundtripValidationBypass : sink {
   vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
   cwe: [CWE_287, CWE_347]

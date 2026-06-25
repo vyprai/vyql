@@ -164,6 +164,11 @@ rule SamlFirstSignatureOnlyBypass {
   match code.SamlFirstSignatureOnlyBypass as verifier
 }
 
+rule OptionalClientSignatureVerification {
+  meta { id: "VYQL-AUTH-072", severity: critical, cwe: [CWE_287, CWE_347], confidence_floor: high }
+  match code.OptionalClientSignatureVerification as verifier
+}
+
 rule CiliumCliEtcdInitMountMismatch {
   meta { id: "VYQL-AUTH-018", severity: medium, cwe: [CWE_280, CWE_755], confidence_floor: high }
   match code.CiliumCliEtcdInitMountMismatch as mount

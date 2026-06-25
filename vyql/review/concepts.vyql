@@ -730,6 +730,12 @@ review code.SamlFirstSignatureOnlyBypass {
   expected: [core.AuthenticationCheck]
   text: "review SAML response signature verification to ensure every XMLDSIG signature is validated, not only the first Signature node"
 }
+review code.OptionalClientSignatureVerification {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review client-signature authentication paths to ensure a missing signature fails closed before accepting the certificate identity"
+}
 review code.SamlAssertionWrappingBypass {
   category: "auth"
   kind: "attention"

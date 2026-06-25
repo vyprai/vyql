@@ -1197,6 +1197,18 @@ adapter java {
     not call path "constantTimeEquals"
     not call path "MessageDigest.isEqual"
   }
+  flag code.OptionalClientSignatureVerification in function {
+    function contains_any ["authenticate", "verify", "validate", "check"]
+    call "getSignature"
+    call path "Signature.getInstance"
+    call "initVerify"
+    call "verify"
+    expr contains_any ["signature!=null", "sigBytes!=null", "clientSignature!=null"]
+    not expr contains_any ["signature==null", "sigBytes==null", "clientSignature==null"]
+    not literal "Client signature required"
+    not literal "signature required"
+    not literal "missing signature"
+  }
   flag code.UnsafeJXPathContextEvaluation in function {
     call path contains_any ["JXPathContext.newContext", "JXPathContextFactory.newInstance.newContext"]
     call path contains_any ["getValue", "selectNodes", "iterate"]
