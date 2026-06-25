@@ -2517,6 +2517,15 @@ concept NumericParserMissingProgressCheck : sink {
   review_assumption: "malformed numeric input can leave the parse cursor unchanged and cause repeated parser work or an infinite loop"
   review_confidence: high
 }
+concept WorldCoordinateSafeRangeMissing : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_20]
+  review_category: "resource"
+  review_condition: "world or chunk operations accept high-magnitude coordinates without a safe world-border range guard"
+  review_evidence: "world-coordinate context {pattern} consumes BlockVector3 coordinates in world access calls without testCoords or an equivalent +/- 30,000,000 guard"
+  review_assumption: "users can select or trigger coordinates outside the engine's safe world range and force expensive or crashing world/chunk operations"
+  review_confidence: high
+}
 concept BlockingReadInAcceptLoop : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_667]

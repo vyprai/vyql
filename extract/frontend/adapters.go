@@ -1614,11 +1614,15 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 	probe := pred
 	probe.Negative = false
 	prefix := locFile(n.Prop("loc"))
+	scope := n.Scope
 	for _, nodeType := range nodeTypes {
 		ids, _ := s.NodesOfType(nodeType)
 		for _, id := range ids {
 			cand, ok, err := s.GetNode(id)
 			if err != nil || !ok || cand.ID == n.ID {
+				continue
+			}
+			if scope != "" && cand.Scope != "" && !sameOrNestedScope(cand.Scope, scope) {
 				continue
 			}
 			if prefix != "" && locFile(cand.Prop("loc")) != prefix {
@@ -1633,6 +1637,10 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 		}
 	}
 	return false
+}
+
+func sameOrNestedScope(candidate, anchor string) bool {
+	return candidate == anchor || strings.HasPrefix(candidate, anchor+"/")
 }
 
 func flagPredicateMatchesNodeOnly(pred flagPredicate, n usg.Node) bool {

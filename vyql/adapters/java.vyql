@@ -90,6 +90,16 @@ adapter java {
     lacks "MAX_RATE"
     lacks "MIN_RATE"
   }
+  flag code.WorldCoordinateSafeRangeMissing in function {
+    param type "BlockVector3"
+    call contains_any [
+      "getBlockAt", "setBlock", "getBlock", "getFullBlock",
+      "getBiome", "setBiome", "generateTree", "canPlaceAt",
+      "applySideEffects", "simulateItemUse", "checkLoadedChunk"
+    ]
+    not call contains_any ["testCoords", "checkCoords", "validateCoords"]
+    not literal "30000000"
+  }
   flag code.FrameworkRequestBeforeSessionValidation in function {
     function "doFilter"
     call path "Meteor.build"

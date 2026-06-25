@@ -629,6 +629,11 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 			if lit := javaStringToken(c.text(m)); lit != "" {
 				add("literal:" + lit)
 			}
+		case "decimal_integer_literal", "hex_integer_literal", "decimal_floating_point_literal",
+			"character_literal":
+			if lit := strings.TrimSpace(c.text(m)); lit != "" {
+				add("literal:" + lit)
+			}
 		case "identifier":
 			if ident := c.text(m); ident != "" {
 				add("identifier:" + ident)

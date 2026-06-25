@@ -1206,6 +1206,12 @@ review code.NumericParserMissingProgressCheck {
   expected: [core.InputValidation]
   text: "review numeric parsers for a cursor-progress guard before retrying fallback parse paths"
 }
+review code.WorldCoordinateSafeRangeMissing {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review world-edit coordinate operations for safe world-border range checks before block or chunk access"
+}
 review code.UnboundedStateGrowthReview {
   category: "resource"
   kind: "attention"

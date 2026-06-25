@@ -232,6 +232,43 @@ func TestJavaFunctionContextIncludesCallOrderTokens(t *testing.T) {
 	t.Fatalf("doFilter context did not include expected call order tokens: %#v", contexts)
 }
 
+func TestJavaFunctionContextIncludesNumericLiteralTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "WorldGuard.java")
+	src := []byte(`class WorldGuard {
+  void testCoords(int x, int z) {
+    if (x > 30000000 || z < -30000000) {
+      throw new RuntimeException();
+    }
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "function_name:testCoords") && strings.Contains(args, "literal:30000000") {
+			return
+		}
+	}
+	t.Fatalf("testCoords context did not include numeric literal token; nodes=%#v", nodes)
+}
+
 func TestJavaEnhancedForBindsElementToIterable(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "C.java")

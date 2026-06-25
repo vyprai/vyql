@@ -495,6 +495,75 @@ adapter javascript {
 	}
 }
 
+func TestContextFlagAstCallPredicatesPreferLexicalScope(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter java {
+  flag custom.WorldAccess in function {
+    function "safe"
+    call path "world.getBlockAt"
+    not call "testCoords"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse scoped context flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "World.java:10",
+		Scope: "World.java/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "function_name:safe",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "other-call",
+		Type:  "code.Call",
+		Loc:   "World.java:30",
+		Scope: "World.java/fn2",
+		Props: map[string]string{
+			"callee_path": "world.getBlockAt",
+			"method":      "getBlockAt",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context flag matched call outside lexical scope: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "local-call",
+		Type:  "code.Call",
+		Loc:   "World.java:12",
+		Scope: "World.java/fn1/if0.t",
+		Props: map[string]string{
+			"callee_path": "world.getBlockAt",
+			"method":      "getBlockAt",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.WorldAccess" {
+		t.Fatalf("context flag did not match nested in-scope call: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "guard",
+		Type:  "code.Call",
+		Loc:   "World.java:11",
+		Scope: "World.java/fn1",
+		Props: map[string]string{
+			"callee_path": "testCoords",
+			"method":      "testCoords",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context flag should skip guarded lexical scope, got %+v", got)
+	}
+}
+
 func TestAstFlagMatchesUnorderedBinopOperands(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter javascript {
