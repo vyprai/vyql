@@ -68,6 +68,11 @@ rule ArchiveMarkerSymlinkOverwrite {
   match code.ArchiveMarkerSymlinkOverwrite as sink
 }
 
+rule HardlinkedFileOverwriteWithoutClobber {
+  meta { id: "VYQL-PATH-051", severity: high, cwe: [CWE_59], confidence_floor: high }
+  match code.HardlinkedFileOverwriteWithoutClobber as sink
+}
+
 rule UploadFilePathTraversalWrite {
   meta { id: "VYQL-PATH-013", severity: high, cwe: [CWE_22], confidence_floor: medium }
   match code.UploadFilePathTraversalWrite as sink

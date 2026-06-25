@@ -844,6 +844,16 @@ adapter javascript {
     has "page.goto(request.url,requestOptions)"
     lacks "request.url.trim().toLowerCase().substring(0,4)==='file'"
   }
+  flag code.HardlinkedFileOverwriteWithoutClobber in function {
+    lang "javascript"
+    name "statCb"
+    call path "get-type"
+    call path "rimraf"
+    call path "create"
+    attr path "self._path"
+    attr path "self.type"
+    not attr path "current.nlink"
+  }
   flag code.ConvertSvgMultiSvgSanitizerBypass in function {
     lang "javascript"
     has "cheerio.default.html"

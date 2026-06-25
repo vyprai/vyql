@@ -1639,6 +1639,12 @@ review code.ArchiveMarkerSymlinkOverwrite {
   expected: [core.PathAccessCheck]
   text: "review archive extraction marker files for symlink-safe creation and explicit marker-entry filtering"
 }
+review code.HardlinkedFileOverwriteWithoutClobber {
+  category: "path"
+  kind: "target"
+  expected: [core.PathAccessCheck]
+  text: "review filesystem writers for hard-link clobbering before writing file entries over existing paths"
+}
 review code.UploadFilePathTraversalWrite {
   category: "path"
   kind: "attention"
