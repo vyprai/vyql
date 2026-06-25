@@ -304,7 +304,9 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		"code.EnvFileVariableInjection":                  true,
 		"code.ForOwnRecursiveDefaultsPrototypePollution": true,
 		"code.PgEscapeStringSqlFilterInjection":          true,
+		"code.ShellTruePackageManagerProbe":              true,
 		"code.TemplateDirectoryHiddenGlobCopy":           true,
+		"code.UnfilteredAgentCommandTag":                 true,
 		"code.UnvalidatedSqlIdentifierInterpolation":     true,
 	}
 

@@ -518,23 +518,23 @@ adapter python {
     not call path contains_any ["shlex.quote", "shlex.join", "subprocess.list2cmdline"]
     not identifier "pkgmgr"
   }
-  flag code.ShellTruePackageManagerProbe on any {
-    path exact "analysis.function.context"
+  flag code.ShellTruePackageManagerProbe in function {
     name "check_for_libaio_pkg"
-    has "find_executable"
-    has "subprocess.Popen"
-    fact shell "True"
-    has "pkgmgr"
-    has "lib"
+    call path "distutils.spawn.find_executable"
+    call path "subprocess.Popen"
+    token identifier "shell"
+    literal "True"
+    token identifier "pkgmgr"
+    token identifier "lib"
   }
-  flag code.ShellTruePackageManagerProbe on any {
-    path exact "analysis.function.context"
+  flag code.ShellTruePackageManagerProbe in function {
     name "check_for_numactl_pkg"
-    has "find_executable"
-    has "subprocess.Popen"
-    fact shell "True"
-    has "pkgmgr"
-    has "lib"
+    call path "distutils.spawn.find_executable"
+    call path "subprocess.Popen"
+    token identifier "shell"
+    literal "True"
+    token identifier "pkgmgr"
+    token identifier "lib"
   }
   sink path "module.run_command" val "apt-key" val "--recv" -> code.SecurityKeyTrustOperation
   flag code.CommandLineAssemblyReview in function {
