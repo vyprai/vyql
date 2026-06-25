@@ -1179,6 +1179,15 @@ concept FrameworkRequestBeforeSessionValidation : sink {
   review_assumption: "attackers can supply an invalid session identifier that should be rejected before framework request setup"
   review_confidence: medium
 }
+concept CaptchaValidationTruthyReturnBypass : sink {
+  vulnerable_to: [validation.ImproperInputValidation, authentication.AuthenticationBypass]
+  cwe: [CWE_20, CWE_287]
+  review_category: "auth"
+  review_condition: "captcha validation can return a non-boolean falsey value instead of explicit False for invalid or empty input"
+  review_evidence: "captcha validation context {pattern} returns a truthy-input and equality expression after invalidating the stored answer"
+  review_assumption: "callers may compare validation failure with == False or otherwise require a real boolean false result"
+  review_confidence: high
+}
 concept RegexLineCommentStripWithoutCharWhitelist : sink {
   vulnerable_to: [validation.ImproperInputValidation]
   cwe: [CWE_20]

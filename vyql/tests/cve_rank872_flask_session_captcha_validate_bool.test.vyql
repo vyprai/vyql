@@ -1,0 +1,39 @@
+# Rank 872 / CVE-2022-24880: Flask-Session-Captcha returned None for empty
+# captcha input via `value and value == session_value`, which bypassed callers
+# that checked validation failure with `== False`.
+
+test "rank872: captcha validator returns non-boolean falsey value"
+  lang python
+  expect VYQL-VAL-012
+  expect_review code.CaptchaValidationTruthyReturnBypass
+  code
+  ```
+  from flask import request, session
+
+  def validate(form_key="captcha", value=None):
+      session_value = session.get("captcha_answer")
+      if not session_value:
+          return False
+      if not value and form_key in request.form:
+          value = request.form[form_key].strip()
+      session["captcha_answer"] = None
+      return value and value == session_value
+  ```
+
+test "rank872: captcha validator returns explicit boolean false"
+  lang python
+  reject VYQL-VAL-012
+  reject_review code.CaptchaValidationTruthyReturnBypass
+  code
+  ```
+  from flask import request, session
+
+  def validate(form_key="captcha", value=None):
+      session_value = session.get("captcha_answer")
+      if not session_value:
+          return False
+      if not value and form_key in request.form:
+          value = request.form[form_key].strip()
+      session["captcha_answer"] = None
+      return value is not None and value == session_value
+  ```

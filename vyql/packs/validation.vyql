@@ -57,3 +57,8 @@ rule DeviceStatusStateMachineBypass {
   meta { id: "VYQL-VAL-011", severity: high, cwe: [CWE_20, CWE_841, CWE_787], confidence_floor: high }
   match code.DeviceStatusStateMachineBypass as status
 }
+
+rule CaptchaValidationTruthyReturnBypass {
+  meta { id: "VYQL-VAL-012", severity: medium, cwe: [CWE_20, CWE_287], confidence_floor: high }
+  match code.CaptchaValidationTruthyReturnBypass as validator
+}

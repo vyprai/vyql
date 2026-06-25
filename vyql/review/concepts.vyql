@@ -155,6 +155,12 @@ review code.AuthFlowBypassReview {
   expected: [core.AuthenticationCheck]
   text: "review alternate UI or navigation exit paths in this authentication flow"
 }
+review code.CaptchaValidationTruthyReturnBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.InputValidation, core.AuthenticationCheck]
+  text: "review captcha validators that return non-boolean falsey values for invalid input instead of explicit False"
+}
 review code.OAuthReauthenticationUserMismatch {
   category: "auth"
   kind: "target"

@@ -590,6 +590,17 @@ adapter python {
     not literal contains_any ["pbkdf2:", "argon2", "bcrypt", "scrypt"]
     not identifier contains_any ["dummy", "DUMMY", "fake", "FAKE", "balance", "BALANCE"]
   }
+  flag code.CaptchaValidationTruthyReturnBypass in function {
+    lang "python"
+    function contains_any ["validate", "verify", "check"]
+    call path "session.get"
+    call path "session.__setitem__"
+    call path contains_any ["request.form[].strip", "request.form.get"]
+    call arg "session.get:captcha_answer"
+    binary contains_any ["__binop.and"]
+    binary contains_any ["__binop.eq"]
+    not binary contains_any ["__binop.is not", "value != None", "answer != None"]
+  }
   flag code.DjangoAttachmentSaveWithoutModelValidation in function {
     name "process_attachments"
     has "attached_files"
