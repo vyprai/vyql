@@ -478,6 +478,11 @@ adapter javascript {
     lacks "timingSafeCompare"
     lacks "tsscmp"
   }
+  flag code.SecretComparisonReview in function {
+    lang "javascript"
+    call path "secure-compare"
+    call path "keys.findIndex"
+  }
   flag code.SecretComparisonReview on binop {
     op any ["==", "==="]
     operand {
