@@ -232,10 +232,11 @@ func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node, paramTyp
 }
 
 func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
+	const maxCContextTokens = 8192
 	seen := map[string]bool{}
 	var out []string
 	add := func(tok string) {
-		if tok == "" || seen[tok] || len(out) >= 512 {
+		if tok == "" || seen[tok] || len(out) >= maxCContextTokens {
 			return
 		}
 		seen[tok] = true
@@ -252,7 +253,7 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 	}
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
-		if n == nil || len(out) >= 512 {
+		if n == nil || len(out) >= maxCContextTokens {
 			return
 		}
 		switch n.Kind() {

@@ -1410,6 +1410,12 @@ review code.RecursiveCompressedPacketDecompression {
   expected: [core.InputValidation]
   text: "review compressed packet handlers for nested compressed or jumbo packet rejection before re-entering packet parsing"
 }
+review code.ZeroLengthRadiusAttributeValueParse {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review RADIUS attribute parsers for zero-length VSA/Tunnel-Password payload checks before value construction"
+}
 review code.BufReadDiscardLoopWithoutEofGuard {
   category: "resource"
   kind: "target"

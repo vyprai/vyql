@@ -207,6 +207,34 @@ brk:
 	}
 }
 
+func TestCFunctionContextIncludesLateCallsInLargeFunction(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "large.c")
+	var b strings.Builder
+	b.WriteString("int parse(int attrlen) {\n")
+	for i := 0; i < 700; i++ {
+		b.WriteString("  attrlen += 1;\n")
+	}
+	b.WriteString("  pairfree(0);\n")
+	b.WriteString("  debug_pair(0);\n")
+	b.WriteString("  return attrlen;\n")
+	b.WriteString("}\n")
+	if err := os.WriteFile(file, []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := cFuncContextTokens(prog.Modules[0].Body, "parse")
+	for _, want := range []string{"call_path:pairfree", "call_path:debug_pair"} {
+		if !strings.Contains(tokens, want) {
+			t.Fatalf("large function context missing late token %q; context length=%d", want, len(strings.Split(tokens, "\x00")))
+		}
+	}
+}
+
 func TestCZeroCountLastIndexObservationRequiresNonZeroGuard(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "frames.c")

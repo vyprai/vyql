@@ -184,3 +184,8 @@ rule RecursiveCompressedPacketDecompression {
   meta { id: "VYQL-DOS-036", severity: high, cwe: [CWE_400, CWE_674], confidence_floor: high }
   match code.RecursiveCompressedPacketDecompression as decompressor
 }
+
+rule ZeroLengthRadiusAttributeValueParse {
+  meta { id: "VYQL-DOS-037", severity: high, cwe: [CWE_20, CWE_248], confidence_floor: high }
+  match code.ZeroLengthRadiusAttributeValueParse as parser
+}

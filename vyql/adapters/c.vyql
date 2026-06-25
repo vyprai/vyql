@@ -542,6 +542,12 @@ adapter c {
     has "transport_flags_from_domain"
     lacks "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)"
   }
+  flag code.ZeroLengthRadiusAttributeValueParse in function {
+    lang "c"
+    name contains_any ["rad_decode", "decode_radius", "radius_decode"]
+    call path contains_any ["debug_pair", "pairfree"]
+    not prop "str_args" contains_any ["attrlen==0", "0==attrlen"]
+  }
   flag code.UncheckedNullableResultDeref in function {
     lang "c"
     has "px->ft=imcb_file_send_start"
