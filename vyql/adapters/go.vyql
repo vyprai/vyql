@@ -293,6 +293,13 @@ adapter go {
     literal "%s: %s"
     not call "maskValue"
   }
+  flag code.RequestPathPercentSLogInjection in function {
+    call path "fmt.Sprintf"
+    selector contains ".Path"
+    selector contains ".ErrorMessage"
+    literal contains "%s %s\n%s"
+    not literal contains "%#v"
+  }
   flag code.TextAccessLogDefaultFormatInjection on call {
     path "cfgcore.DataSource_InlineString"
     operand {
