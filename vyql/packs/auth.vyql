@@ -240,7 +240,7 @@ rule PasswordHashMissingUserBalance {
 }
 
 rule OAuthReauthenticationUserMismatch {
-  meta { id: "VYQL-AUTH-056", severity: medium, cwe: [CWE_287], confidence_floor: high }
+  meta { id: "VYQL-AUTH-061", severity: medium, cwe: [CWE_287], confidence_floor: high }
   match code.OAuthReauthenticationUserMismatch as auth
 }
 

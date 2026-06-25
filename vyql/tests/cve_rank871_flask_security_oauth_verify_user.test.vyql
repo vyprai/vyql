@@ -4,7 +4,7 @@
 
 test "rank871: oauth verify refreshes session freshness for any resolved user"
   lang python
-  expect VYQL-AUTH-056
+  expect VYQL-AUTH-061
   expect_review code.OAuthReauthenticationUserMismatch
   code
   ```
@@ -29,7 +29,7 @@ test "rank871: oauth verify refreshes session freshness for any resolved user"
 
 test "rank871: oauth verify compares resolved user to current user before freshness"
   lang python
-  reject VYQL-AUTH-056
+  reject VYQL-AUTH-061
   reject_review code.OAuthReauthenticationUserMismatch
   code
   ```
