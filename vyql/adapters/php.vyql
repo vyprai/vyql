@@ -1234,6 +1234,7 @@ adapter php {
   sink path "eval" -> code.CodeEval
   sink path "assert" -> code.CodeEval
   sink path "create_function" arg 1 -> code.CodeEval
+  control "preg_replace" val ")\\W*\\w+.*$" -> core.CodeExecutionValidation
 
   // deserialization
   sink path "unserialize" -> code.Deserialization
