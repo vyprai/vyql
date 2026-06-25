@@ -1161,6 +1161,15 @@ concept CallFutureRawWeakStateRef : sink {
   review_assumption: "repeated polling before completion can allocate additional weak references that no callback consumes"
   review_confidence: medium
 }
+concept RateLimitedMbufResponseLeak : sink {
+  vulnerable_to: [resource.ResourceLeak, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_772, CWE_400]
+  review_category: "resource"
+  review_condition: "a rate-limited TCP response helper consumes an mbuf only on the send path and lacks a release on the suppressed path"
+  review_evidence: "mbuf response context {pattern} checks a TCP challenge-ACK limiter and calls tcp_respond without an alternate m_freem release"
+  review_assumption: "the response helper owns or must consume the mbuf argument on every return path"
+  review_confidence: high
+}
 concept StructuredInputDecode : sink {
   vulnerable_to: [validation.ImproperInputValidation]
   cwe: [CWE_20]

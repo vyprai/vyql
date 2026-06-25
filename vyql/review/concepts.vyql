@@ -1320,6 +1320,12 @@ review code.ResourceReview {
   expected: [core.ResourceRelease]
   text: "verify resource usage is bounded, timed out, and released"
 }
+review code.RateLimitedMbufResponseLeak {
+  category: "resource"
+  kind: "attention"
+  expected: [core.ResourceRelease]
+  text: "review rate-limited TCP response helpers to ensure mbufs are consumed or freed on every return path"
+}
 review code.ThreadLocalScopeOverwriteWithoutCleanup {
   category: "race"
   kind: "target"

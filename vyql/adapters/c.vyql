@@ -526,6 +526,14 @@ adapter c {
   }
   sink path "ucsdet_open" -> code.ResourceHandle
   control "ucsdet_close" -> core.ResourceRelease
+  control "m_freem" -> core.ResourceRelease
+  flag code.RateLimitedMbufResponseLeak in function {
+    lang "c"
+    param type "mbuf"
+    call path "tcp_challenge_ack_check"
+    call path "tcp_respond"
+    not call path "m_freem"
+  }
   flag code.ReachableAssertionReview in function {
     lang "c"
     has "AVAHI_FLAGS_VALID"
