@@ -1209,6 +1209,13 @@ adapter java {
     not call path "constantTimeEquals"
     not call path "MessageDigest.isEqual"
   }
+  flag code.SecretComparisonReview in function {
+    function contains_any ["matches", "validate", "verify", "check", "authenticate"]
+    call path contains_any ["StringUtils.equals", "Objects.equals"]
+    call path contains_any ["sha1", "sha256", "computeSignature", "computeDigest", "digest"]
+    call arg contains_any ["StringUtils.equals:computed", "StringUtils.equals:digest", "StringUtils.equals:signature", "Objects.equals:computed", "Objects.equals:digest", "Objects.equals:signature"]
+    not call path contains_any ["MessageDigest.isEqual", "constantTimeEquals", "isEqual"]
+  }
   flag code.OptionalClientSignatureVerification in function {
     function contains_any ["authenticate", "verify", "validate", "check"]
     call "getSignature"
