@@ -1,0 +1,22 @@
+# Rank 943 / CVE-2017-16833: Gemirro HTML-escaped gem homepage metadata before
+# rendering it as a link href, but did not URI-encode or validate the URL.
+
+test "rank943: erb href uses html escape only for url-like value"
+  lang ruby
+  file gem.erb
+  expect VYQL-INJ-186
+  expect_review code.ErbHrefUrlHtmlEscapeOnly
+  code
+  ```
+  <a href="<%= escape(spec.homepage) %>"><%= escape(author) %></a>
+  ```
+
+test "rank943: erb href uses uri-normalized homepage helper"
+  lang ruby
+  file gem.erb
+  reject VYQL-INJ-186
+  reject_review code.ErbHrefUrlHtmlEscapeOnly
+  code
+  ```
+  <a href="<%= homepage(spec) %>"><%= escape(author) %></a>
+  ```

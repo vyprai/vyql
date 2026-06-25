@@ -3961,6 +3961,15 @@ concept ErbHrefInterpolationHtmlEscapeMissing : sink {
   review_assumption: "the interpolated href value can be supplied by gem metadata, content, or another attacker-controlled stored field"
   review_confidence: high
 }
+concept ErbHrefUrlHtmlEscapeOnly : sink {
+  vulnerable_to: [injection.Xss, validation.ImproperInputValidation]
+  cwe: [CWE_79, CWE_20]
+  review_category: "xss"
+  review_condition: "Ruby ERB renders a URL-like value into a href attribute using only HTML escaping instead of URL validation or URI encoding"
+  review_evidence: "ERB template context {pattern} writes a URL-like value into href through an HTML escape helper without URL validation or URI encoding"
+  review_assumption: "the rendered URL-like value can contain a scriptable URL scheme or unsafe URL characters interpreted by the browser"
+  review_confidence: high
+}
 concept StoredHtmlWrite : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

@@ -81,6 +81,7 @@ func parseERBModules(
 		parser.Close()
 		if good {
 			m.Body = append(m.Body, erbUnescapedHrefInterpolationObservations(src, relPath(root, f)+"#erb.rb")...)
+			m.Body = append(m.Body, erbHtmlEscapedUrlHrefObservations(src, relPath(root, f)+"#erb.rb")...)
 			m.Hash = contentHash(src)
 			out = append(out, m)
 		}
@@ -89,6 +90,7 @@ func parseERBModules(
 }
 
 var erbHrefInterpolationRe = regexp.MustCompile(`(?i)\bhref\s*=\s*["'][^"']*#\{([^}]*)\}`)
+var erbHrefOutputRe = regexp.MustCompile(`(?i)\bhref\s*=\s*["']\s*<%=\s*([^%]+?)\s*%>`)
 
 func erbUnescapedHrefInterpolationObservations(src []byte, rel string) []nir.Stmt {
 	var out []nir.Stmt
@@ -142,6 +144,73 @@ func erbHrefInterpolationExprNeedsEscaping(expr string) bool {
 	return strings.Contains(expr, ".") ||
 		strings.Contains(expr, "[") ||
 		strings.HasPrefix(expr, "@")
+}
+
+func erbHtmlEscapedUrlHrefObservations(src []byte, rel string) []nir.Stmt {
+	var out []nir.Stmt
+	for i, line := range strings.Split(string(src), "\n") {
+		for _, m := range erbHrefOutputRe.FindAllStringSubmatch(line, -1) {
+			if len(m) < 2 {
+				continue
+			}
+			expr, helper, ok := erbHtmlEscapeCall(strings.TrimSpace(m[1]))
+			if !ok || !erbHrefExprLooksURLValue(expr) {
+				continue
+			}
+			loc := rel + ":" + itoa(i+1)
+			path := "analysis.erb.html_escaped_url_href"
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: path, Loc: loc},
+				Args: []nir.Expr{
+					nir.Const{Loc: loc, Value: "lang=ruby"},
+					nir.Const{Loc: loc, Value: "template=erb"},
+					nir.Const{Loc: loc, Value: "attr=href"},
+					nir.Const{Loc: loc, Value: "value=url-like"},
+					nir.Const{Loc: loc, Value: "helper=" + helper},
+					nir.Const{Loc: loc, Value: "expr=" + expr},
+				},
+				Path:   path,
+				Method: "html_escaped_url_href",
+				Loc:    loc,
+			}})
+		}
+	}
+	return out
+}
+
+func erbHtmlEscapeCall(expr string) (string, string, bool) {
+	for _, h := range []struct {
+		prefix string
+		name   string
+	}{
+		{"h(", "html_escape"},
+		{"escape(", "html_escape"},
+		{"html_escape(", "html_escape"},
+		{"escape_html(", "html_escape"},
+		{"Rack::Utils.escape_html(", "html_escape"},
+		{"ERB::Util.html_escape(", "html_escape"},
+		{"CGI.escapeHTML(", "html_escape"},
+	} {
+		if !strings.HasPrefix(expr, h.prefix) || !strings.HasSuffix(expr, ")") {
+			continue
+		}
+		inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(expr, h.prefix), ")"))
+		if inner == "" {
+			continue
+		}
+		return inner, h.name, true
+	}
+	return "", "", false
+}
+
+func erbHrefExprLooksURLValue(expr string) bool {
+	lower := strings.ToLower(expr)
+	for _, marker := range []string{"url", "uri", "href", "homepage", "website", "link"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func erbRubySource(src []byte) ([]byte, bool) {

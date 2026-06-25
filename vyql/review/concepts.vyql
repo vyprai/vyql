@@ -1788,6 +1788,12 @@ review code.ErbHrefInterpolationHtmlEscapeMissing {
   expected: [core.HtmlEscape]
   text: "escape Ruby ERB values interpolated into href attributes with h, html_escape, escape_html, or an equivalent HTML attribute escape helper"
 }
+review code.ErbHrefUrlHtmlEscapeOnly {
+  category: "xss"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "validate or URI-encode URL-like values before rendering them into ERB href attributes; HTML escaping alone does not make a URL safe"
+}
 review code.UnescapedHtmlOptionRenderer {
   category: "xss"
   kind: "attention"

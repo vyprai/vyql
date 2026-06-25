@@ -233,6 +233,58 @@ end.join(', ') %>
 	}
 }
 
+func TestRubyERBExtractsHtmlEscapedUrlHrefObservation(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "vuln.erb")
+	fixed := filepath.Join(dir, "fixed.erb")
+	other := filepath.Join(dir, "other.erb")
+	if err := os.WriteFile(vuln, []byte(`<a href="<%= escape(spec.homepage) %>">home</a>
+<a href="<%= html_escape(profile_url) %>">profile</a>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`<a href="<%= homepage(spec) %>">home</a>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(other, []byte(`<a href="<%= escape(author) %>">author</a>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractRuby([]string{vuln, fixed, other}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits := 0
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.erb.html_escaped_url_href" {
+			continue
+		}
+		hits++
+		args := n.Prop("str_args")
+		for _, want := range []string{"template=erb", "attr=href", "value=url-like", "helper=html_escape"} {
+			if !strings.Contains(args, want) {
+				t.Fatalf("ERB URL href observation missing %q; args=%q", want, args)
+			}
+		}
+		if strings.Contains(n.Prop("loc"), "fixed.erb") {
+			t.Fatalf("URI-normalized href should not emit observation: %#v", n)
+		}
+		if strings.Contains(n.Prop("loc"), "other.erb") {
+			t.Fatalf("non-URL href value should not emit observation: %#v", n)
+		}
+	}
+	if hits != 2 {
+		t.Fatalf("got %d URL href observations, want 2; nodes=%#v", hits, nodes)
+	}
+}
+
 func rubyHasFuncWithParam(mods []nir.Module, name, param string) bool {
 	var walk func([]nir.Stmt) bool
 	walk = func(stmts []nir.Stmt) bool {

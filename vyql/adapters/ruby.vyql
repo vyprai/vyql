@@ -199,6 +199,12 @@ adapter ruby {
     fact template "erb"
     fact attr "href"
   }
+  flag code.ErbHrefUrlHtmlEscapeOnly on any {
+    path "analysis.erb.html_escaped_url_href"
+    fact template "erb"
+    fact attr "href"
+    fact value "url-like"
+  }
   flag code.RailsRawTranslationHtmlInterpolationXss on call {
     path "raw"
     operand {
