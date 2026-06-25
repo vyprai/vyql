@@ -59,7 +59,7 @@ adapter config {
     config_template_expr_start: "${",
     config_template_expr_end: "}",
     config_template_scopes: ["jelly", "jsp", "jsp_scriptlet"],
-    config_template_input_pattern_jelly: "\\b(it\\.(name|description|value|defaultValue)|parameter\\.(name|description)|cause\\.description)\\b",
+    config_template_input_pattern_jelly: "\\b(it\\.(name|description|value|defaultValue|getDescription|getToolTip)|parameter\\.(name|description)|cause\\.description)\\b",
     config_template_skip_contains_jelly: ["<j:set", "<j:when", "<j:if", " test=", "markupFormatter.translate", "<f:password", "<f:checkbox", "<f:textarea", "<f:textbox", "<select"],
     config_template_input_event_jelly: "analysis.template.jelly.input",
     config_template_render_event_jelly: "analysis.template.jelly.render",

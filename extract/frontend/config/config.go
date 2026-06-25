@@ -291,17 +291,25 @@ func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
 	}
 	var out []nir.Stmt
 	escapeActive := false
+	aliases := map[string]bool{}
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if containsAnyFold(line, profile.EscapeActiveContains) {
 			escapeActive = true
+		}
+		if varName := templateSetVarName(line); varName != "" {
+			for _, expr := range templateExpressions(line, profile.ExprStart, profile.ExprEnd) {
+				if profile.InputPattern.MatchString(expr) || aliases[expr] {
+					aliases[varName] = true
+				}
+			}
 		}
 		if line == "" || !strings.Contains(line, profile.ExprStart) || containsAny(line, profile.SkipContains) {
 			continue
 		}
 		defaultEscape := escapeActive && containsAnyFold(line, profile.EscapeLineContains)
 		for _, expr := range templateExpressions(line, profile.ExprStart, profile.ExprEnd) {
-			if expr == "" || !profile.InputPattern.MatchString(expr) {
+			if expr == "" || (!profile.InputPattern.MatchString(expr) && !aliases[expr]) {
 				continue
 			}
 			loc := file + ":" + itoa(i+1)
@@ -315,6 +323,26 @@ func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
 		}
 	}
 	return out
+}
+
+func templateSetVarName(line string) string {
+	if !strings.Contains(line, "<j:set") {
+		return ""
+	}
+	for _, quote := range []byte{'"', '\''} {
+		prefix := "var=" + string(quote)
+		start := strings.Index(line, prefix)
+		if start < 0 {
+			continue
+		}
+		rest := line[start+len(prefix):]
+		end := strings.IndexByte(rest, quote)
+		if end <= 0 {
+			return ""
+		}
+		return strings.TrimSpace(rest[:end])
+	}
+	return ""
 }
 
 func templateExpressions(line, startDelim, endDelim string) []string {
