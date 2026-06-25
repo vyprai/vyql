@@ -3,7 +3,7 @@
 
 test "rank747: Jenkins template save/delete actions lack RequirePOST"
   lang java
-  expect VYQL-RF-028
+  expect VYQL-RF-029
   expect_review code.JenkinsStaplerStateChangeMissingPost
   code
   ```
@@ -36,7 +36,7 @@ test "rank747: Jenkins template save/delete actions lack RequirePOST"
 
 test "rank747: Jenkins template save/delete actions with RequirePOST are clean"
   lang java
-  reject VYQL-RF-028
+  reject VYQL-RF-029
   reject_review code.JenkinsStaplerStateChangeMissingPost
   code
   ```

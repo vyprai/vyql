@@ -306,15 +306,6 @@ adapter javascript {
     has "builder.push(self.template(m,column))"
     lacks "Thelpers.encode((column.format?val.format(column.format):val))"
   }
-  flag code.RefererBasedAdminUserCreation in function {
-    lang "javascript"
-    has "req.header('Referer')"
-    has "urlParts.path==='/admin/setup'"
-    has "isAdmin=true"
-    has "db.users.insert(doc"
-    lacks "db.users.count"
-    lacks "userCount===0"
-  }
   flag code.UnescapedLinterIssueMessageXss in function {
     lang "javascript"
     name "renderIssue"

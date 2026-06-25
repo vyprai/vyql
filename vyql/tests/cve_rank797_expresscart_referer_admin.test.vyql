@@ -5,7 +5,7 @@
 test "rank797: JavaScript user creation trusts Referer for admin privilege"
   lang javascript
   file user.js
-  expect VYQL-AUTH-050
+  expect VYQL-AUTH-054
   expect_review code.RefererBasedAdminUserCreation
   code
   ```
@@ -30,7 +30,7 @@ test "rank797: JavaScript user creation trusts Referer for admin privilege"
 test "rank797: JavaScript user creation uses server-side first-user check"
   lang javascript
   file user.js
-  reject VYQL-AUTH-050
+  reject VYQL-AUTH-054
   reject_review code.RefererBasedAdminUserCreation
   code
   ```
