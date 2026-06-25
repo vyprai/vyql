@@ -62,3 +62,8 @@ rule CaptchaValidationTruthyReturnBypass {
   meta { id: "VYQL-VAL-012", severity: medium, cwe: [CWE_20, CWE_287], confidence_floor: high }
   match code.CaptchaValidationTruthyReturnBypass as validator
 }
+
+rule UrlPathParameterCaseNormalizationBypass {
+  meta { id: "VYQL-VAL-013", severity: high, cwe: [CWE_178, CWE_863], confidence_floor: high }
+  match code.UrlPathParameterCaseNormalizationBypass as params
+}

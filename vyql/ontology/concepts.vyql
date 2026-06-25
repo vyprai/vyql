@@ -1224,6 +1224,15 @@ concept ExpressParamArrayValuePollution : sink {
   review_assumption: "callers can supply duplicated HTTP parameters that Express exposes as arrays"
   review_confidence: high
 }
+concept UrlPathParameterCaseNormalizationBypass : sink {
+  vulnerable_to: [validation.ImproperInputValidation, access_control.IncorrectAuthorization]
+  cwe: [CWE_178, CWE_863]
+  review_category: "input_validation"
+  review_condition: "URL path parameter names are stored under caller-controlled case before later security or business lookups"
+  review_evidence: "URL parameter parsing context {pattern} writes path segment names into a parameter map without canonical case normalization"
+  review_assumption: "downstream request parameter lookups use canonical lowercase names and can be bypassed with case variants"
+  review_confidence: high
+}
 concept UnicodeNormalizationAfterFilterBypass : sink {
   vulnerable_to: [validation.ImproperInputValidation, injection.CodeInjection]
   cwe: [CWE_176, CWE_74]

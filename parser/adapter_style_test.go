@@ -196,6 +196,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 		"code.DefaultExternalRelaySecretExposure":       true,
 		"code.ExternalSettingTokenSyncUrlExposure":      true,
 		"code.BrowserPostExportMissingOriginGuard":      true,
+		"code.UrlPathParameterCaseNormalizationBypass":  true,
 	}
 
 	var hits []string

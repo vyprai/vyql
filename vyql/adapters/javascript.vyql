@@ -1379,6 +1379,16 @@ adapter javascript {
     not literal "constructor"
     not literal "prototype"
   }
+  flag code.UrlPathParameterCaseNormalizationBypass in function {
+    lang "javascript"
+    name "getUrlParams"
+    call path "nodeUrl.parse"
+    call path "parsed.pathname.split"
+    call path "_.tail"
+    index "parts.__subscript"
+    call path "__js_dynamic_property_write"
+    not call path "parts[].toLowerCase"
+  }
   flag code.CoerciblePathSegmentPrototypePollution in function {
     lang "javascript"
     has "path.length-1"
