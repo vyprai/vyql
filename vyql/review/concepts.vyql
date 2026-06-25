@@ -1365,6 +1365,12 @@ review code.Free5gcChfRechargeInfoSplitPanic {
   expected: [core.MemoryBoundsCheck]
   text: "review recharge route parsing for a split-result length check before indexing rating-group fields"
 }
+review code.ModexpZeroExponentIterationUnderflow {
+  category: "numeric"
+  kind: "target"
+  expected: [core.IntegerOverflowGuard]
+  text: "review modular exponentiation iteration-count arithmetic for zero-exponent underflow before gas accounting"
+}
 review code.NilMapMergeWritePanic {
   category: "resource"
   kind: "attention"

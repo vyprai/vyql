@@ -134,6 +134,65 @@ impl Config {
 	}
 }
 
+func TestRustFunctionContextIncludesModexpBitLengthArithmetic(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lib.rs")
+	src := []byte(`
+fn calculate_iteration_count(exp_length: u64, exponent: &BigUint) -> u64 {
+    let mut iteration_count = 0;
+    if exp_length > 32 {
+        let bytes: [u8; 32] = [0xFF; 32];
+        let max_256_bit_uint = BigUint::from_bytes_be(&bytes);
+        iteration_count =
+            (8 * (exp_length - 32)) + ((exponent.bitand(max_256_bit_uint)).bits() - 1);
+    }
+    iteration_count
+}
+
+fn fixed_calculate_iteration_count(exp_length: u64, exponent: &BigUint) -> u64 {
+    let mut iteration_count = 0;
+    if exp_length > 32 {
+        let bytes: [u8; 32] = [0xFF; 32];
+        let max_256_bit_uint = BigUint::from_bytes_be(&bytes);
+        iteration_count =
+            (8 * (exp_length - 32)) + exponent.bitand(max_256_bit_uint).bits() - 1;
+    }
+    iteration_count
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	vuln := rustFunctionContextArgs(nodes, "calculate_iteration_count")
+	for _, want := range []string{
+		"call_path:exponent.bitand",
+		"((exponent.bitand(max_256_bit_uint)).bits()-1)",
+	} {
+		if !strings.Contains(vuln, want) {
+			t.Fatalf("rust modexp vulnerable function context missing %q; context=%q", want, vuln)
+		}
+	}
+	fixed := rustFunctionContextArgs(nodes, "fixed_calculate_iteration_count")
+	if !strings.Contains(fixed, "(8*(exp_length-32))+exponent.bitand(max_256_bit_uint).bits()-1") {
+		t.Fatalf("rust modexp fixed function context missing reordered subtraction; context=%q", fixed)
+	}
+	if strings.Contains(fixed, "((exponent.bitand(max_256_bit_uint)).bits()-1)") {
+		t.Fatalf("fixed modexp context should not contain parenthesized bits-minus-one term; context=%q", fixed)
+	}
+}
+
 func rustFunctionContextArgs(nodes []usg.Node, name string) string {
 	for _, n := range nodes {
 		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {

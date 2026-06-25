@@ -124,6 +124,12 @@ adapter rust {
     token assign "self.driver_status=value"
     not call path "self.set_device_status"
   }
+  flag code.ModexpZeroExponentIterationUnderflow on binop {
+    op "-"
+    operand {
+      path "?.bits"
+    }
+  }
   flag code.ConduitHyperUnboundedBodyToBytes in function {
     lang "rust"
     name "blocking_handler"
