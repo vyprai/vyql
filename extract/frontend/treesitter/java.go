@@ -56,6 +56,14 @@ func (c *jvConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
+// endloc is the file:line of a node's LAST line, for the graph-json line range (metadata only).
+func (c *jvConv) endloc(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
+}
+
 func (c *jvConv) text(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
@@ -144,7 +152,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		contextTokens := append([]string{}, c.classContextTokens...)
 		contextTokens = append(contextTokens, annotationTokens...)
 		contextTokens = append(contextTokens, c.jvFunctionTokens(name, n)...)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n),
 			ContextTokens: contextTokens,
 			ParamEntries:  c.jvParamEntries(name, params, paramTypes, tokens, c.jvParamAnnotationTokens(paramsNode)), Exported: c.javaPublic(n)}}
 	case "field_declaration", "local_variable_declaration":

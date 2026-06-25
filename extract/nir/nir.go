@@ -218,6 +218,23 @@ type FuncDef struct {
 	// parameters as an external-entry taint source; internal helpers are reached by
 	// ordinary interprocedural propagation, so they must NOT be entry points.
 	Exported bool
+	// The following fields carry function-identity METADATA for the graph-json CODE_MAPPER
+	// export only (stamped onto the code.Function node in lowering.makeFuncInfo). They do not
+	// affect taint/findings — purely descriptive, for the downstream VyPr reconciliation.
+	//
+	// EndLoc is the file:line of the function's last line (closing brace / dedent); with Loc it
+	// gives the full line range. Empty if the frontend doesn't emit it.
+	EndLoc string
+	// IsRoute marks a web request handler whose framework SENDS a raw string return as the
+	// response body (Flask/FastAPI route functions). Exported as is_route.
+	IsRoute bool
+	// IsValidator marks a function annotated `# vyql: validator` — a custom input-validator.
+	IsValidator bool
+	// HTTPMethod and HTTPPath carry route metadata for a handler detected from a call-registration
+	// framework (Express `app.get("/x", h)`). HTTPMethod is the upper-cased verb; HTTPPath is the
+	// literal route path (empty when not a string literal). Both empty for non-route functions.
+	HTTPMethod string
+	HTTPPath   string
 }
 
 type ParamEntry struct {

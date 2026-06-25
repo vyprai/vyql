@@ -1169,6 +1169,14 @@ func ModuleNS(m nir.Module) string {
 	return m.Key
 }
 
+// boolProp renders a bool as a graph node prop ("true" or "", so an unset prop reads false).
+func boolProp(b bool) string {
+	if b {
+		return "true"
+	}
+	return ""
+}
+
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
 	if l.curFunc != "" {
 		// stamp the enclosing code.Function id on every body node (the node→function map the
@@ -1372,8 +1380,19 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 	// dump only Call/Attr, so it is invisible there). Kept SEPARATE from `func` (=function name),
 	// which the function-context analysis and rules read.
 	fid := sigID(ns, rel, "func", "")
-	l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Loc: st.Loc, Region: l.region,
-		Props: map[string]string{"name": rel, "module": modkey, "class": cls}})
+	// is_route covers BOTH route flavors: send-on-return routes (st.IsRoute — decorator
+	// frameworks) and call-registration routes carrying http_method (Express et al.).
+	fnProps := map[string]string{
+		"name": rel, "module": modkey, "class": cls, "end_loc": st.EndLoc,
+		"is_route": boolProp(st.IsRoute || st.HTTPMethod != ""), "is_validator": boolProp(st.IsValidator),
+	}
+	if st.HTTPMethod != "" {
+		fnProps["http_method"] = st.HTTPMethod
+	}
+	if st.HTTPPath != "" {
+		fnProps["http_path"] = st.HTTPPath
+	}
+	l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Loc: st.Loc, Region: l.region, Props: fnProps})
 	params := map[string]string{}
 	order := make([]string, 0, len(st.Params))
 	for _, p := range st.Params {

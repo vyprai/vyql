@@ -221,6 +221,14 @@ func (c *jsConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
+// endloc is the file:line of a node's LAST line, for the graph-json line range (metadata only).
+func (c *jsConv) endloc(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
+}
+
 func (c *jsConv) text(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
@@ -337,7 +345,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
 		decorators := c.jsDecoratorTokens(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: c.exported[name]}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n), ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: c.exported[name]}}
 	case "class_declaration", "abstract_class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "lexical_declaration", "variable_declaration":
@@ -354,7 +362,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 						params = c.paramsFromFunctionText(d)
 					}
 					body := c.funcBody(val)
-					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(fnName, val), Exported: c.exported[fnName]})
+					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(val), ContextTokens: c.jsFunctionContext(fnName, val), Exported: c.exported[fnName]})
 					continue
 				}
 				var v nir.Expr = nir.Const{Loc: L}
@@ -469,7 +477,7 @@ func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []ni
 		case "method_definition":
 			name := c.text(field(pr, "name"))
 			out = append(out, nir.FuncDef{Name: name, Params: c.funcParams(pr),
-				ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: c.loc(pr), ContextTokens: c.jsFunctionContext(name, pr), Exported: exported})
+				ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: c.loc(pr), EndLoc: c.endloc(pr), ContextTokens: c.jsFunctionContext(name, pr), Exported: exported})
 			out = append(out, c.returnedObjectMethodFuncDefs(pr, exported)...)
 		case "pair":
 			v := field(pr, "value")
@@ -481,7 +489,7 @@ func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []ni
 					params = c.paramsFromFunctionText(pr)
 				}
 				out = append(out, nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes,
-					Body: c.funcBody(v), Loc: c.loc(pr), ContextTokens: c.jsFunctionContext(name, v), Exported: exported})
+					Body: c.funcBody(v), Loc: c.loc(pr), EndLoc: c.endloc(v), ContextTokens: c.jsFunctionContext(name, v), Exported: exported})
 				out = append(out, c.returnedObjectMethodFuncDefs(v, exported)...)
 			}
 			out = append(out, c.objectMethodFuncDefs(v, exported)...)
@@ -597,6 +605,9 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 	case "call_expression":
+		if routes := c.expressRouteFuncs(inner, L); len(routes) > 0 {
+			return routes
+		}
 		if body := c.iife(inner, L); len(body) > 0 {
 			return body
 		}
@@ -624,7 +635,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 			if len(params) == 0 {
 				params = c.paramsFromFunctionText(inner)
 			}
-			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
 		}
 		if left != nil && left.Kind() == "member_expression" && isJsFuncNode(rhs) {
 			if name := c.exportFuncName(left); name != "" {
@@ -633,7 +644,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				if len(params) == 0 {
 					params = c.paramsFromFunctionText(inner)
 				}
-				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
 			}
 			// `Ctor.prototype.method = function` / `Ctor.method = function` on an EXPORTED
 			// constructor/class. Always emit a FuncDef so the method is REGISTERED (calls to
@@ -648,7 +659,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					if len(params) == 0 {
 						params = c.paramsFromFunctionText(inner)
 					}
-					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: !strings.HasPrefix(name, "_")}}
+					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), Exported: !strings.HasPrefix(name, "_")}}
 				}
 			}
 		}
@@ -1406,6 +1417,86 @@ func (c *jsConv) isExpressRouteRegistration(path string) bool {
 		return false
 	}
 	return jsExpressRouteMethods[path[i+1:]]
+}
+
+// expressRouteFuncs promotes an Express-style call-registration — app.get("/x", h),
+// router.post("/y", mw, h), app.use(fn) — into one route-flagged FuncDef per inline handler,
+// carrying the HTTP method and (literal) path. Returning a FuncDef instead of leaving the
+// callback an anonymous Lambda gives the handler a first-class code.Function node, so a sink in
+// its body resolves a func_id (scope:function, not module) and graph-json can export
+// http_method/http_path. The handler's input typing is preserved exactly (typeExpressLambda),
+// so sources/findings are unchanged — only the enclosing-function identity is added. Returns
+// nil when this is not a route registration or has no inline handler (app.use(router),
+// app.get(path, controllerRef)), so those calls flow through the normal expr() path untouched.
+func (c *jsConv) expressRouteFuncs(call *tree_sitter.Node, L string) []nir.Stmt {
+	fn := field(call, "function")
+	path := c.dotted(fn)
+	if !c.isExpressRouteRegistration(path) {
+		return nil
+	}
+	method := strings.ToUpper(path[strings.LastIndex(path, ".")+1:])
+	httpPath := ""
+	var handlers []*tree_sitter.Node
+	if args := field(call, "arguments"); args != nil {
+		for _, a := range namedChildren(args) {
+			switch {
+			case isJsFuncNode(a):
+				handlers = append(handlers, a)
+			case httpPath == "" && a.Kind() == "string":
+				httpPath = c.keyName(a) // strips the surrounding quotes
+			}
+		}
+	}
+	// Precision guard: the route-method names collide with everyday APIs — db.all/db.get
+	// (sqlite3), Promise.all, Map.get/delete, cache.get, headers.get. Promoting (and thereby
+	// DROPPING the original call) on a false match silently deletes a real sink. Only treat it
+	// as a route when there is an inline handler AND either a route-path argument (a string
+	// starting with "/" or the "*" wildcard — a SQL/key string never does) or it is `.use`
+	// middleware. Routes with a non-literal path (app.get(ROUTES.x, h)) are missed here but
+	// still get their input typed via the expr() path — only the entrypoint export is skipped.
+	if len(handlers) == 0 {
+		return nil
+	}
+	routeLike := strings.HasPrefix(httpPath, "/") || httpPath == "*"
+	if !routeLike && method != "USE" {
+		return nil
+	}
+	// line within the file disambiguates the synthetic name; ns is already per-file, so the
+	// id stays stable across incremental rebuilds (same file → same line).
+	line := L
+	if i := strings.LastIndex(L, ":"); i >= 0 {
+		line = L[i+1:]
+	}
+	var out []nir.Stmt
+	for idx, h := range handlers {
+		// reuse the existing param typing (req→express.Request, res→express.Response, …) so the
+		// handler's input source is seeded exactly as it was when these stayed inline Lambdas.
+		lam := c.typeExpressLambda(nir.Lambda{
+			Params:     c.funcParams(h),
+			ParamTypes: c.funcParamTypes(h),
+			Body:       c.funcBody(h),
+			Loc:        c.loc(h),
+		})
+		name := method
+		if httpPath != "" {
+			name += " " + httpPath
+		}
+		name += "@L" + line
+		if len(handlers) > 1 {
+			name += "#" + itoa(idx)
+		}
+		out = append(out, nir.FuncDef{
+			Name:       name,
+			Params:     lam.Params,
+			ParamTypes: lam.ParamTypes,
+			Body:       lam.Body,
+			Loc:        c.loc(h),
+			EndLoc:     c.endloc(h),
+			HTTPMethod: method,
+			HTTPPath:   httpPath,
+		})
+	}
+	return out
 }
 
 func (c *jsConv) typeExpressLambda(lam nir.Lambda) nir.Lambda {

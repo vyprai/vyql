@@ -49,6 +49,15 @@ func (c *pyConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
+// endloc is the file:line of a node's LAST line — the function's closing line, for the
+// graph-json line range. Metadata only (not used by taint).
+func (c *pyConv) endloc(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
+}
+
 func (c *pyConv) text(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
@@ -282,7 +291,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		// public API = no leading underscore, OR a dunder (__init__/__call__ are entry points).
 		exported := !strings.HasPrefix(name, "_") || (strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__"))
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ParamEntries: entries, ResultEntries: c.vyqlResultEntries(n), Exported: exported}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n), IsValidator: c.hasValidatorComment(n), ParamEntries: entries, ResultEntries: c.vyqlResultEntries(n), Exported: exported}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -295,11 +304,17 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return nil
 		}
 		decorators := c.pyDecoratorTokens(n)
+		isRoute := def.Kind() == "function_definition" && c.hasRouteDecorator(n)
 		out := c.stmt(def)
 		for i, st := range out {
 			if fn, ok := st.(nir.FuncDef); ok {
 				fn.Decorators = decorators
 				fn.ParamEntries = append(fn.ParamEntries, c.pyParamEntries(fn.Name, fn.Params, decorators)...)
+				// is_route export metadata only (no taint behavior — the curRoute reflected-string
+				// sink is intentionally NOT wired, so findings stay identical).
+				if isRoute {
+					fn.IsRoute = true
+				}
 				out[i] = fn
 			}
 		}
@@ -601,6 +616,69 @@ func (c *pyConv) block(block *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	return c.blockChildren(block)
+}
+
+// pyRouteMethods are the decorator method names that register a web request handler
+// (Flask/FastAPI/Starlette `@app.get`, `@router.post`, `@app.route`, …).
+var pyRouteMethods = map[string]bool{
+	"get": true, "post": true, "put": true, "delete": true, "patch": true,
+	"head": true, "options": true, "route": true, "websocket": true, "api_route": true,
+}
+
+// hasRouteDecorator reports whether a decorated_definition carries a route-registration
+// decorator. Metadata only — it sets FuncDef.IsRoute for the graph-json export (is_route),
+// not any taint behavior.
+func (c *pyConv) hasRouteDecorator(n *tree_sitter.Node) bool {
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "decorator" {
+			continue
+		}
+		var name string
+		var walk func(m *tree_sitter.Node)
+		walk = func(m *tree_sitter.Node) {
+			if m == nil || name != "" {
+				return
+			}
+			if m.Kind() == "attribute" {
+				if a := field(m, "attribute"); a != nil {
+					name = c.text(a)
+				}
+				return
+			}
+			if m.Kind() == "call" {
+				walk(field(m, "function"))
+				return
+			}
+			for _, k := range namedChildren(m) {
+				walk(k)
+			}
+		}
+		walk(ch)
+		if pyRouteMethods[name] {
+			return true
+		}
+	}
+	return false
+}
+
+// hasValidatorComment reports whether a function carries a `# vyql: validator` marker, for the
+// graph-json is_validator export. Metadata only.
+func (c *pyConv) hasValidatorComment(fn *tree_sitter.Node) bool {
+	scan := func(n *tree_sitter.Node) bool {
+		if n == nil {
+			return false
+		}
+		for _, ch := range children(n) {
+			if ch.Kind() == "comment" {
+				s := strings.ToLower(c.text(ch))
+				if strings.Contains(s, "vyql") && strings.Contains(s, "validat") {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return scan(fn) || scan(field(fn, "body"))
 }
 
 func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
