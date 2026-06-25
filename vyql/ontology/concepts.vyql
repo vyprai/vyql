@@ -3207,6 +3207,15 @@ concept DockerCliProgramDataPluginSearchPath : sink {
   review_assumption: "a lower-privileged Windows user can create the ProgramData plugin directory and place a plugin binary that a privileged Docker CLI process later executes"
   review_confidence: high
 }
+concept RubyFfiWindowsPosixLibrarySearchPath : sink {
+  vulnerable_to: [path.UncontrolledSearchPath]
+  cwe: [CWE_427]
+  review_category: "path"
+  review_condition: "native Windows FFI library loading falls back to POSIX library directories"
+  review_evidence: "Ruby FFI library loader context {pattern} searches /usr library paths after DynamicLibrary.open fails without a Windows guard"
+  review_assumption: "native Windows library loading can resolve unintended DLLs from Cygwin or other lower-trust POSIX-style directories"
+  review_confidence: high
+}
 concept CloakserveFingerprintSeedPathTraversal : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]

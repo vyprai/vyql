@@ -82,6 +82,63 @@ end
 	t.Fatalf("analysis.module.context not found; nodes=%#v", nodes)
 }
 
+func TestRubyFunctionContextIncludesStructuredTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "library.rb")
+	src := []byte(`module FFI
+  module Library
+    def ffi_lib(*names)
+      names.each do |libname|
+        begin
+          FFI::DynamicLibrary.open(libname, lib_flags)
+        rescue Exception => ex
+          unless libname.start_with?("/") || FFI::Platform.windows?
+            path = ['/usr/lib/','/usr/local/lib/'].find do |pth|
+              File.exist?(pth + libname)
+            end
+          end
+        end
+      end
+    end
+  end
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" || !strings.Contains(n.Prop("str_args"), "name=ffi_lib") {
+			continue
+		}
+		args := n.Prop("str_args")
+		for _, want := range []string{
+			"call_path:FFI.DynamicLibrary.open",
+			"call_path:FFI.Platform.windows?",
+			"call_path:File.exist?",
+			"literal:/usr/lib/",
+			"literal:/usr/local/lib/",
+		} {
+			if !strings.Contains(args, want) {
+				t.Fatalf("ruby function context missing %q; context=%q", want, args)
+			}
+		}
+		return
+	}
+	t.Fatalf("analysis.function.context for ffi_lib not found; nodes=%#v", nodes)
+}
+
 func rubyHasFuncWithParam(mods []nir.Module, name, param string) bool {
 	var walk func([]nir.Stmt) bool
 	walk = func(stmts []nir.Stmt) bool {

@@ -222,3 +222,8 @@ rule PrefixWildcardKeyEnumeration {
   meta { id: "VYQL-PATH-043", severity: high, cwe: [CWE_22, CWE_200], confidence_floor: high }
   match code.PrefixWildcardKeyEnumeration as sink
 }
+
+rule RubyFfiWindowsPosixLibrarySearchPath {
+  meta { id: "VYQL-PATH-044", severity: high, cwe: [CWE_427], confidence_floor: high }
+  match code.RubyFfiWindowsPosixLibrarySearchPath as sink
+}

@@ -333,6 +333,15 @@ adapter ruby {
     has "string.to_s"
     has "/^[0-9a-f]{24}$/i"
   }
+  flag code.RubyFfiWindowsPosixLibrarySearchPath in function {
+    lang "ruby"
+    name "ffi_lib"
+    call path "FFI.DynamicLibrary.open"
+    call path "File.exist?"
+    literal "/usr/lib/"
+    literal "/usr/local/lib/"
+    not call path "FFI.Platform.windows?"
+  }
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "update_attributes" -> code.MassAssign

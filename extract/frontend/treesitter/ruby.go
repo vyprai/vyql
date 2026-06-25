@@ -282,9 +282,12 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	loc := c.loc(fn)
 	text := c.text(body)
 	args := []nir.Expr{
-		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name},
+		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name + "\x00function_name:" + name},
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	for _, tok := range c.rbStructuredContextTokens(body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.function.context", Loc: loc},
@@ -327,9 +330,12 @@ func (c *rbConv) rubyClassContext(cls *tree_sitter.Node) []nir.Stmt {
 	loc := c.loc(cls)
 	text := c.text(body)
 	args := []nir.Expr{
-		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name},
+		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name + "\x00class_name:" + name},
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	for _, tok := range c.rbStructuredContextTokens(body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.class.context", Loc: loc},
