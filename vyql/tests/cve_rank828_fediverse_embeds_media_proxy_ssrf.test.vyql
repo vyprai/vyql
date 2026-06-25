@@ -1,0 +1,61 @@
+test "rank828 fediverse embeds: WordPress media proxy fetches request URL without SSRF guard"
+  lang php
+  expect VYQL-RF-001
+  code
+  ```
+  <?php
+  class Media_Proxy {
+      public function proxy_media(\WP_REST_Request $request) {
+          $url = $request["url"];
+          if ($this->archival_mode) {
+              $url = base64_decode($url);
+          }
+          $remote_response = wp_remote_get($url, array(
+              "user-agent" => "FTF: Fediverse Embeds",
+          ));
+          echo $remote_response["body"];
+      }
+  }
+  ?>
+  ```
+
+test "rank828 fediverse embeds: safe URL and host guards suppress media proxy SSRF"
+  lang php
+  reject VYQL-RF-001
+  code
+  ```
+  <?php
+  class Media_Proxy {
+      private function is_safe_host(string $host): bool {
+          return (bool) filter_var(
+              $host,
+              FILTER_VALIDATE_IP,
+              FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+          );
+      }
+
+      private function is_safe_url(string $url): bool {
+          $parsed = parse_url($url);
+          if (!in_array($parsed["scheme"] ?? "", ["http", "https"], true)) {
+              return false;
+          }
+          return $this->is_safe_host($parsed["host"] ?? "");
+      }
+
+      public function proxy_media(\WP_REST_Request $request) {
+          $url = $request["url"];
+          if ($this->archival_mode) {
+              $url = base64_decode($url);
+          }
+          if (empty($url) || !$this->is_safe_url($url)) {
+              status_header(403);
+              exit();
+          }
+          $remote_response = wp_remote_get($url, array(
+              "user-agent" => "FTF: Fediverse Embeds",
+          ));
+          echo $remote_response["body"];
+      }
+  }
+  ?>
+  ```

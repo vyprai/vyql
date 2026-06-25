@@ -7,6 +7,7 @@ adapter php {
   source "$argv" -> code.CliArgument
   source path "analysis.parameter.entry" val "function_param_type:Parser" nval "param_type:Parser" nval "param_type:PPFrame" nval "param_type:OutputPage" nval "param_type:Skin" nval "param_type:Title" nval "param_type:MimeAnalyzer" -> code.HttpInput
   source path "analysis.parameter.entry" val "function_param_type:PPFrame" nval "param_type:Parser" nval "param_type:PPFrame" nval "param_type:OutputPage" nval "param_type:Skin" nval "param_type:Title" nval "param_type:MimeAnalyzer" -> code.HttpInput
+  source path "$request.__subscript" -> code.HttpInput
   source "$_GET" -> code.HttpInput
   source "$_POST" -> code.HttpInput
   source "$_REQUEST" -> code.HttpInput
@@ -1257,11 +1258,16 @@ adapter php {
 
   // SSRF
   sink path "curl_exec" -> code.UrlFetch
+  sink path "wp_remote_get" -> code.UrlFetch
+  sink path "wp_remote_post" -> code.UrlFetch
+  sink path "wp_remote_request" -> code.UrlFetch
 
   // HTTP response splitting / header injection (CWE-113) and log injection (CWE-117).
   sink path "header" -> code.ResponseHeaderWrite
   sink path "overlay_close_dialog" -> code.RedirectTarget
   control "url_is_external" -> core.RedirectAllowlist
+  control method "is_safe_url" -> core.AllowlistValidation
+  control method "is_safe_host" -> core.AllowlistValidation
   sink path "error_log" arg all -> code.LogOutput
   flag code.LogWrite on any {
     path "error_log"
