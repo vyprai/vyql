@@ -2020,6 +2020,12 @@ review code.KubernetesCurlAuthorizationHeaderLogLeak {
   expected: [core.SecretRedaction]
   text: "review Kubernetes client-go curl debug logging for authorization-header redaction before formatting header values"
 }
+review code.UnescapedContentDispositionFilename {
+  category: "injection"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify attachment filenames are URL/header-escaped before being embedded in Content-Disposition response headers"
+}
 review code.CoderAgentManifestInfoLog {
   category: "secret"
   kind: "attention"

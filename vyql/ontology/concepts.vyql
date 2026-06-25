@@ -4468,6 +4468,15 @@ concept ResponseHeaderWrite : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_113]
 }
+concept UnescapedContentDispositionFilename : sink {
+  vulnerable_to: [injection.HttpResponseSplitting]
+  cwe: [CWE_113, CWE_116]
+  review_category: "injection"
+  review_condition: "a caller-controlled attachment filename is inserted into a Content-Disposition response header without URL or header escaping"
+  review_evidence: "Content-Disposition context {pattern} builds an attachment filename header after basename canonicalization but before url.QueryEscape/url.PathEscape or equivalent header-value encoding"
+  review_assumption: "the framework helper is called with filenames derived from HTTP requests, storage object names, or other attacker-influenced paths"
+  review_confidence: high
+}
 concept AmbiguousQueryParameterSeparator : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
   cwe: [CWE_444]

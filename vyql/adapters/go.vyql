@@ -270,6 +270,15 @@ adapter go {
     literal "%s: %s"
     not call "maskValue"
   }
+  flag code.UnescapedContentDispositionFilename in function {
+    function "Attachment"
+    call path "filepath.Base"
+    call path "ctx.Set"
+    call arg "ctx.Set:HeaderContentDisposition"
+    literal "attachment; filename="
+    not call path "url.QueryEscape"
+    not call path "url.PathEscape"
+  }
   flag code.LogWrite on any {
     path "log.Print"
   }

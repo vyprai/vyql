@@ -665,6 +665,11 @@ rule HttpResponseSplitting {
   taint core.UserControlledData -> code.ResponseHeaderWrite
 }
 
+rule UnescapedContentDispositionFilename {
+  meta { id: "VYQL-INJ-172", severity: medium, cwe: [CWE_113, CWE_116], confidence_floor: high }
+  match code.UnescapedContentDispositionFilename as sink
+}
+
 rule AmbiguousQueryParameterSeparator {
   meta { id: "VYQL-INJ-046", severity: medium, cwe: [CWE_444], confidence_floor: medium }
   match code.AmbiguousQueryParameterSeparator as sink
