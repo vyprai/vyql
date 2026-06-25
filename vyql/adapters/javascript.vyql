@@ -215,6 +215,16 @@ adapter javascript {
     lacks "sanitizeHTML(label)"
     lacks "textContent"
   }
+  flag code.PrivilegedContainer in function {
+    lang "javascript"
+    has "dockerrun-dt"
+    has "--privileged=true"
+    has "--cap-addSYS_ADMIN"
+    has "--device/dev/fuse"
+    has "exec(cmd"
+    lacks "appConfig.capabilities"
+    lacks "--privileged=false"
+  }
   flag code.DefaultPermissiveCorsConfig in module {
     lang "javascript"
     has "CORS_ENABLED:true"

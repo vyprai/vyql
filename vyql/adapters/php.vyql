@@ -675,20 +675,13 @@ adapter php {
   }
   flag code.PreservedRequestHiddenInputValueXss in function {
     lang "php"
-    has "piVars"
-    has "<input type="
-    has "hidden"
-    has "value=\""
-    has "$hiddenFields[]"
-    has "implode("
-    lacks "cleanFormValue"
-    lacks "htmlspecialchars"
-    lacks "htmlentities"
-    lacks "esc_attr"
-    lacks "esc_html"
-    lacks "strip_tags"
-    lacks "removeXSS"
-    lacks "FILTER_SANITIZE_STRING"
+    name "modifyForm"
+    attr path "$this.parentPlugin.piVars"
+    token assign_literal "$hiddenFields[]:<inputtype=\"hidden\"name="
+    token assign_literal "$hiddenFields[]:value="
+    token subscript "$markers['hidden_parameter_fields']"
+    call "implode"
+    not call contains_any ["cleanFormValue", "htmlspecialchars", "htmlentities", "esc_attr", "esc_html", "strip_tags", "removeXSS", "filter_var"]
   }
   flag code.RawDatatablesAttributeXss in function {
     lang "php"
