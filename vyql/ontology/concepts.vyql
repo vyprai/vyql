@@ -1730,6 +1730,15 @@ concept OffsetLengthBoundsOverflow : sink {
   review_assumption: "a malformed parsed header can choose offset and length values large enough to wrap before the bounds check"
   review_confidence: high
 }
+concept RandomSpreadModuloZeroDenominator : sink {
+  vulnerable_to: [numeric.DivideByZero]
+  cwe: [CWE_369]
+  review_category: "numeric"
+  review_condition: "a randomized timeout or retry spread uses modulo by a count-derived duration without an observed nonzero guard"
+  review_evidence: "random-spread modulo context {pattern} divides by a count() value"
+  review_assumption: "configuration can set the spread/count duration to zero"
+  review_confidence: high
+}
 concept UnderwidthFormattedIndex : sink {
   vulnerable_to: [memory.OobRead]
   cwe: [CWE_192, CWE_125]

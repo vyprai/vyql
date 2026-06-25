@@ -72,3 +72,8 @@ rule OffsetLengthBoundsOverflow {
   meta { id: "VYQL-NUM-014", severity: high, cwe: [CWE_190, CWE_125], confidence_floor: high }
   match code.OffsetLengthBoundsOverflow as overflow
 }
+
+rule RandomSpreadModuloZeroDenominator {
+  meta { id: "VYQL-NUM-015", severity: medium, cwe: [CWE_369], confidence_floor: high }
+  match code.RandomSpreadModuloZeroDenominator as denominator
+}

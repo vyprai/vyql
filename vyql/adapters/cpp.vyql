@@ -184,6 +184,13 @@ adapter cpp {
     flows to op ">"
     not flows to op "<"
   }
+  flag code.RandomSpreadModuloZeroDenominator in function {
+    lang "cpp"
+    call path "randomish"
+    call path "count"
+    binary contains_any ["%", "__binop.mod"]
+    not call path contains_any ["milliseconds.zero", "seconds.zero", "minutes.zero", "hours.zero"]
+  }
   sink path "ucsdet_open" -> code.ResourceHandle
   control "ucsdet_close" -> core.ResourceRelease
   flag code.ProtocolListAmplification in function {

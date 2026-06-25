@@ -2463,6 +2463,12 @@ review code.OffsetLengthBoundsOverflow {
   expected: [core.IntegerOverflowGuard]
   text: "review offset-plus-length bounds checks for widened arithmetic before comparing with the buffer length"
 }
+review code.RandomSpreadModuloZeroDenominator {
+  category: "numeric"
+  kind: "attention"
+  expected: [core.ZeroValueExclusion]
+  text: "review randomized timeout or retry spread modulo operations for an explicit nonzero guard on the count-derived denominator"
+}
 review code.UnsafeYamlConstructor {
   category: "deserialization"
   kind: "attention"
