@@ -1489,17 +1489,17 @@ adapter php {
   }
   flag code.WordPressOptionUpdateMissingCsrf in function {
     lang "php"
-    has "$_POST"
-    has "update_option"
-    lacks "check_admin_referer"
-    lacks "wp_verify_nonce"
+    token subscript "$_POST"
+    call "update_option"
+    not call "check_admin_referer"
+    not call "wp_verify_nonce"
   }
   flag code.WordPressOptionUpdateMissingCsrf in function {
     lang "php"
-    has "$_REQUEST"
-    has "update_option"
-    lacks "check_admin_referer"
-    lacks "wp_verify_nonce"
+    token subscript "$_REQUEST"
+    call "update_option"
+    not call "check_admin_referer"
+    not call "wp_verify_nonce"
   }
   sink path "queryDB" val "insert into" -> code.StateChangingOp
   sink path "queryDB" val "replace into" -> code.StateChangingOp
