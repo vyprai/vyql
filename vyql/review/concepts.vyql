@@ -42,6 +42,11 @@ review code.StateCommitBeforeExternalWriteAccounting {
   kind: "target"
   text: "verify durable state is not committed before fallible external write accounting or metering succeeds"
 }
+review code.PersistentConnectionReuseAfterInterruptedResponse {
+  category: "lifecycle"
+  kind: "target"
+  text: "verify persistent connections are reset after interrupted or incomplete response reads before socket reuse"
+}
 review core.XmlHardening {
   category: "xml"
   kind: "check"

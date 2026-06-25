@@ -211,6 +211,14 @@ adapter ruby {
     has "@user.cdb_destroy"
     lacks "before :is_admin"
   }
+  flag code.PersistentConnectionReuseAfterInterruptedResponse in function {
+    lang "ruby"
+    name "request"
+    has "datum=response(datum)"
+    has "datum[:persistent]"
+    has "reset"
+    lacks "@persistent_socket_reusable"
+  }
   sink path "ERB.new" -> code.TemplateRender
   sink path "Erubi.new" -> code.TemplateRender
   sink path "Erubis.new" -> code.TemplateRender

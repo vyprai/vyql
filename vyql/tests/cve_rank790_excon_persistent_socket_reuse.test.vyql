@@ -1,0 +1,91 @@
+# Rank 790 / CVE-2019-16779: Excon reused persistent sockets after an interrupted
+# response read could leave bytes buffered for the next request.
+
+test "rank790: persistent response read has no reusable-state guard"
+  lang ruby
+  file connection.rb
+  expect VYQL-LIFE-007
+  expect_review code.PersistentConnectionReuseAfterInterruptedResponse
+  code
+  ```
+  module Excon
+    class Connection
+      def request(params={}, &block)
+        datum = @data.merge(params)
+        datum[:connection] = self
+        datum = datum[:stack].request_call(datum)
+
+        unless datum[:pipeline]
+          datum = response(datum)
+
+          if datum[:persistent]
+            if key = datum[:response][:headers].keys.detect {|k| k.casecmp('Connection') == 0 }
+              if datum[:response][:headers][key].casecmp('close') == 0
+                reset
+              end
+            end
+          else
+            reset
+          end
+
+          Excon::Response.new(datum[:response])
+        else
+          datum
+        end
+      rescue => error
+        reset
+        raise error if !datum
+      end
+    end
+  end
+  ```
+
+test "rank790: persistent response read reset is guarded by reusable-state sentinel"
+  lang ruby
+  file connection.rb
+  reject VYQL-LIFE-007
+  reject_review code.PersistentConnectionReuseAfterInterruptedResponse
+  code
+  ```
+  module Excon
+    class Connection
+      def request(params={}, &block)
+        datum = @data.merge(params)
+        datum[:connection] = self
+
+        if datum[:persistent] && !@persistent_socket_reusable
+          reset
+        end
+
+        datum = datum[:stack].request_call(datum)
+
+        unless datum[:pipeline]
+          @persistent_socket_reusable = false
+          datum = response(datum)
+          @persistent_socket_reusable = true
+
+          if datum[:persistent]
+            if key = datum[:response][:headers].keys.detect {|k| k.casecmp('Connection') == 0 }
+              if datum[:response][:headers][key].casecmp('close') == 0
+                reset
+              end
+            end
+          else
+            reset
+          end
+
+          Excon::Response.new(datum[:response])
+        else
+          datum
+        end
+      rescue => error
+        reset
+        raise error if !datum
+      end
+
+      def reset
+        @persistent_socket_reusable = true
+      end
+    end
+  end
+  ```

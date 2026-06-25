@@ -1224,6 +1224,15 @@ concept StateCommitBeforeExternalWriteAccounting : sink {
   review_assumption: "a failing external accounting hook can return an error after the durable create substate has already been committed"
   review_confidence: high
 }
+concept PersistentConnectionReuseAfterInterruptedResponse : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion]
+  cwe: [CWE_444, CWE_841]
+  review_category: "lifecycle"
+  review_condition: "persistent client connection reuse is not gated by a response-read completion state after interrupts or timeouts"
+  review_evidence: "persistent request context {pattern} reads a response and can keep the socket for later reuse without an observed reusable-state guard"
+  review_assumption: "an interrupted response read can leave bytes buffered on the persistent socket before the next request"
+  review_confidence: high
+}
 concept UnboundedCopy : sink {
   vulnerable_to: [memory.OobWrite]
   enabled_by: [taint.UntrustedData]

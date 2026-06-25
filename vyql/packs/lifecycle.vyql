@@ -31,3 +31,8 @@ rule StateCommitBeforeExternalWriteAccounting {
   meta { id: "VYQL-LIFE-006", severity: high, cwe: [CWE_696, CWE_755], confidence_floor: high }
   match code.StateCommitBeforeExternalWriteAccounting as op
 }
+
+rule PersistentConnectionReuseAfterInterruptedResponse {
+  meta { id: "VYQL-LIFE-007", severity: high, cwe: [CWE_444, CWE_841], confidence_floor: high }
+  match code.PersistentConnectionReuseAfterInterruptedResponse as conn
+}
