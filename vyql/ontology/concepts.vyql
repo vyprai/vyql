@@ -2393,6 +2393,15 @@ concept SamlXmlRoundtripValidationBypass : sink {
   review_assumption: "an attacker can submit a crafted SAML response whose signed XML view differs from the application-unmarshaled assertion view"
   review_confidence: high
 }
+concept SamlAssertionWrappingBypass : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+  cwe: [CWE_287, CWE_347]
+  review_category: "auth"
+  review_condition: "SAML assertion signature validation searches and rewrites signed Assertion elements without proving there is exactly one direct assertion in the expected namespace"
+  review_evidence: "SAML assertion validation context {pattern} iterates namespace matches, detaches an assertion for signature validation, and replaces children in the response tree"
+  review_assumption: "an attacker can submit a SAML response with wrapping or duplicate Assertion elements so the signed assertion differs from the assertion later unmarshaled for authentication"
+  review_confidence: high
+}
 concept UnverifiedFederationMissingEvents : sink {
   vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
   cwe: [CWE_287, CWE_347]

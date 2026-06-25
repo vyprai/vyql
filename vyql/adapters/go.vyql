@@ -1026,6 +1026,16 @@ adapter go {
     call path "p.validateSubject"
     not call path "xrv.Validate"
   }
+  flag code.SamlAssertionWrappingBypass in function {
+    lang "go"
+    call path "etreeutils.NSDetatch"
+    call path "v.context.Validate"
+    call path "elt.RemoveChild"
+    call path "elt.AddChild"
+    not call path "elt.ChildElements"
+    not call path "child.NamespaceURI"
+    not var "errMultipleAssertions"
+  }
 
   // resource lifecycle (CWE-772) — raw handles that must be closed.
   flag code.ResourceHandle on any {

@@ -89,6 +89,11 @@ rule SamlXmlRoundtripValidationBypass {
   match code.SamlXmlRoundtripValidationBypass as verifier
 }
 
+rule SamlAssertionWrappingBypass {
+  meta { id: "VYQL-AUTH-062", severity: critical, cwe: [CWE_287, CWE_347], confidence_floor: high }
+  match code.SamlAssertionWrappingBypass as verifier
+}
+
 rule TokenCacheAuthorizationBypass {
   meta { id: "VYQL-AUTH-039", severity: high, cwe: [CWE_862, CWE_863], confidence_floor: high }
   match code.TokenCacheAuthorizationBypass as cache

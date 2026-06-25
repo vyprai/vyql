@@ -647,6 +647,12 @@ review code.SamlFirstSignatureOnlyBypass {
   expected: [core.AuthenticationCheck]
   text: "review SAML response signature verification to ensure every XMLDSIG signature is validated, not only the first Signature node"
 }
+review code.SamlAssertionWrappingBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review SAML assertion validation for a single direct Assertion element in the expected namespace before accepting a signed assertion"
+}
 review code.UnverifiedFederationMissingEvents {
   category: "auth"
   kind: "attention"
