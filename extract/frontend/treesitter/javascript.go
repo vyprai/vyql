@@ -1810,6 +1810,21 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			method = path[i+1:]
 		}
 		return nir.Call{Callee: c.expr(ctor), Args: arglist, Path: path, Method: method, Loc: L}
+	case "jsx_attribute":
+		name := c.jsxAttributeName(n)
+		if name == "dangerouslySetInnerHTML" {
+			arg := c.jsxDangerouslySetInnerHTMLArg(c.jsxAttributeValue(n))
+			return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: []nir.Expr{arg}, Path: name, Method: name, Loc: L}
+		}
+		if val := c.jsxAttributeValue(n); val != nil {
+			return c.expr(val)
+		}
+		return nir.Name{ID: name, Loc: L}
+	case "jsx_expression":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return nir.Thru{Inner: c.expr(kids[0])}
+		}
+		return nir.Const{Loc: L}
 	case "await_expression", "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
@@ -1881,6 +1896,73 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *jsConv) jsxAttributeName(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if name := field(n, "name"); name != nil {
+		return c.text(name)
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "property_identifier", "identifier", "jsx_identifier":
+			return c.text(ch)
+		}
+	}
+	return ""
+}
+
+func (c *jsConv) jsxAttributeValue(n *tree_sitter.Node) *tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if val := field(n, "value"); val != nil {
+		return val
+	}
+	name := c.jsxAttributeName(n)
+	for _, ch := range namedChildren(n) {
+		if c.text(ch) == name {
+			continue
+		}
+		switch ch.Kind() {
+		case "jsx_expression", "string", "object", "member_expression", "identifier", "call_expression":
+			return ch
+		}
+	}
+	return nil
+}
+
+func (c *jsConv) jsxDangerouslySetInnerHTMLArg(n *tree_sitter.Node) nir.Expr {
+	n = c.unwrapJSXExpression(n)
+	if n == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	if n.Kind() == "object" {
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "pair" && c.keyName(field(ch, "key")) == "__html" {
+				return c.expr(field(ch, "value"))
+			}
+		}
+	}
+	return c.expr(n)
+}
+
+func (c *jsConv) unwrapJSXExpression(n *tree_sitter.Node) *tree_sitter.Node {
+	for n != nil {
+		switch n.Kind() {
+		case "jsx_expression", "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
+			kids := namedChildren(n)
+			if len(kids) == 0 {
+				return n
+			}
+			n = kids[0]
+		default:
+			return n
+		}
+	}
+	return nil
 }
 
 var jsExpressRouteMethods = map[string]bool{

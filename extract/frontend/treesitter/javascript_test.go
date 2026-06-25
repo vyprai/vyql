@@ -96,6 +96,34 @@ export function createTablePopper(popperContent: string) {
 	}
 }
 
+func TestJavaScriptDangerouslySetInnerHTMLLowersHtmlValueAsCallArg(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ChatMessage.jsx")
+	src := []byte(`
+export function ChatMessage({ item }) {
+  return <div dangerouslySetInnerHTML={{ __html: item.data }} />
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := findFuncDef(prog, "ChatMessage")
+	if !ok {
+		t.Fatalf("ChatMessage was not extracted; program=%#v", prog)
+	}
+	if !funcBodyHasCall(fn.Body, "dangerouslySetInnerHTML") {
+		t.Fatalf("JSX dangerous HTML attribute did not lower to a call; body=%#v", fn.Body)
+	}
+	if !funcBodyHasCallArgPath(fn.Body, "dangerouslySetInnerHTML", "item.data") {
+		t.Fatalf("JSX dangerous HTML call did not carry __html value item.data; body=%#v", fn.Body)
+	}
+}
+
 func TestJavaScriptAnonymousDefaultExportFunctionIsExtracted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "index.js")
@@ -783,6 +811,97 @@ func exprHasCall(expr nir.Expr, method string) bool {
 				return true
 			}
 		}
+	case nir.Seq:
+		for _, part := range e.Parts {
+			if exprHasCall(part, method) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func funcBodyHasCallArgPath(stmts []nir.Stmt, method, path string) bool {
+	for _, st := range stmts {
+		switch s := st.(type) {
+		case nir.ExprStmt:
+			if exprHasCallArgPath(s.Value, method, path) {
+				return true
+			}
+		case nir.Return:
+			if exprHasCallArgPath(s.Value, method, path) {
+				return true
+			}
+		case nir.Assign:
+			if exprHasCallArgPath(s.Value, method, path) {
+				return true
+			}
+		case nir.Block:
+			if funcBodyHasCallArgPath(s.Stmts, method, path) {
+				return true
+			}
+		case nir.If:
+			if funcBodyHasCallArgPath(s.Then, method, path) || funcBodyHasCallArgPath(s.Else, method, path) {
+				return true
+			}
+		case nir.Loop:
+			if funcBodyHasCallArgPath(s.Body, method, path) {
+				return true
+			}
+		case nir.Try:
+			if funcBodyHasCallArgPath(s.Body, method, path) {
+				return true
+			}
+			for _, h := range s.Handlers {
+				if funcBodyHasCallArgPath(h, method, path) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func exprHasCallArgPath(expr nir.Expr, method, path string) bool {
+	switch e := expr.(type) {
+	case nir.Call:
+		if e.Method == method {
+			for _, arg := range e.Args {
+				if exprPathEquals(arg, path) {
+					return true
+				}
+			}
+		}
+		for _, arg := range e.Args {
+			if exprHasCallArgPath(arg, method, path) {
+				return true
+			}
+		}
+		return exprHasCallArgPath(e.Callee, method, path)
+	case nir.Thru:
+		return exprHasCallArgPath(e.Inner, method, path)
+	case nir.Format:
+		for _, part := range e.Parts {
+			if exprHasCallArgPath(part, method, path) {
+				return true
+			}
+		}
+	case nir.Seq:
+		for _, part := range e.Parts {
+			if exprHasCallArgPath(part, method, path) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func exprPathEquals(expr nir.Expr, path string) bool {
+	switch e := expr.(type) {
+	case nir.Attr:
+		return e.Path == path
+	case nir.Thru:
+		return exprPathEquals(e.Inner, path)
 	}
 	return false
 }
