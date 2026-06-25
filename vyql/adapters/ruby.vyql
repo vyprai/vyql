@@ -334,6 +334,11 @@ adapter ruby {
   flag code.RegexMatch on any {
     path "__regex.match"
   }
+  flag code.CatastrophicRegex in module {
+    lang "ruby"
+    token regex contains_any ["(?:[^\\\"]|\\\\.)*?", "(?:[^\\\"]|\\\\.)*)"]
+    not token regex contains_any ["(?:[^\\\"]|\\\\\")*?", "(?:[^\\\"]|\\\\\")*)"]
+  }
   flag code.RubyLineAnchorValidationBypass in function {
     lang "ruby"
     name "legal?"
