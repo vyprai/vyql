@@ -517,6 +517,16 @@ adapter javascript {
     has "/_matrix/client/v1/media/thumbnail"
     lacks "validMediaRequest(url,session.baseUrl)"
   }
+  flag code.IncompleteIpDenylist in function {
+    lang "javascript"
+    name "isValidPublicIPv4Address"
+    call path "parseInt"
+    expr "first===10"
+    expr "first===127"
+    expr "first===169&&second===254"
+    expr "first===172&&second>=16&&second<=31"
+    expr "first===192&&second===168"
+  }
   flag code.CkeditorStaticProtectedSourceTokenBypass in function {
     lang "javascript"
     name "protectSource"
