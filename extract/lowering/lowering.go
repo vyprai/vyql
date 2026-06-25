@@ -478,9 +478,13 @@ func (l *lowerer) constBool(e nir.Expr, sc *scope) (bool, bool) {
 }
 
 // containerRead resolves an element-sensitive read of recv[key] into result. Returns false
-// when it can't (non-constant key, or recv was never written as a container) so the caller
-// falls back to the conservative whole-container flow. A constant key that was never written
-// (and no dynamic write happened) reads CLEAN — this is the precision win.
+// when it can't (recv was never written as a container, or a dirty container is read with a
+// dynamic key) so the caller falls back to conservative whole-container/key flow.
+//
+// A constant key that was never written (and no dynamic write happened) reads CLEAN. A dynamic
+// key on a clean tracked container reads "one of the known slots": route all slot taint, but do
+// not taint the selected value merely because the selector is user-controlled. This preserves
+// whitelist maps such as `$files[$request_key]` whose values are compile-time constants.
 func (l *lowerer) containerRead(recv, result string, keyExpr nir.Expr, sc *scope) bool {
 	ci := l.containers[recv]
 	if ci == nil {
@@ -488,7 +492,13 @@ func (l *lowerer) containerRead(recv, result string, keyExpr nir.Expr, sc *scope
 	}
 	key, ok := l.constKey(keyExpr, sc)
 	if !ok {
-		return false // dynamic key — any slot could be read
+		if ci.dirty {
+			return false // unknown write plus dynamic key — any value may be present
+		}
+		for _, elem := range ci.elems {
+			l.flow(elem, result)
+		}
+		return true
 	}
 	switch {
 	case ci.dirty:
@@ -1950,9 +1960,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			props["str_args"] = strings.Join(valToks, "\x00")
 		}
 		n := l.node("Subscript", ex.Loc, props)
-		l.flow(key, n)
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
+			l.flow(key, n)
 			l.flow(base, n)
 		}
 		return n
@@ -2595,6 +2605,14 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// stamp recv_type so type-constrained sink adapters can reason about it.
 	var recvNode string
 	if attr, ok := call.Callee.(nir.Attr); ok {
+		if mutatorMethods[call.Method] {
+			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
+				sc.node[nm.ID] = l.node("Name", nm.Loc, map[string]string{
+					"callee_path": nm.ID,
+					"method":      nm.ID,
+				})
+			}
+		}
 		recvNode = l.eval(attr.Base, sc)
 		if recvNode != "" {
 			props["recv"] = recvNode

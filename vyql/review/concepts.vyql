@@ -1803,6 +1803,12 @@ review code.UnvalidatedRouteConfigKeyStoredXss {
   expected: [core.InputValidation, core.HtmlEscape]
   text: "review route-derived configuration key writes for identifier validation before persistence and later UI rendering"
 }
+review code.UnescapedLocalFileContentHtmlRender {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "review file-content display endpoints for HTML escaping before printing local file contents"
+}
 review code.ResponseWriterScriptWindowIdXss {
   category: "xss"
   kind: "attention"

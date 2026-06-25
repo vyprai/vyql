@@ -253,23 +253,25 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: c.loc(inner)}}}
 		}
-		// subscript write ($arr[$k] = v) — two effects: (1) a write to the base's path
-		// ($bag['key'] -> "bag") so path mappings can match writes;
-		// (2) when the base is a plain variable, a flow join `$arr = combine($arr, v)` so a
-		// later read of $arr carries v's flow (an array built element-by-element stays linked).
-		// Without (2)
-		// the value taint was dropped at the discarded write.
+		// subscript write ($arr[$k] = v) — emit a synthetic __setitem__ call so lowering can
+		// track constant-key array slots precisely while still tainting whole-array reads.
 		if left != nil && left.Kind() == "subscript_expression" {
 			if kids := namedChildren(left); len(kids) > 0 {
 				base := kids[0]
-				write := nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right},
-					Path: c.dotted(base), Method: "", Loc: c.loc(inner)}}
-				if base.Kind() == "variable_name" {
-					bn := c.text(base)
-					join := nir.Assign{Targets: []string{bn},
-						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: bn, Loc: c.loc(base)}, right}, Loc: c.loc(inner)}}
-					return []nir.Stmt{write, join}
+				var key nir.Expr = nir.Const{Loc: c.loc(left)}
+				if len(kids) > 1 {
+					key = c.expr(kids[1])
 				}
+				baseExpr := c.expr(base)
+				path := c.dotted(base)
+				if path != "" {
+					path += ".__setitem__"
+				}
+				write := nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: baseExpr, Attr: "__setitem__", Loc: c.loc(left)},
+					Args:   []nir.Expr{right, key},
+					Path:   path, Method: "__setitem__", Loc: c.loc(inner),
+				}}
 				return []nir.Stmt{write}
 			}
 		}

@@ -849,6 +849,11 @@ rule BufferedErrorPageRequestMetadataXss {
   match code.BufferedErrorPageRequestMetadataXss as sink
 }
 
+rule UnescapedLocalFileContentHtmlRender {
+  meta { id: "VYQL-INJ-180", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedLocalFileContentHtmlRender as sink
+}
+
 rule ContaoAjaxToggleSubpaletteSqlIdentifierInjection {
   meta { id: "VYQL-INJ-112", severity: high, cwe: [CWE_89], confidence_floor: high }
   match code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection as sink

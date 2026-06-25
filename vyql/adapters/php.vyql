@@ -1424,6 +1424,12 @@ adapter php {
     lacks "htmlspecialchars($_SERVER"
     lacks "html_escape($_SERVER"
   }
+  flag code.UnescapedLocalFileContentHtmlRender in function {
+    lang "php"
+    call path "file_get_contents"
+    call path "print"
+    not call path contains_any ["htmlspecialchars", "htmlentities", "esc_html", "html_escape", "strip_tags"]
+  }
   flag code.RequestBackedFooterScriptXss in module {
     lang "php"
     token subscript contains_any ["$_REQUEST[\"footerScripts\"]", "$_REQUEST['footerScripts']"]
