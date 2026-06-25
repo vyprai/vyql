@@ -73,12 +73,14 @@ rule Command {
   meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78], benchmark: cmdi }
   taint core.UserControlledData -> code.CommandExecution
   unless sanitized_by core.ShellEscape
+  unless guarded_by core.CommandArgumentValidation
 }
 
 rule StoredCommand {
   meta { id: "VYQL-INJ-032", severity: high, cwe: [CWE_78] }
   taint code.DatabaseRead -> code.CommandExecution
   unless sanitized_by core.ShellEscape
+  unless guarded_by core.CommandArgumentValidation
 }
 
 rule RubyPipeOpenCommand {

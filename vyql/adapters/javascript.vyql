@@ -1133,6 +1133,11 @@ adapter javascript {
   control "sqlstring.escape" -> core.SqlParameterization
   control "shell-quote.quote" -> core.ShellEscape
   control "shellQuote.quote" -> core.ShellEscape
+  control "isValidHost" -> core.CommandArgumentValidation
+  control "isAllowedHost" -> core.CommandArgumentValidation
+  control "validateHost" -> core.CommandArgumentValidation
+  control "validator.isFQDN" -> core.CommandArgumentValidation
+  control "net.isIP" -> core.CommandArgumentValidation
 
   // ── UNSOUND neutralizers (`assume`) ───────────────────────────────────────────────
   // These MIGHT defuse the threat but cannot be proven to, so they NEVER suppress a flow.
@@ -1885,7 +1890,11 @@ adapter javascript {
   sink method "all" -> code.SqlExecution
   sink method "get" -> code.SqlExecution
   sink method "each" -> code.SqlExecution
-  sink method "exec" -> code.SqlExecution
+  sink path "db.exec" -> code.SqlExecution
+  sink path "database.exec" -> code.SqlExecution
+  sink path "connection.exec" -> code.SqlExecution
+  sink path "sqlite.exec" -> code.SqlExecution
+  sink path "sqlite3.exec" -> code.SqlExecution
   sink method "prepare" -> code.SqlExecution
 
   // xpath (npm xpath) — the expression is arg0.
