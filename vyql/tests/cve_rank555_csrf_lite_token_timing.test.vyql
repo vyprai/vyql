@@ -26,6 +26,20 @@ test "rank555: csrf token ordinary equality leaks timing"
   }
   ```
 
+test "rank555: csrf token AST comparison matches token-like identifiers"
+  lang javascript
+  expect VYQL-CRY-006
+  expect_review code.SecretComparisonReview
+  code
+  ```
+  function validateCsrf(data, sessionToken) {
+    if (!sessionToken)
+      return false
+
+    return data['x-csrf-token'] === sessionToken
+  }
+  ```
+
 test "rank555: csrf token constant-time comparison is clean"
   lang javascript
   reject VYQL-CRY-006

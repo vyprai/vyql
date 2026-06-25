@@ -1660,10 +1660,10 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 	case "tokens":
 		return valuePredicate(pred.Op, pred.Values, n.Prop("str_args"))
 	case "identifier":
-		if n.Type != "code.Name" {
+		if n.Type != "code.Name" && n.Type != "code.Param" {
 			return false
 		}
-		return valuePredicate(pred.Op, pred.Values, n.Prop("callee_path")+"\x00"+n.Prop("method"))
+		return valuePredicate(pred.Op, pred.Values, n.Prop("callee_path")+"\x00"+n.Prop("method")+"\x00"+n.Prop("name")+"\x00"+n.ID)
 	case "key":
 		return valuePredicate(pred.Op, pred.Values, n.Prop("str_args")+"\x00"+n.Prop("callee_path"))
 	case "call":

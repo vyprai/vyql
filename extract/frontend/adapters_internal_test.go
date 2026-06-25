@@ -523,8 +523,8 @@ adapter javascript {
 	store.AddNode(usg.Node{ID: "header", Type: "code.Subscript", Props: map[string]string{
 		"loc": "sample.js:10", "callee_path": "data.__subscript", "method": "[]", "str_args": "x-csrf-token",
 	}})
-	store.AddNode(usg.Node{ID: "candidate", Type: "code.Name", Props: map[string]string{
-		"loc": "sample.js:10", "callee_path": "providedToken", "method": "providedToken",
+	store.AddNode(usg.Node{ID: "candidate", Type: "code.Param", Props: map[string]string{
+		"loc": "sample.js:10", "name": "providedToken",
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "header", Dst: "a0"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "candidate", Dst: "a1"})

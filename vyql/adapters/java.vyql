@@ -659,18 +659,18 @@ adapter java {
   flag code.JenkinsDescriptorPropertyFileValidationMissingPost in function {
     class base "ParameterDescriptor"
     function "doCheckPropertyFile"
-    annotation "QueryParameter"
-    call path "Property"
-    call path "File"
-    call path "URL"
-    call path "property.execute"
+    token identifier "QueryParameter"
+    call "Property"
+    call "File"
+    call "URL"
+    call "execute"
     not annotation "POST"
     not annotation "RequirePOST"
   }
   flag code.JenkinsDescriptorPropertyFileValidationMissingPost in function {
     class base "ParameterDescriptor"
     function contains_any ["doCheckPropertyKey", "doCheckDefaultPropertyFile", "doCheckDefaultPropertyKey"]
-    annotation "QueryParameter"
+    token identifier "QueryParameter"
     call path "doCheckPropertyFile"
     not annotation "POST"
     not annotation "RequirePOST"

@@ -459,12 +459,15 @@ adapter javascript {
     lacks "timingSafeCompare"
     lacks "tsscmp"
   }
-  flag code.SecretComparisonReview in function {
-    lang "javascript"
-    has "data['x-csrf-token']===token"
-    has "deletedata['x-csrf-token']"
-    lacks "scmp"
-    lacks "timingSafeEqual"
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "==="]
+    operand {
+      key contains_any ["csrf-token", "x-csrf-token", "xsrf-token", "auth-token", "api-key", "signature", "secret"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key", "password", "pass"]
+    }
+    lacks call contains_any ["scmp", "tsscmp", "timingSafeEqual", "safeCompare"]
   }
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
   flag code.MethodGatedRedirectValidationBypass in function {
