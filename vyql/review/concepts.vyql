@@ -1876,6 +1876,12 @@ review code.SensitiveConfigInfoLog {
   kind: "attention"
   text: "review configuration object logging above debug level for inline credentials or target resource secrets"
 }
+review code.RemoteUrlObjectDebugLog {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify remote repository URL objects are not logged before credentials, query strings, and fragments are stripped"
+}
 review code.VerboseHttpClientAuthorizationLog {
   category: "secret"
   kind: "attention"

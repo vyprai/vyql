@@ -939,6 +939,65 @@ adapter php {
 	}
 }
 
+func TestContextFlagIgnoresUnscopedParamsFromOtherFunctions(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.RemoteUrlDebugLog in function {
+    lang "javascript"
+    name "fetchRepo"
+    call path "logger.debug"
+    token identifier "url"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context identifier flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "file.ts:40",
+		Scope: "file.ts/fn2",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=javascript\x00name=fetchRepo",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "debug",
+		Type:  "code.Call",
+		Loc:   "file.ts:45",
+		Scope: "file.ts/fn2",
+		Props: map[string]string{"callee_path": "logger.debug", "method": "debug"},
+	})
+	store.AddNode(usg.Node{
+		ID:   "other-param",
+		Type: "code.Param",
+		Loc:  "file.ts:10",
+		Props: map[string]string{
+			"name": "url",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context identifier flag matched unscoped param from a different function: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:   "local-param",
+		Type: "code.Param",
+		Loc:  "file.ts:40",
+		Props: map[string]string{
+			"name": "url",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context identifier flag should match unscoped param on context declaration line: %+v", got)
+	}
+}
+
 func TestContextFlagCallArgDoesNotUseCompactTokenFallback(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter php {
@@ -1101,6 +1160,59 @@ adapter cpp {
 	got = spec.flagAdapter().Apply(store)
 	if len(got) != 0 {
 		t.Fatalf("AST flow flag should skip add with downstream wraparound check: %+v", got)
+	}
+}
+
+func TestAstFlagCallOperandMatchesTransitiveFlow(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.RemoteUrlDebugLog on call {
+    path "logger.debug"
+    operand {
+      identifier contains_any ["url", "uri"]
+    }
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse param flow flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "url-param", Type: "code.Param", Props: map[string]string{
+		"loc": "file.js:10", "name": "url",
+	}})
+	store.AddNode(usg.Node{ID: "elem", Type: "code.CollectionElement", Props: map[string]string{
+		"loc": "file.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "obj", Type: "code.Seq", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "__object_literal",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "file.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "debug", Type: "code.Call", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "logger.debug", "method": "debug", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "url-param", Dst: "elem"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "elem", Dst: "obj"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "obj", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "debug"})
+
+	debug, ok, err := store.GetNode("debug")
+	if err != nil || !ok {
+		t.Fatalf("missing debug node: ok=%v err=%v", ok, err)
+	}
+	if !flagNodeKindAllows(spec.Flags[0], debug) {
+		t.Fatalf("debug node kind was not allowed by flag: %+v", spec.Flags[0])
+	}
+	if !flagMatchesNode(store, &flowTokenIndex{}, spec.Flags[0], debug, "javascript", false, nil) {
+		t.Fatalf("call operand flag did not match transitive URL flow into debug call")
+	}
+
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "debug" || got[0].Concept != "custom.RemoteUrlDebugLog" {
+		t.Fatalf("call operand flag did not label debug log call: %+v", got)
 	}
 }
 

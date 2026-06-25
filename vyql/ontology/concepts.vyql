@@ -4330,6 +4330,15 @@ concept SensitiveConfigInfoLog : sink {
   review_assumption: "operator configuration files may contain inline credentials or target resource secrets"
   review_confidence: medium
 }
+concept RemoteUrlObjectDebugLog : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_532, CWE_598]
+  review_category: "secret"
+  review_condition: "remote repository URL objects are written to debug logs before credential-bearing components are removed"
+  review_evidence: "remote fetch context {pattern} passes a URL object into logger.debug"
+  review_assumption: "remote source URLs may contain credentials, tokens, query strings, or fragments supplied by users or package metadata"
+  review_confidence: high
+}
 concept VerboseHttpClientAuthorizationLog : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]

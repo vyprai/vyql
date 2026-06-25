@@ -1344,6 +1344,9 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 					return nil, []string{"analysis." + strings.ToLower(spec.Flags[i].Scope) + ".context"}, false
 				}
 				for _, pred := range spec.Flags[i].Predicates {
+					if pred.Subject == "flow_to" {
+						continue
+					}
 					switch pred.Property {
 					case "path":
 						paths = append(paths, pred.Values...)
@@ -1486,11 +1489,24 @@ func flagOperandCandidates(s usg.Store, idx *flowTokenIndex, n usg.Node) [][]usg
 		if arg, ok, err := s.GetNode(argID); err == nil && ok {
 			nodes = append(nodes, arg)
 		}
-		for _, srcID := range idx.rev[argID] {
-			if src, ok, err := s.GetNode(srcID); err == nil && ok {
-				nodes = append(nodes, src)
+		seen := map[string]bool{argID: true}
+		var collectUpstream func(string, int)
+		collectUpstream = func(id string, depth int) {
+			if depth >= 6 {
+				return
+			}
+			for _, srcID := range idx.rev[id] {
+				if seen[srcID] {
+					continue
+				}
+				seen[srcID] = true
+				if src, ok, err := s.GetNode(srcID); err == nil && ok {
+					nodes = append(nodes, src)
+				}
+				collectUpstream(srcID, depth+1)
 			}
 		}
+		collectUpstream(argID, 0)
 		out = append(out, nodes)
 	}
 	return out
@@ -1798,8 +1814,14 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 				continue
 			}
 			candScope := nodeLexicalScope(cand)
-			if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
-				continue
+			if scope != "" {
+				if candScope != "" {
+					if !sameOrNestedScope(candScope, scope) {
+						continue
+					}
+				} else if !unscopedNodeBelongsToScopedContext(cand, n) {
+					continue
+				}
 			}
 			if prefix != "" && locFile(cand.Prop("loc")) != prefix {
 				continue
@@ -1813,6 +1835,15 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 		}
 	}
 	return false
+}
+
+func unscopedNodeBelongsToScopedContext(candidate, anchor usg.Node) bool {
+	if candidate.Type != "code.Param" {
+		return false
+	}
+	cFile, cLine := splitLocFileLine(candidate.Prop("loc"))
+	aFile, aLine := splitLocFileLine(anchor.Prop("loc"))
+	return cFile != "" && cFile == aFile && cLine != 0 && cLine == aLine
 }
 
 func nodeLexicalScope(n usg.Node) string {
@@ -1965,6 +1996,15 @@ func locFile(loc string) string {
 		return loc[:i]
 	}
 	return loc
+}
+
+func splitLocFileLine(loc string) (string, int) {
+	i := strings.LastIndex(loc, ":")
+	if i < 0 {
+		return loc, 0
+	}
+	line, _ := strconv.Atoi(loc[i+1:])
+	return loc[:i], line
 }
 
 // markAdapter labels a node with a presence concept for `match`-style rules.

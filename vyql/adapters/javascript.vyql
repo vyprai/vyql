@@ -948,6 +948,12 @@ adapter javascript {
   flag code.LogWrite on any {
     path "logger.debug"
   }
+  flag code.RemoteUrlObjectDebugLog on call {
+    path "logger.debug"
+    operand {
+      identifier contains_any ["url", "uri"]
+    }
+  }
   flag code.LogWrite on any {
     path "log.info"
   }
