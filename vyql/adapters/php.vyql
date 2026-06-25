@@ -49,6 +49,7 @@ adapter php {
   source method "getURI" -> code.HttpInput
   source method "getQuery" -> code.HttpInput
   source method "getPathInfo" -> code.HttpInput
+  source path "$this.getParameter" -> code.HttpInput
   // Drupal request helpers. current_path() can reflect the requested q/path
   // value; URL helper consumers must reject absolute/external targets before
   // using it as a redirect destination.
@@ -1376,6 +1377,7 @@ adapter php {
   sink path "printf" -> code.HtmlRender
   sink path "die" -> code.HtmlRender
   sink path "exit" -> code.HtmlRender
+  sink path "$this.tpl.assign" arg 1 -> code.HtmlRender
   flag code.BufferedErrorPageRequestMetadataXss in function {
     lang "php"
     has "$out.="
