@@ -1042,6 +1042,11 @@ adapter javascript {
   control "BodySchema.parse" -> core.NosqlParameterization
   control "ParamsSchema.parse" -> core.NosqlParameterization
   control "QuerySchema.parse" -> core.NosqlParameterization
+  control "ChatInputGuideListBodySchema.parse" -> core.NosqlParameterization
+  control "GetQuoteBodySchema.parse" -> core.NosqlParameterization
+  control "GetCollectionQuoteBodySchema.parse" -> core.NosqlParameterization
+  control "CreateQuestionGuideBodySchema.parse" -> core.NosqlParameterization
+  control "GetHelperBotChatRecordsParamsSchema.parse" -> core.NosqlParameterization
   flag code.IncompleteHtmlEntityEscape on any {
     path "string.replace"
     has "&amp;"
