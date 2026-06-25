@@ -887,6 +887,16 @@ adapter php {
     call path "addFilter"
     not call path "pg_escape_literal"
   }
+  flag code.EscapedSqlValueFunctionCallAllowed in function {
+    lang "php"
+    name "ConditionExpr"
+    call path "is_array"
+    call path "array_keys"
+    index "$Value.__subscript"
+    call path "stripos"
+    call path "sprintf"
+    not call path "Gdn_UserException"
+  }
   // Review-only access-policy config: nested PHP arrays such as
   // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]
   // carry key-path tokens, so broad role grants on sensitive resource groups can

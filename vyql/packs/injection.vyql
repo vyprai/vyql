@@ -24,6 +24,11 @@ rule PgEscapeStringSqlFilterInjection {
   match code.PgEscapeStringSqlFilterInjection as sink
 }
 
+rule EscapedSqlValueFunctionCallAllowed {
+  meta { id: "VYQL-INJ-183", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.EscapedSqlValueFunctionCallAllowed as sink
+}
+
 rule UnvalidatedSqlOrderDirection {
   meta { id: "VYQL-INJ-124", severity: high, cwe: [CWE_89], confidence_floor: high }
   match code.UnvalidatedSqlOrderDirection as sink
