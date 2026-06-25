@@ -538,6 +538,17 @@ adapter python {
     not call path contains_any ["destination_serializer.dumps", "destination_serializer.loads"]
     not identifier contains_any ["BadSignature", "RedirectAllowlist"]
   }
+  flag code.WeakRedirectUrlValidation in function {
+    lang "python"
+    function contains_any ["validate_redirect", "is_safe_url", "safe_redirect"]
+    call path "urlsplit"
+    attr path "request.host_url"
+    call path "current_app.config.get"
+    binary contains_any ["__binop.not in"]
+    binary contains_any ["__binop.ne"]
+    not call path contains_any ["ord", "url.startswith", "url.replace", "quote", "urlquote"]
+    not binary contains_any ["__binop.le"]
+  }
   flag code.OAuthStateCookieValidationMissing in function {
     function contains_any ["verify_and_process", "oauth_callback", "auth_callback", "callback"]
     literal "state"

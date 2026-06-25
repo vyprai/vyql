@@ -4710,6 +4710,15 @@ concept UnsignedOidcStateDestinationRedirect : sink {
   review_assumption: "the identity provider or an attacker controlling the callback state value can alter the post-login destination"
   review_confidence: high
 }
+concept WeakRedirectUrlValidation : sink {
+  vulnerable_to: [request_forgery.OpenRedirect, validation.ImproperInputValidation]
+  cwe: [CWE_601, CWE_20]
+  review_category: "request_forgery"
+  review_condition: "redirect URL validation allows external netloc checks without scheme parity, slash normalization, and control-character rejection"
+  review_evidence: "redirect validation context {pattern} parses target and request host but uses a weak netloc/external-host check before redirect"
+  review_assumption: "attackers can provide a next/redirect URL that reaches this validation helper"
+  review_confidence: high
+}
 concept SamlRelayStateOpenRedirect : sink {
   vulnerable_to: [request_forgery.OpenRedirect]
   cwe: [CWE_601]
