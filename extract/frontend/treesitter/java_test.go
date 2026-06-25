@@ -3,6 +3,7 @@ package treesitter_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -267,6 +268,116 @@ func TestJavaFunctionContextIncludesNumericLiteralTokens(t *testing.T) {
 		}
 	}
 	t.Fatalf("testCoords context did not include numeric literal token; nodes=%#v", nodes)
+}
+
+func TestJavaSensitiveMetadataExportContextTokens(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "Publisher.java")
+	src := []byte(`
+class Publisher {
+  String repoSource;
+  String gh() { return repoSource; }
+  void vulnerable(JsonObject data, DBBuilder db) {
+    data.add("repoSource", gh());
+    for (JsonProperty p : data.getProperties()) {
+      db.metadata(p.getName(), p.getValue().asString());
+    }
+  }
+  void fixed(JsonObject data, DBBuilder db) {
+    for (JsonProperty p : data.getProperties()) {
+      db.metadata(p.getName(), p.getValue().asString());
+    }
+    data.add("repoSource", gh());
+  }
+}
+class JsonObject { Iterable<JsonProperty> getProperties(){return null;} void add(String k, String v){} }
+class JsonProperty { String getName(){return "";} JsonValue getValue(){return null;} }
+class JsonValue { String asString(){return "";} }
+class DBBuilder { void metadata(String k, String v){} }
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !javaFunctionContextContains(prog.Modules[0].Body, "vulnerable", "metadata_export_after_sensitive_key:repoSource") {
+		t.Fatalf("vulnerable context missing sensitive metadata export token: %#v", prog.Modules[0].Body)
+	}
+	if javaFunctionContextContains(prog.Modules[0].Body, "fixed", "metadata_export_after_sensitive_key:repoSource") {
+		t.Fatalf("fixed context should not contain sensitive metadata export token: %#v", prog.Modules[0].Body)
+	}
+}
+
+func TestJavaSensitiveMetadataExportContextTokensSurviveLargeFunction(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "Publisher.java")
+	var filler strings.Builder
+	for i := 0; i < 700; i++ {
+		filler.WriteString("\n    data.add(\"field")
+		filler.WriteString(strconv.Itoa(i))
+		filler.WriteString("\", \"value\");")
+	}
+	src := []byte(`
+class Publisher {
+  String repoSource;
+  String gh() { return repoSource; }
+  void vulnerable(JsonObject data, DBBuilder db) {` + filler.String() + `
+    data.add("repoSource", gh());
+    for (JsonProperty p : data.getProperties()) {
+      db.metadata(p.getName(), p.getValue().asString());
+    }
+  }
+}
+class JsonObject { Iterable<JsonProperty> getProperties(){return null;} void add(String k, String v){} }
+class JsonProperty { String getName(){return "";} JsonValue getValue(){return null;} }
+class JsonValue { String asString(){return "";} }
+class DBBuilder { void metadata(String k, String v){} }
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.function.context" &&
+			strings.Contains(n.Prop("str_args"), "metadata_export_after_sensitive_key:repoSource") {
+			return
+		}
+	}
+	t.Fatalf("large function context lost sensitive metadata export token")
+}
+
+func javaFunctionContextContains(stmts []nir.Stmt, name, token string) bool {
+	for _, st := range stmts {
+		switch x := st.(type) {
+		case nir.ClassDef:
+			if javaFunctionContextContains(x.Body, name, token) {
+				return true
+			}
+		case nir.FuncDef:
+			if x.Name != name {
+				continue
+			}
+			for _, got := range x.ContextTokens {
+				if got == token {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func TestJavaEnhancedForBindsElementToIterable(t *testing.T) {

@@ -2848,6 +2848,15 @@ concept KubernetesTemplateSecretLookupExposure : sink {
   review_assumption: "lower-trust users can author or influence templates executed by a controller service account with broader Secret read permissions"
   review_confidence: high
 }
+concept RepositorySourceMetadataExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200]
+  review_category: "secret"
+  review_condition: "repository source or Git remote URL metadata is exported to durable build metadata after it may contain embedded credentials"
+  review_evidence: "metadata export context {pattern} adds a repository/Git source key before iterating properties into a metadata writer"
+  review_assumption: "repository URLs may include user-info credentials supplied by CI or command-line automation"
+  review_confidence: high
+}
 concept CinnyServiceWorkerMediaAuthLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_20, CWE_200, CWE_522]

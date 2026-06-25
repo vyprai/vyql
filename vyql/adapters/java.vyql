@@ -300,6 +300,10 @@ adapter java {
     call path "Encode.forHtmlContent"
     not call path "Encode.forJavaScript"
   }
+  flag code.RepositorySourceMetadataExposure in function {
+    token metadata_export_after_sensitive_key "repoSource"
+    token metadata_export_writer "metadata"
+  }
   flag code.JenkinsProjectDisplayNameXss in function {
     function "getName"
     call path "project.getFullDisplayName"

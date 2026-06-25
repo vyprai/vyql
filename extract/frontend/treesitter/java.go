@@ -145,6 +145,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		contextTokens := append([]string{}, c.classContextTokens...)
 		contextTokens = append(contextTokens, annotationTokens...)
 		contextTokens = append(contextTokens, c.jvModifierTokens(n, "function_modifier:")...)
+		contextTokens = append(contextTokens, c.jvSensitiveMetadataExportTokens(n)...)
 		contextTokens = append(contextTokens, c.jvFunctionTokens(name, n, params, paramTypes)...)
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L,
 			ContextTokens: contextTokens,
@@ -680,6 +681,113 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 	}
 	walk(n)
 	return out
+}
+
+func (c *jvConv) jvSensitiveMetadataExportTokens(n *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	added := map[string]map[string]bool{}
+	var stack []string
+	var out []string
+	addToken := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 64 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	addKey := func(obj, key string) {
+		if obj == "" || key == "" || !javaSensitiveMetadataKey(key) {
+			return
+		}
+		if added[obj] == nil {
+			added[obj] = map[string]bool{}
+		}
+		added[obj][key] = true
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil || len(out) >= 64 {
+			return
+		}
+		if m.Kind() == "enhanced_for_statement" {
+			if base := c.jvPropertiesIterableBase(field(m, "value")); base != "" {
+				stack = append(stack, base)
+				for _, ch := range namedChildren(m) {
+					if ch != field(m, "value") {
+						walk(ch)
+					}
+				}
+				stack = stack[:len(stack)-1]
+				return
+			}
+		}
+		if m.Kind() == "method_invocation" {
+			path := c.dotted(m)
+			method := lastSeg(path)
+			base := javaPathBase(path)
+			switch method {
+			case "add", "put", "set":
+				addKey(base, c.jvFirstStringArg(m))
+			case "metadata", "putMetadata", "setMetadata", "writeMetadata":
+				for _, obj := range stack {
+					for key := range added[obj] {
+						addToken("metadata_export_after_sensitive_key:" + key)
+						addToken("metadata_export_after_sensitive_source:" + obj + "." + key)
+						addToken("metadata_export_writer:" + path)
+					}
+				}
+			}
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *jvConv) jvPropertiesIterableBase(n *tree_sitter.Node) string {
+	if n == nil || n.Kind() != "method_invocation" {
+		return ""
+	}
+	path := c.dotted(n)
+	switch lastSeg(path) {
+	case "getProperties", "entrySet", "propertySet":
+		return javaPathBase(path)
+	default:
+		return ""
+	}
+}
+
+func (c *jvConv) jvFirstStringArg(n *tree_sitter.Node) string {
+	args := field(n, "arguments")
+	if args == nil {
+		return ""
+	}
+	for _, ch := range namedChildren(args) {
+		if ch.Kind() == "string_literal" {
+			return javaStringToken(c.text(ch))
+		}
+		return ""
+	}
+	return ""
+}
+
+func javaPathBase(path string) string {
+	if i := strings.LastIndex(path, "."); i > 0 {
+		return path[:i]
+	}
+	return ""
+}
+
+func javaSensitiveMetadataKey(key string) bool {
+	k := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(key, "-", ""), "_", ""))
+	switch k {
+	case "reposource", "repository", "repositoryurl", "gitsource", "gitremote", "originurl", "remoteurl":
+		return true
+	default:
+		return strings.Contains(k, "repo") && (strings.Contains(k, "source") || strings.Contains(k, "url"))
+	}
 }
 
 func javaExprToken(raw string) string {
