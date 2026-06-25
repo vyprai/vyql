@@ -218,6 +218,28 @@ adapter c {
     has "tmp=pos"
     lacks "tmp==pos"
   }
+  flag code.EcPointIdentityElementMissing in function {
+    lang "c"
+    name "pointZZ_pDouble"
+    call path "mpz_invert"
+    lacks "pointZZ_pIsIdentityElement"
+    lacks "pointZZ_pSetToIdentityElement"
+  }
+  flag code.EcPointIdentityElementMissing in function {
+    lang "c"
+    name "pointZZ_pAdd"
+    call path "mpz_invert"
+    lacks "pointZZ_pIsIdentityElement"
+    lacks "pointZZ_pSetToIdentityElement"
+  }
+  flag code.EcPointIdentityElementMissing in function {
+    lang "c"
+    name "pointZZ_pMul"
+    call path "pointZZ_pDouble"
+    call path "pointZZ_pAdd"
+    lacks "pointZZ_pIsIdentityElement"
+    lacks "pointZZ_pSetToIdentityElement"
+  }
   flag code.UnderallocatedFormattedAddressList in function {
     lang "c"
     name "option_to_env"

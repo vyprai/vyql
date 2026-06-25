@@ -1072,6 +1072,12 @@ review code.EcdsaSignatureScalarBoundsMissing {
   expected: [core.InputValidation]
   text: "review ECDSA verification for r and s range checks before modular inverse and point arithmetic"
 }
+review code.EcPointIdentityElementMissing {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review elliptic-curve point double/add/mul operations for point-at-infinity handling before modular inversion and scalar multiplication"
+}
 review code.AuthenticodeSignaturePathBindingBypass {
   category: "crypto"
   kind: "attention"

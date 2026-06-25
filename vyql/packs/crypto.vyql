@@ -133,3 +133,8 @@ rule TpmDiskKeyWeakPcrSealing {
   meta { id: "VYQL-CRY-025", severity: high, cwe: [CWE_327, CWE_347], confidence_floor: high }
   match code.TpmDiskKeyWeakPcrSealing as sealing
 }
+
+rule EcPointIdentityElementMissing {
+  meta { id: "VYQL-CRY-026", severity: high, cwe: [CWE_347, CWE_20], confidence_floor: high }
+  match code.EcPointIdentityElementMissing as point
+}
