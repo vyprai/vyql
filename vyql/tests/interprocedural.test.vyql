@@ -349,6 +349,91 @@ test "go: parameterized query in the repo is clean"
   func repo(value string) { db.Query("SELECT * FROM u WHERE n = $1", value) }
   ```
 
+test "go: OIDC issuer extracted from bearer token reaches provider discovery as SSRF"
+  lang go
+  expect VYQL-RF-001
+  file exchange.go
+  ```
+  package app
+  import (
+    "context"
+    auth "chainguard.dev/sdk/auth"
+  )
+  func Exchange(ctx context.Context, bearer string) error {
+    issuer, err := auth.ExtractIssuer(bearer)
+    if err != nil { return err }
+    _, err = Get(ctx, issuer)
+    return err
+  }
+  ```
+  file provider.go
+  ```
+  package app
+  import (
+    "context"
+    "github.com/coreos/go-oidc/v3/oidc"
+  )
+  func Get(ctx context.Context, issuer string) (any, error) {
+    return newProviderWithRetry(ctx, issuer)
+  }
+  func newProviderWithRetry(ctx context.Context, issuer string) (any, error) {
+    return oidc.NewProvider(ctx, issuer)
+  }
+  ```
+
+test "go: OIDC issuer extracted from bearer token reaches direct provider discovery as SSRF"
+  lang go
+  expect VYQL-RF-001
+  file exchange.go
+  ```
+  package app
+  import (
+    "context"
+    auth "chainguard.dev/sdk/auth"
+    "github.com/coreos/go-oidc/v3/oidc"
+  )
+  func Exchange(ctx context.Context, bearer string) error {
+    issuer, err := auth.ExtractIssuer(bearer)
+    if err != nil { return err }
+    _, err = oidc.NewProvider(ctx, issuer)
+    return err
+  }
+  ```
+
+test "go: OIDC issuer validation guards provider discovery SSRF"
+  lang go
+  reject VYQL-RF-001
+  file exchange.go
+  ```
+  package app
+  import (
+    "context"
+    auth "chainguard.dev/sdk/auth"
+    "github.com/octo-sts/app/pkg/oidcvalidate"
+  )
+  func Exchange(ctx context.Context, bearer string) error {
+    issuer, err := auth.ExtractIssuer(bearer)
+    if err != nil { return err }
+    if !oidcvalidate.IsValidIssuer(issuer) { return nil }
+    _, err = Get(ctx, issuer)
+    return err
+  }
+  ```
+  file provider.go
+  ```
+  package app
+  import (
+    "context"
+    "github.com/coreos/go-oidc/v3/oidc"
+  )
+  func Get(ctx context.Context, issuer string) (any, error) {
+    return newProviderWithRetry(ctx, issuer)
+  }
+  func newProviderWithRetry(ctx context.Context, issuer string) (any, error) {
+    return oidc.NewProvider(ctx, issuer)
+  }
+  ```
+
 # ============================================================================
 # JavaScript (Express) — CommonJS require + exports
 # ============================================================================

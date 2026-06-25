@@ -1,11 +1,11 @@
 // elixir framework adapter (docs/07) — framework→concept content.
 // frameworks: phoenix, plug, ecto. Module calls normalize to dotted paths
-// (System.cmd); Phoenix actions `def a(conn, params)` seed params as http_input.
+// (System.cmd).
 adapter elixir {
   meta { fidelity: resolved }
 
-  // request input — seeded action params + explicit Plug.Conn accessors
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "first_param:conn" nval "param_index:0" nval "param_name:_" -> code.HttpInput
+  source path "analysis.parameter.entry" val "first_param:_conn" nval "param_index:0" nval "param_name:_" -> code.HttpInput
   source "conn.params" -> code.HttpInput
   source "conn.body_params" -> code.HttpInput
   source "conn.query_params" -> code.HttpInput

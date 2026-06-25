@@ -15,18 +15,22 @@ rule InsecureDirectObjectReference {
   unless guarded_by core.OwnershipCheck
 }
 
-// A privileged operation (OS command execution) that sits inside an HTTP request
-// handler but is not preceded by an authentication check on every path. This is the
-// missing-authentication pattern as a context+control query, not a dataflow one: we
-// don't require the request data to *flow into* the command — only that an
-// unauthenticated remote caller can reach the operation. `colocated code.HttpInput`
-// scopes this to HTTP-exposed code (so CLI tools that run commands are not flagged),
-// and `guarded_by core.AuthenticationCheck` suppresses handlers where an auth check
-// dominates the operation. confidence_floor low: auth is sometimes enforced by
-// upstream middleware the analysis cannot see.
-rule UnauthenticatedRemoteCommand {
-  meta { id: "VYQL-AUTH-003", severity: high, cwe: [CWE_306, CWE_862], confidence_floor: low }
-  match code.CommandExecution as op
-  where op colocated code.HttpInput
-  unless guarded_by core.AuthenticationCheck
+rule WeakPasswordRecoveryLinkHost {
+  meta { id: "VYQL-AUTH-003", severity: high, cwe: [CWE_640], confidence_floor: medium }
+  match code.PasswordRecoveryLinkHostControl as link
+}
+
+rule MfaRedirectBypass {
+  meta { id: "VYQL-AUTH-004", severity: high, cwe: [CWE_288], confidence_floor: medium }
+  match code.MfaRedirectBypass as bypass
+}
+
+rule AutoActiveSignupAccount {
+  meta { id: "VYQL-AUTH-005", severity: high, cwe: [CWE_306, CWE_862], confidence_floor: medium }
+  match code.AutoActiveSignupAccount as signup
+}
+
+rule EmptyVerifierAcceptance {
+  meta { id: "VYQL-AUTH-006", severity: medium, cwe: [CWE_345, CWE_670], confidence_floor: medium }
+  match code.EmptyVerifierAcceptance as verifier
 }

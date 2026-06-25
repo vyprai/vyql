@@ -1,0 +1,12 @@
+test "python: method sink confidence is lower than resolved path sink"
+  lang python
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  expect_confidence VYQL-INJ-001 medium
+  expect_confidence VYQL-INJ-002 high
+```
+def h():
+    x = request.args['q']
+    cur.execute("SELECT " + x)
+    os.system("ping " + x)
+```

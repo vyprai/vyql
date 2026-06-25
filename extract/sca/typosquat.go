@@ -65,8 +65,8 @@ func editDistanceLE1(a, b string) bool {
 	return true
 }
 
-// FlagTyposquats labels each sbom.PackageVersion node whose name typosquats a popular
-// package (and is not itself popular/trusted) with sbom.SuspiciousDependency. Kept as a
+// FlagTyposquats records a neutral token on each package node whose name typosquats a
+// popular package (and is not itself popular/trusted). Kept as a
 // standalone entry point; Analyze runs it as one stage. Returns the count labeled.
 func FlagTyposquats(g usg.Store, eco string) (int, error) {
 	d := data()
@@ -85,8 +85,7 @@ func FlagTyposquats(g usg.Store, eco string) (int, error) {
 			continue
 		}
 		if target := nearestPopular(name, popular); target != "" {
-			if err := label(g, nd.ID, "sbom.SuspiciousDependency", map[string]string{
-				"reason": "typosquat", "squats": target}); err != nil {
+			if err := addPackageTokens(g, nd.ID, "status=suspicious", "reason=typosquat", "squats="+target); err != nil {
 				return n, err
 			}
 			n++
@@ -100,11 +99,6 @@ func isTrusted(d *scaData, eco, name, version string) bool {
 		return versionMatch(vs, version)
 	}
 	return false
-}
-
-func label(g usg.Store, id, concept string, detail map[string]string) error {
-	return g.AddLabel(id, usg.Label{Concept: concept,
-		Provenance: usg.Provenance{Adapter: "sbom.intel"}, Detail: detail})
 }
 
 func abs(x int) int {

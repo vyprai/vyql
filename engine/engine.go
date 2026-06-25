@@ -2,6 +2,7 @@ package engine
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/vyprai/vyql/findings"
@@ -13,12 +14,29 @@ import (
 
 // Engine evaluates compiled rules against a USG store.
 type Engine struct {
-	Onto  *ontology.Ontology
-	Store usg.Store
+	Onto               *ontology.Ontology
+	Store              usg.Store
+	analysisRole       map[string]map[string]bool
+	contextReach       []contextReachSource
+	contextReachSet    bool
+	contextAssets      []contextAssetConcept
+	contextAssetsSet   bool
+	contextConfirms    []contextConfirmation
+	contextConfirmsSet bool
+	cfg                map[string]bool
+	labelsByNode       map[string][]usg.Label
+	flowGuards         map[string][]string
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
-	return &Engine{Onto: onto, Store: store}
+	return &Engine{
+		Onto:         onto,
+		Store:        store,
+		analysisRole: map[string]map[string]bool{},
+		cfg:          map[string]bool{},
+		labelsByNode: map[string][]usg.Label{},
+		flowGuards:   map[string][]string{},
+	}
 }
 
 var confOrder = map[string]int{"possibility": 0, "low": 1, "medium": 2, "high": 3}
@@ -33,26 +51,15 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	return e.applyConfidenceFloor(cr, dedup(fs)), nil
 }
 
-// PossibilityFindings emits low-confidence "possibility" findings for the AI/triage pass:
-// one per dangerous-concept node (any sink in the ontology) that the confirmed rules did
-// NOT already report. The idea — "if VyQL can't prove exploitability, surface the site as a
-// possibility and let a later AI pass decide" — trades precision for recall. Each carries an
-// exploit condition describing what to verify, and confidence "possibility" (below "low"),
-// so it is OFF by default and never affects the protected benchmarks; the AI-pass pipeline
-// opts in. `confirmed` is the set of findings already produced by the normal rules.
+// PossibilityFindings emits opt-in, low-confidence review findings for labelled target
+// sites that confirmed rules did not already report. Concept-specific review text lives in
+// ontology data; the fallback here is deliberately generic.
 func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.Finding {
 	covered := map[string]bool{}
 	for _, f := range confirmed {
 		for _, b := range f.Bindings {
 			covered[b.NodeID] = true
 		}
-	}
-	// Low-signal / high-volume concepts excluded from the possibility pass: they ride on
-	// very broad labels (e.g. TrustBoundary on every collection .Add; LogOutput on every
-	// log call) that are fine for taint-GATED confirmed rules but would flood the AI pass
-	// as untainted possibilities. (Confirmed taint findings for these still fire normally.)
-	possibilityDeny := map[string]bool{
-		"code.TrustBoundary": true, "code.LogOutput": true, "code.LogWrite": true,
 	}
 	var out []*findings.Finding
 	seen := map[string]bool{}
@@ -61,36 +68,70 @@ func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.
 			continue
 		}
 		qn := c.QualifiedName()
-		if possibilityDeny[qn] {
+		if c.Possibility == "exclude" {
 			continue
 		}
 		nodes, _ := e.Store.NodesWithConcept(qn)
 		for _, id := range nodes {
-			if covered[id] || seen[id] {
+			key := e.possibilityKey(qn, id)
+			if covered[id] || seen[key] {
 				continue
 			}
-			seen[id] = true
-			threat := c.VulnerableTo[0]
-			cwe := ""
-			if len(c.CWE) > 0 {
-				cwe = c.CWE[0]
-			}
+			seen[key] = true
+			rc := possibilityReview(c)
 			out = append(out, &findings.Finding{
 				RuleID:      "VYQL-POSS-" + c.Name,
 				Severity:    "info",
 				Confidence:  "possibility",
 				WitnessKind: "possibility",
 				Bindings:    []findings.Binding{{Name: "sink", NodeID: id, Concept: qn, Loc: e.loc(id)}},
-				ExploitConditions: []findings.ExploitCondition{{
-					Category:   threat,
-					Condition:  "a " + c.Name + " sink (" + threat + ", " + cwe + ") with no proven sanitized untrusted-input flow — verify whether attacker-controlled data can reach it",
-					Assumption: "exploitable only if untrusted input reaches this site unsanitized",
-					Confidence: "possibility",
+				ReviewConditions: []findings.ReviewCondition{{
+					Category:   rc.Category,
+					Condition:  rc.Condition,
+					Evidence:   rc.Evidence,
+					Assumption: rc.Assumption,
+					Confidence: rc.Confidence,
 				}},
 			})
 		}
 	}
 	return out
+}
+
+func (e *Engine) possibilityKey(concept, nodeID string) string {
+	n, ok, _ := e.Store.GetNode(nodeID)
+	if !ok {
+		return concept + "\x00" + nodeID
+	}
+	loc := n.Prop("loc")
+	if loc == "" {
+		loc = nodeID
+	}
+	return concept + "\x00" + loc + "\x00" + n.Prop("path") + "\x00" + n.Prop("method")
+}
+
+func possibilityReview(c ontology.Concept) findings.ReviewCondition {
+	qn := c.QualifiedName()
+	category := firstNonEmpty(c.ReviewCategory, firstString(c.VulnerableTo), qn)
+	condition := c.ReviewCondition
+	if condition == "" {
+		condition = "review " + qn + " because this labelled site was not covered by a confirmed rule finding"
+	}
+	evidence := c.ReviewEvidence
+	if evidence == "" {
+		evidence = "concept label " + qn + " is present"
+	}
+	assumption := c.ReviewAssumption
+	if assumption == "" {
+		assumption = "the data and control conditions represented by this concept hold for the reviewed site"
+	}
+	return findings.ReviewCondition{
+		Category:   category,
+		Condition:  condition,
+		Evidence:   evidence,
+		Assumption: assumption,
+		Confidence: firstNonEmpty(c.ReviewConfidence, "possibility"),
+	}
 }
 
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
@@ -112,8 +153,8 @@ func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	return nil, nil
 }
 
-// evalOrder evaluates `order A before B` (B2 temporal): a finding for each (A,B) where an
-// A-operation can reach a B-operation on a CFG path (reentrancy, TOCTOU, …).
+// evalOrder evaluates `order A before B`: a finding for each (A,B) where an
+// A-operation can reach a B-operation on a CFG path.
 func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.OrderStmt)
 	firsts, _ := e.Store.NodesWithConcept(body.First.Concept)
@@ -126,8 +167,8 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 			}
 			out = append(out, &findings.Finding{
 				RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "order",
-				Confidence:        e.conf(a),
-				ExploitConditions: append(e.exploitConditions(a, body.First.Concept), e.exploitConditions(b, body.Second.Concept)...),
+				Confidence:       e.conf(a),
+				ReviewConditions: append(e.reviewConditions(a, body.First.Concept), e.reviewConditions(b, body.Second.Concept)...),
 				Bindings: []findings.Binding{
 					{Name: "first", NodeID: a, Concept: body.First.Concept, Loc: e.loc(a), LabelProvenance: e.prov(a, body.First.Concept)},
 					{Name: "second", NodeID: b, Concept: body.Second.Concept, Loc: e.loc(b), LabelProvenance: e.prov(b, body.Second.Concept)},
@@ -177,11 +218,7 @@ func (e *Engine) evalAssume(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.FlowStmt)
 	sources, _ := e.Store.NodesWithConcept(body.Src.Concept)
 	targets, _ := e.Store.NodesWithConcept(body.Dst.Concept)
-	minLevel := ""
-	if body.Dst.Concept == "identity.AdminPrivilege" {
-		minLevel = "ADMIN"
-	}
-	paths, err := solvers.FindAssume(e.Store, sources, targets, minLevel)
+	paths, err := solvers.FindAssume(e.Store, sources, targets, e.assumeMinLevel(body.Dst.Concept))
 	if err != nil {
 		return nil, err
 	}
@@ -229,60 +266,174 @@ func flattenAnd(e parser.Expr) []parser.Expr {
 	return []parser.Expr{e}
 }
 
-// crossDomainContext surfaces graph context that makes a finding matter more
-// where it is deployed (docs/10, /14, /17): the sink's service being
-// internet-reachable, and the sink's database holding sensitive asset kinds.
-// This is the cross-domain payoff at the individual-finding level and the input
-// to factor-based risk — derived and witness-backed, never a fabricated score.
+// crossDomainContext surfaces ontology-configured graph context around a finding.
+// Concepts define which sink properties point to related graph nodes and how
+// evidence should be rendered; the engine only follows those links.
 func (e *Engine) crossDomainContext(sinkID string) []string {
 	n, ok, _ := e.Store.GetNode(sinkID)
 	if !ok {
 		return nil
 	}
 	var ctx []string
-	if svc := n.Prop("service"); svc != "" {
-		if _, ok, _ := e.Store.GetNode(svc); ok {
-			internet, _ := e.Store.NodesWithConcept("cloud.Internet")
-			if paths, _ := solvers.FindReach(e.Store, internet, []string{svc}, nil); len(paths) > 0 {
-				h := paths[0].Hops
-				via := ""
-				if len(h) > 0 {
-					via = h[len(h)-1].Rule
-				}
-				line := svc + " is internet-reachable (via " + via + ")"
-				// static↔runtime confirmation (docs/11 Part B): a statically
-				// predicted exposure observed in runtime telemetry is confirmed,
-				// which the risk layer escalates (docs/17 exposure→confirmed).
-				if e.observedExternalConnection(svc) {
-					line += " — confirmed by runtime traffic (last 24h)"
-				}
-				ctx = append(ctx, line)
+	for _, src := range e.contextReachSources() {
+		target := n.Prop(src.TargetProp)
+		if target == "" {
+			continue
+		}
+		if _, ok, _ := e.Store.GetNode(target); !ok {
+			continue
+		}
+		sourceIDs, _ := e.Store.NodesWithConcept(src.Concept)
+		if paths, _ := solvers.FindReach(e.Store, sourceIDs, []string{target}, nil); len(paths) > 0 {
+			h := paths[0].Hops
+			via := ""
+			if len(h) > 0 {
+				via = h[len(h)-1].Rule
 			}
+			line := target + " is " + src.Label + " (via " + via + ")"
+			for _, label := range e.contextConfirmations(target) {
+				line += " — " + label
+			}
+			ctx = append(ctx, line)
 		}
 	}
-	if db := n.Prop("database"); db != "" {
-		if _, ok, _ := e.Store.GetNode(db); ok {
-			if kinds := sortedSet(e.assetKinds(db)); len(kinds) > 0 {
-				ctx = append(ctx, "sink database "+db+" holds ["+strings.Join(kinds, " ")+"]")
-			}
+	for _, ac := range e.contextAssetConcepts() {
+		target := n.Prop(ac.TargetProp)
+		if target == "" {
+			continue
+		}
+		if _, ok, _ := e.Store.GetNode(target); !ok {
+			continue
+		}
+		if !e.nodeHasConcept(target, ac.Concept) {
+			continue
+		}
+		if kinds := sortedSet(e.assetKinds(target)); len(kinds) > 0 {
+			ctx = append(ctx, renderContextLabel(ac.Label, target, kinds))
 		}
 	}
 	return ctx
 }
 
-// observedExternalConnection reports whether the pre-aggregated runtime snapshot
-// holds a runtime.Connection observed reaching svc from outside (docs/11: an
-// OBSERVED external connection). Modeled over the aggregate graph, not a live
-// stream — the streaming evaluator that maintains these deltas is deferred.
-func (e *Engine) observedExternalConnection(svc string) bool {
-	ids, _ := e.Store.NodesWithConcept("runtime.Connection")
-	for _, id := range ids {
-		n, _, _ := e.Store.GetNode(id)
-		if n.Prop("dst") == svc && n.Prop("external") == "true" {
-			return true
+type contextReachSource struct {
+	Concept    string
+	Label      string
+	TargetProp string
+}
+
+func (e *Engine) contextReachSources() []contextReachSource {
+	if e.contextReachSet {
+		return e.contextReach
+	}
+	e.contextReachSet = true
+	var out []contextReachSource
+	for _, c := range e.Onto.AllConcepts() {
+		if c.ContextReachSource != "true" {
+			continue
+		}
+		if c.ContextReachTargetProp == "" {
+			continue
+		}
+		label := c.ContextReachLabel
+		if label == "" {
+			label = c.Name
+		}
+		out = append(out, contextReachSource{
+			Concept:    c.QualifiedName(),
+			Label:      label,
+			TargetProp: c.ContextReachTargetProp,
+		})
+	}
+	e.contextReach = out
+	return e.contextReach
+}
+
+type contextAssetConcept struct {
+	Concept    string
+	TargetProp string
+	Label      string
+}
+
+func (e *Engine) contextAssetConcepts() []contextAssetConcept {
+	if e.contextAssetsSet {
+		return e.contextAssets
+	}
+	e.contextAssetsSet = true
+	var out []contextAssetConcept
+	for _, c := range e.Onto.AllConcepts() {
+		if c.ContextAssetTargetProp == "" {
+			continue
+		}
+		label := c.ContextAssetLabel
+		if label == "" {
+			label = "{target} holds [{kinds}]"
+		}
+		out = append(out, contextAssetConcept{
+			Concept:    c.QualifiedName(),
+			TargetProp: c.ContextAssetTargetProp,
+			Label:      label,
+		})
+	}
+	e.contextAssets = out
+	return e.contextAssets
+}
+
+func renderContextLabel(template, target string, kinds []string) string {
+	out := strings.ReplaceAll(template, "{target}", target)
+	out = strings.ReplaceAll(out, "{kinds}", strings.Join(kinds, " "))
+	return out
+}
+
+func (e *Engine) contextConfirmations(target string) []string {
+	var out []string
+	for _, c := range e.contextConfirmationSpecs() {
+		ids, _ := e.Store.NodesWithConcept(c.Concept)
+		for _, id := range ids {
+			n, _, _ := e.Store.GetNode(id)
+			if n.Prop(c.DstProp) != target {
+				continue
+			}
+			if c.FlagProp != "" && n.Prop(c.FlagProp) != c.FlagValue {
+				continue
+			}
+			out = append(out, c.Label)
 		}
 	}
-	return false
+	return out
+}
+
+type contextConfirmation struct {
+	Concept   string
+	DstProp   string
+	FlagProp  string
+	FlagValue string
+	Label     string
+}
+
+func (e *Engine) contextConfirmationSpecs() []contextConfirmation {
+	if e.contextConfirmsSet {
+		return e.contextConfirms
+	}
+	e.contextConfirmsSet = true
+	var out []contextConfirmation
+	for _, c := range e.Onto.AllConcepts() {
+		if c.ContextConfirmDstProp == "" {
+			continue
+		}
+		label := c.ContextConfirmLabel
+		if label == "" {
+			label = "confirmed by " + c.Name
+		}
+		out = append(out, contextConfirmation{
+			Concept:   c.QualifiedName(),
+			DstProp:   c.ContextConfirmDstProp,
+			FlagProp:  c.ContextConfirmFlagProp,
+			FlagValue: c.ContextConfirmFlagValue,
+			Label:     label,
+		})
+	}
+	e.contextConfirms = out
+	return e.contextConfirms
 }
 
 func sortedSet(m map[string]bool) []string {
@@ -317,10 +468,18 @@ func intersect(a, b map[string]bool) bool {
 	return false
 }
 
-// weakCharFilter returns an assumption note if a character-filter (replace) lies on a
-// live taint path — meaning vyql could NOT prove it neutralizes this sink's dangerous
-// chars (a sound allowlist filter would have killed the flow already).
-func (e *Engine) weakCharFilter(path []string, dangerous string) string {
+func (e *Engine) assumeMinLevel(concept string) string {
+	if c, err := e.Onto.Get(concept); err == nil {
+		return c.AssumeMinLevel
+	}
+	return ""
+}
+
+// charFilterAssumption returns an assumption note if a character-filter (replace) lies on a
+// live taint path — meaning vyql could NOT prove it excludes this sink's required
+// character set (a sound allowlist filter would have killed the flow already).
+func (e *Engine) charFilterAssumption(path []string, excluded string) string {
+	charFilters := e.conceptsWithAnalysisRole(ontology.AnalysisRoleCharFilter)
 	onPath := make(map[string]bool, len(path))
 	for _, id := range path {
 		onPath[id] = true
@@ -328,38 +487,39 @@ func (e *Engine) weakCharFilter(path []string, dangerous string) string {
 	for _, id := range path {
 		labels, _ := e.Store.Labels(id)
 		for _, l := range labels {
-			if l.Concept != "core.CharFilter" {
+			if !charFilters[l.Concept] {
 				continue
 			}
 			// A replace FILTERS its subject but emits its REPLACEMENT verbatim (arg1, in both
 			// `s.replace(pat,repl)` and `re.sub(pat,repl,s)`). If the taint entered through the
-			// replacement, the filter never touched it — it is template insertion, not
-			// sanitization — so this is a confident finding, not an assumption.
+			// replacement, the filter never touched it: this is a direct insertion,
+			// so this is a confident finding, not an assumption.
 			if n, ok, _ := e.Store.GetNode(id); ok {
 				if a1 := n.Prop("arg1"); a1 != "" && onPath[a1] {
 					continue
 				}
 			}
 			pat := l.Detail["pattern"]
-			if dangerous == "" {
-				return "a character-filter replace(" + pat + ") is on the path but this sink declares no dangerous_chars to verify against; finding holds unless the filter neutralizes by other means"
+			if excluded == "" {
+				return "a character-filter replace(" + pat + ") is on the path but this sink declares no excluded_chars to verify against; finding holds unless the filter neutralizes by other means"
 			}
-			return "a character-filter replace(" + pat + ") is on the path but its bounded output is not proven to exclude [" + dangerous + "]; false positive if it sanitizes correctly (e.g. an escaper or value-specific allowlist)"
+			return "a character-filter replace(" + pat + ") is on the path but its bounded output is not proven to exclude [" + excluded + "]; false positive if the transform is complete for this value set"
 		}
 	}
 	return ""
 }
 
-// weakAssumptions surfaces UNSOUND neutralizers (core.Assumption) that bear on a finding:
+// neutralizerAssumptions surfaces UNSOUND neutralizers that bear on a finding:
 // a guard that DOMINATES the sink, or a sanitizer ON the taint path, whose declared `about`
 // concept matches this sink's threat. Each yields an assumption note — the flow is NEVER
 // suppressed (vyql cannot prove the neutralizer sound), but is flagged as a false positive
-// IF it works. This generalizes the regex-CharFilter mechanism (weakCharFilter) to arbitrary
+// IF it works. This generalizes the regex-CharFilter mechanism (charFilterAssumption) to arbitrary
 // neutralizers: the confident bucket (findings with no assumption note) is near-zero-FP, and
 // the noted bucket is the human review queue. Which calls are unsound neutralizers is data
 // (the `assume` adapter directive); this engine logic is threat-agnostic.
-func (e *Engine) weakAssumptions(path []string, sinkID string, sinkConcepts map[string]bool) []findings.NegationEvidence {
+func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcepts map[string]bool) []findings.NegationEvidence {
 	var out []findings.NegationEvidence
+	assumptions := e.conceptsWithAnalysisRole(ontology.AnalysisRoleNeutralizerAssumption)
 	seen := map[string]bool{}
 	add := func(mode, pat string) {
 		key := mode + "|" + pat
@@ -367,37 +527,37 @@ func (e *Engine) weakAssumptions(path []string, sinkID string, sinkConcepts map[
 			return
 		}
 		seen[key] = true
-		detail := "an unsound sanitizer " + pat + " is on the path but is not provably complete for this sink (e.g. an escaper/encoder vyql cannot verify); false positive if it neutralizes correctly"
+		detail := "an unsound sanitizer " + pat + " is on the path but is not provably complete for this sink; false positive if it neutralizes correctly"
 		if mode == "guard" {
-			detail = "an unsound guard " + pat + " dominates the sink but does not provably exclude the attack (e.g. a prefix/normalize check a crafted input can bypass); false positive if it actually blocks the threat"
+			detail = "an unsound guard " + pat + " dominates the sink but is not provably complete for this target; false positive if it blocks the relevant condition"
 		}
 		out = append(out, findings.NegationEvidence{Clause: mode + " (assumption)", Satisfied: false, Detail: detail})
 	}
-	// sanitizer-style: a core.Assumption label lying ON the taint path.
+	// sanitizer-style: an assumption-role label lying ON the taint path.
 	for _, id := range path {
 		for _, l := range e.labels(id) {
-			if l.Concept == "core.Assumption" && l.Detail["mode"] == "sanitizer" && sinkConcepts[l.Detail["about"]] {
+			if assumptions[l.Concept] && l.Detail["mode"] == "sanitizer" && sinkConcepts[l.Detail["about"]] {
 				add("sanitizer", l.Detail["pattern"])
 			}
 		}
 	}
-	// guard-style: a core.Assumption guard that DOMINATES the sink. A guard inspecting THIS
+	// guard-style: an assumption-role guard that DOMINATES the sink. A guard inspecting THIS
 	// tainted value is, by construction, a direct FLOWS out-neighbour of a node on the path
 	// (the tainted operand flows into it), so we scan those neighbours LOCALLY rather than the
 	// whole store — O(path · out-degree), not O(store · findings). Found nothing globally is
 	// the same as found nothing here, but cheap on large corpora.
-	if hasCFG(e.Store, sinkID) {
+	if e.hasCFG(sinkID) {
 		guarded := map[string]bool{}
 		for _, pid := range path {
 			edges, _ := e.Store.OutEdges(pid, "FLOWS")
 			for _, ed := range edges {
 				gid := ed.Dst
-				if gid == sinkID || guarded[gid] || !hasCFG(e.Store, gid) {
+				if gid == sinkID || guarded[gid] || !e.hasCFG(gid) {
 					continue
 				}
 				guarded[gid] = true
 				for _, l := range e.labels(gid) {
-					if l.Concept != "core.Assumption" || l.Detail["mode"] != "guard" {
+					if !assumptions[l.Concept] || l.Detail["mode"] != "guard" {
 						continue
 					}
 					// about=="*" is a structural guard (a `<const> in tainted` blocklist) that
@@ -428,22 +588,22 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 	}
 
-	// dangerous characters for this sink threat (declared on the sink concept(s) via
-	// `dangerous_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
-	dangerous := ""
+	// excluded characters for this sink threat (declared on the sink concept(s) via
+	// `excluded_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
+	excluded := ""
 	seenRune := map[rune]bool{}
 	for c := range sinkConcepts {
 		if cc, err := e.Onto.Get(c); err == nil {
-			for _, r := range cc.DangerousChars {
+			for _, r := range cc.ExcludedChars {
 				if !seenRune[r] {
 					seenRune[r] = true
-					dangerous += string(r)
+					excluded += string(r)
 				}
 			}
 		}
 	}
 
-	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, dangerous)
+	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, excluded, e.conceptsWithAnalysisRole(ontology.AnalysisRoleCharFilter))
 	if err != nil {
 		return nil, err
 	}
@@ -463,9 +623,9 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 	}
 
 	var out []*findings.Finding
-	// One finding per (rule, sink): a vulnerable sink reachable from N sources is ONE
-	// issue, not N. Reporting per source→sink path inflated real-world scans ~6× (e.g.
-	// a single `echo` reachable from 25 request reads). Keep the highest-confidence
+	// One finding per (rule, sink): a target sink reachable from N sources is ONE
+	// issue, not N. Reporting per source→sink path inflates real-world scans when
+	// many source reads converge on one target. Keep the highest-confidence
 	// source as the representative witness; bySink maps sinkID → index in `out`.
 	bySink := map[string]int{}
 	for _, fl := range flows {
@@ -486,15 +646,15 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		// A character-filter on a still-LIVE path is, by definition, not provably sound
 		// for this sink (a sound one would have killed the flow). Surface it as an
 		// assumption: the finding is a false positive IF that filter actually neutralizes.
-		if wf := e.weakCharFilter(fl.Path, dangerous); wf != "" {
+		if wf := e.charFilterAssumption(fl.Path, excluded); wf != "" {
 			ne = append(ne, findings.NegationEvidence{Clause: "char-filter (assumption)", Satisfied: false, Detail: wf})
 		}
 		// Unsound guards/sanitizers (declared via the `assume` directive) likewise never kill
 		// the flow — they annotate it as assumption-gated.
-		ne = append(ne, e.weakAssumptions(fl.Path, fl.SinkID, sinkConcepts)...)
+		ne = append(ne, e.neutralizerAssumptions(fl.Path, fl.SinkID, sinkConcepts)...)
 		suppressed := false
 		for _, g := range guards {
-			ok := e.endpointGuarded(fl.SinkID, g)
+			ok := e.endpointGuarded(fl.SinkID, g) || e.flowGuarded(fl.Path, g)
 			detail := "no guard on sink"
 			if ok {
 				detail = "guard covers sink"
@@ -508,30 +668,23 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
 		conf := e.conf(fl.SourceID, fl.SinkID)
-		exploit := e.exploitConditions(fl.SinkID, snkC)
-		if srcC == "code.ExternalEntryInput" {
-			// Library/SDK trust boundary: the source is a public-API parameter, not a proven
-			// untrusted input. The flow is real, but exploitability depends on whether a CALLER
-			// forwards attacker-controlled data here — which can't be decided from the library
-			// alone. Emit it as caller-conditional (capped confidence) so a later triage/AI phase
-			// assesses exploitability against actual usage, rather than asserting it.
+		review := e.reviewConditions(fl.SinkID, snkC)
+		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourcePolicy == "caller_conditional" {
 			n, _, _ := e.Store.GetNode(fl.SourceID)
 			param := ""
 			if n.ID != "" {
 				param = n.Prop("name")
 			}
-			cond := "a caller forwards attacker-controlled data into the public-API parameter"
-			if param != "" {
-				cond += " '" + param + "'"
-			}
-			exploit = append(exploit, findings.ExploitCondition{
-				Category:   "caller-controlled-input",
+			cond := strings.ReplaceAll(srcMeta.SourceCondition, "{param}", param)
+			review = append(review, findings.ReviewCondition{
+				Category:   srcMeta.SourceConditionCategory,
 				Condition:  cond,
-				Assumption: "the library is invoked with untrusted input at this entry point",
-				Confidence: "medium",
+				Assumption: srcMeta.SourceAssumption,
+				Confidence: firstNonEmpty(srcMeta.SourceConfidence, "medium"),
 			})
-			if confOrder[conf] > confOrder["medium"] {
-				conf = "medium" // caller-dependent: never assert high confidence from a param source
+			ceil := firstNonEmpty(srcMeta.SourceConfidence, "medium")
+			if confOrder[conf] > confOrder[ceil] {
+				conf = ceil
 			}
 		}
 		f := &findings.Finding{
@@ -541,13 +694,13 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				{Name: "source", NodeID: fl.SourceID, Concept: srcC, Loc: e.loc(fl.SourceID), LabelProvenance: e.prov(fl.SourceID, srcC)},
 				{Name: "sink", NodeID: fl.SinkID, Concept: snkC, Loc: e.loc(fl.SinkID), LabelProvenance: e.prov(fl.SinkID, snkC)},
 			},
-			Witness:           fl.Path,
-			PathLocs:          e.pathLocs(fl.Path),
-			WitnessKind:       "taint",
-			NegationEvidence:  ne,
-			Confidence:        conf,
-			Context:           e.crossDomainContext(fl.SinkID),
-			ExploitConditions: exploit,
+			Witness:          fl.Path,
+			PathLocs:         e.pathLocs(fl.Path),
+			WitnessKind:      "taint",
+			NegationEvidence: ne,
+			Confidence:       conf,
+			Context:          e.crossDomainContext(fl.SinkID),
+			ReviewConditions: review,
 		}
 		if idx, seen := bySink[fl.SinkID]; seen {
 			// same sink already reported for this rule — keep whichever source gives the
@@ -574,8 +727,8 @@ func (e *Engine) ruleID(cr *CompiledRule) string {
 
 // pathLocs resolves each witness node to its loc, keeping order and dropping
 // consecutive duplicates. Used to expose the files the taint path traverses
-// (a CVE patch frequently lands on a sanitizer/helper on the flow, not the
-// source or sink site), so downstream localization can match the patch file.
+// (a patch frequently lands on a helper on the flow, not the source or sink site),
+// so downstream localization can match the changed file.
 func (e *Engine) pathLocs(path []string) []string {
 	if len(path) == 0 {
 		return nil
@@ -605,8 +758,24 @@ func (e *Engine) loc(nodeID string) string {
 }
 
 func (e *Engine) labels(nodeID string) []usg.Label {
+	if ls, ok := e.labelsByNode[nodeID]; ok {
+		return ls
+	}
 	ls, _ := e.Store.Labels(nodeID)
+	e.labelsByNode[nodeID] = ls
 	return ls
+}
+
+func (e *Engine) conceptsWithAnalysisRole(role string) map[string]bool {
+	if e == nil || e.Onto == nil || role == "" {
+		return nil
+	}
+	if concepts, ok := e.analysisRole[role]; ok {
+		return concepts
+	}
+	concepts := e.Onto.ConceptsWithAnalysisRole(role)
+	e.analysisRole[role] = concepts
+	return concepts
 }
 
 func (e *Engine) conceptIn(nodeID string, set map[string]bool) string {
@@ -618,8 +787,19 @@ func (e *Engine) conceptIn(nodeID string, set map[string]bool) string {
 	return ""
 }
 
+func (e *Engine) sourceConcept(concept string) *ontology.Concept {
+	if concept == "" {
+		return nil
+	}
+	if c, err := e.Onto.Get(concept); err == nil {
+		return c
+	}
+	return nil
+}
+
 func (e *Engine) prov(nodeID, concept string) string {
 	var fallback string
+	bestPriority := -1
 	for _, l := range e.labels(nodeID) {
 		if l.Concept == concept && l.Provenance.Adapter != "" {
 			fid := l.Provenance.Fidelity
@@ -627,39 +807,47 @@ func (e *Engine) prov(nodeID, concept string) string {
 				fid = "resolved"
 			}
 			s := concept + " by " + l.Provenance.Adapter + "@" + fid
-			// an SCA advisory (CVE/GHSA) is the most specific provenance — prefer it over a
-			// generic adapter sink that labels the same node (e.g. yaml.load is both).
-			if strings.HasPrefix(l.Provenance.Adapter, "advisory:") {
-				return s
-			}
-			if fallback == "" {
+			priority := labelProvenancePriority(l)
+			if fallback == "" || priority > bestPriority {
 				fallback = s
+				bestPriority = priority
 			}
 		}
 	}
 	return fallback
 }
 
-func (e *Engine) exploitConditions(nodeID, concept string) []findings.ExploitCondition {
-	var out []findings.ExploitCondition
+func labelProvenancePriority(l usg.Label) int {
+	if l.Detail == nil {
+		return 0
+	}
+	n, err := strconv.Atoi(l.Detail["provenance_priority"])
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+func (e *Engine) reviewConditions(nodeID, concept string) []findings.ReviewCondition {
+	var out []findings.ReviewCondition
 	seen := map[string]bool{}
 	for _, l := range e.labels(nodeID) {
 		if l.Concept != concept || l.Detail == nil {
 			continue
 		}
-		cond := firstNonEmpty(l.Detail["exploit_condition"], l.Detail["condition"])
+		cond := firstNonEmpty(l.Detail["review_condition"], l.Detail["condition"])
 		if cond == "" {
 			continue
 		}
-		conf := firstNonEmpty(l.Detail["exploit_confidence"], l.Provenance.Confidence)
+		conf := firstNonEmpty(l.Detail["review_confidence"], l.Provenance.Confidence)
 		if conf == "" {
 			conf = "medium"
 		}
-		ec := findings.ExploitCondition{
-			Category:   firstNonEmpty(l.Detail["exploit_category"], l.Detail["category"]),
+		ec := findings.ReviewCondition{
+			Category:   firstNonEmpty(l.Detail["review_category"], l.Detail["category"]),
 			Condition:  cond,
-			Evidence:   firstNonEmpty(l.Detail["exploit_evidence"], l.Detail["evidence"]),
-			Assumption: firstNonEmpty(l.Detail["exploit_assumption"], l.Detail["assumption"]),
+			Evidence:   firstNonEmpty(l.Detail["review_evidence"], l.Detail["evidence"]),
+			Assumption: firstNonEmpty(l.Detail["review_assumption"], l.Detail["assumption"]),
 			Confidence: conf,
 		}
 		key := ec.Category + "\x00" + ec.Condition + "\x00" + ec.Evidence + "\x00" + ec.Assumption
@@ -678,6 +866,13 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+func firstString(vals []string) string {
+	if len(vals) == 0 {
+		return ""
+	}
+	return vals[0]
 }
 
 // fidelityCeil caps confidence by match fidelity (docs/07): a syntactic match
@@ -723,7 +918,7 @@ func (e *Engine) conf(nodeIDs ...string) string {
 // graphs, frontends not yet converted to structured NIR) it falls back to presence
 // semantics at a lower fidelity, so existing behaviour and tests are unchanged.
 func (e *Engine) endpointGuarded(sinkID, control string) bool {
-	sinkCFG := hasCFG(e.Store, sinkID)
+	sinkCFG := e.hasCFG(sinkID)
 	// (1) an explicit PROTECTS/CHECKS edge (graph specs; a future endpoint-linking pass).
 	for _, et := range []string{"PROTECTS", "CHECKS"} {
 		edges, _ := e.Store.InEdges(sinkID, et)
@@ -732,7 +927,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 				if l.Concept != control {
 					continue
 				}
-				if sinkCFG && hasCFG(e.Store, ed.Src) {
+				if sinkCFG && e.hasCFG(ed.Src) {
 					if solvers.Dominates(e.Store, ed.Src, sinkID) {
 						return true // guard dominates → covers every path → suppress
 					}
@@ -743,15 +938,20 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 		}
 	}
 	// (2) B1: a guard-control-labelled node that DOMINATES the sink. This is what makes
-	// `guarded_by` work on REAL CODE — adapters label the check (e.g. validate_csrf_token,
-	// a @login_required decorator) with the control concept, and the structured CFG lets us
+	// `guarded_by` work on real code: adapters label the check with the control concept,
+	// and the structured CFG lets us
 	// connect it to exactly the sinks it covers (path-sensitive: a check in one branch does
 	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free
 	// graphs — those rely on the explicit edge above.
 	if sinkCFG {
 		guards, _ := e.Store.NodesWithConcept(control)
 		for _, gid := range guards {
-			if gid != sinkID && hasCFG(e.Store, gid) && solvers.Dominates(e.Store, gid, sinkID) {
+			if gid != sinkID && e.hasCFG(gid) && solvers.Dominates(e.Store, gid, sinkID) {
+				return true
+			}
+		}
+		for _, gid := range guards {
+			if gid != sinkID && e.preflightLoopGuarded(gid, sinkID) {
 				return true
 			}
 		}
@@ -759,18 +959,109 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	return false
 }
 
+// flowGuarded reports whether a guard consumes the tainted value and dominates
+// a later node on this same source-to-sink path. This covers the common shape:
+//
+//	v := source()
+//	if !validate(v) { return }
+//	wrapper(v) // endpoint is inside wrapper
+//
+// The guard does not dominate the callee-internal sink, so endpointGuarded cannot
+// see it. It does dominate the path boundary that forwards the checked value,
+// which is enough for guard-style allowlist validators.
+func (e *Engine) flowGuarded(path []string, control string) bool {
+	if len(path) == 0 {
+		return false
+	}
+	for i, pid := range path {
+		for _, gid := range e.flowGuardCandidates(pid, control) {
+			if gid == pid || !e.hasCFG(gid) {
+				continue
+			}
+			for _, later := range path[i+1:] {
+				if later != gid && e.hasCFG(later) && solvers.Dominates(e.Store, gid, later) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
+	key := control + "\x00" + nodeID
+	if out, ok := e.flowGuards[key]; ok {
+		return out
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(id string) {
+		if id == "" || seen[id] || !e.nodeHasConcept(id, control) {
+			return
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	edges, _ := e.Store.OutEdges(nodeID, "FLOWS")
+	for _, ed := range edges {
+		add(ed.Dst)
+		midEdges, _ := e.Store.OutEdges(ed.Dst, "FLOWS")
+		for _, mid := range midEdges {
+			add(mid.Dst)
+		}
+	}
+	e.flowGuards[key] = out
+	return out
+}
+
+// preflightLoopGuarded recognizes "validate every item, then run one bulk operation"
+// shapes. The guard itself does not dominate a post-loop sink because a loop body may
+// execute zero times, but for bulk APIs a guard in the loop body can still be the
+// program's preflight validation. Adapter data decides which calls are real guards;
+// this helper only models the structured-control relation.
+func (e *Engine) preflightLoopGuarded(guardID, sinkID string) bool {
+	gn, ok1, _ := e.Store.GetNode(guardID)
+	sn, ok2, _ := e.Store.GetNode(sinkID)
+	if !ok1 || !ok2 {
+		return false
+	}
+	parent, ok := nearestLoopParent(gn.Prop("region"))
+	if !ok {
+		return false
+	}
+	sinkRegion := sn.Prop("region")
+	if sinkRegion != parent && !strings.HasPrefix(sinkRegion, parent+"/") {
+		return false
+	}
+	return solvers.Reaches(e.Store, guardID, sinkID)
+}
+
+func nearestLoopParent(region string) (string, bool) {
+	parts := strings.Split(region, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if strings.HasPrefix(parts[i], "loop") {
+			parent := strings.Join(parts[:i], "/")
+			if parent == "" {
+				parent = "/"
+			}
+			return parent, true
+		}
+	}
+	return "", false
+}
+
 // endpointClosed reports whether a release carrying `control` POST-DOMINATES the alloc —
 // i.e. the resource is released on every path to function exit (so there is no leak). With
 // CFG metadata it uses post-dominance; without it falls back to presence (any release
 // suppresses — conservative, to avoid leak false positives on unconverted frontends).
 func (e *Engine) endpointClosed(allocID, control string) bool {
-	allocCFG := hasCFG(e.Store, allocID)
+	allocCFG := e.hasCFG(allocID)
 	releases, _ := e.Store.NodesWithConcept(control)
 	for _, rid := range releases {
 		if rid == allocID {
 			continue
 		}
-		if allocCFG && hasCFG(e.Store, rid) {
+		if allocCFG && e.hasCFG(rid) {
 			if solvers.PostDominates(e.Store, rid, allocID) {
 				return true
 			}
@@ -787,6 +1078,15 @@ func hasCFG(store usg.Store, id string) bool {
 		return n.Prop("region") != ""
 	}
 	return false
+}
+
+func (e *Engine) hasCFG(id string) bool {
+	if v, ok := e.cfg[id]; ok {
+		return v
+	}
+	v := hasCFG(e.Store, id)
+	e.cfg[id] = v
+	return v
 }
 
 func dedup(fs []*findings.Finding) []*findings.Finding {

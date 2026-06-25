@@ -25,3 +25,16 @@ test "trust-boundary: a constant key is clean (java)"
     }
   }
   ```
+
+test "trust-boundary: python vyql result marker maps through adapter control"
+  lang python
+  reject VYQL-CFG-014
+  code
+  ```
+  def clean_role(value):
+      # vyql: validator
+      return value
+
+  def handler(request, session):
+      session["role"] = clean_role(request.args["role"])
+  ```

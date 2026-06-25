@@ -10,7 +10,7 @@ import (
 
 func compileEval(t *testing.T, src string, s usg.Store) []int {
 	t.Helper()
-	onto := ontology.Seed()
+	onto := solverContractOntology()
 	decls, err := parser.Parse(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -31,86 +31,129 @@ func compileEval(t *testing.T, src string, s usg.Store) []int {
 	return counts
 }
 
-// Mirrors poc/cases/case_05 toxic combination: a single match rule composes
-// reach + assume through the engine.
-func TestToxicCombination(t *testing.T) {
+func TestMatchComposesReachAndAssume(t *testing.T) {
 	src := `
-package vypr.identity;
-rule ToxicCombinationLateral {
-  match identity.WorkloadIdentity as w
-  where reach(cloud.Internet, w.workload) and assume(w, identity.AdminPrivilege)
+package test;
+rule ComposedMatch {
+  match custom.WorkItem as w
+  where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
 }
 `
 	s := usg.NewInMemStore()
-	// network: internet -> pod (reachable); internet -/-> batchpod
-	s.AddNode(usg.Node{ID: "internet", Type: "cloud.Internet"})
-	s.AddLabel("internet", usg.Label{Concept: "cloud.Internet"})
-	s.AddNode(usg.Node{ID: "pod", Type: "cloud.Container", Props: map[string]string{"loc": "pod/orders"}})
-	s.AddEdge(usg.Edge{Type: "NET", Src: "internet", Dst: "pod", Props: map[string]string{"rule": "sg-pub:443", "proto": "tcp", "port": "443"}})
-	// workload identity for pod, escalatable to admin
-	s.AddNode(usg.Node{ID: "wid", Type: "identity.ServiceAccount", Props: map[string]string{"loc": "sa/orders", "workload": "pod"}})
-	s.AddLabel("wid", usg.Label{Concept: "identity.WorkloadIdentity"})
-	s.AddNode(usg.Node{ID: "admin", Type: "identity.Role", Props: map[string]string{"priv_level": "ADMIN"}})
-	s.AddLabel("admin", usg.Label{Concept: "identity.AdminPrivilege"})
-	s.AddEdge(usg.Edge{Type: "STEP", Src: "wid", Dst: "admin", Props: map[string]string{"ability": "create-pod+mount-sa-token"}})
-	// a second workload identity NOT internet-reachable
-	s.AddNode(usg.Node{ID: "wid2", Type: "identity.ServiceAccount", Props: map[string]string{"workload": "batchpod"}})
-	s.AddLabel("wid2", usg.Label{Concept: "identity.WorkloadIdentity"})
-	s.AddNode(usg.Node{ID: "batchpod", Type: "cloud.Container"})
-	s.AddEdge(usg.Edge{Type: "STEP", Src: "wid2", Dst: "admin", Props: map[string]string{"ability": "create-pod+mount-sa-token"}})
+	s.AddNode(usg.Node{ID: "edge", Type: "custom.Edge"})
+	s.AddLabel("edge", usg.Label{Concept: "custom.Edge"})
+	s.AddNode(usg.Node{ID: "workload", Type: "custom.Workload", Props: map[string]string{"loc": "workload"}})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "workload", Props: map[string]string{"rule": "edge-workload"}})
+
+	s.AddNode(usg.Node{ID: "item", Type: "custom.WorkItem", Props: map[string]string{"loc": "item", "workload": "workload"}})
+	s.AddLabel("item", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "capability", Type: "custom.Capability", Props: map[string]string{"priv_level": "ADMIN"}})
+	s.AddLabel("capability", usg.Label{Concept: "custom.Capability"})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "item", Dst: "capability", Props: map[string]string{"ability": "item-capability"}})
+
+	s.AddNode(usg.Node{ID: "item2", Type: "custom.WorkItem", Props: map[string]string{"workload": "otherWorkload"}})
+	s.AddLabel("item2", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "otherWorkload", Type: "custom.Workload"})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "item2", Dst: "capability", Props: map[string]string{"ability": "other-capability"}})
 
 	counts := compileEval(t, src, s)
 	if counts[0] != 1 {
-		t.Fatalf("toxic combo should fire once (internet-reachable + escalatable), got %d", counts[0])
+		t.Fatalf("composed match should fire once, got %d", counts[0])
 	}
 }
 
-// Mirrors poc/cases/case_09: business-logic refund authorization + state machine.
-func TestBusinessMatchAndTransition(t *testing.T) {
-	refundRule := `
-package vypr.bizlogic;
-rule UnauthorizedRefund {
-  match business.Refund as a
-  where a.actor is identity.User and a.resource is business.Order
-  unless guarded_by core.OwnershipCheck
+func TestConceptMatchAndTransition(t *testing.T) {
+	actionRule := `
+package test;
+rule UnguardedAction {
+  match custom.Action as a
+  where a.actor is custom.ActorKind and a.resource is custom.ResourceKind
+  unless guarded_by custom.Transform
 }
 `
-	// unguarded refund -> finding
 	g := usg.NewInMemStore()
-	g.AddNode(usg.Node{ID: "refund1", Type: "business.Action", Props: map[string]string{"loc": "RefundService.execute", "actor": "identity.User", "resource": "business.Order"}})
-	g.AddLabel("refund1", usg.Label{Concept: "business.Refund"})
-	if c := compileEval(t, refundRule, g); c[0] != 1 {
-		t.Fatalf("unguarded refund: expected 1 finding, got %d", c[0])
+	g.AddNode(usg.Node{ID: "action1", Type: "custom.Action", Props: map[string]string{"loc": "action.execute", "actor": "custom.ActorKind", "resource": "custom.ResourceKind"}})
+	g.AddLabel("action1", usg.Label{Concept: "custom.Action"})
+	if c := compileEval(t, actionRule, g); c[0] != 1 {
+		t.Fatalf("unguarded action: expected 1 finding, got %d", c[0])
 	}
 
-	// ownership-checked refund -> no finding
 	g2 := usg.NewInMemStore()
-	g2.AddNode(usg.Node{ID: "refund1", Type: "business.Action", Props: map[string]string{"actor": "identity.User", "resource": "business.Order"}})
-	g2.AddLabel("refund1", usg.Label{Concept: "business.Refund"})
-	g2.AddNode(usg.Node{ID: "own", Type: "business.Control"})
-	g2.AddLabel("own", usg.Label{Concept: "core.OwnershipCheck"})
-	g2.AddEdge(usg.Edge{Type: "CHECKS", Src: "own", Dst: "refund1"})
-	if c := compileEval(t, refundRule, g2); c[0] != 0 {
-		t.Fatalf("guarded refund: expected 0 findings, got %d", c[0])
+	g2.AddNode(usg.Node{ID: "action1", Type: "custom.Action", Props: map[string]string{"actor": "custom.ActorKind", "resource": "custom.ResourceKind"}})
+	g2.AddLabel("action1", usg.Label{Concept: "custom.Action"})
+	g2.AddNode(usg.Node{ID: "guard", Type: "custom.Control"})
+	g2.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g2.AddEdge(usg.Edge{Type: "CHECKS", Src: "guard", Dst: "action1"})
+	if c := compileEval(t, actionRule, g2); c[0] != 0 {
+		t.Fatalf("guarded action: expected 0 findings, got %d", c[0])
 	}
 
 	transitionRule := `
-package vypr.bizlogic;
-rule InvalidRefundTransition {
-  match transition * -> Refunded on Order as t
-  unless t.from == Paid
+package test;
+rule InvalidTransition {
+  match transition * -> Done on Workflow as t
+  unless t.from == Allowed
 }
 `
-	// invalid: Created -> Refunded
 	gt := usg.NewInMemStore()
-	gt.AddNode(usg.Node{ID: "t1", Type: "business.Transition", Props: map[string]string{"machine": "Order", "from": "Created", "to": "Refunded"}})
+	gt.AddNode(usg.Node{ID: "t1", Type: "analysis.Transition", Props: map[string]string{"machine": "Workflow", "from": "Started", "to": "Done"}})
 	if c := compileEval(t, transitionRule, gt); c[0] != 1 {
 		t.Fatalf("invalid transition: expected 1 finding, got %d", c[0])
 	}
-	// valid: Paid -> Refunded
 	gv := usg.NewInMemStore()
-	gv.AddNode(usg.Node{ID: "t1", Type: "business.Transition", Props: map[string]string{"machine": "Order", "from": "Paid", "to": "Refunded"}})
+	gv.AddNode(usg.Node{ID: "t1", Type: "analysis.Transition", Props: map[string]string{"machine": "Workflow", "from": "Allowed", "to": "Done"}})
 	if c := compileEval(t, transitionRule, gv); c[0] != 0 {
 		t.Fatalf("valid transition: expected 0 findings, got %d", c[0])
+	}
+}
+
+func TestMatchGuardedByDominatingBranchCondition(t *testing.T) {
+	actionRule := `
+package test;
+rule GuardedAction {
+  match custom.Action as a
+  unless guarded_by custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Arg", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t/if2.t", Order: 11, HasOrder: true})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEval(t, actionRule, g); c[0] != 0 {
+		t.Fatalf("dominating branch guard should suppress match, got %d", c[0])
+	}
+}
+
+func TestMatchGuardedByDominatingBranchConditionWithQualifiedConcepts(t *testing.T) {
+	rule := `
+package vypr.memory;
+rule CountDerivedElementAccess {
+  meta { id: "TEST-MEM", severity: medium, cwe: [CWE_125] }
+  match code.CountDerivedElementAccess as idx
+  unless guarded_by core.MemoryBoundsCheck
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "bucket.go:666", Region: "bucket.go/fn143/if144.e/if149.t", Order: 2032, HasOrder: true})
+	g.AddLabel("guard", usg.Label{Concept: "core.MemoryBoundsCheck"})
+	g.AddNode(usg.Node{ID: "idx", Type: "code.Arg", Loc: "bucket.go:667", Region: "bucket.go/fn143/if144.e/if149.t/if150.t", Order: 2038, HasOrder: true})
+	g.AddLabel("idx", usg.Label{Concept: "code.CountDerivedElementAccess"})
+
+	decls, err := parser.Parse(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("qualified dominating branch guard should suppress match, got %d", len(fs))
 	}
 }

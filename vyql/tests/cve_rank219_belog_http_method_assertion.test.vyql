@@ -1,0 +1,48 @@
+test "rank219: backend delete action lacks HTTP method assertion"
+  lang php
+  expect VYQL-RF-007
+  expect_review code.MissingHttpMethodAssertion
+  code
+  ```
+  <?php
+  class BackendLogController extends ActionController
+  {
+      public function deleteMessageAction(int $errorUid): ResponseInterface
+      {
+          $logEntry = $this->logEntryRepository->findByUid($errorUid);
+          if (!$logEntry) {
+              return $this->redirect('list');
+          }
+          $numberOfDeletedRows = $this->logEntryRepository->deleteByMessageDetails($logEntry);
+          $this->addFlashMessage(sprintf('deleted %d', $numberOfDeletedRows));
+          return $this->redirect('list');
+      }
+  }
+  ```
+
+test "rank219: backend delete action asserts POST before dispatch"
+  lang php
+  reject VYQL-RF-007
+  reject_review code.MissingHttpMethodAssertion
+  code
+  ```
+  <?php
+  class BackendLogController extends ActionController
+  {
+      public function initializeDeleteMessageAction(): void
+      {
+          $this->assertAllowedHttpMethod($this->request, 'POST');
+      }
+
+      public function deleteMessageAction(int $errorUid): ResponseInterface
+      {
+          $logEntry = $this->logEntryRepository->findByUid($errorUid);
+          if (!$logEntry) {
+              return $this->redirect('list');
+          }
+          $numberOfDeletedRows = $this->logEntryRepository->deleteByMessageDetails($logEntry);
+          $this->addFlashMessage(sprintf('deleted %d', $numberOfDeletedRows));
+          return $this->redirect('list');
+      }
+  }
+  ```

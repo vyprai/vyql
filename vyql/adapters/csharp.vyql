@@ -3,11 +3,24 @@
 adapter csharp {
   meta { match: contains, fidelity: resolved }
 
-  // MVC controller action parameters (model-bound from the request) — the
-  // frontend seeds each as http_input() at the method top.
+  // MVC controller action parameters and Razor bound properties.
   source "Environment.GetCommandLineArgs" -> code.CliArgument
   source "Console.ReadLine" -> code.StdinInput
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpGet" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpPost" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpPut" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpDelete" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpPatch" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:HttpHead" -> code.HttpInput
+  source path "analysis.parameter.entry" val "method_attribute:Route" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_attribute:ApiController" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_attribute:Route" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_name:" val "Controller" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:Controller" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:ControllerBase" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_base:ApiController" -> code.HttpInput
+  source path "analysis.property.entry" val "property_attribute:BindProperty" val "SupportsGet" val "true" -> code.HttpInput
+  source path "analysis.property.entry" val "property_attribute:BindPropertyAttribute" val "SupportsGet" val "true" -> code.HttpInput
 
   // ASP.NET request inputs (receiver name varies → substring match)
   source ".QueryString" -> code.HttpInput
@@ -100,6 +113,7 @@ adapter csharp {
   sink path "Response.Write" -> code.HtmlRender
   sink method "Raw" -> code.HtmlRender
   sink path "MarkupString" -> code.HtmlRender
+  mark method "LoadHtml" -> code.HtmlSanitizerLogicReview
   // BTCPay ConfirmModel(title, description, action): the Description (arg 1) is rendered as
   // RAW HTML in the Confirm view, so an untrusted value interpolated into it is reflected XSS.
   sink path "ConfirmModel" arg 1 -> code.HtmlRender
@@ -177,6 +191,15 @@ adapter csharp {
   mark "TokenValidationParameters" val "ValidateIssuerSigningKey=false" -> code.JwtUnverified
   mark "IgnoreAntiforgeryToken" -> code.CsrfDisabled
   mark "UnixFileMode.OtherWrite" -> code.InsecurePermission
+  mark exact "analysis.function.context" val "lang=csharp" val "ReadVarUInt32" val "(int)input.ReadVarUInt32()" nval "checked" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "ReadVarUInt32" val "input.ReadVarUInt32()<<1" nval "checked" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "input.SkipBytes(count*sizeof(" nval "checked(count*sizeof(" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "name=SkipBytes" val "position+=count" nval "checked(position+count)" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "currentLength+=count" nval "checked(stackFrame.currentLength+count)" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "value.Length<<1" nval "checked(value.Length*2)" -> code.UncheckedEncodedLengthArithmetic
+  mark exact "analysis.function.context" val "lang=csharp" val "name=GetOrAddNode" val "GetOrAddNode(subKey)" nval "MaxStateDepth" -> code.UnboundedStateGrowthReview
+  mark exact "analysis.function.context" val "lang=csharp" val "name=GetValidity" val "GetValidity(node.ChildNodes[i])" nval "MaxValidationDepth" -> code.UnboundedStateGrowthReview
+  mark exact "analysis.function.context" val "lang=csharp" val "BlobSasBuilder" val "ExpiresOn" val "AddHours(1)" val "GenerateSasUri" nval "AddMinutes(tokenDuration)" -> code.TimeBoundAccessTokenReview
   mark "File.Open" -> code.ResourceHandle
   mark "File.OpenRead" -> code.ResourceHandle
   mark "TcpClient" -> code.ResourceHandle

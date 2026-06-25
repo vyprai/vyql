@@ -198,8 +198,8 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal":
 		// plain single/double-quoted literal with no interpolation: carry the
-		// quote-stripped source text so val-matched marks (e.g. Cipher "DES",
-		// cookie "false") can match the literal VALUE. q/qq strings handled below.
+		// quote-stripped source text so val-matched marks can inspect the literal
+		// value. q/qq strings handled below.
 		return nir.Const{Loc: L, Value: strings.Trim(c.text(n), "\"'")}
 	case "bareword", "heredoc_content":
 		return nir.Const{Loc: L}
@@ -220,7 +220,7 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Format{Parts: parts, Loc: L}
 		}
 		// no interpolation: a constant double-quoted/qq string. Carry the quote-
-		// stripped text so val-matched marks (Cipher "DES", cookie "false") match.
+		// stripped text so val-matched marks can inspect the literal value.
 		return nir.Const{Loc: L, Value: strings.Trim(c.text(n), "\"'")}
 	case "method_call_expression":
 		inv := field(n, "invocant")
@@ -335,7 +335,7 @@ func (c *plConv) dotted(n *tree_sitter.Node) string {
 		return c.plVarName(n)
 	case "function", "bareword", "method":
 		// normalize package separator `::` to `.` so dotted paths are boundary-
-		// matchable like every other language (Digest::MD5::md5_hex -> Digest.MD5.md5_hex).
+		// matchable like every other language (Pkg::Thing::call -> Pkg.Thing.call).
 		return strings.ReplaceAll(c.text(n), "::", ".")
 	case "method_call_expression":
 		return c.dotted(field(n, "invocant")) + "." + strings.ReplaceAll(c.text(field(n, "method")), "::", ".")

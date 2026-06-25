@@ -7,11 +7,8 @@ package sca
 
 import "github.com/vyprai/vyql/usg"
 
-// Reputation categories, by descending severity, as sbom labels:
-//   sbom.VulnerableDependency  — a known-CVE version (advisories.json)
-//   sbom.MaliciousDependency   — a known-malware name@version (malware.json)
-//   sbom.SuspiciousDependency  — typosquat, OR an unreviewed version of a package that
-//                                has malicious releases (the "not marked safe/unsafe" scan)
+// Reputation categories are recorded as neutral package tokens; VyQL adapter data
+// maps them to concrete concepts.
 // A version listed in trusted.json is verified-good and short-circuits the name scans.
 
 // Analyze runs the full reputation pipeline for one ecosystem over every
@@ -38,9 +35,14 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 		trusted := isTrusted(d, eco, name, version)
 
 		// 1. known-vulnerable version (CVE feed)
-		if adv := matchAdvisory(d, eco, name, version); adv != "" {
-			if e := label(g, nd.ID, "sbom.VulnerableDependency", map[string]string{"advisory": adv}); e != nil {
+		if adv, ok := matchAdvisory(d, eco, name, version); ok {
+			if e := addPackageTokens(g, nd.ID, "status=vulnerable", "advisory="+adv.ID); e != nil {
 				return vuln, malicious, suspicious, e
+			}
+			for _, cwe := range adv.CWE {
+				if e := addPackageTokens(g, nd.ID, "advisory_cwe="+cwe); e != nil {
+					return vuln, malicious, suspicious, e
+				}
 			}
 			vuln++
 		}
@@ -54,16 +56,14 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 		switch {
 		case hasMalwareHistory && versionMatch(badVersions, version):
 			// this exact version (or all versions, "*") is known-malicious.
-			if e := label(g, nd.ID, "sbom.MaliciousDependency", map[string]string{
-				"reason": "known-malware", "version": version}); e != nil {
+			if e := addPackageTokens(g, nd.ID, "status=malicious", "reason=known-malware", "malware_version="+version); e != nil {
 				return vuln, malicious, suspicious, e
 			}
 			malicious++
 		case hasMalwareHistory:
 			// the package HAS malicious releases but this version isn't on the list and
 			// isn't trusted → unreviewed/unverified → scan-flag as suspicious.
-			if e := label(g, nd.ID, "sbom.SuspiciousDependency", map[string]string{
-				"reason": "unverified-version", "note": "package has known-malicious releases"}); e != nil {
+			if e := addPackageTokens(g, nd.ID, "status=suspicious", "reason=unverified-version"); e != nil {
 				return vuln, malicious, suspicious, e
 			}
 			suspicious++
@@ -71,8 +71,7 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 			// 3b. typosquat of a popular package.
 			if !popular[name] {
 				if target := nearestPopular(name, popular); target != "" {
-					if e := label(g, nd.ID, "sbom.SuspiciousDependency", map[string]string{
-						"reason": "typosquat", "squats": target}); e != nil {
+					if e := addPackageTokens(g, nd.ID, "status=suspicious", "reason=typosquat", "squats="+target); e != nil {
 						return vuln, malicious, suspicious, e
 					}
 					suspicious++
@@ -85,11 +84,11 @@ func Analyze(g usg.Store, eco string) (vuln, malicious, suspicious int, err erro
 
 // matchAdvisory returns the advisory id if (name, version) is a known-vulnerable
 // release for the ecosystem, else "".
-func matchAdvisory(d *scaData, eco, name, version string) string {
+func matchAdvisory(d *scaData, eco, name, version string) (advisoryEntry, bool) {
 	for _, a := range d.advisories[eco][name] {
 		if a.Version == version || a.Version == "*" {
-			return a.ID
+			return a, true
 		}
 	}
-	return ""
+	return advisoryEntry{}, false
 }

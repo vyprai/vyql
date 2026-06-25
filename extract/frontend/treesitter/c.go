@@ -14,24 +14,25 @@ import (
 )
 
 // ccConv walks a tree-sitter C CST into NIR. C has no string-concat operator:
-// untrusted data reaches a buffer through writer functions (sprintf/strcpy/…),
-// so those are modeled as an ASSIGNMENT to their destination argument, and
-// reader functions (fgets/gets/…) seed their destination buffer as a source.
+// data reaches a buffer through writer functions (sprintf/strcpy/...), so those
+// are modeled as an assignment to their destination argument, and reader
+// functions (fgets/gets/...) seed their destination buffer from the call result.
 type ccConv struct {
 	src  []byte
 	file string
 	key  string
+	lang string
 }
 
-// cPropagators taint their dest (arg0) from the remaining (source) arguments.
+// cPropagators write their source arguments into destination arg0.
 var cPropagators = map[string]bool{
 	"sprintf": true, "snprintf": true, "vsprintf": true, "vsnprintf": true,
 	"strcpy": true, "strncpy": true, "strcat": true, "strncat": true,
 	"memcpy": true, "memmove": true, "stpcpy": true,
 }
 
-// cReaders read external input into a destination BUFFER argument; the value is the
-// arg index of that buffer (recv/read take the buffer at arg1, not arg0).
+// cReaders write the call result into a destination buffer argument. recv/read
+// take the buffer at arg1, not arg0.
 var cReaders = map[string]int{
 	"fgets": 0, "gets": 0, "fread": 0, "fscanf": 0,
 	"read": 1, "recv": 1, "recvfrom": 1, "pread": 1,
@@ -64,9 +65,9 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 			return p
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext)}
+			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), lang: ccLang(ext)}
 			body := c.decls(tree.RootNode())
-			body = append(body, c.ccFailurePathOwnedBufferFree(tree.RootNode())...)
+			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -88,7 +89,7 @@ var (
 	ccDeleteRe    = regexp.MustCompile(`delete\s*(?:\[\]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*;`)
 )
 
-func (c *ccConv) ccFailurePathOwnedBufferFree(root *tree_sitter.Node) []nir.Stmt {
+func (c *ccConv) ccLifetimeReleaseReturnObservations(root *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	seen := map[string]bool{}
 	var walk func(*tree_sitter.Node)
@@ -121,11 +122,16 @@ func (c *ccConv) ccFailurePathOwnedBufferFree(root *tree_sitter.Node) []nir.Stmt
 					continue
 				}
 				seen[loc] = true
-				path := "security.cpp.failure_path_owned_buffer_free"
+				path := "analysis.lifetime.release_then_return"
 				out = append(out, nir.ExprStmt{Value: nir.Call{
 					Callee: nir.Name{ID: path, Loc: loc},
+					Args: []nir.Expr{
+						nir.Const{Loc: loc, Value: "release=delete"},
+						nir.Const{Loc: loc, Value: "return=false"},
+						nir.Const{Loc: loc, Value: "storage=nonlocal"},
+					},
 					Path:   path,
-					Method: lastSeg(path),
+					Method: "release_then_return",
 					Loc:    loc,
 				}})
 			}
@@ -162,6 +168,24 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func ccLang(ext string) string {
+	switch ext {
+	case ".cpp":
+		return "cpp"
+	case ".m":
+		return "objc"
+	default:
+		return "c"
+	}
+}
+
+func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	return []string{"lang=" + c.lang, "name=" + name, compactCExprText(c.text(body))}
 }
 
 func (c *ccConv) decls(n *tree_sitter.Node) []nir.Stmt {
@@ -235,6 +259,9 @@ func (c *ccConv) declName(d *tree_sitter.Node) string {
 
 func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
+	if n.IsError() || strings.HasPrefix(n.Kind(), "preproc_") {
+		return c.decls(n)
+	}
 	switch n.Kind() {
 	case "function_definition":
 		decl := field(n, "declarator")
@@ -249,12 +276,14 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if len(params) == 0 {
 			params, paramTypes = c.paramsFromSignatureText(c.text(n))
 		}
+		name := c.declName(decl)
 		return []nir.Stmt{nir.FuncDef{
-			Name:       c.declName(decl),
-			Params:     params,
-			ParamTypes: paramTypes,
-			Body:       append(c.block(field(n, "body")), c.ccUncheckedFieldIndexAccesses(n)...),
-			Loc:        L,
+			Name:          name,
+			Params:        params,
+			ParamTypes:    paramTypes,
+			Body:          append(c.block(field(n, "body")), c.ccIndexAccessObservations(n)...),
+			Loc:           L,
+			ContextTokens: c.ccFunctionContext(name, field(n, "body")),
 		}}
 	case "struct_specifier", "union_specifier", "enum_specifier":
 		return nil
@@ -268,7 +297,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return out
 	case "method_definition", "method_declaration": // ObjC method
 		name, params, body := c.objcMethod(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: c.objcParamTypes(n, params), Body: c.block(body), Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: c.objcParamTypes(n, params), Body: c.block(body), Loc: L, ContextTokens: c.ccFunctionContext(name, body)}}
 	case "namespace_definition", "linkage_specification", "declaration_list": // C++
 		if b := field(n, "body"); b != nil {
 			return c.decls(b)
@@ -325,15 +354,51 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1); Cond nil (C did not evaluate the predicate) -> byte-identical.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.cBranch(field(n, "consequence")), Else: c.cBranch(field(n, "alternative"))}}
+		condNode := field(n, "condition")
+		ifn := nir.If{Cond: c.expr(condNode), Then: c.cBranch(field(n, "consequence")), Else: c.cBranch(field(n, "alternative"))}
+		if target, val, ok := c.ccAssignmentExpr(condNode); ok {
+			return []nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}, ifn}
+		}
+		return []nir.Stmt{ifn}
 	case "while_statement", "for_statement", "do_statement":
-		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+		body := c.collectBlocks(n)
+		if target, val, ok := c.ccAssignmentExpr(field(n, "condition")); ok {
+			body = append([]nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}}, body...)
+		}
+		return []nir.Stmt{nir.Loop{Body: body}}
 	case "switch_statement":
 		return []nir.Stmt{c.cSwitch(n)}
 	case "compound_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return nil
+}
+
+func (c *ccConv) ccAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
+	for n != nil && n.Kind() == "parenthesized_expression" {
+		kids := namedChildren(n)
+		if len(kids) != 1 {
+			return "", nil, false
+		}
+		n = kids[0]
+	}
+	if n == nil || n.Kind() != "assignment_expression" {
+		for _, ch := range namedChildren(n) {
+			if target, val, ok := c.ccAssignmentExpr(ch); ok {
+				return target, val, true
+			}
+		}
+		return "", nil, false
+	}
+	left := field(n, "left")
+	if left == nil || left.Kind() != "identifier" {
+		return "", nil, false
+	}
+	right := field(n, "right")
+	if right == nil {
+		return "", nil, false
+	}
+	return c.text(left), c.expr(right), true
 }
 
 // vexingCtorArgs decides whether a function_declarator's parameter_list is really a
@@ -376,20 +441,19 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	case "assignment_expression":
 		left := field(inner, "left")
 		right := c.expr(field(inner, "right"))
+		if ev := c.fieldClearNullEvent(inner, left, field(inner, "right")); ev != nil {
+			return append([]nir.Stmt{*ev}, c.assignmentFallback(left, right)...)
+		}
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		if left != nil {
-			return []nir.Stmt{nir.ExprStmt{Value: c.expr(left)}, nir.ExprStmt{Value: right}}
-		}
-		return []nir.Stmt{nir.ExprStmt{Value: right}}
+		return c.assignmentFallback(left, right)
 	case "call_expression":
 		name := lastSeg(c.dotted(field(inner, "function")))
 		args := namedChildren(field(inner, "arguments"))
-		// buffer writers: the destination buffer is tainted from the source args / the read.
 		if len(args) > 0 {
 			if cPropagators[name] {
-				if dst := c.destName(args[0]); dst != "" { // dest is arg0 for str/mem copy
+				if dst := c.destName(args[0]); dst != "" {
 					var parts []nir.Expr
 					for _, a := range args[1:] {
 						parts = append(parts, c.expr(a))
@@ -401,13 +465,65 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 				}
 			}
 			if idx, ok := cReaders[name]; ok && idx < len(args) {
-				if dst := c.destName(args[idx]); dst != "" { // read into the BUFFER arg (recv/read = arg1)
+				if dst := c.destName(args[idx]); dst != "" {
 					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
 				}
 			}
 		}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+func (c *ccConv) assignmentFallback(left *tree_sitter.Node, right nir.Expr) []nir.Stmt {
+	if left != nil {
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(left)}, nir.ExprStmt{Value: right}}
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: right}}
+}
+
+func (c *ccConv) fieldClearNullEvent(assign, left, right *tree_sitter.Node) *nir.ExprStmt {
+	if left == nil || right == nil || !c.isNullExpr(right) {
+		return nil
+	}
+	base, fld, ok := c.fieldTarget(left)
+	if !ok {
+		return nil
+	}
+	path := "analysis.field.clear_null"
+	return &nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: c.loc(assign)},
+		Args: []nir.Expr{
+			c.expr(base),
+			nir.Const{Loc: c.loc(left), Value: "field=" + fld},
+		},
+		Path:   path,
+		Method: "clear_null",
+		Loc:    c.loc(assign),
+	}}
+}
+
+func (c *ccConv) fieldTarget(n *tree_sitter.Node) (*tree_sitter.Node, string, bool) {
+	if n == nil || n.Kind() != "field_expression" {
+		return nil, "", false
+	}
+	base := field(n, "argument")
+	fld := c.text(field(n, "field"))
+	return base, fld, base != nil && fld != ""
+}
+
+func (c *ccConv) isNullExpr(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Kind() {
+	case "identifier":
+		return c.text(n) == "NULL"
+	case "number_literal":
+		return c.text(n) == "0"
+	case "null", "nullptr":
+		return true
+	}
+	return false
 }
 
 // destName returns the buffer variable name of a writer's destination argument,
@@ -686,7 +802,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "concatenated_string", "raw_string_literal":
 		// carry the quote-stripped literal text so val-matched marks/sinks
-		// (Cipher "DES", setSecure "false", algorithm strings) can value-match;
+		// adapter value predicates can match constants;
 		// unquoteLit in lowering strips the surrounding delimiters.
 		return nir.Const{Loc: L, Value: cStringText(c.text(n))}
 	case "new_expression": // C++
@@ -699,7 +815,8 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "call_expression":
 		fn := field(n, "function")
 		path := c.dotted(fn)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
+		method := lastSeg(path)
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: method, Loc: L}
 	case "message_expression": // ObjC [receiver method:arg ...]
 		recv := field(n, "receiver")
 		methN := field(n, "method")
@@ -749,7 +866,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	return nir.Seq{Parts: parts, Loc: L}
 }
 
-func (c *ccConv) ccUncheckedFieldIndexAccesses(fn *tree_sitter.Node) []nir.Stmt {
+func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
@@ -766,15 +883,24 @@ func (c *ccConv) ccUncheckedFieldIndexAccesses(fn *tree_sitter.Node) []nir.Stmt 
 			idx := field(n, "index")
 			idxText := c.text(idx)
 			compactIdx := compactCExprText(idxText)
-			if ccFieldDerivedIndex(idxText) && compactIdx != "" && !ccHasUpperBoundGuard(bodyText, compactIdx) {
+			if ccStructuredIndex(idxText) && compactIdx != "" {
 				loc := c.loc(n)
 				if !seen[loc] {
 					seen[loc] = true
-					path := "security.index.field_derived.unchecked"
+					guard := "guard=missing_upper_bound"
+					if ccHasUpperBoundGuard(bodyText, compactIdx) {
+						guard = "guard=upper_bound"
+					}
+					path := "analysis.index.access"
 					out = append(out, nir.ExprStmt{Value: nir.Call{
 						Callee: nir.Name{ID: path, Loc: loc},
+						Args: []nir.Expr{
+							nir.Const{Loc: loc, Value: "index_kind=field_derived"},
+							nir.Const{Loc: loc, Value: guard},
+							nir.Const{Loc: loc, Value: "index=" + compactIdx},
+						},
 						Path:   path,
-						Method: lastSeg(path),
+						Method: "access",
 						Loc:    loc,
 					}})
 				}
@@ -788,7 +914,7 @@ func (c *ccConv) ccUncheckedFieldIndexAccesses(fn *tree_sitter.Node) []nir.Stmt 
 	return out
 }
 
-func ccFieldDerivedIndex(s string) bool {
+func ccStructuredIndex(s string) bool {
 	return strings.Contains(s, "->") || strings.Contains(s, ".")
 }
 

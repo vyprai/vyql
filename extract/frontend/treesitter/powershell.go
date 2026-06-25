@@ -13,8 +13,8 @@ import (
 // psConv walks a tree-sitter PowerShell CST into NIR. PowerShell wraps every
 // expression in a deep precedence cascade (logical→bitwise→…→unary); psUnwrap
 // peels those single-child wrappers to the meaningful node. A `command` is a Call
-// (cmdlet name → path, elements → args); $env:CGI vars and param() parameters are
-// sources; expandable strings ("ping $x") propagate taint.
+// (cmdlet name -> path, elements -> args); expandable strings ("ping $x")
+// propagate taint.
 type psConv struct {
 	src  []byte
 	file string
@@ -72,12 +72,21 @@ func (c *psConv) psUnwrap(n *tree_sitter.Node) *tree_sitter.Node {
 
 func (c *psConv) program(root *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	// top-level param() block → seed parameters as user input
+	// Top-level param() block entries are emitted as neutral parameter-entry events.
 	for _, ch := range namedChildren(root) {
 		if ch.Kind() == "param_block" {
 			for _, p := range c.paramNames(ch) {
 				out = append(out, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input"}, Path: "http_input", Method: "http_input", Loc: c.loc(ch)}})
+					Value: nir.Call{
+						Callee: nir.Name{ID: "analysis.parameter.entry", Loc: c.loc(ch)},
+						Args: []nir.Expr{
+							nir.Const{Loc: c.loc(ch), Value: "entry_kind:script_param"},
+							nir.Const{Loc: c.loc(ch), Value: "param_name:" + p},
+						},
+						Path:   "analysis.parameter.entry",
+						Method: "entry",
+						Loc:    c.loc(ch),
+					}})
 			}
 		}
 	}
@@ -260,7 +269,7 @@ func (c *psConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
 			switch ch.Kind() {
-			case "script_block", "script_block_body", "statement_list", "named_block",
+			case "statement_block", "script_block", "script_block_body", "statement_list", "named_block",
 				"else_clause", "elseif_clause", "catch_clause", "finally_clause":
 				walk(ch)
 			case "command", "pipeline", "assignment_expression", "if_statement",
@@ -412,25 +421,13 @@ func (c *psConv) command(n *tree_sitter.Node) nir.Expr {
 			args = append(args, c.expr(ch))
 		}
 	}
-	// A shell command's danger can be in ANY argument position (e.g.
-	// Start-Process "cmd" $userArg), so collapse all args into one taint-carrying
-	// Format that the sink (arg0) inspects.
+	// Command adapters inspect arg0; collapse all command elements into one
+	// taint-carrying Format so no argument position is dropped.
 	var callArgs []nir.Expr
 	if len(args) > 0 {
 		callArgs = []nir.Expr{nir.Format{Parts: args, Loc: L}}
 	}
 	return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: callArgs, Path: name, Method: name, Loc: L}
-}
-
-// shSourcePSVar: $env:QUERY_STRING / $env:HTTP_* etc. are untrusted input.
-func psSourceVar(name string) bool {
-	n := strings.TrimPrefix(strings.ToUpper(name), "ENV:")
-	for _, p := range []string{"QUERY_STRING", "HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_"} {
-		if n == p || strings.HasPrefix(n, p) {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *psConv) varName(n *tree_sitter.Node) string {
@@ -445,8 +442,8 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "variable":
-		if psSourceVar(c.varName(n)) {
-			return nir.Call{Callee: nir.Name{ID: "shell_input", Loc: L}, Path: "shell_input", Method: "shell_input", Loc: L}
+		if event, ok := sourceVarEvent("powershell", c.varName(n)); ok {
+			return nir.Call{Callee: nir.Name{ID: event, Loc: L}, Path: event, Method: event, Loc: L}
 		}
 		return nir.Name{ID: c.varName(n), Loc: L}
 	case "integer_literal", "decimal_integer_literal", "real_literal", "boolean":
@@ -503,11 +500,19 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "member_access":
 		base := namedChildren(n)
 		if len(base) > 0 {
-			return nir.Attr{Base: c.expr(base[0]), Attr: c.text(field(n, "member")), Path: c.dotted(n), Loc: L}
+			return nir.Attr{Base: c.expr(base[0]), Attr: c.psMemberName(n), Path: c.dotted(n), Loc: L}
 		}
 	case "invokation_expression":
 		if k := namedChildren(n); len(k) > 0 {
 			path := c.dotted(k[0])
+			if invokePath := c.psInvokePathFromText(n); invokePath != "" {
+				path = invokePath
+			}
+			if path == "?" {
+				if staticPath := c.psStaticPath(n); staticPath != "" {
+					path = staticPath
+				}
+			}
 			return nir.Call{Callee: c.expr(k[0]), Args: c.psInvokeArgs(n), Path: path, Method: lastSeg(path), Loc: L}
 		}
 	}
@@ -537,8 +542,130 @@ func (c *psConv) psInvokeArgs(n *tree_sitter.Node) []nir.Expr {
 		for _, ch := range namedChildren(a) {
 			out = append(out, c.expr(ch))
 		}
+		return out
+	}
+	if parsed := c.psInvokeArgsFromText(n); len(parsed) > 0 {
+		return parsed
+	}
+	kids := namedChildren(n)
+	for i, ch := range kids {
+		if i == 0 {
+			continue
+		}
+		if ch.Kind() == "argument_list" {
+			for _, arg := range namedChildren(ch) {
+				out = append(out, c.expr(arg))
+			}
+			continue
+		}
+		out = append(out, c.expr(ch))
 	}
 	return out
+}
+
+func (c *psConv) psInvokeArgsFromText(n *tree_sitter.Node) []nir.Expr {
+	raw := strings.TrimSpace(c.text(n))
+	open := strings.Index(raw, "(")
+	close := strings.LastIndex(raw, ")")
+	if open < 0 || close <= open {
+		return nil
+	}
+	var out []nir.Expr
+	for _, part := range psSplitArgs(raw[open+1 : close]) {
+		if expr, ok := c.psExprFromText(part, c.loc(n)); ok {
+			out = append(out, expr)
+		}
+	}
+	return out
+}
+
+func psSplitArgs(raw string) []string {
+	var out []string
+	start := 0
+	depth := 0
+	quote := rune(0)
+	for i, r := range raw {
+		if quote != 0 {
+			if r == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch r {
+		case '\'', '"':
+			quote = r
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			if depth > 0 {
+				depth--
+			}
+		case ',':
+			if depth == 0 {
+				out = append(out, strings.TrimSpace(raw[start:i]))
+				start = i + len(string(r))
+			}
+		}
+	}
+	out = append(out, strings.TrimSpace(raw[start:]))
+	return out
+}
+
+func (c *psConv) psExprFromText(raw, loc string) (nir.Expr, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, false
+	}
+	if strings.Contains(raw, "+") {
+		var parts []nir.Expr
+		for _, part := range strings.Split(raw, "+") {
+			if expr, ok := c.psExprFromText(part, loc); ok {
+				parts = append(parts, expr)
+			}
+		}
+		if len(parts) > 0 {
+			return nir.Format{Parts: parts, Loc: loc}, true
+		}
+	}
+	if strings.HasPrefix(raw, "$") {
+		name := strings.TrimPrefix(raw, "$")
+		if strings.EqualFold(name, "true") || strings.EqualFold(name, "false") {
+			return nir.Const{Loc: loc, Value: strings.ToLower(name)}, true
+		}
+		parts := strings.Split(name, ".")
+		expr := nir.Expr(nir.Name{ID: parts[0], Loc: loc})
+		path := parts[0]
+		for _, attr := range parts[1:] {
+			attr = strings.TrimSpace(attr)
+			if attr == "" {
+				continue
+			}
+			path += "." + attr
+			expr = nir.Attr{Base: expr, Attr: attr, Path: path, Loc: loc}
+		}
+		return expr, true
+	}
+	if len(raw) >= 2 {
+		if q := raw[0]; (q == '\'' || q == '"') && raw[len(raw)-1] == q {
+			return nir.Const{Loc: loc, Value: raw[1 : len(raw)-1]}, true
+		}
+	}
+	return nir.Const{Loc: loc, Value: raw}, true
+}
+
+func (c *psConv) psMemberName(n *tree_sitter.Node) string {
+	if m := field(n, "member"); m != nil {
+		return c.text(m)
+	}
+	raw := strings.TrimSpace(c.text(n))
+	if i := strings.LastIndex(raw, "."); i >= 0 && i+1 < len(raw) {
+		return strings.TrimSpace(raw[i+1:])
+	}
+	kids := namedChildren(n)
+	if len(kids) > 1 {
+		return strings.TrimSpace(c.text(kids[len(kids)-1]))
+	}
+	return ""
 }
 
 func (c *psConv) dotted(n *tree_sitter.Node) string {
@@ -552,10 +679,50 @@ func (c *psConv) dotted(n *tree_sitter.Node) string {
 	case "member_access":
 		base := namedChildren(n)
 		if len(base) > 0 {
-			return c.dotted(base[0]) + "." + c.text(field(n, "member"))
+			return c.dotted(base[0]) + "." + c.psMemberName(n)
 		}
 	case "command":
 		return lastSeg(c.text(field(n, "command_name")))
 	}
+	if path := c.psStaticPath(n); path != "" {
+		return path
+	}
 	return "?"
+}
+
+func (c *psConv) psStaticPath(n *tree_sitter.Node) string {
+	raw := strings.TrimSpace(c.text(n))
+	if !strings.Contains(raw, "::") {
+		return ""
+	}
+	if i := strings.Index(raw, "("); i >= 0 {
+		raw = raw[:i]
+	}
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimPrefix(raw, "[")
+	raw = strings.ReplaceAll(raw, "]::", ".")
+	raw = strings.ReplaceAll(raw, "::", ".")
+	raw = strings.ReplaceAll(raw, "[", "")
+	raw = strings.ReplaceAll(raw, "]", "")
+	raw = strings.Trim(raw, " \t\r\n")
+	if raw == "" || strings.ContainsAny(raw, " \t\r\n") {
+		return ""
+	}
+	return raw
+}
+
+func (c *psConv) psInvokePathFromText(n *tree_sitter.Node) string {
+	raw := strings.TrimSpace(c.text(n))
+	if !strings.Contains(raw, "(") {
+		return ""
+	}
+	if staticPath := c.psStaticPath(n); staticPath != "" {
+		return staticPath
+	}
+	raw = strings.TrimSpace(raw[:strings.Index(raw, "(")])
+	raw = strings.TrimPrefix(raw, "$")
+	if raw == "" || !strings.Contains(raw, ".") || strings.ContainsAny(raw, " \t\r\n") {
+		return ""
+	}
+	return raw
 }

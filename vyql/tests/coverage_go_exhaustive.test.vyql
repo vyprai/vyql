@@ -48,6 +48,104 @@ test "go exhaustive: constants and filepath.Base suppress command path upload ar
   }
   ```
 
+test "go exhaustive: repository filepath reaches read"
+  lang go
+  expect VYQL-PATH-001
+  code
+  ```
+  package main
+
+  func h(r *http.Request) ([]byte, error) {
+    filePath := r.URL.Query().Get("filePath")
+    return ioutil.ReadFile(fmt.Sprintf("%s/%s", "/repo", filePath))
+  }
+  ```
+
+test "go exhaustive: repository filepath denylist and symlink check guard read"
+  lang go
+  reject VYQL-PATH-001
+  code
+  ```
+  package main
+
+  var notAllowedInPath = []string{"..", "~", "\\"}
+
+  func h(r *http.Request) ([]byte, error) {
+    filePath := r.URL.Query().Get("filePath")
+    for _, na := range notAllowedInPath {
+      if strings.Contains(filePath, na) {
+        return nil, fmt.Errorf("bad path")
+      }
+    }
+    fullPath := fmt.Sprintf("%s/%s", "/repo", filePath)
+    isSymbolLink, err := isSymbolLink(fullPath)
+    if err != nil {
+      return nil, err
+    }
+    if isSymbolLink {
+      return nil, fmt.Errorf("symbolic link is not allowed")
+    }
+    return ioutil.ReadFile(fullPath)
+  }
+
+  func isSymbolLink(filepath string) (bool, error) {
+    fi, err := os.Lstat(path.Clean(filepath))
+    if err != nil {
+      return false, err
+    }
+    if fi.Mode()&os.ModeSymlink != 0 {
+      return true, nil
+    }
+    return false, nil
+  }
+  ```
+
+test "go exhaustive: repository filepath symlink check alone does not guard traversal"
+  lang go
+  expect VYQL-PATH-001
+  code
+  ```
+  package main
+
+  func h(r *http.Request) ([]byte, error) {
+    filePath := r.URL.Query().Get("filePath")
+    fullPath := fmt.Sprintf("%s/%s", "/repo", filePath)
+    isSymbolLink, err := isSymbolLink(fullPath)
+    if err != nil {
+      return nil, err
+    }
+    if isSymbolLink {
+      return nil, fmt.Errorf("symbolic link is not allowed")
+    }
+    return ioutil.ReadFile(fullPath)
+  }
+
+  func isSymbolLink(filepath string) (bool, error) {
+    fi, err := os.Lstat(path.Clean(filepath))
+    if err != nil {
+      return false, err
+    }
+    if fi.Mode()&os.ModeSymlink != 0 {
+      return true, nil
+    }
+    return false, nil
+  }
+  ```
+
+test "go exhaustive: custom parse helper flows request data into destination"
+  lang go
+  expect VYQL-INJ-001
+  code
+  ```
+  package main
+  func h(r *http.Request, db *sql.DB) {
+    v := r.URL.Query().Get("v")
+    var form string
+    parseForm(v, form)
+    db.Query(form)
+  }
+  ```
+
 test "go exhaustive: HTML header log CSV LDAP XPath regex trust auth and IDOR findings are reported"
   lang go
   expect VYQL-INJ-004
@@ -183,5 +281,46 @@ test "go exhaustive: stronger crypto secure config closed resources and unlocked
     c.Close()
     mu.Lock()
     mu.Unlock()
+  }
+  ```
+
+test "go exhaustive: public HTML helper return is an XSS sink"
+  lang go
+  profile library
+  expect VYQL-INJ-004
+  code
+  ```
+  package themes
+
+  import "bytes"
+
+  func MessagePageBytes(title string, body []byte, theme string) []byte {
+    var buf bytes.Buffer
+    buf.WriteString("<!doctype html><html><head><title>")
+    buf.WriteString(title)
+    buf.WriteString("</title></head><body><h1>")
+    buf.WriteString(title)
+    buf.WriteString("</h1>")
+    buf.Write(body)
+    return buf.Bytes()
+  }
+  ```
+
+test "go exhaustive: gin response writer string is an XSS sink"
+  lang go
+  expect VYQL-INJ-004
+  code
+  ```
+  package controllers
+
+  import (
+    "fmt"
+    "github.com/gin-gonic/gin"
+  )
+
+  func Plist(c *gin.Context) {
+    name := c.Param("data")
+    plist := fmt.Sprintf("<plist><string>%s</string></plist>", name)
+    c.Writer.WriteString(plist)
   }
   ```

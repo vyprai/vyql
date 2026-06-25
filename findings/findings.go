@@ -28,9 +28,9 @@ type NegationEvidence struct {
 	Detail    string
 }
 
-// ExploitCondition records what must be true for a non-perfectly-proven
-// weakness to be exploitable, and what evidence VyQL observed for it.
-type ExploitCondition struct {
+// ReviewCondition records what a reviewer should verify for a non-perfectly
+// proven condition, and what evidence VyQL observed for it.
+type ReviewCondition struct {
 	Category   string
 	Condition  string
 	Evidence   string
@@ -40,16 +40,16 @@ type ExploitCondition struct {
 
 // Finding is a rule match with its full derivation.
 type Finding struct {
-	RuleID            string
-	Severity          string
-	Bindings          []Binding
-	Witness           []string // solver witness (node ids / hops, kind-specific)
-	PathLocs          []string // distinct file:line locs along the witness (taint path), in order
-	WitnessKind       string   // taint | reach | assume | match
-	NegationEvidence  []NegationEvidence
-	Confidence        string
-	Context           []string
-	ExploitConditions []ExploitCondition
+	RuleID           string
+	Severity         string
+	Bindings         []Binding
+	Witness          []string // solver witness (node ids / hops, kind-specific)
+	PathLocs         []string // distinct file:line locs along the witness (taint path), in order
+	WitnessKind      string   // taint | reach | assume | match
+	NegationEvidence []NegationEvidence
+	Confidence       string
+	Context          []string
+	ReviewConditions []ReviewCondition
 }
 
 // Fingerprint is content-anchored (rule + binding LOCATIONS), so equivalent
@@ -99,8 +99,8 @@ func (f *Finding) Render() string {
 	for _, c := range f.Context {
 		fmt.Fprintf(&b, "    context: %s\n", c)
 	}
-	for _, ec := range f.ExploitConditions {
-		fmt.Fprintf(&b, "    exploit condition: %s", ec.Condition)
+	for _, ec := range f.ReviewConditions {
+		fmt.Fprintf(&b, "    review condition: %s", ec.Condition)
 		if ec.Category != "" {
 			fmt.Fprintf(&b, " [%s]", ec.Category)
 		}

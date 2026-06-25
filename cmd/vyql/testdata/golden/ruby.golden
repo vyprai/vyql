@@ -1,1 +1,6 @@
-call conn.execute
+call analysis.function.context
+call analysis.function.return
+call analysis.parameter.entry
+call analysis.parameter.entry
+call source.value
+call worker.run

@@ -1,8 +1,6 @@
-// Package config is a non-tree-sitter frontend for mobile app configuration
-// files — AndroidManifest.xml and iOS Info.plist — that surfaces insecure
-// settings as markable NIR Call nodes. Each dangerous setting becomes a bare
-// call whose path is a stable token (e.g. "android_exported"), which the config
-// adapter labels with a presence concept (ExportedComponent/CleartextConfig/...).
+// Package config is a non-tree-sitter frontend for declarative project files.
+// It performs lightweight file parsing and emits data-defined event calls that
+// adapters can label with concepts.
 package config
 
 import (
@@ -12,11 +10,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
+	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/nir"
+	"github.com/vyprai/vyql/parser"
 )
 
-// Extract parses AndroidManifest.xml / *.plist files into one NIR Program. Other
+// Extract parses declarative config/template files into one NIR Program. Other
 // XML files (and unparseable input) yield no nodes — never an error.
 func Extract(files []string, root string) (nir.Program, error) {
 	var prog nir.Program
@@ -28,21 +29,31 @@ func Extract(files []string, root string) (nir.Program, error) {
 		}
 		rel := relPath(root, f)
 		var body []nir.Stmt
-		switch kind(f, src) {
-		case "android":
+		k := kind(f, src)
+		if k == "" {
+			if scope, ok := textTemplateScope(f, src, loadProfile()); ok {
+				k = "texttemplate:" + scope
+			}
+		}
+		switch {
+		case k == "android":
 			body = scanAndroidManifest(src, rel)
-		case "plist":
+		case k == "plist":
 			body = scanPlist(src, rel)
-		case "dockerfile":
+		case k == "dockerfile":
 			body = scanDockerfile(src, rel)
-		case "yaml":
-			body = scanK8sYaml(src, rel)
-		case "terraform":
+		case k == "yaml":
+			body = scanYaml(src, rel)
+		case k == "terraform":
 			body = scanTerraform(src, rel)
-		case "jelly":
+		case k == "jelly":
 			body = scanJelly(src, rel)
-		case "jsp":
+		case k == "jsp":
 			body = scanJSP(src, rel)
+		case k == "dottemplate":
+			body = scanDotTemplate(src, rel)
+		case strings.HasPrefix(k, "texttemplate:"):
+			body = scanTextTemplate(src, rel, strings.TrimPrefix(k, "texttemplate:"))
 		}
 		if len(body) == 0 {
 			continue
@@ -76,12 +87,11 @@ func kind(path string, src []byte) string {
 	if ext == ".jsp" || ext == ".tag" {
 		return "jsp"
 	}
+	if ext == ".jst" || ext == ".def" {
+		return "dottemplate"
+	}
 	if ext == ".yaml" || ext == ".yml" {
-		// only Kubernetes-shaped manifests yield nodes; other YAML is inert.
-		if bytes.Contains(src, []byte("apiVersion")) && bytes.Contains(src, []byte("kind")) {
-			return "yaml"
-		}
-		return ""
+		return "yaml"
 	}
 	// fall back to the root element for unconventionally-named files.
 	dec := xml.NewDecoder(bytes.NewReader(src))
@@ -104,34 +114,127 @@ func kind(path string, src []byte) string {
 }
 
 var (
-	jellyInputRE = regexp.MustCompile(`\bit\.(name|description|value|defaultValue)\b`)
-	jspInputRE   = regexp.MustCompile(`\b(requestContext|request|param|row|queues|value|text|name|defaultValue|JMSDestination)\b`)
+	defaultExprStart = "${"
+	defaultExprEnd   = "}"
 )
 
 func scanJelly(src []byte, file string) []nir.Stmt {
-	return scanTemplateExpressions(src, file, "jelly", jellyInputRE, jellyControlLine, jellyExpr)
+	return scanTemplateExpressions(src, file, "jelly")
 }
 
 func scanJSP(src []byte, file string) []nir.Stmt {
-	return scanTemplateExpressions(src, file, "jsp", jspInputRE, jspControlLine, jspExpr)
+	return scanTemplateExpressions(src, file, "jsp")
 }
 
-func scanTemplateExpressions(src []byte, file, prefix string, inputRE *regexp.Regexp, skipLine func(string) bool, exprFn func(string, string) nir.Expr) []nir.Stmt {
+func scanDotTemplate(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	text := string(src)
+	base := strings.ToLower(filepath.Base(file))
+	for _, rule := range cfg.DotRules {
+		if strings.ToLower(rule.File) != base {
+			continue
+		}
+		if containsAny(text, rule.SkipContains) || !containsAll(text, rule.RequiredContains) {
+			continue
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: call(rule.Event, file, firstLineContaining(text, rule.LineNeedle))}}
+	}
+	return nil
+}
+
+func scanTextTemplate(src []byte, file, scope string) []nir.Stmt {
+	cfg := loadProfile()
+	profile, ok := cfg.TextTemplates[scope]
+	if !ok {
+		return nil
+	}
 	var out []nir.Stmt
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
-		if line == "" || !strings.Contains(line, "${") || skipLine(line) {
+		if line == "" {
 			continue
 		}
-		for _, expr := range jellyExpressions(line) {
-			if expr == "" || !inputRE.MatchString(expr) {
+		loc := file + ":" + itoa(i+1)
+		for _, rule := range profile.LineEvents {
+			if containsMatch(line, rule.Match) {
+				out = append(out, nir.ExprStmt{Value: call(rule.Event, file, i+1)})
+			}
+		}
+		for _, rule := range profile.AssignEvents {
+			m := rule.AssignPattern.FindStringSubmatch(line)
+			if len(m) < 2 {
+				continue
+			}
+			expr := rule.SourcePattern.FindString(line)
+			if expr == "" {
+				continue
+			}
+			out = append(out, nir.Assign{
+				Targets: []string{m[1]},
+				Value:   textTemplateValue(rule.InputEvent, expr, loc),
+			})
+		}
+		for _, rule := range profile.FlowEvents {
+			if !containsMatch(line, rule.Match) {
+				continue
+			}
+			expr := rule.SourcePattern.FindString(line)
+			if expr == "" {
+				continue
+			}
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: rule.OperationEvent, Loc: loc},
+				Args:   []nir.Expr{textTemplateValue(rule.InputEvent, expr, loc)},
+				Path:   rule.OperationEvent,
+				Method: lastSeg(rule.OperationEvent),
+				Loc:    loc,
+			}})
+		}
+	}
+	return out
+}
+
+func textTemplateValue(inputEvent, expr, loc string) nir.Expr {
+	name := strings.TrimPrefix(expr, "$")
+	name = strings.TrimPrefix(name, "!")
+	if !strings.HasPrefix(name, "request.") {
+		return nir.Name{ID: name, Loc: loc}
+	}
+	return nir.Call{
+		Callee: nir.Name{ID: inputEvent, Loc: loc},
+		Args:   []nir.Expr{nir.Const{Value: expr, Loc: loc}},
+		Path:   inputEvent,
+		Method: "input",
+		Loc:    loc,
+	}
+}
+
+func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
+	cfg := loadProfile()
+	profile, ok := cfg.Templates[scope]
+	if !ok {
+		return nil
+	}
+	var out []nir.Stmt
+	escapeActive := false
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if containsAnyFold(line, profile.EscapeActiveContains) {
+			escapeActive = true
+		}
+		if line == "" || !strings.Contains(line, profile.ExprStart) || containsAny(line, profile.SkipContains) {
+			continue
+		}
+		defaultEscape := escapeActive && containsAnyFold(line, profile.EscapeLineContains)
+		for _, expr := range templateExpressions(line, profile.ExprStart, profile.ExprEnd) {
+			if expr == "" || !profile.InputPattern.MatchString(expr) {
 				continue
 			}
 			loc := file + ":" + itoa(i+1)
 			out = append(out, nir.ExprStmt{Value: nir.Call{
-				Callee: nir.Name{ID: prefix + ".render", Loc: loc},
-				Args:   []nir.Expr{exprFn(expr, loc)},
-				Path:   prefix + ".render",
+				Callee: nir.Name{ID: profile.RenderEvent, Loc: loc},
+				Args:   []nir.Expr{templateExpr(profile, expr, loc, defaultEscape)},
+				Path:   profile.RenderEvent,
 				Method: "render",
 				Loc:    loc,
 			}})
@@ -140,31 +243,15 @@ func scanTemplateExpressions(src []byte, file, prefix string, inputRE *regexp.Re
 	return out
 }
 
-func jellyControlLine(line string) bool {
-	return strings.Contains(line, "<j:set") ||
-		strings.Contains(line, "<j:when") ||
-		strings.Contains(line, "<j:if") ||
-		strings.Contains(line, " test=")
-}
-
-func jspControlLine(line string) bool {
-	return strings.Contains(line, "<%@") ||
-		strings.Contains(line, "<c:out") ||
-		strings.Contains(line, "<c:forEach") ||
-		strings.Contains(line, "<c:if") ||
-		strings.Contains(line, " items=") ||
-		strings.Contains(line, " test=")
-}
-
-func jellyExpressions(line string) []string {
+func templateExpressions(line, startDelim, endDelim string) []string {
 	var out []string
 	for {
-		start := strings.Index(line, "${")
+		start := strings.Index(line, startDelim)
 		if start < 0 {
 			return out
 		}
-		rest := line[start+2:]
-		end := strings.IndexByte(rest, '}')
+		rest := line[start+len(startDelim):]
+		end := strings.Index(rest, endDelim)
 		if end < 0 {
 			return out
 		}
@@ -173,31 +260,32 @@ func jellyExpressions(line string) []string {
 	}
 }
 
-func jellyExpr(expr, loc string) nir.Expr {
-	if inner, ok := jellyEscapeArg(expr); ok {
+func templateExpr(profile templateProfile, expr, loc string, defaultEscape bool) nir.Expr {
+	if inner, ok := templateWrapperArg(expr, profile.EscapePrefix); ok {
 		return nir.Call{
-			Callee: nir.Attr{Base: nir.Name{ID: "h", Loc: loc}, Attr: "escape", Path: "h.escape", Loc: loc},
-			Args:   []nir.Expr{jellySource(inner, loc)},
-			Path:   "h.escape",
-			Method: "escape",
+			Callee: nir.Name{ID: profile.EscapeEvent, Loc: loc},
+			Args:   []nir.Expr{templateInput(profile, inner, loc)},
+			Path:   profile.EscapeEvent,
+			Method: lastSeg(profile.EscapeEvent),
 			Loc:    loc,
 		}
 	}
-	return jellySource(expr, loc)
-}
-
-func jspExpr(expr, loc string) nir.Expr {
-	return nir.Call{
-		Callee: nir.Name{ID: "jsp.input", Loc: loc},
-		Args:   []nir.Expr{nir.Const{Value: expr, Loc: loc}},
-		Path:   "jsp.input",
-		Method: "input",
-		Loc:    loc,
+	if defaultEscape && profile.EscapeEvent != "" {
+		return nir.Call{
+			Callee: nir.Name{ID: profile.EscapeEvent, Loc: loc},
+			Args:   []nir.Expr{templateInput(profile, expr, loc)},
+			Path:   profile.EscapeEvent,
+			Method: lastSeg(profile.EscapeEvent),
+			Loc:    loc,
+		}
 	}
+	return templateInput(profile, expr, loc)
 }
 
-func jellyEscapeArg(expr string) (string, bool) {
-	const prefix = "h.escape("
+func templateWrapperArg(expr, prefix string) (string, bool) {
+	if prefix == "" {
+		return "", false
+	}
 	start := strings.Index(expr, prefix)
 	if start < 0 {
 		return "", false
@@ -210,24 +298,286 @@ func jellyEscapeArg(expr string) (string, bool) {
 	return inner, inner != ""
 }
 
-func jellySource(expr, loc string) nir.Expr {
+func templateInput(profile templateProfile, expr, loc string) nir.Expr {
 	return nir.Call{
-		Callee: nir.Name{ID: "jelly.input", Loc: loc},
+		Callee: nir.Name{ID: profile.InputEvent, Loc: loc},
 		Args:   []nir.Expr{nir.Const{Value: expr, Loc: loc}},
-		Path:   "jelly.input",
+		Path:   profile.InputEvent,
 		Method: "input",
 		Loc:    loc,
 	}
 }
 
-// androidComponents are the manifest elements whose android:exported="true" is a
-// security-relevant attack surface (CWE-926).
-var androidComponents = map[string]bool{
-	"activity": true, "activity-alias": true, "service": true,
-	"receiver": true, "provider": true,
+type boolAttrRule struct {
+	Element string
+	Attr    string
+	Event   string
+}
+
+type attrNotValueRule struct {
+	Element string
+	Attr    string
+	Value   string
+	Event   string
+}
+
+type scopedLineRule struct {
+	Scope string
+	Match string
+	Event string
+}
+
+type scopedFileContainsAllRule struct {
+	Scope   string
+	Event   string
+	Needles []string
+}
+
+type directiveValueRule struct {
+	Scope     string
+	Directive string
+	Value     string
+	Mode      string
+	Event     string
+}
+
+type templateProfile struct {
+	ExprStart            string
+	ExprEnd              string
+	InputPattern         *regexp.Regexp
+	SkipContains         []string
+	InputEvent           string
+	RenderEvent          string
+	EscapePrefix         string
+	EscapeEvent          string
+	EscapeActiveContains []string
+	EscapeLineContains   []string
+}
+
+type dotTemplateRule struct {
+	File             string
+	SkipContains     []string
+	RequiredContains []string
+	LineNeedle       string
+	Event            string
+}
+
+type textTemplateFlowRule struct {
+	Match          string
+	SourcePattern  *regexp.Regexp
+	InputEvent     string
+	OperationEvent string
+}
+
+type textTemplateAssignRule struct {
+	AssignPattern *regexp.Regexp
+	SourcePattern *regexp.Regexp
+	InputEvent    string
+}
+
+type textTemplateProfile struct {
+	Extensions       []string
+	RequiredContains []string
+	LineEvents       []scopedLineRule
+	AssignEvents     []textTemplateAssignRule
+	FlowEvents       []textTemplateFlowRule
+}
+
+type configProfile struct {
+	XMLTrueAttrs      []boolAttrRule
+	XMLAttrNotValues  []attrNotValueRule
+	PlistTrueKey      map[string]string
+	LineContains      []scopedLineRule
+	LineExactCompact  []scopedLineRule
+	LinePrefixCompact []scopedLineRule
+	FileContainsAll   []scopedFileContainsAllRule
+	DirectiveValues   []directiveValueRule
+	QuotedStarFields  []scopedLineRule
+	Templates         map[string]templateProfile
+	DotRules          []dotTemplateRule
+	TextTemplates     map[string]textTemplateProfile
+}
+
+var (
+	configProfileOnce sync.Once
+	configProfileData configProfile
+)
+
+func loadProfile() configProfile {
+	configProfileOnce.Do(func() {
+		raw := string(datadir.MustRead("adapters/config.vyql"))
+		decls, err := parser.Parse(raw)
+		if err != nil {
+			panic("config: parse adapters/config.vyql: " + err.Error())
+		}
+		var meta map[string]any
+		for _, d := range decls {
+			if ad, ok := d.(*parser.AdapterDecl); ok && ad.Name == "config" {
+				meta = ad.Meta
+				break
+			}
+		}
+		if meta == nil {
+			panic("config: missing adapter metadata")
+		}
+		configProfileData = configProfile{
+			PlistTrueKey:  map[string]string{},
+			Templates:     map[string]templateProfile{},
+			TextTemplates: map[string]textTemplateProfile{},
+		}
+		for _, entry := range metaList(meta, "config_xml_true_attrs") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+				panic("config: malformed config_xml_true_attrs entry " + entry)
+			}
+			configProfileData.XMLTrueAttrs = append(configProfileData.XMLTrueAttrs, boolAttrRule{
+				Element: parts[0],
+				Attr:    parts[1],
+				Event:   parts[2],
+			})
+		}
+		for _, entry := range metaList(meta, "config_xml_attr_not_value_events") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
+				panic("config: malformed config_xml_attr_not_value_events entry " + entry)
+			}
+			configProfileData.XMLAttrNotValues = append(configProfileData.XMLAttrNotValues, attrNotValueRule{
+				Element: parts[0],
+				Attr:    parts[1],
+				Value:   parts[2],
+				Event:   parts[3],
+			})
+		}
+		for _, entry := range metaList(meta, "config_plist_true_keys") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				panic("config: malformed config_plist_true_keys entry " + entry)
+			}
+			configProfileData.PlistTrueKey[parts[0]] = parts[1]
+		}
+		configProfileData.LineContains = parseScopedLineRules(meta, "config_line_contains_events")
+		configProfileData.LineExactCompact = parseScopedLineRules(meta, "config_line_exact_compact_events")
+		configProfileData.LinePrefixCompact = parseScopedLineRules(meta, "config_line_prefix_compact_events")
+		configProfileData.FileContainsAll = parseScopedFileContainsAllRules(meta, "config_file_contains_all_events")
+		configProfileData.QuotedStarFields = parseScopedLineRules(meta, "config_quoted_star_field_events")
+		for _, entry := range metaList(meta, "config_directive_value_events") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 5 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" || parts[4] == "" {
+				panic("config: malformed config_directive_value_events entry " + entry)
+			}
+			configProfileData.DirectiveValues = append(configProfileData.DirectiveValues, directiveValueRule{
+				Scope:     parts[0],
+				Directive: parts[1],
+				Value:     parts[2],
+				Mode:      parts[3],
+				Event:     parts[4],
+			})
+		}
+		exprStart := firstNonEmpty(metaString(meta, "config_template_expr_start"), defaultExprStart)
+		exprEnd := firstNonEmpty(metaString(meta, "config_template_expr_end"), defaultExprEnd)
+		for _, scope := range metaList(meta, "config_template_scopes") {
+			pattern := metaString(meta, "config_template_input_pattern_"+scope)
+			inputEvent := metaString(meta, "config_template_input_event_"+scope)
+			renderEvent := metaString(meta, "config_template_render_event_"+scope)
+			if scope == "" || pattern == "" || inputEvent == "" || renderEvent == "" {
+				panic("config: malformed config template profile " + scope)
+			}
+			configProfileData.Templates[scope] = templateProfile{
+				ExprStart:            exprStart,
+				ExprEnd:              exprEnd,
+				InputPattern:         regexp.MustCompile(pattern),
+				SkipContains:         metaList(meta, "config_template_skip_contains_"+scope),
+				InputEvent:           inputEvent,
+				RenderEvent:          renderEvent,
+				EscapePrefix:         metaString(meta, "config_template_escape_prefix_"+scope),
+				EscapeEvent:          metaString(meta, "config_template_escape_event_"+scope),
+				EscapeActiveContains: metaList(meta, "config_template_escape_active_contains_"+scope),
+				EscapeLineContains:   metaList(meta, "config_template_escape_line_contains_"+scope),
+			}
+		}
+		for _, entry := range metaList(meta, "config_dot_template_rules") {
+			parts := strings.Split(entry, "|")
+			if len(parts) != 5 || parts[0] == "" || parts[2] == "" || parts[3] == "" || parts[4] == "" {
+				panic("config: malformed config_dot_template_rules entry " + entry)
+			}
+			configProfileData.DotRules = append(configProfileData.DotRules, dotTemplateRule{
+				File:             parts[0],
+				SkipContains:     splitList(parts[1]),
+				RequiredContains: splitList(parts[2]),
+				LineNeedle:       parts[3],
+				Event:            parts[4],
+			})
+		}
+		for _, scope := range metaList(meta, "config_text_template_scopes") {
+			if scope == "" {
+				panic("config: malformed config text template profile")
+			}
+			profile := textTemplateProfile{
+				Extensions:       metaList(meta, "config_text_template_extensions_"+scope),
+				RequiredContains: metaList(meta, "config_text_template_required_contains_"+scope),
+			}
+			if len(profile.Extensions) == 0 || len(profile.RequiredContains) == 0 {
+				panic("config: malformed config text template classifier " + scope)
+			}
+			for _, entry := range metaList(meta, "config_text_template_line_events_"+scope) {
+				parts := strings.Split(entry, "|")
+				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+					panic("config: malformed config_text_template_line_events entry " + entry)
+				}
+				profile.LineEvents = append(profile.LineEvents, scopedLineRule{Scope: scope, Match: parts[0], Event: parts[1]})
+			}
+			for _, entry := range metaList(meta, "config_text_template_assign_events_"+scope) {
+				parts := strings.Split(entry, "|")
+				if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+					panic("config: malformed config_text_template_assign_events entry " + entry)
+				}
+				profile.AssignEvents = append(profile.AssignEvents, textTemplateAssignRule{
+					AssignPattern: regexp.MustCompile(parts[0]),
+					SourcePattern: regexp.MustCompile(parts[1]),
+					InputEvent:    parts[2],
+				})
+			}
+			for _, entry := range metaList(meta, "config_text_template_flow_events_"+scope) {
+				parts := strings.Split(entry, "|")
+				if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
+					panic("config: malformed config_text_template_flow_events entry " + entry)
+				}
+				profile.FlowEvents = append(profile.FlowEvents, textTemplateFlowRule{
+					Match:          parts[0],
+					SourcePattern:  regexp.MustCompile(parts[1]),
+					InputEvent:     parts[2],
+					OperationEvent: parts[3],
+				})
+			}
+			configProfileData.TextTemplates[scope] = profile
+		}
+	})
+	return configProfileData
+}
+
+func textTemplateScope(path string, src []byte, cfg configProfile) (string, bool) {
+	text := string(src)
+	ext := strings.ToLower(filepath.Ext(path))
+	for scope, profile := range cfg.TextTemplates {
+		if !extensionAllowed(ext, profile.Extensions) || !containsAll(text, profile.RequiredContains) {
+			continue
+		}
+		return scope, true
+	}
+	return "", false
+}
+
+func extensionAllowed(ext string, allowed []string) bool {
+	for _, candidate := range allowed {
+		if strings.EqualFold(ext, candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func scanAndroidManifest(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	dec := xml.NewDecoder(bytes.NewReader(src))
 	line := 1
@@ -252,29 +602,22 @@ func scanAndroidManifest(src []byte, file string) []nir.Stmt {
 			}
 			return ""
 		}
-		if androidComponents[se.Name.Local] && isTrue(attr("exported")) {
-			emit("android_exported")
-		}
-		if se.Name.Local == "application" {
-			if isTrue(attr("usesCleartextTraffic")) {
-				emit("android_cleartext")
+		for _, rule := range cfg.XMLTrueAttrs {
+			if se.Name.Local == rule.Element && isTrue(attr(rule.Attr)) {
+				emit(rule.Event)
 			}
-			if isTrue(attr("debuggable")) {
-				emit("android_debuggable")
+		}
+		for _, rule := range cfg.XMLAttrNotValues {
+			if se.Name.Local == rule.Element && !strings.EqualFold(strings.TrimSpace(attr(rule.Attr)), rule.Value) {
+				emit(rule.Event)
 			}
 		}
 	}
 	return out
 }
 
-// plistFlagKeys map an Info.plist boolean key (set to <true/>) to its finding token.
-var plistFlagKeys = map[string]string{
-	"NSAllowsArbitraryLoads":             "ats_arbitrary_loads",
-	"NSAllowsArbitraryLoadsInWebContent": "ats_arbitrary_loads",
-	"NSAllowsArbitraryLoadsForMedia":     "ats_arbitrary_loads",
-}
-
 func scanPlist(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	dec := xml.NewDecoder(bytes.NewReader(src))
 	line := 1
@@ -293,7 +636,7 @@ func scanPlist(src []byte, file string) []nir.Stmt {
 				inKey = true
 				lastKey = ""
 			case "true":
-				if token, ok := plistFlagKeys[lastKey]; ok {
+				if token, ok := cfg.PlistTrueKey[lastKey]; ok {
 					out = append(out, nir.ExprStmt{Value: call(token, file, line)})
 				}
 				lastKey = "" // value consumed
@@ -313,78 +656,46 @@ func scanPlist(src []byte, file string) []nir.Stmt {
 	return out
 }
 
-// scanDockerfile flags running as root (USER root, or no USER directive at all is NOT
-// flagged — too noisy) and privileged build args. Line-based, comment-aware.
 func scanDockerfile(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		low := strings.ToLower(line)
-		switch {
-		case strings.HasPrefix(low, "user "):
-			user := strings.TrimSpace(line[5:])
-			if user == "root" || user == "0" || strings.HasPrefix(user, "root:") || strings.HasPrefix(user, "0:") {
-				out = append(out, nir.ExprStmt{Value: call("container_user_root", file, i+1)})
-			}
-		case strings.Contains(low, "--privileged"):
-			out = append(out, nir.ExprStmt{Value: call("docker_privileged", file, i+1)})
-		}
+		out = append(out, directiveValueEvents(cfg, "dockerfile", line, file, i+1)...)
+		out = append(out, scopedContainsEvents(cfg, "dockerfile", line, file, i+1)...)
 	}
 	return out
 }
 
-// k8sFlags map a `key: true`-style security-relevant K8s field to its finding token.
-var k8sFlags = []struct{ needle, token string }{
-	{"privileged: true", "k8s_privileged"},
-	{"allowprivilegeescalation: true", "k8s_privileged"},
-	{"hostnetwork: true", "k8s_host_namespace"},
-	{"hostpid: true", "k8s_host_namespace"},
-	{"hostipc: true", "k8s_host_namespace"},
-}
-
-// scanK8sYaml flags privileged containers / host-namespace sharing / host-path mounts in
-// a Kubernetes manifest. Line-based (whitespace-insensitive) — no YAML parse needed.
-func scanK8sYaml(src []byte, file string) []nir.Stmt {
+func scanYaml(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
+	out = append(out, scopedFileContainsAllEvents(cfg, "yaml", string(src), file)...)
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		low := strings.ToLower(strings.ReplaceAll(line, " ", ""))
-		for _, f := range k8sFlags {
-			if low == strings.ReplaceAll(f.needle, " ", "") {
-				out = append(out, nir.ExprStmt{Value: call(f.token, file, i+1)})
-			}
-		}
-		if strings.HasPrefix(low, "hostpath:") || low == "hostpath:" {
-			out = append(out, nir.ExprStmt{Value: call("k8s_host_path", file, i+1)})
-		}
+		out = append(out, scopedContainsEvents(cfg, "yaml", line, file, i+1)...)
+		out = append(out, scopedCompactEvents(cfg.LineExactCompact, "yaml", line, false, file, i+1)...)
+		out = append(out, scopedCompactEvents(cfg.LinePrefixCompact, "yaml", line, true, file, i+1)...)
 	}
 	return out
 }
 
-// scanTerraform flags an open security-group CIDR (0.0.0.0/0) and wildcard IAM
-// action/resource. Line-based over HCL/JSON — robust to formatting.
 func scanTerraform(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
 	var out []nir.Stmt
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
 			continue
 		}
-		low := strings.ToLower(line)
-		if strings.Contains(low, "0.0.0.0/0") {
-			out = append(out, nir.ExprStmt{Value: call("tf_open_cidr", file, i+1)})
-		}
-		// wildcard IAM: HCL `actions = ["*"]` / `resources = ["*"]` or JSON `"Action": "*"`.
-		if (strings.Contains(low, "action") || strings.Contains(low, "resource")) &&
-			(strings.Contains(line, `"*"`) || strings.Contains(line, `'*'`)) {
-			out = append(out, nir.ExprStmt{Value: call("tf_wildcard_iam", file, i+1)})
-		}
+		out = append(out, scopedContainsEvents(cfg, "terraform", line, file, i+1)...)
+		out = append(out, quotedStarFieldEvents(cfg, "terraform", line, file, i+1)...)
 	}
 	return out
 }
@@ -395,6 +706,223 @@ func call(token, file string, line int) nir.Call {
 }
 
 func isTrue(v string) bool { return strings.EqualFold(strings.TrimSpace(v), "true") }
+
+func containsAny(text string, needles []string) bool {
+	for _, needle := range needles {
+		if needle != "" && strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAnyFold(text string, needles []string) bool {
+	low := strings.ToLower(text)
+	for _, needle := range needles {
+		if needle != "" && strings.Contains(low, strings.ToLower(needle)) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAll(text string, needles []string) bool {
+	for _, needle := range needles {
+		if needle != "" && !strings.Contains(text, needle) {
+			return false
+		}
+	}
+	return true
+}
+
+func containsAllFold(text string, needles []string) bool {
+	low := strings.ToLower(text)
+	for _, needle := range needles {
+		if needle != "" && !strings.Contains(low, strings.ToLower(needle)) {
+			return false
+		}
+	}
+	return true
+}
+
+func containsMatch(text, needle string) bool {
+	return needle != "" && strings.Contains(strings.ToLower(text), strings.ToLower(needle))
+}
+
+func parseScopedLineRules(meta map[string]any, key string) []scopedLineRule {
+	var out []scopedLineRule
+	for _, entry := range metaList(meta, key) {
+		parts := strings.Split(entry, "|")
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+			panic("config: malformed " + key + " entry " + entry)
+		}
+		out = append(out, scopedLineRule{Scope: parts[0], Match: parts[1], Event: parts[2]})
+	}
+	return out
+}
+
+func parseScopedFileContainsAllRules(meta map[string]any, key string) []scopedFileContainsAllRule {
+	var out []scopedFileContainsAllRule
+	for _, entry := range metaList(meta, key) {
+		parts := strings.SplitN(entry, "|", 3)
+		if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+			panic("config: malformed " + key + " entry " + entry)
+		}
+		var needles []string
+		for _, needle := range strings.Split(parts[2], ";;") {
+			if needle = strings.TrimSpace(needle); needle != "" {
+				needles = append(needles, needle)
+			}
+		}
+		if len(needles) == 0 {
+			panic("config: malformed " + key + " entry " + entry)
+		}
+		out = append(out, scopedFileContainsAllRule{Scope: parts[0], Event: parts[1], Needles: needles})
+	}
+	return out
+}
+
+func scopedFileContainsAllEvents(cfg configProfile, scope, text, file string) []nir.Stmt {
+	var out []nir.Stmt
+	for _, rule := range cfg.FileContainsAll {
+		if rule.Scope == scope && containsAllFold(text, rule.Needles) {
+			out = append(out, nir.ExprStmt{Value: call(rule.Event, file, firstLineContainingFold(text, rule.Needles[0]))})
+		}
+	}
+	return out
+}
+
+func scopedContainsEvents(cfg configProfile, scope, line, file string, lineNo int) []nir.Stmt {
+	var out []nir.Stmt
+	low := strings.ToLower(line)
+	for _, rule := range cfg.LineContains {
+		if rule.Scope == scope && strings.Contains(low, strings.ToLower(rule.Match)) {
+			out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+		}
+	}
+	return out
+}
+
+func scopedCompactEvents(rules []scopedLineRule, scope, line string, prefix bool, file string, lineNo int) []nir.Stmt {
+	var out []nir.Stmt
+	compact := strings.ToLower(strings.ReplaceAll(line, " ", ""))
+	for _, rule := range rules {
+		if rule.Scope != scope {
+			continue
+		}
+		match := strings.ToLower(strings.ReplaceAll(rule.Match, " ", ""))
+		if (!prefix && compact == match) || (prefix && strings.HasPrefix(compact, match)) {
+			out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+		}
+	}
+	return out
+}
+
+func directiveValueEvents(cfg configProfile, scope, line, file string, lineNo int) []nir.Stmt {
+	var out []nir.Stmt
+	low := strings.ToLower(line)
+	for _, rule := range cfg.DirectiveValues {
+		prefix := strings.ToLower(rule.Directive) + " "
+		if rule.Scope != scope || !strings.HasPrefix(low, prefix) {
+			continue
+		}
+		value := strings.TrimSpace(line[len(rule.Directive):])
+		switch rule.Mode {
+		case "exact":
+			if value == rule.Value {
+				out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+			}
+		case "prefix":
+			if strings.HasPrefix(value, rule.Value) {
+				out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+			}
+		default:
+			panic("config: unsupported directive value match mode " + rule.Mode)
+		}
+	}
+	return out
+}
+
+func quotedStarFieldEvents(cfg configProfile, scope, line, file string, lineNo int) []nir.Stmt {
+	var out []nir.Stmt
+	low := strings.ToLower(line)
+	if !strings.Contains(line, `"*"`) && !strings.Contains(line, `'*'`) {
+		return nil
+	}
+	for _, rule := range cfg.QuotedStarFields {
+		if rule.Scope == scope && strings.Contains(low, strings.ToLower(rule.Match)) {
+			out = append(out, nir.ExprStmt{Value: call(rule.Event, file, lineNo)})
+		}
+	}
+	return out
+}
+
+func metaList(meta map[string]any, key string) []string {
+	switch v := meta[key].(type) {
+	case []string:
+		return v
+	case string:
+		if v != "" {
+			return []string{v}
+		}
+	}
+	return nil
+}
+
+func metaString(meta map[string]any, key string) string {
+	if s, ok := meta[key].(string); ok {
+		return s
+	}
+	return ""
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func splitList(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, part := range strings.Split(s, ";") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func lastSeg(path string) string {
+	if i := strings.LastIndex(path, "."); i >= 0 {
+		return path[i+1:]
+	}
+	return path
+}
+
+func firstLineContaining(text, needle string) int {
+	for i, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, needle) {
+			return i + 1
+		}
+	}
+	return 1
+}
+
+func firstLineContainingFold(text, needle string) int {
+	lowNeedle := strings.ToLower(needle)
+	for i, line := range strings.Split(text, "\n") {
+		if strings.Contains(strings.ToLower(line), lowNeedle) {
+			return i + 1
+		}
+	}
+	return 1
+}
 
 func relPath(root, f string) string {
 	if rel, err := filepath.Rel(root, f); err == nil {

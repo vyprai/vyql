@@ -1,0 +1,9 @@
+// Input validation failures that are not naturally modeled as interpreter
+// injection. These rules catch rejected/unchecked parse states and similar
+// boundary validation defects.
+module vypr.validation;
+
+rule UncheckedDecodeResult {
+  meta { id: "VYQL-VAL-001", severity: medium, cwe: [CWE_20], confidence_floor: medium }
+  match code.UncheckedDecodeResult as decode
+}

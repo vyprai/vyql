@@ -1,0 +1,102 @@
+test "rank214: oversized beanstalk put body returns without discarding body bytes"
+  lang c
+  expect VYQL-INJ-040
+  code
+  ```
+  #include <errno.h>
+
+  #define OP_PUT 1
+  #define MSG_BAD_FORMAT "BAD_FORMAT"
+  #define MSG_JOB_TOO_BIG "JOB_TOO_BIG"
+
+  typedef struct conn_t {
+    char *cmd;
+    int cmd_len;
+  } *conn;
+
+  unsigned int job_data_size_limit;
+
+  int read_pri(unsigned int *pri, char *cmd, char **delay_buf);
+  int read_delay(unsigned long long *delay, char *delay_buf, char **ttr_buf);
+  int read_ttr(unsigned long long *ttr, char *ttr_buf, char **size_buf);
+  unsigned long strtoul(const char *nptr, char **endptr, int base);
+  int which_cmd(conn c);
+  int reply_msg(conn c, const char *msg);
+
+  static void dispatch_cmd(conn c) {
+    int r;
+    char *delay_buf, *ttr_buf, *size_buf, *end_buf;
+    unsigned int pri, body_size;
+    unsigned long long delay, ttr;
+
+    switch (which_cmd(c)) {
+    case OP_PUT:
+      r = read_pri(&pri, c->cmd + 4, &delay_buf);
+      if (r) return reply_msg(c, MSG_BAD_FORMAT);
+      r = read_delay(&delay, delay_buf, &ttr_buf);
+      if (r) return reply_msg(c, MSG_BAD_FORMAT);
+      r = read_ttr(&ttr, ttr_buf, &size_buf);
+      if (r) return reply_msg(c, MSG_BAD_FORMAT);
+
+      errno = 0;
+      body_size = strtoul(size_buf, &end_buf, 10);
+      if (errno) return reply_msg(c, MSG_BAD_FORMAT);
+
+      if (body_size > job_data_size_limit) {
+        return reply_msg(c, MSG_JOB_TOO_BIG);
+      }
+    }
+  }
+  ```
+
+test "rank214: oversized beanstalk put body is discarded before response"
+  lang c
+  reject VYQL-INJ-040
+  code
+  ```
+  #include <errno.h>
+
+  #define OP_PUT 1
+  #define MSG_BAD_FORMAT "BAD_FORMAT"
+  #define MSG_JOB_TOO_BIG "JOB_TOO_BIG"
+
+  typedef struct conn_t {
+    char *cmd;
+    int cmd_len;
+  } *conn;
+
+  unsigned int job_data_size_limit;
+
+  int read_pri(unsigned int *pri, char *cmd, char **delay_buf);
+  int read_delay(unsigned long long *delay, char *delay_buf, char **ttr_buf);
+  int read_ttr(unsigned long long *ttr, char *ttr_buf, char **size_buf);
+  unsigned long strtoul(const char *nptr, char **endptr, int base);
+  int which_cmd(conn c);
+  int reply_msg(conn c, const char *msg);
+  int skip(conn c, unsigned int body_size, const char *msg);
+
+  static void dispatch_cmd(conn c) {
+    int r;
+    char *delay_buf, *ttr_buf, *size_buf, *end_buf;
+    unsigned int pri, body_size;
+    unsigned long long delay, ttr;
+
+    switch (which_cmd(c)) {
+    case OP_PUT:
+      r = read_pri(&pri, c->cmd + 4, &delay_buf);
+      if (r) return reply_msg(c, MSG_BAD_FORMAT);
+      r = read_delay(&delay, delay_buf, &ttr_buf);
+      if (r) return reply_msg(c, MSG_BAD_FORMAT);
+      r = read_ttr(&ttr, ttr_buf, &size_buf);
+      if (r) return reply_msg(c, MSG_BAD_FORMAT);
+
+      errno = 0;
+      body_size = strtoul(size_buf, &end_buf, 10);
+      if (errno) return reply_msg(c, MSG_BAD_FORMAT);
+
+      if (body_size > job_data_size_limit) {
+        return skip(c, body_size + 2, MSG_JOB_TOO_BIG);
+      }
+    }
+  }
+  ```

@@ -2,7 +2,7 @@
 module vypr.path;
 
 rule Traversal {
-  meta { id: "VYQL-PATH-001", severity: high, cwe: [CWE_22] }
+  meta { id: "VYQL-PATH-001", severity: high, cwe: [CWE_22], benchmark: pathtraver }
   taint core.UserControlledData -> code.FilePathAccess
   unless sanitized_by core.PathCanonicalization
   unless guarded_by core.PathAccessCheck
@@ -11,12 +11,13 @@ rule Traversal {
 rule FileInclusion {
   meta { id: "VYQL-PATH-002", severity: high, cwe: [CWE_98] }
   taint core.UserControlledData -> code.FileInclude
+  unless guarded_by core.PathAccessCheck
 }
 
 // Insecure temporary file (CWE-377) — predictable-name / race-prone temp APIs
 // (mktemp/tmpnam/tempnam). Presence rule: their use is the weakness, no taint needed.
 rule InsecureTempFile {
-  meta { id: "VYQL-PATH-003", severity: low, cwe: [CWE_377] }
+  meta { id: "VYQL-PATH-003", severity: low, cwe: [CWE_377, CWE_59] }
   match code.InsecureTempFile as t
 }
 
@@ -25,4 +26,24 @@ rule ArchiveExtractionTraversal {
   taint core.UserControlledData -> code.ArchiveEntryWrite
   unless sanitized_by core.PathCanonicalization
   unless guarded_by core.PathAccessCheck
+}
+
+rule PackageEntryPointScriptTraversal {
+  meta { id: "VYQL-PATH-005", severity: high, cwe: [CWE_22] }
+  match code.PackageEntryPointScriptWrite as sink
+}
+
+rule RemoteListingDownloadTraversal {
+  meta { id: "VYQL-PATH-006", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.RemoteListingDownloadPath as sink
+}
+
+rule ArchiveSymlinkFilterBypass {
+  meta { id: "VYQL-PATH-007", severity: high, cwe: [CWE_22, CWE_59], confidence_floor: medium }
+  match code.ArchiveSymlinkFilterBypass as sink
+}
+
+rule LocalFileUrlNavigation {
+  meta { id: "VYQL-PATH-008", severity: high, cwe: [CWE_22], confidence_floor: medium }
+  match code.LocalFileUrlNavigation as sink
 }

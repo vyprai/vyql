@@ -4,20 +4,58 @@
 module vypr.injection;
 
 rule Sql {
-  meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89] }
+  meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89], benchmark: sqli }
   taint core.UserControlledData -> code.SqlExecution
   unless sanitized_by core.SqlParameterization
 }
 
+rule UnparameterizedSqlQueryParser {
+  meta { id: "VYQL-INJ-030", severity: high, cwe: [CWE_89], confidence_floor: medium }
+  match code.UnparameterizedSqlQueryParser as sink
+}
+
 rule Command {
-  meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78] }
+  meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78], benchmark: cmdi }
   taint core.UserControlledData -> code.CommandExecution
   unless sanitized_by core.ShellEscape
 }
 
+rule StoredCommand {
+  meta { id: "VYQL-INJ-032", severity: high, cwe: [CWE_78] }
+  taint code.DatabaseRead -> code.CommandExecution
+  unless sanitized_by core.ShellEscape
+}
+
+rule RubyPipeOpenCommand {
+  meta { id: "VYQL-INJ-042", severity: critical, cwe: [CWE_78], benchmark: cmdi, confidence_floor: medium }
+  taint core.UserControlledData -> code.RubyPipeOpenCommandExecution
+  unless sanitized_by core.ShellEscape
+}
+
+rule CommandOptionInjection {
+  meta { id: "VYQL-INJ-031", severity: high, cwe: [CWE_74, CWE_88], confidence_floor: medium }
+  match code.CommandOptionInjection as sink
+}
+
+rule ProtocolCommandInjection {
+  meta { id: "VYQL-INJ-040", severity: high, cwe: [CWE_349], confidence_floor: medium }
+  match code.ProtocolCommandInjection as sink
+}
+
 rule Code {
-  meta { id: "VYQL-INJ-003", severity: critical, cwe: [CWE_94] }
+  meta { id: "VYQL-INJ-003", severity: critical, cwe: [CWE_94], benchmark: codeinj }
   taint core.UserControlledData -> code.CodeEval
+  unless guarded_by core.CodeExecutionValidation
+}
+
+rule RequestReferenceEval {
+  meta { id: "VYQL-INJ-038", severity: critical, cwe: [CWE_94], confidence_floor: medium }
+  match code.RequestReferenceEval as sink
+}
+
+rule Vm2HostCallbackBridge {
+  meta { id: "VYQL-INJ-035", severity: critical, cwe: [CWE_94], confidence_floor: medium }
+  match code.Vm2HostCallbackBridge as bridge
 }
 
 rule DynamicCodeLoad {
@@ -30,10 +68,16 @@ rule PackageInstallCodeExecution {
   match code.PackageInstallExecution as sink
 }
 
+rule PrivilegedWorkflowUntrustedCodeExecution {
+  meta { id: "VYQL-INJ-044", severity: critical, cwe: [CWE_94, CWE_95], confidence_floor: medium }
+  match code.PrivilegedWorkflowUntrustedCodeExecution as sink
+}
+
 rule Xss {
-  meta { id: "VYQL-INJ-004", severity: high, cwe: [CWE_79] }
+  meta { id: "VYQL-INJ-004", severity: high, cwe: [CWE_79], benchmark: xss }
   taint core.UserControlledData -> code.HtmlRender
   unless sanitized_by core.HtmlEscape
+  unless guarded_by core.SafeResponseContentType
 }
 
 rule UnsafeEmbeddableAllowlist {
@@ -49,6 +93,36 @@ rule MarkdownNegotiationBypass {
 rule UnescapedSessionFlash {
   meta { id: "VYQL-INJ-025", severity: medium, cwe: [CWE_79], confidence_floor: low }
   match code.UnescapedSessionFlash as sink
+}
+
+rule UnescapedRequestGlobalTemplateVar {
+  meta { id: "VYQL-INJ-039", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedRequestGlobalTemplateVar as sink
+}
+
+rule UnescapedHtmlOptionRenderer {
+  meta { id: "VYQL-INJ-041", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedHtmlOptionRenderer as sink
+}
+
+rule UnescapedTableExportHtml {
+  meta { id: "VYQL-INJ-045", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedTableExportHtml as sink
+}
+
+rule UnescapedExceptionMessageMarkup {
+  meta { id: "VYQL-INJ-033", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedExceptionMessageMarkup as sink
+}
+
+rule IncompleteHtmlEntityEscape {
+  meta { id: "VYQL-INJ-034", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.IncompleteHtmlEntityEscape as sink
+}
+
+rule UnescapedDiagnosticHtml {
+  meta { id: "VYQL-INJ-047", severity: medium, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedDiagnosticHtml as sink
 }
 
 rule PdfJsEvalSupported {
@@ -67,6 +141,12 @@ rule UnrestrictedVariableVariableAssignment {
   match code.UnrestrictedVariableVariableAssignment as sink
 }
 
+rule StoredHtmlWriteRequiresSanitization {
+  meta { id: "VYQL-INJ-028", severity: high, cwe: [CWE_79], confidence_floor: low }
+  match code.StoredHtmlWrite as sink
+  unless guarded_by core.HtmlEscape
+}
+
 // Stored / second-order XSS — data read back from the database (assumed attacker-
 // influenced) rendered WITHOUT escaping (Markup/mark_safe/html_safe/raw). Auto-escaped
 // renders (render_template / Jinja default) are not sinks, so they don't fire. Medium
@@ -78,13 +158,13 @@ rule StoredXss {
 }
 
 rule Ldap {
-  meta { id: "VYQL-INJ-005", severity: high, cwe: [CWE_90] }
+  meta { id: "VYQL-INJ-005", severity: high, cwe: [CWE_90], benchmark: ldapi }
   taint core.UserControlledData -> code.LdapQuery
   unless sanitized_by core.LdapEscape
 }
 
 rule Xpath {
-  meta { id: "VYQL-INJ-006", severity: high, cwe: [CWE_643] }
+  meta { id: "VYQL-INJ-006", severity: high, cwe: [CWE_643], benchmark: xpathi }
   taint core.UserControlledData -> code.XpathQuery
   unless sanitized_by core.XpathEscape
 }
@@ -109,9 +189,19 @@ rule Log {
   taint core.UserControlledData -> code.LogOutput
 }
 
+rule UnneutralizedDiagnosticValue {
+  meta { id: "VYQL-INJ-036", severity: medium, cwe: [CWE_150, CWE_117], confidence_floor: medium }
+  match code.UnneutralizedDiagnosticValue as diagnostic
+}
+
 rule HttpResponseSplitting {
   meta { id: "VYQL-INJ-010", severity: medium, cwe: [CWE_113] }
   taint core.UserControlledData -> code.ResponseHeaderWrite
+}
+
+rule AmbiguousQueryParameterSeparator {
+  meta { id: "VYQL-INJ-046", severity: medium, cwe: [CWE_444], confidence_floor: medium }
+  match code.AmbiguousQueryParameterSeparator as sink
 }
 
 // Untrusted data used as a printf-style FORMAT string (CWE-134).
@@ -130,6 +220,17 @@ rule MassAssignment {
 rule PrototypePollution {
   meta { id: "VYQL-INJ-013", severity: medium, cwe: [CWE_1321] }
   taint core.UserControlledData -> code.ProtoPollute
+  unless guarded_by core.PrototypePollutionGuard
+}
+
+rule SchemaCodegenValidationBypass {
+  meta { id: "VYQL-INJ-029", severity: medium, cwe: [CWE_1321, CWE_915], confidence_floor: low }
+  match code.SchemaCodegenValidationBypass as sink
+}
+
+rule UncheckedPrototypeConfigKey {
+  meta { id: "VYQL-INJ-048", severity: medium, cwe: [CWE_1321], confidence_floor: medium }
+  match code.UncheckedPrototypeConfigKey as key
 }
 
 // Untrusted data written to a CSV/spreadsheet cell — formula injection (CWE-1236).
@@ -142,6 +243,16 @@ rule CsvInjection {
 rule UnrestrictedUpload {
   meta { id: "VYQL-INJ-015", severity: medium, cwe: [CWE_434] }
   taint core.UserControlledData -> code.UnsafeUpload
+}
+
+rule IncompleteFileExtensionValidation {
+  meta { id: "VYQL-INJ-037", severity: medium, cwe: [CWE_434], confidence_floor: medium }
+  match code.IncompleteFileExtensionValidation as validator
+}
+
+rule UncheckedUploadedImageProcessing {
+  meta { id: "VYQL-INJ-043", severity: medium, cwe: [CWE_434], confidence_floor: medium }
+  match code.UncheckedUploadedImageProcessing as processor
 }
 
 // Untrusted data evaluated as an expression-language expression — SpEL/OGNL/MVEL/EL (CWE-917).

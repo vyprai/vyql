@@ -1,0 +1,48 @@
+# Rank 269 / CVE-2015-5057: Broken Link Checker stored remote HTTP
+# response headers in the link diagnostic log, which is later rendered as HTML.
+
+test "rank269: response headers appended to rendered diagnostic log"
+  lang php
+  expect VYQL-INJ-047
+  expect_review code.UnescapedDiagnosticHtml
+  code
+  ```
+  <?php
+  class blcCurlHttp {
+      var $last_headers = '';
+
+      function check($info) {
+          $log = "Response headers\n";
+          $log .= $this->last_headers;
+          if ( isset($info['request_header']) ) {
+              $log .= htmlentities($info['request_header']);
+          }
+          $result['log'] = $log;
+          return $result;
+      }
+  }
+  ?>
+  ```
+
+test "rank269: response headers are escaped before diagnostic log"
+  lang php
+  reject VYQL-INJ-047
+  reject_review code.UnescapedDiagnosticHtml
+  code
+  ```
+  <?php
+  class blcCurlHttp {
+      var $last_headers = '';
+
+      function check($info) {
+          $log = "Response headers\n";
+          $log .= htmlentities($this->last_headers);
+          if ( isset($info['request_header']) ) {
+              $log .= htmlentities($info['request_header']);
+          }
+          $result['log'] = $log;
+          return $result;
+      }
+  }
+  ?>
+  ```

@@ -62,6 +62,12 @@ func excluded(base, rel string) bool {
 	return false
 }
 
+var scanHiddenDirs = map[string]bool{
+	".github":    true,
+	".circleci":  true,
+	".buildkite": true,
+}
+
 // ListFiles walks root and returns files whose extension is in exts (e.g.
 // {".py": true}). Dependency/build/VCS directories are skipped.
 func ListFiles(root string, exts map[string]bool) ([]string, error) {
@@ -72,7 +78,7 @@ func ListFiles(root string, exts map[string]bool) ([]string, error) {
 		}
 		rel := strings.TrimPrefix(path, root)
 		if d.IsDir() {
-			if skipDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") && d.Name() != "." || excluded(d.Name(), rel) {
+			if shouldSkipDir(root, path, d.Name()) || excluded(d.Name(), rel) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -107,7 +113,7 @@ func ListAllFiles(root string) []Entry {
 		}
 		rel := strings.TrimPrefix(path, root)
 		if d.IsDir() {
-			if skipDirs[d.Name()] || strings.HasPrefix(d.Name(), ".") && d.Name() != "." || excluded(d.Name(), rel) {
+			if shouldSkipDir(root, path, d.Name()) || excluded(d.Name(), rel) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -130,4 +136,21 @@ func FilterEntries(entries []Entry, exts map[string]bool) []string {
 		}
 	}
 	return out
+}
+
+func shouldSkipDir(root, path, name string) bool {
+	if strings.HasPrefix(name, ".") && name != "." {
+		return !scanHiddenDirs[name]
+	}
+	if !skipDirs[name] {
+		return false
+	}
+	if name == "build" {
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return true
+		}
+		return filepath.ToSlash(rel) == "build"
+	}
+	return true
 }

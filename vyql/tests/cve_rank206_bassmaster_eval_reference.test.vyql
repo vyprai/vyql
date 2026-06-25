@@ -1,0 +1,86 @@
+test "rank206: bassmaster evaluates request-derived response references"
+  lang javascript
+  expect VYQL-INJ-038
+  code
+  ```
+  var internals = {};
+
+  internals.config = function (request) {
+    var requests = [];
+    var resultsData = { resultsMap: {} };
+    for (var i = 0; i < request.payload.requests.length; ++i) {
+      var parts = [];
+      request.payload.requests[i].path.replace(/\$(\d+)?\.?([^\/]*)/g, function ($0, $1, $2) {
+        parts.push({ type: 'ref', index: $1, value: $2 });
+        return '';
+      });
+      requests.push(parts);
+    }
+    internals.batch(request, resultsData, 0, requests[0], function () {});
+  };
+
+  internals.batch = function (batchRequest, resultsData, pos, parts, callback) {
+    var path = '';
+
+    for (var i = 0, il = parts.length; i < il; ++i) {
+      if (parts[i].type === 'ref') {
+        var ref = resultsData.resultsMap[parts[i].index];
+        if (ref) {
+          var value = null;
+          eval('value = ref.' + parts[i].value + ';');
+          if (value) {
+            path += value;
+          }
+        }
+      }
+      else {
+        path += parts[i].value;
+      }
+    }
+
+    batchRequest.payload.requests[pos].path = path;
+  };
+  ```
+
+test "rank206: bassmaster uses bracket lookup instead of eval"
+  lang javascript
+  reject VYQL-INJ-038
+  code
+  ```
+  var internals = {};
+
+  internals.config = function (request) {
+    var requests = [];
+    var resultsData = { resultsMap: {} };
+    for (var i = 0; i < request.payload.requests.length; ++i) {
+      var parts = [];
+      request.payload.requests[i].path.replace(/\$(\d+)?\.?([^\/]*)/g, function ($0, $1, $2) {
+        parts.push({ type: 'ref', index: $1, value: $2 });
+        return '';
+      });
+      requests.push(parts);
+    }
+    internals.batch(request, resultsData, 0, requests[0], function () {});
+  };
+
+  internals.batch = function (batchRequest, resultsData, pos, parts, callback) {
+    var path = '';
+
+    for (var i = 0, il = parts.length; i < il; ++i) {
+      if (parts[i].type === 'ref') {
+        var ref = resultsData.resultsMap[parts[i].index];
+        if (ref) {
+          var value = ref[parts[i].value] || null;
+          if (value) {
+            path += value;
+          }
+        }
+      }
+      else {
+        path += parts[i].value;
+      }
+    }
+
+    batchRequest.payload.requests[pos].path = path;
+  };
+  ```

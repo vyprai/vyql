@@ -1,0 +1,85 @@
+test "rank201: barebox FDT unflattening accepts delimiter-bearing names without review guard"
+  lang c
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  #define FDT_BEGIN_NODE 1
+  #define FDT_PROP 3
+  struct device_node {};
+  struct fdt_node_header { const char *name; };
+  struct fdt_property { int nameoff; };
+  int is_reserved_name(const char *name) { return *name == '$'; }
+  struct device_node *of_new_node(struct device_node *node, const char *name);
+  void of_new_property(struct device_node *node, const char *name, const void *data, int len);
+  const char *dt_string(void *f, void *strings, int off);
+
+  int __of_unflatten_dtb(void *infdt, int tag, struct fdt_node_header *fnh,
+                         struct fdt_property *fdt_prop, void *dt_strings) {
+    const char *pathp;
+    const char *name;
+    struct device_node *node;
+
+    switch (tag) {
+    case FDT_BEGIN_NODE:
+      pathp = name = fnh->name;
+      if (!*pathp || is_reserved_name(pathp)) {
+        return -1;
+      }
+      node = of_new_node(node, pathp);
+      break;
+    case FDT_PROP:
+      name = dt_string(infdt, dt_strings, fdt_prop->nameoff);
+      if (!name || !node || is_reserved_name(name)) {
+        return -1;
+      }
+      of_new_property(node, name, 0, 0);
+      break;
+    }
+    return 0;
+  }
+  ```
+
+test "rank201: barebox FDT unflattening rejects slash-delimited names"
+  lang c
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  #define FDT_BEGIN_NODE 1
+  #define FDT_PROP 3
+  struct device_node {};
+  struct fdt_node_header { const char *name; };
+  struct fdt_property { int nameoff; };
+  char *strchr(const char *s, int c);
+  int is_reserved_name(const char *name) { return *name == '$'; }
+  int is_allowed_input_name(const char *name) {
+    return !is_reserved_name(name) && !strchr(name, '/');
+  }
+  struct device_node *of_new_node(struct device_node *node, const char *name);
+  void of_new_property(struct device_node *node, const char *name, const void *data, int len);
+  const char *dt_string(void *f, void *strings, int off);
+
+  int __of_unflatten_dtb(void *infdt, int tag, struct fdt_node_header *fnh,
+                         struct fdt_property *fdt_prop, void *dt_strings) {
+    const char *pathp;
+    const char *name;
+    struct device_node *node;
+
+    switch (tag) {
+    case FDT_BEGIN_NODE:
+      pathp = name = fnh->name;
+      if (!*pathp || !is_allowed_input_name(pathp)) {
+        return -1;
+      }
+      node = of_new_node(node, pathp);
+      break;
+    case FDT_PROP:
+      name = dt_string(infdt, dt_strings, fdt_prop->nameoff);
+      if (!name || !node || !is_allowed_input_name(name)) {
+        return -1;
+      }
+      of_new_property(node, name, 0, 0);
+      break;
+    }
+    return 0;
+  }
+  ```

@@ -212,8 +212,8 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "number":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string":
-		// carry the quote-stripped literal text so value-matched marks/sinks
-		// (e.g. crypto.cipher("DES")) can read the algorithm string via str_args.
+		// carry the quote-stripped literal text so value-matched mappings can read it
+		// through str_args.
 		return nir.Const{Loc: L, Value: luaStringValue(c.text(n))}
 	case "dot_index_expression":
 		return nir.Attr{Base: c.expr(field(n, "table")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}

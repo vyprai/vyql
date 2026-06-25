@@ -21,7 +21,7 @@ adapter go {
   type "support.NewSession" -> session.Store
   type "csv.NewWriter" -> csv.Writer
 
-  source "http_input" -> code.HttpInput  // seeded on *http.Request params
+  source path "analysis.parameter.entry" val "param_type:http.Request" -> code.HttpInput
   source "os.Args" -> code.CliArgument
   source "os.Getenv" -> code.EnvVariable
   source "flag.Arg" -> code.CliArgument
@@ -58,6 +58,11 @@ adapter go {
   source ".Cookie" -> code.HttpInput
   source ".Params" -> code.HttpInput
   source ".Param" -> code.HttpInput
+  // OIDC issuers/subjects/audiences are parsed from untrusted bearer tokens before
+  // verification; provider discovery on those values is an SSRF-sensitive fetch.
+  source "auth.ExtractIssuer" -> code.HttpInput
+  source "apiauth.ExtractIssuer" -> code.HttpInput
+  source "ExtractIssuer" -> code.HttpInput
 
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
@@ -100,6 +105,8 @@ adapter go {
   sink path "client.Post" -> code.UrlFetch
   sink path "client.Do" -> code.UrlFetch
   sink path "client.Head" -> code.UrlFetch
+  sink path "provider.Get" arg 1 val "issuer" -> code.UrlFetch
+  sink path "oidc.NewProvider" arg 1 -> code.UrlFetch
   sink path "resty.R" -> code.UrlFetch
   sink path "req.Get" -> code.UrlFetch
   sink path "os.Open" -> code.FilePathAccess
@@ -131,6 +138,17 @@ adapter go {
   sink path "template.HTML" -> code.HtmlRender
   sink path "template.JS" -> code.HtmlRender
   sink path "template.URL" -> code.HtmlRender
+  // Helpers that construct and return raw HTML bytes/strings are response render
+  // boundaries when caller-controlled values are interpolated into the returned value.
+  // The Go frontend emits neutral function literal evidence; this adapter assigns the
+  // security meaning in data.
+  sink path "analysis.function.return" val "<html" -> code.HtmlRender
+  sink path "analysis.function.return" val "<body" -> code.HtmlRender
+  sink path "analysis.function.return" val "<a " -> code.HtmlRender
+  // Gin/http response writer bodies. These are the last-hop render boundary for
+  // raw strings/bytes assembled by handlers.
+  sink path "Writer.WriteString" -> code.HtmlRender
+  sink path "Writer.Write" -> code.HtmlRender
   sink path "http.Redirect" -> code.RedirectTarget
   sink path "c.Redirect" -> code.RedirectTarget
   sink path "ctx.Redirect" -> code.RedirectTarget
@@ -147,6 +165,8 @@ adapter go {
   mark "DeleteAccount" -> code.AuthenticationRequiredOp
   mark "GrantRole" -> code.AuthenticationRequiredOp
   mark "MakeAdmin" -> code.AuthenticationRequiredOp
+  mark exact "analysis.function.context" val "function_name:SolveChallenge" val "selector:challenge.tries" val "selector:s.challenges" -> code.AuthAttemptLimitReview
+  mark exact "analysis.function.context" val "function_name:Verify" val "call:Get" val "binary:v==answer" nval "binary:v!=\"\"" -> code.EmptyVerifierAcceptance
   // HTTP response splitting / header injection (CWE-113).
   sink path "Header.Set" arg 1 -> code.ResponseHeaderWrite
   sink path "Header.Add" arg 1 -> code.ResponseHeaderWrite
@@ -165,9 +185,19 @@ adapter go {
   // controls (sanitizers/validators) — neutralize a flow that passes through them
   control "html.EscapeString" -> core.HtmlEscape
   control "template.HTMLEscapeString" -> core.HtmlEscape
+  control "ctx.Header" val "content-type" val "image/" -> core.SafeResponseContentType
+  control "c.Header" val "content-type" val "image/" -> core.SafeResponseContentType
+  control "Header.Set" val "content-type" val "image/" -> core.SafeResponseContentType
+  control "Header.Add" val "content-type" val "image/" -> core.SafeResponseContentType
   // filepath.Base strips all directory components — no `/`, `\`, or `..` survives, so it
   // confines a path to a single segment (the Go analogue of path.basename).
   control "filepath.Base" -> core.PathCanonicalization
+  // A path denylist that rejects parent-directory and Windows separator tokens is
+  // a real traversal guard; weaker substring checks remain ordinary calls.
+  control "strings.Contains" val ".." val "\\" -> core.PathAccessCheck
+  control "pathrs.Reopen" -> core.PathAccessCheck
+  control "procfs.OpenProcRoot" -> core.PathAccessCheck
+  control method "OpenThreadSelf" -> core.PathAccessCheck
   // benchmark-harness escapers/validators (wrap real neutralization the rule honors).
   control "support.EscapeLDAP" -> core.LdapEscape
   control "support.XPathLiteral" -> core.XpathEscape
@@ -179,6 +209,8 @@ adapter go {
   control method "CheckOwnership" -> core.OwnershipCheck
   control method "RequireOwner" -> core.OwnershipCheck
   control method "IsOwner" -> core.OwnershipCheck
+  control "oidcvalidate.IsValidIssuer" -> core.AllowlistValidation
+  control "IsValidIssuer" -> core.AllowlistValidation
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "regexp.Compile" -> code.RegexCompile
@@ -222,6 +254,45 @@ adapter go {
   // "redact/scrub secrets" option before returning configs through diagnostics/API.
   mark "MarshalConfig" val "false" -> code.ConfigExposureReview
   mark "instance.MarshalConfig" val "false" -> code.ConfigExposureReview
+  mark exact "analysis.type.context" val "field:Repositories" val "field:Keyring" nval "method:MarshalYAML" -> code.ConfigExposureReview
+  mark "settingspkg.Settings" val "PasswordPattern" -> code.SensitiveSettingsExposureReview
+  // Review-only: protocol/state handlers that stop a registration timer without
+  // first checking the corresponding state can accept out-of-sequence messages.
+  mark exact "analysis.function.context" val "call:StopT3550" nval "selector:ue.T3550" -> code.ProtocolStateReview
+  // Review-only: protocol handlers that compare an incoming previous-state pointer
+  // against the last stored state need manual review for stale or forked-chain cases.
+  mark exact "analysis.function.context" val "PrevATXID" val "call:GetLastIDByNodeID" -> code.ProtocolStateReview
+  // Review-only: request handlers that derive request metadata, load resource metadata,
+  // then dispatch a resource handler need a visible request/resource scope consistency
+  // check before dispatch.
+  mark exact "analysis.function.context" val "function_name:ServeHTTP" val "call:RequestInfoFrom" val "call:Get" val "call:serveResource" nval "selector:apiextensions.NamespaceScoped" -> code.RequestScopePolicyReview
+  // Review-only: admission ignore helpers that skip every non-empty subresource
+  // need manual review for alternate API paths that bypass the primary policy.
+  mark exact "analysis.function.context" val "function_name:shouldIgnore" val "call:GetSubresource" nval "ignoredSubresources" -> code.AdmissionSubresourcePolicyReview
+  mark exact "analysis.function.context" val "call:LoadOrStore" val "literal:overflow" -> code.UnboundedStateGrowthReview
+  mark exact "analysis.function.context" val "function_name:MessageReceived" val "call:Wantlist" val "call:splitWantsCancels" val "call:Wants" val "call:PushTasksTruncated" nval "call:ByteLen" nval "mh.IDENTITY" -> code.UnboundedProtocolStateByIdentifier
+  mark exact "analysis.function.context" val "function_name:readBytes" val "call:ReadLong" val "call:int" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxSliceAllocSize" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxMapAllocSize" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "call:SkipNBytes" val "call:int" nval "call:SkipNBytesInt64" nval "function_name:SkipNBytesInt64" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "function_name:readBlock" val "call:ReadLong" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "function_name:readNBytes" val "call:make" val "call:ReadByte" nval "selector:reader.data" nval "selector:reader.pos" -> code.LengthDerivedAllocation
+  mark exact "analysis.function.context" val "call:ReadString" val "call:BytesNtohs" val "binary:len(buf)<=off" nval "binary:len(buf)<off+2" -> code.FieldDerivedIndexAccess
+  mark exact "analysis.function.context" val "call_path:fmt.Sprintf" val "literal:%08b" val "index:capabilities:8" nval "literal:%016b" -> code.UnderwidthFormattedIndex
+  sink method "BranchPageElement" val "Count" -> code.CountDerivedElementAccess
+  mark "__binop.ne" val "Count" val "0" -> core.MemoryBoundsCheck
+  mark exact "analysis.function.context" val "literal:SELECT 'aurora_global_db_status'::regproc" nval "pg_catalog.aurora_global_db_status" -> code.UnqualifiedDatabaseRoutineReview
+  mark exact "analysis.function.context" val "literal:SELECT 'aurora_global_db_instance_status'::regproc" nval "pg_catalog.aurora_global_db_instance_status" -> code.UnqualifiedDatabaseRoutineReview
+  mark exact "analysis.function.context" val "literal:SELECT count(1) FROM aurora_global_db_status()" nval "pg_catalog.aurora_global_db_status" -> code.UnqualifiedDatabaseRoutineReview
+  mark exact "analysis.function.context" val "literal:FROM aurora_global_db_instance_status()" nval "pg_catalog.aurora_global_db_instance_status" -> code.UnqualifiedDatabaseRoutineReview
+  mark exact "analysis.function.context" val "function_name:NodePublishVolume" val "call:GetVolumeContext" val "call:append" val "call:Mount" nval "call:ParseIP" -> code.CommandOptionInjection
+  // Review-only: writing security state through ordinary path opening of procfs control
+  // files needs a verified procfs/open boundary to avoid link or mount redirection.
+  mark exact "analysis.function.context" val "call_path:os.OpenFile" val "literal:/proc/self/attr/exec" nval "call:OpenProcRoot" nval "call:OpenThreadSelf" nval "call_path:pathrs.Reopen" -> code.SpecialFileAccessReview
+  // Review-only: request/header secrets compared after ordinary string conversion need
+  // constant-time comparison when attacker-controlled candidates can be repeated.
+  mark exact "analysis.function.context" val "function_name:ParseAndValidate" val "selector:r.Header.Get" val "call:string" nval "call:ConstantTimeCompare" -> code.SecretComparisonReview
+  mark exact "analysis.function.context" val "call:BasicAuth" val "binary:username==wrapper.username" val "binary:password==wrapper.password" nval "call:ConstantTimeCompare" -> code.SecretComparisonReview
   mark "os.WriteFile" val "0666" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
   mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission
@@ -259,6 +330,8 @@ adapter go {
   // lifecycle / locking (CWE-667)
   mark "Lock" -> code.LockAcquire
   mark "RLock" -> code.LockAcquire
+  mark exact "analysis.global.mutation" val "field:ctx" -> code.LocklessSharedMutation
+  mark exact "analysis.global.mutation" val "field:roundTripper" -> code.LocklessSharedMutation
   control method "Unlock" -> core.LockRelease
   control method "RUnlock" -> core.LockRelease
 

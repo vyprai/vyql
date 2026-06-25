@@ -120,7 +120,8 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 			// (creator-attributed); the nodes/edges still land in base via the recordingStore.
 			rec := &recordingStore{Store: base, d: &moduleDelta{}}
 			l.g = rec
-			l.block(l.bodyOf(m).Body, newScope())
+			body := l.bodyOf(m)
+			l.block(body.Body, l.moduleScope(body))
 			l.g = base
 			fresh[ns] = true
 			sync.MarkFresh(ns)
@@ -138,7 +139,8 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		// cache miss → lower the body fresh (decoding the stub on demand if needed).
 		rec := &recordingStore{Store: base, d: &moduleDelta{}}
 		l.g = rec
-		l.block(l.bodyOf(m).Body, newScope())
+		body := l.bodyOf(m)
+		l.block(body.Body, l.moduleScope(body))
 		l.g = base
 		writes[keys[i]] = encodeDelta(rec.d)
 		fresh[ns] = true
@@ -250,12 +252,14 @@ type ieGob struct {
 	Symbol   string
 }
 type fiGob struct {
-	Qual, Short         string
-	ParamNames          []string
-	Params, ParamTypes  map[string]string
-	Ret, Module, Cls    string
-	Name                string
-	Validator, Abstract bool
+	Qual, Short        string
+	ParamNames         []string
+	Params, ParamTypes map[string]string
+	Ret, Module, Cls   string
+	Name               string
+	ParamEntries       []nir.ParamEntry
+	ResultEntries      []nir.ResultEntry
+	Abstract           bool
 }
 type cfGob struct{ Key, Field, Type string }
 
@@ -288,17 +292,10 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 	}
 	l.importTables[modkey] = tbl
 	for _, f := range d.Funcs {
-		// funcID is deterministic (sigID over ns + qualified name), so recompute it on replay
-		// rather than serializing it — it must match what makeFuncInfo minted, so a re-lowered
-		// body (pass 2) can stamp `func` on its nodes (the node→function map).
-		rel := f.Name
-		if f.Cls != "" {
-			rel = f.Cls + "." + f.Name
-		}
 		fi := &funcInfo{
 			paramNames: f.ParamNames, params: f.Params, paramTypes: f.ParamTypes, ret: f.Ret,
-			module: f.Module, cls: f.Cls, name: f.Name, funcID: sigID(ns, rel, "func", ""),
-			validator: f.Validator, abstract: f.Abstract,
+			module: f.Module, cls: f.Cls, name: f.Name, paramEntries: f.ParamEntries,
+			resultEntries: f.ResultEntries, abstract: f.Abstract,
 		}
 		l.funcQual[f.Qual] = fi
 		l.funcShort[f.Short] = append(l.funcShort[f.Short], fi)
@@ -383,8 +380,8 @@ func NodeModule(id string) (string, bool) {
 }
 
 // sigFingerprint hashes everything cross-module body lowering depends on besides a module's own
-// NIR: the function signature table (qualified name → param/return node ids, declared types,
-// validator/abstract flags), import tables, class registry/fields, constructor types, and the
+// NIR: the function signature table (qualified name -> param/return node ids, declared types,
+// result-event/abstract metadata), import tables, class registry/fields, constructor types, and the
 // self name / import-resolution mode. If this is unchanged, a module's body lowers identically.
 func (l *lowerer) sigFingerprint() string {
 	h := sha256.New()
@@ -394,7 +391,10 @@ func (l *lowerer) sigFingerprint() string {
 	}
 	for _, q := range sortedFuncKeys(l.funcQual) {
 		fi := l.funcQual[q]
-		fmt.Fprintf(h, "F %s ret=%s abstract=%v validator=%v cls=%s\n", q, fi.ret, fi.abstract, fi.validator, fi.cls)
+		fmt.Fprintf(h, "F %s ret=%s abstract=%v cls=%s\n", q, fi.ret, fi.abstract, fi.cls)
+		for _, entry := range fi.resultEntries {
+			fmt.Fprintf(h, "  r %s\n", strings.Join(entry.Tokens, "\x00"))
+		}
 		for _, pn := range fi.paramNames {
 			fmt.Fprintf(h, "  p %s id=%s t=%s\n", pn, fi.params[pn], fi.paramTypes[pn])
 		}

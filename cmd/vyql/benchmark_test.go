@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/parser"
 )
 
 // TestOWASPBenchmark scores VyQL against an OWASP Benchmark suite (Java or Python) and
@@ -30,11 +31,12 @@ func TestOWASPBenchmark(t *testing.T) {
 	}
 
 	rules, _ := loadRules("")
+	ruleCategory := benchmarkCategories(t, rules)
 	// python layout: testcode/ + helpers/. java layout: src/main/java (testcode + helpers).
 	candidates := [][]string{
 		{filepath.Join(dir, "testcode"), filepath.Join(dir, "helpers")},
 		// src/main (not just .../java) so bundled .properties under resources are read,
-		// letting config-indirection reads like getProperty("hashAlg1") const-fold.
+		// letting config-indirection reads like getProperty("mode") const-fold.
 		{filepath.Join(dir, "src", "main")},
 	}
 	var roots []string
@@ -53,7 +55,7 @@ func TestOWASPBenchmark(t *testing.T) {
 	if len(roots) == 0 {
 		roots = []string{dir}
 	}
-	fs, _, err := scanPaths(roots, rules)
+	fs, _, _, err := scanPaths(roots, rules)
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}
@@ -98,7 +100,7 @@ func TestOWASPBenchmark(t *testing.T) {
 }
 
 // hasAssumptionNote reports whether a finding is assumption-gated — an unsound neutralizer
-// (regex char-filter, prefix guard, unverifiable escaper) lies on or dominates its flow.
+// (regex char-filter, prefix guard, unverifiable transform) lies on or dominates its flow.
 func hasAssumptionNote(f *findings.Finding) bool {
 	for _, ne := range f.NegationEvidence {
 		if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
@@ -151,23 +153,25 @@ func testNameOf(loc string) string {
 	return ""
 }
 
-// ruleCategory maps a VyQL rule id to its OWASP Benchmark category.
-var ruleCategory = map[string]string{
-	"VYQL-PATH-001":  "pathtraver",
-	"VYQL-INJ-001":   "sqli",
-	"VYQL-INJ-002":   "cmdi",
-	"VYQL-INJ-003":   "codeinj",
-	"VYQL-INJ-004":   "xss",
-	"VYQL-INJ-005":   "ldapi",
-	"VYQL-INJ-006":   "xpathi",
-	"VYQL-CRY-001":   "hash",   // weak hash/digest (MD5/SHA1)
-	"VYQL-CRY-002":   "crypto", // weak cipher (DES/RC4/ECB)
-	"VYQL-CRY-003":   "weakrand",
-	"VYQL-CFG-007":   "securecookie",
-	"VYQL-RF-002":    "redirect",
-	"VYQL-DESER-001": "deserialization",
-	"VYQL-DESER-002": "xxe",
-	"VYQL-CFG-014":   "trustbound",
+func benchmarkCategories(t *testing.T, rules string) map[string]string {
+	t.Helper()
+	decls, err := parser.Parse(rules)
+	if err != nil {
+		t.Fatalf("parse rules: %v", err)
+	}
+	out := map[string]string{}
+	for _, d := range decls {
+		r, ok := d.(*parser.Rule)
+		if !ok {
+			continue
+		}
+		id, _ := r.Meta["id"].(string)
+		cat, _ := r.Meta["benchmark"].(string)
+		if id != "" && cat != "" {
+			out[id] = cat
+		}
+	}
+	return out
 }
 
 func score(t *testing.T, expected map[string]expRow, detected map[string]map[string]bool) {
@@ -179,7 +183,7 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		}
 		return cats[c]
 	}
-	dumpCat, dumpKind := os.Getenv("BENCH_DUMP_CAT"), os.Getenv("BENCH_DUMP_KIND") // e.g. sqli / fp; cat "all" dumps every category
+	dumpCat, dumpKind := os.Getenv("BENCH_DUMP_CAT"), os.Getenv("BENCH_DUMP_KIND") // cat "all" dumps every category
 	var dumped []string
 	byCat := map[string][]string{} // for dumpCat=="all": category -> matching test names
 	for name, e := range expected {

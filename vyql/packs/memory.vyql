@@ -18,6 +18,11 @@ rule TaintedRawMemoryCopySize {
   taint core.UserControlledData -> code.RawMemoryCopySize
 }
 
+rule PotentialRawMemoryCopySize {
+  meta { id: "VYQL-MEM-016", severity: medium, cwe: [CWE_119, CWE_787], confidence_floor: low }
+  match code.RawMemoryCopySize as c
+}
+
 rule StackAllocationSmell {
   meta { id: "VYQL-MEM-004", severity: low, cwe: [CWE_400], confidence_floor: low }
   match code.StackAllocationSmell as a
@@ -48,6 +53,16 @@ rule PotentialUnsafeMutableAlias {
   match code.UnsafeMutableAlias as a
 }
 
+rule PotentialFfiEnumLayoutRisk {
+  meta { id: "VYQL-MEM-014", severity: medium, cwe: [CWE_119], confidence_floor: low }
+  match code.FfiEnumLayoutRisk as e
+}
+
+rule PotentialUninitializedBufferExposure {
+  meta { id: "VYQL-MEM-015", severity: medium, cwe: [CWE_908], confidence_floor: medium }
+  match code.UninitializedBufferExposure as b
+}
+
 rule PotentialFieldDerivedIndexAccess {
   meta { id: "VYQL-MEM-010", severity: medium, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: low }
   match code.FieldDerivedIndexAccess as idx
@@ -56,4 +71,31 @@ rule PotentialFieldDerivedIndexAccess {
 rule FailurePathOwnedBufferFree {
   meta { id: "VYQL-MEM-011", severity: high, cwe: [CWE_415], confidence_floor: low }
   match code.FailurePathOwnedBufferFree as free
+}
+
+rule ReentrantQueueCleanup {
+  meta { id: "VYQL-MEM-019", severity: high, cwe: [CWE_415, CWE_416], confidence_floor: medium }
+  match code.ReentrantQueueCleanupReview as cleanup
+}
+
+rule PotentialZeroSizeReallocation {
+  meta { id: "VYQL-MEM-012", severity: high, cwe: [CWE_415], confidence_floor: low }
+  taint code.ComputedSizeValue -> code.ZeroSizeReallocation
+    unless sanitized_by core.ZeroValueExclusion
+}
+
+rule EscapedTerminatorWrite {
+  meta { id: "VYQL-MEM-013", severity: medium, cwe: [CWE_119, CWE_125, CWE_787], confidence_floor: medium }
+  match code.EscapedTerminatorWrite as w
+}
+
+rule CountDerivedElementAccess {
+  meta { id: "VYQL-MEM-017", severity: medium, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: medium }
+  match code.CountDerivedElementAccess as idx
+  unless guarded_by core.MemoryBoundsCheck
+}
+
+rule UncheckedNullableResultDeref {
+  meta { id: "VYQL-MEM-018", severity: medium, cwe: [CWE_476], confidence_floor: medium }
+  match code.UncheckedNullableResultDeref as deref
 }

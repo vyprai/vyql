@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsscala "github.com/tree-sitter/tree-sitter-scala/bindings/go"
 
@@ -9,9 +11,10 @@ import (
 
 // scConvScala walks a tree-sitter Scala CST into NIR.
 type scConvScala struct {
-	src  []byte
-	file string
-	key  string
+	src         []byte
+	file        string
+	key         string
+	currentFunc string
 }
 
 // ExtractScala parses Scala files into one NIR Program (one module per file).
@@ -60,11 +63,16 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}}
 	case "function_definition":
 		params := c.params(field(n, "parameters"))
+		name := c.text(field(n, "name"))
+		prev := c.currentFunc
+		c.currentFunc = name
+		body := c.bodyStmts(field(n, "body"))
+		c.currentFunc = prev
 		return []nir.Stmt{nir.FuncDef{
-			Name:       c.text(field(n, "name")),
+			Name:       name,
 			Params:     params,
 			ParamTypes: c.paramTypes(field(n, "parameters")),
-			Body:       c.bodyStmts(field(n, "body")),
+			Body:       body,
 			Loc:        L,
 		}}
 	case "val_definition", "var_definition", "val_declaration", "var_declaration":
@@ -81,7 +89,7 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 			case "identifier":
 				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 			case "field_expression", "indexed_expression":
-				// member/subscript write `obj.role = p` / `a(k) = p` — model as a path-sink
+				// member/subscript write `obj.field = p` / `a(k) = p` — model as a path-sink
 				// Call (Method="") so the assigned value flows into a write node.
 				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 					Callee: c.expr(left), Args: []nir.Expr{right},
@@ -92,14 +100,19 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	// branch-structured (B1); Cond nil (Scala did not evaluate the predicate) -> byte-identical.
 	case "if_expression":
-		ifn := nir.If{Cond: c.expr(field(n, "condition"))}
+		condNode := field(n, "condition")
+		cond := c.expr(condNode)
+		ifn := nir.If{Cond: cond}
 		if cons := field(n, "consequence"); cons != nil {
 			ifn.Then = c.collectBlocks(cons)
 		}
 		if alt := field(n, "alternative"); alt != nil {
 			ifn.Else = c.collectBlocks(alt)
 		}
-		return []nir.Stmt{ifn}
+		return []nir.Stmt{
+			nir.ExprStmt{Value: c.conditionContextCall(condNode, L)},
+			ifn,
+		}
 	case "for_expression", "while_expression":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "try_expression":
@@ -110,6 +123,22 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *scConvScala) conditionContextCall(cond *tree_sitter.Node, loc string) nir.Call {
+	raw := c.text(cond)
+	compact := strings.Join(strings.Fields(raw), "")
+	return nir.Call{
+		Callee: nir.Name{ID: "analysis.condition.if", Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: raw},
+			nir.Const{Loc: loc, Value: compact},
+			nir.Const{Loc: loc, Value: c.currentFunc},
+		},
+		Path:   "analysis.condition.if",
+		Method: "if",
+		Loc:    loc,
+	}
 }
 
 // scMatch lowers a `x match { case … }` to a subject+labelled nir.Switch so a constant
@@ -257,7 +286,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 	case "integer_literal", "floating_point_literal", "character_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "boolean_literal", "null_literal", "unit":
-		return nir.Const{Loc: L, Value: c.text(n)} // carry value for marks (setSecure(false))
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for matching
 	case "string", "symbol_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // literal text for `val` matching
 	case "interpolated_string_expression":
@@ -288,7 +317,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		return c.expr(field(n, "function"))
 	case "instance_expression":
 		// `new Type(args)` — model as a constructor call so type/arg sinks and marks match
-		// (e.g. new java.io.File(p), new java.util.Random()). Grammar nests a call_expression
+		// (e.g. new pkg.Widget(p), new pkg.Builder()). Grammar nests a call_expression
 		// (type applied to arguments) or carries the type + arguments directly.
 		for _, ch := range namedChildren(n) {
 			if k := ch.Kind(); k == "call_expression" || k == "generic_function" {
@@ -297,7 +326,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		kids := namedChildren(n)
 		if len(kids) >= 1 {
-			// the type may be a stable_type_identifier (`java.io.File`) that c.dotted can't
+			// the type may be a stable_type_identifier (`pkg.Widget`) that c.dotted can't
 			// resolve (returns "?"); fall back to its source text for the constructor path.
 			path := c.dotted(kids[0])
 			if path == "" || path == "?" {
@@ -332,14 +361,16 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 	case "if_expression":
 		// if-as-expression `if (c) a else b` → Ternary so the engine merges both branch
 		// values into a Phi (a tainted branch then taints the result).
-		t := nir.Ternary{Cond: c.expr(field(n, "condition")), Loc: L}
+		condNode := field(n, "condition")
+		cond := c.expr(condNode)
+		t := nir.Ternary{Cond: cond, Loc: L}
 		t.Then = c.blockTail(field(n, "consequence"))
 		if alt := field(n, "alternative"); alt != nil {
 			t.Else = c.blockTail(alt)
 		} else {
 			t.Else = nir.Const{Loc: L}
 		}
-		return t
+		return nir.Seq{Parts: []nir.Expr{c.conditionContextCall(condNode, L), t}, Loc: L}
 	case "match_expression", "block":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {

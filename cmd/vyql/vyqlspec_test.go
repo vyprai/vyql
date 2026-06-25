@@ -2,11 +2,13 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
+	adapterapply "github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
@@ -25,11 +27,19 @@ import (
 //
 //	test "short description"
 //	  lang   java
-//	  expect VYQL-CRY-002      # repeatable — every listed rule MUST fire
-//	  reject VYQL-INJ-001      # repeatable — every listed rule must NOT fire
+//	  expect RULE-ID      # repeatable — every listed rule MUST fire
+//	  reject RULE-ID      # repeatable — every listed rule must NOT fire
+//	  expect_evidence RULE-ID assumption  # rule must carry negation evidence text
+//	  reject_evidence RULE-ID char-filter # rule evidence must not contain text
+//	  expect_review some.Concept          # repeatable — review concept must appear
+//	  reject_review some.Concept          # repeatable — review concept must not appear
+//	  adapter python                     # optional graph adapter to apply before label checks
+//	  expect_label node-id custom.Source # graph adapter label assertion
+//	  reject_label node-id custom.Source # graph adapter negative label assertion
+//	  gitlink vendor/lib <sha>  # optional git submodule/gitlink fixture
 //	  code
 //	  ```
-//	  class C { void f() { Cipher.getInstance("DES/CBC/PKCS5Padding"); } }
+//	  class C { void f() { marker(); } }
 //	  ```
 
 type specFile struct {
@@ -37,16 +47,45 @@ type specFile struct {
 	code string
 }
 
+type evidenceSpec struct {
+	ruleID string
+	text   string
+}
+
+type confidenceSpec struct {
+	ruleID string
+	level  string
+}
+
+type gitlinkSpec struct {
+	path string
+	sha  string
+}
+
+type labelSpec struct {
+	nodeID  string
+	concept string
+}
+
 type vyqlSpec struct {
-	name     string
-	lang     string
-	expect   []string
-	reject   []string
-	profile  string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
-	files    []specFile // one or more code blocks (multi-file specs supported)
-	graphSrc string     // a `graph` block: an asset/identity graph (mutually exclusive with code)
-	src      string     // source spec filename (for messages)
-	line     int
+	name         string
+	lang         string
+	expect       []string
+	reject       []string
+	expectConf   []confidenceSpec
+	expectEv     []evidenceSpec
+	rejectEv     []evidenceSpec
+	expectReview []string
+	rejectReview []string
+	adapterTech  string
+	expectLabels []labelSpec
+	rejectLabels []labelSpec
+	profile      string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
+	files        []specFile // one or more code blocks (multi-file specs supported)
+	gitlinks     []gitlinkSpec
+	graphSrc     string // a `graph` block: an asset/identity graph (mutually exclusive with code)
+	src          string // source spec filename (for messages)
+	line         int
 }
 
 // primaryExt maps a spec `lang` to the file extension its frontend keys on.
@@ -60,9 +99,8 @@ var primaryExt = map[string]string{
 	"elixir": ".ex",
 	"dart":   ".dart",
 	"groovy": ".groovy",
-	// secretscan runs over any text file; `.env` keys on no real frontend, so a
-	// `lang secretscan` spec exercises the secret scanner in isolation.
-	"secretscan": ".env",
+	// textpattern runs over any text file; `.env` keys on no real source frontend.
+	"textpattern": ".env",
 }
 
 func parseSpecFile(t *testing.T, path string) []vyqlSpec {
@@ -121,8 +159,26 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			cur.expect = append(cur.expect, rest)
 		case "reject":
 			cur.reject = append(cur.reject, rest)
+		case "expect_confidence":
+			cur.expectConf = append(cur.expectConf, parseConfidenceSpec(t, rel, i+1, rest))
+		case "expect_evidence":
+			cur.expectEv = append(cur.expectEv, parseEvidenceSpec(t, rel, i+1, rest))
+		case "reject_evidence":
+			cur.rejectEv = append(cur.rejectEv, parseEvidenceSpec(t, rel, i+1, rest))
+		case "expect_review":
+			cur.expectReview = append(cur.expectReview, rest)
+		case "reject_review":
+			cur.rejectReview = append(cur.rejectReview, rest)
+		case "adapter":
+			cur.adapterTech = rest
+		case "expect_label":
+			cur.expectLabels = append(cur.expectLabels, parseLabelSpec(t, rel, i+1, rest))
+		case "reject_label":
+			cur.rejectLabels = append(cur.rejectLabels, parseLabelSpec(t, rel, i+1, rest))
 		case "file":
 			pendingFile = rest // next fence writes to this filename
+		case "gitlink":
+			cur.gitlinks = append(cur.gitlinks, parseGitlinkSpec(t, rel, i+1, rest))
 		case "code":
 			// optional keyword; the following ``` opens the block
 		case "graph":
@@ -179,13 +235,22 @@ func TestVyqlSpecs(t *testing.T) {
 			s := s
 			total++
 			t.Run(s.src+"/"+s.name, func(t *testing.T) {
-				if len(s.expect) == 0 && len(s.reject) == 0 {
-					t.Fatalf("%s:%d: spec has neither expect nor reject", s.src, s.line)
+				if len(s.expect) == 0 && len(s.reject) == 0 && len(s.expectEv) == 0 && len(s.rejectEv) == 0 &&
+					len(s.expectReview) == 0 && len(s.rejectReview) == 0 && len(s.expectLabels) == 0 && len(s.rejectLabels) == 0 {
+					t.Fatalf("%s:%d: spec has no expect/reject, review, or label assertion", s.src, s.line)
 				}
 				fired := map[string]bool{}
+				confidence := map[string]string{}
+				evidence := map[string][]string{}
+				reviewed := map[string]bool{}
 				if s.graphSrc != "" {
 					// graph spec: build the asset/identity graph and evaluate the packs.
 					store := buildGraphStore(t, s)
+					if s.adapterTech != "" {
+						if _, _, err := adapterapply.Apply(store, frontend.AdaptersFor(s.adapterTech), nil); err != nil {
+							t.Fatalf("apply %s adapters: %v", s.adapterTech, err)
+						}
+					}
 					eng := engine.New(onto, store)
 					for _, cr := range compiled {
 						got, err := eng.Evaluate(cr)
@@ -194,8 +259,22 @@ func TestVyqlSpecs(t *testing.T) {
 						}
 						for _, fnd := range got {
 							fired[fnd.RuleID] = true
+							confidence[fnd.RuleID] = fnd.Confidence
+							for _, ne := range fnd.NegationEvidence {
+								evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
+							}
+							for _, ec := range fnd.ReviewConditions {
+								evidence[fnd.RuleID] = append(evidence[fnd.RuleID], strings.Join([]string{
+									ec.Category, ec.Condition, ec.Evidence, ec.Assumption, ec.Confidence,
+								}, " "))
+							}
 						}
 					}
+					for _, row := range collectReviewItems(store) {
+						reviewed[row.Concept] = true
+					}
+					assertLabelSpecs(t, store, s.expectLabels, true)
+					assertLabelSpecs(t, store, s.rejectLabels, false)
 				} else {
 					// code spec: write the snippet(s) and scan as source.
 					ext, ok := primaryExt[s.lang]
@@ -214,22 +293,47 @@ func TestVyqlSpecs(t *testing.T) {
 								name = "snippet" + strconv.Itoa(n) + ext
 							}
 						}
-						if err := os.WriteFile(filepath.Join(dir, name), []byte(fl.code), 0o644); err != nil {
+						dst := filepath.Join(dir, name)
+						if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+							t.Fatal(err)
+						}
+						if err := os.WriteFile(dst, []byte(fl.code), 0o644); err != nil {
 							t.Fatal(err)
 						}
 					}
-					// optional `profile` directive: set the trust boundary (e.g. library) so
-					// profile-gated sources like ExternalEntryInput are active for this spec.
+					if len(s.gitlinks) > 0 {
+						initGitlinks(t, dir, s.gitlinks)
+					}
+					// optional `profile` directive: set the trust boundary so profile-gated
+					// sources are active for this spec.
 					if s.profile != "" {
 						applyProfile([]string{dir}, s.profile)
 						defer frontend.SetActiveSources(nil)
 					}
-					found, _, err := scanPaths([]string{dir}, rules)
+					found, _, _, err := scanPaths([]string{dir}, rules)
 					if err != nil {
 						t.Fatalf("scan: %v", err)
 					}
 					for _, fnd := range found {
 						fired[fnd.RuleID] = true
+						confidence[fnd.RuleID] = fnd.Confidence
+						for _, ne := range fnd.NegationEvidence {
+							evidence[fnd.RuleID] = append(evidence[fnd.RuleID], ne.Clause+" "+ne.Detail)
+						}
+						for _, ec := range fnd.ReviewConditions {
+							evidence[fnd.RuleID] = append(evidence[fnd.RuleID], strings.Join([]string{
+								ec.Category, ec.Condition, ec.Evidence, ec.Assumption, ec.Confidence,
+							}, " "))
+						}
+					}
+					if len(s.expectReview) > 0 || len(s.rejectReview) > 0 {
+						g, _, err := buildGraph([]string{dir})
+						if err != nil {
+							t.Fatalf("build graph for review: %v", err)
+						}
+						for _, row := range collectReviewItems(g) {
+							reviewed[row.Concept] = true
+						}
 					}
 				}
 				for _, want := range s.expect {
@@ -240,6 +344,31 @@ func TestVyqlSpecs(t *testing.T) {
 				for _, no := range s.reject {
 					if fired[no] {
 						t.Errorf("rule %s fired but should not have", no)
+					}
+				}
+				for _, want := range s.expectConf {
+					if got := confidence[want.ruleID]; got != want.level {
+						t.Errorf("expected rule %s confidence %q, got %q", want.ruleID, want.level, got)
+					}
+				}
+				for _, want := range s.expectEv {
+					if !evidenceContains(evidence[want.ruleID], want.text) {
+						t.Errorf("expected rule %s evidence to contain %q, got %q", want.ruleID, want.text, strings.Join(evidence[want.ruleID], " | "))
+					}
+				}
+				for _, no := range s.rejectEv {
+					if evidenceContains(evidence[no.ruleID], no.text) {
+						t.Errorf("rule %s evidence contained forbidden text %q: %q", no.ruleID, no.text, strings.Join(evidence[no.ruleID], " | "))
+					}
+				}
+				for _, want := range s.expectReview {
+					if !reviewed[want] {
+						t.Errorf("expected review concept %s to appear, but it did not (reviewed: %s)", want, keys(reviewed))
+					}
+				}
+				for _, no := range s.rejectReview {
+					if reviewed[no] {
+						t.Errorf("review concept %s appeared but should not have", no)
 					}
 				}
 			})
@@ -298,6 +427,97 @@ func parseGraphProps(s string) map[string]string {
 		}
 	}
 	return out
+}
+
+func parseEvidenceSpec(t *testing.T, src string, line int, rest string) evidenceSpec {
+	t.Helper()
+	ruleID, text, ok := strings.Cut(rest, " ")
+	if !ok || strings.TrimSpace(ruleID) == "" || strings.TrimSpace(text) == "" {
+		t.Fatalf("%s:%d: evidence assertion must be `expect_evidence <RULE> <text>`", src, line)
+	}
+	return evidenceSpec{ruleID: strings.TrimSpace(ruleID), text: strings.TrimSpace(text)}
+}
+
+func parseConfidenceSpec(t *testing.T, src string, line int, rest string) confidenceSpec {
+	t.Helper()
+	ruleID, level, ok := strings.Cut(rest, " ")
+	if !ok || strings.TrimSpace(ruleID) == "" || strings.TrimSpace(level) == "" {
+		t.Fatalf("%s:%d: confidence assertion must be `expect_confidence <RULE> <level>`", src, line)
+	}
+	return confidenceSpec{ruleID: strings.TrimSpace(ruleID), level: strings.TrimSpace(level)}
+}
+
+func parseLabelSpec(t *testing.T, src string, line int, rest string) labelSpec {
+	t.Helper()
+	nodeID, concept, ok := strings.Cut(rest, " ")
+	if !ok || strings.TrimSpace(nodeID) == "" || strings.TrimSpace(concept) == "" {
+		t.Fatalf("%s:%d: label assertion must be `expect_label <node-id> <concept>`", src, line)
+	}
+	return labelSpec{nodeID: strings.TrimSpace(nodeID), concept: strings.TrimSpace(concept)}
+}
+
+func assertLabelSpecs(t *testing.T, store usg.Store, specs []labelSpec, want bool) {
+	t.Helper()
+	for _, spec := range specs {
+		got, err := store.Labels(spec.nodeID)
+		if err != nil {
+			t.Fatalf("labels(%s): %v", spec.nodeID, err)
+		}
+		found := false
+		for _, label := range got {
+			if label.Concept == spec.concept {
+				found = true
+				break
+			}
+		}
+		if want && !found {
+			t.Errorf("expected node %s to have label %s; got %+v", spec.nodeID, spec.concept, got)
+		}
+		if !want && found {
+			t.Errorf("expected node %s not to have label %s; got %+v", spec.nodeID, spec.concept, got)
+		}
+	}
+}
+
+func parseGitlinkSpec(t *testing.T, src string, line int, rest string) gitlinkSpec {
+	t.Helper()
+	path, sha, ok := strings.Cut(rest, " ")
+	if !ok || strings.TrimSpace(path) == "" || strings.TrimSpace(sha) == "" {
+		t.Fatalf("%s:%d: gitlink fixture must be `gitlink <path> <sha>`", src, line)
+	}
+	return gitlinkSpec{path: strings.TrimSpace(path), sha: strings.TrimSpace(sha)}
+}
+
+func initGitlinks(t *testing.T, dir string, gitlinks []gitlinkSpec) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q")
+	run("config", "user.email", "test@example.invalid")
+	run("config", "user.name", "VyQL Test")
+	run("add", ".")
+	for _, gl := range gitlinks {
+		run("update-index", "--add", "--cacheinfo", "160000,"+gl.sha+","+gl.path)
+	}
+	run("commit", "-q", "-m", "fixture")
+}
+
+func evidenceContains(items []string, text string) bool {
+	text = strings.ToLower(text)
+	for _, item := range items {
+		if strings.Contains(strings.ToLower(item), text) {
+			return true
+		}
+	}
+	return false
 }
 
 func keys(m map[string]bool) string {

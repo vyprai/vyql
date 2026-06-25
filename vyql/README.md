@@ -19,7 +19,7 @@ vyql/
     elixir.vyql  go.vyql  groovy.vyql  java.vyql  javascript.vyql
     kotlin.vyql  lua.vyql  objc.vyql  perl.vyql  php.vyql  pii.vyql
     powershell.vyql  python.vyql  ruby.vyql  rust.vyql  scala.vyql
-    secretscan.vyql  solidity.vyql  swift.vyql
+    textpattern.vyql  solidity.vyql  swift.vyql
   ontology/     the curated analysis vocabulary
     concepts.vyql       151 concepts: concept X : kind { ... }
     threatkinds.vyql    90 threat kinds: threat X { cwe: [...] }

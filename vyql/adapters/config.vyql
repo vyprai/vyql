@@ -1,36 +1,131 @@
-// config "framework" adapter — mobile app configuration files. The config
-// frontend (AndroidManifest.xml / Info.plist) emits a bare call per insecure
-// setting; these marks label each with its presence concept.
+// config "framework" adapter. The Go frontend parses declarative files and
+// emits the data-defined events below; this adapter gives those events their
+// security meaning.
 adapter config {
-  meta { fidelity: resolved }
+  meta {
+    fidelity: resolved,
+    config_xml_true_attrs: [
+      "activity|exported|analysis.config.android.exported_component",
+      "activity-alias|exported|analysis.config.android.exported_component",
+      "service|exported|analysis.config.android.exported_component",
+      "receiver|exported|analysis.config.android.exported_component",
+      "provider|exported|analysis.config.android.exported_component",
+      "application|usesCleartextTraffic|analysis.config.android.cleartext_enabled",
+      "application|debuggable|analysis.config.android.debuggable_enabled"
+    ],
+    config_xml_attr_not_value_events: [
+      "application|allowBackup|false|analysis.config.android.backup_allowed"
+    ],
+    config_plist_true_keys: [
+      "NSAllowsArbitraryLoads|analysis.config.plist.ats_arbitrary_loads",
+      "NSAllowsArbitraryLoadsInWebContent|analysis.config.plist.ats_arbitrary_loads",
+      "NSAllowsArbitraryLoadsForMedia|analysis.config.plist.ats_arbitrary_loads"
+    ],
+    config_directive_value_events: [
+      "dockerfile|USER|root|exact|analysis.config.container.root_user",
+      "dockerfile|USER|0|exact|analysis.config.container.root_user",
+      "dockerfile|USER|root:|prefix|analysis.config.container.root_user",
+      "dockerfile|USER|0:|prefix|analysis.config.container.root_user"
+    ],
+    config_line_contains_events: [
+      "dockerfile|--privileged|analysis.config.container.privileged_mode",
+      "terraform|0.0.0.0/0|analysis.config.terraform.open_cidr"
+    ],
+    config_file_contains_all_events: [
+      "yaml|analysis.config.github_actions.privileged_pr_framework_execution|pull_request_target;;git show \"$PR_SHA:$file\" > \"$file\";;python manage.py makemigrations"
+    ],
+    config_line_exact_compact_events: [
+      "yaml|privileged: true|analysis.config.k8s.privileged_container",
+      "yaml|allowprivilegeescalation: true|analysis.config.k8s.privileged_container",
+      "yaml|hostnetwork: true|analysis.config.k8s.host_namespace",
+      "yaml|hostpid: true|analysis.config.k8s.host_namespace",
+      "yaml|hostipc: true|analysis.config.k8s.host_namespace"
+    ],
+    config_line_prefix_compact_events: [
+      "yaml|hostpath:|analysis.config.k8s.host_path"
+    ],
+    config_quoted_star_field_events: [
+      "terraform|action|analysis.config.terraform.wildcard_iam",
+      "terraform|resource|analysis.config.terraform.wildcard_iam"
+    ],
+    config_template_expr_start: "${",
+    config_template_expr_end: "}",
+    config_template_scopes: ["jelly", "jsp"],
+    config_template_input_pattern_jelly: "\\bit\\.(name|description|value|defaultValue)\\b",
+    config_template_skip_contains_jelly: ["<j:set", "<j:when", "<j:if", " test="],
+    config_template_input_event_jelly: "analysis.template.jelly.input",
+    config_template_render_event_jelly: "analysis.template.jelly.render",
+    config_template_escape_prefix_jelly: "h.escape(",
+    config_template_escape_event_jelly: "analysis.template.jelly.escape",
+    config_template_escape_active_contains_jelly: ["escapeEntryTitleAndDescription\" value=\"true"],
+    config_template_escape_line_contains_jelly: ["title=", "description="],
+    config_template_input_pattern_jsp: "\\b(requestContext|request|param|row|queues|value|text|name|defaultValue|JMSDestination)\\b",
+    config_template_skip_contains_jsp: ["<%@", "<c:out", "<c:forEach", "<c:if", " items=", " test="],
+    config_template_input_event_jsp: "analysis.template.jsp.input",
+    config_template_render_event_jsp: "analysis.template.jsp.render",
+    config_dot_template_rules: [
+      "_limit.jst|must be number|maximum;exclusiveMaximum;$schemaExcl|$schemaExcl|analysis.template.dot.schema_codegen_unvalidated",
+      "_limititems.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
+      "_limitlength.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
+      "_limitproperties.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated",
+      "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated"
+    ],
+    config_text_template_scopes: ["xwiki_velocity"],
+    config_text_template_extensions_xwiki_velocity: [".xml"],
+    config_text_template_required_contains_xwiki_velocity: ["<content", "$request.", "#"],
+    config_text_template_line_events_xwiki_velocity: [
+      "$services.csrf.isTokenValid|analysis.template.xwiki_velocity.csrf_check"
+    ],
+    config_text_template_assign_events_xwiki_velocity: [
+      "#set\\s*\\(\\s*\\$([A-Za-z_][A-Za-z0-9_]*)\\s*=.*\\$!?request\\.[A-Za-z0-9_]+\\b|\\$!?request\\.[A-Za-z0-9_]+\\b|analysis.template.xwiki_velocity.input"
+    ],
+    config_text_template_flow_events_xwiki_velocity: [
+      "#ckeditor_convert|\\$!?request\\.[A-Za-z0-9_]+\\b|analysis.template.xwiki_velocity.input|analysis.template.xwiki_velocity.state_change",
+      "#ckeditor_convert|\\$text\\b|analysis.template.xwiki_velocity.input|analysis.template.xwiki_velocity.state_change"
+    ]
+  }
 
   // Android: android:exported="true" on an activity/service/receiver/provider
-  mark "android_exported" -> code.ExportedComponent
+  mark "analysis.config.android.exported_component" -> code.ExportedComponent
   // Android: <application android:usesCleartextTraffic="true">
-  mark "android_cleartext" -> code.CleartextConfig
+  mark "analysis.config.android.cleartext_enabled" -> code.CleartextConfig
   // Android: <application android:debuggable="true">
-  mark "android_debuggable" -> code.DebuggableApp
+  mark "analysis.config.android.debuggable_enabled" -> code.DebuggableApp
+  // Android: backups are enabled by default unless <application android:allowBackup="false">
+  mark "analysis.config.android.backup_allowed" -> code.BackupAllowedConfig
   // iOS Info.plist: ATS NSAllowsArbitraryLoads(/InWebContent/ForMedia) = <true/>
-  mark "ats_arbitrary_loads" -> code.CleartextConfig
+  mark "analysis.config.plist.ats_arbitrary_loads" -> code.CleartextConfig
 
   // IaC / container misconfig (CWE-250/653/284) — tokens from the Dockerfile / K8s YAML
   // / Terraform scanners.
-  mark "k8s_privileged" -> code.PrivilegedContainer
-  mark "container_user_root" -> code.PrivilegedContainer
-  mark "docker_privileged" -> code.PrivilegedContainer
-  mark "k8s_host_namespace" -> code.HostNamespaceShare
-  mark "k8s_host_path" -> code.HostNamespaceShare
-  mark "tf_open_cidr" -> code.PublicNetworkExposure
-  mark "tf_wildcard_iam" -> code.WildcardIamPolicy
+  mark "analysis.config.k8s.privileged_container" -> code.PrivilegedContainer
+  mark "analysis.config.container.root_user" -> code.PrivilegedContainer
+  mark "analysis.config.container.privileged_mode" -> code.PrivilegedContainer
+  mark "analysis.config.k8s.host_namespace" -> code.HostNamespaceShare
+  mark "analysis.config.k8s.host_path" -> code.HostNamespaceShare
+  mark "analysis.config.terraform.open_cidr" -> code.PublicNetworkExposure
+  mark "analysis.config.terraform.wildcard_iam" -> code.WildcardIamPolicy
+  mark "analysis.config.github_actions.privileged_pr_framework_execution" -> code.PrivilegedWorkflowUntrustedCodeExecution
 
   // Jenkins Jelly views: template model fields such as it.name/it.description
   // rendered into HTML-bearing attributes need escaping before display.
-  source "jelly.input" -> core.UserControlledData
-  sink   "jelly.render" -> code.HtmlRender
-  control "h.escape" -> core.HtmlEscape
+  source "analysis.template.jelly.input" -> core.UserControlledData
+  sink   "analysis.template.jelly.render" -> code.HtmlRender
+  control "analysis.template.jelly.escape" -> core.HtmlEscape
 
   // JSP/JSTL views: raw EL expressions in HTML/link/attribute contexts are
   // rendered output; <c:out> is skipped by the frontend as an escaped render.
-  source "jsp.input" -> core.UserControlledData
-  sink   "jsp.render" -> code.HtmlRender
+  source "analysis.template.jsp.input" -> core.UserControlledData
+  sink   "analysis.template.jsp.render" -> code.HtmlRender
+
+  // Ajv/doT codegen templates: numeric schema keywords must be type-checked
+  // before the template emits validator code. Missing checks can let crafted
+  // schemas steer generated code/prototype behavior.
+  mark "analysis.template.dot.schema_codegen_unvalidated" -> code.SchemaCodegenValidationBypass
+
+  // XWiki Velocity pages embedded in XML: request-driven server-side conversion
+  // actions need CSRF validation before they execute.
+  source "analysis.template.xwiki_velocity.input" -> core.UserControlledData
+  sink   "analysis.template.xwiki_velocity.state_change" -> code.StateChangingOp
+  control "analysis.template.xwiki_velocity.csrf_check" -> core.CsrfProtection
 }

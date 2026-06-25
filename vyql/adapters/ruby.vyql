@@ -19,6 +19,7 @@ adapter ruby {
   source "request.headers" -> code.HttpInput
   source "request.path_parameters" -> code.HttpInput
   source "request.raw_post" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_name:process" val "param_name:target" -> code.HttpInput
   source "request.query_string" -> code.HttpInput
 
   // stored / second-order data — ActiveRecord reads (CWE-79 stored XSS when rendered
@@ -78,6 +79,7 @@ adapter ruby {
   control "require_auth" -> core.AuthenticationCheck
   control "ensure_authenticated" -> core.AuthenticationCheck
   control "signed_in?" -> core.AuthenticationCheck
+  control "action_auth_level" -> core.AuthorizationCheck
   // authorization checks (guards BIZ-001) — Pundit/CanCan predicates (path-sensitive via B1).
   control "authorize" -> core.AuthorizationCheck
   control "authorize!" -> core.AuthorizationCheck
@@ -94,7 +96,10 @@ adapter ruby {
   sink path "Kernel.system" -> code.CommandExecution
   sink path "Kernel.exec" -> code.CommandExecution
   sink path "Kernel.spawn" -> code.CommandExecution
+  sink path "Kernel.open" -> code.RubyPipeOpenCommandExecution
   sink path "IO.popen" -> code.CommandExecution
+  sink path "IO.foreach" -> code.CommandExecution
+  sink path "URI.open" -> code.CommandExecution
   sink path "Open3.capture2" -> code.CommandExecution
   sink path "Open3.capture2e" -> code.CommandExecution
   sink path "Open3.capture3" -> code.CommandExecution
@@ -231,8 +236,12 @@ adapter ruby {
   mark "JWT.encode" val "algorithm=none" -> code.JwtUnverified
   mark "skip_before_action" val "verify_authenticity_token" -> code.CsrfDisabled
   mark "verify_mode" val "VERIFY_NONE" -> code.CertValidationDisabled
+  mark exact "analysis.function.context" val "lang=ruby" val "SSLContext.new" val "ca_file" nval "verify_mode" -> code.CertValidationDisabled
   mark "File.chmod" val "0777" -> code.InsecurePermission
   mark "File.chmod" val "0666" -> code.InsecurePermission
+  mark "command" val "bridge-nf-call-iptables" val "echo 0" -> code.NetworkFilteringDisabled
+  mark "command" val "bridge-nf-call-ip6tables" val "echo 0" -> code.NetworkFilteringDisabled
+  mark "command" val "bridge-nf-call-arptables" val "echo 0" -> code.NetworkFilteringDisabled
   mark "File.open" val "/tmp/" val "w" -> code.InsecureTempFile
   mark "TCPSocket.open" -> code.ResourceHandle
   mark "File.open" -> code.ResourceHandle
@@ -250,6 +259,7 @@ adapter ruby {
 
   // character-filter: gsub is always global.
   filter method "gsub" global
+  mark exact "analysis.function.context" val "lang=ruby" val "polymorphic_as" val "_type=" val "params[\"#{polymorphic_as}_type\"]" val "model.send" nval "valid_polymorphic_class" -> code.PolymorphicTypeSelectionReview
   sink path "search" arg 1 -> code.LdapQuery
   sink path "Net::LDAP" arg 1 -> code.LdapQuery
   sink method "search" arg 1 -> code.LdapQuery

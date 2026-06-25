@@ -54,6 +54,27 @@ test "internet reaches a PII database (CLD-001)"
 
 These live in `graph/*.test.vyql` and run through the same `TestVyqlSpecs` runner.
 
+### Adapter label specs
+
+Adapter catalog wiring can be tested over a `graph` block by applying an adapter and
+asserting labels:
+
+```
+test "python package adapter labels an imported package call"
+  adapter python
+  expect_label arg code.Deserialization
+  graph
+  ```
+  node imp code.Import { module = pyyaml, package = pyyaml }
+  node arg code.Arg
+  node call code.Call { callee_path = yaml.load, method = load, arg0 = arg }
+  ```
+```
+
+- `adapter <tech>` applies the shipped adapter for that technology to the graph.
+- `expect_label <node> <concept>` and `reject_label <node> <concept>` assert labels after
+  adapter application.
+
 ### Multi-file specs
 
 For cross-file flows (e.g. interprocedural taint), give each block a `file <name>`:

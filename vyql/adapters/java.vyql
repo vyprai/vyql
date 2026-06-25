@@ -3,9 +3,29 @@
 adapter java {
   meta { match: contains, fidelity: resolved }
 
-  // Spring handler params (seeded http_input by the frontend) + servlet inputs
+  // Handler/framework-supplied params + servlet inputs
   source "System.console.readLine" -> code.StdinInput
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:GetMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PostMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PutMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:DeleteMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PatchMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:RequestMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:GET" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:POST" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:PUT" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:DELETE" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:HEAD" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:OPTIONS" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:Get" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:Post" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:Put" -> code.HttpInput
+  source path "analysis.parameter.entry" val "annotation:Delete" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:RestController" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:Controller" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:RequestMapping" -> code.HttpInput
+  source path "analysis.parameter.entry" val "class_annotation:Path" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_name:isValid" val "has_param_type:ConstraintValidatorContext" val "param_index:0" -> code.HttpInput
   // Servlet / Spring request inputs (receiver name varies → substring match)
   source ".getParameter" -> code.HttpInput
   source ".getParameterValues" -> code.HttpInput
@@ -23,6 +43,7 @@ adapter java {
   // intercepted business call's runtime data — untrusted in an interceptor (e.g. @DS SpEL
   // routing evaluates them, CVE-2026-7045). Surfaces only if they reach a sink.
   source method "getArguments" -> code.HttpInput
+  source receiver "getName" on "ZipEntry" -> code.ArchiveEntryName
   // Android intent / deep-link inputs (attacker-controlled IPC entry points)
   source ".getStringExtra" -> code.IntentInput
   source ".getStringArrayExtra" -> code.IntentInput
@@ -44,6 +65,16 @@ adapter java {
   type "CharArrayWriter" -> CharArrayWriter
   type "ByteArrayOutputStream" -> ByteArrayOutputStream
   type "CSVWriter" -> CSVWriter
+
+  // Offset/length range checks must avoid additive overflow before a native or buffer
+  // operation consumes the range. The patched idiom checks `offset > len - length`.
+  mark exact "analysis.function.context" val "expr:offset+length>b.length" val "call_path:write" nval "expr:offset>b.length-length" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "function_name:crypt_raw" val "expr:1<<log_rounds" nval "call:roundsForLogRounds" -> code.IntegerSizeArithmetic
+  mark "__binop.shl" val "log_rounds" val "1" nval "1L" -> code.IntegerSizeArithmetic
+  mark exact "analysis.function.context" val "function_name:safeDecryptPreMasterSecret" val "call:doFinal" val "call:createSecret" val "M[0]" nval "expr:m.length==48" -> code.PremasterSecretLengthReview
+  mark exact "analysis.function.context" val "call:getServerName" val "call:getHost" val "call:equals" nval "call:contains" -> code.RequestHostUrlValidationBypass
+  mark exact "analysis.function.context" val "call:setAuthentication" val "call:getSession" nval "call:invalidate" -> code.MissingSessionRotationAfterAuthentication
+  mark exact "analysis.function.context" val "function_name:correctlySpends" val "call:fromPublicOnly" val "call:verify" val "hashFor" nval "call:sha256hash160" -> code.PublicKeyHashBindingReview
 
   // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
@@ -79,6 +110,11 @@ adapter java {
   sink method "queryForLong" -> code.SqlExecution
   sink method "queryForStream" -> code.SqlExecution
   sink method "batchUpdate" -> code.SqlExecution
+  // Driver/parser helpers that return hand-built SQL literal casts instead of
+  // routing text through the shared quoting routine.
+  mark exact "analysis.function.return" val "function_name:toString" val "::uuid" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.return" val "function_name:toString" val "::point" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.return" val "function_name:toString" val "::box" -> code.UnparameterizedSqlQueryParser
 
   // Command execution. arg all: the tainted value can be the command, an argument, or the
   // environment array — Runtime.exec(cmd) / exec(cmdarray, envp), ProcessBuilder(a, b, …),
@@ -97,6 +133,11 @@ adapter java {
   sink method "readValue" -> code.Deserialization
   sink path "yaml.load" -> code.Deserialization
   sink path "Yaml.load" -> code.Deserialization
+  mark exact "analysis.class.context" val "class_base:InvocationHandler" val "call:getMethod" val "call:invokeMethod" nval "function_name:readResolve" nval "function_name:readObject" nval "call:NotSerializableException" -> code.DeserializableInvocationHandler
+  package "org.yaml.snakeyaml" {
+    mark exact "analysis.class.context" val "class_base:Constructor" -> code.UnsafeYamlConstructor
+    mark exact "org.yaml.snakeyaml.constructor.Constructor" -> code.UnsafeYamlConstructor
+  }
 
   // XXE
   sink method "parse" -> code.XmlParse
@@ -132,13 +173,11 @@ adapter java {
   sink method "transferTo" -> code.UnsafeUpload
 
   // SSRF
-  sink path "URL" -> code.UrlFetch
-  sink method "openConnection" -> code.UrlFetch
+  sink receiver "openConnection" -> code.UrlFetch
   sink method "getForObject" -> code.UrlFetch
   sink method "getForEntity" -> code.UrlFetch
   sink method "findById" -> code.ObjectLookupByUserInput
   sink method "getReferenceById" -> code.ObjectLookupByUserInput
-  sink method "getUser" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
   sink method "getOrder" -> code.ObjectLookupByUserInput
   mark "changePassword" -> code.AuthenticationRequiredOp
@@ -177,13 +216,32 @@ adapter java {
   control method "hasRole" -> core.AuthorizationCheck
   control method "checkPermission" -> core.AuthorizationCheck
   mark "Login.accurevLoginFromGlobalConfig" -> code.SensitiveOperation
-  // Accumulo-style permission gates: review-only context for authz CVEs where the bug is
-  // an ignored/unenforced boolean result rather than taint reaching a sink.
-  control method "canFlush" -> core.AuthorizationCheck
-  control method "canPerformSystemActions" -> core.AuthorizationCheck
-  control method "canAlterNamespace" -> core.AuthorizationCheck
-  control method "canAlterTable" -> core.AuthorizationCheck
-  control method "canObtainDelegationToken" -> core.AuthorizationCheck
+  // Accumulo-style permission gates: a bare can* call is not a guard unless its false
+  // result stops the operation. Surface ignored results for review; treat throw-on-false
+  // contexts as authorization checks.
+  mark exact "analysis.function.context" val "call:canFlush" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  mark exact "analysis.function.context" val "call:canPerformSystemActions" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  mark exact "analysis.function.context" val "call:canAlterNamespace" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  mark exact "analysis.function.context" val "call:canAlterTable" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  mark exact "analysis.function.context" val "call:canObtainDelegationToken" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  control "analysis.function.context" val "call:canFlush" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  control "analysis.function.context" val "call:canPerformSystemActions" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  control "analysis.function.context" val "call:canAlterNamespace" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  control "analysis.function.context" val "call:canAlterTable" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  control "analysis.function.context" val "call:canObtainDelegationToken" val "call:ThriftSecurityException" -> core.AuthorizationCheck
+  mark exact "analysis.function.context" val "function_name:doTest" val "call:setCredentialsId" val "call:accurevLoginFromGlobalConfig" nval "call:hasPermission" nval "call:checkPermission" -> code.CredentialedEndpointReview
+  mark exact "analysis.function.context" val "function_name:doFill" val "call:getBzmUtils" nval "call:checkPermission" -> code.CredentialedEndpointReview
+  mark exact "analysis.function.context" val "function_name:doFillCredentialsIdItems" val "call:lookupCredentials" nval "call:hasPermission" nval "call:checkPermission" -> code.CredentialedEndpointReview
+  mark exact "analysis.parameter.entry" val "param_name:awsSecretKey" val "param_type:Secret" -> code.SecretDatabindingReview
+  mark exact "analysis.function.context" val "function_name:setAkid" nval "call:fromString" -> code.SecretDatabindingReview
+  mark exact "analysis.function.context" val "function_name:setSkid" nval "call:fromString" -> code.SecretDatabindingReview
+  mark exact "analysis.function.context" val "function_name:doConfigure" val "call:configure" val "call:save" nval "call:checkPermission" -> code.SensitiveOperation
+  mark exact "analysis.function.context" val "function_name:doAttachPublicIP" val "call:getNode" val "call:attachPublicIP" nval "call:checkPermission" -> code.SensitiveOperation
+  mark exact "analysis.function.context" val "function_name:doFill" nval "call:checkPermission" nval "annotation:POST" nval "annotation:RequirePOST" -> code.StateChangingOp
+  mark exact "analysis.function.context" val "selector:Constants.MC_REALPATH" val "selector:Constants.MC_RELATIVE_PATH" val "call:FileReader" nval "call:FileNotFoundException" -> code.AbsolutePathDisclosure
+  // Jenkins project workspace access requires an explicit item permission check in
+  // descriptor/form-validation paths.
+  mark method "getSomeWorkspace" -> code.SensitiveOperation
   control method "requireAuth" -> core.AuthenticationCheck
   control method "ensureAuthenticated" -> core.AuthenticationCheck
   control method "isAuthenticated" -> core.AuthenticationCheck
@@ -199,10 +257,16 @@ adapter java {
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
+  control "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
+  control "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
+  control "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
   // materialize hardening as a node mark for the structural XXE rule's guarded_by
   mark "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   mark "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
   mark "setExpandEntityReferences" val "false" -> core.XmlHardening
+  mark "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
+  mark "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
+  mark "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
   mark "setProperty" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
   mark "setXIncludeAware" val "false" -> core.XmlHardening
   // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
@@ -259,6 +323,8 @@ adapter java {
   mark "setWritable" val "true" val "false" -> code.InsecurePermission
   mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
   mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
+  mark exact "analysis.function.context" val "call:setContent" val "call:toJson" val "call:saveDocument" nval "call:setHidden" -> code.InternalContentExposureReview
+  mark exact "analysis.function.context" val "call:getType" val "selector:FEDERATION_DOWNSTREAM_CONNECT" val "call:deploy" nval "call:getSubject" -> code.ProtocolStateReview
   mark "Socket" -> code.ResourceHandle
   mark "Files.newInputStream" -> code.ResourceHandle
   mark "Files.newOutputStream" -> code.ResourceHandle
@@ -359,17 +425,17 @@ adapter java {
 
   // log injection (CWE-117, INJ-009) + secret-in-log (CWE-532, SEC-001) — logging calls
   // are a LogOutput sink (user data → log injection) AND a LogWrite mark (secret → leak).
-  sink path "logger.info" -> code.LogOutput
-  sink path "logger.warn" -> code.LogOutput
-  sink path "logger.error" -> code.LogOutput
-  sink path "logger.debug" -> code.LogOutput
-  sink path "log.info" -> code.LogOutput
-  sink path "log.warn" -> code.LogOutput
-  sink path "log.error" -> code.LogOutput
-  sink path "log.debug" -> code.LogOutput
-  sink path "LOG.info" -> code.LogOutput
-  sink path "LOG.error" -> code.LogOutput
-  sink path "System.out.println" -> code.LogOutput
+  sink path "logger.info" arg all -> code.LogOutput
+  sink path "logger.warn" arg all -> code.LogOutput
+  sink path "logger.error" arg all -> code.LogOutput
+  sink path "logger.debug" arg all -> code.LogOutput
+  sink path "log.info" arg all -> code.LogOutput
+  sink path "log.warn" arg all -> code.LogOutput
+  sink path "log.error" arg all -> code.LogOutput
+  sink path "log.debug" arg all -> code.LogOutput
+  sink path "LOG.info" arg all -> code.LogOutput
+  sink path "LOG.error" arg all -> code.LogOutput
+  sink path "System.out.println" arg all -> code.LogOutput
   mark "logger.info" -> code.LogWrite
   mark "logger.warn" -> code.LogWrite
   mark "logger.error" -> code.LogWrite
@@ -394,6 +460,7 @@ adapter java {
   assume guard method "endsWith"   -> code.FilePathAccess
   assume guard method "contains"   -> code.FilePathAccess
   assume guard method "matches"    -> code.FilePathAccess
+  assume guard path "analysis.guard.containment_check" -> code.FilePathAccess
   assume guard method "startsWith" -> code.TrustBoundary
   // Path canonicalizers normalize but do NOT confine to a base dir on their own.
   assume sanitizer method "normalize"        -> code.FilePathAccess

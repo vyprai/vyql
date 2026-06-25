@@ -8,8 +8,15 @@ concept Refund : action { }
 
 module cloud;
 
-concept Database : asset { }
-concept Internet : exposure { }
+concept Database : asset {
+  context_asset_target_prop: database
+  context_asset_label: "sink database {target} holds [{kinds}]"
+}
+concept Internet : exposure {
+  context_reach_source: true
+  context_reach_label: "internet-reachable"
+  context_reach_target_prop: service
+}
 concept ObjectStore : asset { }
 concept PublicStorage : exposure { }
 concept SecretStore : asset { }
@@ -26,26 +33,119 @@ concept CliArgument : source {
 concept ExternalEntryInput : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
+  source_policy: caller_conditional
+  source_condition_category: "caller-controlled-input"
+  source_condition: "a caller forwards attacker-controlled data into the public-API parameter {param}"
+  source_assumption: "the library is invoked with untrusted input at this entry point"
+  source_confidence: medium
 }
 concept CodeEval : sink {
   vulnerable_to: [injection.CodeInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_94]
 }
+concept Vm2HostCallbackBridge : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94]
+  review_category: "code_execution"
+  review_condition: "vm2 sandbox exposes host callbacks or globals while sandbox code is executed"
+  review_evidence: "vm2 context {pattern} bridges host callbacks into the sandbox and executes vm.run"
+  review_assumption: "template or sandbox-executed code can invoke the bridged host callbacks"
+  review_confidence: medium
+}
+concept RequestReferenceEval : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94]
+  review_category: "code_execution"
+  review_condition: "request-controlled reference paths are evaluated as code to read response fields"
+  review_evidence: "request reference context {pattern} builds an eval string from parsed request path parts"
+  review_assumption: "an attacker can submit batch request paths containing reference expressions"
+  review_confidence: high
+}
 concept DynamicCodeLoad : sink {
   vulnerable_to: [injection.UnsafeDynamicLoading]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_829]
+  review_category: "code_loading"
+  review_condition: "attacker-controlled module or library name reaches a dynamic code loader"
+  review_evidence: "dynamic loader {pattern} receives tainted input"
+  review_assumption: "the resolved module/library path or search path can be influenced by the attacker"
+  review_confidence: medium
+}
+concept UnqualifiedDatabaseRoutineReview : sink {
+  vulnerable_to: [injection.UnsafeDynamicLoading]
+  cwe: [CWE_426]
+  review_category: "path"
+  review_condition: "database routine names are resolved through the active search path instead of an explicit trusted schema"
+  review_evidence: "SQL routine reference {pattern} is unqualified"
+  review_assumption: "an attacker or tenant can influence routine resolution through database search-path state"
+  review_confidence: possibility
+}
+concept ExternalResourceIntegrityReview : sink {
+  vulnerable_to: [injection.UnsafeDynamicLoading]
+  cwe: [CWE_345, CWE_829]
+  review_category: "supply_chain"
+  review_condition: "external script or style integrity metadata can register an unapproved resource as trusted"
+  review_evidence: "resource integrity context {pattern} accepts provided integrity metadata without an observed allowlist decision"
+  review_assumption: "the HTML/resource reference may be attacker-controlled or may point at an untrusted external origin"
+  review_confidence: possibility
 }
 concept PackageInstallExecution : sink {
   vulnerable_to: [injection.CodeInjection]
   cwe: [CWE_94]
 }
+concept PrivilegedWorkflowUntrustedCodeExecution : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94, CWE_95]
+  review_category: "code_execution"
+  review_condition: "a privileged CI workflow stages untrusted pull-request code before invoking a code-loading framework command"
+  review_evidence: "workflow context {pattern} combines a privileged PR trigger, untrusted file copy, and framework code execution"
+  review_assumption: "the copied files can contain code imported by the framework command during the privileged workflow run"
+  review_confidence: high
+}
+concept PackageVersionSpecifierValidationReview : sink {
+  vulnerable_to: [validation.ImproperInputValidation, injection.CodeInjection]
+  cwe: [CWE_20, CWE_94]
+  review_category: "supply_chain"
+  review_condition: "package version specifier validation accepts arbitrary trailing dependency syntax"
+  review_evidence: "package specifier validation context {pattern} uses a permissive regex before installation"
+  review_assumption: "project metadata or action inputs can influence the dependency specifier passed to the package installer"
+  review_confidence: medium
+}
 concept CommandExecution : sink {
   vulnerable_to: [injection.CommandInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_78]
-  dangerous_chars: ";|&$<>()"
+  excluded_chars: ";|&$<>()"
+}
+concept RubyPipeOpenCommandExecution : sink {
+  vulnerable_to: [injection.CommandInjection]
+  enabled_by: [taint.UntrustedData]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "caller-controlled Ruby open path can select process execution with a pipe prefix"
+  review_evidence: "Ruby Kernel.open context {pattern} receives caller-controlled input"
+  review_assumption: "the path can begin with a pipe character and reach Ruby's process-opening behavior"
+  review_confidence: high
+}
+concept CommandOptionInjection : sink {
+  vulnerable_to: [injection.ArgumentInjection]
+  cwe: [CWE_74, CWE_88]
+}
+
+concept ProtocolCommandInjection : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion]
+  cwe: [CWE_349]
+}
+
+concept CommandLineAssemblyReview : sink {
+  vulnerable_to: [injection.CommandInjection, injection.ArgumentInjection, injection.UnsafeDynamicLoading]
+  cwe: [CWE_77, CWE_88, CWE_829]
+  review_category: "command"
+  review_condition: "command line text is assembled from contextual values without observed shell quoting"
+  review_evidence: "command-line assembly context {pattern} appends a placeholder value before process/application launch"
+  review_assumption: "the appended value can be influenced through a document, URI, desktop action, or caller-controlled parameter"
+  review_confidence: medium
 }
 
 concept FormatString : sink {
@@ -66,6 +166,16 @@ concept RegexMatch : sink {
   cwe: [CWE_1333]
 }
 
+concept CatastrophicRegex : sink {
+  vulnerable_to: [dos.ReDoS, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_1333, CWE_400]
+  review_category: "resource"
+  review_condition: "a static regular expression has catastrophic-backtracking structure"
+  review_evidence: "regex construction {pattern} contains nested or ambiguous quantified branches"
+  review_assumption: "an attacker can supply input matched by this exported or reachable regex"
+  review_confidence: medium
+}
+
 concept MassAssign : sink {
   vulnerable_to: [injection.MassAssignment]
   enabled_by: [taint.UntrustedData]
@@ -76,6 +186,20 @@ concept ProtoPollute : sink {
   vulnerable_to: [injection.PrototypePollution]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_1321]
+  analysis_role: attribute_sink
+}
+concept UncheckedPrototypeConfigKey : sink {
+  vulnerable_to: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  review_category: "prototype_pollution"
+  review_condition: "configuration object keys are copied into plain object properties without filtering prototype-mutating names"
+  review_evidence: "prototype-sensitive config-key copy context {pattern} writes dynamic keys into output objects"
+  review_assumption: "a package, project, or build configuration can supply keys such as __proto__ or constructor"
+  review_confidence: medium
+}
+concept SchemaCodegenValidationBypass : sink {
+  vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
+  cwe: [CWE_1321, CWE_915]
 }
 
 concept WeakHash : sink {
@@ -101,6 +225,19 @@ concept UnsafeUpload : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_434]
 }
+concept IncompleteFileExtensionValidation : sink {
+  vulnerable_to: [injection.UnrestrictedUpload]
+  cwe: [CWE_434]
+  review_category: "upload"
+  review_condition: "file extension validation covers uploaded-file arrays but not stored or updated string filenames"
+  review_evidence: "extension validator context {pattern} checks uploaded filename metadata without an observed string filename extension check"
+  review_assumption: "an attacker can preserve or submit a stored filename value that later controls an uploaded or served file extension"
+  review_confidence: medium
+}
+concept UncheckedUploadedImageProcessing : sink {
+  vulnerable_to: [injection.UnrestrictedUpload]
+  cwe: [CWE_434]
+}
 
 concept ExpressionEval : sink {
   vulnerable_to: [injection.ExpressionLanguageInjection]
@@ -111,7 +248,7 @@ concept ExpressionEval : sink {
 concept WeakCipher : sink {
   vulnerable_to: [crypto.WeakCipher]
   enabled_by: [taint.UntrustedData]
-  cwe: [CWE_327]
+  cwe: [CWE_327, CWE_326]
 }
 // A cryptographic operation (sign/verify/encrypt/decrypt/hash/key-derivation) whose
 // CORRECTNESS — algorithm choice, signature verification, key/IV handling — can't be
@@ -123,10 +260,30 @@ concept CryptoOperation : sink {
   cwe: [CWE_327]
 }
 
+concept AuthenticatedDecryptionTagReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+  cwe: [CWE_287, CWE_347]
+  review_category: "crypto"
+  review_condition: "authenticated decryption accepts a decoded authentication tag without an observed fixed-length check"
+  review_evidence: "decryption context {pattern} passes a decoded tag into an authenticated cipher"
+  review_assumption: "the encrypted payload or authentication tag can be supplied or replayed by an attacker"
+  review_confidence: medium
+}
+
 concept SessionId : sink {
   vulnerable_to: [session.SessionFixation]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_384]
+}
+
+concept MissingSessionRotationAfterAuthentication : sink {
+  vulnerable_to: [session.SessionFixation]
+  cwe: [CWE_384]
+  review_category: "auth"
+  review_condition: "authentication completes without rotating or invalidating the existing HTTP session"
+  review_evidence: "authentication context {pattern} sets the authenticated security context while reusing session state"
+  review_assumption: "the pre-authentication session identifier can be fixed or known before login"
+  review_confidence: medium
 }
 
 concept PermissiveCors : sink {
@@ -142,8 +299,22 @@ concept MailHeaderWrite : sink {
 }
 
 concept InsecureTempFile : sink {
-  vulnerable_to: [path.InsecureTempFile]
-  cwe: [CWE_377]
+  vulnerable_to: [path.InsecureTempFile, path.LinkFollowing]
+  cwe: [CWE_377, CWE_59]
+}
+
+// Review-only: security-sensitive virtual filesystem paths (for example procfs
+// control files) opened through ordinary path APIs may be redirected or resolved
+// outside the intended special filesystem. This stays review-only because the
+// exploitability depends on mount/user namespace context.
+concept SpecialFileAccessReview : sink {
+  vulnerable_to: [path.LinkFollowing]
+  cwe: [CWE_61, CWE_706]
+  review_category: "path"
+  review_condition: "security-sensitive virtual filesystem path is opened without an observed secure filesystem boundary"
+  review_evidence: "special-file access context {pattern} uses ordinary path opening"
+  review_assumption: "the path may be redirected away from the intended special filesystem"
+  review_confidence: possibility
 }
 
 concept CertValidationDisabled : sink {
@@ -154,6 +325,60 @@ concept CertValidationDisabled : sink {
 concept JwtUnverified : sink {
   vulnerable_to: [crypto.ImproperSignatureCheck]
   cwe: [CWE_347]
+}
+concept HeaderControlledJwkReview : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+}
+
+concept PublicKeyHashBindingReview : sink {
+  vulnerable_to: [crypto.ImproperSignatureCheck]
+  cwe: [CWE_347]
+  review_category: "crypto"
+  review_condition: "signature verification accepts a public key without binding it to the expected key hash"
+  review_evidence: "signature verification context {pattern} derives a public key and verifies a signature without an observed key-hash comparison"
+  review_assumption: "the script, witness, or signed payload can provide a public key that must match a committed key hash"
+  review_confidence: medium
+}
+
+concept ShortSecurityIdentifier : source {
+  taint: [taint.WeakSecurityIdentifier]
+  cwe: [CWE_358]
+  review_category: "crypto"
+  review_condition: "a security identifier is shortened before it is used for a trust decision"
+  review_evidence: "identifier truncation {pattern} produces a shortened value"
+  review_assumption: "the shortened identifier can collide with a different trusted identity"
+  review_confidence: medium
+}
+
+concept SecurityKeyTrustOperation : sink {
+  vulnerable_to: [crypto.IncompleteSecurityIdentifier, crypto.ImproperSignatureCheck]
+  enabled_by: [taint.WeakSecurityIdentifier]
+  cwe: [CWE_358, CWE_347]
+  review_category: "crypto"
+  review_condition: "a shortened security key identifier reaches a key trust operation"
+  review_evidence: "trust operation {pattern} receives a shortened identifier"
+  review_assumption: "the keyserver or trust store may contain a colliding key identifier"
+  review_confidence: medium
+}
+
+concept SecretComparisonReview : sink {
+  vulnerable_to: [crypto.ObservableDiscrepancy]
+  cwe: [CWE_200, CWE_203, CWE_208]
+  review_category: "crypto"
+  review_condition: "secret material is compared with an ordinary equality operation instead of a constant-time comparison"
+  review_evidence: "secret comparison context {pattern} derives request data and secret data without an observed constant-time compare"
+  review_assumption: "an attacker can repeatedly submit candidate values and observe timing or error differences"
+  review_confidence: medium
+}
+concept PremasterSecretLengthReview : sink {
+  vulnerable_to: [crypto.ObservableDiscrepancy]
+  cwe: [CWE_203]
+  review_category: "crypto"
+  review_condition: "TLS RSA premaster-secret decryption output is used without confirming the required 48-byte length"
+  review_evidence: "premaster-secret context {pattern} decrypts attacker-controlled ciphertext and later uses fixed premaster-secret offsets"
+  review_assumption: "an attacker can submit malformed RSA ciphertexts and observe alert, exception, or handshake behavior differences"
+  review_confidence: medium
 }
 
 concept CleartextChannel : sink {
@@ -193,6 +418,10 @@ concept DebuggableApp : sink {
   vulnerable_to: [mobile.DebuggableBuild]
   cwe: [CWE_489]
 }
+concept BackupAllowedConfig : sink {
+  vulnerable_to: [mobile.BackupExposure]
+  cwe: [CWE_922]
+}
 
 // IaC / container misconfig — presence findings from the config frontend (K8s YAML,
 // Dockerfile, Terraform). Each is a markable token labeled by the config adapter.
@@ -210,6 +439,10 @@ concept PublicNetworkExposure : sink {
 }
 concept WildcardIamPolicy : sink {
   vulnerable_to: [iac.WildcardIamPolicy]
+  cwe: [CWE_284]
+}
+concept NetworkFilteringDisabled : sink {
+  vulnerable_to: [iac.NetworkFilteringDisabled]
   cwe: [CWE_284]
 }
 
@@ -236,92 +469,396 @@ concept ResourceHandle : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_772]
 }
+concept StructuredInputDecode : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "structured input bytes are decoded and should be validated against the target format"
+  review_evidence: "decoder operation {pattern} consumes structured bytes"
+  review_assumption: "malformed or out-of-alphabet input can reach callers that trust the decoded value"
+  review_confidence: possibility
+}
+concept UncheckedDecodeResult : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "input_validation"
+  review_condition: "structured decoding errors should be returned or rejected before decoded data is trusted"
+  review_evidence: "decode operation {pattern} unwraps or expects a successful result"
+  review_assumption: "malformed attacker-controlled encoded input can reach this decoder"
+  review_confidence: medium
+}
+concept OwnerFieldClear : sink {
+  vulnerable_to: [resource.ResourceLeak]
+  cwe: [CWE_401]
+  review_category: "resource"
+  review_condition: "an owned field is cleared before the owning object is released"
+  review_evidence: "field-clear operation {pattern} dominates owner release"
+  review_assumption: "the cleared field owns nested allocation state that the owner release would otherwise free"
+  review_confidence: low
+}
+concept OwnerFree : sink {
+  vulnerable_to: [resource.ResourceLeak]
+  cwe: [CWE_401]
+  review_category: "resource"
+  review_condition: "owner release follows a dominating field clear"
+  review_evidence: "owner release primitive {pattern} is reached after an owned field clear"
+  review_assumption: "the release routine frees nested fields unless they are cleared first"
+  review_confidence: low
+}
 concept LockAcquire : sink {
   vulnerable_to: [concurrency.Deadlock]
   cwe: [CWE_667]
+  review_category: "lifecycle"
+  review_condition: "a lock acquisition may not be released on every path"
+  review_evidence: "lock primitive {pattern} is acquired"
+  review_assumption: "an unreleased lock can be triggered to deadlock or starve concurrent work"
+  review_confidence: medium
 }
 concept UnboundedCopy : sink {
   vulnerable_to: [memory.OobWrite]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_787, CWE_120]
+  review_category: "memory"
+  review_condition: "attacker-controlled bytes reach an unbounded copy into a fixed-size destination"
+  review_evidence: "unsafe copy primitive {pattern} receives tainted input"
+  review_assumption: "the destination capacity can be smaller than the copied bytes"
+  review_confidence: high
 }
 concept UnboundedCopySmell : sink {
   vulnerable_to: [memory.OobWrite]
   cwe: [CWE_787, CWE_120]
+  review_category: "memory"
+  review_condition: "an unbounded copy can overflow its destination"
+  review_evidence: "unsafe copy primitive {pattern} is present"
+  review_assumption: "an attacker can influence source length or destination capacity is insufficient"
+  review_confidence: low
 }
 concept RawMemoryCopySize : sink {
   vulnerable_to: [memory.OobWrite]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_787]
+  review_category: "memory"
+  review_condition: "raw memory copy size expression needs bounds review"
+  review_evidence: "copy-size argument to {pattern} is computed or externally influenced"
+  review_assumption: "the size or source offset can exceed the destination/source object bounds"
+  review_confidence: medium
 }
 concept UnsafeMutableAlias : sink {
   vulnerable_to: [memory.OobWrite, memory.UseAfterFree]
   cwe: [CWE_787, CWE_416]
 }
+concept UnsafeAutoTraitImpl : sink {
+  vulnerable_to: [concurrency.RaceCondition, memory.OobRead, memory.OobWrite]
+  cwe: [CWE_362, CWE_119]
+}
+concept FfiEnumLayoutRisk : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_119]
+  review_category: "memory"
+  review_condition: "a language enum crosses an FFI boundary with ABI-sensitive representation"
+  review_evidence: "enum representation metadata {pattern} requires layout review"
+  review_assumption: "the foreign ABI expects a fixed-width integer representation"
+  review_confidence: low
+}
+concept UninitializedBufferExposure : sink {
+  vulnerable_to: [memory.UninitializedUse]
+  cwe: [CWE_908]
+  review_category: "memory"
+  review_condition: "a buffer with reserved capacity is exposed as initialized mutable storage"
+  review_evidence: "uninitialized buffer lifecycle {pattern} is present"
+  review_assumption: "the callee can observe or depend on bytes before they are initialized"
+  review_confidence: medium
+}
 concept FailurePathOwnedBufferFree : sink {
   vulnerable_to: [memory.DoubleFree]
   cwe: [CWE_415]
+}
+concept ReentrantQueueCleanupReview : sink {
+  vulnerable_to: [memory.DoubleFree, memory.UseAfterFree]
+  cwe: [CWE_415, CWE_416]
+  review_category: "memory"
+  review_condition: "queue cleanup and cancellation can both own queued entries without an observed reentrant cleanup guard"
+  review_evidence: "queue-cancel context {pattern} removes queued operations and destroys them without a disconnect-cleanup diversion"
+  review_assumption: "a callback invoked during queue cleanup can reenter cancellation for an operation still owned by the cleanup traversal"
+  review_confidence: medium
+}
+concept ComputedSizeValue : source {
+  taint: [taint.ComputedSize]
 }
 concept SizeComputation : sink {
   vulnerable_to: [memory.IntegerOverflow]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_190]
+  review_category: "numeric"
+  review_condition: "attacker-controlled size feeds allocation or bounds-sensitive operation"
+  review_evidence: "size argument to {pattern} is tainted"
+  review_assumption: "the value is not range-checked before memory use"
+  review_confidence: medium
 }
 concept StackAllocationSmell : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
+  review_category: "memory"
+  review_condition: "unbounded stack allocation can exhaust stack or corrupt nearby state"
+  review_evidence: "stack allocation primitive {pattern} is present"
+  review_assumption: "the allocation size can be attacker-influenced or unexpectedly large"
+  review_confidence: low
 }
 concept FileCheck : sink {
   vulnerable_to: [concurrency.Toctou]
   cwe: [CWE_367]
+  review_category: "race"
+  review_condition: "filesystem state is checked before a later use"
+  review_evidence: "check primitive {pattern} observes path state"
+  review_assumption: "an attacker can change the path target between check and use"
+  review_confidence: medium
 }
 concept FileUse : sink {
   vulnerable_to: [concurrency.Toctou]
   cwe: [CWE_367]
+  review_category: "race"
+  review_condition: "checked filesystem state is later used"
+  review_evidence: "use primitive {pattern} acts on the path"
+  review_assumption: "the use is not protected by atomic open flags or symlink-safe handling"
+  review_confidence: medium
 }
 concept LocklessSharedMutation : sink {
   vulnerable_to: [concurrency.RaceCondition]
   cwe: [CWE_362]
+  review_category: "race"
+  review_condition: "shared state appears to be mutated without an observed lock or atomic guard"
+  review_evidence: "concurrency-capable mutation primitive {pattern} is present"
+  review_assumption: "multiple attacker-triggerable executions can interleave on the same state"
+  review_confidence: low
 }
 concept IndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "attacker-controlled index reaches an array/subscript access"
+  review_evidence: "subscript index flows into {pattern}"
+  review_assumption: "the index is not range-checked against the accessed object"
+  review_confidence: medium
 }
 concept FieldDerivedIndexAccess : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   cwe: [CWE_129, CWE_125, CWE_787]
 }
+concept CountDerivedElementAccess : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_129, CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "an element accessor uses a count-derived last index without a visible non-empty guard"
+  review_evidence: "element accessor {pattern} receives Count()-derived index"
+  review_assumption: "a malformed or attacker-influenced container can have zero elements"
+  review_confidence: medium
+}
 concept DivisionDenominator : sink {
   vulnerable_to: [numeric.DivideByZero]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_369]
+  review_category: "numeric"
+  review_condition: "attacker-controlled denominator reaches division or modulo"
+  review_evidence: "denominator operand for {pattern} is tainted"
+  review_assumption: "zero or unsafe divisor values are not excluded before the operation"
+  review_confidence: medium
 }
 concept IntegerSizeArithmetic : sink {
   vulnerable_to: [memory.IntegerOverflow]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_190]
+  review_category: "numeric"
+  review_condition: "attacker-controlled value participates in size-sensitive arithmetic"
+  review_evidence: "arithmetic operation {pattern} receives tainted input"
+  review_assumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
+  review_confidence: low
+}
+concept UncheckedEncodedLengthArithmetic : sink {
+  vulnerable_to: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_190, CWE_835]
+  review_category: "numeric"
+  review_condition: "serialized protocol length arithmetic lacks checked overflow handling"
+  review_evidence: "protocol length context {pattern} narrows or scales serialized lengths without checked arithmetic"
+  review_assumption: "a malformed serialized payload can supply oversized container or string lengths"
+  review_confidence: medium
+}
+concept PointerOffsetBoundsCheck : sink {
+  vulnerable_to: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
+  cwe: [CWE_20, CWE_125, CWE_190]
+  review_category: "numeric"
+  review_condition: "a pointer is advanced by an encoded length before the bounds comparison is made"
+  review_evidence: "pointer-offset bounds context {pattern} compares pointer+length against an end pointer"
+  review_assumption: "a malformed serialized length can move the pointer outside the valid buffer before the check"
+  review_confidence: medium
+}
+concept UnderwidthFormattedIndex : sink {
+  vulnerable_to: [memory.BoundsError]
+  cwe: [CWE_192, CWE_125]
+  review_category: "numeric"
+  review_condition: "formatted numeric output may be shorter than a later fixed index expects"
+  review_evidence: "format/index context {pattern} indexes a formatted value beyond the requested minimum width"
+  review_assumption: "the formatted numeric value can be small enough to produce the minimum-width string"
+  review_confidence: medium
+}
+concept ZeroSizeReallocation : sink {
+  vulnerable_to: [memory.DoubleFree]
+  enabled_by: [taint.ComputedSize]
+  cwe: [CWE_415]
+  review_category: "memory"
+  review_condition: "computed allocation size reaches a reallocation primitive that can treat zero size as free"
+  review_evidence: "computed size value reaches {pattern}"
+  review_assumption: "zero is not excluded on the same size value before reallocation"
+  review_confidence: low
 }
 concept PointerFree : sink {
   vulnerable_to: [memory.UseAfterFree, memory.DoubleFree]
   cwe: [CWE_416, CWE_415]
+  review_category: "memory"
+  review_condition: "a pointer is released and may be released or used again later"
+  review_evidence: "release primitive {pattern} is observed"
+  review_assumption: "the same allocation or alias is involved and remains attacker-reachable"
+  review_confidence: low
 }
 concept PointerUse : sink {
   vulnerable_to: [memory.UseAfterFree]
   cwe: [CWE_416]
+  review_category: "memory"
+  review_condition: "a pointer is dereferenced or otherwise used after a prior release"
+  review_evidence: "pointer-use primitive {pattern} is observed"
+  review_assumption: "the pointer aliases the released allocation and no safe reinitialization occurs"
+  review_confidence: low
 }
 concept NullableDeref : sink {
   vulnerable_to: [memory.NullDereference]
   cwe: [CWE_476]
+  review_category: "memory"
+  review_condition: "a pointer-like value is dereferenced without an observed null exclusion"
+  review_evidence: "dereference primitive {pattern} is present"
+  review_assumption: "the dereferenced value may be null on an attacker-triggerable path"
+  review_confidence: low
+}
+concept UncheckedNullableResultDeref : sink {
+  vulnerable_to: [memory.NullDereference]
+  cwe: [CWE_476]
+  review_category: "memory"
+  review_condition: "nullable factory or callback result is dereferenced before an observed null guard"
+  review_evidence: "nullable-result context {pattern} stores a result and dereferences it without a dominating null check"
+  review_assumption: "the callee can return null for attacker-controlled or unexpected protocol state"
+  review_confidence: medium
+}
+concept EscapedTerminatorWrite : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_119, CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "an escape decoder writes a decoded byte without rejecting an escaped string terminator"
+  review_evidence: "escape decoder context {pattern} writes the decoded byte immediately after unescaping"
+  review_assumption: "attacker-controlled input can end with an escape marker followed by a terminator"
+  review_confidence: medium
 }
 concept AuthenticationRequiredOp : sink {
   vulnerable_to: [authentication.MissingAuthentication]
   cwe: [CWE_306]
+  review_category: "auth"
+  review_condition: "security-sensitive operation is reachable without an observed authentication guard"
+  review_evidence: "sensitive operation {pattern} is present"
+  review_assumption: "the enclosing endpoint or entry point can be reached by an unauthenticated actor"
+  review_confidence: low
+}
+// Review-only: UI/navigation exit paths from an authentication or lock flow. This is not
+// a confirmed vulnerability by itself; it gives the review/AI pass the code locations where
+// alternate platform exits may bypass the expected authentication state.
+concept AuthFlowBypassReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+}
+concept MfaRedirectBypass : sink {
+  vulnerable_to: [authentication.AuthenticationBypass]
+  cwe: [CWE_288]
+}
+concept AutoActiveSignupAccount : sink {
+  vulnerable_to: [authentication.MissingAuthentication, access_control.MissingAuthorization]
+  cwe: [CWE_306, CWE_862]
+  review_category: "auth"
+  review_condition: "self-service signup creates an active account before an observed administrator activation step"
+  review_evidence: "signup context {pattern} initializes a newly registered user as active"
+  review_assumption: "active status grants access to system resources before separate approval"
+  review_confidence: medium
+}
+concept EmptyVerifierAcceptance : sink {
+  vulnerable_to: [authentication.AuthenticationBypass]
+  cwe: [CWE_345, CWE_670]
+  review_category: "auth"
+  review_condition: "verification succeeds when a missing stored challenge value equals an empty supplied answer"
+  review_evidence: "verifier context {pattern} compares the looked-up value to the supplied answer without excluding an empty stored value"
+  review_assumption: "a failed lookup returns an empty value and the verifier is reachable with attacker-supplied challenge id and answer"
+  review_confidence: medium
+}
+concept LocalRequestBypassReview : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_266, CWE_285, CWE_862]
+}
+concept PrivilegedEntryPointReview : sink {
+  vulnerable_to: [access_control.MissingAuthorization]
+  cwe: [CWE_862]
+}
+concept IgnoredAuthorizationResult : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_252, CWE_285, CWE_863]
+}
+concept CredentialedEndpointReview : sink {
+  vulnerable_to: [access_control.MissingAuthorization, secrets.SecretLeak]
+  cwe: [CWE_200, CWE_862]
+}
+concept TimeBoundAccessTokenReview : sink {
+  vulnerable_to: [access_control.BrokenAccess]
+  cwe: [CWE_284]
+}
+// Review-only: authentication challenge, retry, or attempt-limit logic. Used for
+// cases where static analysis should hand context to the AI/manual stage to verify
+// brute-force limits, rate limiting, and concurrency around failed-attempt counters.
+concept AuthAttemptLimitReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_307]
+}
+concept PasswordRecoveryLinkHostControl : sink {
+  vulnerable_to: [authentication.WeakPasswordRecovery]
+  cwe: [CWE_640]
+}
+concept ProtocolFrameBindingReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+}
+// Review-only: authentication/forward-auth handlers must fail closed with the
+// response code expected by the integrating proxy. Static analysis can surface
+// the mismatched error path, but proxy behavior determines exploitability.
+concept AuthFailureResponseReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+  review_category: "auth"
+  review_condition: "authentication verification error handling returns a generic failure response instead of an observed fail-closed unauthorized response"
+  review_evidence: "auth verification error path {pattern} handles malformed forwarded target data with a generic error response"
+  review_assumption: "an upstream proxy interprets the generic error response as successful authentication or otherwise fails open"
+  review_confidence: possibility
+}
+concept ClientAuthFailureResponseReview : sink {
+  vulnerable_to: [authentication.ImproperAuthentication]
+  cwe: [CWE_287]
+  review_category: "auth"
+  review_condition: "client-side request helper invokes success callbacks after an observed authorization failure response"
+  review_evidence: "AJAX response handler {pattern} checks a request object instead of the response status before calling the success callback"
+  review_assumption: "privileged UI callbacks trust the shared helper to stop unauthorized response handling"
+  review_confidence: medium
 }
 concept ObjectLookupByUserInput : sink {
   vulnerable_to: [access_control.Idor]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_639]
+  review_category: "access_control"
+  review_condition: "attacker-controlled object id reaches a direct object lookup"
+  review_evidence: "lookup primitive {pattern} receives tainted input"
+  review_assumption: "the object is not constrained to the authenticated principal or tenant"
+  review_confidence: medium
 }
 // A privileged / state-changing operation (delete/grant/setRole/admin, DB writes) whose
 // access-control can't be verified statically. POSSIBILITY-tier review concept (broader than
@@ -331,6 +868,67 @@ concept ObjectLookupByUserInput : sink {
 concept SensitiveOperation : sink {
   vulnerable_to: [access_control.MissingAuthorization]
   cwe: [CWE_862]
+}
+// Review-only: static role/group policy configuration that may grant access to a broader
+// principal than intended. Used to feed the AI/manual review pass for authz config CVEs.
+concept AccessPolicyReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_863]
+}
+// Review-only: a handler resolves request metadata and resource metadata but does
+// not show a consistency check between request scope and resource scope. Used for
+// authz CVEs where the policy boundary is the request/resource scope contract.
+concept RequestScopePolicyReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_863]
+  review_category: "auth"
+  review_condition: "request metadata and resource metadata are used without an observed request/resource scope consistency check"
+  review_evidence: "handler context {pattern} resolves request and resource metadata without a scope comparison"
+  review_assumption: "the request may be authorized or dispatched under the wrong resource scope"
+  review_confidence: possibility
+}
+// Review-only: external identity data is converted into local user/group ids
+// without an observed registration or uniqueness boundary. Used for identity
+// collision/spoofing CVEs where the exploitable condition needs product context.
+concept UserIdentityMappingReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_286, CWE_863]
+  review_category: "auth"
+  review_condition: "external identity data determines local user or group identifiers without an observed uniqueness boundary"
+  review_evidence: "identity mapping context {pattern} derives local ids from broker-provided user data"
+  review_assumption: "an attacker can influence the external username or identity data and local id collisions affect authorization"
+  review_confidence: possibility
+}
+// Review-only: an admission or policy hook ignores all subresources instead of
+// making the admitted subresources explicit. Used for bypasses where an alternate
+// API path skips the same admission/security policy applied to the primary object.
+concept AdmissionSubresourcePolicyReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_288, CWE_863]
+  review_category: "auth"
+  review_condition: "admission logic returns early for a non-empty subresource without an observed explicit subresource policy"
+  review_evidence: "admission ignore context {pattern} checks subresource presence but does not show an allowlist or handled-subresource branch"
+  review_assumption: "an alternate subresource path may bypass the policy applied to the primary resource"
+  review_confidence: possibility
+}
+// Review-only: business workflow/status policy that guards a protected action (for
+// example payment state before a digital download). Inert for confirmed scan rules.
+concept WorkflowPolicyReview : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_841, CWE_862, CWE_863]
+}
+// Review-only: object lookup/update/delete criteria that identify a user-owned
+// record but omit the current-principal ownership constraint. Used for IDOR
+// patch-review cases without promoting broad authz heuristics to scan findings.
+concept IdorPolicyReview : sink {
+  vulnerable_to: [access_control.Idor]
+  cwe: [CWE_639]
+}
+// Review-only: externally supplied polymorphic type/class names are written into
+// association state without being constrained to a configured allowlist.
+concept PolymorphicTypeSelectionReview : sink {
+  vulnerable_to: [validation.ImproperInputValidation, deserialization.UnsafeReflection]
+  cwe: [CWE_20, CWE_470]
 }
 // A network address denylist that recognizes special/private address classes but omits
 // ranges needed to keep SSRF fetches away from local or nonsensical endpoints.
@@ -344,6 +942,18 @@ concept IncompleteServerPortValidation : sink {
   vulnerable_to: [request_forgery.Ssrf]
   cwe: [CWE_918]
 }
+// URL/domain validation that trusts the inbound Host header or request host as
+// the allowlist authority. Attackers who control Host can make an absolute URL
+// appear same-domain unless validation uses a configured allowlist.
+concept RequestHostUrlValidationBypass : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  cwe: [CWE_20, CWE_918]
+  review_category: "request_forgery"
+  review_condition: "absolute URL validation accepts hosts derived from the current HTTP request"
+  review_evidence: "URL host validation context {pattern} compares URL host against request host metadata"
+  review_assumption: "the request Host header or equivalent server-name metadata can be attacker-controlled"
+  review_confidence: medium
+}
 // A resource-acquiring / potentially-unbounded operation (open file/socket/connection,
 // spawn thread, allocate, read-all). POSSIBILITY-tier review concept for the resource/DoS
 // bucket: "verify this resource is bounded and released". Inert for confirmed rules.
@@ -351,22 +961,165 @@ concept ResourceReview : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
 }
+concept UnboundedResourceOperation : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_772]
+}
+concept ZeroStepSequenceExpansion : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "sequence expansion loop can use a zero increment"
+  review_evidence: "sequence expansion context {pattern} derives the loop step from parsed input without excluding zero before incrementing the loop variable"
+  review_assumption: "a zero step leaves the loop variable unchanged while the loop condition remains true"
+  review_confidence: high
+}
+concept UnstoppedLimitedStream : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_772]
+}
+concept UnboundedStateGrowthReview : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770]
+}
+concept UnboundedProtocolStateByIdentifier : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770]
+  review_category: "resource"
+  review_condition: "protocol message identifiers are stored in peer state or queued before per-identifier size/type limits are enforced"
+  review_evidence: "protocol state context {pattern} accepts remote message entries into state and task queues without an observed identifier size/type rejection"
+  review_assumption: "the identifier bytes can be supplied by a remote peer and can be large enough or numerous enough to amplify memory/CPU"
+  review_confidence: medium
+}
+concept UnboundedAllocationReview : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770]
+}
+concept UnboundedDelimiterSplitCount : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "a delimiter-count helper fully splits attacker-sized input before enforcing a count limit"
+  review_evidence: "delimiter-count context {pattern} materializes all split parts before comparing with the limit"
+  review_assumption: "the parsed input body can contain enough delimiters to amplify CPU or memory within the accepted byte limit"
+  review_confidence: medium
+}
+concept LengthDerivedAllocation : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_789]
+  review_category: "resource"
+  review_condition: "parsed length controls allocation before the available input bytes are proven"
+  review_evidence: "length-derived allocation context {pattern} allocates a buffer and then reads bytes into it"
+  review_assumption: "the encoded length can be attacker-controlled and larger than the remaining input"
+  review_confidence: medium
+}
+concept ReachableAssertionReview : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_617]
+  review_category: "resource"
+  review_condition: "externally reachable input can violate an internal assertion or invariant and terminate the process"
+  review_evidence: "input validation context {pattern} reaches assertion-backed invariant logic without an observed rejection branch"
+  review_assumption: "the validated fields can be supplied across a process or trust boundary"
+  review_confidence: possibility
+}
 // Configuration or diagnostic serialization that may include inline secrets unless redacted.
 // Review-only: static analysis cannot know which config fields are sensitive in every
 // project, so the AI/manual pass should verify redaction before exposure through APIs,
 // logs, diagnostics, or support bundles.
 concept ConfigExposureReview : sink {
   vulnerable_to: [secrets.SecretLeak, crypto.CleartextStorage]
-  cwe: [CWE_200, CWE_312]
+  cwe: [CWE_200, CWE_312, CWE_522, CWE_532]
+  review_category: "secret"
+  review_condition: "configuration or diagnostic serialization may expose inline secrets without an observed redaction path"
+  review_evidence: "config-like serialization site {pattern} lacks a matching redaction control"
+  review_assumption: "repository, keyring, credential, or diagnostic fields may contain inline credentials"
+  review_confidence: possibility
+}
+concept SecretDatabindingReview : sink {
+  vulnerable_to: [secrets.SecretLeak, crypto.CleartextStorage]
+  cwe: [CWE_311, CWE_522]
+  review_category: "secret"
+  review_condition: "secret configuration data is databound without an observed protected-secret conversion"
+  review_evidence: "secret parameter {pattern} is accepted at a configuration boundary"
+  review_assumption: "the configuration framework may persist or display the value unless it is converted to protected secret storage"
+  review_confidence: possibility
+}
+// Review-only: API settings responses that include password policy, token, or
+// similar security-setting fields should be gated by authentication.
+concept SensitiveSettingsExposureReview : sink {
+  vulnerable_to: [authentication.MissingAuthentication, secrets.SecretLeak]
+  cwe: [CWE_306, CWE_287, CWE_200]
+  review_category: "auth"
+  review_condition: "sensitive settings fields are included in an API settings response without an observed authentication gate"
+  review_evidence: "settings response construction {pattern} includes a sensitive settings field"
+  review_assumption: "the settings response can be requested by unauthenticated callers"
+  review_confidence: possibility
+}
+// Review-only: generated/internal application content is serialized into a platform
+// document or page without an observed visibility/access-control hardening step. Used for
+// CWE-200 cases where the issue is not taint, but default platform visibility.
+concept InternalContentExposureReview : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.IncorrectAuthorization]
+  cwe: [CWE_200, CWE_863]
+  review_category: "secret"
+  review_condition: "internal or diagnostic content is persisted without an observed visibility restriction"
+  review_evidence: "document serialization context {pattern} lacks a matching hidden or access-policy hardening call"
+  review_assumption: "the generated page or document may be readable by principals beyond the intended operators"
+  review_confidence: possibility
+}
+concept AbsolutePathDisclosure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200]
 }
 concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_22, CWE_59]
+  review_category: "path"
+  review_condition: "attacker-controlled archive entry path reaches filesystem write/extraction"
+  review_evidence: "archive extraction/write primitive {pattern} receives tainted input"
+  review_assumption: "the entry name is not normalized, confined, or symlink-safe before writing"
+  review_confidence: medium
+}
+concept ArchiveSymlinkFilterBypass : sink {
+  vulnerable_to: [path.PathTraversal, path.LinkFollowing]
+  cwe: [CWE_22, CWE_59]
+  review_category: "path"
+  review_condition: "archive extraction symlink filter appears wired to the wrong entry metadata shape"
+  review_evidence: "archive extraction context {pattern} uses a symlink ignore callback that checks stale or unreachable entry metadata"
+  review_assumption: "archive entries may contain symlinks that redirect later writes outside the intended extraction directory"
+  review_confidence: medium
+}
+concept ArchiveEntryName : source {
+  taint: [taint.UntrustedData]
+  refines: core.UserControlledData
+}
+concept PackageEntryPointScriptWrite : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "package entry point script names are generated without confinement to the scripts directory"
+  review_evidence: "entry point script generation context {pattern} lacks a scripts-directory containment check"
+  review_assumption: "a package can provide an entry point name with path separators or parent-directory components"
+  review_confidence: medium
+}
+concept RemoteListingDownloadPath : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "remote directory listing filenames are joined into local download paths without rejecting path components"
+  review_evidence: "recursive download context {pattern} combines a local directory with a remote listing filename"
+  review_assumption: "the remote server can provide listing names containing path separators or traversal components"
+  review_confidence: medium
 }
 concept StaticIv : sink {
   vulnerable_to: [crypto.StaticIv]
   cwe: [CWE_329]
+  review_category: "crypto"
+  review_condition: "cipher operation uses a static or predictable IV/nonce"
+  review_evidence: "cipher primitive {pattern} is called with static-looking IV material"
+  review_assumption: "the mode requires nonce/IV uniqueness for confidentiality or integrity"
+  review_confidence: low
 }
 concept TxOriginAuth : sink {
   vulnerable_to: [smartcontract.TxOriginAuth]
@@ -376,6 +1129,7 @@ concept Cookie : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_20]
   refines: core.UserControlledData
+  coverage_reserved_source: true
 }
 concept DatabaseRead : source {
   taint: [taint.UntrustedData]
@@ -384,6 +1138,36 @@ concept Deserialization : sink {
   vulnerable_to: [deserialization.DeserializationAbuse]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_502]
+}
+concept DeserializableInvocationHandler : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+  review_category: "deserialization"
+  review_condition: "a dynamic-proxy invocation handler can be serialized without an observed rejection hook"
+  review_evidence: "invocation handler class context {pattern} lacks readResolve/readObject rejection"
+  review_assumption: "attacker-controlled serialized data can include or reach the proxy handler object graph"
+  review_confidence: medium
+}
+concept UnsafeYamlConstructor : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+}
+concept UnrestrictedRequestParamDeserialization : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+}
+concept ArchiveManifestDeserialization : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+}
+concept RequestSelectedDeserializationFormat : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+  review_category: "deserialization"
+  review_condition: "request-controlled media type selects a deserialization format before HTTP request body decoding"
+  review_evidence: "request deserialization context {pattern} selects a serde from request Content-Type"
+  review_assumption: "the selected serde registry includes an unsafe object deserialization format"
+  review_confidence: medium
 }
 concept EnvVariable : source {
   taint: [taint.UntrustedData]
@@ -400,9 +1184,11 @@ concept StoredDataRead : source {
 concept ConfigFileInput : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
+  coverage_reserved_source: true
 }
 concept ExternalApiResponse : source {
   taint: [taint.UntrustedData]
+  coverage_reserved_source: true
 }
 concept FileInclude : sink {
   vulnerable_to: [path.FileInclusion]
@@ -413,7 +1199,16 @@ concept FilePathAccess : sink {
   vulnerable_to: [path.PathTraversal]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_22]
-  dangerous_chars: "/\\"
+  excluded_chars: "/\\"
+}
+concept LocalFileUrlNavigation : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "caller-controlled file URLs can be navigated by a headless browser and expose local file contents"
+  review_evidence: "headless-browser navigation context {pattern} passes a request URL to page navigation without an observed file-protocol branch"
+  review_assumption: "the request URL can use the file:// protocol and the rendered output is returned to the caller"
+  review_confidence: medium
 }
 concept FileUpload : source {
   taint: [taint.UntrustedData]
@@ -424,7 +1219,11 @@ concept HtmlRender : sink {
   vulnerable_to: [injection.Xss]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_79]
-  dangerous_chars: "<>&\"'"
+  excluded_chars: "<>&\"'"
+}
+concept StoredHtmlWrite : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
 }
 concept UnsafeEmbeddableAllowlist : sink {
   vulnerable_to: [injection.Xss]
@@ -437,6 +1236,46 @@ concept MarkdownNegotiationBypass : sink {
 concept UnescapedSessionFlash : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
+}
+concept UnescapedRequestGlobalTemplateVar : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "request data is copied through PHP globals into template variables without an observed HTML escape"
+  review_evidence: "PHP template context {pattern} copies request-backed globals into render variables"
+  review_assumption: "the template variables are later rendered into HTML or script context"
+  review_confidence: medium
+}
+concept UnescapedHtmlOptionRenderer : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "a frontend option renderer returns HTML containing model fields without escaping"
+  review_evidence: "HTML renderer {pattern} returns option markup"
+  review_assumption: "the rendered option label can contain stored or attacker-provided text"
+  review_confidence: medium
+}
+concept UnescapedTableExportHtml : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "table export callback preserves raw cell HTML"
+  review_evidence: "table export callback {pattern} returns raw cell HTML"
+  review_assumption: "exported table cells may contain attacker-controlled markup"
+  review_confidence: medium
+}
+concept UnescapedExceptionMessageMarkup : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
+concept UnescapedDiagnosticHtml : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "diagnostic or log text containing remote response data is rendered as HTML without escaping"
+  review_evidence: "diagnostic assembly context {pattern} appends unescaped data into an HTML-rendered log field"
+  review_assumption: "the diagnostic log is visible in a browser context"
+  review_confidence: medium
 }
 concept PdfJsEvalSupported : source {
   taint: [taint.UntrustedData]
@@ -451,6 +1290,31 @@ concept UnscannedPdfPreview : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
 }
+// HTML sanitizer/parser correctness review. Libraries that parse attacker-supplied HTML
+// and return a cleaned serialization can still have mutation-XSS/raw-text/comment edge
+// cases that static taint cannot prove as a normal app source->sink flow.
+concept HtmlSanitizerLogicReview : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
+  review_evidence: "HTML parser/sanitizer operation {pattern} is part of the cleaned-output pipeline"
+  review_assumption: "the parsed HTML may be attacker-controlled and the cleaned serialization is trusted by callers"
+  review_confidence: possibility
+}
+concept IncompleteHtmlEntityEscape : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+}
+concept HtmlAttributeRewriteReview : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "review HTML attribute rewrite logic that injects dynamic values into markup without an attribute-aware parser or escaping"
+  review_evidence: "attribute rewrite context {pattern} injects a dynamic value into generated HTML"
+  review_assumption: "the rewritten markup or injected attribute value may be attacker-influenced before browser parsing"
+  review_confidence: possibility
+}
 concept UnrestrictedVariableVariableAssignment : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
@@ -458,6 +1322,7 @@ concept UnrestrictedVariableVariableAssignment : sink {
 concept HttpHeader : source {
   taint: [taint.UntrustedData]
   refines: core.UserControlledData
+  coverage_reserved_source: true
 }
 concept HttpInput : source {
   taint: [taint.UntrustedData]
@@ -493,15 +1358,34 @@ concept LogOutput : sink {
   vulnerable_to: [injection.LogInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_117]
+  excluded_chars: "\n\r"
+  possibility: exclude
+}
+concept UnneutralizedDiagnosticValue : sink {
+  vulnerable_to: [injection.LogInjection]
+  cwe: [CWE_150, CWE_117]
 }
 concept LogWrite : sink {
   vulnerable_to: [secrets.SecretLeak]
   enabled_by: [taint.SecretValue]
+  possibility: exclude
 }
-// A hardcoded secret literal flagged by the secretscan frontend (presence — no flow).
+// A hardcoded secret literal flagged by the text-pattern frontend (presence — no flow).
 concept HardcodedSecret : sink {
   vulnerable_to: [secrets.HardcodedCredentials]
   cwe: [CWE_798]
+}
+// Secret/key material is generated or written in a function without an observed
+// restrictive permission hardening call. Review-only because default file modes
+// depend on framework helpers and process umask.
+concept SecretFilePermissionReview : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.InsecurePermission]
+  cwe: [CWE_522, CWE_732]
+  review_category: "secret"
+  review_condition: "secret or key material is generated without an observed restrictive file-permission hardening call"
+  review_evidence: "key-generation context {pattern} does not include a chmod-style permission hardening call"
+  review_assumption: "the helper may create the private key file with permissions broader than intended"
+  review_confidence: possibility
 }
 // Insecure (non-cryptographic) PRNG — Math.random / random.* / rand() etc. A PRESENCE
 // finding (CWE-330): security-sensitive code should use a CSPRNG (secrets / os.urandom /
@@ -532,9 +1416,11 @@ concept TrustBoundary : sink {
   vulnerable_to: [validation.TrustBoundary]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_501]
+  possibility: exclude
 }
 concept MessageInput : source {
   taint: [taint.UntrustedData]
+  coverage_reserved_source: true
 }
 concept NosqlQuery : sink {
   vulnerable_to: [injection.NosqlInjection]
@@ -568,6 +1454,24 @@ concept RedirectTarget : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_601]
 }
+concept MethodGatedRedirectValidationBypass : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "redirect or callback URL validation is skipped for non-matching HTTP methods"
+  review_evidence: "URL validation context {pattern} returns before checking callback or redirect URL parameters"
+  review_assumption: "a GET or other non-matching method can carry attacker-controlled redirect/callback URL parameters"
+  review_confidence: medium
+}
+concept ChecksumErrorLogoutRedirect : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "checksum-error handling can redirect to a request-supplied logout URL"
+  review_evidence: "checksum error context {pattern} calls the generic invalid redirect path without disabling logoutURL"
+  review_assumption: "the API redirects validation failures and exposes logoutURL as a request parameter"
+  review_confidence: medium
+}
 concept ReflectionInvoke : sink {
   vulnerable_to: [deserialization.UnsafeReflection]
   enabled_by: [taint.UntrustedData]
@@ -578,19 +1482,50 @@ concept ResponseHeaderWrite : sink {
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_113]
 }
+concept AmbiguousQueryParameterSeparator : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion]
+  cwe: [CWE_444]
+  review_category: "request"
+  review_condition: "query parser accepts semicolon as an alternate parameter separator"
+  review_evidence: "query parsing context {pattern} rewrites semicolons into ampersands before splitting parameters"
+  review_assumption: "upstream components, caches, or security filters use ampersand-only query delimiter semantics"
+  review_confidence: medium
+}
 concept SecretValue : source {
   taint: [taint.SecretValue]
+  coverage_reserved_source: true
 }
 concept SqlExecution : sink {
   vulnerable_to: [injection.SqlInjection]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_89]
-  dangerous_chars: "'\"\\;"
+  excluded_chars: "'\"\\;"
+}
+concept UnparameterizedSqlQueryParser : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+}
+concept UnboundedReportPeriod : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
 }
 concept StateChangingOp : sink {
   vulnerable_to: [request_forgery.Csrf]
   enabled_by: [taint.UntrustedData]
   cwe: [CWE_352]
+}
+concept IncompleteCsrfTokenValidation : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352]
+}
+concept MissingHttpMethodAssertion : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352, CWE_749]
+  review_category: "csrf"
+  review_condition: "a state-changing HTTP action lacks an explicit allowed-method assertion"
+  review_evidence: "action/controller context {pattern} performs state change without method assertion"
+  review_assumption: "the action is reachable through a browser-backed route"
+  review_confidence: medium
 }
 concept StoredDataWrite : sink {
   vulnerable_to: [crypto.CleartextStorage]
@@ -605,6 +1540,23 @@ concept TemplateRender : sink {
 concept IncompleteTemplateValidation : sink {
   vulnerable_to: [injection.TemplateInjection]
   cwe: [CWE_1336]
+}
+concept IncompleteArchiveFilenameValidation : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse, injection.MassAssignment]
+  cwe: [CWE_502, CWE_915]
+  review_category: "deserialization"
+  review_condition: "archive member filename validation omits dangerous URI or stream-wrapper schemes"
+  review_evidence: "archive filename validator {pattern} checks traversal strings but lacks scheme rejection"
+  review_assumption: "archive member names may be attacker-controlled and passed to filesystem APIs that resolve stream wrappers"
+  review_confidence: medium
+}
+concept ProtocolStateReview : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion]
+  cwe: [CWE_287, CWE_349, CWE_404, CWE_841]
+}
+concept RequestPolicyStripped : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion]
+  cwe: [CWE_200, CWE_441, CWE_524]
 }
 concept UrlFetch : sink {
   vulnerable_to: [request_forgery.Ssrf]
@@ -651,6 +1603,16 @@ concept InputValidation : control {
   neutralizes: [validation.TrustBoundary, validation.ImproperInputValidation]
   applies: path
 }
+concept CodeExecutionValidation : control {
+  neutralizes: [injection.CodeInjection]
+  cwe: [CWE_94]
+  applies: path
+}
+concept PrototypePollutionGuard : control {
+  neutralizes: [injection.PrototypePollution]
+  cwe: [CWE_1321]
+  applies: endpoint
+}
 concept AuthenticationCheck : control {
   neutralizes: [authentication.MissingAuthentication]
   cwe: [CWE_306]
@@ -663,6 +1625,21 @@ concept AuthorizationCheck : control {
 concept CsrfProtection : control {
   neutralizes: [request_forgery.Csrf]
   applies: endpoint
+}
+concept ZeroValueExclusion : control {
+  neutralizes: [memory.DoubleFree]
+  cwe: [CWE_415]
+  applies: path
+}
+concept IntegerOverflowGuard : control {
+  neutralizes: [memory.IntegerOverflow]
+  cwe: [CWE_190]
+  applies: endpoint
+}
+concept MemoryBoundsCheck : control {
+  neutralizes: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_125, CWE_787]
+  applies: path
 }
 // Privacy/data-collection opt-in or opt-out controls exposed by SDKs.
 concept DataCollectionControl : control {
@@ -686,6 +1663,11 @@ concept EncryptionInTransit : control {
 concept HtmlEscape : control {
   neutralizes: [injection.Xss]
   applies: path
+}
+concept SafeResponseContentType : control {
+  neutralizes: [injection.Xss]
+  cwe: [CWE_79]
+  applies: endpoint
 }
 concept PdfScanCheck : control {
   neutralizes: [injection.Xss]
@@ -722,14 +1704,15 @@ concept PathCanonicalization : control {
   applies: path
 }
 concept PathAccessCheck : control {
-  neutralizes: [path.PathTraversal]
-  cwe: [CWE_22]
+  neutralizes: [path.PathTraversal, path.FileInclusion]
+  cwe: [CWE_22, CWE_98]
   applies: endpoint
 }
 concept RateLimit : control {
   neutralizes: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]
   applies: endpoint
+  coverage_reserved_control: true
 }
 concept RedirectAllowlist : control {
   neutralizes: [request_forgery.OpenRedirect]
@@ -766,6 +1749,7 @@ concept StrongHashing : control {
 }
 concept UserControlledData : source {
   taint: [taint.UntrustedData]
+  coverage_reserved_source: true
 }
 concept XmlHardening : control {
   neutralizes: [deserialization.Xxe]
@@ -775,19 +1759,29 @@ concept XmlHardening : control {
 
 module identity;
 
-concept AdminPrivilege : privilege { }
+concept AdminPrivilege : privilege {
+  assume_min_level: ADMIN
+}
 concept Anonymous : principal { }
 concept AuthenticatedUser : principal { }
 concept CiPrincipal : principal { }
 concept ExternalPrincipal : principal { }
-concept SuperAdminPrivilege : privilege { }
+concept SuperAdminPrivilege : privilege {
+  assume_min_level: SUPERADMIN
+}
 concept WorkloadIdentity : principal { }
 
 module runtime;
 
-concept Connection : observation { }
+concept Connection : observation {
+  context_confirm_dst_prop: dst
+  context_confirm_flag_prop: external
+  context_confirm_flag_value: true
+  context_confirm_label: "confirmed by runtime traffic (last 24h)"
+}
 concept HttpRequest : source {
   taint: [taint.UntrustedData]
+  coverage_reserved_source: true
 }
 concept Process : observation { }
 concept ShellExecution : sink {
@@ -799,6 +1793,8 @@ module sbom;
 
 concept ReachableSymbol : exposure { }
 concept VulnerableDependency : asset { }
+concept HttpRequestSmugglingDependency : asset { }
+concept CertValidationDependency : asset { }
 // A dependency whose name typosquats a popular package, or an unreviewed version of a
 // package with malicious history (CWE-1357 reliance on an undesirable component).
 concept SuspiciousDependency : asset { }
@@ -811,8 +1807,9 @@ concept MiningPool : indicator { }
 
 
 // A character-filtering replace(); the engine records its proven output alphabet and
-// treats it as a sound sanitizer for any sink whose dangerous_chars it excludes.
+// treats it as a sound sanitizer for any sink whose excluded_chars it excludes.
 concept CharFilter : control {
+  analysis_role: char_filter
 }
 
 // An UNSOUND neutralizer — a guard or sanitizer that *might* defuse a threat but cannot be
@@ -820,4 +1817,5 @@ concept CharFilter : control {
 // flow; the engine attaches an assumption note so the finding lands in the review queue
 // rather than the confident bucket. Declared via the `assume` adapter directive.
 concept Assumption : control {
+  analysis_role: neutralizer_assumption
 }

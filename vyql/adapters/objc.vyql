@@ -55,9 +55,14 @@ adapter objc {
   sink path "malloc" -> code.SizeComputation
   sink path "calloc" arg all -> code.SizeComputation
   sink path "realloc" arg 1 -> code.SizeComputation
+  sink path "reallocarray" arg 1 -> code.SizeComputation
+  mark "realloc" -> code.ZeroSizeReallocation
+  mark "reallocarray" -> code.ZeroSizeReallocation
   mark "alloca" -> code.StackAllocationSmell
   mark "__subscript" -> code.IndexAccess
-  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
+  mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
+  mark "analysis.field.clear_null" -> code.OwnerFieldClear
+  mark "xmlFreeDoc" -> code.OwnerFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree
@@ -65,8 +70,10 @@ adapter objc {
   sink path "__binop.mod" arg 1 -> code.DivisionDenominator
   mark "__binop.add" -> code.IntegerSizeArithmetic
   mark "__binop.sub" -> code.IntegerSizeArithmetic
+  source "__binop.mul" -> code.ComputedSizeValue
   mark "__binop.mul" -> code.IntegerSizeArithmetic
   mark "__binop.shl" -> code.IntegerSizeArithmetic
+  control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 
   // TOCTOU / race (CWE-367)
   mark "access" -> code.FileCheck

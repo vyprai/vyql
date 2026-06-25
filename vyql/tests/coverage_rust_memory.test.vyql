@@ -76,3 +76,78 @@ test "rust memory: mutable buffer pointer cast is not immutable alias"
       }
   }
   ```
+
+test "rust memory: C repr enum crossing FFI is a layout review point"
+  lang rust
+  expect VYQL-MEM-014
+  expect_review code.FfiEnumLayoutRisk
+  code
+  ```
+  #[repr(C)]
+  #[derive(Clone, Copy, Debug, PartialEq)]
+  pub enum DType {
+      F32 = 0,
+      F64 = 1,
+  }
+
+  extern "C" {
+      fn af_create_array(out: *mut i64, dtype: DType) -> i32;
+  }
+  ```
+
+test "rust memory: read_exact into Vec capacity before set_len exposes uninitialized buffer"
+  lang rust
+  expect VYQL-MEM-015
+  expect_review code.UninitializedBufferExposure
+  code
+  ```
+  use std::{io, slice};
+
+  pub fn read_spv<R: io::Read + io::Seek>(x: &mut R) -> io::Result<Vec<u32>> {
+      let words = 8usize;
+      let mut result = Vec::<u32>::with_capacity(words);
+      unsafe {
+          x.read_exact(slice::from_raw_parts_mut(
+              result.as_mut_ptr() as *mut u8,
+              words * 4,
+          ))?;
+          result.set_len(words);
+      }
+      Ok(result)
+  }
+  ```
+
+test "rust memory: read_exact into zeroed Vec buffer is clean"
+  lang rust
+  reject VYQL-MEM-015
+  code
+  ```
+  use std::{io, slice};
+
+  pub fn read_spv<R: io::Read + io::Seek>(x: &mut R) -> io::Result<Vec<u32>> {
+      let words = 8usize;
+      let mut result = vec![0u32; words];
+      x.read_exact(unsafe {
+          slice::from_raw_parts_mut(result.as_mut_ptr() as *mut u8, words * 4)
+      })?;
+      Ok(result)
+  }
+  ```
+
+test "rust memory: explicit integer repr enum is clean for FFI layout"
+  lang rust
+  reject VYQL-MEM-014
+  reject_review code.FfiEnumLayoutRisk
+  code
+  ```
+  #[repr(u32)]
+  #[derive(Clone, Copy, Debug, PartialEq)]
+  pub enum DType {
+      F32 = 0,
+      F64 = 1,
+  }
+
+  extern "C" {
+      fn af_create_array(out: *mut i64, dtype: DType) -> i32;
+  }
+  ```

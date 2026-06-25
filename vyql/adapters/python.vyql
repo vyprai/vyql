@@ -3,9 +3,17 @@
 adapter python {
   meta { fidelity: resolved }
 
-  // FastAPI/Starlette route-handler params, seeded by the frontend (the decorator
-  // marks the handler; each parameter is request-bound path/query/body input).
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:get" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:post" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:put" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:delete" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:patch" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:head" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:options" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:route" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:websocket" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:api_route" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_name:resolve_" nval "param_name:self" nval "param_name:cls" nval "param_name:info" nval "param_name:root" nval "param_name:parent" nval "param_name:_" -> code.HttpInput
 
   source "request.form" -> code.HttpInput
   source "request.query_string" -> code.HttpInput
@@ -38,6 +46,8 @@ adapter python {
   source "request.POST" -> code.HttpInput
   source "request.body" -> code.HttpInput
   source "request.COOKIES" -> code.HttpInput
+  source path "analysis.function.context.source" val "traceback.format_exc" val "<pre" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HttpInput
+  source path "analysis.function.context.source" val "traceback.format_exc" val "<html" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HttpInput
   source "request.META" -> code.HttpInput
   source "request.FILES" -> code.HttpInput
   source "request.path_info" -> code.HttpInput
@@ -68,16 +78,22 @@ adapter python {
   source "ctx.request.json" -> code.HttpInput
   source "req.params" -> code.HttpInput
   source "req.media" -> code.HttpInput
+  source path "analysis.function.context.source" val "class_bases=serializers.ModelSerializer" val "fields" val "is_superuser" val "validated_data" val "objects.create" nval "pop('is_superuser'" nval "pop(\"is_superuser\"" -> code.HttpInput
+  source path "analysis.function.context.source" val "class_bases=serializers.ModelSerializer" val "fields" val "is_superuser" val "validated_data" val "super().update" nval "pop('is_superuser'" nval "pop(\"is_superuser\"" -> code.HttpInput
   source "req.get_param" -> code.HttpInput
   source "req.stream" -> code.HttpInput
   source "sys.argv" -> code.CliArgument
   source "input" -> code.StdinInput
   source "sys.stdin" -> code.StdinInput
   source "fileinput.input" -> code.StdinInput
+  source method "[]" val "-8:" -> code.ShortSecurityIdentifier
+  source "os.environ.get" val "HTTP_PROXY" -> code.HttpInput
+  source "os.getenv" val "HTTP_PROXY" -> code.HttpInput
   source "os.environ" -> code.SecretValue
   source "os.getenv" -> code.SecretValue
   source "config.get" -> code.SecretValue
   source "settings.SECRET_KEY" -> code.SecretValue
+  mark exact "analysis.function.context" val "name=signup" val "UserStatus.ACTIVE" val "UserRole.USER" val "generate_keypair" val "create_user_with_keypair" nval "UserStatus.INACTIVE" -> code.AutoActiveSignupAccount
 
   // stored / second-order data — DB cursor reads (CWE-79 stored XSS when later rendered
   // unescaped). Only unambiguous cursor fetch methods are marked (bare .get/.all/.first
@@ -152,11 +168,6 @@ adapter python {
   control "is_safe_redirect_url" -> core.RedirectAllowlist
   control "is_allowed_url" -> core.AllowlistValidation
   control "is_allowed_host" -> core.AllowlistValidation
-  // input validation / authentication boundary (CWE-501): a value that passed through an
-  // authenticator (login → returns the authenticated identity) or an explicit validator is
-  // trusted enough to cross into the session. Returns clean data for the trust-boundary
-  // threat (not for XSS/SQLi — those controls are separate). Custom validators the tool
-  // can't infer are opted in with a `# vyql: validator` comment on the function.
   control method "login" -> core.InputValidation
   control method "authenticate" -> core.InputValidation
   control method "authenticate_user" -> core.InputValidation
@@ -167,7 +178,9 @@ adapter python {
   control method "validate_credentials" -> core.InputValidation
   control method "check_password" -> core.InputValidation
   control method "verify_password" -> core.InputValidation
+  control "analysis.function.result" val "marker:validator" -> core.InputValidation
   control "validate_url" -> core.AllowlistValidation
+  control "validate_python_code" -> core.CodeExecutionValidation
   // XXE hardening — a parser configured to not resolve external entities / fetch network,
   // dominating the parse it is passed to (value-matched config).
   control "etree.XMLParser" val "resolve_entities=False" -> core.XmlHardening
@@ -186,6 +199,7 @@ adapter python {
   sink path "logger.debug" -> code.LogOutput
   sink path "log.info" -> code.LogOutput
   sink path "log.error" -> code.LogOutput
+  mark exact "analysis.function.context" val "name=parsedkim" val "_warnmsg" val "Unknown DKIM key type" val "dkim['k']" nval "_warnmsg(\"Unknown DKIM key type\")" -> code.UnneutralizedDiagnosticValue
   mark "logging.info" -> code.LogWrite
   mark "logging.warning" -> code.LogWrite
   mark "logging.error" -> code.LogWrite
@@ -198,15 +212,23 @@ adapter python {
   sink path "os.popen2" -> code.CommandExecution
   sink path "os.popen3" -> code.CommandExecution
   sink path "os.popen4" -> code.CommandExecution
-  sink path "subprocess.call" -> code.CommandExecution
-  sink path "subprocess.run" -> code.CommandExecution
-  sink path "subprocess.Popen" -> code.CommandExecution
-  sink path "subprocess.check_output" -> code.CommandExecution
-  sink path "subprocess.check_call" -> code.CommandExecution
+  sink path "subprocess.call" collection first -> code.CommandExecution
+  sink path "subprocess.run" collection first -> code.CommandExecution
+  sink path "subprocess.Popen" collection first -> code.CommandExecution
+  sink path "subprocess.call" collection 2 val "-c" -> code.CommandExecution
+  sink path "subprocess.run" collection 2 val "-c" -> code.CommandExecution
+  sink path "subprocess.Popen" collection 2 val "-c" -> code.CommandExecution
+  sink path "subprocess.Popen" val "self.args" val "tag.filename" nval "--" -> code.CommandOptionInjection
+  sink path "subprocess.Popen" val "self.args" val "filename" nval "--" -> code.CommandOptionInjection
+  sink path "subprocess.check_output" collection first -> code.CommandExecution
+  sink path "subprocess.check_call" collection first -> code.CommandExecution
+  sink path "subprocess.check_output" collection 2 val "-c" -> code.CommandExecution
+  sink path "subprocess.check_call" collection 2 val "-c" -> code.CommandExecution
   sink path "subprocess.getoutput" -> code.CommandExecution
   sink path "subprocess.getstatusoutput" -> code.CommandExecution
   sink path "commands.getoutput" -> code.CommandExecution
   sink path "commands.getstatusoutput" -> code.CommandExecution
+  sink path "module.run_command" val "apt-key" val "--recv" -> code.SecurityKeyTrustOperation
   sink path "pty.spawn" -> code.CommandExecution
   sink path "os.execv" -> code.CommandExecution
   sink path "os.execve" -> code.CommandExecution
@@ -215,7 +237,7 @@ adapter python {
   sink path "os.spawnv" -> code.CommandExecution
   sink path "os.spawnl" -> code.CommandExecution
   sink path "asyncio.create_subprocess_shell" -> code.CommandExecution
-  sink path "asyncio.create_subprocess_exec" -> code.CommandExecution
+  sink path "asyncio.create_subprocess_exec" arg all collection -> code.CommandExecution
   sink path "popen2.popen2" -> code.CommandExecution
   sink path "popen2.popen3" -> code.CommandExecution
   sink path "eval" -> code.CodeEval
@@ -245,6 +267,7 @@ adapter python {
   sink path "joblib.load" -> code.Deserialization
   sink path "numpy.load" -> code.Deserialization
   sink path "pandas.read_pickle" -> code.Deserialization
+  mark exact "analysis.function.context" val "name=api_endpoint" val "request.headers.get" val "Content-Type" val "ALL_SERDE.get" val "from_http_request" nval "name=api_endpoint_wrapper" nval "UNSUPPORTED_MEDIA_TYPE" -> code.RequestSelectedDeserializationFormat
   sink path "etree.parse" -> code.XmlParse
   sink path "etree.fromstring" -> code.XmlParse
   sink path "etree.XML" -> code.XmlParse
@@ -275,6 +298,7 @@ adapter python {
   sink path "urllib2.urlopen" -> code.UrlFetch
   sink path "urllib2.Request" -> code.UrlFetch
   sink path "urllib3.request" -> code.UrlFetch
+  sink path "urllib3.ProxyManager" -> code.UrlFetch
   sink path "urllib3.PoolManager" -> code.UrlFetch
   sink path "httpx.get" -> code.UrlFetch
   sink path "httpx.post" -> code.UrlFetch
@@ -303,6 +327,8 @@ adapter python {
   sink path "User.objects.create" arg all -> code.MassAssign
   sink path "Model.objects.create" arg all -> code.MassAssign
   sink path "serializer.save" arg all -> code.MassAssign
+  sink path "analysis.function.context.sink" val "class_bases=serializers.ModelSerializer" val "fields" val "is_superuser" val "validated_data" val "objects.create" nval "pop('is_superuser'" nval "pop(\"is_superuser\"" -> code.MassAssign
+  sink path "analysis.function.context.sink" val "class_bases=serializers.ModelSerializer" val "fields" val "is_superuser" val "validated_data" val "super().update" nval "pop('is_superuser'" nval "pop(\"is_superuser\"" -> code.MassAssign
 
   sink path "open" -> code.FilePathAccess
   sink path "io.open" -> code.FilePathAccess
@@ -330,7 +356,6 @@ adapter python {
   sink path "tarfile.open" -> code.FilePathAccess
   sink method "extract" -> code.ArchiveEntryWrite
   sink method "extractall" -> code.ArchiveEntryWrite
-  sink path "pathlib.Path" -> code.FilePathAccess
   // os.path predicates/normalizers fed a tainted path (CWE-22): the path is arg 0.
   sink path "os.path.exists" -> code.FilePathAccess
   sink path "os.path.isfile" -> code.FilePathAccess
@@ -359,10 +384,23 @@ adapter python {
   sink receiver "unlink" -> code.FilePathAccess
   sink path "render_template_string" -> code.HtmlRender
   sink path "flask.render_template_string" -> code.HtmlRender
+  sink path "analysis.function.context.sink" val "traceback.format_exc" val "<pre" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HtmlRender
+  sink path "analysis.function.context.sink" val "traceback.format_exc" val "<html" nval "cgi.escape" nval "html.escape" nval "markupsafe.escape" -> code.HtmlRender
+  mark exact "analysis.function.context" val "class_bases=HTMLSerializer" val "name=serialize" nval "escape_rcdata=True" -> code.HtmlSanitizerLogicReview
+  sink path "analysis.function.return" val "decorator_method:get" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:post" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:put" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:delete" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:patch" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:head" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:options" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:route" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:websocket" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
+  sink path "analysis.function.return" val "decorator_method:api_route" nval "abort" nval "jsonify" nval "redirect" nval "render_template" nval "render_template_string" nval "send_file" nval "send_from_directory" nval "url_for" nval "FileResponse" nval "Response" nval "HttpResponse" nval "make_response" -> code.HtmlRender
   // the response BODY reflected to the browser (Flask make_response / Response / HttpResponse).
   // and the synthetic http_response wrapping a route handler's return value).
   sink path "make_response" -> code.HtmlRender
-  sink path "Response" -> code.HtmlRender
+  sink path "Response" nval "text/plain" nval "application/json" -> code.HtmlRender
   sink path "HttpResponse" -> code.HtmlRender
   sink path "Markup" -> code.HtmlRender
   sink path "markupsafe.Markup" -> code.HtmlRender
@@ -379,7 +417,16 @@ adapter python {
   sink path "mako.template.Template" -> code.TemplateRender
   sink path "Environment.from_string" -> code.TemplateRender
   sink path "render_template_string" -> code.TemplateRender
-  mark "security.template.fstring.validation.incomplete" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "Formatter().parse" val "." nval "format_spec" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "Formatter().parse" val "[" nval "format_spec" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "Formatter().parse" val "." val "format_spec" nval "{" nval "}" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "Formatter().parse" val "[" val "format_spec" nval "{" nval "}" -> code.IncompleteTemplateValidation
+  mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "ILIKE" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "::jsonb" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.context" val "name=parse" val "query_expr.parseString" val "repr(" val ".replace(" val "__default_field__" val "=ANY(" -> code.UnparameterizedSqlQueryParser
+  mark exact "analysis.function.context" val "name=_parse_qsl" val "qs.replace(';','&').split('&')" -> code.AmbiguousQueryParameterSeparator
+  mark exact "analysis.function.context" val "_original_transport" val "_reader._transport" val "_writer._transport" nval "_reader._buffer.clear" -> code.ProtocolStateReview
+  mark exact "analysis.function.context" val "name=_recv_packet" val "MSG_USERAUTH_LAST" val "process_packet(pkttype,seq,packet" nval "Invalid request received before" -> code.ProtocolStateReview
   sink path "redirect" -> code.RedirectTarget
   sink path "flask.redirect" -> code.RedirectTarget
   sink path "HttpResponseRedirect" -> code.RedirectTarget
@@ -435,6 +482,12 @@ adapter python {
   // Boundary check for realpath/common workspace guards: `resolved.startswith(base + os.sep)`
   // requires a path separator after the base, unlike plain prefix checks.
   control method "startswith" val "os.sep" -> core.PathAccessCheck
+  control "analysis.path.access_check" val "path.resolve.parents" -> core.PathAccessCheck
+  // pathlib containment guard: `candidate.resolve().relative_to(root)` raises
+  // ValueError when the candidate escapes root, and is the patched idiom for
+  // Windows-safe prompt file containment in CVE-2026-10044.
+  control receiver method "relative_to" -> core.PathCanonicalization
+  control method "relative_to" -> core.PathAccessCheck
 
   // UNSOUND neutralizers (`assume`) — never suppress; emit an assumption note. The dominant
   // Python OWASP idiom is the `if '<bad>' in tainted:` substring blocklist, recognized
@@ -442,16 +495,21 @@ adapter python {
   // prefix/suffix checks and path canonicalizers that do NOT confine to a base directory.
   assume guard method "startswith" -> code.FilePathAccess
   assume guard method "endswith"   -> code.FilePathAccess
+  assume guard path "analysis.guard.containment_check" -> code.FilePathAccess
   assume sanitizer path "os.path.normpath" -> code.FilePathAccess
   assume sanitizer path "os.path.realpath" -> code.FilePathAccess
   assume sanitizer path "posixpath.normpath" -> code.FilePathAccess
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
+  mark exact "re.compile" val "^black([^A-Z0-9._-]+.*)$" -> code.PackageVersionSpecifierValidationReview
   sink path "re.compile" -> code.RegexCompile
   sink path "re.match" -> code.RegexCompile
   sink path "re.search" -> code.RegexCompile
   sink path "re.sub" -> code.RegexCompile
   sink path "re.findall" -> code.RegexCompile
+  // Static catastrophic regex: a repeated segment that can consume an optional slash
+  // creates ambiguous partitions for long event strings.
+  sink path "re.match" val "+/?)+" -> code.CatastrophicRegex
 
   // weak crypto (CWE-327/328) — presence marker on the call node
   mark "hashlib.md5" -> code.WeakHash
@@ -471,7 +529,10 @@ adapter python {
   mark "os.chmod" val "0o666" -> code.InsecurePermission
   mark "os.fchmod" val "0o777" -> code.InsecurePermission
   mark "os.fchmod" val "0o666" -> code.InsecurePermission
+  mark "os.open" val "0o777" -> code.InsecurePermission
+  mark "os.open" val "0o666" -> code.InsecurePermission
   mark "Path.chmod" val "0o777" -> code.InsecurePermission
+  mark method "mkdir" val "parents=True" val "exist_ok=True" nval "mode=" -> code.InsecurePermission
 
   // resource lifecycle (CWE-772, RES-001) — a raw socket handle that must be closed on
   // every path. close() is receiver-agnostic (control method). Context-manager (`with`)
@@ -514,6 +575,8 @@ adapter python {
   mark "ARC4.new" -> code.WeakCipher
   mark "Blowfish.new" -> code.WeakCipher
   mark "DES3.new" -> code.WeakCipher
+  // PyCrypto/PyCryptodome AES.new defaults to ECB when no MODE_* argument is supplied.
+  mark exact "AES.new" nval "MODE_" -> code.WeakCipher
   // ECB mode (CWE-327) — pycryptodome AES.MODE_ECB constant or cryptography modes.ECB().
   // The mode is a member access / call (not a string), so match the path on the Attr/Call.
   mark "AES.MODE_ECB" -> code.WeakCipher
@@ -527,16 +590,24 @@ adapter python {
 
   // insecure temp file (CWE-377) — tempfile.mktemp is documented-insecure (race)
   mark "tempfile.mktemp" -> code.InsecureTempFile
+  mark "open" val "/tmp/" val "w" -> code.InsecureTempFile
+  mark "open" val ".lxc-attach-script" val "w" -> code.InsecureTempFile
+  mark "open" val "lxc-attach-script.log" val "a" -> code.InsecureTempFile
+  mark "open" val "lxc-attach-script.err" val "a" -> code.InsecureTempFile
 
   // TLS cert validation disabled (CWE-295) — requests/httpx verify=False
   mark "requests" val "verify=False" -> code.CertValidationDisabled
   mark "httpx" val "verify=False" -> code.CertValidationDisabled
+  mark exact "analysis.function.context" val "use_ssl=False" val "Tls(" val "validate=ssl.CERT_REQUIRED" val "Server(" -> code.CertValidationDisabled
 
   // JWT signature not verified (CWE-347) — pyjwt alg none / verify off
   mark "jwt.decode" val "algorithms=none" -> code.JwtUnverified
   mark "jwt.decode" val "verify_signature=False" -> code.JwtUnverified
   mark "jwt.decode" val "verify=False" -> code.JwtUnverified
   mark "jwt.encode" val "algorithm=none" -> code.JwtUnverified
+  mark exact "analysis.function.context" val "name=_prepare_algorithm_key" val "key is None and \"jwk\" in header" val "key = header[\"jwk\"]" val "prepare_key(key)" -> code.HeaderControlledJwkReview
+  mark exact "analysis.function.context" val "name=prepare_key" val "key is None and \"jwk\" in header" val "key = header[\"jwk\"]" val "prepare_key(key)" -> code.HeaderControlledJwkReview
+  mark exact "analysis.function.context" val "name=to_dict" val "self.__dict__.items" val "storage[k] = v" nval "api" -> code.ConfigExposureReview
 
   // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
   // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.

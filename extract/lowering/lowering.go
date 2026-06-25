@@ -1,5 +1,5 @@
 // Package lowering is the shared, language-AGNOSTIC tier (docs/20): it lowers
-// NIR into a Universal Security Graph, owning the function/class registries,
+// NIR into the shared graph, owning the function/class registries,
 // per-file import tables, the type map (self, constructors, class/static
 // receivers), call resolution (import -> type -> guarded unique-name fallback),
 // and dataflow construction (scopes, assignments, FLOWS edges).
@@ -13,7 +13,6 @@
 package lowering
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -22,17 +21,17 @@ import (
 )
 
 type funcInfo struct {
-	paramNames []string
-	params     map[string]string // name -> param node id
-	paramTypes map[string]string // name -> declared/inferred receiver type
-	ret        string            // return node id
-	module     string
-	cls        string
-	name       string
-	funcID     string // id of this function's code.Function node; stamped as `func` on its nodes
-	validator  bool   // a `# vyql: validator` function: its result clears trust-boundary taint
-	abstract   bool   // an interface/abstract method (empty body) — dispatch to concrete impls
-	selfNode   string // stable `this` node for a method (alias target for the receiver); "" if none
+	paramNames    []string
+	params        map[string]string // name -> param node id
+	paramTypes    map[string]string // name -> declared/inferred receiver type
+	ret           string            // return node id
+	module        string
+	cls           string
+	name          string
+	paramEntries  []nir.ParamEntry
+	resultEntries []nir.ResultEntry
+	abstract      bool   // an interface/abstract method (empty body) — dispatch to concrete impls
+	selfNode      string // stable `this` node for a method (alias target for the receiver); "" if none
 }
 
 type importEntry struct {
@@ -49,27 +48,28 @@ type lowerer struct {
 	g              usg.Store
 	modCtr         map[string]int // per-module node-id counter (stable, module-local ids)
 
-	funcQual     map[string]*funcInfo         // "modkey::qual" -> info
-	funcShort    map[string][]*funcInfo       // short name -> infos
-	classQual    map[string]bool              // "modkey::Class"
-	classDefs    map[string]map[string]bool   // bare class name -> SET of modules that define it
-	classFields  map[string]map[string]string // "modkey::Class" -> field -> declared class type
-	importTables map[string]map[string]importEntry
+	funcQual      map[string]*funcInfo         // "modkey::qual" -> info
+	funcShort     map[string][]*funcInfo       // short name -> infos
+	classQual     map[string]bool              // "modkey::Class"
+	classDefs     map[string]map[string]bool   // bare class name -> SET of modules that define it
+	classFields   map[string]map[string]string // "modkey::Class" -> field -> declared class type
+	importTables  map[string]map[string]importEntry
+	moduleGlobals map[string]map[string]string // JS/TS module-level binding name -> stable slot node
 
-	// inheritance-aware implicit-`this` member resolution (populated by frontends that set
-	// ClassDef.Members/Bases — currently C#). directMembers: "modkey::Class" -> declared member
-	// set; classBaseNames: "modkey::Class" -> base SHORT names; membersOfShort: short class name
-	// -> union of declared members (for resolving inherited members by name across files).
-	directMembers  map[string]map[string]bool
-	classBaseNames map[string][]string
-	membersOfShort map[string]map[string]bool
-	allMembersMemo map[string]map[string]bool // memoized transitive member set per "modkey::Class"
+	// inheritance-aware dispatch and implicit-`this` member resolution (populated by frontends
+	// that set ClassDef.Bases/Members). directMembers: "modkey::Class" -> declared member set;
+	// classBaseNames: "modkey::Class" -> base SHORT names; membersOfShort: short class name ->
+	// union of declared members (for resolving inherited members by name across files).
+	directMembers   map[string]map[string]bool
+	classBaseNames  map[string][]string
+	derivedChildren map[string][]string // base short name -> child class quals
+	membersOfShort  map[string]map[string]bool
+	allMembersMemo  map[string]map[string]bool // memoized transitive member set per "modkey::Class"
 
-	curModule string // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
-	curNS     string // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
-	curClass  string // "" = none
-	curRoute  bool   // lowering the body of a web request handler (FuncDef.IsRoute)
-	curFunc   string // id of the code.Function node enclosing the nodes being lowered ("" = top level)
+	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
+	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
+	curClass      string   // "" = none
+	curDecorators []string // syntax annotations/decorators on the enclosing function
 
 	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
 	// module key (e.g. "app/utils.go/fn3/loop5"); every node is stamped with it plus a
@@ -359,14 +359,14 @@ func (l *lowerer) constStrVal(e nir.Expr, sc *scope) (string, bool) {
 				return string(base[idx]), true
 			}
 		}
-		// array-literal index: ['sha1'][0]  → the i-th element if constant.
+		// array-literal index: ['kind'][0]  → the i-th element if constant.
 		if seq, ok := l.seqOf(v.Base); ok {
 			if idx, ok := l.constInt(v.Key, sc); ok && idx >= 0 && int(idx) < len(seq) {
 				return l.constStrVal(seq[idx], sc)
 			}
 		}
 	case nir.Attr:
-		// object-literal property: { name: 'md5' }.name  → the matching pair's value.
+		// object-literal property: { name: 'mode' }.name  → the matching pair's value.
 		if seq, ok := l.seqOf(v.Base); ok {
 			for _, p := range seq {
 				if pr, ok := p.(nir.Pair); ok && pr.Key == v.Attr {
@@ -625,10 +625,11 @@ type scope struct {
 	node map[string]string
 	typ  map[string][2]string
 	cnst map[string]string // variable -> its string-constant value (lightweight const-prop)
+	lex  map[string]bool   // JS/TS captured lexical bindings shared across nested functions
 }
 
 func newScope() *scope {
-	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}}
+	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}, lex: map[string]bool{}}
 }
 
 func (s *scope) clone() *scope {
@@ -642,7 +643,459 @@ func (s *scope) clone() *scope {
 	for k, v := range s.cnst {
 		c.cnst[k] = v
 	}
+	for k, v := range s.lex {
+		c.lex[k] = v
+	}
 	return c
+}
+
+func (l *lowerer) promoteCapturedJSBindings(stmts []nir.Stmt, params []string, sc *scope, loc string) {
+	if !isJSLikeModule(l.curNS) {
+		return
+	}
+	for name := range freeNames(stmts, params) {
+		if sc.node[name] != "" {
+			l.ensureLexicalBinding(sc, name, loc)
+		}
+	}
+}
+
+func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
+	if name == "" || sc.node[name] == "" || sc.lex[name] {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	slot := l.node("Name", loc, map[string]string{
+		"callee_path":     name,
+		"method":          name,
+		"lexical_binding": "true",
+	})
+	l.flow(sc.node[name], slot)
+	sc.node[name] = slot
+	sc.lex[name] = true
+}
+
+func freeNames(stmts []nir.Stmt, params []string) map[string]bool {
+	local := map[string]bool{}
+	for _, p := range params {
+		local[p] = true
+	}
+	collectLocalDecls(stmts, local)
+
+	used := map[string]bool{}
+	for _, st := range stmts {
+		collectStmtNames(st, used)
+	}
+	for name := range local {
+		delete(used, name)
+	}
+	return used
+}
+
+func collectLocalDecls(stmts []nir.Stmt, local map[string]bool) {
+	for _, st := range stmts {
+		switch s := st.(type) {
+		case nir.Assign:
+			if s.Decl {
+				for _, t := range s.Targets {
+					if t != "" && !strings.ContainsAny(t, ".[") {
+						local[t] = true
+					}
+				}
+			}
+		case nir.FuncDef:
+			if s.Name != "" {
+				local[s.Name] = true
+			}
+		case nir.ClassDef:
+			if s.Name != "" {
+				local[s.Name] = true
+			}
+		case nir.Block:
+			collectLocalDecls(s.Stmts, local)
+		case nir.If:
+			collectLocalDecls(s.Then, local)
+			collectLocalDecls(s.Else, local)
+		case nir.Loop:
+			for _, name := range s.Vars {
+				if name != "" && !strings.ContainsAny(name, ".[") {
+					local[name] = true
+				}
+			}
+			collectLocalDecls(s.Body, local)
+		case nir.Switch:
+			for _, c := range s.Cases {
+				collectLocalDecls(c, local)
+			}
+			collectLocalDecls(s.Default, local)
+		case nir.Try:
+			collectLocalDecls(s.Body, local)
+			for _, h := range s.Handlers {
+				collectLocalDecls(h, local)
+			}
+			collectLocalDecls(s.Finally, local)
+		}
+	}
+}
+
+func collectStmtNames(st nir.Stmt, used map[string]bool) {
+	switch s := st.(type) {
+	case nir.Assign:
+		if !s.Decl {
+			for _, t := range s.Targets {
+				if t != "" && !strings.ContainsAny(t, ".[") {
+					used[t] = true
+				}
+			}
+		}
+		collectExprNames(s.Value, used)
+	case nir.AugAssign:
+		if s.Target != "" {
+			used[s.Target] = true
+		}
+		collectExprNames(s.Value, used)
+	case nir.Return:
+		collectExprNames(s.Value, used)
+	case nir.ExprStmt:
+		collectExprNames(s.Value, used)
+	case nir.Block:
+		for _, child := range s.Stmts {
+			collectStmtNames(child, used)
+		}
+	case nir.If:
+		collectExprNames(s.Cond, used)
+		for _, child := range s.Then {
+			collectStmtNames(child, used)
+		}
+		for _, child := range s.Else {
+			collectStmtNames(child, used)
+		}
+	case nir.Loop:
+		collectExprNames(s.Cond, used)
+		collectExprNames(s.Iter, used)
+		for _, child := range s.Body {
+			collectStmtNames(child, used)
+		}
+	case nir.Switch:
+		collectExprNames(s.Subject, used)
+		for _, labels := range s.Labels {
+			for _, label := range labels {
+				collectExprNames(label, used)
+			}
+		}
+		for _, c := range s.Cases {
+			for _, child := range c {
+				collectStmtNames(child, used)
+			}
+		}
+		for _, child := range s.Default {
+			collectStmtNames(child, used)
+		}
+	case nir.Try:
+		for _, child := range s.Body {
+			collectStmtNames(child, used)
+		}
+		for _, h := range s.Handlers {
+			for _, child := range h {
+				collectStmtNames(child, used)
+			}
+		}
+		for _, child := range s.Finally {
+			collectStmtNames(child, used)
+		}
+	}
+}
+
+func collectExprNames(ex nir.Expr, used map[string]bool) {
+	switch e := ex.(type) {
+	case nil:
+	case nir.Name:
+		if e.ID != "" {
+			used[e.ID] = true
+		}
+	case nir.Attr:
+		collectExprNames(e.Base, used)
+	case nir.Index:
+		collectExprNames(e.Base, used)
+		collectExprNames(e.Key, used)
+	case nir.Call:
+		collectExprNames(e.Callee, used)
+		for _, a := range e.Args {
+			collectExprNames(a, used)
+		}
+	case nir.Format:
+		for _, p := range e.Parts {
+			collectExprNames(p, used)
+		}
+	case nir.Seq:
+		for _, p := range e.Parts {
+			collectExprNames(p, used)
+		}
+	case nir.Pair:
+		collectExprNames(e.Value, used)
+	case nir.Thru:
+		collectExprNames(e.Inner, used)
+	case nir.BinOp:
+		collectExprNames(e.Left, used)
+		collectExprNames(e.Right, used)
+	case nir.Unary:
+		collectExprNames(e.Operand, used)
+	case nir.Ternary:
+		collectExprNames(e.Cond, used)
+		collectExprNames(e.Then, used)
+		collectExprNames(e.Else, used)
+	}
+}
+
+type analysisEventSpec struct {
+	path   string
+	method string
+}
+
+var (
+	analysisFunctionReturn  = analysisEventSpec{path: "analysis.function.return", method: "return"}
+	analysisFunctionContext = analysisEventSpec{path: "analysis.function.context", method: "context"}
+	analysisFunctionResult  = analysisEventSpec{path: "analysis.function.result", method: "result"}
+	analysisClassContext    = analysisEventSpec{path: "analysis.class.context", method: "context"}
+	analysisParameterEntry  = analysisEventSpec{path: "analysis.parameter.entry", method: "entry"}
+	analysisGlobalMutation  = analysisEventSpec{path: "analysis.global.mutation", method: "mutation"}
+)
+
+func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []string) {
+	if len(contextTokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{
+		"callee_path": analysisFunctionContext.path,
+		"method":      analysisFunctionContext.method,
+		"str_args":    strings.Join(contextTokens, "\x00"),
+	}
+	l.node("Call", loc, props)
+}
+
+func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, memberTokens []string) {
+	var tokens []string
+	seen := map[string]bool{}
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(tokens) >= 512 {
+			return
+		}
+		seen[tok] = true
+		tokens = append(tokens, tok)
+	}
+	if name != "" {
+		add("class_name:" + name)
+	}
+	for _, base := range bases {
+		add("class_base:" + base)
+	}
+	for _, tok := range memberTokens {
+		add(tok)
+	}
+	if len(tokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{
+		"callee_path": analysisClassContext.path,
+		"method":      analysisClassContext.method,
+		"str_args":    strings.Join(tokens, "\x00"),
+	}
+	l.node("Call", loc, props)
+}
+
+func classMemberContextTokens(stmts []nir.Stmt) []string {
+	var tokens []string
+	var walk func([]nir.Stmt)
+	walk = func(stmts []nir.Stmt) {
+		for _, s := range stmts {
+			if len(tokens) >= 512 {
+				return
+			}
+			switch st := s.(type) {
+			case nir.FuncDef:
+				tokens = append(tokens, st.ContextTokens...)
+				walk(st.Body)
+			case nir.ClassDef:
+				// Nested classes get their own class-context event; do not smear their
+				// member evidence onto the enclosing class.
+				continue
+			case nir.Block:
+				walk(st.Stmts)
+			case nir.If:
+				walk(st.Then)
+				walk(st.Else)
+			case nir.Loop:
+				walk(st.Body)
+			case nir.Switch:
+				for _, c := range st.Cases {
+					walk(c)
+				}
+			case nir.Try:
+				walk(st.Body)
+				for _, h := range st.Handlers {
+					walk(h)
+				}
+				walk(st.Finally)
+			}
+		}
+	}
+	walk(stmts)
+	if len(tokens) > 512 {
+		return tokens[:512]
+	}
+	return tokens
+}
+
+func (l *lowerer) globalMutationAnalysisEvent(loc string, tokens []string) {
+	if len(tokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{
+		"callee_path": analysisGlobalMutation.path,
+		"method":      analysisGlobalMutation.method,
+		"str_args":    strings.Join(tokens, "\x00"),
+	}
+	l.node("Call", loc, props)
+}
+
+func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []string) {
+	if id == "" || len(contextTokens) == 0 {
+		return
+	}
+	// Lowering records only structural return evidence. Adapter data decides whether
+	// the event has any domain meaning.
+	valToks := append([]string{}, contextTokens...)
+	n, ok, _ := l.g.GetNode(id)
+	if ok {
+		if loc == "" {
+			loc = n.Loc
+		}
+		if path := n.Prop("callee_path"); path != "" {
+			valToks = append(valToks, path)
+			if last := lastPathSegment(path); last != "" && last != path {
+				valToks = append(valToks, last)
+			}
+		}
+		if method := n.Prop("method"); method != "" {
+			valToks = append(valToks, method)
+		}
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	arg := l.node("Arg", loc, map[string]string{"vkind": "Return"})
+	l.flow(id, arg)
+	props := map[string]string{
+		"callee_path": analysisFunctionReturn.path,
+		"method":      analysisFunctionReturn.method,
+		"arg0":        arg,
+	}
+	if len(valToks) > 0 {
+		props["str_args"] = strings.Join(valToks, "\x00")
+	}
+	call := l.node("Call", loc, props)
+	l.flow(arg, call)
+}
+
+func (l *lowerer) parameterEntry(paramNode, loc string, tokens []string) {
+	if paramNode == "" || len(tokens) == 0 {
+		return
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{
+		"callee_path": analysisParameterEntry.path,
+		"method":      analysisParameterEntry.method,
+		"str_args":    strings.Join(tokens, "\x00"),
+	}
+	call := l.node("Call", loc, props)
+	l.flow(call, paramNode)
+}
+
+func (l *lowerer) syntheticCall(path, method, id, loc string, valToks ...string) string {
+	if id == "" {
+		return ""
+	}
+	n, ok, _ := l.g.GetNode(id)
+	if ok && loc == "" {
+		loc = n.Loc
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	arg := l.node("Arg", loc, map[string]string{"vkind": "Analysis"})
+	l.flow(id, arg)
+	props := map[string]string{
+		"callee_path": path,
+		"method":      method,
+		"arg0":        arg,
+	}
+	if len(valToks) > 0 {
+		props["str_args"] = strings.Join(valToks, "\x00")
+	}
+	call := l.node("Call", loc, props)
+	l.flow(arg, call)
+	return call
+}
+
+func (l *lowerer) guardObservation(path, method, observed, loc string, valToks ...string) string {
+	if observed == "" {
+		return ""
+	}
+	n, ok, _ := l.g.GetNode(observed)
+	if ok && loc == "" {
+		loc = n.Loc
+	}
+	if loc == "" {
+		loc = "?:0"
+	}
+	props := map[string]string{"callee_path": path, "method": method}
+	if len(valToks) > 0 {
+		props["str_args"] = strings.Join(valToks, "\x00")
+	}
+	call := l.node("Call", loc, props)
+	l.flow(observed, call)
+	in, _ := l.g.InEdges(observed, "FLOWS")
+	for _, ed := range in {
+		l.flow(ed.Src, call)
+	}
+	return call
+}
+
+func lastPathSegment(path string) string {
+	i := strings.LastIndex(path, ".")
+	if i < 0 || i == len(path)-1 {
+		return path
+	}
+	return path[i+1:]
+}
+
+func shortClassName(name string) string {
+	name = lastPathSegment(strings.TrimSpace(name))
+	if i := strings.LastIndex(name, "::"); i >= 0 && i < len(name)-2 {
+		return name[i+2:]
+	}
+	return name
+}
+
+func isPathResolveParents(expr nir.Expr) bool {
+	attr, ok := expr.(nir.Attr)
+	if !ok || attr.Attr != "parents" {
+		return false
+	}
+	return strings.HasSuffix(attr.Path, ".resolve.parents")
 }
 
 // Lower lowers a Program into a fresh in-memory USG. When resolveImports is
@@ -653,7 +1106,7 @@ func Lower(prog nir.Program, resolveImports bool) (usg.Store, error) {
 }
 
 // LowerTyped is Lower with a constructor→type table (callee path of a
-// constructor → the type it returns, e.g. "sql.Open" → "sql.DB"). A receiver
+// constructor → the type it returns, e.g. "pkg.Open" → "pkg.Handle"). A receiver
 // assigned from a known constructor lets the lowering stamp `recv_type` on its
 // method calls, which type-constrained sink adapters use for precision.
 func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]string) (usg.Store, error) {
@@ -668,26 +1121,28 @@ func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 // incremental lowerer.
 func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]string) *lowerer {
 	return &lowerer{
-		prog:           prog,
-		selfName:       prog.Self(),
-		resolveImports: resolveImports,
-		ctorTypes:      ctorTypes,
-		g:              newGraphStore(0),
-		modCtr:         map[string]int{},
-		modOrder:       map[string]int{},
-		modBranch:      map[string]int{},
-		funcQual:       map[string]*funcInfo{},
-		funcShort:      map[string][]*funcInfo{},
-		classQual:      map[string]bool{},
-		classDefs:      map[string]map[string]bool{},
-		classFields:    map[string]map[string]string{},
-		importTables:   map[string]map[string]importEntry{},
-		containers:     map[string]*containerInfo{},
-		lambdaParams:   map[string][]string{},
-		directMembers:  map[string]map[string]bool{},
-		classBaseNames: map[string][]string{},
-		membersOfShort: map[string]map[string]bool{},
-		allMembersMemo: map[string]map[string]bool{},
+		prog:            prog,
+		selfName:        prog.Self(),
+		resolveImports:  resolveImports,
+		ctorTypes:       ctorTypes,
+		g:               newGraphStore(0),
+		modCtr:          map[string]int{},
+		modOrder:        map[string]int{},
+		modBranch:       map[string]int{},
+		funcQual:        map[string]*funcInfo{},
+		funcShort:       map[string][]*funcInfo{},
+		classQual:       map[string]bool{},
+		classDefs:       map[string]map[string]bool{},
+		classFields:     map[string]map[string]string{},
+		importTables:    map[string]map[string]importEntry{},
+		moduleGlobals:   map[string]map[string]string{},
+		containers:      map[string]*containerInfo{},
+		lambdaParams:    map[string][]string{},
+		directMembers:   map[string]map[string]bool{},
+		classBaseNames:  map[string][]string{},
+		derivedChildren: map[string][]string{},
+		membersOfShort:  map[string]map[string]bool{},
+		allMembersMemo:  map[string]map[string]bool{},
 	}
 }
 
@@ -712,24 +1167,7 @@ func ModuleNS(m nir.Module) string {
 	return m.Key
 }
 
-func boolProp(b bool) string {
-	if b {
-		return "true"
-	}
-	return ""
-}
-
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
-	if l.curFunc != "" {
-		// stamp the enclosing code.Function id on every body node (the node→function map
-		// VyPr keys off). Copy so the caller's props map is never mutated.
-		merged := make(map[string]string, len(props)+1)
-		for k, v := range props {
-			merged[k] = v
-		}
-		merged["func"] = l.curFunc
-		props = merged
-	}
 	return l.nodeWithID(l.nid(kind), kind, loc, props)
 }
 
@@ -790,9 +1228,70 @@ func (l *lowerer) run() error {
 	}
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
-		l.block(m.Body, newScope())
+		l.block(m.Body, l.moduleScope(m))
 	}
 	return nil
+}
+
+func (l *lowerer) moduleScope(m nir.Module) *scope {
+	sc := newScope()
+	if !usesModuleGlobalSlots(m.File) {
+		return sc
+	}
+	globals := l.moduleGlobals[ModuleNS(m)]
+	if globals == nil {
+		globals = map[string]string{}
+		l.moduleGlobals[ModuleNS(m)] = globals
+	}
+	for _, name := range topLevelAssignedNames(m.Body) {
+		slot := globals[name]
+		if slot == "" {
+			slot = l.nodeWithID(sigID(l.curNS, "__module", "var", name), "Name", m.File,
+				map[string]string{"callee_path": name, "method": name, "module_global": "true"})
+			globals[name] = slot
+		}
+		sc.node[name] = slot
+	}
+	return sc
+}
+
+func usesModuleGlobalSlots(file string) bool {
+	return isJSLikeModule(file) || strings.HasSuffix(file, ".go")
+}
+
+func isJSLikeModule(file string) bool {
+	for _, ext := range []string{".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"} {
+		if strings.HasSuffix(file, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+func topLevelAssignedNames(stmts []nir.Stmt) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range stmts {
+		a, ok := s.(nir.Assign)
+		if !ok {
+			continue
+		}
+		for _, t := range a.Targets {
+			if t == "" || strings.ContainsAny(t, ".[") || seen[t] {
+				continue
+			}
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func (l *lowerer) moduleGlobalSlot(name string) string {
+	if globals := l.moduleGlobals[l.curNS]; globals != nil {
+		return globals[name]
+	}
+	return ""
 }
 
 func (l *lowerer) importNode(m nir.Module, imp nir.Import) {
@@ -854,34 +1353,10 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 	// signature node ids use the per-FILE namespace (curNS), so they are file-local and stable
 	// even when the resolution key (modkey) is shared ("") across files.
 	ns := l.curNS
-	// first-class function record: a code.Function node every node in this function points at
-	// via its `func` prop (the node→function map VyPr's CodeFunction / call-edge / path-function
-	// tables key off). Its id is NAME-derived (sigID), like the Param/Return signature nodes — so
-	// it is stable and module-namespaced: an incremental rebuild that re-lowers only one module
-	// reproduces the same id (no collision with cached modules, no build-order dependence).
-	fid := sigID(ns, rel, "func", "")
-	// is_route covers BOTH route flavors: send-on-return routes (st.IsRoute — decorator
-	// frameworks) and call-registration routes carrying http_method (Express et al.). Only the
-	// former drives the reflected-string-return sink (l.curRoute, set in the FuncDef case).
-	props := map[string]string{
-		"name":         rel,
-		"end_loc":      st.EndLoc,
-		"module":       modkey,
-		"class":        cls,
-		"is_route":     boolProp(st.IsRoute || st.HTTPMethod != ""),
-		"is_validator": boolProp(st.IsValidator),
-	}
-	if st.HTTPMethod != "" {
-		props["http_method"] = st.HTTPMethod
-	}
-	if st.HTTPPath != "" {
-		props["http_path"] = st.HTTPPath
-	}
-	l.g.AddNode(usg.Node{ID: fid, Type: "code.Function", Loc: st.Loc, Region: l.region, Props: props})
 	params := map[string]string{}
 	order := make([]string, 0, len(st.Params))
 	for _, p := range st.Params {
-		props := map[string]string{"name": p, "func": fid}
+		props := map[string]string{"name": p, "func": st.Name}
 		if typ := st.ParamTypes[p]; typ != "" {
 			props["decl_type"] = typ
 		}
@@ -896,10 +1371,10 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		paramNames: order,
 		params:     params,
 		paramTypes: st.ParamTypes,
-		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": fid}),
+		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
 		module:     modkey, cls: cls, name: st.Name,
-		funcID:    fid,
-		validator: st.IsValidator,
+		paramEntries:  st.ParamEntries,
+		resultEntries: st.ResultEntries,
 		// an empty body marks an interface/abstract method: a call typed to it must dispatch
 		// to the concrete implementations (whose bodies carry the taint).
 		abstract: len(st.Body) == 0,
@@ -1006,7 +1481,11 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				}
 			}
 			if len(st.Bases) > 0 {
-				l.classBaseNames[modkey+"::"+st.Name] = st.Bases
+				qual := modkey + "::" + st.Name
+				l.classBaseNames[qual] = st.Bases
+				for _, base := range st.Bases {
+					l.derivedChildren[shortClassName(base)] = append(l.derivedChildren[shortClassName(base)], qual)
+				}
 			}
 			// record field -> declared class type (for cross-file method resolution
 			// on field receivers, e.g. Spring `@Autowired UserService svc; svc.m()`).
@@ -1035,12 +1514,12 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				l.p1.Funcs = append(l.p1.Funcs, fiGob{
 					Qual: qual, Short: st.Name, ParamNames: info.paramNames, Params: info.params,
 					ParamTypes: info.paramTypes, Ret: info.ret, Module: info.module, Cls: info.cls,
-					Name: info.name, Validator: info.validator, Abstract: info.abstract,
+					Name: info.name, ParamEntries: info.paramEntries, ResultEntries: info.resultEntries, Abstract: info.abstract,
 				})
 			}
 			// recurse into the body to register NESTED LOCAL FUNCTIONS (C# local functions, JS
-			// inner function declarations) so a FORWARD reference — `coll.ForEach(x => Helper(x));
-			// … void Helper(...) {}` (RestSharp AddHeaders) — resolves regardless of declaration order.
+			// inner function declarations) so a FORWARD reference resolves regardless of
+			// declaration order.
 			l.register(modkey, st.Body, cls)
 		}
 	}
@@ -1059,6 +1538,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.ClassDef:
 		prev := l.curClass
 		l.curClass = st.Name
+		l.classContextAnalysisEvent(st.Loc, st.Name, st.Bases, classMemberContextTokens(st.Body))
 		l.block(st.Body, newScope())
 		l.curClass = prev
 	case nir.FuncDef:
@@ -1073,6 +1553,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			l.funcQual[qual] = info
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
 		}
+		l.promoteCapturedJSBindings(st.Body, st.Params, sc, st.Loc)
 		// closure capture: a nested function sees the enclosing scope's bindings, so a free
 		// variable's taint flows into the body. Params are reseeded below, shadowing.
 		inner := sc.clone()
@@ -1087,10 +1568,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 			inner.node["__ret__"] = info.ret
 		}
-		// bind the receiver to the enclosing class so `self.m()` / `this.m()` resolve to a
-		// sibling method. Python/Ruby pass it as the first param (`self`); JS/TS/Java leave
-		// `this` implicit — bind it regardless of whether it appears in the param list.
-		if l.curClass != "" && (len(st.Params) > 0 && st.Params[0] == l.selfName || l.selfName == "this") {
+		if info != nil {
+			for _, pe := range l.effectiveParamEntries(info) {
+				if paramNode := info.params[pe.Param]; paramNode != "" {
+					l.parameterEntry(paramNode, st.Loc, pe.Tokens)
+				}
+			}
+		}
+		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
 			inner.typ[l.selfName] = [2]string{l.curModule, l.curClass}
 		}
 		// languages with no explicit self param (C#) still need a STABLE `this` node per method
@@ -1115,15 +1600,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// functions (cross-function flows fall back to presence semantics — conservative).
 		saveRegion := l.region
 		l.region = l.curNS + "/fn" + l.nextBranch()
-		saveRoute := l.curRoute
-		l.curRoute = st.IsRoute
-		saveFunc := l.curFunc
-		if info != nil {
-			l.curFunc = info.funcID
-		}
+		saveDecorators := l.curDecorators
+		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
+		l.functionContextAnalysisEvent(st.Loc, st.ContextTokens)
 		l.block(st.Body, inner)
-		l.curFunc = saveFunc
-		l.curRoute = saveRoute
+		l.curDecorators = saveDecorators
 		l.region = saveRegion
 	case nir.Assign:
 		val := l.eval(st.Value, sc)
@@ -1137,10 +1618,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if !hasTyp && st.Type != "" { // declared type (no/foreign RHS), e.g. Spring DI field
 			if cm, ok := l.classModule(st.Type, l.importTables[l.curModule]); ok {
 				typ, hasTyp = [2]string{cm, st.Type}, true
+			} else {
+				// External/library declared types are still useful for adapter receiver
+				// constraints even when there is no project class body to resolve.
+				typ, hasTyp = [2]string{"", st.Type}, true
 			}
 		}
 		cv := constStr(st.Value)
-		if cv == "" { // config read folded to its real value (e.g. getProperty("hashAlg1") -> "MD5")
+		if cv == "" { // config read folded to its real value (e.g. getProperty("mode") -> "fast")
 			if pv, ok := l.propConst(st.Value); ok {
 				cv = pv
 			}
@@ -1151,9 +1636,58 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		for _, t := range st.Targets {
-			sc.node[t] = val
-			if hasTyp {
-				sc.typ[t] = typ
+			localDecl := st.Decl && l.region != ""
+			targetTyp, targetHasTyp := typ, hasTyp
+			if !targetHasTyp {
+				if prev, ok := sc.typ[t]; ok && prev[1] != "" {
+					targetTyp, targetHasTyp = prev, true
+				}
+			}
+			targetVal := val
+			if targetHasTyp && targetTyp[1] != "" {
+				targetVal = l.typedBindingNode(val, targetTyp[1])
+			}
+			if base, field, ok := splitFieldTarget(t); ok && !localDecl {
+				if slot := l.moduleGlobalSlot(base); slot != "" {
+					l.globalMutationAnalysisEvent(st.Loc, []string{
+						"base:" + base,
+						"field:" + field,
+						"target:" + t,
+					})
+					l.flow(targetVal, slot)
+				}
+			}
+			if sc.lex[t] && !st.Decl {
+				l.flow(targetVal, sc.node[t])
+				if targetHasTyp {
+					sc.typ[t] = targetTyp
+				}
+				if cv != "" {
+					sc.cnst[t] = cv // x = "literal"
+				} else {
+					delete(sc.cnst, t) // reassigned to a non-constant -> value unknown
+				}
+				continue
+			}
+			if slot := l.moduleGlobalSlot(t); slot != "" && !localDecl {
+				l.flow(targetVal, slot)
+				sc.node[t] = slot
+				if targetHasTyp {
+					sc.typ[t] = targetTyp
+				}
+				if cv != "" {
+					sc.cnst[t] = cv // x = "literal"
+				} else {
+					delete(sc.cnst, t) // reassigned to a non-constant → value unknown
+				}
+				continue
+			}
+			if st.Decl {
+				delete(sc.lex, t)
+			}
+			sc.node[t] = targetVal
+			if targetHasTyp {
+				sc.typ[t] = targetTyp
 			}
 			if cv != "" {
 				sc.cnst[t] = cv // x = "literal"
@@ -1165,6 +1699,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		n := l.node("Concat", st.Loc, nil)
 		l.flow(l.eval(st.Value, sc), n)
 		l.flow(sc.node[st.Target], n)
+		if sc.lex[st.Target] {
+			l.flow(n, sc.node[st.Target])
+			delete(sc.cnst, st.Target)
+			return
+		}
+		if slot := l.moduleGlobalSlot(st.Target); slot != "" {
+			l.flow(n, slot)
+			sc.node[st.Target] = slot
+			delete(sc.cnst, st.Target)
+			return
+		}
 		sc.node[st.Target] = n
 	case nir.Return:
 		rv := l.eval(st.Value, sc)
@@ -1180,24 +1725,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 		}
-		// reflected XSS: a route handler returning a freshly-built string (an f-string or
-		// concatenation) writes it straight to the response body unescaped. Only string-build
-		// nodes qualify — returning a template render / Response object / redirect (all Calls)
-		// is not a raw-string sink, so secure handlers that render templates stay clean.
-		if l.curRoute && rv != "" {
-			if n, ok, _ := l.g.GetNode(rv); ok && (n.Type == "code.Concat" || n.Type == "code.Format") {
-				l.g.AddLabel(rv, usg.Label{Concept: "code.HtmlRender",
-					Provenance: usg.Provenance{Adapter: "route.return", Fidelity: "syntactic", Confidence: "medium"}})
-			}
-		}
+		retTokens := append([]string{}, l.curDecorators...)
+		collectValTokens(st.Value, "", &retTokens)
+		l.functionReturnAnalysisEvent(rv, "", retTokens)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
-		// receiver-mutating ("builder"/accumulator) taint: a stdlib builder method
-		// (strings.Builder.WriteString, bytes.Buffer.Write…) or a C string-accumulator
-		// (g_string_append*, strcat/strncat) folds its args INTO the object you later read
-		// back. Model it as a taint-join on that variable (like `x += …`): the variable
-		// gains the call's taint. Without this, `b.WriteString(taint); b.String()` loses it.
-		// (stdlib accumulator semantics = language mechanism, not security knowledge.)
+		// Builder/accumulator calls fold their args into the object/buffer you
+		// later read back. Model them as a taint-join on the mutated variable.
 		if call, ok := st.Value.(nir.Call); ok && callNode != "" {
 			if v := mutatedVar(call); v != "" {
 				n := l.node("Concat", call.Loc, nil)
@@ -1217,14 +1751,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	// Cond=nil and the eval is a no-op — each frontend keeps its exact prior node set.
 	case nir.If:
 		condNode := l.eval(st.Cond, sc)
-		// Unsound blocklist guard: `if '<bad>' in tainted: <reject>` (the Python/Ruby OWASP
-		// idiom). A substring/containment filter cannot be proven complete (absolute paths,
-		// encodings, alternate separators bypass it), so it NEVER suppresses — label the
-		// condition core.Assumption(guard) and the engine notes any sink it dominates. The
-		// allowlist form `tainted in (consts)` is the SOUND ternary case, handled separately.
-		if pat, ok := unsoundContainmentGuard(st.Cond); ok && condNode != "" {
-			l.g.AddLabel(condNode, usg.Label{Concept: "core.Assumption",
-				Detail: map[string]string{"mode": "guard", "about": "*", "pattern": pat}})
+		if pat, name, ok := unsoundContainmentGuard(st.Cond); ok && condNode != "" {
+			observed := condNode
+			if name != "" && sc.node[name] != "" {
+				observed = sc.node[name]
+			}
+			l.guardObservation("analysis.guard.containment_check", "containment_check", observed, "", pat)
 		}
 		// opaque-predicate pruning: a compile-time-constant condition has a dead branch that
 		// never executes — lower ONLY the live branch (no Phi join), so `if (const) x = src();
@@ -1240,16 +1772,44 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
-		l.inRegion("if"+b+".t", func() { l.block(st.Then, sc) })
+		l.inRegion("if"+b+".t", func() {
+			if name, ok := allowlistMembershipVar(st.Cond); ok && before[name] != "" {
+				loc := st.Loc
+				if loc == "" {
+					loc = "?:0"
+				}
+				sc.node[name] = l.node("AllowlistValue", loc, map[string]string{
+					"name": name,
+					"kind": "literal_membership",
+				})
+			}
+			l.block(st.Then, sc)
+		})
 		thenB := cloneStrMap(sc.node)
 		sc.node = cloneStrMap(before)
 		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
 		elseB := cloneStrMap(sc.node)
 		sc.node = before
 		l.mergeBindings(sc, before, []map[string]string{thenB, elseB})
+		if name, ok := zeroExitGuardName(st.Cond, st.Then, st.Else); ok {
+			if observed := before[name]; observed != "" {
+				sc.node[name] = l.guardObservation("analysis.guard.value_exclusion", "value_exclusion", observed, "", "value=0")
+				delete(sc.cnst, name)
+			}
+		}
 	case nir.Loop:
 		l.eval(st.Cond, sc)
 		before := cloneStrMap(sc.node)
+		iterNode := l.eval(st.Iter, sc)
+		if iterNode != "" {
+			for _, name := range st.Vars {
+				if name == "" || name == "_" {
+					continue
+				}
+				sc.node[name] = iterNode
+				delete(sc.cnst, name)
+			}
+		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
 		bodyB := cloneStrMap(sc.node)
 		sc.node = before
@@ -1305,6 +1865,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	}
 }
 
+func splitFieldTarget(target string) (base, field string, ok bool) {
+	if target == "" || target == "_" {
+		return "", "", false
+	}
+	i := strings.IndexByte(target, '.')
+	if i <= 0 || i == len(target)-1 {
+		return "", "", false
+	}
+	return target[:i], target[i+1:], true
+}
+
 // --- expressions --------------------------------------------------------
 
 func (l *lowerer) eval(e nir.Expr, sc *scope) string {
@@ -1312,6 +1883,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nil:
 		return ""
 	case nir.Name:
+		props := map[string]string{"callee_path": ex.ID, "method": ex.ID}
+		if typ, ok := sc.typ[ex.ID]; ok && typ[1] != "" {
+			props["decl_type"] = typ[1]
+		}
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
 		}
@@ -1325,7 +1900,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 				return l.elemNode(self, ex.ID, ex.Loc)
 			}
 		}
-		return l.node("Name", ex.Loc, map[string]string{"callee_path": ex.ID, "method": ex.ID})
+		return l.node("Name", ex.Loc, props)
 	case nir.Const:
 		return l.node("Const", ex.Loc, nil)
 	case nir.Thru:
@@ -1350,7 +1925,13 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
 		key := l.eval(ex.Key, sc)
-		n := l.node("Subscript", ex.Loc, map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key})
+		props := map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key}
+		var valToks []string
+		collectValTokens(ex.Key, "", &valToks)
+		if len(valToks) > 0 {
+			props["str_args"] = strings.Join(valToks, "\x00")
+		}
+		n := l.node("Subscript", ex.Loc, props)
 		l.flow(key, n)
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
@@ -1360,7 +1941,13 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Call:
 		return l.evalCall(ex, sc)
 	case nir.Format:
-		n := l.node("Format", ex.Loc, nil)
+		props := map[string]string{}
+		var valToks []string
+		collectValTokens(ex, "", &valToks)
+		if len(valToks) > 0 {
+			props["str_args"] = strings.Join(valToks, "\x00")
+		}
+		n := l.node("Format", ex.Loc, props)
 		for _, p := range ex.Parts {
 			l.flow(l.eval(p, sc), n)
 		}
@@ -1369,12 +1956,18 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		props := map[string]string{"callee_path": "__object_literal"}
 		var valToks []string
 		collectValTokens(ex, "", &valToks)
+		collectKeyPathTokens(ex.KeyPath, &valToks)
 		if len(valToks) > 0 {
 			props["str_args"] = strings.Join(valToks, "\x00")
 		}
 		n := l.node("Seq", ex.Loc, props)
-		for _, p := range ex.Parts {
-			l.flow(l.eval(p, sc), n)
+		for i, p := range ex.Parts {
+			elem := l.node("CollectionElement", ex.Loc, map[string]string{
+				"collection_index": strconv.Itoa(i),
+				"vkind":            nirKind(p),
+			})
+			l.flow(l.eval(p, sc), elem)
+			l.flow(elem, n)
 		}
 		return n
 	case nir.BinOp:
@@ -1385,11 +1978,20 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		l.flow(left, leftArg)
 		l.flow(right, rightArg)
 		method := binopMethod(ex.Op)
-		n := l.node("BinOp", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg})
+		props := map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg}
+		var valToks []string
+		collectValTokens(ex, "", &valToks)
+		if len(valToks) > 0 {
+			props["str_args"] = strings.Join(valToks, "\x00")
+		}
+		n := l.node("BinOp", ex.Loc, props)
 		l.flow(leftArg, n)
 		l.flow(rightArg, n)
 		l.flow(left, n)
 		l.flow(right, n)
+		if ex.Op == "in" && isPathResolveParents(ex.Right) {
+			l.syntheticCall("analysis.path.access_check", "access_check", n, ex.Loc, "path.resolve.parents")
+		}
 		return n
 	case nir.Unary:
 		operand := l.eval(ex.Operand, sc)
@@ -1400,16 +2002,19 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Ternary:
 		// `cond ? then : else` — prune the dead arm when the condition is a compile-time
 		// constant; otherwise both arms flow (over-approximation).
-		l.eval(ex.Cond, sc)
+		cond := l.eval(ex.Cond, sc)
 		if live, ok := l.constBool(ex.Cond, sc); ok {
 			if live {
+				if isMissingTernaryArm(ex.Then) {
+					return cond
+				}
 				return l.eval(ex.Then, sc)
 			}
 			return l.eval(ex.Else, sc)
 		}
 		// Allowlist-membership guard: `LIT_SET.includes(x) ? x : default`. The true arm
-		// returns a value provably drawn from a CONSTANT set (the attacker cannot escape the
-		// fixed allowlist), so x's taint does NOT survive into the result — a SOUND kill, not
+		// returns a value provably drawn from a CONSTANT set (the selected value cannot escape
+		// that fixed set), so x's taint does NOT survive into the result — a SOUND kill, not
 		// an assumption. FN-safe: fires only when the tested value and the then-arm are the
 		// same variable and the receiver is a literal of constants.
 		if v, ok := allowlistMembershipVar(ex.Cond); ok {
@@ -1420,7 +2025,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 		}
 		n := l.node("Phi", ex.Loc, nil)
-		l.flow(l.eval(ex.Then, sc), n)
+		if isMissingTernaryArm(ex.Then) {
+			l.flow(cond, n)
+		} else {
+			l.flow(l.eval(ex.Then, sc), n)
+		}
 		l.flow(l.eval(ex.Else, sc), n)
 		return n
 	case nir.Pair:
@@ -1429,17 +2038,21 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// object property holding user input).
 		return l.eval(ex.Value, sc)
 	case nir.Lambda:
+		l.promoteCapturedJSBindings(ex.Body, ex.Params, sc, ex.Loc)
+		l.functionContextAnalysisEvent(ex.Loc, ex.ContextTokens)
 		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
 		// thunk, .then, event handler) thus fires with the captured taint.
 		inner := sc.clone()
 		var paramNodes []string
+		paramByName := map[string]string{}
 		for _, p := range ex.Params {
 			props := map[string]string{"name": p}
 			if typ := ex.ParamTypes[p]; typ != "" {
 				props["decl_type"] = typ
 			}
 			pn := l.node("Param", ex.Loc, props)
+			paramByName[p] = pn
 			inner.node[p] = pn
 			if typ := ex.ParamTypes[p]; typ != "" {
 				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
@@ -1448,38 +2061,12 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 			paramNodes = append(paramNodes, pn)
 		}
-		l.block(ex.Body, inner)
-		// closure write-back (recall-safe over-approximation): a callback that assigns to a
-		// captured OUTER variable — express's `res.format({ text(){ body = … } })` thunks, an
-		// event handler, any synchronously-invoked callback — must propagate that taint to the
-		// enclosing scope. We assume the callback runs; for one that doesn't, this only
-		// over-taints (recall-safe). Params shadow, so they never write back.
-		isParam := make(map[string]bool, len(ex.Params))
-		for _, p := range ex.Params {
-			isParam[p] = true
-		}
-		// iterate captured names in SORTED order: the merge mints Phi nodes (consuming the
-		// node counter), so a map-iteration order would make node ids — and thus the whole
-		// graph — nondeterministic run-to-run.
-		writeBack := make([]string, 0, len(sc.node))
-		for name := range sc.node {
-			if !isParam[name] {
-				if innerNode, ok := inner.node[name]; ok && innerNode != sc.node[name] {
-					writeBack = append(writeBack, name)
-				}
+		for _, pe := range ex.ParamEntries {
+			if paramNode := paramByName[pe.Param]; paramNode != "" {
+				l.parameterEntry(paramNode, ex.Loc, pe.Tokens)
 			}
 		}
-		sort.Strings(writeBack)
-		for _, name := range writeBack {
-			// UNION, not overwrite: sibling callbacks are mutually exclusive
-			// (`res.format({ text(){body=…}, html(){body=…}, default(){body=''} })` picks one
-			// by content-type), so the variable could hold ANY branch's value — keep them all
-			// so a later default('') can't clobber a tainted text/html write.
-			join := l.node("Phi", ex.Loc, nil)
-			l.flow(sc.node[name], join)
-			l.flow(inner.node[name], join)
-			sc.node[name] = join
-		}
+		l.block(ex.Body, inner)
 		fn := l.node("Func", ex.Loc, nil)
 		l.lambdaParams[fn] = paramNodes // for higher-order callback dispatch
 		return fn
@@ -1545,10 +2132,89 @@ func unaryMethod(op string) string {
 	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "deref", "+", "pos", "-", "neg").Replace(op)
 }
 
+func isMissingTernaryArm(e nir.Expr) bool {
+	c, ok := e.(nir.Const)
+	return ok && c.Loc == "?:0" && c.Value == ""
+}
+
+func zeroExitGuardName(cond nir.Expr, thenStmts, elseStmts []nir.Stmt) (string, bool) {
+	name, zeroOnThen, ok := zeroComparisonName(cond)
+	if !ok {
+		return "", false
+	}
+	if zeroOnThen && branchDefinitelyExits(thenStmts) {
+		return name, true
+	}
+	if !zeroOnThen && branchDefinitelyExits(elseStmts) {
+		return name, true
+	}
+	return "", false
+}
+
+func zeroComparisonName(cond nir.Expr) (name string, zeroOnThen bool, ok bool) {
+	b, ok := peelThru(cond).(nir.BinOp)
+	if !ok {
+		return "", false, false
+	}
+	switch b.Op {
+	case "==":
+		name, ok = nameComparedToConst(b.Left, b.Right, "0")
+		return name, true, ok
+	case "!=":
+		name, ok = nameComparedToConst(b.Left, b.Right, "0")
+		return name, false, ok
+	}
+	return "", false, false
+}
+
+func nameComparedToConst(a, b nir.Expr, value string) (string, bool) {
+	if n, ok := peelThru(a).(nir.Name); ok && isConstValue(b, value) {
+		return n.ID, true
+	}
+	if n, ok := peelThru(b).(nir.Name); ok && isConstValue(a, value) {
+		return n.ID, true
+	}
+	return "", false
+}
+
+func isConstValue(e nir.Expr, value string) bool {
+	c, ok := peelThru(e).(nir.Const)
+	return ok && unquoteLit(c.Value) == value
+}
+
+func peelThru(e nir.Expr) nir.Expr {
+	for {
+		t, ok := e.(nir.Thru)
+		if !ok {
+			return e
+		}
+		e = t.Inner
+	}
+}
+
+func branchDefinitelyExits(stmts []nir.Stmt) bool {
+	if len(stmts) == 0 {
+		return false
+	}
+	for i := len(stmts) - 1; i >= 0; i-- {
+		switch st := stmts[i].(type) {
+		case nir.Return:
+			return true
+		case nir.Block:
+			if branchDefinitelyExits(st.Stmts) {
+				return true
+			}
+		case nir.If:
+			return branchDefinitelyExits(st.Then) && branchDefinitelyExits(st.Else)
+		}
+	}
+	return false
+}
+
 // allowlistMembershipVar recognizes a constant-set membership test — `["a","b"].includes(x)`,
 // `.contains(x)`, `.has(x)` — over a LITERAL set of constants, returning the tested variable.
 // Such a guard, when it gates the same variable in a ternary, bounds the value to the fixed
-// allowlist (sound). The receiver must be a literal Seq of Consts so the attacker cannot
+// allowlist (sound). The receiver must be a literal Seq of Consts so the checked value cannot
 // influence the set.
 func allowlistMembershipVar(cond nir.Expr) (string, bool) {
 	switch c := cond.(type) {
@@ -1591,24 +2257,25 @@ func allowlistMembershipVar(cond nir.Expr) (string, bool) {
 // bad substring and cannot be proven complete. It deliberately does NOT match the allowlist
 // shape `<var> in <literal-set>` (that is the sound membership ternary): here the constant is
 // the LEFT operand (the needle) and the variable the right (the haystack).
-func unsoundContainmentGuard(cond nir.Expr) (string, bool) {
+func unsoundContainmentGuard(cond nir.Expr) (string, string, bool) {
 	b, ok := cond.(nir.BinOp)
 	if !ok || (b.Op != "in" && b.Op != "not in") {
-		return "", false
+		return "", "", false
 	}
 	if _, lc := b.Left.(nir.Const); !lc {
-		return "", false
+		return "", "", false
 	}
-	if _, rn := b.Right.(nir.Name); !rn {
-		return "", false
+	rn, ok := b.Right.(nir.Name)
+	if !ok {
+		return "", "", false
 	}
-	return b.Op + " <const>", true
+	return b.Op + " <const>", rn.ID, true
 }
 
 // constSeqVar confirms set is a fixed literal set of constants and returns varID,true. A set
 // is either a collection literal (`[a,b]`, JS/Python) or a JVM constant-set factory call
 // (`Arrays.asList(a,b)`, `List.of(a,b)`, `Set.of(a,b)`) — in every case with all-constant
-// elements, so the attacker cannot influence the membership domain.
+// elements, so the checked value cannot influence the membership domain.
 func constSeqVar(set nir.Expr, varID string) (string, bool) {
 	switch s := set.(type) {
 	case nir.Seq:
@@ -1651,9 +2318,8 @@ func constSetFactory(path, method string) bool {
 // tokens for named-value matching (`val`/`nval`). For each literal it emits the
 // bare value, and — when it sits under a key (a kwarg, dict/object/hash entry, or
 // struct field) — also a "key=value" token. Lists/objects are walked so nested
-// literals are reached, e.g. jwt(algorithms=["none"]) yields "none" and
-// "algorithms=none"; requests.get(url, verify=False) yields "False" and
-// "verify=False". Pair keys are also emitted on their own so adapters can
+// literals are reached, so call(options={mode:["fast"]}) yields "fast" and
+// "mode=fast". Pair keys are also emitted on their own so adapters can
 // recognize structured-field sinks even when the field value is non-literal
 // (`{ hypertext: userInput }`). Frontends that don't emit nir.Pair simply
 // contribute bare values.
@@ -1664,16 +2330,16 @@ var recvMutators = map[string]bool{
 	"append": true, "push": true, // StringBuilder.append / list-ish builders
 }
 
-// argMutators are C/stdlib accumulator FUNCTIONS whose first argument (the destination)
-// gains the other args' taint (g_string_append*, strcat/strncat, …).
+// argMutators are C/stdlib accumulator functions whose first argument gains the
+// other args' taint.
 var argMutators = map[string]bool{
 	"strcat": true, "strncat": true, "strlcat": true,
 	"g_string_append": true, "g_string_append_printf": true, "g_string_append_len": true,
 	"g_string_prepend": true, "g_string_insert": true,
 }
 
-// mutatedVar returns the variable a builder/accumulator call mutates (so taint can be
-// joined onto it): the receiver of a recvMutator method, or arg0 of an argMutator function.
+// mutatedVar returns the variable a builder/accumulator call mutates: the
+// receiver of a recvMutator method, or arg0 of an argMutator function.
 func mutatedVar(call nir.Call) string {
 	if recvMutators[call.Method] {
 		if at, ok := call.Callee.(nir.Attr); ok {
@@ -1697,13 +2363,26 @@ func lastDot(p string) string {
 	return p
 }
 
+func collectKeyPathTokens(path []string, out *[]string) {
+	if len(path) == 0 {
+		return
+	}
+	for _, p := range path {
+		if p != "" {
+			*out = append(*out, p)
+		}
+	}
+	*out = append(*out, strings.Join(path, "/"))
+	*out = append(*out, strings.Join(path, "."))
+}
+
 func collectValTokens(e nir.Expr, key string, out *[]string) {
 	switch ex := e.(type) {
 	case nir.Const:
 		if v := unquoteLit(ex.Value); v != "" {
 			*out = append(*out, v)
 			if key != "" {
-				*out = append(*out, key+"="+v) // e.g. verify=False, algorithms=none
+				*out = append(*out, key+"="+v) // e.g. mode=fast, enabled=true
 			}
 		}
 	case nir.Pair:
@@ -1719,15 +2398,18 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		for _, p := range ex.Parts {
 			collectValTokens(p, key, out)
 		}
+	case nir.BinOp:
+		collectValTokens(ex.Left, key, out)
+		collectValTokens(ex.Right, key, out)
 	case nir.Call:
 		collectValTokens(ex.Callee, key, out)
 		for _, a := range ex.Args {
 			collectValTokens(a, key, out)
 		}
 	case nir.Name:
-		// enum / named constant arg (QSslSocket::VerifyNone, SSL_VERIFY_NONE, DES,
-		// Algorithm.none). Value-matched marks/sinks key off these symbolic values, not
-		// just string literals, so capture the identifier for `val`/`nval` matching.
+		// enum / named constant arg. Value-matched marks/sinks key off these symbolic
+		// values, not just string literals, so capture the identifier for `val`/`nval`
+		// matching.
 		if ex.ID != "" {
 			*out = append(*out, ex.ID)
 			if key != "" {
@@ -1776,7 +2458,7 @@ func nirKind(e nir.Expr) string {
 		return "Seq"
 	case nir.Pair:
 		// A keyword/hash/struct entry is a collection-shaped arg, like Seq — sinks must
-		// treat it as a safe parameterized condition (e.g. Rails where(id: params[:id])),
+		// treat it as a structured argument rather than a raw scalar,
 		// NOT a raw value. Value-matching still sees it via str_args, and taint still
 		// flows through eval(Pair)->eval(Value); only arg-slot sink selection is affected.
 		return "Seq"
@@ -1815,12 +2497,22 @@ func (l *lowerer) recvType(nodeID string) string {
 	return ""
 }
 
+func (l *lowerer) typedBindingNode(val, typ string) string {
+	loc := ""
+	if n, ok, _ := l.g.GetNode(val); ok {
+		loc = n.Loc
+	}
+	typed := l.node("Name", loc, map[string]string{"callee_path": typ, "method": typ, "decl_type": typ})
+	l.flow(val, typed)
+	return typed
+}
+
 func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// Each argument SLOT is a distinct program point at the call site (an Arg
 	// node), flowing from the argument value. This gives sinks the correct
 	// location (the call, not where the value was defined) and lets an adapter
 	// label an arg position as a sink even when the value is itself a source —
-	// e.g. yaml.load(request_input).
+	// e.g. call(input_value).
 	var args []string
 	var argVals []string // the eval'd value node per arg (a Func node for a callback)
 	var valToks []string // literal value tokens for value-matching sinks (`val`/`nval`)
@@ -1828,23 +2520,22 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		av := l.eval(a, sc)
 		argVals = append(argVals, av)
 		// Record the argument's NIR kind on the slot, so sink adapters can
-		// distinguish a raw-SQL string position (Format/Const/Name/…) from a
-		// collection literal (Seq — e.g. Rails `where(id: params[:id])`, which is
-		// a safe hash condition, not a raw query).
+		// distinguish a string-building position (Format/Const/Name/...) from a
+		// collection literal (Seq).
 		an := l.node("Arg", call.Loc, map[string]string{"vkind": nirKind(a)})
 		l.flow(av, an)
 		args = append(args, an)
 		collectValTokens(a, "", &valToks)
-		// value-flow: fold a const-propped variable, an array-literal index (['sha1'][0]),
-		// or an object-literal property ({name:'md5'}.name) to its string so it value-matches
-		// like the inline literal — `getInstance(algo)`, `createHash(['sha1'][0])`, etc.
+		// value-flow: fold a const-propped variable, an array-literal index (['kind'][0]),
+		// or an object-literal property ({name:'mode'}.name) to its string so it value-matches
+		// like the inline literal — `factory(kind)`, `make(['kind'][0])`, etc.
 		if sv, ok := l.constStrVal(a, sc); ok {
 			valToks = append(valToks, sv)
 		}
 	}
 	// A bare call to a `from mod import sym` alias is matched by adapters under its
-	// resolved dotted path, so imported sinks/sanitizers (e.g. `escape` from
-	// `markupsafe.escape`, `system` from `os.system`) are recognized.
+	// resolved dotted path, so imported adapter targets (e.g. `normalize` from
+	// `pkg.normalize`, `run` from `runtime.run`) are recognized.
 	calleePath := call.Path
 	if l.resolveImports {
 		if nm, ok := call.Callee.(nir.Name); ok {
@@ -1853,7 +2544,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 				case "sym":
 					calleePath = imp.module + "." + imp.symbol
 				case "mod":
-					// a default-export module called directly: f = require('escape-html'); f(x)
+					// a default-export module called directly: f = require('pkg-name'); f(x)
 					// resolves to the module's own path so module-named sinks/controls match.
 					calleePath = imp.module
 				}
@@ -1872,6 +2563,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for i, a := range call.Args {
 		var toks []string
 		collectValTokens(a, "", &toks)
+		if sv, ok := l.constStrVal(a, sc); ok {
+			toks = append([]string{sv}, toks...)
+		}
 		if len(toks) > 0 {
 			props["lit"+strconv.Itoa(i)] = toks[0]
 		}
@@ -1881,6 +2575,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	var recvNode string
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		recvNode = l.eval(attr.Base, sc)
+		if recvNode != "" {
+			props["recv"] = recvNode
+		}
 		if t := l.recvType(recvNode); t != "" {
 			props["recv_type"] = t
 		}
@@ -1894,18 +2591,10 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(recvNode, result)
 		}
 		// a collection/builder MUTATOR taints its receiver from the added value, so a
-		// later read or a sink fed the whole container sees the taint (e.g.
-		// list.add(param); ProcessBuilder(list)). Element-sensitive per constant key.
+		// later read or a sink fed the whole container sees the taint. Element-sensitive
+		// per constant key.
 		if mutatorMethods[call.Method] {
 			l.containerWrite(call, args, recvNode, sc)
-			// a fluent mutator returns its (now-mutated) receiver, so the added value is
-			// reachable through the call RESULT for a chained read:
-			// `res.set('Location', url).get('Location')` (express redirect), or
-			// `sb.append(taint).toString()`. Recall-safe over-approximation — the result of a
-			// discarded mutator call is unused, so this only matters when it is chained/assigned.
-			for _, a := range args {
-				l.flow(a, result)
-			}
 			// `base.field.add(v)` — the receiver is a member access, so the mutator taints a
 			// transient Attr read node, not the FIELD SLOT. Also route the added value(s) into
 			// elemNode(base, field) so a later `base.field` read (or an aliased receiver) sees
@@ -1953,17 +2642,40 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
+	l.applyTargetArgsCallback(call, argVals, sc)
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
-	// function's body (arg → param → … → ret → result), so a sanitizer applied INSIDE the
-	// callee is honoured — `bar = my_wrapper(p)` where my_wrapper escapes p is clean. Only an
+	// function's body (arg → param → … → ret → result), so an in-body transform is
+	// honoured — `bar = my_wrapper(p)` where my_wrapper transforms p is clean. Only an
 	// arg NOT mapped to any resolved param keeps the conservative direct `arg → result` edge
 	// (unknown/library callee, or a vararg beyond the param list), preserving recall there.
 	targets := l.resolveTargets(call.Callee, sc)
+	dynamicCallback := len(targets) == 0 && l.dynamicFunctionParamCall(call.Callee, sc)
+	if dynamicCallback {
+		targets = l.dynamicCallbackTargets()
+	}
 	mapped := make([]bool, len(args))
 	for _, target := range targets {
+		if dynamicCallback {
+			for i, a := range args {
+				l.flowValueToAllParams(a, target)
+				mapped[i] = true
+			}
+			l.flow(target.ret, result)
+			continue
+		}
+		paramOffset := 0
+		if recvNode != "" && target.cls != "" && len(target.paramNames) > 0 && target.paramNames[0] == l.selfName {
+			selfParam := target.params[target.paramNames[0]]
+			l.flow(recvNode, selfParam)
+			if l.containers[recvNode] != nil {
+				l.aliasReceiverSelf(recvNode, selfParam)
+			}
+			paramOffset = 1
+		}
 		for i, a := range args {
-			if i < len(target.paramNames) {
-				pnode := target.params[target.paramNames[i]]
+			paramIndex := i + paramOffset
+			if paramIndex < len(target.paramNames) {
+				pnode := target.params[target.paramNames[paramIndex]]
 				l.flow(a, pnode)
 				// cross-method object identity: C# objects are reference types, so a field
 				// mutation inside the callee (`p.field = …` / `p.list.Add(…)`) is visible to the
@@ -1981,15 +2693,14 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		// object-sensitivity: alias the receiver with the callee's stable `this` node so field
 		// mutations performed via `this` inside the method reach the receiver object (and reads
 		// of the receiver's fields are visible inside the method). Enables fluent/builder
-		// mutators (`req.AddParameter(p)` whose body does `this.Parameters.Add(p)`).
+		// mutators whose bodies update fields on the receiver.
 		if recvNode != "" && target.selfNode != "" {
 			l.aliasReceiverSelf(recvNode, target.selfNode)
 		}
-		// a `# vyql: validator` function returns validated data: label the call result so
-		// `unless sanitized_by core.InputValidation` clears the trust-boundary threat.
-		if target.validator {
-			l.g.AddLabel(result, usg.Label{Concept: "core.InputValidation",
-				Provenance: usg.Provenance{Adapter: "vyql.validator", Fidelity: "resolved", Confidence: "high"}})
+		for _, entry := range target.resultEntries {
+			if len(entry.Tokens) > 0 {
+				result = l.syntheticCall(analysisFunctionResult.path, analysisFunctionResult.method, result, call.Loc, entry.Tokens...)
+			}
 		}
 	}
 	for i, a := range args {
@@ -2000,13 +2711,121 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// wrapper-object taint: `new T(taintedArg)` builds an object that CONTAINS its args, so the
 	// constructed object (result) carries each arg's taint — even when the ctor body is resolved
 	// (args mapped to params). Lets a tainted value wrapped in an object propagate through it
-	// (e.g. RestSharp `new HeaderParameter(name, value)`). FN-safe over-approximation.
+	// FN-safe over-approximation.
 	if call.IsCtor {
 		for _, av := range argVals {
 			l.flow(av, result)
 		}
 	}
+	l.applyCallEffects(call, argVals, result, sc)
 	return result
+}
+
+func (l *lowerer) applyTargetArgsCallback(call nir.Call, argVals []string, sc *scope) {
+	if len(call.Args) != len(argVals) {
+		return
+	}
+	targetExpr, argsVal, ok := targetArgsPair(call.Args, argVals)
+	if !ok {
+		return
+	}
+	for _, target := range l.resolveTargets(targetExpr, sc) {
+		l.flowValueToAllParams(argsVal, target)
+	}
+}
+
+func targetArgsPair(args []nir.Expr, argVals []string) (nir.Expr, string, bool) {
+	var target nir.Expr
+	argsVal := ""
+	for i, arg := range args {
+		pair, ok := arg.(nir.Pair)
+		if !ok {
+			continue
+		}
+		switch pair.Key {
+		case "target":
+			target = pair.Value
+		case "args":
+			argsVal = argVals[i]
+		}
+	}
+	return target, argsVal, target != nil && argsVal != ""
+}
+
+func (l *lowerer) dynamicFunctionParamCall(callee nir.Expr, sc *scope) bool {
+	name, ok := callee.(nir.Name)
+	if !ok {
+		return false
+	}
+	id := sc.node[name.ID]
+	if id == "" {
+		return false
+	}
+	n, ok, _ := l.g.GetNode(id)
+	return ok && n.Type == "code.Param"
+}
+
+func (l *lowerer) dynamicCallbackTargets() []*funcInfo {
+	var out []*funcInfo
+	for _, funcs := range l.funcShort {
+		out = append(out, funcs...)
+	}
+	return dedupeFuncInfos(out)
+}
+
+func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
+	if value == "" || target == nil {
+		return
+	}
+	for _, pname := range target.paramNames {
+		if pname == l.selfName {
+			continue
+		}
+		if pnode := target.params[pname]; pnode != "" {
+			l.flow(value, pnode)
+		}
+	}
+}
+
+func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result string, sc *scope) {
+	for _, effect := range call.Effects {
+		if effect.DestArg < 0 || effect.DestArg >= len(call.Args) {
+			continue
+		}
+		dest := callEffectDestName(call.Args[effect.DestArg])
+		if dest == "" {
+			continue
+		}
+		if effect.SourceResult {
+			sc.node[dest] = result
+			delete(sc.cnst, dest)
+			continue
+		}
+		if effect.SourceArg < 0 || effect.SourceArg >= len(argVals) {
+			continue
+		}
+		n := l.node("Concat", call.Loc, nil)
+		if cur := sc.node[dest]; cur != "" {
+			l.flow(cur, n)
+		}
+		for i := effect.SourceArg; i < len(argVals); i++ {
+			l.flow(argVals[i], n)
+		}
+		sc.node[dest] = n
+		delete(sc.cnst, dest)
+	}
+}
+
+func callEffectDestName(e nir.Expr) string {
+	switch ex := e.(type) {
+	case nir.Name:
+		return ex.ID
+	case nir.Thru:
+		return callEffectDestName(ex.Inner)
+	case nir.Unary:
+		return callEffectDestName(ex.Operand)
+	}
+	return ""
 }
 
 // --- call resolution (shared; docs/10 §"Call resolution") -------------
@@ -2066,6 +2885,9 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 			return nil
 		}
 		obj, attr := base.ID, c.Attr
+		if obj == "super" && l.curClass != "" {
+			return l.resolveBaseMethods(l.curModule, l.curClass, attr)
+		}
 		if imp, ok := imports[obj]; ok && imp.kind == "mod" { // module.func
 			if f := l.funcQual[imp.module+"::"+attr]; f != nil {
 				return []*funcInfo{f}
@@ -2077,6 +2899,7 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 			}
 		}
 		if typ, ok := sc.typ[obj]; ok { // instance/self method
+			var out []*funcInfo
 			if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
 				if m.abstract {
 					// interface/abstract method — the concrete runtime target is unknown, so
@@ -2084,9 +2907,16 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 					// unresolved: the conservative direct arg→result edge then carries taint
 					// through the call (over-approximate, recall-safe), while concrete callees
 					// still route through their real body so in-body sanitizers are honoured.
-					return nil
+					return l.resolveDerivedMethods(typ[1], attr)
 				}
-				return []*funcInfo{m}
+				out = append(out, m)
+			}
+			out = append(out, l.resolveDerivedMethods(typ[1], attr)...)
+			if len(out) > 0 {
+				return dedupeFuncInfos(out)
+			}
+			if bases := l.resolveBaseMethods(typ[0], typ[1], attr); len(bases) > 0 {
+				return bases
 			}
 		}
 		// Cross-file fallback: the receiver type is unresolved (common with dynamically-typed
@@ -2099,6 +2929,162 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		}
 	}
 	return nil
+}
+
+func dedupeFuncInfos(in []*funcInfo) []*funcInfo {
+	seen := map[*funcInfo]bool{}
+	var out []*funcInfo
+	for _, f := range in {
+		if f == nil || seen[f] {
+			continue
+		}
+		seen[f] = true
+		out = append(out, f)
+	}
+	return out
+}
+
+func (l *lowerer) resolveDerivedMethods(class, method string) []*funcInfo {
+	var out []*funcInfo
+	seenClass := map[string]bool{}
+	var walk func(string)
+	walk = func(parentClass string) {
+		for _, qual := range l.derivedChildren[shortClassName(parentClass)] {
+			if seenClass[qual] {
+				continue
+			}
+			childMod, childClass, ok := splitClassQual(qual)
+			if !ok {
+				continue
+			}
+			seenClass[qual] = true
+			if f := l.funcQual[childMod+"::"+childClass+"."+method]; f != nil {
+				out = append(out, f)
+			}
+			walk(childClass)
+		}
+	}
+	walk(class)
+	return dedupeFuncInfos(out)
+}
+
+func (l *lowerer) effectiveParamEntries(info *funcInfo) []nir.ParamEntry {
+	if info == nil {
+		return nil
+	}
+	out := append([]nir.ParamEntry{}, info.paramEntries...)
+	if info.cls == "" {
+		return out
+	}
+	seen := map[string]bool{}
+	for _, pe := range out {
+		seen[paramEntryKey(pe)] = true
+	}
+	for _, base := range l.classBaseNames[info.module+"::"+info.cls] {
+		for _, baseInfo := range l.baseMethodInfos(info.module, base, info.name) {
+			if baseInfo == nil || !baseInfo.abstract || len(baseInfo.paramNames) != len(info.paramNames) {
+				continue
+			}
+			for _, pe := range baseInfo.paramEntries {
+				inherited, ok := remapParamEntry(pe, baseInfo.paramNames, info.paramNames)
+				if !ok {
+					continue
+				}
+				key := paramEntryKey(inherited)
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				out = append(out, inherited)
+			}
+		}
+	}
+	return out
+}
+
+func (l *lowerer) baseMethodInfos(modkey, base, method string) []*funcInfo {
+	var out []*funcInfo
+	if f := l.funcQual[modkey+"::"+base+"."+method]; f != nil {
+		out = append(out, f)
+	}
+	if mods := l.classDefs[base]; len(mods) == 1 {
+		for bm := range mods {
+			if f := l.funcQual[bm+"::"+base+"."+method]; f != nil {
+				out = append(out, f)
+			}
+		}
+	}
+	return dedupeFuncInfos(out)
+}
+
+func remapParamEntry(pe nir.ParamEntry, fromNames, toNames []string) (nir.ParamEntry, bool) {
+	idx := -1
+	for i, name := range fromNames {
+		if name == pe.Param {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || idx >= len(toNames) {
+		return nir.ParamEntry{}, false
+	}
+	param := toNames[idx]
+	tokens := append([]string{}, pe.Tokens...)
+	for i, tok := range tokens {
+		if strings.HasPrefix(tok, "param_name:") {
+			tokens[i] = "param_name:" + param
+		}
+	}
+	return nir.ParamEntry{Param: param, Tokens: tokens}, true
+}
+
+func paramEntryKey(pe nir.ParamEntry) string {
+	return pe.Param + "\x00" + strings.Join(pe.Tokens, "\x00")
+}
+
+func splitClassQual(qual string) (modkey, class string, ok bool) {
+	i := strings.LastIndex(qual, "::")
+	if i < 0 {
+		return "", "", false
+	}
+	return qual[:i], qual[i+2:], true
+}
+
+func classBasesInclude(class string, bases []string) bool {
+	for _, base := range bases {
+		if base == class || strings.HasSuffix(base, "."+class) || strings.HasSuffix(base, "::"+class) {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *lowerer) resolveBaseMethods(modkey, class, method string) []*funcInfo {
+	bases := l.classBaseNames[modkey+"::"+class]
+	if len(bases) == 0 {
+		return nil
+	}
+	var out []*funcInfo
+	seen := map[*funcInfo]bool{}
+	add := func(fi *funcInfo) {
+		if fi == nil || fi.abstract || seen[fi] {
+			return
+		}
+		seen[fi] = true
+		out = append(out, fi)
+	}
+	for _, base := range bases {
+		if f := l.funcQual[modkey+"::"+base+"."+method]; f != nil {
+			add(f)
+			continue
+		}
+		if mods := l.classDefs[base]; len(mods) == 1 {
+			for bm := range mods {
+				add(l.funcQual[bm+"::"+base+"."+method])
+			}
+		}
+	}
+	return out
 }
 
 // classModule returns the module key a class name resolves to (ok=false if it

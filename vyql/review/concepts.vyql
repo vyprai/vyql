@@ -1,0 +1,591 @@
+import core.*
+import code.*
+
+review core.AuthenticationCheck {
+  category: "auth"
+  kind: "check"
+}
+review core.AuthorizationCheck {
+  category: "auth"
+  kind: "check"
+}
+review core.OwnershipCheck {
+  category: "auth"
+  kind: "check"
+}
+review core.CsrfProtection {
+  category: "request"
+  kind: "check"
+}
+review core.ResourceRelease {
+  category: "resource"
+  kind: "check"
+}
+review core.LockRelease {
+  category: "concurrency"
+  kind: "check"
+}
+review core.XmlHardening {
+  category: "xml"
+  kind: "check"
+}
+review core.CertificateValidation {
+  category: "crypto"
+  kind: "check"
+}
+review core.EncryptionAtRest {
+  category: "crypto"
+  kind: "check"
+}
+review core.EncryptionInTransit {
+  category: "crypto"
+  kind: "check"
+}
+
+review code.AuthenticationRequiredOp {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck]
+  text: "verify an authenticated user is required before this operation"
+}
+review code.UnqualifiedDatabaseRoutineReview {
+  category: "path"
+  kind: "attention"
+  text: "review database routine references for explicit trusted schema qualification"
+}
+review code.AuthFlowBypassReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review alternate UI or navigation exit paths in this authentication flow"
+}
+review code.MissingSessionRotationAfterAuthentication {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review successful authentication flows that reuse the pre-login HTTP session instead of rotating it"
+}
+review code.LocalRequestBypassReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "review localhost or local-request bypasses on protected routes"
+}
+review code.PrivilegedEntryPointReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review privileged entry point dispatch and caller privilege checks"
+}
+review code.IgnoredAuthorizationResult {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review authorization check result usage; a failed check must stop the operation"
+}
+review code.CredentialedEndpointReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review credentialed test endpoint for admin permission and request-method guards"
+}
+review code.TimeBoundAccessTokenReview {
+  category: "auth"
+  kind: "attention"
+  text: "review generated access tokens or signed URLs for configurable, appropriately bounded expiration"
+}
+review code.AuthAttemptLimitReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.RateLimit]
+  text: "review authentication challenge or failed-attempt limit logic for brute-force resistance and concurrent bypasses"
+}
+review code.ProtocolFrameBindingReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review protocol frame/session identifier binding before accepting the frame as belonging to an existing authenticated session"
+}
+review code.AuthFailureResponseReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review authentication verification error responses for fail-closed unauthorized behavior expected by the proxy"
+}
+review code.ClientAuthFailureResponseReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review client-side unauthorized response handling before invoking privileged success callbacks"
+}
+review code.ObjectLookupByUserInput {
+  category: "auth"
+  kind: "target"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "verify object access is constrained to the current principal"
+}
+review code.DeserializableInvocationHandler {
+  category: "deserialization"
+  kind: "attention"
+  text: "review serializable dynamic-proxy invocation handlers that dispatch reflected or scripted methods without a deserialization rejection hook"
+}
+review code.RequestSelectedDeserializationFormat {
+  category: "deserialization"
+  kind: "attention"
+  text: "review request-selected deserialization formats for unsafe codecs such as pickle"
+}
+review code.UncheckedPrototypeConfigKey {
+  category: "prototype_pollution"
+  kind: "attention"
+  text: "review dynamic config-key copies for __proto__/constructor/prototype filtering before writing plain object properties"
+}
+review code.MethodGatedRedirectValidationBypass {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review HTTP method gates that skip redirect or callback URL origin validation"
+}
+review code.ChecksumErrorLogoutRedirect {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review checksum-error redirect handling that can fall back to request-supplied logout URLs"
+}
+review code.RequestHostUrlValidationBypass {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review URL host validation that trusts request Host or server-name metadata instead of a configured allowlist"
+}
+review code.SensitiveOperation {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify this privileged or destructive operation enforces authorization"
+}
+review code.AccessPolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review role or group policy configuration for overly broad access"
+}
+review code.RequestScopePolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review request/resource scope consistency before dispatching the resource handler"
+}
+review code.UserIdentityMappingReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review external identity to local UID/GID mapping for collision resistance and durable uniqueness"
+}
+review code.AdmissionSubresourcePolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review subresource admission handling for alternate paths that bypass the primary resource policy"
+}
+review code.WorkflowPolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review workflow or status checks before this protected business action"
+}
+review code.IdorPolicyReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "review object lookup or delete criteria for a current-principal ownership constraint"
+}
+review code.IncompleteIpDenylist {
+  category: "request"
+  kind: "attention"
+  text: "review network address validation for missing special-use IP ranges such as unspecified or broadcast"
+}
+review code.LocalFileUrlNavigation {
+  category: "path"
+  kind: "attention"
+  text: "review headless-browser navigation for file:// URL handling before caller-controlled URLs reach page.goto"
+}
+review code.ProtocolStateReview {
+  category: "request"
+  kind: "attention"
+  text: "review protocol/state transitions for out-of-sequence, stale, or unauthenticated data accepted without the required state check"
+}
+review code.StateChangingOp {
+  category: "request"
+  kind: "target"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "verify state-changing request paths have CSRF protection and auth context"
+}
+review code.CsrfDisabled {
+  category: "request"
+  kind: "target"
+  expected: [core.CsrfProtection]
+  text: "review why CSRF protection is disabled or exempted here"
+}
+review code.IncompleteCsrfTokenValidation {
+  category: "request"
+  kind: "attention"
+  expected: [core.CsrfProtection]
+  text: "review CSRF token validation for empty-token acceptance or missing freshness checks"
+}
+review code.MissingHttpMethodAssertion {
+  category: "csrf"
+  kind: "attention"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "review state-changing HTTP actions for explicit allowed-method assertions"
+}
+review code.InsecurePermission {
+  category: "permission"
+  kind: "target"
+  text: "review broad permission assignment and surrounding privilege checks"
+}
+review code.CryptoOperation {
+  category: "crypto"
+  kind: "target"
+  expected: [core.CertificateValidation, core.EncryptionAtRest, core.EncryptionInTransit]
+  text: "verify algorithm choice, key/IV handling, and signature or certificate checks"
+}
+review code.HeaderControlledJwkReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review signature or decryption key selection for fallback to attacker-controlled JWK header data"
+}
+review code.AuthenticatedDecryptionTagReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review authenticated decryption tag validation for fixed length and fail-closed behavior"
+}
+review code.ExternalResourceIntegrityReview {
+  category: "supply_chain"
+  kind: "attention"
+  text: "review external script/style integrity handling for allowlist decisions before trusting provided SRI metadata"
+}
+review code.PackageVersionSpecifierValidationReview {
+  category: "supply_chain"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review package version specifier validation before using the specifier in package installation"
+}
+review code.CommandLineAssemblyReview {
+  category: "command"
+  kind: "attention"
+  text: "review command-line assembly for unquoted placeholder values before process or application launch"
+}
+review code.RubyPipeOpenCommandExecution {
+  category: "command"
+  kind: "attention"
+  text: "review Ruby Kernel.open callers for pipe-prefixed path command execution"
+}
+review code.ShortSecurityIdentifier {
+  category: "crypto"
+  kind: "attention"
+  text: "review shortened security identifiers for collision-resistant trust decisions"
+}
+review code.SecurityKeyTrustOperation {
+  category: "crypto"
+  kind: "target"
+  text: "verify trust/key operations use a full collision-resistant identifier"
+}
+review code.PublicKeyHashBindingReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review signature verification flows that accept a public key without checking it matches the committed key hash"
+}
+review code.SecretComparisonReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review secret comparisons for ordinary equality or early-exit behavior where constant-time comparison is expected"
+}
+review code.PremasterSecretLengthReview {
+  category: "crypto"
+  kind: "attention"
+  text: "review TLS RSA premaster-secret decryption for exact 48-byte length validation and indistinguishable fallback behavior"
+}
+review code.ResourceReview {
+  category: "resource"
+  kind: "target"
+  expected: [core.ResourceRelease]
+  text: "verify resource usage is bounded, timed out, and released"
+}
+review code.UnboundedResourceOperation {
+  category: "resource"
+  kind: "attention"
+  text: "review long-lived resource operation for timeouts, message limits, and cancellation"
+}
+review code.ZeroStepSequenceExpansion {
+  category: "resource"
+  kind: "attention"
+  text: "review sequence expansion loops for parsed zero steps that prevent loop progress"
+}
+review code.UnboundedStateGrowthReview {
+  category: "resource"
+  kind: "attention"
+  text: "review state keyed by attacker-controlled or high-cardinality values for fail-closed limits"
+}
+review code.UnboundedProtocolStateByIdentifier {
+  category: "resource"
+  kind: "attention"
+  text: "review protocol state keyed by remote identifiers for fail-closed size/type checks before storage or queueing"
+}
+review code.UnboundedAllocationReview {
+  category: "resource"
+  kind: "attention"
+  text: "review allocation sizes derived from parsed counts for per-item limits, aggregate consistency checks, and overflow"
+}
+review code.UnboundedDelimiterSplitCount {
+  category: "resource"
+  kind: "attention"
+  text: "review delimiter counting that fully splits attacker-sized input before enforcing the count limit"
+}
+review code.LengthDerivedAllocation {
+  category: "resource"
+  kind: "attention"
+  text: "review length-derived allocation for a dominating remaining-buffer or maximum-size check"
+}
+review code.ReachableAssertionReview {
+  category: "resource"
+  kind: "attention"
+  text: "review externally reachable validation paths that can violate internal assertions or invariants"
+}
+review code.StructuredInputDecode {
+  category: "input_validation"
+  kind: "attention"
+  text: "review structured decoder output validation against the target format"
+}
+review code.UncheckedDecodeResult {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review structured decode errors that are unwrapped instead of returned or rejected"
+}
+review code.PolymorphicTypeSelectionReview {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review polymorphic type or class selection against a configured allowlist before assigning model state"
+}
+review code.IncompleteArchiveFilenameValidation {
+  category: "deserialization"
+  kind: "attention"
+  text: "review archive member filename validation for dangerous URI or stream-wrapper schemes"
+}
+review code.ArchiveSymlinkFilterBypass {
+  category: "path"
+  kind: "attention"
+  text: "review archive extraction symlink filters for library-specific callback signatures and symlink type values"
+}
+review code.CatastrophicRegex {
+  category: "resource"
+  kind: "attention"
+  text: "review static regex complexity and attacker-controlled match input length"
+}
+review code.HtmlSanitizerLogicReview {
+  category: "xss"
+  kind: "attention"
+  text: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
+}
+review code.UnescapedHtmlOptionRenderer {
+  category: "xss"
+  kind: "attention"
+  text: "review option-renderer HTML assembled from option metadata and whether it is sanitized before insertion"
+}
+review code.UnescapedTableExportHtml {
+  category: "xss"
+  kind: "attention"
+  text: "review table-export callbacks that return raw cell HTML instead of text or escaped content"
+}
+review code.HtmlAttributeRewriteReview {
+  category: "xss"
+  kind: "attention"
+  text: "review HTML attribute rewrite logic that injects dynamic values into generated markup"
+}
+review code.UnescapedDiagnosticHtml {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review diagnostic log fields rendered as HTML for escaping of remote response data"
+}
+review code.AmbiguousQueryParameterSeparator {
+  category: "request"
+  kind: "attention"
+  text: "review query parsers that treat semicolon as an alternate parameter separator"
+}
+review code.ConfigExposureReview {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "verify config or diagnostic serialization redacts inline secrets before exposure"
+}
+review code.SecretDatabindingReview {
+  category: "secret"
+  kind: "attention"
+  text: "review secret configuration parameters for conversion into protected secret storage before persistence"
+}
+review code.SensitiveSettingsExposureReview {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "verify sensitive settings fields are only returned to authenticated callers"
+}
+review code.InternalContentExposureReview {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "verify generated internal content has hidden or restricted visibility before it is saved"
+}
+review code.SecretFilePermissionReview {
+  category: "secret"
+  kind: "attention"
+  text: "verify generated key material is stored with restrictive file permissions"
+}
+review core.PathAccessCheck {
+  category: "path"
+  kind: "check"
+}
+review code.SpecialFileAccessReview {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "verify special filesystem paths are opened through a boundary that prevents link or mount redirection"
+}
+review code.LockAcquire {
+  category: "concurrency"
+  kind: "target"
+  expected: [core.LockRelease]
+  text: "verify the lock is released on every path"
+}
+review code.XmlParserCreate {
+  category: "xml"
+  kind: "target"
+  expected: [core.XmlHardening]
+  text: "verify parser factory hardening disables dangerous XML features"
+}
+review code.UnboundedCopy {
+  category: "memory"
+  kind: "attention"
+  text: "review copy bounds and whether attacker-controlled data can reach the copied length or source"
+}
+review code.UnboundedCopySmell {
+  category: "memory"
+  kind: "attention"
+  text: "review unbounded string copy usage and surrounding length constraints"
+}
+review code.RawMemoryCopySize {
+  category: "memory"
+  kind: "attention"
+  text: "review raw memory copy size calculations and bounds checks"
+}
+review code.UnsafeMutableAlias {
+  category: "memory"
+  kind: "attention"
+  text: "review unsafe mutable reference construction from raw pointer casts and aliasing/lifetime guarantees"
+}
+review code.UnsafeAutoTraitImpl {
+  category: "concurrency"
+  kind: "attention"
+  text: "review unsafe Send/Sync implementation and whether generic bounds preserve thread-safety invariants"
+}
+review code.FfiEnumLayoutRisk {
+  category: "memory"
+  kind: "attention"
+  text: "review FFI enum representation and whether the foreign ABI expects a fixed integer width"
+}
+review code.UninitializedBufferExposure {
+  category: "memory"
+  kind: "attention"
+  text: "review reserved-capacity buffer exposure and whether every byte is initialized before the callee can observe it"
+}
+review code.SizeComputation {
+  category: "memory"
+  kind: "attention"
+  text: "review allocation or size computation for overflow and untrusted dimensions"
+}
+review code.StackAllocationSmell {
+  category: "memory"
+  kind: "attention"
+  text: "review stack allocation size and whether it is bounded"
+}
+review code.ReentrantQueueCleanupReview {
+  category: "memory"
+  kind: "attention"
+  text: "review queue cleanup/cancel paths for reentrant lifetime ownership guards"
+}
+review code.OwnerFieldClear {
+  category: "resource"
+  kind: "attention"
+  text: "review whether clearing the owner field before release leaks nested state"
+}
+review code.OwnerFree {
+  category: "resource"
+  kind: "attention"
+  text: "review owner release and fields cleared before it"
+}
+review code.IndexAccess {
+  category: "memory"
+  kind: "attention"
+  text: "review index/subscript access and the dominating bounds checks"
+}
+review code.FieldDerivedIndexAccess {
+  category: "memory"
+  kind: "attention"
+  text: "review field-derived array index access and the dominating upper-bound checks"
+}
+review code.IntegerSizeArithmetic {
+  category: "numeric"
+  kind: "attention"
+  text: "review integer arithmetic used for address, size, or bounds calculations"
+}
+review code.UncheckedEncodedLengthArithmetic {
+  category: "numeric"
+  kind: "attention"
+  text: "review serialized length arithmetic that narrows or scales sizes without checked overflow handling"
+}
+review code.PointerOffsetBoundsCheck {
+  category: "numeric"
+  kind: "attention"
+  text: "review pointer-plus-length bounds comparisons; compare the length to remaining buffer size before advancing the pointer"
+}
+review code.UnsafeYamlConstructor {
+  category: "deserialization"
+  kind: "attention"
+  text: "review SnakeYAML Constructor usage on untrusted YAML; prefer SafeConstructor"
+}
+review code.UnderwidthFormattedIndex {
+  category: "numeric"
+  kind: "attention"
+  text: "review formatted numeric strings before fixed-position indexing"
+}
+review code.ZeroSizeReallocation {
+  category: "memory"
+  kind: "attention"
+  text: "review reallocation size guards and zero-size lifetime behavior"
+}
+review code.PointerFree {
+  category: "memory"
+  kind: "attention"
+  text: "review pointer lifetime: frees, aliases, and later uses"
+}
+review code.PointerUse {
+  category: "memory"
+  kind: "attention"
+  text: "review pointer use and whether lifetime/initialization is guaranteed"
+}
+review code.NullableDeref {
+  category: "memory"
+  kind: "attention"
+  text: "review dereference and nearby null checks"
+}
+review code.UncheckedNullableResultDeref {
+  category: "memory"
+  kind: "attention"
+  text: "review nullable result assignment and ensure a null guard dominates later dereferences"
+}
+review code.EscapedTerminatorWrite {
+  category: "memory"
+  kind: "attention"
+  text: "review escape-decoder loops for an escaped terminator check before writing the decoded byte"
+}

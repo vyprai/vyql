@@ -1,6 +1,12 @@
 package treesitter
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/vyprai/vyql/extract/nir"
+)
 
 func TestCBoolValueNormalizesObjCAndCBoolLiterals(t *testing.T) {
 	cases := []struct {
@@ -22,4 +28,117 @@ func TestCBoolValueNormalizesObjCAndCBoolLiterals(t *testing.T) {
 			t.Fatalf("cBoolValue(%q) = (%q, %v), want (%q, %v)", c.in, got, ok, c.want, c.ok)
 		}
 	}
+}
+
+func TestCExtractsFunctionsInsidePreprocessorWrappers(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "wrapped.c")
+	src := []byte(`
+int before(void) {
+  return 1;
+}
+
+#ifdef FEATURE_ENABLED
+int wrapped(void) {
+  sink();
+  return 0;
+}
+#endif
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("modules = %d, want 1", len(prog.Modules))
+	}
+	if !hasCFuncCall(prog.Modules[0].Body, "wrapped", "sink") {
+		t.Fatalf("function inside #ifdef was not extracted with its call: %#v", prog.Modules[0].Body)
+	}
+}
+
+func TestCExtractsFunctionsInsideRecoverablePreprocessorWrappers(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "recoverable.c")
+	src := []byte(`
+#ifdef FEATURE_ENABLED
+int wrapped(void) {
+#if DEBUG
+  if (ready) {
+#endif
+  sink();
+#if DEBUG
+  }
+#endif
+  return 0;
+}
+#endif
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("modules = %d, want 1", len(prog.Modules))
+	}
+	if !hasCFuncCall(prog.Modules[0].Body, "wrapped", "sink") {
+		t.Fatalf("function inside recovered preprocessor region was not extracted: %#v", prog.Modules[0].Body)
+	}
+}
+
+func hasCFuncCall(stmts []nir.Stmt, funcName, method string) bool {
+	for _, st := range stmts {
+		fn, ok := st.(nir.FuncDef)
+		if !ok || fn.Name != funcName {
+			continue
+		}
+		return hasCStmtCall(fn.Body, method)
+	}
+	return false
+}
+
+func hasCStmtCall(stmts []nir.Stmt, method string) bool {
+	for _, st := range stmts {
+		switch s := st.(type) {
+		case nir.ExprStmt:
+			return hasCExprCall(s.Value, method)
+		case nir.Block:
+			if hasCStmtCall(s.Stmts, method) {
+				return true
+			}
+		case nir.If:
+			if hasCStmtCall(s.Then, method) || hasCStmtCall(s.Else, method) {
+				return true
+			}
+		case nir.Loop:
+			if hasCStmtCall(s.Body, method) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasCExprCall(expr nir.Expr, method string) bool {
+	switch e := expr.(type) {
+	case nir.Call:
+		return e.Method == method
+	case nir.Thru:
+		return hasCExprCall(e.Inner, method)
+	case nir.Seq:
+		for _, part := range e.Parts {
+			if hasCExprCall(part, method) {
+				return true
+			}
+		}
+	}
+	return false
 }

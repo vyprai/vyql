@@ -19,10 +19,12 @@ import (
 
 // pyConv walks a tree-sitter Python CST into NIR.
 type pyConv struct {
-	src  []byte
-	root string // scan root, for display-relative loc
-	file string // current file (display path, relative to root)
-	key  string // current module key (source-root dotted)
+	src           []byte
+	root          string // scan root, for display-relative loc
+	file          string // current file (display path, relative to root)
+	key           string // current module key (source-root dotted)
+	moduleContext string
+	classContext  []string
 }
 
 // ExtractPython parses Python files into one NIR Program (one module per file,
@@ -35,8 +37,9 @@ func ExtractPython(files []string, root string) (nir.Program, error) {
 			return p
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
 			root0 := tree.RootNode()
+			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
+			c.moduleContext = c.pyModuleLiteralContext(root0)
 			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
@@ -44,13 +47,6 @@ func ExtractPython(files []string, root string) (nir.Program, error) {
 
 func (c *pyConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
-}
-
-func (c *pyConv) endloc(n *tree_sitter.Node) string {
-	if n == nil {
-		return ""
-	}
-	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
 }
 
 func (c *pyConv) text(n *tree_sitter.Node) string {
@@ -154,27 +150,43 @@ func (c *pyConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
-// hasValidatorComment reports whether a function carries a `# vyql: validator` marker
-// comment in its body — opting it in as a trust-boundary input-validator/authenticator the
-// tool can't infer by name. Matched loosely (any comment containing "vyql" and "validat").
-func (c *pyConv) hasValidatorComment(fn *tree_sitter.Node) bool {
-	// the marker comment attaches as a direct child of the function_definition (between the
-	// signature and the body suite) or as a leading statement inside the body block.
-	scan := func(n *tree_sitter.Node) bool {
+// vyqlResultEntries extracts `# vyql: ...` function markers without interpreting them.
+func (c *pyConv) vyqlResultEntries(fn *tree_sitter.Node) []nir.ResultEntry {
+	var out []nir.ResultEntry
+	scan := func(n *tree_sitter.Node) {
 		if n == nil {
-			return false
+			return
 		}
 		for _, ch := range children(n) {
 			if ch.Kind() == "comment" {
-				s := strings.ToLower(c.text(ch))
-				if strings.Contains(s, "vyql") && strings.Contains(s, "validat") {
-					return true
+				for _, tok := range vyqlMarkerTokens(c.text(ch)) {
+					out = append(out, nir.ResultEntry{Tokens: []string{tok}})
 				}
 			}
 		}
-		return false
 	}
-	return scan(fn) || scan(field(fn, "body"))
+	scan(fn)
+	scan(field(fn, "body"))
+	return out
+}
+
+func vyqlMarkerTokens(comment string) []string {
+	lower := strings.ToLower(comment)
+	i := strings.Index(lower, "vyql:")
+	if i < 0 {
+		return nil
+	}
+	text := lower[i+len("vyql:"):]
+	fields := strings.FieldsFunc(text, func(r rune) bool {
+		return !(r == '_' || r == '-' || r == '.' || r == ':' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
+	})
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if f != "" {
+			out = append(out, "marker:"+f)
+		}
+	}
+	return out
 }
 
 // firstIdent returns the first identifier at or under n (e.g. the target name inside a
@@ -263,15 +275,14 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
-		body = append(body, c.pyIncompleteFStringValidation(n)...)
-		// GraphQL (graphene/ariadne) resolver: `def resolve_x(self, info, arg…)` —
-		// the args after self/info/root/parent are the query's user-supplied inputs.
+		body = append(body, c.pyFunctionContext(n)...)
+		var entries []nir.ParamEntry
 		if strings.HasPrefix(name, "resolve_") {
-			body = append(c.seedResolverParams(params, L), body...)
+			entries = append(entries, c.pyParamEntries(name, params, nil)...)
 		}
 		// public API = no leading underscore, OR a dunder (__init__/__call__ are entry points).
 		exported := !strings.HasPrefix(name, "_") || (strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__"))
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n), IsValidator: c.hasValidatorComment(n), Exported: exported}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ParamEntries: entries, ResultEntries: c.vyqlResultEntries(n), Exported: exported}}
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
@@ -283,26 +294,24 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if def == nil {
 			return nil
 		}
-		// FastAPI/Flask/Starlette route handlers: `@app.get(...)`, `@router.post(...)`,
-		// `@app.route(...)` — the function's parameters are bound from the request
-		// (path/query/body), so seed each as http_input (like Java controllers).
-		if def.Kind() == "function_definition" && c.hasRouteDecorator(n) {
-			params := c.params(field(def, "parameters"))
-			paramTypes := c.paramTypes(field(def, "parameters"))
-			body := c.block(field(def, "body"))
-			var seed []nir.Stmt
-			for _, p := range params {
-				if p == "self" || p == "cls" {
-					continue
-				}
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+		decorators := c.pyDecoratorTokens(n)
+		out := c.stmt(def)
+		for i, st := range out {
+			if fn, ok := st.(nir.FuncDef); ok {
+				fn.Decorators = decorators
+				fn.ParamEntries = append(fn.ParamEntries, c.pyParamEntries(fn.Name, fn.Params, decorators)...)
+				out[i] = fn
 			}
-			return []nir.Stmt{nir.FuncDef{Name: c.text(field(def, "name")), Params: params, ParamTypes: paramTypes, Body: append(seed, body...), Loc: L, EndLoc: c.endloc(def), IsRoute: true, Exported: true}}
 		}
-		return c.stmt(def)
+		return out
 	case "class_definition":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
+		name := c.text(field(n, "name"))
+		bases := c.pyClassBases(n)
+		ctx := c.pyClassContext(n, name, bases)
+		c.classContext = append(c.classContext, ctx...)
+		body := c.block(field(n, "body"))
+		c.classContext = c.classContext[:len(c.classContext)-len(ctx)]
+		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L, Bases: bases}}
 	case "expression_statement":
 		kids := namedChildren(n)
 		if len(kids) == 0 {
@@ -318,14 +327,14 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			left := field(inner, "left")
 			tgts := c.targets(left)
-			// subscript store `container[k] = v` (e.g. session[bar] = v, map[k] = param): no
+			// subscript store `container[k] = v` (e.g. bag[key] = v, map[k] = param): no
 			// simple name target, so model it as a mutating setitem that taints the container
 			// from v — otherwise a later read `x = container[k]` loses the taint.
 			if len(tgts) == 0 && left != nil && left.Kind() == "subscript" {
 				base := c.expr(field(left, "value"))
 				args := []nir.Expr{val}
 				if k := field(left, "subscript"); k != nil {
-					args = append(args, c.expr(k)) // include the key: session[tainted_key] = x
+					args = append(args, c.expr(k)) // include the key: bag[dynamic_key] = x
 				}
 				path := c.dotted(field(left, "value"))
 				if path != "" {
@@ -484,31 +493,80 @@ func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 	return els
 }
 
-func (c *pyConv) pyIncompleteFStringValidation(fn *tree_sitter.Node) []nir.Stmt {
+func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
 	}
-	text := c.text(body)
-	if !strings.Contains(text, "Formatter().parse") {
-		return nil
+	name := c.text(field(fn, "name"))
+	bodyText := c.text(body)
+	loc := c.loc(fn)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "name=" + name},
+		nir.Const{Loc: loc, Value: bodyText},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
+		nir.Const{Loc: loc, Value: c.moduleContext},
 	}
-	if !strings.Contains(text, "'.'") && !strings.Contains(text, "\".\"") &&
-		!strings.Contains(text, "'['") && !strings.Contains(text, "\"[\"") {
-		return nil
+	for _, tok := range c.classContext {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
-	if strings.Contains(text, "format_spec") &&
-		(strings.Contains(text, "'{'") || strings.Contains(text, "\"{\"") ||
-			strings.Contains(text, "'}'") || strings.Contains(text, "\"}\"")) {
-		return nil
+	contextPath := "analysis.function.context"
+	sourcePath := "analysis.function.context.source"
+	sinkPath := "analysis.function.context.sink"
+	tmp := "__vyql_function_context"
+	sinkArgs := append([]nir.Expr{nir.Name{ID: tmp, Loc: loc}}, args...)
+	return []nir.Stmt{
+		nir.Assign{Targets: []string{tmp}, Value: nir.Call{
+			Callee: nir.Name{ID: sourcePath, Loc: loc},
+			Args:   args,
+			Path:   sourcePath,
+			Method: "source",
+			Loc:    loc,
+		}},
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: contextPath, Loc: loc},
+			Args:   args,
+			Path:   contextPath,
+			Method: "context",
+			Loc:    loc,
+		}},
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: sinkPath, Loc: loc},
+			Args:   sinkArgs,
+			Path:   sinkPath,
+			Method: "sink",
+			Loc:    loc,
+		}},
 	}
-	path := "security.template.fstring.validation.incomplete"
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
-		Callee: nir.Name{ID: path, Loc: c.loc(fn)},
-		Path:   path,
-		Method: lastSeg(path),
-		Loc:    c.loc(fn),
-	}}}
+}
+
+func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string) []string {
+	body := c.text(field(n, "body"))
+	return []string{
+		"class_name=" + name,
+		"class_bases=" + strings.Join(bases, ","),
+		body,
+		strings.Join(strings.Fields(body), ""),
+	}
+}
+
+func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
+	var toks []string
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "string" || n.Kind() == "concatenated_string" {
+			toks = append(toks, c.text(n))
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return strings.Join(toks, "\n")
 }
 
 // clauseBlock returns the lowered statements of a clause's `block` child.
@@ -545,62 +603,93 @@ func (c *pyConv) block(block *tree_sitter.Node) []nir.Stmt {
 	return c.blockChildren(block)
 }
 
-// pyRouteMethods are the decorator attributes that mark a request handler whose
-// parameters are bound from the request (FastAPI/Flask/Starlette/APIRouter).
-var pyRouteMethods = map[string]bool{
-	"get": true, "post": true, "put": true, "delete": true, "patch": true,
-	"head": true, "options": true, "route": true, "websocket": true, "api_route": true,
-}
-
-// seedResolverParams seeds a GraphQL resolver's query-argument params (those
-// after the conventional self/info/root/parent positions) as http_input.
-func (c *pyConv) seedResolverParams(params []string, L string) []nir.Stmt {
-	skip := map[string]bool{"self": true, "cls": true, "info": true, "root": true, "parent": true, "_": true}
-	var seed []nir.Stmt
-	for _, p := range params {
-		if skip[p] {
-			continue
+func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
 		}
-		seed = append(seed, nir.Assign{Targets: []string{p},
-			Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+		seen[tok] = true
+		out = append(out, tok)
 	}
-	return seed
-}
-
-// hasRouteDecorator reports whether a decorated_definition carries a route
-// decorator like `@app.get("/x")` / `@router.post(...)` / `@app.route(...)`.
-func (c *pyConv) hasRouteDecorator(n *tree_sitter.Node) bool {
 	for _, ch := range namedChildren(n) {
 		if ch.Kind() != "decorator" {
 			continue
 		}
-		// the decorator's expression: a call (`app.get(...)`) or bare attribute.
-		var name string
-		var walk func(m *tree_sitter.Node)
-		walk = func(m *tree_sitter.Node) {
-			if m == nil || name != "" {
-				return
-			}
-			if m.Kind() == "attribute" {
-				if a := field(m, "attribute"); a != nil {
-					name = c.text(a)
-				}
-				return
-			}
-			if m.Kind() == "call" {
-				walk(field(m, "function"))
-				return
-			}
-			for _, k := range namedChildren(m) {
-				walk(k)
-			}
-		}
-		walk(ch)
-		if pyRouteMethods[name] {
-			return true
+		path := c.pyDecoratorPath(ch)
+		add("decorator_path:" + path)
+		if i := strings.LastIndex(path, "."); i >= 0 {
+			add("decorator_method:" + path[i+1:])
+		} else {
+			add("decorator_method:" + path)
 		}
 	}
-	return false
+	return out
+}
+
+func (c *pyConv) pyParamEntries(name string, params []string, base []string) []nir.ParamEntry {
+	var out []nir.ParamEntry
+	for i, p := range params {
+		tokens := append([]string{}, base...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return out
+}
+
+func (c *pyConv) pyDecoratorPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Kind() {
+	case "decorator", "call":
+		if p := c.pyDecoratorPath(field(n, "function")); p != "" {
+			return p
+		}
+	case "attribute":
+		base := c.pyDecoratorPath(field(n, "object"))
+		if base == "" {
+			base = c.pyDecoratorPath(field(n, "value"))
+		}
+		attr := c.text(field(n, "attribute"))
+		if base == "" {
+			return attr
+		}
+		if attr == "" {
+			return base
+		}
+		return base + "." + attr
+	case "identifier":
+		return c.text(n)
+	}
+	for _, ch := range namedChildren(n) {
+		if p := c.pyDecoratorPath(ch); p != "" {
+			return p
+		}
+	}
+	return ""
+}
+
+func (c *pyConv) pyClassBases(n *tree_sitter.Node) []string {
+	var bases []string
+	args := field(n, "superclasses")
+	if args == nil {
+		return bases
+	}
+	for _, ch := range namedChildren(args) {
+		if ch.Kind() == "keyword_argument" {
+			continue
+		}
+		base := c.dotted(ch)
+		if base == "" && ch.Kind() == "call" {
+			base = c.dotted(field(ch, "function"))
+		}
+		if base != "" {
+			bases = append(bases, base)
+		}
+	}
+	return bases
 }
 
 func (c *pyConv) params(params *tree_sitter.Node) []string {
@@ -611,12 +700,12 @@ func (c *pyConv) params(params *tree_sitter.Node) []string {
 	for _, ch := range namedChildren(params) {
 		switch ch.Kind() {
 		case "identifier":
-			out = append(out, c.text(ch))
+			out = append(out, pyParamName(c.text(ch)))
 		case "default_parameter", "typed_parameter", "typed_default_parameter":
 			if nm := field(ch, "name"); nm != nil {
-				out = append(out, c.text(nm))
+				out = append(out, pyParamName(c.text(nm)))
 			} else if kids := namedChildren(ch); len(kids) > 0 {
-				out = append(out, c.text(kids[0]))
+				out = append(out, pyParamName(c.text(kids[0])))
 			}
 		}
 	}
@@ -633,14 +722,18 @@ func (c *pyConv) paramTypes(params *tree_sitter.Node) map[string]string {
 		case "typed_parameter", "typed_default_parameter":
 			name := ""
 			if nm := field(ch, "name"); nm != nil {
-				name = c.text(nm)
+				name = pyParamName(c.text(nm))
 			} else if kids := namedChildren(ch); len(kids) > 0 {
-				name = c.text(kids[0])
+				name = pyParamName(c.text(kids[0]))
 			}
 			putParamType(out, name, paramTypeFromField(c, ch))
 		}
 	}
 	return out
+}
+
+func pyParamName(name string) string {
+	return strings.TrimLeft(name, "*")
 }
 
 func (c *pyConv) targets(left *tree_sitter.Node) []string {
@@ -683,7 +776,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(interps) > 0 {
 			return nir.Format{Parts: interps, Loc: L}
 		}
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: c.text(n)}
 	case "integer", "float":
 		// carry the literal text so value-matching can see numeric modes/flags
 		// (e.g. os.chmod(p, 0o777)); taint is unaffected (Value is val-match only).
@@ -693,6 +786,11 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "keyword_argument":
 		return nir.Pair{Key: c.keyName(field(n, "name")), Value: c.expr(field(n, "value")), Loc: L}
+	case "list_splat", "dictionary_splat":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return nir.Thru{Inner: c.expr(kids[0])}
+		}
+		return nir.Const{Loc: L}
 	case "dictionary":
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
@@ -705,13 +803,19 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "attribute")), Path: c.dotted(n), Loc: L}
 	case "subscript":
 		return nir.Index{Base: c.expr(field(n, "value")), Key: c.expr(field(n, "subscript")), Path: c.dotted(field(n, "value")), Loc: L}
+	case "slice":
+		return nir.Const{Loc: L, Value: c.text(n)}
 	case "call":
 		fn := field(n, "function")
 		path := c.dotted(fn)
 		var arglist []nir.Expr
 		if args := field(n, "arguments"); args != nil {
-			for _, a := range namedChildren(args) {
-				arglist = append(arglist, c.expr(a))
+			if args.Kind() == "generator_expression" {
+				arglist = append(arglist, c.expr(args))
+			} else {
+				for _, a := range namedChildren(args) {
+					arglist = append(arglist, c.expr(a))
+				}
 			}
 		}
 		method := path
@@ -757,6 +861,8 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
+	case "generator_expression", "list_comprehension", "set_comprehension":
+		return c.comprehensionValue(n, L)
 	case "parenthesized_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return c.expr(kids[0])
@@ -767,6 +873,176 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
+	body := field(n, "body")
+	if body == nil {
+		var parts []nir.Expr
+		for _, ch := range namedChildren(n) {
+			parts = append(parts, c.expr(ch))
+		}
+		return nir.Seq{Parts: parts, Loc: loc}
+	}
+	out := c.expr(body)
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "for_in_clause" {
+			continue
+		}
+		names := c.targets(field(ch, "left"))
+		iter := field(ch, "right")
+		if len(names) == 0 || iter == nil {
+			break
+		}
+		repl := c.expr(iter)
+		for _, name := range names {
+			out = replaceName(out, name, repl)
+		}
+		break
+	}
+	return out
+}
+
+func replaceName(ex nir.Expr, name string, repl nir.Expr) nir.Expr {
+	switch e := ex.(type) {
+	case nil:
+		return e
+	case nir.Name:
+		if e.ID == name {
+			return cloneExpr(repl)
+		}
+		return e
+	case nir.Attr:
+		e.Base = replaceName(e.Base, name, repl)
+		return e
+	case nir.Index:
+		e.Base = replaceName(e.Base, name, repl)
+		e.Key = replaceName(e.Key, name, repl)
+		return e
+	case nir.Call:
+		e.Callee = replaceName(e.Callee, name, repl)
+		for i, a := range e.Args {
+			e.Args[i] = replaceName(a, name, repl)
+		}
+		return e
+	case nir.Format:
+		for i, p := range e.Parts {
+			e.Parts[i] = replaceName(p, name, repl)
+		}
+		return e
+	case nir.Seq:
+		for i, p := range e.Parts {
+			e.Parts[i] = replaceName(p, name, repl)
+		}
+		return e
+	case nir.Pair:
+		e.Value = replaceName(e.Value, name, repl)
+		return e
+	case nir.Thru:
+		e.Inner = replaceName(e.Inner, name, repl)
+		return e
+	case nir.BinOp:
+		e.Left = replaceName(e.Left, name, repl)
+		e.Right = replaceName(e.Right, name, repl)
+		return e
+	case nir.Unary:
+		e.Operand = replaceName(e.Operand, name, repl)
+		return e
+	case nir.Ternary:
+		e.Cond = replaceName(e.Cond, name, repl)
+		e.Then = replaceName(e.Then, name, repl)
+		e.Else = replaceName(e.Else, name, repl)
+		return e
+	case nir.Lambda:
+		return e
+	default:
+		return e
+	}
+}
+
+func cloneExpr(ex nir.Expr) nir.Expr {
+	switch e := ex.(type) {
+	case nil:
+		return e
+	case nir.Name, nir.Const:
+		return e
+	case nir.Attr:
+		e.Base = cloneExpr(e.Base)
+		return e
+	case nir.Index:
+		e.Base = cloneExpr(e.Base)
+		e.Key = cloneExpr(e.Key)
+		return e
+	case nir.Call:
+		e.Callee = cloneExpr(e.Callee)
+		e.Args = cloneExprs(e.Args)
+		return e
+	case nir.Format:
+		e.Parts = cloneExprs(e.Parts)
+		return e
+	case nir.Seq:
+		e.Parts = cloneExprs(e.Parts)
+		if len(e.KeyPath) > 0 {
+			e.KeyPath = append([]string(nil), e.KeyPath...)
+		}
+		return e
+	case nir.Pair:
+		e.Value = cloneExpr(e.Value)
+		return e
+	case nir.Thru:
+		e.Inner = cloneExpr(e.Inner)
+		return e
+	case nir.BinOp:
+		e.Left = cloneExpr(e.Left)
+		e.Right = cloneExpr(e.Right)
+		return e
+	case nir.Unary:
+		e.Operand = cloneExpr(e.Operand)
+		return e
+	case nir.Ternary:
+		e.Cond = cloneExpr(e.Cond)
+		e.Then = cloneExpr(e.Then)
+		e.Else = cloneExpr(e.Else)
+		return e
+	case nir.Lambda:
+		e.Body = cloneStmts(e.Body)
+		if e.ParamTypes != nil {
+			cp := map[string]string{}
+			for k, v := range e.ParamTypes {
+				cp[k] = v
+			}
+			e.ParamTypes = cp
+		}
+		if len(e.Params) > 0 {
+			e.Params = append([]string(nil), e.Params...)
+		}
+		if len(e.ParamEntries) > 0 {
+			e.ParamEntries = append([]nir.ParamEntry(nil), e.ParamEntries...)
+		}
+		return e
+	default:
+		return e
+	}
+}
+
+func cloneExprs(in []nir.Expr) []nir.Expr {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]nir.Expr, len(in))
+	for i, e := range in {
+		out[i] = cloneExpr(e)
+	}
+	return out
+}
+
+func cloneStmts(in []nir.Stmt) []nir.Stmt {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]nir.Stmt, len(in))
+	copy(out, in)
+	return out
 }
 
 // keyName returns the bare name of a Pair key node — an identifier as-is, or a

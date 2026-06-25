@@ -51,3 +51,13 @@ test "path-sensitive: a CSRF check in ONE branch does not cover the sink (real c
       pw = request.form["new_password"]
       account.change_password(pw)
   ```
+
+test "path-sensitive: a preflight validation loop covers a later bulk sink"
+  reject VYQL-PATH-004
+  graph
+  ```
+  node src core.UserControlledData {region=/fn1, order=1}
+  node guard core.PathAccessCheck {region=/fn1/loop2, order=3}
+  node sink code.ArchiveEntryWrite {region=/fn1, order=5}
+  edge FLOWS src -> sink
+  ```

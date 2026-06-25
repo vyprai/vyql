@@ -1,4 +1,3 @@
-call std.env.var
-call std.env.var.unwrap
-call std.process.Command.new
-call std.process.Command.new.arg
+call analysis.function.context
+call source.value
+call worker.run

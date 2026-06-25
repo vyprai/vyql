@@ -40,7 +40,7 @@ rule CleartextChannel {
 
 // Insecure cookie — set without the HttpOnly flag (CWE-614), value-ABSENCE presence.
 rule InsecureCookie {
-  meta { id: "VYQL-CFG-007", severity: low, cwe: [CWE_614] }
+  meta { id: "VYQL-CFG-007", severity: low, cwe: [CWE_614], benchmark: securecookie }
   match code.InsecureCookie as c
 }
 
@@ -80,10 +80,16 @@ rule WildcardIamPolicy {
 
 // Trust-boundary violation (CWE-501) — untrusted data stored into the HTTP session.
 rule TrustBoundary {
-  meta { id: "VYQL-CFG-014", severity: medium, cwe: [CWE_501] }
+  meta { id: "VYQL-CFG-014", severity: medium, cwe: [CWE_501], benchmark: trustbound }
   // data that passed through a validator/authenticator (login(), an @vyql:validator
   // function) before reaching the store is no longer an untrusted-data violation.
   taint core.UserControlledData -> code.TrustBoundary
     unless sanitized_by core.InputValidation
 }
 
+// Network policy enforcement explicitly disabled. Linux bridge netfilter sysctls
+// set to 0 bypass iptables/ip6tables/arptables filtering for bridged traffic.
+rule NetworkFilteringDisabled {
+  meta { id: "VYQL-CFG-015", severity: high, cwe: [CWE_284] }
+  match code.NetworkFilteringDisabled as n
+}

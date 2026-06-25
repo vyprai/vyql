@@ -10,10 +10,9 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// evalOne compiles a single-rule program and evaluates it over a store.
 func evalOne(t *testing.T, src string, s usg.Store) int {
 	t.Helper()
-	onto := ontology.Seed()
+	onto := runtimeTestOntology()
 	decls, err := parser.Parse(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -29,65 +28,72 @@ func evalOne(t *testing.T, src string, s usg.Store) int {
 	return len(fs)
 }
 
-// Runtime rule pack (docs/11 Part B) evaluated over a PRE-AGGREGATED runtime
-// snapshot — "ordinary VyQL rules… no special machinery beyond the streaming
-// evaluator". The streaming evaluator + telemetry aggregation are deferred; here
-// the runtime.* aggregate nodes are hand-built and the rules run on the batch
-// engine, which is the oracle the streaming engine must later match.
+func runtimeTestOntology() *ontology.Ontology {
+	onto := contextTestOntology()
+	onto.Add(ontology.Concept{Name: "Link", Package: "custom", Kind: "asset"})
+	onto.Add(ontology.Concept{Name: "Indicator", Package: "custom", Kind: "asset"})
+	onto.Add(ontology.Concept{Name: "Process", Package: "custom", Kind: "asset"})
+	onto.Add(ontology.Concept{
+		Name:                    "ObservedLink",
+		Package:                 "custom",
+		Kind:                    "observation",
+		ContextConfirmDstProp:   "dst",
+		ContextConfirmFlagProp:  "observed",
+		ContextConfirmFlagValue: "yes",
+		ContextConfirmLabel:     "confirmed by runtime",
+	})
+	return onto
+}
 
-// `match runtime.Connection as c where c.dst labeled threat.MiningPool`.
-func TestRuntimeMiningEgress(t *testing.T) {
+func TestRuntimeLinkToLabeledTarget(t *testing.T) {
 	rule := `
-package vypr.runtime;
-rule CryptoMiningEgress {
-  meta { id: "VYQL-RTM-004", severity: high, attack: [T1496] }
-  match runtime.Connection as c
-  where c.dst labeled threat.MiningPool
+package test;
+rule LinkToLabeledTarget {
+  meta { id: "TEST-RUNTIME-004", severity: high }
+  match custom.Link as c
+  where c.dst labeled custom.Indicator
 }
 `
 	s := usg.NewInMemStore()
-	// pool is a known mining pool (threat-intel projection); cdn is benign
-	s.AddNode(usg.Node{ID: "pool", Type: "cloud.Internet"})
-	s.AddLabel("pool", usg.Label{Concept: "threat.MiningPool"})
-	s.AddNode(usg.Node{ID: "cdn", Type: "cloud.Internet"})
-	// two observed connections; only the one to the pool should fire
-	s.AddNode(usg.Node{ID: "conn1", Type: "runtime.Connection", Props: map[string]string{"dst": "pool"}})
-	s.AddLabel("conn1", usg.Label{Concept: "runtime.Connection"})
-	s.AddNode(usg.Node{ID: "conn2", Type: "runtime.Connection", Props: map[string]string{"dst": "cdn"}})
-	s.AddLabel("conn2", usg.Label{Concept: "runtime.Connection"})
+	s.AddNode(usg.Node{ID: "marked", Type: "custom.Endpoint"})
+	s.AddLabel("marked", usg.Label{Concept: "custom.Indicator"})
+	s.AddNode(usg.Node{ID: "plain", Type: "custom.Endpoint"})
+	s.AddNode(usg.Node{ID: "link1", Type: "custom.Link", Props: map[string]string{"dst": "marked"}})
+	s.AddLabel("link1", usg.Label{Concept: "custom.Link"})
+	s.AddNode(usg.Node{ID: "link2", Type: "custom.Link", Props: map[string]string{"dst": "plain"}})
+	s.AddLabel("link2", usg.Label{Concept: "custom.Link"})
 
 	if n := evalOne(t, rule, s); n != 1 {
-		t.Fatalf("mining-egress should fire once (the pool connection), got %d", n)
+		t.Fatalf("link rule should fire once, got %d", n)
 	}
 }
 
-// `match runtime.Process as p where p.image not in [<declared images>]`.
-func TestRuntimeWorkloadDrift(t *testing.T) {
+func TestRuntimePropertyDrift(t *testing.T) {
 	rule := `
-package vypr.runtime;
-rule WorkloadDrift {
-  meta { id: "VYQL-RTM-003", severity: high }
-  match runtime.Process as p
-  where p.image not in [nginx, redis]
+package test;
+rule PropertyDrift {
+  meta { id: "TEST-RUNTIME-003", severity: high }
+  match custom.Process as p
+  where p.image not in [expectedA, expectedB]
 }
 `
 	s := usg.NewInMemStore()
-	s.AddNode(usg.Node{ID: "proc1", Type: "runtime.Process", Props: map[string]string{"image": "xmrig"}})
-	s.AddLabel("proc1", usg.Label{Concept: "runtime.Process"})
-	s.AddNode(usg.Node{ID: "proc2", Type: "runtime.Process", Props: map[string]string{"image": "nginx"}})
-	s.AddLabel("proc2", usg.Label{Concept: "runtime.Process"})
+	s.AddNode(usg.Node{ID: "proc1", Type: "custom.Process", Props: map[string]string{"image": "unexpected"}})
+	s.AddLabel("proc1", usg.Label{Concept: "custom.Process"})
+	s.AddNode(usg.Node{ID: "proc2", Type: "custom.Process", Props: map[string]string{"image": "expectedA"}})
+	s.AddLabel("proc2", usg.Label{Concept: "custom.Process"})
 
 	if n := evalOne(t, rule, s); n != 1 {
-		t.Fatalf("drift should fire once (the undeclared xmrig image), got %d", n)
+		t.Fatalf("drift should fire once, got %d", n)
 	}
 }
 
-// Static↔runtime confirmation (docs/11 Part B → docs/17): a statically
-// predicted internet exposure that is OBSERVED in the runtime snapshot is
-// "confirmed", and the risk layer escalates the finding's priority band.
 func TestRuntimeConfirmationEscalatesRisk(t *testing.T) {
-	onto := ontology.Seed()
-	decls, _ := parser.Parse(sqliRule)
+	onto := runtimeTestOntology()
+	if edge, err := onto.Get("custom.Edge"); err == nil {
+		edge.ContextReachLabel = "internet-reachable"
+	}
+	decls, _ := parser.Parse(flowRule)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -95,20 +101,19 @@ func TestRuntimeConfirmationEscalatesRisk(t *testing.T) {
 
 	build := func(observed bool) usg.Store {
 		s := usg.NewInMemStore()
-		s.AddNode(usg.Node{ID: "svc", Type: "cloud.Container", Props: map[string]string{"loc": "svc"}})
-		s.AddNode(usg.Node{ID: "in", Type: "code.X", Props: map[string]string{"loc": "h.py:1"}})
-		s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "h.py:2", "service": "svc"}})
-		s.AddLabel("in", usg.Label{Concept: "code.HttpInput"})
-		s.AddLabel("q", usg.Label{Concept: "code.SqlExecution"})
+		s.AddNode(usg.Node{ID: "svc", Type: "custom.Service", Props: map[string]string{"loc": "svc"}})
+		s.AddNode(usg.Node{ID: "in", Type: "code.X", Props: map[string]string{"loc": "flow:1"}})
+		s.AddNode(usg.Node{ID: "q", Type: "code.X", Props: map[string]string{"loc": "flow:2", "endpoint": "svc"}})
+		s.AddLabel("in", usg.Label{Concept: "custom.Input"})
+		s.AddLabel("q", usg.Label{Concept: "custom.Target"})
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
-		s.AddNode(usg.Node{ID: "internet", Type: "cloud.Internet", Props: map[string]string{"loc": "0.0.0.0/0"}})
-		s.AddLabel("internet", usg.Label{Concept: "cloud.Internet"})
-		s.AddEdge(usg.Edge{Type: "NET", Src: "internet", Dst: "svc", Props: map[string]string{"rule": "sg-pub:443"}})
+		s.AddNode(usg.Node{ID: "edge", Type: "custom.Edge", Props: map[string]string{"loc": "edge"}})
+		s.AddLabel("edge", usg.Label{Concept: "custom.Edge"})
+		s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "svc", Props: map[string]string{"rule": "edge-svc"}})
 		if observed {
-			// a pre-aggregated runtime.Connection observed from an external src to svc
-			s.AddNode(usg.Node{ID: "rconn", Type: "runtime.Connection",
-				Props: map[string]string{"dst": "svc", "external": "true", "evidence_ref": "ocsf://win/2024-..."}})
-			s.AddLabel("rconn", usg.Label{Concept: "runtime.Connection"})
+			s.AddNode(usg.Node{ID: "observed", Type: "custom.Observation",
+				Props: map[string]string{"dst": "svc", "observed": "yes", "evidence_ref": "observed://example"}})
+			s.AddLabel("observed", usg.Label{Concept: "custom.ObservedLink"})
 		}
 		return s
 	}

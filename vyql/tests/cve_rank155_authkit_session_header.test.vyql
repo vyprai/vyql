@@ -1,0 +1,103 @@
+# Rank 155 / CVE-2024-29901: AuthKit middleware forwarded client-controlled
+# request headers without first stripping x-workos-session. Downstream getUser()
+# trusted that header as the middleware-owned session channel.
+
+test "rank155: typescript authkit middleware must strip client session header"
+  lang javascript
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  import { cookies } from 'next/headers';
+  import { NextRequest, NextResponse } from 'next/server';
+
+  const sessionHeaderName = 'x-workos-session';
+
+  async function getSessionFromCookie() {
+    return undefined;
+  }
+
+  async function verifyAccessToken(token) {
+    return false;
+  }
+
+  async function encryptSession(session) {
+    return 'sealed';
+  }
+
+  async function updateSession(request, debug) {
+    const session = await getSessionFromCookie();
+    const newRequestHeaders = new Headers(request.headers);
+
+    if (!session) {
+      return NextResponse.next({
+        request: { headers: newRequestHeaders },
+      });
+    }
+
+    const hasValidSession = await verifyAccessToken(session.accessToken);
+
+    if (hasValidSession) {
+      newRequestHeaders.set(sessionHeaderName, cookies().get('authkit')!.value);
+      return NextResponse.next({
+        request: { headers: newRequestHeaders },
+      });
+    }
+
+    const encryptedSession = await encryptSession(session);
+    newRequestHeaders.set(sessionHeaderName, encryptedSession);
+    return NextResponse.next({
+      request: { headers: newRequestHeaders },
+    });
+  }
+  ```
+
+test "rank155: typescript authkit middleware strips client session header"
+  lang javascript
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  import { cookies } from 'next/headers';
+  import { NextRequest, NextResponse } from 'next/server';
+
+  const sessionHeaderName = 'x-workos-session';
+
+  async function getSessionFromCookie() {
+    return undefined;
+  }
+
+  async function verifyAccessToken(token) {
+    return false;
+  }
+
+  async function encryptSession(session) {
+    return 'sealed';
+  }
+
+  async function updateSession(request, debug) {
+    const session = await getSessionFromCookie();
+    const newRequestHeaders = new Headers(request.headers);
+
+    newRequestHeaders.delete(sessionHeaderName);
+
+    if (!session) {
+      return NextResponse.next({
+        request: { headers: newRequestHeaders },
+      });
+    }
+
+    const hasValidSession = await verifyAccessToken(session.accessToken);
+
+    if (hasValidSession) {
+      newRequestHeaders.set(sessionHeaderName, cookies().get('authkit')!.value);
+      return NextResponse.next({
+        request: { headers: newRequestHeaders },
+      });
+    }
+
+    const encryptedSession = await encryptSession(session);
+    newRequestHeaders.set(sessionHeaderName, encryptedSession);
+    return NextResponse.next({
+      request: { headers: newRequestHeaders },
+    });
+  }
+  ```

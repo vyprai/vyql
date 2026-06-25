@@ -1,3 +1,2 @@
-attr Platform.environment
-attr Platform.environment.
-call db.rawQuery
+call source.value
+call worker.run

@@ -388,3 +388,40 @@ test "resource-leak: a Perl file handle never closed leaks"
     print <$fh>;
   }
   ```
+
+test "resource-leak: clearing an owned field before freeing the owner can leak nested state"
+  lang c
+  expect VYQL-RES-002
+  code
+  ```
+  typedef struct _xmlDoc {
+      void *oldNs;
+  } xmlDoc;
+  typedef xmlDoc *xmlDocPtr;
+  void xmlFreeDoc(xmlDocPtr doc);
+
+  int parse(xmlDocPtr doc, xmlDocPtr newDoc) {
+      newDoc->oldNs = NULL;
+      xmlFreeDoc(newDoc);
+      return 0;
+  }
+  ```
+
+test "resource-leak: conditional owner field clear does not dominate owner free"
+  lang c
+  reject VYQL-RES-002
+  code
+  ```
+  typedef struct _xmlDoc {
+      void *oldNs;
+  } xmlDoc;
+  typedef xmlDoc *xmlDocPtr;
+  void xmlFreeDoc(xmlDocPtr doc);
+
+  int parse(xmlDocPtr doc, xmlDocPtr newDoc) {
+      if (doc != 0)
+          newDoc->oldNs = NULL;
+      xmlFreeDoc(newDoc);
+      return 0;
+  }
+  ```

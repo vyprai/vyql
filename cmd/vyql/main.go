@@ -6,7 +6,7 @@
 // Usage:
 //
 //	vyql scan [flags] <path>...
-//	  -rules <file|dir>   load rule(s) from .vyql file(s) (default: built-in SQLi)
+//	  -rules <file|dir>   load rule(s) from .vyql file(s)
 //	  -format text|sarif  output format (default: text)
 //
 // Other languages and a tree-sitter frontend are the documented next step; this
@@ -56,9 +56,6 @@ func main() {
 				panic(r)
 			}
 			fmt.Fprintln(os.Stderr, "vyql: "+fmt.Sprint(r))
-			if os.Getenv("VYQL_DEBUG") != "" {
-				fmt.Fprintln(os.Stderr, string(debug.Stack()))
-			}
 			os.Exit(1)
 		}
 	}()
@@ -104,18 +101,18 @@ func main() {
 func cmdScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "load rule(s) from a .vyql file or directory (default: vyql/packs)")
-	format := fs.String("format", "text", "output format: text | sarif | json | graph-json")
-	profileName := fs.String("profile", "auto", "application threat-model profile: auto | "+profileNames())
+	format := fs.String("format", "text", "output format: text | sarif | json")
+	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
-	exclude := fs.String("exclude", "", "comma-separated glob patterns to skip, layered on the built-in deps/build skips (e.g. test,examples,*.spec.js)")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
+	exclude := fs.String("exclude", "", "comma-separated glob patterns to skip, layered on the built-in deps/build skips (e.g. test,examples,*.spec.js)")
 	_ = fs.Parse(args)
+	treesitter.SetExcludes(strings.Split(*exclude, ","))
 	paths := fs.Args()
 	if len(paths) == 0 {
 		usage()
 		os.Exit(2)
 	}
-	treesitter.SetExcludes(strings.Split(*exclude, ","))
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
 	return run(paths, *rulesPath, *format, *profileName, *stats)
@@ -182,8 +179,8 @@ func parseBytes(s string) (int64, error) {
 	return int64(f * float64(mult)), nil
 }
 
-// applyProfile selects the threat-model profile (explicit name or auto-detected),
-// sets the source trust boundary, and returns it for reporting.
+// applyProfile selects the analysis profile (explicit name or auto-detected),
+// sets the active source families, and returns it for reporting.
 func applyProfile(paths []string, name string) profile.Profile {
 	profiles, _ := profile.Load()
 	var p profile.Profile
@@ -213,57 +210,44 @@ func profileNames() string {
 // scanPaths runs the full pipeline (extract → lower → adapters → compile →
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework adapters.
-func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, error) {
-	all, _, _, stats, err := scanPathsFull(paths, rulesSrc)
-	return all, stats, err
-}
-
-// scanPathsFull is scanPaths plus the lowered graph and per-rule meta (keyed by the
-// finding's RuleID), which the graph-json export needs for node lookups and CWE.
-func scanPathsFull(paths []string, rulesSrc string) ([]*findings.Finding, usg.Store, map[string]map[string]any, scanStats, error) {
+func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, usg.Store, error) {
 	g, stats, err := buildGraph(paths)
 	if err != nil {
-		return nil, nil, nil, stats, err
+		return nil, stats, nil, err
 	}
 	if g == nil {
-		return nil, nil, nil, stats, nil // recognized files, but nothing to analyze
+		return nil, stats, nil, nil // recognized files, but nothing to analyze
 	}
 	onto := ontology.Seed()
 	decls, err := parser.Parse(rulesSrc)
 	if err != nil {
-		return nil, nil, nil, stats, fmt.Errorf("rule parse: %w", err)
+		return nil, stats, g, fmt.Errorf("rule parse: %w", err)
 	}
 	compiled, cerrs := engine.CompileRules(decls, onto)
 	if len(cerrs) != 0 {
 		for _, e := range cerrs {
 			fmt.Fprintln(os.Stderr, "rule error: "+e.Error())
 		}
-		return nil, nil, nil, stats, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
+		return nil, stats, g, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
 	}
 	eng := engine.New(onto, g)
 	var all []*findings.Finding
-	meta := map[string]map[string]any{}
 	tk := newTimer()
 	for _, cr := range compiled {
-		id, _ := cr.Rule.Meta["id"].(string)
-		if id == "" {
-			id = cr.Rule.QualifiedName()
-		}
-		meta[id] = cr.Rule.Meta
 		got, err := eng.Evaluate(cr)
 		if err != nil {
-			return nil, nil, nil, stats, err
+			return nil, stats, g, err
 		}
 		all = append(all, got...)
 	}
-	// Possibility mode (opt-in, for the AI/triage pass): surface every dangerous-concept
-	// site the confirmed rules did not flag, as low-confidence "possibility" findings. OFF
-	// by default so the protected benchmarks are unaffected.
+	// Possibility mode (opt-in, for the AI/triage pass): surface ontology sink
+	// sites the confirmed rules did not flag, as low-confidence "possibility"
+	// findings. OFF by default so the protected benchmarks are unaffected.
 	if os.Getenv("VYQL_POSSIBILITY") != "" {
 		all = append(all, eng.PossibilityFindings(all)...)
 	}
 	tk.mark("evaluate")
-	return all, g, meta, stats, nil
+	return all, stats, g, nil
 }
 
 func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
@@ -278,57 +262,46 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	if err != nil {
 		return err
 	}
+	// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
+	// changed — no source file edit and no vyql/ data change — replay the cached findings and
+	// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
+	// reparse only the files that actually changed.
+	cache := parsecache.Shared()
+	tk := newTimer()
+	// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force the
+	// full pipeline (skip the whole-scan findings cache) so the collector is populated.
+	syncPath := syncOutputPath()
+	if syncPath != "" {
+		syncCollector = graphsync.New()
+	}
+	var rkey string
 	var all []*findings.Finding
 	var stats scanStats
-	var g usg.Store
-	var ruleMeta map[string]map[string]any
-
-	if format == "graph-json" {
-		// graph-json needs the live graph + per-rule meta; the whole-scan findings cache can't
-		// serve those, so always run the full pipeline for it (no cache replay).
-		all, g, ruleMeta, stats, err = scanPathsFull(paths, src)
+	var graph usg.Store
+	hit := false
+	if cache != nil && syncCollector == nil {
+		rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
+		if cs, ok := loadCachedScan(cache, rkey); ok {
+			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
+		}
+	}
+	tk.mark("fingerprint")
+	if !hit {
+		all, stats, graph, err = scanPaths(paths, src)
 		if err != nil {
 			return err
 		}
-	} else {
-		// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
-		// changed — no source file edit and no vyql/ data change — replay the cached findings and
-		// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
-		// reparse only the files that actually changed.
-		cache := parsecache.Shared()
-		tk := newTimer()
-		// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force the
-		// full pipeline (skip the whole-scan findings cache) so the collector is populated.
-		syncPath := syncOutputPath()
-		if syncPath != "" {
-			syncCollector = graphsync.New()
-		}
-		var rkey string
-		hit := false
 		if cache != nil && syncCollector == nil {
-			rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
-			if cs, ok := loadCachedScan(cache, rkey); ok {
-				all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
-			}
+			storeCachedScan(cache, rkey, all, stats)
 		}
-		tk.mark("fingerprint")
-		if !hit {
-			all, stats, err = scanPaths(paths, src)
-			if err != nil {
-				return err
-			}
-			if cache != nil && syncCollector == nil {
-				storeCachedScan(cache, rkey, all, stats)
-			}
+	}
+	if syncPath != "" {
+		n, e, l, d, serr := writeSyncDelta(syncPath)
+		if serr != nil {
+			return fmt.Errorf("graph sync: %w", serr)
 		}
-		if syncPath != "" {
-			n, e, l, d, serr := writeSyncDelta(syncPath)
-			if serr != nil {
-				return fmt.Errorf("graph sync: %w", serr)
-			}
-			fmt.Fprintf(os.Stderr, "[sync] wrote %s: %d node, %d edge, %d label upserts; %d module tombstones\n",
-				syncPath, n, e, l, d)
-		}
+		fmt.Fprintf(os.Stderr, "[sync] wrote %s: %d node, %d edge, %d label upserts; %d module tombstones\n",
+			syncPath, n, e, l, d)
 	}
 
 	// output
@@ -340,27 +313,14 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	case "json":
 		b, _ := json.MarshalIndent(findingsJSON(all), "", "  ")
 		fmt.Println(string(b))
-	case "graph-json":
-		root := ""
-		if len(paths) > 0 {
-			root = paths[0]
-		}
-		var doc gjDocument
-		if g != nil {
-			doc = buildGraphJSON(g, all, ruleMeta, root)
-		} else {
-			doc = gjDocument{SchemaVersion: gjSchemaVersion, Tool: gjTool{Name: "VyQL", Version: version}, Concepts: conceptLegend(), CodeMap: gjCodeMap{Root: root}}
-		}
-		b, _ := json.MarshalIndent(doc, "", "  ")
-		fmt.Println(string(b))
 	default:
-		fmt.Printf("threat model: %s (%s)\n\n", prof.Title, prof.Name)
+		fmt.Printf("analysis profile: %s (%s)\n\n", prof.Title, prof.Name)
 		printReport(all)
 		printSummary(stats, len(all))
 	}
 	if showStats {
 		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
-		printScanStats(paths)
+		printScanStats(graph, stats)
 	}
 	return nil
 }
@@ -440,7 +400,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json|graph-json -profile -stats]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats]")
 	fmt.Fprintln(os.Stderr, "  review     list non-finding review targets and supporting checks for AI/manual review   [-format text|json]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")

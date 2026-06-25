@@ -12,8 +12,19 @@ adapter javascript {
   // compiler callback through a cache/helper the analyzer cannot inline.
   source "options.timezone" -> core.UserControlledData
   source "config.timezone" -> core.UserControlledData
-  // NestJS route-handler params (@Body/@Query/@Param/@Headers), seeded by the frontend.
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Get" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Post" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Put" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Delete" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Patch" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Options" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:Head" -> code.HttpInput
+  source path "analysis.parameter.entry" val "decorator_method:All" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcMain" val "call_method:on" nval "param_index:0" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcMain" val "call_method:handle" nval "param_index:0" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcMain" val "call_method:once" nval "param_index:0" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcRenderer" val "call_method:on" nval "param_index:0" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcRenderer" val "call_method:once" nval "param_index:0" -> code.HttpInput
   source "req.body" -> code.HttpInput
   source "req.query" -> code.HttpInput
   source "req.params" -> code.HttpInput
@@ -47,10 +58,20 @@ adapter javascript {
   source "ctx.headers" -> code.HttpInput
   source "ctx.request.headers" -> code.HttpInput
   source "ctx.request.querystring" -> code.HttpInput
+  source "event.headers" -> code.HttpInput
+  source "event.multiValueHeaders" -> code.HttpInput
+  source "event.queryStringParameters" -> code.HttpInput
+  source "event.pathParameters" -> code.HttpInput
+  source "event.body" -> code.HttpInput
   // Build/CI environment variables are operator-controlled input; when concatenated
   // into shell-plugin script strings they become command injection input.
   source "process.env.NODE_ENV" -> core.UserControlledData
   source "process.env" -> code.SecretValue
+  // Parsed output from a shell command is external platform state. If a later
+  // shell command interpolates one of those parsed values, it is command input.
+  source path "execSync.toString.split.map" -> code.StoredDataRead
+  source path "child_process.execSync.toString.split.map" -> code.StoredDataRead
+  source path "cp.execSync.toString.split.map" -> code.StoredDataRead
   // vm2-style bridge boundary: arguments crossing from sandbox realm into host
   // function application are attacker-controlled by sandbox code.
   source "otherFromThisArguments" -> core.UserControlledData
@@ -60,9 +81,11 @@ adapter javascript {
   source "location.hash" -> code.DomInput
   source "location.href" -> code.DomInput
   source "location.pathname" -> code.DomInput
+  source "window.location" -> code.DomInput
   source "window.location.search" -> code.DomInput
   source "window.location.hash" -> code.DomInput
   source "window.location.href" -> code.DomInput
+  source "getPageQuery" -> code.DomInput
   source "document.location" -> code.DomInput
   source "document.URL" -> code.DomInput
   source "document.documentURI" -> code.DomInput
@@ -71,12 +94,13 @@ adapter javascript {
   source "localStorage.getItem" -> code.DomInput
   source "sessionStorage.getItem" -> code.DomInput
   source "document.cookie" -> code.DomInput
+  // Browser fetch/Response payloads are external data. SPAs often store parsed JSON
+  // in a client model and later render model fields into the DOM.
+  source "response.json" -> code.DomInput
+  source "res.json" -> code.DomInput
   source "queryParams" -> code.DomInput
   // jQuery data-* reads can carry server/user-controlled DOM content into client-side HTML.
   source method "data" -> code.DomInput
-  // clipboard / drag-and-drop payload (DataTransfer.getData / ClipboardEvent.clipboardData):
-  // the pasted/dropped content is attacker-influenced (a page can seed the clipboard).
-  source method "getData" -> code.DomInput
   // Browser UI helper option bags can be populated from attacker-controlled markup/URLs.
   source "opt.title" -> code.DomInput
   // Tooltip title metadata is copied from attacker-controlled DOM attributes in common
@@ -86,6 +110,11 @@ adapter javascript {
   // Parsed browser XML/HTML often comes from network responses; values extracted from it
   // are attacker-controlled unless independently verified.
   source method "parseFromString" -> core.UserControlledData
+  mark exact "analysis.function.context" val "lang=javascript" val "copyIn" val "file.path" val "info.extension" nval "sanitizeSvg" nval "DOMPurify" -> code.StoredHtmlWrite
+  mark exact "analysis.function.context" val "lang=javascript" val "newTomSelect" val "directoryName" val "return`<" nval "sanitizeDirectoryName" nval "textContent" nval "innerHTML" -> code.UnescapedHtmlOptionRenderer
+  mark exact "analysis.function.context" val "lang=javascript" val "getAttribute" val "data-content" val "optionContent" val "innerHTML" val "appendChild" nval "sanitizeHtml" nval "DOMPurify" nval "sanitize-html" -> code.UnescapedHtmlOptionRenderer
+  mark exact "analysis.module.context" val "lang=javascript" val "onCellHtmlData" val "htmlData" val "returnhtmlData" val "tableExport" val "escape:false" nval "escape:true" nval "returncell.text" nval "returncell.text()" -> code.UnescapedTableExportHtml
+  mark exact "analysis.module.context" val "lang=javascript" val "tar.extract" val "ignore:isSymlink" val "functionisSymlink(entry)" val "entry.type==='SymbolicLink'" nval "functionisSymlink(_,entry)" nval "entry.type==='symlink'" -> code.ArchiveSymlinkFilterBypass
   // Next.js App Router — searchParams (page prop / destructured) + nextUrl query
   source "searchParams" -> code.HttpInput
   source "req.nextUrl" -> code.HttpInput
@@ -138,25 +167,6 @@ adapter javascript {
   control "ensureAuthenticated" -> core.AuthenticationCheck
   control "isAuthenticated" -> core.AuthenticationCheck
   control "authenticate" -> core.AuthenticationCheck
-  // Broader Node/Express auth-middleware vocabulary. These are how real apps express
-  // an authentication gate; without them an AuthenticationCheck rarely suppresses
-  // AUTH-001/AUTH-003, leaving false positives on middleware-protected handlers. Only
-  // ADDS suppressions (never new findings). Passport (passport.authenticate), JWT
-  // verification (jwt.verify / verifyToken / verifyJWT), and connect-ensure-login
-  // (ensureLoggedIn) plus common login-guard names.
-  control "passport.authenticate" -> core.AuthenticationCheck
-  control "ensureLoggedIn" -> core.AuthenticationCheck
-  control "isLoggedIn" -> core.AuthenticationCheck
-  control "requireLogin" -> core.AuthenticationCheck
-  control "loginRequired" -> core.AuthenticationCheck
-  control "requireUser" -> core.AuthenticationCheck
-  control "requireSession" -> core.AuthenticationCheck
-  control "checkAuth" -> core.AuthenticationCheck
-  control "verifyToken" -> core.AuthenticationCheck
-  control "verifyJwt" -> core.AuthenticationCheck
-  control "verifyJWT" -> core.AuthenticationCheck
-  control "jwt.verify" -> core.AuthenticationCheck
-  control "authenticateToken" -> core.AuthenticationCheck
   // authorization checks (guards BIZ-001) — path-sensitive via B1.
   control "checkPermission" -> core.AuthorizationCheck
   control "hasPermission" -> core.AuthorizationCheck
@@ -165,13 +175,18 @@ adapter javascript {
   control "requireOwner" -> core.OwnershipCheck
   control "isOwner" -> core.OwnershipCheck
   control "ownsResource" -> core.OwnershipCheck
+  mark exact "analysis.function.context" val "isLocalRequest" val "isLocal||awaithasValidToken" nval "hasValidCliToken" -> code.LocalRequestBypassReview
+  mark exact "analysis.function.context" val "lang=javascript" val "authorized_keys?.includes(data.pubkey)" val "private_keys[data.pubkey]" val "!noscraper" nval "pubkeyInConfig" nval "authorized_keys?.length&&!pubkeyInConfig" -> code.AccessPolicyReview
+  mark exact "analysis.function.context" val "lang=javascript" val "user==username&&pass==password" nval "timingSafeCompare" nval "tsscmp" -> code.SecretComparisonReview
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
+  mark exact "analysis.function.context" val "lang=javascript" val "ctx.request?.method" val "POST" val "return;" val "callbackURL" val "redirectTo" val "trustedOrigins" val "validateURL" -> code.MethodGatedRedirectValidationBypass
   control "isSafeRedirect" -> core.RedirectAllowlist
   control "isValidRedirect" -> core.RedirectAllowlist
   control "isAllowedRedirect" -> core.RedirectAllowlist
   control "isUrlAllowed" -> core.AllowlistValidation
   control "isAllowedHost" -> core.AllowlistValidation
   control "validateUrl" -> core.AllowlistValidation
+  mark exact "analysis.function.context" val "name=updateDynamicPageSriHashes" val "integrityRegex.exec(attrs)" val "globalHashes[t2].set(src,sriHash)" nval "Detected reference to not explicitly allowed external resource" -> code.ExternalResourceIntegrityReview
   // Electron: shell.openExternal can launch arbitrary apps/protocols from a URL
   sink path "shell.openExternal" -> code.CommandExecution
   // Electron insecure renderer config (named-value on the BrowserWindow options)
@@ -222,6 +237,8 @@ adapter javascript {
   sink path "vm.runInContext" -> code.CodeEval
   sink path "vm.compileFunction" -> code.CodeEval
   sink path "vm2.run" -> code.CodeEval
+  mark "eval" val "ref." val "parts" -> code.RequestReferenceEval
+  mark exact "analysis.function.context" val "new VM" val "sandbox.templateFilters" val "sandbox.templateGlobals" val "vm.run" nval "isolated-vm" nval "Isolate" -> code.Vm2HostCallbackBridge
   sink path "globalEval" -> code.CodeEval
   sink path "require" -> code.DynamicCodeLoad
   sink path "import" -> code.DynamicCodeLoad
@@ -241,23 +258,12 @@ adapter javascript {
   sink path "yaml.load" -> code.Deserialization
   sink path "js-yaml.load" -> code.Deserialization
   sink path "jsyaml.load" -> code.Deserialization
-  // XML parsing (CWE-611 XXE) — libxmljs/xml2js/sax parse untrusted XML. The
-  // {noent:true} entity-expansion option makes libxmljs.parseXmlString classic XXE.
-  sink method "parseXmlString" -> code.XmlParse
-  sink method "parseXml" -> code.XmlParse
-  sink path "libxmljs.parseXmlString" -> code.XmlParse
-  sink path "libxmljs.parseXml" -> code.XmlParse
-  sink path "xml2js.parseString" -> code.XmlParse
-  sink path "xml2js.parseStringPromise" -> code.XmlParse
   sink path "axios.get" -> code.UrlFetch
   sink path "axios.post" -> code.UrlFetch
   sink path "axios.put" -> code.UrlFetch
   sink path "axios.delete" -> code.UrlFetch
   sink path "axios.request" -> code.UrlFetch
-  // `exact`: match the bare call `axios(cfg)` for SSRF, but NOT member access like
-  // `axios.Cancel = ...` / `axios.default = axios` (those are property assignments, not
-  // network calls — segment-prefix matching mislabelled them as UrlFetch sinks).
-  sink exact "axios" -> code.UrlFetch
+  sink path "axios" -> code.UrlFetch
   sink path "fetch" -> code.UrlFetch
   sink path "node-fetch" -> code.UrlFetch
   sink path "http.get" -> code.UrlFetch
@@ -268,6 +274,7 @@ adapter javascript {
   // headless-browser navigation (Puppeteer/Playwright `page.goto(url)`) fetches an
   // attacker-controllable URL server-side -> SSRF (CVE-2026-5323, a11y-mcp).
   sink method "goto" -> code.UrlFetch
+  mark exact "analysis.function.context" val "page.goto(request.url,requestOptions)" nval "request.url.trim().toLowerCase().substring(0,4)==='file'" -> code.LocalFileUrlNavigation
   sink path "request.get" -> code.UrlFetch
   sink path "request.post" -> code.UrlFetch
   sink path "needle.get" -> code.UrlFetch
@@ -312,6 +319,14 @@ adapter javascript {
   sink path "zip.extractEntryTo" -> code.ArchiveEntryWrite
   sink path "admZip.extractEntryTo" -> code.ArchiveEntryWrite
   sink path "entry.pipe" -> code.ArchiveEntryWrite
+  package "adm-zip" {
+    // Bulk extraction writes archive entry names chosen by the archive content.
+    // Model the constructed archive as untrusted data and the extraction receiver
+    // as the path-writing primitive; guarded_by PathAccessCheck handles preflight
+    // entry containment loops.
+    source path "adm-zip" -> code.ArchiveEntryName
+    sink receiver "extractAllTo" -> code.ArchiveEntryWrite
+  }
   sink path "User.findById" -> code.ObjectLookupByUserInput
   sink path "Account.findById" -> code.ObjectLookupByUserInput
   sink path "Order.findById" -> code.ObjectLookupByUserInput
@@ -359,21 +374,15 @@ adapter javascript {
   sink method "send" -> code.HtmlRender
   sink path "res.write" -> code.HtmlRender
   sink path "res.end" -> code.HtmlRender
-  // res.render(view, data): tainted values in the template data object reach the
-  // rendered HTML (reflected/stored XSS). arg 1 = the data object. Taint-gated, so
-  // it only fires when user input actually flows into the render — not on every view.
-  sink path "res.render" arg 1 -> code.HtmlRender
   sink path "dangerouslySetInnerHTML" -> code.HtmlRender
   sink path "innerHTML" -> code.HtmlRender
   sink path "outerHTML" -> code.HtmlRender
   sink path "document.write" -> code.HtmlRender
   sink path "insertAdjacentHTML" arg 1 -> code.HtmlRender
-  // DOM-based XSS via a link/script URL: writing untrusted data into a `.href`/`.src`
-  // property lets a `javascript:`/`data:` scheme execute (anchor href, iframe/script src).
-  // Member-writes lower to a path-sink call (see js frontend), so this fires only on the
-  // tainted WRITE, never a read (location.href stays a source).
-  sink path "href" -> code.HtmlRender
-  sink path "src" -> code.HtmlRender
+  // jQuery root calls can parse an HTML string, unlike scoped lookups such as
+  // $(document).find(selector).
+  sink exact "$" val "selector" -> code.HtmlRender
+  sink exact "jQuery" val "selector" -> code.HtmlRender
   sink path "$.html" -> code.HtmlRender
   sink path "el.html" -> code.HtmlRender
   sink method "html" -> code.HtmlRender
@@ -453,7 +462,10 @@ adapter javascript {
   control "validator.isAlphanumeric" -> core.InputValidation
   control "validator.isInt" -> core.InputValidation
   control "validator.isNumeric" -> core.InputValidation
+  mark "string.replace" val "&amp;" val "\\w+;" nval "#\\d" nval "#x" -> code.IncompleteHtmlEntityEscape
   control "encode" -> core.HtmlEscape
+  control "encodeEntities" -> core.HtmlEscape
+  control "escapeHTML" -> core.HtmlEscape
   control "escape-html" -> core.HtmlEscape
   control "he.encode" -> core.HtmlEscape
   control "validator.escape" -> core.HtmlEscape
@@ -492,6 +504,7 @@ adapter javascript {
   control method "sanitizeFilePath" -> core.PathCanonicalization
   control "checkLoadingAccess" -> core.PathAccessCheck
   control "isParentDirectory" -> core.PathAccessCheck
+  control "isWithin" -> core.PathAccessCheck
   // Custom / library LDAP & XPath escapers we cannot verify are complete for the sink grammar.
   assume sanitizer method "ldapEscape"      -> code.LdapQuery
   assume sanitizer path   "ldap.escapeFilter" -> code.LdapQuery
@@ -502,6 +515,9 @@ adapter javascript {
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "RegExp" -> code.RegexCompile
+  sink receiver "replace" val "+)*m" -> code.RegexMatch
+  mark "RegExp" val "d]*(?:;" -> code.CatastrophicRegex
+  mark method "match" val "^\\{(,+(?:(\\{,+\\})*),*|,*(?:(\\{,+\\})*),+)\\}" nval "^\\{((?:,|\\{,+\\})+)\\}" -> code.CatastrophicRegex
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "bulkCreate" -> code.MassAssign
@@ -515,6 +531,8 @@ adapter javascript {
   sink path "$.extend" arg 2 -> code.ProtoPollute
   sink path "jQuery.extend" arg 2 -> code.ProtoPollute
   sink path "__js_dynamic_property_write" -> code.ProtoPollute
+  control "analysis.function.context" val "curr[prop]===constructor.prototype" val "curr[prop]={}" -> core.PrototypePollutionGuard
+  mark exact "analysis.function.context" val "name=separateExposeGlobals" val "Object.keys(shims).forEach" val "exposeGlobals[k]=exp" val "onlyShims[k]=val" nval "k==='__proto__'||k==='constructor'" -> code.UncheckedPrototypeConfigKey
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute
@@ -527,6 +545,7 @@ adapter javascript {
   // weak cipher (CWE-327) value-matched
   // weak cipher (CWE-327): fire unless a strong AEAD/256-bit algorithm literal is present
   // (catches ecb/cbc/des/rc4/aes-128 + dynamic algorithm vars; accepts FP on dynamic-strong).
+  mark "simplecrypt" val "aes-192-ecb" -> code.WeakCipher
   mark "createCipheriv" nval "gcm" nval "chacha" nval "poly1305" -> code.WeakCipher
   mark "createCipheriv" val "0000000000000000" -> code.StaticIv
   mark "createCipheriv" val "000000000000" -> code.StaticIv
@@ -540,9 +559,6 @@ adapter javascript {
   mark "createHash" val "md2" -> code.WeakHash
   mark "createHash" val "sha1" -> code.WeakHash
   mark "createHash" val "ripemd" -> code.WeakHash
-  // The `md5` / `sha1` npm packages, called directly (md5(data)) — always weak.
-  mark "md5" -> code.WeakHash
-  mark "sha1" -> code.WeakHash
 
   // Package managers and monorepo tools execute project-controlled lifecycle
   // scripts during install/sync. Treat explicit installer invocations as code
@@ -574,10 +590,18 @@ adapter javascript {
   mark "https.get" val "rejectUnauthorized=false" -> code.CertValidationDisabled
   mark "https.Agent" val "rejectUnauthorized=false" -> code.CertValidationDisabled
   mark "tls.connect" val "rejectUnauthorized=false" -> code.CertValidationDisabled
+  mark exact "analysis.function.context" val "responseBuffer.push(chunk)" val "Buffer.concat(responseBuffer).length>config.maxContentLength" nval "stream.destroy()" -> code.UnboundedResourceOperation
+  mark exact "analysis.function.context" val "lang=javascript" val "body.split('&').length" val "len>limit?undefined:len-1" nval "indexOf('&'" -> code.UnboundedDelimiterSplitCount
+  mark exact "analysis.function.context" val "lang=javascript" val "Math.abs(numeric(n[2]))" val "test(i,y)" val "i+=incr" nval "Math.max(Math.abs(numeric(n[2])),1)" -> code.ZeroStepSequenceExpansion
   mark "fs.openSync" -> code.ResourceHandle
   mark "fs.open" -> code.ResourceHandle
   control "fs.closeSync" -> core.ResourceRelease
   control "fs.close" -> core.ResourceRelease
+  mark exact "analysis.function.context" val "maxContentLength" val "Buffer.concat(responseBuffer).length>config.maxContentLength" val "reject(createError" nval "stream.destroy" -> code.UnstoppedLimitedStream
+  mark exact "analysis.function.context" val "name=processMessage" val "protocolMsg" val "HISTORY_SYNC_NOTIFICATION" val "APP_STATE_SYNC_KEY_SHARE" val "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" nval "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe" -> code.ProtocolStateReview
+  mark exact "analysis.function.context" val "_downloadFromWorkingDir" val "join(localDirPath,file.name)" val "downloadTo(localPath,file.name)" nval "basename(file.name)" -> code.RemoteListingDownloadPath
+  mark exact "analysis.function.context" val "name=<lambda>" val "callbackData.hasOwnProperty(\"status\")" val "data.status==-1" val "callbackFun(callbackData)" nval "callbackData.status==-1" -> code.ClientAuthFailureResponseReview
+  mark exact "analysis.function.context" val "prisma.accounts.update" val "where:{id}" val "passwordHash" val "originalPassword" nval "currentUserId" nval "ctx.id" -> code.IdorPolicyReview
 
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
   mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified
@@ -589,18 +613,13 @@ adapter javascript {
   // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
   // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.
   mark "axios" val "http://" nval "127.0" -> code.CleartextChannel
+  // Reconstructing a browser Request while copying headers but dropping redirect policy
+  // can turn caller-specified `redirect: "error"` into the default follow behavior.
+  sink method "newRequest" arg 1 collection val "headers" nval "redirect" -> code.RequestPolicyStripped
 
   // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled (omission not flagged).
   mark "res.cookie" val "httpOnly=false" -> code.InsecureCookie
   mark "res.cookie" nval "secure=true" -> code.InsecureCookie
-  // session middleware with an explicitly insecure cookie flag
-  // (express-session / cookie-session: session({cookie:{secure:false}})).
-  // Calls resolve to the imported package path, so match that.
-  mark "express-session" val "secure=false" -> code.InsecureCookie
-  mark "express-session" val "httponly=false" -> code.InsecureCookie
-  mark "cookie-session" val "secure=false" -> code.InsecureCookie
-  mark "session" val "secure=false" -> code.InsecureCookie
-  mark "cookieSession" val "secure=false" -> code.InsecureCookie
 
   // permissive CORS (CWE-942) — ACAO header set to "*" (multi-val: name AND wildcard)
   mark "res.header" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
@@ -615,7 +634,7 @@ adapter javascript {
   mark "helmet" val "frameguard=false" -> code.MissingFrameProtection
 
   // character-filtering replace(/regex/g, repl): the engine analyzes the output
-  // alphabet (charfilter.go) -> sound sanitizer where it excludes the sink dangerous_chars.
+  // alphabet (charfilter.go) -> sound sanitizer where it excludes the sink excluded_chars.
   filter method "replace"
 
   // sqlite3 / better-sqlite3 — db.all/get/each/run/exec/prepare(sql, …). A non-SQL

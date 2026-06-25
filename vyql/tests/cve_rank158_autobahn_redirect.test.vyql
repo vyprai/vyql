@@ -1,0 +1,33 @@
+# Rank 158 / CVE-2020-35678: Autobahn accepted the `redirect`
+# query parameter directly as a status-page redirect target. The fix parses,
+# re-encodes, normalizes, and serializes it with hyperlink before redirecting.
+
+test "rank158: python autobahn raw redirect parameter reaches redirect target"
+  lang python
+  expect VYQL-RF-002
+  code
+  ```
+  import autobahn
+
+  class WebSocketServerProtocol:
+      def onConnect(self):
+          if "redirect" in self.http_request_params and len(self.http_request_params["redirect"]) > 0:
+              url = self.http_request_params["redirect"][0]
+              self.sendRedirect(url)
+  ```
+
+test "rank158: python autobahn hyperlink-normalized redirect parameter is clean"
+  lang python
+  reject VYQL-RF-002
+  code
+  ```
+  import autobahn
+  import hyperlink
+
+  class WebSocketServerProtocol:
+      def onConnect(self):
+          if "redirect" in self.http_request_params and len(self.http_request_params["redirect"]) > 0:
+              url = hyperlink.URL.from_text(self.http_request_params["redirect"][0])
+              url = url.to_uri().normalize().to_text()
+              self.sendRedirect(url)
+  ```

@@ -8,14 +8,26 @@ adapter rust {
   source "env.var" -> code.EnvVariable
   source "env.vars" -> code.EnvVariable
   source "env.args" -> code.CliArgument
-  // web handler params (actix/axum/rocket) seeded by the frontend
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:get" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:post" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:put" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:delete" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:patch" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:head" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:route" -> code.HttpInput
+  source path "analysis.parameter.entry" val "attr_name:handler" -> code.HttpInput
 
   // command execution — Command::new(prog) + .arg(x)/.args(x)
   sink path "Command.new" -> code.CommandExecution
   sink method "arg" -> code.CommandExecution
   sink method "args" -> code.CommandExecution
-  mark "security.rust.unsafe.mutable_alias" -> code.UnsafeMutableAlias
+  mark exact "analysis.function.context" val "lang=rust" val "&mut" val "as *const" val "as *mut" -> code.UnsafeMutableAlias
+  mark exact "analysis.rust.enum" val "kind:enum" val "repr:C" -> code.FfiEnumLayoutRisk
+  mark exact "analysis.rust.unsafe_impl" val "trait:Send" nval "bound:Send" -> code.UnsafeAutoTraitImpl
+  mark exact "analysis.rust.unsafe_impl" val "trait:Sync" nval "bound:Sync" -> code.UnsafeAutoTraitImpl
+  mark exact "analysis.function.context" val "lang=rust" val "with_capacity" val "as_mut_ptr" val "from_raw_parts_mut" val "read_exact" val "set_len" -> code.UninitializedBufferExposure
+  mark exact "analysis.function.context" val "lang=rust" val "as_mut_ptr" val "from_raw_parts_mut" val ".read(" val "set_len" -> code.UninitializedBufferExposure
+  mark exact "analysis.function.context" val "lang=rust" val ".next().await" nval "timeout" -> code.UnboundedResourceOperation
 
   // SSRF — HTTP clients (reqwest / ureq / surf); the URL is the call argument
   sink path "reqwest.get" -> code.UrlFetch
@@ -27,7 +39,8 @@ adapter rust {
   sink path "ureq.request" -> code.UrlFetch
   sink path "surf.get" -> code.UrlFetch
   sink path "surf.post" -> code.UrlFetch
-  mark "security.ipv4.denylist.incomplete" -> code.IncompleteIpDenylist
+  mark exact "analysis.function.context" val "lang=rust" val "is_private" val "is_loopback" val "is_link_local" val "is_multicast" val "is_documentation" nval "is_unspecified" -> code.IncompleteIpDenylist
+  mark exact "analysis.function.context" val "lang=rust" val "is_private" val "is_loopback" val "is_link_local" val "is_multicast" val "is_documentation" nval "is_broadcast" -> code.IncompleteIpDenylist
   mark "reqwest.get" val "http://" nval "127.0" -> code.CleartextChannel
   mark "reqwest.post" val "http://" nval "127.0" -> code.CleartextChannel
   mark "reqwest.Client.get" val "http://" nval "127.0" -> code.CleartextChannel
@@ -113,6 +126,7 @@ adapter rust {
   // deserialization
   sink path "serde_json.from_str" -> code.Deserialization
   sink path "serde_yaml.from_str" -> code.Deserialization
+  mark exact "b62_decode.expect" -> code.UncheckedDecodeResult
   sink method "find_by_id" -> code.ObjectLookupByUserInput
   sink method "get_user" -> code.ObjectLookupByUserInput
   sink method "get_account" -> code.ObjectLookupByUserInput

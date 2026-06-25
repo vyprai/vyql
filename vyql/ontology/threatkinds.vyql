@@ -15,6 +15,8 @@ threat Clickjacking { cwe: [CWE_1021], desc: "Improper restriction of rendered U
 module authentication;
 threat ImproperAuthentication { cwe: [CWE_287], desc: "Improper authentication" }
 threat MissingAuthentication { cwe: [CWE_306], desc: "Missing authentication for critical function" }
+threat WeakPasswordRecovery { cwe: [CWE_640], desc: "Weak password recovery mechanism" }
+threat AuthenticationBypass { cwe: [CWE_288], desc: "Authentication bypass using an alternate path or condition" }
 
 module business_logic;
 threat BusinessLogic { cwe: [CWE_841], desc: "Improper enforcement of behavioral workflow (business logic)" }
@@ -39,6 +41,8 @@ threat MissingEncryption { cwe: [CWE_311], desc: "Missing encryption of sensitiv
 threat WeakCrypto { cwe: [CWE_327], desc: "Use of a broken/risky cryptographic algorithm" }
 threat ImproperCertValidation { cwe: [CWE_295], desc: "Improper certificate validation (verification disabled)" }
 threat ImproperSignatureCheck { cwe: [CWE_347], desc: "Improper verification of cryptographic signature (e.g. JWT alg none)" }
+threat IncompleteSecurityIdentifier { cwe: [CWE_358], desc: "Security-sensitive identity check uses a shortened or ambiguous identifier" }
+threat ObservableDiscrepancy { cwe: [CWE_203, CWE_208], desc: "Secret-dependent comparison may expose observable or timing differences" }
 
 module deserialization;
 threat DeserializationAbuse { cwe: [CWE_502], desc: "Deserialization of untrusted data" }
@@ -63,6 +67,7 @@ threat FormatString { cwe: [CWE_134], desc: "Untrusted data used as a format str
 threat CrlfInjection { cwe: [CWE_93], desc: "Improper neutralization of CRLF sequences" }
 threat ExpressionLanguageInjection { cwe: [CWE_917], desc: "Untrusted data in an expression-language statement" }
 threat HttpResponseSplitting { cwe: [CWE_113], desc: "Untrusted data in HTTP headers" }
+threat ProtocolStateConfusion { cwe: [CWE_349], desc: "Protocol state transition accepts stale untrusted data as trusted data" }
 threat LdapInjection { cwe: [CWE_90], desc: "Untrusted data in an LDAP query" }
 threat LogInjection { cwe: [CWE_117], desc: "Untrusted data in log output" }
 threat NosqlInjection { cwe: [CWE_943], desc: "Untrusted data in a data-query/NoSQL command" }
@@ -80,6 +85,7 @@ threat NullDereference { cwe: [CWE_476], desc: "NULL pointer dereference" }
 threat OobRead { cwe: [CWE_125], desc: "Out-of-bounds read" }
 threat OobWrite { cwe: [CWE_787], desc: "Out-of-bounds write (buffer overflow)" }
 threat TypeConfusion { cwe: [CWE_843], desc: "Type confusion" }
+threat UninitializedUse { cwe: [CWE_908], desc: "Use of uninitialized resource" }
 threat UseAfterFree { cwe: [CWE_416], desc: "Use after free" }
 
 module numeric;
@@ -115,6 +121,7 @@ threat PrivilegedContainer { cwe: [CWE_250], desc: "Container running privileged
 threat HostNamespaceShare { cwe: [CWE_653], desc: "Pod/container shares a host namespace or mounts a host path (weak compartmentalization)" }
 threat PublicNetworkExposure { cwe: [CWE_284], desc: "Security group / firewall rule open to 0.0.0.0/0" }
 threat WildcardIamPolicy { cwe: [CWE_284], desc: "IAM policy grants wildcard action or resource" }
+threat NetworkFilteringDisabled { cwe: [CWE_284], desc: "Network filtering or policy enforcement is explicitly disabled" }
 
 module validation;
 threat ImproperEncoding { cwe: [CWE_116], desc: "Improper encoding/escaping of output" }
@@ -132,6 +139,7 @@ module mobile;
 threat WebViewInjection { cwe: [CWE_749], desc: "Untrusted data loaded/evaluated in a WebView, or a native bridge exposed to it" }
 threat ExportedComponent { cwe: [CWE_926], desc: "Android component exported to other apps without permission (android:exported=\"true\")" }
 threat DebuggableBuild { cwe: [CWE_489], desc: "Application shipped with debugging enabled (android:debuggable=\"true\")" }
+threat BackupExposure { cwe: [CWE_922], desc: "Sensitive mobile app data can be included in platform backup or restore" }
 
 module desktop;
 threat InsecureElectronConfig { cwe: [CWE_829], desc: "Electron renderer with nodeIntegration enabled / contextIsolation disabled (untrusted web content can run Node)" }

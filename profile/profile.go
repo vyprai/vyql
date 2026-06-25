@@ -1,7 +1,6 @@
-// Package profile implements application-archetype threat-modelling profiles
-// (design: plan/threat-profiles.md). A profile declares the trust boundary for a
-// kind of application — which entry-point source families are attacker-controlled
-// — plus fingerprints used to auto-detect the archetype from a project. Profiles
+// Package profile implements application-archetype analysis profiles. A profile
+// declares which entry-point source families are active for a kind of application,
+// plus fingerprints used to auto-detect the archetype from a project. Profiles
 // are authored as VyQL data in vyql/profiles/*.vyql.
 package profile
 
@@ -20,6 +19,7 @@ import (
 type Profile struct {
 	Name        string
 	Title       string
+	Priority    int      // tie-breaker when profiles have the same detection score
 	Detect      []string // fingerprints: "dep:x" | "file:rel" | "ext:.x"
 	Entrypoints []string // active source concept short names ("DomInput"); empty = all
 }
@@ -72,6 +72,7 @@ func Load() ([]Profile, error) {
 			out = append(out, Profile{
 				Name:        pd.Name,
 				Title:       str(pd.Fields["title"]),
+				Priority:    intField(pd.Fields["priority"]),
 				Detect:      list(pd.Fields["detect"]),
 				Entrypoints: list(pd.Fields["entrypoints"]),
 			})
@@ -91,7 +92,8 @@ func ByName(profiles []Profile, name string) (Profile, bool) {
 }
 
 // Detect picks the best-matching profile for a project rooted at the given paths,
-// by counting fingerprint hits; ties break by the order profiles are listed.
+// by counting fingerprint hits; ties use the data-defined profile priority, then
+// the order profiles are listed.
 // Returns the generic profile when nothing matches.
 func Detect(paths []string, profiles []Profile) Profile {
 	manifests := readManifests(paths)
@@ -115,14 +117,14 @@ func Detect(paths []string, profiles []Profile) Profile {
 					score++
 				}
 			case "npm":
-				if val == "library" && npmLibrary(paths) {
+				if val == "publishable" && npmPublishable(paths) {
 					// A publishable package manifest is a stronger archetype signal than
 					// incidental docs/demo frontend files inside the same repository.
 					score += 2
 				}
 			case "manifest":
-				if val == "library" && manifestLibrary(paths) {
-					score += 2 // a non-npm/python ecosystem library manifest (gem/crate/composer/pod)
+				if val == "publishable" && manifestPublishable(paths) {
+					score += 2 // a non-npm/python ecosystem publish manifest (gem/crate/composer/pod)
 				}
 			case "ext":
 				if exts[strings.ToLower(val)] {
@@ -130,7 +132,7 @@ func Detect(paths []string, profiles []Profile) Profile {
 				}
 			}
 		}
-		if score > bestScore {
+		if score > bestScore || (score == bestScore && score > 0 && p.Priority > best.Priority) {
 			best, bestScore = p, score
 		}
 	}
@@ -162,12 +164,12 @@ func packageJSONDepKeys(data []byte) string {
 	return b.String()
 }
 
-// manifestLibrary reports whether the project is a library/SDK in a non-npm/python
-// ecosystem, by its PUBLISH manifest: a *.gemspec (Ruby gem), *.podspec (CocoaPods),
-// Cargo.toml with a [lib] target (Rust crate lib), or composer.json with "type":"library"
-// (PHP). These are unambiguous library signals (apps don't ship them), so they won't flip
-// applications — and the OWASP ports have none of them.
-func manifestLibrary(paths []string) bool {
+// manifestPublishable reports whether the project is a library/SDK by its PUBLISH
+// manifest: a *.gemspec (Ruby gem), *.podspec (CocoaPods), Cargo.toml with a [lib] target
+// (Rust crate lib), composer.json with "type":"library" (PHP), plus .nuspec/.csproj NuGet
+// and Maven plugin packaging. These are unambiguous library signals (apps don't ship them),
+// so they won't flip applications — and the OWASP ports have none of them.
+func manifestPublishable(paths []string) bool {
 	for _, root := range roots(paths) {
 		found := false
 		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -186,7 +188,7 @@ func manifestLibrary(paths []string) bool {
 				found = true
 			case strings.HasSuffix(name, ".csproj"):
 				// a .NET project that declares NuGet PACKAGE metadata is a publishable
-				// library (apps don't); ignore Exe output projects.
+				// artifact; ignore Exe output projects.
 				if data, err := os.ReadFile(path); err == nil {
 					t := string(data)
 					if !strings.Contains(t, "<OutputType>Exe</OutputType>") && !strings.Contains(t, "<OutputType>WinExe</OutputType>") &&
@@ -196,10 +198,8 @@ func manifestLibrary(paths []string) bool {
 					}
 				}
 			case name == "pom.xml":
-				// A Maven artifact with hpi/maven-plugin packaging is unambiguously a
-				// plugin/library (never a deployable app), so its public-API params are the
-				// trust boundary. Plain-jar poms are NOT flipped — too many are apps and there
-				// is no Java OWASP gate to bound the precision cost.
+				// A Maven artifact with hpi/maven-plugin packaging is a publishable plugin.
+				// Plain-jar poms are too ambiguous to use as a profile fingerprint.
 				if data, err := os.ReadFile(path); err == nil {
 					t := string(data)
 					if strings.Contains(t, "<packaging>hpi</packaging>") || strings.Contains(t, "<packaging>maven-plugin</packaging>") {
@@ -238,7 +238,7 @@ func depMatch(manifests, dep string) bool {
 	return regexp.MustCompile(pat).FindStringIndex(manifests) != nil
 }
 
-func npmLibrary(paths []string) bool {
+func npmPublishable(paths []string) bool {
 	for _, root := range roots(paths) {
 		found := false
 		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -271,7 +271,7 @@ func npmLibrary(paths []string) bool {
 			if json.Unmarshal(data, &pkg) != nil || pkg.Private {
 				return nil
 			}
-			// A non-private package that declares any publish surface is a library/SDK.
+			// A non-private package that declares any publish surface is publishable.
 			// `main` is often omitted (defaults to index.js); also accept files/types/bin.
 			if pkg.Main != "" || pkg.Module != "" || len(pkg.Exports) > 0 ||
 				len(pkg.Files) > 0 || pkg.Types != "" || pkg.Typings != "" || len(pkg.Bin) > 0 {
@@ -289,14 +289,15 @@ func npmLibrary(paths []string) bool {
 // readManifests concatenates the text of common dependency manifests under the
 // scanned roots, so "dep:x" fingerprints can substring-match a declared dep.
 var (
-	jsonNameField = regexp.MustCompile(`"name"\s*:\s*"[^"]*"`)         // package.json / composer.json
-	tomlNameField = regexp.MustCompile(`(?m)^\s*name\s*=\s*"[^"]*"`)   // Cargo.toml / pyproject.toml
-	goModModule   = regexp.MustCompile(`(?m)^module\s+\S+`)            // go.mod self-path
+	jsonNameField = regexp.MustCompile(`"name"\s*:\s*"[^"]*"`)       // package.json / composer.json
+	tomlNameField = regexp.MustCompile(`(?m)^\s*name\s*=\s*"[^"]*"`) // Cargo.toml / pyproject.toml
+	goModModule   = regexp.MustCompile(`(?m)^module\s+\S+`)          // go.mod self-path
 )
 
 func readManifests(paths []string) string {
 	names := []string{"package.json", "requirements.txt", "pyproject.toml", "go.mod",
-		"Gemfile", "Gemfile.lock", "pom.xml", "build.gradle", "Cargo.toml", "composer.json"}
+		"Pipfile", "Pipfile.lock", "poetry.lock", "Gemfile", "Gemfile.lock", "pom.xml",
+		"build.gradle", "Cargo.toml", "composer.json"}
 	var b strings.Builder
 	for _, root := range roots(paths) {
 		for _, n := range names {
@@ -351,19 +352,74 @@ func fileExists(paths []string, rel string) bool {
 
 func roots(paths []string) []string {
 	var out []string
+	seen := map[string]bool{}
 	for _, p := range paths {
-		if info, err := os.Stat(p); err == nil && info.IsDir() {
-			out = append(out, p)
-		} else {
-			out = append(out, filepath.Dir(p))
+		root := projectRoot(p)
+		if seen[root] {
+			continue
 		}
+		seen[root] = true
+		out = append(out, root)
 	}
 	return out
+}
+
+func projectRoot(p string) string {
+	base := filepath.Clean(p)
+	if info, err := os.Stat(p); err == nil && info.IsDir() {
+		base = p
+	} else {
+		base = filepath.Dir(p)
+	}
+	fallback := filepath.Clean(base)
+	for {
+		if hasProjectMarker(base) {
+			return base
+		}
+		parent := filepath.Dir(base)
+		if parent == base {
+			return fallback
+		}
+		base = parent
+	}
+}
+
+func hasProjectMarker(dir string) bool {
+	markers := []string{
+		".git", "package.json", "setup.py", "setup.cfg", "pyproject.toml", "go.mod",
+		"Pipfile", "requirements.txt", "Gemfile", "pom.xml", "build.gradle",
+		"Cargo.toml", "composer.json", "AndroidManifest.xml", "Info.plist",
+		"Package.swift",
+	}
+	for _, marker := range markers {
+		if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+			return true
+		}
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.xcodeproj")); len(matches) > 0 {
+		return true
+	}
+	return false
 }
 
 func str(v any) string {
 	s, _ := v.(string)
 	return s
+}
+
+func intField(v any) int {
+	s := strings.TrimSpace(str(v))
+	if s == "" {
+		return 0
+	}
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n
 }
 
 func list(v any) []string {

@@ -1,0 +1,122 @@
+test "rank215: PostgreSQL field format slice lacks remaining-length check"
+  lang go
+  expect VYQL-MEM-010
+  code
+  ```
+  package pgsql
+
+  var errFieldBufferShort error
+  var errNoFieldName error
+
+  type pgsqlStream struct {
+    message *message
+  }
+
+  type message struct {
+    numberOfFields int
+  }
+
+  var common struct {
+    ReadString func([]byte) (string, error)
+    BytesNtohs func([]byte) uint16
+  }
+
+  func readCount(buf []byte) int { return int(buf[0]) }
+
+  func pgsqlFieldsParser(s *pgsqlStream, buf []byte) error {
+    m := s.message
+    if len(buf) < 2 {
+      return errFieldBufferShort
+    }
+
+    off := 2
+    fieldCount := readCount(buf)
+    fieldsFormat := []byte{}
+
+    for i := 0; i < fieldCount; i++ {
+      if len(buf) <= off {
+        return errFieldBufferShort
+      }
+
+      fieldName, err := common.ReadString(buf[off:])
+      if err != nil {
+        return errNoFieldName
+      }
+      m.numberOfFields++
+      off += len(fieldName) + 1
+      off += 4
+      off += 2
+      off += 4
+      off += 2
+      off += 4
+
+      format := common.BytesNtohs(buf[off : off+2])
+      off += 2
+      fieldsFormat = append(fieldsFormat, byte(format))
+    }
+    return nil
+  }
+  ```
+
+test "rank215: PostgreSQL field format slice checks remaining bytes"
+  lang go
+  reject VYQL-MEM-010
+  code
+  ```
+  package pgsql
+
+  var errFieldBufferShort error
+  var errNoFieldName error
+
+  type pgsqlStream struct {
+    message *message
+  }
+
+  type message struct {
+    numberOfFields int
+  }
+
+  var common struct {
+    ReadString func([]byte) (string, error)
+    BytesNtohs func([]byte) uint16
+  }
+
+  func readCount(buf []byte) int { return int(buf[0]) }
+
+  func pgsqlFieldsParser(s *pgsqlStream, buf []byte) error {
+    m := s.message
+    if len(buf) < 2 {
+      return errFieldBufferShort
+    }
+
+    off := 2
+    fieldCount := readCount(buf)
+    fieldsFormat := []byte{}
+
+    for i := 0; i < fieldCount; i++ {
+      if len(buf) <= off {
+        return errFieldBufferShort
+      }
+
+      fieldName, err := common.ReadString(buf[off:])
+      if err != nil {
+        return errNoFieldName
+      }
+      m.numberOfFields++
+      off += len(fieldName) + 1
+      off += 4
+      off += 2
+      off += 4
+      off += 2
+      off += 4
+
+      if len(buf) < off+2 {
+        return errFieldBufferShort
+      }
+      format := common.BytesNtohs(buf[off : off+2])
+      off += 2
+      fieldsFormat = append(fieldsFormat, byte(format))
+    }
+    return nil
+  }
+  ```

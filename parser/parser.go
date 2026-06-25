@@ -82,8 +82,8 @@ func (p *parser) parseProgram() []Decl {
 			}
 			continue
 		}
-		// `import code.HttpInput;`, `import code.*;`, and
-		// `import code.{HttpInput, SqlExecution};` make concept references shorter
+		// `import code.SomeConcept;`, `import code.*;`, and
+		// `import code.{A, B};` make concept references shorter
 		// in rule/adapter bodies without changing declaration namespaces.
 		if p.atWord("import") {
 			p.parseImportDecl()
@@ -109,6 +109,8 @@ func (p *parser) parseDecl() Decl {
 		return p.parseAdapterDecl()
 	case p.atWord("threat"):
 		return p.parseThreatDecl()
+	case p.atWord("review"):
+		return p.parseReviewDecl()
 	case p.atWord("state_machine"):
 		return p.parseStateMachine()
 	case p.atWord("profile"):
@@ -401,14 +403,8 @@ func (p *parser) parseAtom() Expr {
 		p.next()
 		return Has{Ref: ref, Concept: p.parseConceptRef()}
 	}
-	// `colocated <Concept>` — the ref's enclosing function also contains a node
-	// carrying Concept (same `func` scope). Context gate without a dataflow path.
-	if p.atWord("colocated") {
-		p.next()
-		return Colocated{Ref: ref, Concept: p.parseConceptRef()}
-	}
-	// `labeled <Concept>` — the node the ref resolves to carries the concept
-	// (docs/11: `c.dst labeled threat.MiningPool`). Same semantics as `has`.
+	// `labeled <Concept>` — the node the ref resolves to carries the concept.
+	// Same semantics as `has`.
 	if p.atWord("labeled") {
 		p.next()
 		return Has{Ref: ref, Concept: p.parseConceptRef()}
@@ -552,7 +548,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.next()
 		kind := "source"
 		if p.atWord("param") { // public-API parameter source (library archetype): no pattern;
-			p.next()           // labels parameter nodes. A first-class source form like method/receiver.
+			p.next() // labels parameter nodes. A first-class source form like method/receiver.
 			sm := AdapterMapping{Kind: "source_param"}
 			p.parseAdapterGuards(&sm, true)
 			p.expect(tArrow, "->")
@@ -589,8 +585,6 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 			p.next()
 			kind = "sink_receiver"
 		} else if p.atWord("exact") {
-			// exact path match (no dotted-segment-prefix continuation) — matches the
-			// bare call `axios(cfg)` but not member access `axios.Cancel`.
 			p.next()
 			exact = true
 		} else if p.atWord("path") {
@@ -598,7 +592,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		}
 		pat := p.parsePattern()
 		m := AdapterMapping{Kind: kind, Pattern: pat, Exact: exact}
-		if p.atWord("arg") { // which argument is dangerous (default 0; `arg all` = every arg)
+		if p.atWord("arg") { // which argument position is targeted (default 0; `arg all` = every arg)
 			p.next()
 			if p.atWord("all") {
 				p.next()
@@ -607,9 +601,20 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 				m.ArgIndex = n
 			}
 		}
-		if p.atWord("collection") { // also flag a Seq/collection-literal arg (ldap options {filter})
+		if p.atWord("collection") { // also flag a Seq/collection-literal arg
 			p.next()
 			m.Collection = true
+			if p.atWord("first") {
+				p.next()
+				m.CollectionFirst = true
+				m.CollectionIndex = 0
+			} else if p.at(tWord) {
+				if n, err := strconv.Atoi(p.peek().val); err == nil {
+					p.next()
+					m.CollectionFirst = true
+					m.CollectionIndex = n
+				}
+			}
 		}
 		if p.atWord("on") { // optional receiver-type constraint (one type or [list])
 			p.next()
@@ -623,13 +628,52 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.expect(tArrow, "->")
 		m.Concept = p.parseConceptRef()
 		return []AdapterMapping{m}
+	case p.atWord("flow"):
+		p.next()
+		kind := "flow_path"
+		if p.atWord("method") {
+			p.next()
+			kind = "flow_method"
+		} else if p.atWord("prefix") {
+			p.next()
+			kind = "flow_prefix"
+		} else if p.atWord("path") {
+			p.next()
+		}
+		m := AdapterMapping{Kind: kind, Pattern: p.parsePattern(), FlowSourceArg: -1}
+		p.expectWord("arg")
+		dest, err := strconv.Atoi(p.expect(tWord, "destination arg index").val)
+		if err != nil {
+			p.fail("invalid destination arg index")
+		}
+		m.FlowDestArg = dest
+		p.expectWord("from")
+		switch {
+		case p.atWord("result"):
+			p.next()
+			m.FlowSourceResult = true
+		case p.atWord("args"):
+			p.next()
+			src, err := strconv.Atoi(p.expect(tWord, "source arg start index").val)
+			if err != nil {
+				p.fail("invalid source arg index")
+			}
+			m.FlowSourceArg = src
+		default:
+			p.fail("expected result or args after flow source")
+		}
+		return []AdapterMapping{m}
 	case p.atWord("control"):
 		// `control "fn" [val "x"] [nval "y"] -> concept` labels a sanitizer/validator on
 		// the matching CALL node so `unless sanitized_by` can kill a flow through it. The
 		// optional val/nval gate value-based hardening (e.g. resolve_entities=False).
 		p.next()
 		kind := "control"
-		if p.atWord("method") { // receiver-agnostic: match the call method name (e.g. .close())
+		if p.atWord("receiver") {
+			p.next()
+			p.expectWord("method")
+			kind = "control_receiver_method"
+		} else if p.atWord("method") { // receiver-agnostic: match the call method name (e.g. .close())
 			p.next()
 			kind = "control_method"
 		}
@@ -663,9 +707,8 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		return []AdapterMapping{mk}
 	case p.atWord("filter"):
 		// `filter method "replace"` / `filter path "preg_replace"` marks a
-		// character-filtering replace(pattern, repl). The engine analyzes the
-		// pattern's output alphabet and labels the result core.CharFilter — a
-		// threat-aware sanitizer (sound for sinks whose dangerous chars it excludes).
+		// character-filtering replace(pattern, repl). The adapter layer labels it
+		// with the ontology concept tagged for the character-filter analysis role.
 		p.next()
 		kind := "filter_path"
 		if p.atWord("method") {
@@ -675,7 +718,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 			p.next()
 		}
 		pat := p.parsePattern()
-		fm := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.CharFilter"}
+		fm := AdapterMapping{Kind: kind, Pattern: pat}
 		if p.atWord("global") { // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
 			p.next()
 			fm.Constraint = "global"
@@ -683,12 +726,12 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.parseAdapterGuards(&fm, false)
 		return []AdapterMapping{fm}
 	case p.atWord("assume"):
-		// `assume guard method "startsWith" -> core.FilePathAccess` /
-		// `assume sanitizer path "ldapEscape" -> core.LdapQuery` declares an UNSOUND
-		// neutralizer: a guard or escaper that *might* defuse the threat but cannot be
-		// proven to. The engine never suppresses on it — instead it labels the node
-		// core.Assumption and, when that node guards/sanitizes a finding, attaches an
-		// assumption note (the regex-CharFilter pattern, generalized to any neutralizer).
+		// `assume guard method "check" -> code.Target` /
+		// `assume sanitizer path "normalize" -> code.Target` declares an UNSOUND
+		// neutralizer: a guard or transformer that *might* defuse the condition but cannot be
+		// proven to. The engine never suppresses on it — instead the adapter layer
+		// labels the node with the ontology concept tagged for the assumption role,
+		// and the engine attaches an assumption note when it bears on a finding.
 		p.next()
 		mode := "guard"
 		if p.atWord("sanitizer") {
@@ -705,7 +748,7 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 			p.next()
 		}
 		pat := p.parsePattern()
-		am := AdapterMapping{Kind: kind, Pattern: pat, Concept: "core.Assumption"}
+		am := AdapterMapping{Kind: kind, Pattern: pat}
 		p.parseAdapterGuards(&am, true)
 		p.expect(tArrow, "->")
 		am.About = p.parseConceptRef()
@@ -788,9 +831,27 @@ func (p *parser) parseThreatDecl() *ThreatDecl {
 	return t
 }
 
+// parseReviewDecl parses `review <concept> { key: value … }`. Review metadata is
+// presentation/triage data, not rule semantics; concept refs are resolved with the
+// same imports as rules and adapters.
+func (p *parser) parseReviewDecl() *ReviewDecl {
+	p.next() // 'review'
+	r := &ReviewDecl{Concept: p.parseConceptRef(), Fields: map[string]any{}}
+	p.expect(tLBrace, "{")
+	for !p.at(tRBrace) {
+		key := p.expect(tWord, "word").val
+		p.expect(tColon, ":")
+		r.Fields[key] = p.parseConceptValue()
+		if p.at(tComma) || p.at(tSemi) {
+			p.next()
+		}
+	}
+	p.expect(tRBrace, "}")
+	return r
+}
+
 // parseConceptValue parses a concept-field value: a string, a qualified name, or
-// a bracketed list of either (so qualified refs like
-// `deserialization.DeserializationAbuse` survive inside `[...]`).
+// a bracketed list of either, preserving qualified refs inside `[...]`.
 func (p *parser) parseConceptValue() any {
 	if p.at(tString) {
 		return p.next().val

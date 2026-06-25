@@ -25,15 +25,6 @@ type jsConv struct {
 	file     string
 	key      string
 	exported map[string]bool
-	// exportsAlias holds local identifiers aliased to the module's exports object via
-	// `module.exports = res`. The dominant Node-library idiom then augments it as
-	// `res.method = function(...)`; treating those methods as the public API lets their
-	// params be treated as public-API entry points (Exported), just like `module.exports.x`.
-	exportsAlias map[string]bool
-	// thisReceiver is the object `this` binds to inside this file's methods — set to the
-	// sole exports alias so `this.X` resolves to `res.X` (see dotted()). Empty when there
-	// isn't exactly one alias, leaving `this` unresolved.
-	thisReceiver string
 }
 
 func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
@@ -48,10 +39,12 @@ func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
 // matching grammar by extension (.ts → typescript, .tsx → tsx, else javascript); all
 // share the jsConv walker.
 func ExtractJavaScript(files []string, root string) (nir.Program, error) {
-	var js, ts, tsx []string
+	var js, ts, tsx, vue []string
 	for _, f := range files {
 		l := strings.ToLower(f)
 		switch {
+		case strings.HasSuffix(l, ".vue"):
+			vue = append(vue, f)
 		case strings.HasSuffix(l, ".tsx"):
 			tsx = append(tsx, f)
 		case strings.HasSuffix(l, ".ts") || strings.HasSuffix(l, ".mts") || strings.HasSuffix(l, ".cts"):
@@ -64,20 +57,94 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 		c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
 		root0 := tree.RootNode()
 		c.exported = c.exportedNames(root0)
-		// single-prototype library (`module.exports = res; res.x = function`): bind `this`
-		// to res so `this.end`/`this.set`/… resolve to the receiver-named sinks.
-		if len(c.exportsAlias) == 1 {
-			for a := range c.exportsAlias {
-				c.thisReceiver = a
-			}
-		}
-		return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+		body := append(c.jsModuleContext(root0), c.blockChildren(root0)...)
+		return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: body}, true
 	}
 	var mods []nir.Module
 	mods = append(mods, parseModules(js, root, jsParserFor(tsjs.Language()), build)...)
 	mods = append(mods, parseModules(ts, root, jsParserFor(tstypescript.LanguageTypescript()), build)...)
 	mods = append(mods, parseModules(tsx, root, jsParserFor(tstypescript.LanguageTSX()), build)...)
+	mods = append(mods, parseVueModules(vue, root, build)...)
 	return nir.Program{SelfName: "this", Modules: mods}, nil
+}
+
+func parseVueModules(
+	files []string,
+	root string,
+	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+) []nir.Module {
+	if len(files) == 0 {
+		return nil
+	}
+	out := make([]nir.Module, 0, len(files))
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		script, lang, ok := vueScriptSource(src)
+		if !ok {
+			continue
+		}
+		parserFactory := jsParserFor(tsjs.Language())
+		if lang == "ts" {
+			parserFactory = jsParserFor(tstypescript.LanguageTypescript())
+		} else if lang == "tsx" {
+			parserFactory = jsParserFor(tstypescript.LanguageTSX())
+		}
+		parser := parserFactory()
+		tree := parser.Parse(script, nil)
+		if tree == nil {
+			parser.Close()
+			continue
+		}
+		m, good := build(script, f, relPath(root, f), tree)
+		tree.Close()
+		parser.Close()
+		if good {
+			m.Hash = contentHash(src)
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func vueScriptSource(src []byte) ([]byte, string, bool) {
+	lower := strings.ToLower(string(src))
+	start := strings.Index(lower, "<script")
+	if start < 0 {
+		return nil, "", false
+	}
+	tagEndRel := strings.IndexByte(lower[start:], '>')
+	if tagEndRel < 0 {
+		return nil, "", false
+	}
+	tagEnd := start + tagEndRel
+	codeStart := tagEnd + 1
+	endRel := strings.Index(lower[codeStart:], "</script>")
+	if endRel < 0 {
+		return nil, "", false
+	}
+	codeEnd := codeStart + endRel
+	out := make([]byte, len(src))
+	for i, b := range src {
+		switch b {
+		case '\n', '\r':
+			out[i] = b
+		default:
+			out[i] = ' '
+		}
+	}
+	copy(out[codeStart:codeEnd], src[codeStart:codeEnd])
+	tag := lower[start:tagEnd]
+	switch {
+	case strings.Contains(tag, `lang="tsx"`) || strings.Contains(tag, `lang='tsx'`) || strings.Contains(tag, "lang=tsx"):
+		return out, "tsx", true
+	case strings.Contains(tag, `lang="ts"`) || strings.Contains(tag, `lang='ts'`) || strings.Contains(tag, "lang=ts"):
+		return out, "ts", true
+	default:
+		return out, "js", true
+	}
 }
 
 func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
@@ -123,12 +190,6 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 				if c.isModuleExports(left) {
 					if rhs != nil && rhs.Kind() == "identifier" {
 						out[c.text(rhs)] = true
-						// `module.exports = res` aliases `res` to exports; later
-						// `res.method = fn` assignments then export `method`.
-						if c.exportsAlias == nil {
-							c.exportsAlias = map[string]bool{}
-						}
-						c.exportsAlias[c.text(rhs)] = true
 					}
 					markObjectExports(rhs)
 				} else if name := c.exportFuncName(left); name != "" {
@@ -147,7 +208,6 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	return out
 }
 
-
 func jsModuleKey(root, f string) string {
 	for _, ext := range []string{".jsx", ".tsx", ".ts", ".js"} {
 		if strings.HasSuffix(strings.ToLower(f), ext) {
@@ -161,18 +221,30 @@ func (c *jsConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
-func (c *jsConv) endloc(n *tree_sitter.Node) string {
-	if n == nil {
-		return ""
-	}
-	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
-}
-
 func (c *jsConv) text(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *jsConv) jsModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=javascript"},
+			nir.Const{Loc: loc, Value: text},
+			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+		},
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
 }
 
 func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
@@ -187,6 +259,14 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 			// resolution require() uses) — otherwise a relative ES import never resolves.
 			mod := c.resolveRequire(strings.Trim(src, "'\"`"))
 			clause := field(n, "import_clause")
+			if clause == nil {
+				for _, ch := range namedChildren(n) {
+					if ch.Kind() == "import_clause" {
+						clause = ch
+						break
+					}
+				}
+			}
 			if clause == nil {
 				clause = n
 			}
@@ -256,51 +336,10 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.funcParams(n)
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
-		// NestJS route handler (`@Get()/@Post() find(@Query() q, @Param() id)`): the
-		// method's parameters are request-bound (@Body/@Query/@Param/@Headers), so seed
-		// each as http_input. Detected by the HTTP-method decorator on the method.
-		if n.Kind() == "method_definition" && c.jsHasRouteDecorator(n) {
-			var seed []nir.Stmt
-			for _, p := range params {
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-			}
-			body = append(seed, body...)
-		}
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n), Exported: c.exported[name]}}
-	case "class_declaration":
+		decorators := c.jsDecoratorTokens(n)
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: c.exported[name]}}
+	case "class_declaration", "abstract_class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
-	case "field_definition", "public_field_definition":
-		// a class field whose value is an object literal of methods, e.g.
-		// `static events = { paste(event){ … } }` (trix input-handler maps, and the common
-		// "handler dictionary" pattern). Lower each method so its body is analyzed — otherwise
-		// the whole object, and any source→sink flow inside it, is dead code.
-		val := field(n, "value")
-		if val == nil {
-			for _, ch := range namedChildren(n) {
-				if ch.Kind() == "object" {
-					val = ch
-					break
-				}
-			}
-		}
-		if val != nil && val.Kind() == "object" {
-			var out []nir.Stmt
-			for _, pr := range namedChildren(val) {
-				switch pr.Kind() {
-				case "method_definition":
-					out = append(out, c.stmt(pr)...)
-				case "pair":
-					if v := field(pr, "value"); isJsFuncNode(v) {
-						out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")),
-							Params: c.funcParams(v), ParamTypes: c.funcParamTypes(v),
-							Body: c.funcBody(v), Loc: c.loc(pr), EndLoc: c.endloc(v)})
-					}
-				}
-			}
-			return out
-		}
-		return nil
 	case "lexical_declaration", "variable_declaration":
 		var out []nir.Stmt
 		for _, d := range namedChildren(n) {
@@ -315,7 +354,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 						params = c.paramsFromFunctionText(d)
 					}
 					body := c.funcBody(val)
-					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, Exported: c.exported[fnName]})
+					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(fnName, val), Exported: c.exported[fnName]})
 					continue
 				}
 				var v nir.Expr = nir.Const{Loc: L}
@@ -323,10 +362,13 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					v = c.expr(val)
 				}
 				if name != nil && name.Kind() == "identifier" {
-					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v})
+					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Decl: true})
+					if val != nil && val.Kind() == "object" {
+						out = append(out, c.objectMethodFuncDefs(val, false)...)
+					}
 				} else if targets := c.bindingNames(name); len(targets) > 0 {
 					for _, target := range targets {
-						out = append(out, nir.Assign{Targets: []string{target}, Value: v})
+						out = append(out, nir.Assign{Targets: []string{target}, Value: v, Decl: true})
 					}
 				} else {
 					out = append(out, nir.ExprStmt{Value: v})
@@ -354,12 +396,25 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			cond = c.expr(cn)
 		}
 		return []nir.Stmt{nir.If{Cond: cond, Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
-	case "while_statement", "for_statement", "for_in_statement":
+	case "while_statement", "for_statement":
 		var cond nir.Expr
+		body := c.collectStatementBlocks(n)
 		if cn := field(n, "condition"); cn != nil {
+			if target, val, ok := c.jsAssignmentExpr(cn); ok {
+				body = append([]nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}}, body...)
+			}
 			cond = c.expr(cn)
 		}
-		return []nir.Stmt{nir.Loop{Cond: cond, Body: c.collectStatementBlocks(n)}}
+		return []nir.Stmt{nir.Loop{Cond: cond, Body: body}}
+	case "for_in_statement":
+		loop := nir.Loop{Body: c.collectStatementBlocks(n)}
+		if right := field(n, "right"); right != nil {
+			loop.Iter = c.expr(right)
+		}
+		if left := field(n, "left"); left != nil {
+			loop.Vars = c.bindingNames(left)
+		}
+		return []nir.Stmt{loop}
 	case "switch_statement":
 		return []nir.Stmt{c.switchStmt(n)}
 	case "try_statement":
@@ -371,11 +426,103 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// declaration inside is analyzed (Next.js route handlers are all exports).
 		var out []nir.Stmt
 		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "object" {
+				out = append(out, c.objectMethodFuncDefs(ch, true)...)
+				continue
+			}
 			out = append(out, c.stmt(ch)...)
 		}
 		return out
 	}
 	return nil
+}
+
+func (c *jsConv) jsAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
+	for n != nil && n.Kind() == "parenthesized_expression" {
+		kids := namedChildren(n)
+		if len(kids) != 1 {
+			return "", nil, false
+		}
+		n = kids[0]
+	}
+	if n == nil || n.Kind() != "assignment_expression" {
+		return "", nil, false
+	}
+	left := field(n, "left")
+	if left == nil || left.Kind() != "identifier" {
+		return "", nil, false
+	}
+	right := field(n, "right")
+	if right == nil {
+		return "", nil, false
+	}
+	return c.text(left), c.expr(right), true
+}
+
+func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []nir.Stmt {
+	if obj == nil || obj.Kind() != "object" {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, pr := range namedChildren(obj) {
+		switch pr.Kind() {
+		case "method_definition":
+			name := c.text(field(pr, "name"))
+			out = append(out, nir.FuncDef{Name: name, Params: c.funcParams(pr),
+				ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: c.loc(pr), ContextTokens: c.jsFunctionContext(name, pr), Exported: exported})
+			out = append(out, c.returnedObjectMethodFuncDefs(pr, exported)...)
+		case "pair":
+			v := field(pr, "value")
+			if isJsFuncNode(v) {
+				name := c.keyName(field(pr, "key"))
+				params := c.funcParams(v)
+				paramTypes := c.funcParamTypes(v)
+				if len(params) == 0 {
+					params = c.paramsFromFunctionText(pr)
+				}
+				out = append(out, nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes,
+					Body: c.funcBody(v), Loc: c.loc(pr), ContextTokens: c.jsFunctionContext(name, v), Exported: exported})
+				out = append(out, c.returnedObjectMethodFuncDefs(v, exported)...)
+			}
+			out = append(out, c.objectMethodFuncDefs(v, exported)...)
+		}
+	}
+	return out
+}
+
+func (c *jsConv) returnedObjectMethodFuncDefs(fn *tree_sitter.Node, exported bool) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		for _, ch := range namedChildren(fn) {
+			if ch.Kind() == "statement_block" {
+				body = ch
+				break
+			}
+		}
+	}
+	if body == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "return_statement" {
+			for _, ch := range namedChildren(n) {
+				if ch.Kind() == "object" {
+					out = append(out, c.objectMethodFuncDefs(ch, exported)...)
+				}
+			}
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
 }
 
 // resolveRequire normalizes a relative require/import specifier to the dotted,
@@ -413,8 +560,8 @@ func (c *jsConv) isModuleExports(n *tree_sitter.Node) bool {
 // exportFuncName returns the exported function name for `exports.NAME` or
 // `module.exports.NAME` member targets ("" if it is neither).
 // memberRootIdent returns the root identifier of a member chain (the object at the base
-// of `A.b.c`), or "" — so `LdapAuth.prototype.authenticate` yields "LdapAuth". Used to
-// tie a prototype/static method back to an exported constructor/class.
+// of `A.b.c`), or "". Used to tie a prototype/static method back to an exported
+// constructor/class.
 func (c *jsConv) memberRootIdent(m *tree_sitter.Node) string {
 	for m != nil && m.Kind() == "member_expression" {
 		m = field(m, "object")
@@ -434,9 +581,6 @@ func (c *jsConv) exportFuncName(left *tree_sitter.Node) string {
 	if obj.Kind() == "identifier" && c.text(obj) == "exports" {
 		return name
 	}
-	if obj.Kind() == "identifier" && c.exportsAlias[c.text(obj)] {
-		return name // `res.method = fn` where `module.exports = res` aliased res to exports
-	}
 	if c.isModuleExports(obj) {
 		return name
 	}
@@ -453,11 +597,15 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 	case "call_expression":
-		if routes := c.expressRouteFuncs(inner, L); len(routes) > 0 {
-			return routes
-		}
 		if body := c.iife(inner, L); len(body) > 0 {
 			return body
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+	case "unary_expression":
+		if arg := c.unaryArg(inner); arg != nil && arg.Kind() == "call_expression" {
+			if body := c.iife(arg, L); len(body) > 0 {
+				return body
+			}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 	case "assignment_expression":
@@ -476,7 +624,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 			if len(params) == 0 {
 				params = c.paramsFromFunctionText(inner)
 			}
-			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, Exported: true}}
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
 		}
 		if left != nil && left.Kind() == "member_expression" && isJsFuncNode(rhs) {
 			if name := c.exportFuncName(left); name != "" {
@@ -485,7 +633,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				if len(params) == 0 {
 					params = c.paramsFromFunctionText(inner)
 				}
-				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), Exported: true}}
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
 			}
 			// `Ctor.prototype.method = function` / `Ctor.method = function` on an EXPORTED
 			// constructor/class. Always emit a FuncDef so the method is REGISTERED (calls to
@@ -500,29 +648,12 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					if len(params) == 0 {
 						params = c.paramsFromFunctionText(inner)
 					}
-					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), Exported: !strings.HasPrefix(name, "_")}}
+					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: !strings.HasPrefix(name, "_")}}
 				}
 			}
 		}
 		if left != nil && c.isModuleExports(left) && rhs != nil && rhs.Kind() == "object" {
-			var out []nir.Stmt
-			for _, pr := range namedChildren(rhs) {
-				if pr.Kind() == "pair" && isJsFuncNode(field(pr, "value")) {
-					v := field(pr, "value")
-					params := c.funcParams(v)
-					paramTypes := c.funcParamTypes(v)
-					if len(params) == 0 {
-						params = c.paramsFromFunctionText(pr)
-					}
-					out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")), Params: params, ParamTypes: paramTypes, Body: c.funcBody(v), Loc: L, EndLoc: c.endloc(v), Exported: true})
-				} else if pr.Kind() == "method_definition" {
-					// object-method SHORTHAND: `module.exports = { set(o, p, v) { … } }`.
-					// Common npm-library export shape; extract as an exported FuncDef so its
-					// params are public-API entry points and its body is analyzed.
-					out = append(out, nir.FuncDef{Name: c.text(field(pr, "name")), Params: c.funcParams(pr),
-						ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: L, EndLoc: c.endloc(pr), Exported: true})
-				}
-			}
+			out := c.objectMethodFuncDefs(rhs, true)
 			if len(out) > 0 {
 				return out
 			}
@@ -531,21 +662,20 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// member-property write (e.g. el.innerHTML = x, location.href = x): model as a
-		// PATH sink call so DOM-XSS / open-redirect `sink path "innerHTML"` etc. fire.
-		// Method is empty so it can never collide with method-name sinks (query/exec/…).
+		// member-property write (e.g. obj.prop = x): model as a path call so adapter
+		// mappings can reason about the assigned value.
+		// Method is empty so it can never collide with method-name mappings.
 		if left != nil && left.Kind() == "member_expression" {
 			p := c.dotted(left)
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}
 		}
-		// subscript write (session['x'] = v): model as a write to the base's path so the
-		// same path sinks (trust-context, DOM) fire as for a dotted member write.
+		// subscript write (obj[key] = v): model as a write to the base's path so the
+		// same path mappings fire as for a dotted member write.
 		if left != nil && left.Kind() == "subscript_expression" {
 			base := field(left, "object")
 			key := field(left, "index")
 			return []nir.Stmt{
-				// Dynamic property names can mutate Object.prototype when the key is
-				// attacker-controlled ("__proto__", "constructor", etc.).
+				// Preserve dynamic property-name flow separately from value flow.
 				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{c.expr(key)}, Path: "__js_dynamic_property_write", Method: "", Loc: L}},
 				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right}, Path: c.dotted(base), Method: "", Loc: L}},
 			}
@@ -585,6 +715,21 @@ func (c *jsConv) iife(call *tree_sitter.Node, L string) []nir.Stmt {
 		body = append([]nir.Stmt{nir.Assign{Targets: []string{p}, Value: c.expr(as[i])}}, body...)
 	}
 	return body
+}
+
+func (c *jsConv) unaryArg(n *tree_sitter.Node) *tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if arg := field(n, "argument"); arg != nil {
+		return arg
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "comment" {
+			return ch
+		}
+	}
+	return nil
 }
 
 // branchBody flattens one if-branch body: a `{}` block, an else_clause wrapper, or a
@@ -772,6 +917,30 @@ func (c *jsConv) funcBody(n *tree_sitter.Node) []nir.Stmt {
 	return c.body(body)
 }
 
+func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	body := field(n, "body")
+	if body == nil {
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "statement_block" {
+				body = ch
+				break
+			}
+		}
+	}
+	if body == nil {
+		return nil
+	}
+	bodyText := c.text(body)
+	return []string{
+		"lang=javascript\x00name=" + name,
+		bodyText,
+		strings.Join(strings.Fields(bodyText), ""),
+	}
+}
+
 func (c *jsConv) isFunctionLikeDeclarator(n *tree_sitter.Node) bool {
 	txt := c.text(n)
 	if i := strings.IndexByte(txt, '='); i >= 0 {
@@ -779,9 +948,55 @@ func (c *jsConv) isFunctionLikeDeclarator(n *tree_sitter.Node) bool {
 	}
 	return strings.HasPrefix(txt, "function") ||
 		strings.HasPrefix(txt, "async function") ||
-		strings.HasPrefix(txt, "async (") ||
-		strings.HasPrefix(txt, "(") && strings.Contains(txt, "=>") ||
-		isJSIdentPrefixArrow(txt)
+		isJSArrowFunctionText(txt)
+}
+
+func isJSArrowFunctionText(s string) bool {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "async ") {
+		s = strings.TrimSpace(strings.TrimPrefix(s, "async "))
+	}
+	if isJSIdentPrefixArrow(s) {
+		return true
+	}
+	if !strings.HasPrefix(s, "(") {
+		return false
+	}
+	depth, end := 0, -1
+	inQuote := byte(0)
+	escaped := false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if inQuote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == inQuote {
+				inQuote = 0
+			}
+			continue
+		}
+		if ch == '\'' || ch == '"' || ch == '`' {
+			inQuote = ch
+			continue
+		}
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				end = i
+				i = len(s)
+			}
+		}
+	}
+	return end > 0 && strings.HasPrefix(strings.TrimSpace(s[end+1:]), "=>")
 }
 
 func (c *jsConv) paramsFromFunctionText(n *tree_sitter.Node) []string {
@@ -841,72 +1056,91 @@ func isJSIdent(s string) bool {
 	return true
 }
 
-// jsRouteDecorators are NestJS HTTP-method decorators that mark a request handler.
-var jsRouteDecorators = map[string]bool{
-	"Get": true, "Post": true, "Put": true, "Delete": true, "Patch": true,
-	"Options": true, "Head": true, "All": true,
-}
-
-// jsHasRouteDecorator reports whether a method_definition carries a NestJS route
-// decorator (`@Get()`, `@Post(':id')`, …) — a `decorator` child whose callee name
-// (identifier of the call, or a bare identifier) is an HTTP-method decorator.
-// isIpcHandler reports whether a call path registers an Electron IPC handler
-// (`ipcMain.on/handle/once`, `ipcRenderer.on/once`) whose callback receives
-// renderer-controlled data.
-func (c *jsConv) isIpcHandler(path string) bool {
-	if !strings.Contains(path, "ipcMain") && !strings.Contains(path, "ipcRenderer") {
-		return false
-	}
-	return strings.HasSuffix(path, ".on") || strings.HasSuffix(path, ".handle") || strings.HasSuffix(path, ".once")
-}
-
-// seedIpcLambda seeds an IPC callback's payload parameters (every param after the
-// first `event` arg) as http_input.
-func (c *jsConv) seedIpcLambda(lam nir.Lambda, L string) nir.Lambda {
-	var seed []nir.Stmt
+func (c *jsConv) markCallLambdaParams(path string, lam nir.Lambda, L string) nir.Lambda {
+	method := lastSeg(path)
 	for i, p := range lam.Params {
-		if i == 0 { // the IPC `event` object, not the payload
+		if p == "" || p == "_" {
 			continue
 		}
-		seed = append(seed, nir.Assign{Targets: []string{p},
-			Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
+		tokens := []string{
+			"entry_kind:call_lambda_param",
+			"call_path:" + path,
+			"call_method:" + method,
+			"param_count:" + itoa(len(lam.Params)),
+			"param_name:" + p,
+			"param_index:" + itoa(i),
+		}
+		lam.ParamEntries = append(lam.ParamEntries, nir.ParamEntry{Param: p, Tokens: tokens})
 	}
-	lam.Body = append(seed, lam.Body...)
 	return lam
 }
 
-func (c *jsConv) jsHasRouteDecorator(n *tree_sitter.Node) bool {
+func (c *jsConv) jsDecoratorTokens(n *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
 	for _, ch := range namedChildren(n) {
 		if ch.Kind() != "decorator" {
 			continue
 		}
-		var name string
-		var walk func(m *tree_sitter.Node)
-		walk = func(m *tree_sitter.Node) {
-			if m == nil || name != "" {
-				return
-			}
-			switch m.Kind() {
-			case "identifier":
-				name = c.text(m)
-			case "call_expression":
-				walk(field(m, "function"))
-			case "member_expression":
-				if p := field(m, "property"); p != nil {
-					name = c.text(p)
-				}
-			default:
-				for _, k := range namedChildren(m) {
-					walk(k)
-				}
-			}
-		}
-		walk(ch)
-		if jsRouteDecorators[name] {
-			return true
+		path := c.jsDecoratorPath(ch)
+		add("decorator_path:" + path)
+		if i := strings.LastIndex(path, "."); i >= 0 {
+			add("decorator_method:" + path[i+1:])
+		} else {
+			add("decorator_method:" + path)
 		}
 	}
-	return false
+	return out
+}
+
+func (c *jsConv) jsParamEntries(name string, params []string, base []string) []nir.ParamEntry {
+	if len(base) == 0 {
+		return nil
+	}
+	var out []nir.ParamEntry
+	for i, p := range params {
+		tokens := append([]string{}, base...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return out
+}
+
+func (c *jsConv) jsDecoratorPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Kind() {
+	case "decorator", "call_expression":
+		if p := c.jsDecoratorPath(field(n, "function")); p != "" {
+			return p
+		}
+	case "member_expression":
+		base := c.jsDecoratorPath(field(n, "object"))
+		prop := c.text(field(n, "property"))
+		if base == "" {
+			return prop
+		}
+		if prop == "" {
+			return base
+		}
+		return base + "." + prop
+	case "identifier":
+		return c.text(n)
+	}
+	for _, ch := range namedChildren(n) {
+		if p := c.jsDecoratorPath(ch); p != "" {
+			return p
+		}
+	}
+	return ""
 }
 
 func (c *jsConv) params(params *tree_sitter.Node) []string {
@@ -1035,7 +1269,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		// output alphabet of x.replace(/…/g, repl).
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "true", "false", "null", "undefined":
-		// carry the literal text so value-matching sees rejectUnauthorized=false etc.
+		// carry the literal text so value-matching can inspect boolean/null constants.
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "member_expression":
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "property")), Path: c.dotted(n), Loc: L}
@@ -1053,13 +1287,9 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 				arglist = append(arglist, c.expr(a))
 			}
 		}
-		// Electron IPC handler registration `ipcMain.on/handle/once(channel, (event, arg) => …)`:
-		// the callback's args after `event` are renderer-controlled — seed them.
-		if c.isIpcHandler(path) {
-			for i, a := range arglist {
-				if lam, ok := a.(nir.Lambda); ok {
-					arglist[i] = c.seedIpcLambda(lam, L)
-				}
+		for i, a := range arglist {
+			if lam, ok := a.(nir.Lambda); ok {
+				arglist[i] = c.markCallLambdaParams(path, lam, L)
 			}
 		}
 		if c.isExpressRouteRegistration(path) {
@@ -1098,7 +1328,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	case "arrow_function", "function_expression", "function":
 		// a single bare arrow param `v => …` is under the `parameter` field, not `parameters`.
-		return nir.Lambda{Params: c.funcParams(n), ParamTypes: c.funcParamTypes(n), Body: c.funcBody(n), Loc: L}
+		return nir.Lambda{Params: c.funcParams(n), ParamTypes: c.funcParamTypes(n), Body: c.funcBody(n), Loc: L, ContextTokens: c.jsFunctionContext("<lambda>", n)}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
@@ -1107,7 +1337,16 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "unary_expression":
-		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "argument")), Loc: L}
+		arg := field(n, "argument")
+		if arg == nil {
+			for _, ch := range namedChildren(n) {
+				if ch.Kind() != "comment" {
+					arg = ch
+					break
+				}
+			}
+		}
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(arg), Loc: L}
 	case "ternary_expression":
 		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	case "template_string":
@@ -1169,87 +1408,6 @@ func (c *jsConv) isExpressRouteRegistration(path string) bool {
 	return jsExpressRouteMethods[path[i+1:]]
 }
 
-// expressRouteFuncs promotes an Express-style call-registration — app.get("/x", h),
-// router.post("/y", mw, h), app.use(fn) — into one route-flagged FuncDef per inline handler,
-// carrying the HTTP method and (literal) path. Returning a FuncDef instead of leaving the
-// callback an anonymous Lambda gives the handler a first-class code.Function node, so a sink in
-// its body resolves a func_id (scope:function, not module — docs/21 §4) and graph-json can
-// export http_method/http_path. Express does NOT auto-send raw string returns (the handler must
-// call res.send), so these are NOT marked IsRoute — that flag means send-on-return (reflected
-// XSS), which would be a false positive here; the route metadata alone drives the is_route
-// export (see lowering.makeFuncInfo). Returns nil when this is not a route registration or has
-// no inline handler to model (e.g. app.use(router), app.get(path, controllerRef)).
-func (c *jsConv) expressRouteFuncs(call *tree_sitter.Node, L string) []nir.Stmt {
-	fn := field(call, "function")
-	path := c.dotted(fn)
-	if !c.isExpressRouteRegistration(path) {
-		return nil
-	}
-	method := strings.ToUpper(path[strings.LastIndex(path, ".")+1:])
-	httpPath := ""
-	var handlers []*tree_sitter.Node
-	if args := field(call, "arguments"); args != nil {
-		for _, a := range namedChildren(args) {
-			switch {
-			case isJsFuncNode(a):
-				handlers = append(handlers, a)
-			case httpPath == "" && a.Kind() == "string":
-				httpPath = c.keyName(a) // strips the surrounding quotes
-			}
-		}
-	}
-	// Precision guard: the route-method names collide with everyday APIs — db.all/db.get
-	// (sqlite3), Promise.all, Map.get/delete, cache.get, headers.get. Promoting (and thereby
-	// DROPPING the original call) on a false match silently deletes a real sink. Only treat it
-	// as a route when there is an inline handler AND either a route-path argument (a string
-	// starting with "/" or the "*" wildcard — a SQL/key string never does) or it is `.use`
-	// middleware. Routes with a non-literal path (app.get(ROUTES.x, h)) are missed here but
-	// still get their input typed via the expr() path — only the entrypoint export is skipped.
-	if len(handlers) == 0 {
-		return nil
-	}
-	routeLike := strings.HasPrefix(httpPath, "/") || httpPath == "*"
-	if !routeLike && method != "USE" {
-		return nil
-	}
-	// line within the file disambiguates the synthetic name; ns is already per-file, so the
-	// id stays stable across incremental rebuilds (same file → same line).
-	line := L
-	if i := strings.LastIndex(L, ":"); i >= 0 {
-		line = L[i+1:]
-	}
-	var out []nir.Stmt
-	for idx, h := range handlers {
-		// reuse the existing param typing (req→express.Request, res→express.Response, …) so the
-		// handler's input source is seeded exactly as it was when these stayed inline Lambdas.
-		lam := c.typeExpressLambda(nir.Lambda{
-			Params:     c.funcParams(h),
-			ParamTypes: c.funcParamTypes(h),
-			Body:       c.funcBody(h),
-			Loc:        c.loc(h),
-		})
-		name := method
-		if httpPath != "" {
-			name += " " + httpPath
-		}
-		name += "@L" + line
-		if len(handlers) > 1 {
-			name += "#" + itoa(idx)
-		}
-		out = append(out, nir.FuncDef{
-			Name:       name,
-			Params:     lam.Params,
-			ParamTypes: lam.ParamTypes,
-			Body:       lam.Body,
-			Loc:        c.loc(h),
-			EndLoc:     c.endloc(h),
-			HTTPMethod: method,
-			HTTPPath:   httpPath,
-		})
-	}
-	return out
-}
-
 func (c *jsConv) typeExpressLambda(lam nir.Lambda) nir.Lambda {
 	if len(lam.Params) == 0 {
 		return lam
@@ -1259,7 +1417,7 @@ func (c *jsConv) typeExpressLambda(lam nir.Lambda) nir.Lambda {
 	}
 	offset := 0
 	if len(lam.Params) >= 4 {
-		offset = 1 // Express error middleware: (err, req, res, next)
+		offset = 1
 	}
 	if offset < len(lam.Params) {
 		lam.ParamTypes[lam.Params[offset]] = "express.Request"
@@ -1314,16 +1472,6 @@ func (c *jsConv) dotted(n *tree_sitter.Node) string {
 		return "?"
 	}
 	switch n.Kind() {
-	case "this":
-		// In a Node prototype library — `module.exports = res; res.method = function(){ … this.end() … }`
-		// — `this` is the exports object. Binding it lets `this.end`/`this.set`/`this.location`
-		// resolve to `res.*` so the receiver-named sink adapters (sink path "res.end", …) match,
-		// instead of dead-ending at an unresolved `?.*` receiver. Only when the file has exactly
-		// one such alias (the common single-prototype case); otherwise the receiver stays unknown.
-		if c.thisReceiver != "" {
-			return c.thisReceiver
-		}
-		return "?"
 	case "identifier", "property_identifier":
 		return c.text(n)
 	case "member_expression":

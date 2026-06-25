@@ -1,10 +1,11 @@
 // solidity framework adapter (docs/07) — smart-contract sinks/sources.
-// External/public function params are attacker-controllable (seeded http_input);
-// for to.call/to.transfer the RECEIVER address is modeled as arg0 (the danger).
+// For to.call/to.transfer the receiver address is modeled as arg0.
 adapter solidity {
   meta { fidelity: resolved }
 
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_visibility:public" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_visibility:external" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_visibility:implicit_public" -> code.HttpInput
   source "msg.data" -> code.HttpInput
   source "msg.value" -> code.HttpInput
 
@@ -21,6 +22,6 @@ adapter solidity {
 
   // tx.origin authorization anti-pattern (CWE-477) — presence of tx.origin
   mark "tx.origin" -> code.TxOriginAuth
-  // storage write marker emitted by the frontend for member/mapping assignments (B2 reentrancy).
+  // storage write marker emitted by the frontend for member/mapping assignments.
   mark "state_write" -> code.StateWrite
 }

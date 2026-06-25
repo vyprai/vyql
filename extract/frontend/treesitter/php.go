@@ -31,10 +31,7 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &phConv{src: src, root: root, file: rel}
 			body := c.block(tree.RootNode())
-			body = append(body, c.phpIncompleteServerPortValidation(tree.RootNode())...)
-			body = append(body, c.phpUnescapedSessionFlash(tree.RootNode())...)
-			body = append(body, c.phpUnscannedPdfPreview(tree.RootNode())...)
-			body = append(body, c.phpUnrestrictedVariableVariableAssignment(tree.RootNode())...)
+			body = append(body, c.phpModuleContext(tree.RootNode())...)
 			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -53,7 +50,12 @@ func (c *phConv) text(n *tree_sitter.Node) string {
 
 func (c *phConv) block(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, st := range namedChildren(n) {
+	kids := namedChildren(n)
+	for i, st := range kids {
+		if i > 0 && c.phpOpensShorthandEcho(kids[i-1]) && st.Kind() == "expression_statement" {
+			out = append(out, c.phpEchoExprStmt(st)...)
+			continue
+		}
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -79,34 +81,27 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		prevFunc := c.funcName
 		c.funcName = name
 		body := c.block(field(n, "body"))
+		body = append(body, c.phpFunctionContext(n)...)
 		c.funcName = prevFunc
 		if n.Kind() == "method_declaration" && phpIsWPListTableColumn(name) && len(params) > 0 {
 			body = append([]nir.Stmt{nir.Assign{Targets: []string{params[0]},
 				Value: nir.Call{Callee: nir.Name{ID: "wp.list_table.row", Loc: L}, Path: "wp.list_table.row", Method: "row", Loc: L}}}, body...)
 		}
-		// MediaWiki parser hook: a method taking a `Parser`/`PPFrame` carries user wiki markup
-		// in its OTHER params ($input, $args of `parse3DTag($input,$args,Parser $p,PPFrame $f)`),
-		// which flow into Html::element/rawElement output (stored XSS). Seed those as input.
-		if phpHasFrameworkParam(ptypes) {
-			var seed []nir.Stmt
-			for _, p := range params {
-				if t := ptypes[p]; !phpFrameworkType(t) {
-					seed = append(seed, nir.Assign{Targets: []string{p},
-						Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-				}
-			}
-			body = append(seed, body...)
-		}
 		return []nir.Stmt{nir.FuncDef{
-			Name:       name,
-			Params:     params,
-			ParamTypes: ptypes,
-			Body:       body,
-			Loc:        L,
-			Exported:   exported,
+			Name:          name,
+			Params:        params,
+			ParamTypes:    ptypes,
+			ContextTokens: c.phpFunctionTokens(name),
+			ParamEntries:  c.phpParamEntries(name, params, ptypes),
+			Body:          body,
+			Loc:           L,
+			Exported:      exported,
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
+		name := c.text(field(n, "name"))
+		body := c.block(field(n, "body"))
+		body = append(body, c.phpClassContext(n, name)...)
+		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L}}
 	case "expression_statement":
 		kids := namedChildren(n)
 		if len(kids) == 0 {
@@ -143,9 +138,9 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "foreach_statement":
 		// `foreach ($coll as $k => $v) {…}` — bind the loop key/value vars to the collection
 		// (conservative whole-collection taint) so element taint flows into the body. Without
-		// this $v/$k were unbound and all per-element taint was lost (e.g. building an HTML
-		// attribute array `$par[$k]=$v` from user input). Binding $k too matters for
-		// attribute-NAME injection. tree-sitter-php: `body` is a field; the non-body children
+		// this $v/$k were unbound and all per-element flow was lost (e.g. building a
+		// keyed array `$par[$k]=$v` from input). Binding $k preserves dynamic keys too.
+		// tree-sitter-php: `body` is a field; the non-body children
 		// are [iterable, value-spec], where value-spec is variable_name | by_ref | list_literal
 		// | pair($k => $v).
 		body := c.collectBlocks(n)
@@ -192,17 +187,17 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			}
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// member-property write ($obj->role = v) — model as a PATH-sink Call (Method empty so
-		// it never collides with method-name sinks) so trust-context / DOM path sinks fire.
+		// member-property write ($obj->field = v) — model as a PATH-sink Call (Method empty so
+		// it never collides with method-name mappings) so path mappings can match writes.
 		if left != nil && left.Kind() == "member_access_expression" {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: c.loc(inner)}}}
 		}
 		// subscript write ($arr[$k] = v) — two effects: (1) a write to the base's path
-		// ($_SESSION['role'] → "_SESSION") so the trust-boundary path sink fires (CWE-501);
-		// (2) when the base is a plain variable, a taint-JOIN `$arr = combine($arr, v)` so a
-		// later read of $arr carries v's taint (an array built element-by-element from user
-		// input — e.g. `$par[$k]=$v; Html::element('canvas',$par)` — stays tainted). Without (2)
+		// ($bag['key'] -> "bag") so path mappings can match writes;
+		// (2) when the base is a plain variable, a flow join `$arr = combine($arr, v)` so a
+		// later read of $arr carries v's flow (an array built element-by-element stays linked).
+		// Without (2)
 		// the value taint was dropped at the discarded write.
 		if left != nil && left.Kind() == "subscript_expression" {
 			if kids := namedChildren(left); len(kids) > 0 {
@@ -230,6 +225,81 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			Args: args, Path: "include", Method: "include", Loc: c.loc(inner)}}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+func (c *phConv) phpEchoExprStmt(n *tree_sitter.Node) []nir.Stmt {
+	kids := namedChildren(n)
+	if len(kids) == 0 {
+		return nil
+	}
+	L := c.loc(n)
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "echo", Loc: L},
+		Args:   []nir.Expr{c.expr(kids[0])},
+		Path:   "echo",
+		Method: "echo",
+		Loc:    L,
+	}}}
+}
+
+func (c *phConv) phpOpensShorthandEcho(n *tree_sitter.Node) bool {
+	if n == nil || n.Kind() != "text_interpolation" {
+		return false
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "php_tag" && strings.TrimSpace(c.text(ch)) == "<?=" {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *phConv) phpModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	return c.phpContextCall("analysis.module.context", c.loc(root), "module", "lang=php", c.text(root))
+}
+
+func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	name := c.text(field(fn, "name"))
+	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", "lang=php\x00name="+name, c.text(body))
+}
+
+func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt {
+	body := field(cls, "body")
+	if body == nil {
+		return nil
+	}
+	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", "lang=php\x00name="+name, c.text(body))
+}
+
+func (c *phConv) phpContextCall(path, loc, method, prefix, text string) []nir.Stmt {
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: prefix},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: phpCompactText(text)},
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: method,
+		Loc:    loc,
+	}}}
+}
+
+func phpCompactText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // phpBranch flattens one if-branch body: a `{}` compound_statement, or a brace-less
@@ -404,250 +474,39 @@ func (c *phConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 	return out
 }
 
-// phpFrameworkType reports whether a PHP param type is a MediaWiki framework object (NOT user
-// data) — used to identify a parser hook and exclude these params from input seeding.
-func phpFrameworkType(t string) bool {
-	switch t {
-	case "Parser", "PPFrame", "OutputPage", "Skin", "Title", "MimeAnalyzer":
-		return true
+func (c *phConv) phpFunctionTokens(name string) []string {
+	if name == "" {
+		return nil
 	}
-	return false
-}
-
-func phpHasFrameworkParam(ptypes map[string]string) bool {
-	for _, t := range ptypes {
-		if t == "Parser" || t == "PPFrame" {
-			return true
-		}
-	}
-	return false
+	return []string{"function_name:" + name}
 }
 
 func phpIsWPListTableColumn(name string) bool {
 	return name == "column_default" || strings.HasPrefix(name, "column_")
 }
 
-func (c *phConv) phpIncompleteServerPortValidation(root *tree_sitter.Node) []nir.Stmt {
-	full := c.text(root)
-	compact := strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, full)
-	if !strings.Contains(compact, "connect(") ||
-		!strings.Contains(compact, "is_numeric($port)") ||
-		!(strings.Contains(compact, "explode(\":\",SERVER") || strings.Contains(compact, "explode(':',SERVER")) ||
-		!(strings.Contains(compact, "$port<1024") || strings.Contains(compact, "1024>$port")) {
+func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string]string) []nir.ParamEntry {
+	if len(params) == 0 {
 		return nil
 	}
-	var out []nir.Stmt
+	var functionTypes []string
 	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
-		if n == nil {
-			return
-		}
-		callText := strings.Map(func(r rune) rune {
-			if unicode.IsSpace(r) {
-				return -1
-			}
-			return r
-		}, c.text(n))
-		if n.Kind() == "function_call_expression" &&
-			c.dotted(field(n, "function")) == "is_numeric" &&
-			strings.Contains(callText, "is_numeric($port)") {
-			loc := c.loc(n)
-			if !seen[loc] {
-				seen[loc] = true
-				path := "security.php.server_port_validation.incomplete"
-				out = append(out, nir.ExprStmt{Value: nir.Call{
-					Callee: nir.Name{ID: path, Loc: loc},
-					Path:   path,
-					Method: lastSeg(path),
-					Loc:    loc,
-				}})
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch)
+	for _, p := range params {
+		if t := ptypes[p]; t != "" && !seen[t] {
+			seen[t] = true
+			functionTypes = append(functionTypes, "function_param_type:"+t)
 		}
 	}
-	walk(root)
+	var out []nir.ParamEntry
+	for i, p := range params {
+		tokens := append([]string{}, functionTypes...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		if t := ptypes[p]; t != "" {
+			tokens = append(tokens, "param_type:"+t)
+		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
 	return out
-}
-
-func (c *phConv) phpUnescapedSessionFlash(root *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind() == "assignment_expression" {
-			left := c.text(field(n, "left"))
-			right := c.text(field(n, "right"))
-			if phpSessionFlashInfoWrite(left) &&
-				strings.Contains(right, "$") &&
-				!phpLooksHtmlEscaped(right) {
-				loc := c.loc(n)
-				if !seen[loc] {
-					seen[loc] = true
-					path := "security.php.session_flash.unescaped"
-					out = append(out, nir.ExprStmt{Value: nir.Call{
-						Callee: nir.Name{ID: path, Loc: loc},
-						Path:   path,
-						Method: lastSeg(path),
-						Loc:    loc,
-					}})
-				}
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch)
-		}
-	}
-	walk(root)
-	return out
-}
-
-func phpSessionFlashInfoWrite(left string) bool {
-	compact := strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, left)
-	return strings.Contains(compact, "$_SESSION['info']") ||
-		strings.Contains(compact, "$_SESSION[\"info\"]") ||
-		strings.Contains(compact, "$_SESSION['message']") ||
-		strings.Contains(compact, "$_SESSION[\"message\"]") ||
-		strings.Contains(compact, "$_SESSION['flash']") ||
-		strings.Contains(compact, "$_SESSION[\"flash\"]")
-}
-
-func phpLooksHtmlEscaped(s string) bool {
-	lower := strings.ToLower(s)
-	return strings.Contains(lower, "htmlspecialchars") ||
-		strings.Contains(lower, "htmlentities") ||
-		strings.Contains(lower, "esc_html") ||
-		strings.Contains(lower, "strip_tags")
-}
-
-func (c *phConv) phpUnscannedPdfPreview(root *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node, string)
-	walk = func(n *tree_sitter.Node, scope string) {
-		if n == nil {
-			return
-		}
-		if n.Kind() == "function_definition" || n.Kind() == "method_declaration" {
-			scope = c.text(n)
-		}
-		if n.Kind() == "object_creation_expression" {
-			text := c.text(n)
-			if strings.Contains(text, "StreamedResponse") &&
-				strings.Contains(strings.ToLower(text), "application/pdf") &&
-				!phpPdfScanGateBefore(scope, text) {
-				loc := c.loc(n)
-				if !seen[loc] {
-					seen[loc] = true
-					path := "security.php.pdf_preview.unscanned"
-					out = append(out, nir.ExprStmt{Value: nir.Call{
-						Callee: nir.Name{ID: path, Loc: loc},
-						Path:   path,
-						Method: lastSeg(path),
-						Loc:    loc,
-					}})
-				}
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch, scope)
-		}
-	}
-	walk(root, "")
-	return out
-}
-
-func phpPdfScanGateBefore(scope, objectText string) bool {
-	if scope == "" {
-		return false
-	}
-	idx := strings.Index(scope, objectText)
-	if idx < 0 {
-		idx = len(scope)
-	}
-	prefix := strings.ToLower(scope[:idx])
-	return strings.Contains(prefix, "getresponsebyscanstatus") ||
-		strings.Contains(prefix, "getscanstatus") ||
-		strings.Contains(prefix, "scan_pdf")
-}
-
-func (c *phConv) phpUnrestrictedVariableVariableAssignment(root *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	seen := map[string]bool{}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind() == "foreach_statement" {
-			text := c.text(n)
-			if strings.Contains(text, "$_GET") &&
-				strings.Contains(text, "$$") &&
-				!phpVariableVariableKeyGuardBefore(text) {
-				loc := c.phpVariableVariableAssignLoc(n)
-				if !seen[loc] {
-					seen[loc] = true
-					path := "security.php.variable_variable.unrestricted"
-					out = append(out, nir.ExprStmt{Value: nir.Call{
-						Callee: nir.Name{ID: path, Loc: loc},
-						Path:   path,
-						Method: lastSeg(path),
-						Loc:    loc,
-					}})
-				}
-			}
-		}
-		for _, ch := range namedChildren(n) {
-			walk(ch)
-		}
-	}
-	walk(root)
-	return out
-}
-
-func phpVariableVariableKeyGuardBefore(foreachText string) bool {
-	idx := strings.Index(foreachText, "$$")
-	if idx < 0 {
-		return false
-	}
-	prefix := strings.ToLower(foreachText[:idx])
-	return strings.Contains(prefix, "preg_match") ||
-		strings.Contains(prefix, "in_array") ||
-		strings.Contains(prefix, "array_key_exists")
-}
-
-func (c *phConv) phpVariableVariableAssignLoc(n *tree_sitter.Node) string {
-	loc := c.loc(n)
-	var walk func(*tree_sitter.Node)
-	walk = func(cur *tree_sitter.Node) {
-		if cur == nil {
-			return
-		}
-		if cur.Kind() == "assignment_expression" && strings.Contains(c.text(cur), "$$") {
-			loc = c.loc(cur)
-			return
-		}
-		for _, ch := range namedChildren(cur) {
-			walk(ch)
-		}
-	}
-	walk(n)
-	return loc
 }
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —
@@ -692,6 +551,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		if len(parts) > 0 {
+			parts = append([]nir.Expr{nir.Const{Loc: L, Value: c.text(n)}}, parts...)
 			return nir.Format{Parts: parts, Loc: L}
 		}
 		return nir.Const{Loc: L, Value: c.text(n)} // non-interpolated → literal value
@@ -737,7 +597,13 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "unary_op_expression":
-		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "operand")), Loc: L}
+		operand := field(n, "operand")
+		if operand == nil {
+			if kids := namedChildren(n); len(kids) > 0 {
+				operand = kids[len(kids)-1]
+			}
+		}
+		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(operand), Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
@@ -749,7 +615,8 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 				k := namedChildren(ch)
 				switch {
 				case len(k) >= 2: // key => value (named-value matching)
-					parts = append(parts, nir.Pair{Key: c.keyName(k[0]), Value: c.expr(k[len(k)-1]), Loc: L})
+					key := c.keyName(k[0])
+					parts = append(parts, nir.Pair{Key: key, Value: prependSeqKeyPath(c.expr(k[len(k)-1]), key), Loc: L})
 				case len(k) == 1:
 					parts = append(parts, c.expr(k[0]))
 				}
@@ -779,8 +646,30 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	return nir.Seq{Parts: parts, Loc: L}
 }
 
-// keyName returns the bare name of an array key — a string literal with quotes
-// stripped (e.g. 'httponly'), or a constant/name as-is (e.g. CURLOPT_SSL_VERIFYPEER).
+func prependSeqKeyPath(e nir.Expr, key string) nir.Expr {
+	if key == "" {
+		return e
+	}
+	switch ex := e.(type) {
+	case nir.Seq:
+		ex.KeyPath = append([]string{key}, ex.KeyPath...)
+		for i := range ex.Parts {
+			ex.Parts[i] = prependSeqKeyPath(ex.Parts[i], key)
+		}
+		return ex
+	case nir.Pair:
+		ex.Value = prependSeqKeyPath(ex.Value, key)
+		return ex
+	case nir.Thru:
+		ex.Inner = prependSeqKeyPath(ex.Inner, key)
+		return ex
+	default:
+		return e
+	}
+}
+
+// keyName returns the bare name of an array key: a string literal with quotes
+// stripped, or a constant/name as-is.
 func (c *phConv) keyName(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""

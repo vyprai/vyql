@@ -1,0 +1,38 @@
+test "go: raw response body without content type can be XSS"
+  lang go
+  expect VYQL-INJ-004
+  code
+  ```
+  package p
+
+  import (
+    "fmt"
+    "github.com/gin-gonic/gin"
+  )
+
+  func avatar(ctx *gin.Context) {
+    name := ctx.Param("data")
+    body := fmt.Sprintf("<svg>%s</svg>", name)
+    ctx.Writer.WriteString(body)
+  }
+  ```
+
+test "go: raw response body with image content type is clean"
+  lang go
+  reject VYQL-INJ-004
+  code
+  ```
+  package p
+
+  import (
+    "fmt"
+    "github.com/gin-gonic/gin"
+  )
+
+  func avatar(ctx *gin.Context) {
+    name := ctx.Param("data")
+    body := fmt.Sprintf("<svg>%s</svg>", name)
+    ctx.Header("content-type", "image/png")
+    ctx.Writer.WriteString(body)
+  }
+  ```

@@ -23,10 +23,19 @@ type TaintFlow struct {
 }
 
 // excludesAll reports whether a char-filter's bounded output alphabet excludes every
-// dangerous character for a sink (i.e. the filter provably neutralizes the taint).
-func excludesAll(alphabet, dangerous string) bool {
-	for _, d := range dangerous {
+// excluded character for a sink (i.e. the filter provably neutralizes the taint).
+func excludesAll(alphabet, excluded string) bool {
+	for _, d := range excluded {
 		if strings.ContainsRune(alphabet, d) {
+			return false
+		}
+	}
+	return true
+}
+
+func coversAll(chars, excluded string) bool {
+	for _, d := range excluded {
+		if !strings.ContainsRune(chars, d) {
 			return false
 		}
 	}
@@ -43,12 +52,12 @@ func firstKey(m map[string]bool) string {
 // FindTaintFlows enumerates source->sink paths; a path yields a flow iff no
 // kill-control node lies on it (the control killed the fact). Records near-miss
 // controls seen on killed sibling paths.
-func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, dangerous string) ([]TaintFlow, error) {
+func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) ([]TaintFlow, error) {
 	// int-indexed fast path: run the whole fixpoint on int32 node indices (no string ids/payload
 	// in the hot loop) when the store supports it — the basis for keeping only int adjacency +
 	// labels resident while ids/payload spill to disk. Produces identical findings.
 	if ig, ok := store.(usg.IntGraph); ok {
-		return findTaintFlowsInt(ig, sourceConcepts, sinkConcepts, taintKinds, killControls, dangerous), nil
+		return findTaintFlowsInt(ig, sourceConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters), nil
 	}
 	// collect source nodes (nodes carrying any source concept)
 	sourceNodes := map[string]bool{}
@@ -98,7 +107,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 		return nil, nil
 	}
 	// isKill: a node neutralizes taint if it carries a kill control, or a char-filter whose
-	// bounded output alphabet provably excludes the sink's dangerous chars. killOf also returns
+	// bounded output alphabet provably excludes the sink's excluded chars. killOf also returns
 	// the concept for near-miss detail. Memoized — each node's labels are scanned once.
 	killMemo := map[string]int8{} // 0 unknown, 1 kill, 2 not-kill
 	killConcept := map[string]string{}
@@ -114,10 +123,15 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 				killMemo[id], killConcept[id] = 1, l.Concept
 				return true, l.Concept
 			}
-			if l.Concept == "core.CharFilter" && dangerous != "" &&
-				l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], dangerous) {
-				killMemo[id], killConcept[id] = 1, "core.CharFilter"
-				return true, "core.CharFilter"
+			if charFilters[l.Concept] && excluded != "" {
+				if l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
+					killMemo[id], killConcept[id] = 1, l.Concept
+					return true, l.Concept
+				}
+				if removed := l.Detail["removed"]; removed != "" && coversAll(removed, excluded) {
+					killMemo[id], killConcept[id] = 1, l.Concept
+					return true, l.Concept
+				}
 			}
 		}
 		killMemo[id] = 2
@@ -220,7 +234,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 // int32 (no string maps in the hot loop), and adjacency/labels/concept-sets come from the
 // IntGraph. String ids are produced only when emitting findings (NodeID), so the inner loop
 // touches no ids or payload — exactly what an out-of-core (ids/payload-on-disk) store needs.
-func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, dangerous string) []TaintFlow {
+func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) []TaintFlow {
 	n := g.NodeCount()
 	kind := firstKey(taintKinds)
 
@@ -256,11 +270,17 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 				killConcept[i] = l.Concept
 				return true, l.Concept
 			}
-			if l.Concept == "core.CharFilter" && dangerous != "" &&
-				l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], dangerous) {
-				killMemo[i] = 1
-				killConcept[i] = "core.CharFilter"
-				return true, "core.CharFilter"
+			if charFilters[l.Concept] && excluded != "" {
+				if l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
+					killMemo[i] = 1
+					killConcept[i] = l.Concept
+					return true, l.Concept
+				}
+				if removed := l.Detail["removed"]; removed != "" && coversAll(removed, excluded) {
+					killMemo[i] = 1
+					killConcept[i] = l.Concept
+					return true, l.Concept
+				}
 			}
 		}
 		killMemo[i] = 2

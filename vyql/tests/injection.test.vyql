@@ -163,6 +163,36 @@ test "js: a constant nunjucks template is clean"
   nunjucks.compile('<h1>hello</h1>');
   ```
 
+test "python: f-string field validation misses nested field syntax"
+  lang python
+  expect VYQL-INJ-024
+  code
+  ```
+  from string import Formatter
+
+  def validate(template):
+      for literal, field, format_spec, conv in Formatter().parse(template):
+          if field and "." in field:
+              raise ValueError("bad field")
+      return template
+  ```
+
+test "python: f-string field validation covers nested format specs"
+  lang python
+  reject VYQL-INJ-024
+  code
+  ```
+  from string import Formatter
+
+  def validate(template):
+      for literal, field, format_spec, conv in Formatter().parse(template):
+          if field and "." in field:
+              raise ValueError("bad field")
+          if format_spec and ("{" in format_spec or "}" in format_spec):
+              raise ValueError("bad format")
+      return template
+  ```
+
 # --- Expression-language injection (VYQL-INJ-016) ---
 test "java: tainted SpEL parseExpression is EL injection"
   lang java
@@ -299,6 +329,66 @@ test "js: taint enters function-expression assigned to a variable"
   }
   ```
 
+test "js: unflatten for-in path keys can pollute prototypes"
+  lang javascript
+  profile library
+  expect VYQL-INJ-013
+  code
+  ```
+  function unflatten(obj = {}) {
+    const regex = /\.?([^.\[\]]+)|\[(\d+)\]/g;
+    const resultholder = {};
+
+    for (const p in obj) {
+      let curr = resultholder;
+      let prop = "";
+      let m = {};
+
+      while ((m = regex.exec(p))) {
+        curr = curr[prop] || (curr[prop] = m[2] ? [] : {});
+        prop = m[2] || m[1];
+      }
+
+      curr[prop] = obj[p];
+    }
+
+    return resultholder[""] || resultholder;
+  }
+
+  module.exports = unflatten;
+  ```
+
+test "js: unflatten constructor prototype split guard is clean"
+  lang javascript
+  profile library
+  reject VYQL-INJ-013
+  code
+  ```
+  function unflatten(obj = {}) {
+    const regex = /\.?([^.\[\]]+)|\[(\d+)\]/g;
+    const resultholder = {};
+
+    for (const p in obj) {
+      let curr = resultholder;
+      let prop = "";
+      let m = {};
+
+      while ((m = regex.exec(p))) {
+        if (curr[prop] === constructor.prototype)
+          curr[prop] = {};
+        curr = curr[prop] || (curr[prop] = m[2] ? [] : {});
+        prop = m[2] || m[1];
+      }
+
+      curr[prop] = obj[p];
+    }
+
+    return resultholder[""] || resultholder;
+  }
+
+  module.exports = unflatten;
+  ```
+
 # --- Stored XSS writes (VYQL-INJ-004) ---
 test "js: tainted Mongo hypertext update is stored XSS"
   lang javascript
@@ -329,6 +419,49 @@ test "js: sanitize-html neutralizes stored XSS update"
       }
     });
   }
+  ```
+
+test "javascript: SVG upload copied with preserved extension needs sanitization"
+  lang javascript
+  expect VYQL-INJ-028
+  code
+  ```
+  module.exports = {
+    methods(self) {
+      return {
+        async insert(file) {
+          const info = {
+            _id: self.apos.util.generateId(),
+            name: self.apos.util.slugify(file.name),
+            extension: path.extname(file.name).substr(1).toLowerCase()
+          };
+          await Promise.promisify(self.uploadfs.copyIn)(file.path, '/attachments/' + info._id + '-' + info.name + '.' + info.extension);
+        }
+      };
+    }
+  };
+  ```
+
+test "javascript: SVG upload sanitization before preserved-extension copy is clean"
+  lang javascript
+  reject VYQL-INJ-028
+  code
+  ```
+  module.exports = {
+    methods(self) {
+      return {
+        async insert(file) {
+          const info = {
+            _id: self.apos.util.generateId(),
+            name: self.apos.util.slugify(file.name),
+            extension: path.extname(file.name).substr(1).toLowerCase()
+          };
+          await self.sanitizeSvg(file.path);
+          await Promise.promisify(self.uploadfs.copyIn)(file.path, '/attachments/' + info._id + '-' + info.name + '.' + info.extension);
+        }
+      };
+    }
+  };
   ```
 
 test "js: nested async Mongo helper preserves stored XSS taint"
@@ -631,6 +764,103 @@ test "javascript: encoded error message sent as HTML is clean"
   };
   ```
 
+test "python: traceback rendered as raw HTML is XSS"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  import traceback
+
+  def respond_error(context):
+      context.respond_server_error()
+      stack = traceback.format_exc()
+      return """
+      <html><body><pre>
+  %s
+      </pre></body></html>
+      """ % stack
+  ```
+
+test "python: escaped traceback HTML is clean"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  import cgi
+  import traceback
+
+  def respond_error(context):
+      context.respond_server_error()
+      stack = traceback.format_exc()
+      return """
+      <html><body><pre>
+  %s
+      </pre></body></html>
+      """ % cgi.escape(stack)
+  ```
+
+test "python: Flask raw route return is XSS"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, Response, request
+
+  app = Flask(__name__)
+
+  @app.route("/raw")
+  def raw():
+      value = request.args.get("x", "")
+      return value
+  ```
+
+test "python: Flask text/plain Response route return is clean"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, Response, request
+
+  app = Flask(__name__)
+
+  @app.route("/plain")
+  def plain():
+      value = request.args.get("y", "")
+      return Response(value, mimetype="text/plain")
+  ```
+
+test "python: Flask JSON Response without JSON mimetype can reflect route params as XSS"
+  lang python
+  profile web
+  expect VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, Response
+  import json
+
+  app = Flask(__name__)
+
+  @app.route("/api/preferences/set/<key>/<value>")
+  def pref_set(key, value):
+      return Response(json.dumps({"key": key, "success": ""})), 201
+  ```
+
+test "python: Flask JSON Response with JSON mimetype is clean"
+  lang python
+  profile web
+  reject VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, Response
+  import json
+
+  app = Flask(__name__)
+
+  @app.route("/api/preferences/set/<key>/<value>")
+  def pref_set(key, value):
+      return Response(json.dumps({"key": key, "success": ""}), mimetype="application/json"), 201
+  ```
+
 test "javascript: generate-function builder receives tainted source"
   lang javascript
   profile library
@@ -909,6 +1139,36 @@ test "php: non-request variable-variable assignment is not request XSS"
   }
   ```
 
+test "php: stored CMS HTML write without purifier is XSS-relevant"
+  lang php
+  expect VYQL-INJ-028
+  code
+  ```
+  <?php
+  foreach ($data as $entry) {
+      if (trim($this->val($entry, 'text.content', '')) === '') {
+          continue;
+      }
+      $refItem->fromArray($entry, true)->setType('content');
+  }
+  ```
+
+test "php: stored CMS HTML write after purifier is clean"
+  lang php
+  reject VYQL-INJ-028
+  code
+  ```
+  <?php
+  foreach ($data as $entry) {
+      if (!( $content = trim($this->val($entry, 'text.content', '')))) {
+          continue;
+      }
+      $purifier = new HTMLPurifier();
+      $entry['text.content'] = $purifier->purify($content);
+      $refItem->fromArray($entry, true)->setType('content');
+  }
+  ```
+
 test "javascript: environment value in webpack shell plugin script is command injection"
   lang javascript
   expect VYQL-INJ-002
@@ -941,6 +1201,23 @@ test "javascript: constant webpack shell plugin scripts are clean"
     }
   };
   new WebpackShellPlugin(shellPluginConfig);
+  ```
+
+test "javascript: command output interpolated into a later shell command is command injection"
+  lang javascript
+  expect VYQL-INJ-002
+  code
+  ```
+  const { execSync } = require('child_process');
+  function loadCertificates() {
+    const keychains = execSync('security list-keychains')
+      .toString()
+      .split('\n')
+      .map((kc) => kc.trim().replace(/"/g, ''));
+    keychains.forEach((keychain) => {
+      execSync(`security find-certificate -a -p ${keychain}`).toString();
+    });
+  }
   ```
 
 # --- Format string (VYQL-INJ-011) ---
@@ -985,4 +1262,44 @@ test "python: shlex.quote neutralizes the command injection"
   def safe():
       x = request.args['q']
       os.system("ping " + shlex.quote(x))
+  ```
+
+test "python: shell quote inside generator join neutralizes command injection"
+  lang python
+  reject VYQL-INJ-002
+  code
+  ```
+  from pipes import quote
+
+  def safe():
+      args = [request.args['tool'], request.args['input'], "-d", "/tmp/out"]
+      command = " ".join(quote(arg) for arg in args)
+      os.system(command)
+  ```
+
+test "python: SQLAlchemy stored value reaches command execution"
+  lang python
+  expect VYQL-INJ-032
+  code
+  ```
+  import os
+  import sqlalchemy
+
+  def run_submission(submission_hash):
+      submission = Submission.query.get(submission_hash)
+      os.system("jpseek " + submission.password)
+  ```
+
+test "python: SQLAlchemy stored value reaches asyncio exec splat"
+  lang python
+  expect VYQL-INJ-032
+  code
+  ```
+  import asyncio
+  import sqlalchemy
+
+  async def run_submission(submission_hash):
+      submission = Submission.query.get(submission_hash)
+      cmd = ["bash", "-c", "jpseek " + submission.password]
+      await asyncio.create_subprocess_exec(*cmd)
   ```

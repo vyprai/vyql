@@ -3,6 +3,7 @@ package lowering
 import (
 	"errors"
 
+	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -47,6 +48,19 @@ func (w *bufWriter) strs(ss []string) {
 	w.uvar(len(ss))
 	for _, s := range ss {
 		w.str(s)
+	}
+}
+func (w *bufWriter) resultEntries(entries []nir.ResultEntry) {
+	w.uvar(len(entries))
+	for _, entry := range entries {
+		w.strs(entry.Tokens)
+	}
+}
+func (w *bufWriter) paramEntries(entries []nir.ParamEntry) {
+	w.uvar(len(entries))
+	for _, entry := range entries {
+		w.str(entry.Param)
+		w.strs(entry.Tokens)
 	}
 }
 
@@ -116,6 +130,28 @@ func (r *bufReader) strs() []string {
 	out := make([]string, n)
 	for j := 0; j < n; j++ {
 		out[j] = r.str()
+	}
+	return out
+}
+func (r *bufReader) resultEntries() []nir.ResultEntry {
+	n := r.uvar()
+	if n == 0 {
+		return nil
+	}
+	out := make([]nir.ResultEntry, n)
+	for i := range out {
+		out[i] = nir.ResultEntry{Tokens: r.strs()}
+	}
+	return out
+}
+func (r *bufReader) paramEntries() []nir.ParamEntry {
+	n := r.uvar()
+	if n == 0 {
+		return nil
+	}
+	out := make([]nir.ParamEntry, n)
+	for i := range out {
+		out[i] = nir.ParamEntry{Param: r.str(), Tokens: r.strs()}
 	}
 	return out
 }
@@ -212,7 +248,8 @@ func encodePass1(d *pass1Delta) []byte {
 		w.str(f.Module)
 		w.str(f.Cls)
 		w.str(f.Name)
-		w.boolean(f.Validator)
+		w.paramEntries(f.ParamEntries)
+		w.resultEntries(f.ResultEntries)
 		w.boolean(f.Abstract)
 	}
 	w.strs(d.ClassQual)
@@ -255,7 +292,7 @@ func decodePass1(raw []byte) (d *pass1Delta, err error) {
 				Qual: r.str(), Short: r.str(), ParamNames: r.strs(),
 				Params: r.smap(), ParamTypes: r.smap(),
 				Ret: r.str(), Module: r.str(), Cls: r.str(), Name: r.str(),
-				Validator: r.boolean(), Abstract: r.boolean(),
+				ParamEntries: r.paramEntries(), ResultEntries: r.resultEntries(), Abstract: r.boolean(),
 			}
 		}
 	}

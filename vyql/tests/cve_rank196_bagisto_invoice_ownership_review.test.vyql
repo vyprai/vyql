@@ -1,0 +1,36 @@
+test "rank196: bagisto invoice print lookup without customer ownership guard is review-visible"
+  lang php
+  expect_review code.ObjectLookupByUserInput
+  code
+  ```
+  <?php
+  class OrderController {
+      public function print($id) {
+          $invoice = $this->invoiceRepository->findOrFail($id);
+          $pdf = PDF::loadView('shop::customers.account.orders.pdf', compact('invoice'))->setPaper('a4');
+          return $pdf->download('invoice-' . $invoice->created_at->format('d-m-Y') . '.pdf');
+      }
+  }
+  ?>
+  ```
+
+test "rank196: bagisto invoice print customer ownership guard is review-visible"
+  lang php
+  expect_review core.OwnershipCheck
+  code
+  ```
+  <?php
+  class OrderController {
+      public function print($id) {
+          $invoice = $this->invoiceRepository->findOrFail($id);
+
+          if ($invoice->order->customer_id !== auth()->guard('customer')->user()->id) {
+              abort(404);
+          }
+
+          $pdf = PDF::loadView('shop::customers.account.orders.pdf', compact('invoice'))->setPaper('a4');
+          return $pdf->download('invoice-' . $invoice->created_at->format('d-m-Y') . '.pdf');
+      }
+  }
+  ?>
+  ```

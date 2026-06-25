@@ -2,13 +2,13 @@
 module vypr.deserialization;
 
 rule Unsafe {
-  meta { id: "VYQL-DESER-001", severity: critical, cwe: [CWE_502] }
+  meta { id: "VYQL-DESER-001", severity: critical, cwe: [CWE_502], benchmark: deserialization }
   taint core.UserControlledData -> code.Deserialization
   unless sanitized_by core.SafeDeserialization
 }
 
 rule Xxe {
-  meta { id: "VYQL-DESER-002", severity: high, cwe: [CWE_611] }
+  meta { id: "VYQL-DESER-002", severity: high, cwe: [CWE_611], benchmark: xxe }
   taint core.UserControlledData -> code.XmlParse
   unless sanitized_by core.XmlHardening
   unless guarded_by core.XmlHardening
@@ -28,4 +28,34 @@ rule XxeUnhardened {
   match code.XmlParserCreate as p
   unless guarded_by core.XmlHardening
   unless sanitized_by core.XmlHardening
+}
+
+rule IncompleteArchiveFilenameValidation {
+  meta { id: "VYQL-DESER-005", severity: high, cwe: [CWE_502, CWE_915], confidence_floor: medium }
+  match code.IncompleteArchiveFilenameValidation as validator
+}
+
+rule UnsafeYamlConstructor {
+  meta { id: "VYQL-DESER-006", severity: high, cwe: [CWE_502, CWE_94], confidence_floor: medium }
+  match code.UnsafeYamlConstructor as constructor
+}
+
+rule UnrestrictedRequestParamDeserialization {
+  meta { id: "VYQL-DESER-007", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.UnrestrictedRequestParamDeserialization as deserialization
+}
+
+rule ArchiveManifestDeserialization {
+  meta { id: "VYQL-DESER-008", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.ArchiveManifestDeserialization as deserialization
+}
+
+rule DeserializableInvocationHandler {
+  meta { id: "VYQL-DESER-009", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.DeserializableInvocationHandler as handler
+}
+
+rule RequestSelectedDeserializationFormat {
+  meta { id: "VYQL-DESER-010", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.RequestSelectedDeserializationFormat as deserialization
 }

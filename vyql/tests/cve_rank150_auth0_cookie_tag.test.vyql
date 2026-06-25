@@ -1,0 +1,63 @@
+# Rank 150 / CVE-2025-47275: Auth0-PHP accepted AES-GCM cookie tags without
+# enforcing the expected 16-byte authentication tag length before decrypting.
+
+test "rank150: php authenticated decrypt without tag length check is review attention"
+  lang php
+  expect_review code.AuthenticatedDecryptionTagReview
+  code
+  ```
+  <?php
+  final class CookieStore {
+    public const VAL_CRYPTO_ALGO = 'aes-128-gcm';
+
+    public function decrypt(string $payload): ?array {
+      $secret = $this->configuration->getCookieSecret();
+      $data = json_decode(stripslashes(rawurldecode($payload)), true, 512);
+      if (! isset($data['iv']) || ! isset($data['tag']) || ! is_string($data['iv']) || ! is_string($data['tag'])) {
+        return null;
+      }
+
+      $iv = base64_decode($data['iv'], true);
+      $tag = base64_decode($data['tag'], true);
+
+      if (! is_string($iv) || ! is_string($tag)) {
+        return null;
+      }
+
+      $data = openssl_decrypt($data['data'], self::VAL_CRYPTO_ALGO, $secret, 0, $iv, $tag);
+      return is_string($data) ? json_decode($data, true) : null;
+    }
+  }
+  ?>
+  ```
+
+test "rank150: php authenticated decrypt with tag length check is clean"
+  lang php
+  reject_review code.AuthenticatedDecryptionTagReview
+  code
+  ```
+  <?php
+  final class CookieStore {
+    public const VAL_CRYPTO_ALGO = 'aes-128-gcm';
+    public const VAL_CRYPTO_TAG_LENGTH_BYTES = 16;
+
+    public function decrypt(string $payload): ?array {
+      $secret = $this->configuration->getCookieSecret();
+      $data = json_decode(stripslashes(rawurldecode($payload)), true, 512);
+      if (! isset($data['iv']) || ! isset($data['tag']) || ! is_string($data['iv']) || ! is_string($data['tag'])) {
+        return null;
+      }
+
+      $iv = base64_decode($data['iv'], true);
+      $tag = base64_decode($data['tag'], true);
+
+      if (! is_string($iv) || ! is_string($tag) || self::VAL_CRYPTO_TAG_LENGTH_BYTES !== strlen($tag)) {
+        return null;
+      }
+
+      $data = openssl_decrypt($data['data'], self::VAL_CRYPTO_ALGO, $secret, 0, $iv, $tag);
+      return is_string($data) ? json_decode($data, true) : null;
+    }
+  }
+  ?>
+  ```

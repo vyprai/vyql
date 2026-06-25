@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"strings"
+	"unicode"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tsruby "github.com/tree-sitter/tree-sitter-ruby/bindings/go"
@@ -48,11 +49,7 @@ func (c *rbConv) text(n *tree_sitter.Node) string {
 }
 
 func (c *rbConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
-	var out []nir.Stmt
-	for _, st := range namedChildren(n) {
-		out = append(out, c.stmt(st)...)
-	}
-	return out
+	return c.rbStmtList(namedChildren(n))
 }
 
 func (c *rbConv) body(n *tree_sitter.Node) []nir.Stmt {
@@ -63,6 +60,17 @@ func (c *rbConv) body(n *tree_sitter.Node) []nir.Stmt {
 	return c.blockChildren(n)
 }
 
+func (c *rbConv) rbMethodBody(n *tree_sitter.Node) []nir.Stmt {
+	stmts := c.body(n)
+	if len(stmts) == 0 {
+		return stmts
+	}
+	if last, ok := stmts[len(stmts)-1].(nir.ExprStmt); ok {
+		stmts[len(stmts)-1] = nir.Return{Value: last.Value}
+	}
+	return stmts
+}
+
 func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
@@ -70,23 +78,31 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// Ruby methods are PUBLIC by default (the gem's API surface). A `private`/`protected`
 		// marker would hide subsequent methods — not tracked yet, so this slightly
 		// over-marks; the library param-source is caller-conditional, which absorbs that.
-		return []nir.Stmt{nir.FuncDef{
-			Name:     c.text(field(n, "name")),
-			Params:   c.params(field(n, "parameters")),
-			Body:     c.body(field(n, "body")),
-			Loc:      L,
-			Exported: true,
-		}}
+		body := field(n, "body")
+		name := c.text(field(n, "name"))
+		params := c.params(field(n, "parameters"))
+		out := c.rubyFunctionContext(n)
+		out = append(out, nir.FuncDef{
+			Name:         name,
+			Params:       params,
+			ParamEntries: c.rbParamEntries(name, params),
+			Body:         c.rbMethodBody(body),
+			Loc:          L,
+			Exported:     true,
+		})
+		return out
 	case "class", "module":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
+	case "singleton_class":
+		return c.body(field(n, "body"))
 	case "assignment":
 		left := field(n, "left")
 		right := c.expr(field(n, "right"))
 		if left != nil && (left.Kind() == "identifier" || left.Kind() == "constant" || left.Kind() == "instance_variable") {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// subscript write (session['role'] = v) — model as a write to the base's path so a
-		// trust-context path sink fires (CWE-501). Method empty → no method-sink collision.
+		// subscript write (bag['key'] = v) — model as a write to the base's path.
+		// Method empty -> no method-sink collision.
 		if left != nil && left.Kind() == "element_reference" {
 			base := field(left, "object")
 			if base == nil {
@@ -99,7 +115,7 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					Path: c.dotted(base), Method: "", Loc: L}}}
 			}
 		}
-		// attribute/setter write (obj.role = v) — model as a path-sink Call on the target path.
+		// attribute/setter write (obj.field = v) — model as a path-sink Call on the target path.
 		if left != nil && left.Kind() == "call" {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: L}}}
@@ -122,11 +138,21 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "if":
 		// separate Then/Else so the join-merge keeps the live branch tainted and a constant
 		// condition prunes.
-		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}}
+		cond := field(n, "condition")
+		ifn := nir.If{Cond: c.expr(cond), Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}
+		if target, val, ok := c.rbAssignmentExpr(cond); ok {
+			return []nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}, ifn}
+		}
+		return []nir.Stmt{ifn}
 	case "unless":
 		// `unless c` runs the body when c is FALSE — split branches for the join-merge, but
 		// leave Cond nil (no const-prune, to avoid inverting the condition incorrectly).
-		return []nir.Stmt{nir.If{Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}}
+		cond := field(n, "condition")
+		ifn := nir.If{Then: c.rubyBody(field(n, "consequence")), Else: c.rubyAlt(field(n, "alternative"))}
+		if target, val, ok := c.rbAssignmentExpr(cond); ok {
+			return []nir.Stmt{nir.Assign{Targets: []string{target}, Value: val}, ifn}
+		}
+		return []nir.Stmt{ifn}
 	case "while", "until", "for":
 		return []nir.Stmt{nir.Loop{Body: c.collectBodies(n)}}
 	case "begin":
@@ -151,17 +177,86 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 }
 
+func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	name := c.text(field(fn, "name"))
+	loc := c.loc(fn)
+	text := c.text(body)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.function.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.function.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func (c *rbConv) rbParamEntries(name string, params []string) []nir.ParamEntry {
+	out := make([]nir.ParamEntry, 0, len(params))
+	for i, p := range params {
+		if p == "" {
+			continue
+		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: []string{
+			"function_name:" + name,
+			"param_name:" + p,
+			"param_index:" + itoa(i),
+		}})
+	}
+	return out
+}
+
+func (c *rbConv) rbAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
+	for n != nil && n.Kind() == "parenthesized_statements" {
+		kids := namedChildren(n)
+		if len(kids) != 1 {
+			return "", nil, false
+		}
+		n = kids[0]
+	}
+	if n == nil || n.Kind() != "assignment" {
+		for _, ch := range namedChildren(n) {
+			if target, val, ok := c.rbAssignmentExpr(ch); ok {
+				return target, val, true
+			}
+		}
+		return "", nil, false
+	}
+	left := field(n, "left")
+	if left == nil || left.Kind() != "identifier" {
+		return "", nil, false
+	}
+	right := field(n, "right")
+	if right == nil {
+		return "", nil, false
+	}
+	return c.text(left), c.expr(right), true
+}
+
+func rbCompactText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
 // rubyBody lowers the statements of a then/else clause node (or a bare body).
 func (c *rbConv) rubyBody(n *tree_sitter.Node) []nir.Stmt {
 	if n == nil {
 		return nil
 	}
 	if n.Kind() == "then" || n.Kind() == "else" || n.Kind() == "body_statement" {
-		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
-			out = append(out, c.stmt(ch)...)
-		}
-		return out
+		return c.rbStmtList(namedChildren(n))
 	}
 	return c.stmt(n)
 }
@@ -212,16 +307,60 @@ func (c *rbConv) rubyCase(n *tree_sitter.Node) nir.Stmt {
 // (flow-approximate).
 func (c *rbConv) collectBodies(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	kids := namedChildren(n)
+	for i := 0; i < len(kids); i++ {
+		ch := kids[i]
 		switch ch.Kind() {
 		case "body_statement", "then", "else", "elsif", "ensure", "when", "do_block", "block":
 			out = append(out, c.collectBodies(ch)...)
 		case "comment":
 		default:
+			if isRbCallNode(ch) && rbCallHasHeredocArg(ch) && i+1 < len(kids) && kids[i+1].Kind() == "heredoc_body" {
+				out = append(out, c.callStmtWithExtraArg(ch, c.expr(kids[i+1]))...)
+				i++
+				continue
+			}
 			out = append(out, c.stmt(ch)...)
 		}
 	}
 	return out
+}
+
+func (c *rbConv) rbStmtList(kids []*tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	for i := 0; i < len(kids); i++ {
+		ch := kids[i]
+		if isRbCallNode(ch) && rbCallHasHeredocArg(ch) && i+1 < len(kids) && kids[i+1].Kind() == "heredoc_body" {
+			out = append(out, c.callStmtWithExtraArg(ch, c.expr(kids[i+1]))...)
+			i++
+			continue
+		}
+		out = append(out, c.stmt(ch)...)
+	}
+	return out
+}
+
+func isRbCallNode(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Kind() {
+	case "call", "method_call", "command", "command_call":
+		return true
+	default:
+		return false
+	}
+}
+
+func rbCallHasHeredocArg(n *tree_sitter.Node) bool {
+	if al := field(n, "arguments"); al != nil {
+		for _, a := range namedChildren(al) {
+			if a.Kind() == "heredoc_beginning" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *rbConv) params(params *tree_sitter.Node) []string {
@@ -261,6 +400,8 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "true", "false":
 		return nir.Const{Loc: L, Value: c.text(n)} // boolean value for `val` matching
 	case "string":
+		return c.string(n, L)
+	case "heredoc_body", "heredoc_content":
 		return c.string(n, L)
 	case "regex":
 		if rubyRegexMayBacktrack(c.text(n)) {
@@ -481,6 +622,17 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 		}
 	}
 	return nir.Call{Callee: callee, Args: args, Path: path, Method: m, Loc: L}
+}
+
+func (c *rbConv) callStmtWithExtraArg(n *tree_sitter.Node, extra nir.Expr) []nir.Stmt {
+	L := c.loc(n)
+	call, ok := c.call(n, L).(nir.Call)
+	if !ok {
+		return c.stmt(n)
+	}
+	call.Args = append(call.Args, extra)
+	out := []nir.Stmt{nir.ExprStmt{Value: call}}
+	return append(out, c.callBlockStmts(n)...)
 }
 
 // callBlockStmts lowers a trailing block on a call (`recv.each { |x| … }`, `lambda { |v| … }`)

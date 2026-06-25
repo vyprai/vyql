@@ -4,7 +4,9 @@
 // delegate-param sourcing is deferred — see plan/threat-model-checklist.md.)
 profile mobile_ios {
   title: "Mobile app — iOS"
+  priority: "90"
   detect: ["file:Info.plist", "file:Package.swift", "dep:UIKit", "dep:SwiftUI",
            "dep:WebKit", "ext:.xcodeproj", "ext:.swift"]
-  entrypoints: [PasteboardInput, URLSchemeInput, ExternalApiResponse, DatabaseRead, SecretValue]
+  entrypoints: [PasteboardInput, URLSchemeInput, ExternalApiResponse, DatabaseRead, StoredDataRead, SecretValue,
+                ComputedSizeValue, ArchiveEntryName]
 }

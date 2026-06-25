@@ -55,7 +55,10 @@ adapter cpp {
   sink path "malloc" -> code.SizeComputation
   sink path "calloc" arg all -> code.SizeComputation
   sink path "realloc" arg 1 -> code.SizeComputation
+  sink path "reallocarray" arg 1 -> code.SizeComputation
   sink path "operator new" -> code.SizeComputation
+  mark "realloc" -> code.ZeroSizeReallocation
+  mark "reallocarray" -> code.ZeroSizeReallocation
   mark "alloca" -> code.StackAllocationSmell
   mark "mktemp" -> code.InsecureTempFile
   mark "tmpnam" -> code.InsecureTempFile
@@ -72,8 +75,16 @@ adapter cpp {
   mark "curl_easy_setopt" val "CURLOPT_SSL_VERIFYPEER" val "0" -> code.CertValidationDisabled
   mark "setsslverify" val "false" -> code.CertValidationDisabled
   mark "__subscript" -> code.IndexAccess
-  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
-  mark "security.cpp.failure_path_owned_buffer_free" -> code.FailurePathOwnedBufferFree
+  mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
+  mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
+  mark exact "analysis.function.context" val "lang=cpp" val "unescapeChar(*readPtr++);}*writePtr++=c;" -> code.EscapedTerminatorWrite
+  mark exact "analysis.function.context" val "lang=cpp" val "count_vertices+=*itf;" val "newaiVector3D[count_vertices]" nval "AI_MAX_FACE_INDICES" nval "count_vertices>vertices.size()" -> code.UnboundedAllocationReview
+  mark exact "analysis.function.context" val "lang=cpp" val "start+len+1>end" val "start+=len" nval "buff_size" nval "end-start-1" -> code.PointerOffsetBoundsCheck
+  mark exact "analysis.function.context" val "lang=cpp" val "visitBrOn(&curr)" val "validateTypeAnnotation(in,curr.ref)" val "curr.desc" nval "curr.ref->type.isRef" nval "curr.desc->type.isRef" -> code.ReachableAssertionReview
+  mark exact "analysis.function.context" val "lang=cpp" val "Record_Type::ApplicationData" val "callbacks().tls_record_received" nval "can_decrypt_application_traffic" -> code.ProtocolStateReview
+  mark exact "analysis.function.context" val "lang=cpp" val "name=HTTPAuthorized" val "strUserPass==strRPCUserColonPass" nval "nResult|=" -> code.SecretComparisonReview
+  mark "analysis.field.clear_null" -> code.OwnerFieldClear
+  mark "xmlFreeDoc" -> code.OwnerFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree
@@ -81,8 +92,10 @@ adapter cpp {
   sink path "__binop.mod" arg 1 -> code.DivisionDenominator
   mark "__binop.add" -> code.IntegerSizeArithmetic
   mark "__binop.sub" -> code.IntegerSizeArithmetic
+  source "__binop.mul" -> code.ComputedSizeValue
   mark "__binop.mul" -> code.IntegerSizeArithmetic
   mark "__binop.shl" -> code.IntegerSizeArithmetic
+  control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 
   // TOCTOU / race (CWE-367)
   mark "access" -> code.FileCheck

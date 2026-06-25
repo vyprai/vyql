@@ -9,7 +9,7 @@
 // Kept high-signal (destructive/privileged ops, acquisition calls) rather than every CRUD
 // call, to keep the AI pass's review set tractable. cross_language: these recur by name.
 adapter auditreview {
-  meta { fidelity: syntactic, cross_language: true }
+  meta { fidelity: syntactic, cross_language: true, auto_apply: graph }
 
   // --- privileged / destructive operations (authz review) ---
   // NOTE: bare delete/remove/destroy/drop omitted — too generic (match every collection
@@ -27,6 +27,8 @@ adapter auditreview {
   mark method "setPermissions" -> code.SensitiveOperation
   mark method "makeAdmin" -> code.SensitiveOperation
   mark method "setAdmin" -> code.SensitiveOperation
+  mark method "update" val "password" -> code.SensitiveOperation
+  mark method "update!" val "password" -> code.SensitiveOperation
   mark method "elevate" -> code.SensitiveOperation
   mark method "impersonate" -> code.SensitiveOperation
   mark method "assumeRole" -> code.SensitiveOperation
@@ -49,4 +51,8 @@ adapter auditreview {
   mark "fopen" -> code.ResourceReview
   mark "opendir" -> code.ResourceReview
   mark "socket" -> code.ResourceReview
+
+  // --- structured input decoders (format-validation review) ---
+  mark method "parseOctetString" -> code.StructuredInputDecode
+  mark method "parseBitString" -> code.StructuredInputDecode
 }

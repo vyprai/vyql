@@ -1,6 +1,4 @@
 // c framework adapter (docs/07) — framework→concept content.
-// C has no string concat; the frontend models writer fns (sprintf/strcpy) as
-// assignments to their dest, and reader fns (fgets/gets) as sources on the dest.
 adapter c {
   meta { fidelity: resolved }
 
@@ -27,6 +25,7 @@ adapter c {
   sink path "g_spawn_command_line_sync" -> code.CommandExecution
   sink path "g_spawn_command_line_async" -> code.CommandExecution
   sink path "g_app_info_create_from_commandline" -> code.CommandExecution
+  mark exact "analysis.function.context" val "g_app_info_create_from_commandline(cmdline" val "g_string_append_printf(cmd,\"--find=%s\",search_string)" nval "g_shell_quote" -> code.CommandLineAssemblyReview
 
   // SQL (procedural — the query is arg1)
   sink path "mysql_query" arg 1 -> code.SqlExecution
@@ -85,10 +84,24 @@ adapter c {
   sink path "malloc" -> code.SizeComputation
   sink path "calloc" arg all -> code.SizeComputation
   sink path "realloc" arg 1 -> code.SizeComputation
+  sink path "reallocarray" arg 1 -> code.SizeComputation
+  mark "realloc" -> code.ZeroSizeReallocation
+  mark "reallocarray" -> code.ZeroSizeReallocation
   mark "alloca" -> code.StackAllocationSmell
   mark "__subscript" -> code.IndexAccess
-  mark "security.index.field_derived.unchecked" -> code.FieldDerivedIndexAccess
-  mark "security.cpp.failure_path_owned_buffer_free" -> code.FailurePathOwnedBufferFree
+  mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
+  mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
+  mark exact "analysis.function.context" val "lang=c" val "name=bt_att_cancel" val "queue_remove_if(att->req_queue" val "queue_remove_if(att->ind_queue" val "queue_remove_if(att->write_queue" val "destroy_att_send_op(op)" nval "att->in_disc" nval "bt_att_disc_cancel" -> code.ReentrantQueueCleanupReview
+  mark exact "analysis.function.context" val "lang=c" val "unescapeChar(*readPtr++);}*writePtr++=c;" -> code.EscapedTerminatorWrite
+  mark exact "analysis.function.context" val "lang=c" val "start+len+1>end" val "start+=len" nval "buff_size" nval "end-start-1" -> code.PointerOffsetBoundsCheck
+  mark exact "analysis.function.context" val "lang=c" val "name=match" val "cur->peercallno==callno" val "dcallno==cur->callno" nval "full_frame?dcallno==cur->callno" -> code.ProtocolFrameBindingReview
+  mark exact "analysis.function.context" val "lang=c" val "name=__of_unflatten_dtb" val "FDT_BEGIN_NODE" val "FDT_PROP" val "is_reserved_name(pathp)" val "is_reserved_name(name)" val "of_new_node(node,pathp)" val "of_new_property" nval "is_allowed_input_name" nval "strchr(name,'/')" -> code.ProtocolStateReview
+  mark exact "analysis.function.context" val "lang=c" val "name=dispatch_cmd" val "OP_PUT" val "body_size=strtoul" val "body_size>job_data_size_limit" val "reply_msg(c,MSG_JOB_TOO_BIG)" nval "skip(c,body_size+2,MSG_JOB_TOO_BIG)" -> code.ProtocolCommandInjection
+  mark exact "analysis.function.context" val "name=perform_http_xact" val "CREATION_NOTIFICATION" val "run_post_create" nval "client_uid!=0" -> code.PrivilegedEntryPointReview
+  mark exact "analysis.function.context" val "lang=c" val "AVAHI_FLAGS_VALID" val "AVAHI_PUBLISH_USE_WIDE_AREA" val "AVAHI_PUBLISH_USE_MULTICAST" val "transport_flags_from_domain" nval "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)" -> code.ReachableAssertionReview
+  mark exact "analysis.function.context" val "lang=c" val "px->ft=imcb_file_send_start" val "px->ft->data=px" nval "if(!px->ft)" -> code.UncheckedNullableResultDeref
+  mark "analysis.field.clear_null" -> code.OwnerFieldClear
+  mark "xmlFreeDoc" -> code.OwnerFree
   mark "__deref" -> code.PointerUse
   mark "__deref" -> code.NullableDeref
   mark "free" -> code.PointerFree
@@ -96,8 +109,11 @@ adapter c {
   sink path "__binop.mod" arg 1 -> code.DivisionDenominator
   mark "__binop.add" -> code.IntegerSizeArithmetic
   mark "__binop.sub" -> code.IntegerSizeArithmetic
+  source "__binop.mul" -> code.ComputedSizeValue
   mark "__binop.mul" -> code.IntegerSizeArithmetic
   mark "__binop.shl" -> code.IntegerSizeArithmetic
+  control "analysis.function.context" val "(int)size<0" val "save+size<save" -> core.IntegerOverflowGuard
+  control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 
   // TOCTOU / race (CWE-367): check before use on the same CFG path. The rule is
   // assumption-gated because same-path ordering is not yet same-object proof.

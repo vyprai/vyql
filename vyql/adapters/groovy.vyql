@@ -33,6 +33,7 @@ adapter groovy {
   sink path "File" -> code.FilePathAccess
   sink path "URL" -> code.UrlFetch
   sink path "URI" -> code.UrlFetch
+  mark exact "analysis.module.context" val "lang=groovy" val "checksumError" val "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient)" nval "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient,\"\",false)" -> code.ChecksumErrorLogoutRedirect
   mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
   mark "URI" val "http://" nval "127.0" -> code.CleartextChannel
   sink method "extractEntry" -> code.ArchiveEntryWrite

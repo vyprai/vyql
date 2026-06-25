@@ -1,0 +1,52 @@
+test "rank186: Craft Azure Blob container loader lists containers without admin check"
+  lang php
+  expect_review code.CredentialedEndpointReview
+  code
+  ```
+  <?php
+
+  class DefaultController extends BaseController
+  {
+      public function actionLoadContainerData(): Response
+      {
+          $this->requirePostRequest();
+          $this->requireAcceptsJson();
+
+          $request = Craft::$app->getRequest();
+          $connectionString = Craft::parseEnv($request->getRequiredBodyParam('connectionString'));
+
+          try {
+              return $this->asJson(Fs::loadContainerList($connectionString));
+          } catch (\Throwable $e) {
+              return $this->asErrorJson($e->getMessage());
+          }
+      }
+  }
+  ```
+
+test "rank186: Craft Azure Blob container loader requires admin before listing containers"
+  lang php
+  reject_review code.CredentialedEndpointReview
+  code
+  ```
+  <?php
+
+  class DefaultController extends BaseController
+  {
+      public function actionLoadContainerData(): Response
+      {
+          $this->requireAdmin();
+          $this->requirePostRequest();
+          $this->requireAcceptsJson();
+
+          $request = Craft::$app->getRequest();
+          $connectionString = Craft::parseEnv($request->getRequiredBodyParam('connectionString'));
+
+          try {
+              return $this->asJson(Fs::loadContainerList($connectionString));
+          } catch (\Throwable $e) {
+              return $this->asErrorJson($e->getMessage());
+          }
+      }
+  }
+  ```

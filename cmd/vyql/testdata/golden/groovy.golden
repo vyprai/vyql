@@ -1,2 +1,4 @@
-attr params.BRANCH
-call sh
+call analysis.function.context
+call analysis.module.context
+call source.value
+call worker.run

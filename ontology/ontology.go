@@ -15,25 +15,53 @@ import (
 // namespace; the qualified id is `<package>.<Name>` (e.g. code.HttpInput).
 // Cross-package references (Refines/VulnerableTo/…) are written qualified.
 type Concept struct {
-	Name         string   `json:"name"`              // short PascalCase
-	Package      string   `json:"package"`           // namespace (e.g. code, core, cloud)
-	Kind         string   `json:"kind"`              // source|sink|control|asset|privilege|principal|exposure|action|state
-	Taint        []string `json:"taint,omitempty"`   // for sources (taint kinds, qualified)
-	VulnerableTo []string `json:"vulnerable_to,omitempty"` // for sinks (threat kinds, qualified)
-	Neutralizes  []string `json:"neutralizes,omitempty"`   // for controls (threat kinds, qualified)
-	Applies      string   `json:"applies,omitempty"`       // control: path|endpoint|scope
-	Refines      string   `json:"refines,omitempty"`       // single-parent specialization (qualified)
-	EnabledBy    []string `json:"enabled_by,omitempty"`    // for sinks: taint kinds that arm it (qualified)
-	CWE          []string `json:"cwe,omitempty"`           // mapped weakness ids (CWE_89)
-	CAPEC        []string `json:"capec,omitempty"`         // mapped attack-pattern ids (CAPEC_66)
-	Attack       []string `json:"attack,omitempty"`        // MITRE ATT&CK technique ids
-	Aliases      []string `json:"aliases,omitempty"`
-	Deprecated   string   `json:"deprecated,omitempty"`
-	// DangerousChars: for sinks, the characters that MUST be absent for taint to be
+	Name                    string   `json:"name"`                    // short PascalCase
+	Package                 string   `json:"package"`                 // namespace (e.g. code, core, cloud)
+	Kind                    string   `json:"kind"`                    // source|sink|control|asset|privilege|principal|exposure|action|state
+	Taint                   []string `json:"taint,omitempty"`         // for sources (taint kinds, qualified)
+	VulnerableTo            []string `json:"vulnerable_to,omitempty"` // for sinks (threat kinds, qualified)
+	Neutralizes             []string `json:"neutralizes,omitempty"`   // for controls (threat kinds, qualified)
+	Applies                 string   `json:"applies,omitempty"`       // control: path|endpoint|scope
+	Refines                 string   `json:"refines,omitempty"`       // single-parent specialization (qualified)
+	EnabledBy               []string `json:"enabled_by,omitempty"`    // for sinks: taint kinds that arm it (qualified)
+	CWE                     []string `json:"cwe,omitempty"`           // mapped weakness ids (CWE_89)
+	CAPEC                   []string `json:"capec,omitempty"`         // mapped attack-pattern ids (CAPEC_66)
+	Attack                  []string `json:"attack,omitempty"`        // MITRE ATT&CK technique ids
+	Aliases                 []string `json:"aliases,omitempty"`
+	Deprecated              string   `json:"deprecated,omitempty"`
+	Possibility             string   `json:"possibility,omitempty"` // possibility pass policy: include|exclude
+	ReviewCategory          string   `json:"review_category,omitempty"`
+	ReviewCondition         string   `json:"review_condition,omitempty"`
+	ReviewEvidence          string   `json:"review_evidence,omitempty"`
+	ReviewAssumption        string   `json:"review_assumption,omitempty"`
+	ReviewConfidence        string   `json:"review_confidence,omitempty"`
+	SourcePolicy            string   `json:"source_policy,omitempty"` // source review policy: direct|caller_conditional
+	SourceConditionCategory string   `json:"source_condition_category,omitempty"`
+	SourceCondition         string   `json:"source_condition,omitempty"`
+	SourceAssumption        string   `json:"source_assumption,omitempty"`
+	SourceConfidence        string   `json:"source_confidence,omitempty"`
+	AssumeMinLevel          string   `json:"assume_min_level,omitempty"`
+	AnalysisRole            string   `json:"analysis_role,omitempty"`
+	ContextReachSource      string   `json:"context_reach_source,omitempty"`
+	ContextReachLabel       string   `json:"context_reach_label,omitempty"`
+	ContextReachTargetProp  string   `json:"context_reach_target_prop,omitempty"`
+	ContextAssetTargetProp  string   `json:"context_asset_target_prop,omitempty"`
+	ContextAssetLabel       string   `json:"context_asset_label,omitempty"`
+	ContextConfirmDstProp   string   `json:"context_confirm_dst_prop,omitempty"`
+	ContextConfirmFlagProp  string   `json:"context_confirm_flag_prop,omitempty"`
+	ContextConfirmFlagValue string   `json:"context_confirm_flag_value,omitempty"`
+	ContextConfirmLabel     string   `json:"context_confirm_label,omitempty"`
+	// ExcludedChars: for sinks, the characters that MUST be absent for taint to be
 	// neutralized — lets a character-filter (allowlist replace) be proven a sound
 	// sanitizer when its output alphabet excludes all of them.
-	DangerousChars string `json:"dangerous_chars,omitempty"`
+	ExcludedChars string `json:"excluded_chars,omitempty"`
 }
+
+const (
+	AnalysisRoleAttributeSink         = "attribute_sink"
+	AnalysisRoleCharFilter            = "char_filter"
+	AnalysisRoleNeutralizerAssumption = "neutralizer_assumption"
+)
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.
 func (c Concept) QualifiedName() string {
@@ -73,6 +101,35 @@ func (o *Ontology) AllConcepts() []Concept {
 		out = append(out, *c)
 	}
 	sortConcepts(out)
+	return out
+}
+
+// ConceptsWithAnalysisRole returns the concepts tagged for an internal engine
+// role. The role names are generic mechanics; the concrete concept identities
+// live in ontology data.
+func (o *Ontology) ConceptsWithAnalysisRole(role string) map[string]bool {
+	out := map[string]bool{}
+	if role == "" {
+		return out
+	}
+	for _, c := range o.concepts {
+		if c.AnalysisRole == role {
+			out[c.QualifiedName()] = true
+		}
+	}
+	return out
+}
+
+// SingleConceptWithAnalysisRole returns the sole concept tagged for role.
+func (o *Ontology) SingleConceptWithAnalysisRole(role string) string {
+	concepts := o.ConceptsWithAnalysisRole(role)
+	var out string
+	for c := range concepts {
+		if out != "" {
+			return ""
+		}
+		out = c
+	}
 	return out
 }
 
@@ -156,10 +213,10 @@ func (o *Ontology) Descendants(name string) map[string]bool {
 
 // --- typing predicates ---------------------------------------------------
 
-func (o *Ontology) SinkThreats(sink string) []string  { return o.field(sink, "vulnerable_to") }
+func (o *Ontology) SinkThreats(sink string) []string     { return o.field(sink, "vulnerable_to") }
 func (o *Ontology) ControlNeutralizes(c string) []string { return o.field(c, "neutralizes") }
-func (o *Ontology) SourceTaints(s string) []string    { return o.field(s, "taint") }
-func (o *Ontology) SinkArmedBy(sink string) []string  { return o.field(sink, "enabled_by") }
+func (o *Ontology) SourceTaints(s string) []string       { return o.field(s, "taint") }
+func (o *Ontology) SinkArmedBy(sink string) []string     { return o.field(sink, "enabled_by") }
 
 func (o *Ontology) field(name, which string) []string {
 	c, err := o.Get(name)
@@ -197,7 +254,7 @@ func (o *Ontology) CheckSanitizerTyping(source, sink, control string) (string, e
 	}
 	if len(armed) > 0 && len(intersect(srcTaints, armed)) == 0 {
 		return "", fmt.Errorf("source '%s' carries taint %v but sink '%s' is only armed by %v — "+
-			"source cannot reach this sink dangerously.",
+			"source taint kind does not arm this sink.",
 			source, sortedKeys(srcTaints), sink, sortedKeys(armed))
 	}
 	c := sortedKeys(common)

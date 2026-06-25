@@ -1,0 +1,72 @@
+test "rank210: bcrypt Java int shift for log rounds needs overflow review"
+  lang java
+  expect VYQL-NUM-003
+  expect_review code.IntegerSizeArithmetic
+  code
+  ```
+  class BCrypt {
+    public static void entry() {
+      hashpw(new byte[16], System.console().readLine());
+    }
+
+    public static String hashpw(byte password[], String salt) {
+      int rounds = Integer.parseInt(salt.substring(4, 6));
+      new BCrypt().crypt_raw(password, new byte[16], rounds);
+      return salt;
+    }
+
+    private byte[] crypt_raw(byte password[], byte salt[], int log_rounds) {
+      int rounds, i;
+      if (log_rounds < 4 || log_rounds > 31) {
+        throw new IllegalArgumentException("Bad number of rounds");
+      }
+      rounds = 1 << log_rounds;
+      for (i = 0; i < rounds; i++) {
+        key(password);
+      }
+      return password;
+    }
+
+    private void key(byte[] password) {}
+  }
+  ```
+
+test "rank210: bcrypt Java long shift helper avoids log rounds overflow"
+  lang java
+  reject VYQL-NUM-003
+  reject_review code.IntegerSizeArithmetic
+  code
+  ```
+  class BCrypt {
+    public static void entry() {
+      hashpw(new byte[16], System.console().readLine());
+    }
+
+    public static String hashpw(byte password[], String salt) {
+      int rounds = Integer.parseInt(salt.substring(4, 6));
+      new BCrypt().crypt_raw(password, new byte[16], rounds);
+      return salt;
+    }
+
+    static long roundsForLogRounds(int log_rounds) {
+      if (log_rounds < 4 || log_rounds > 31) {
+        throw new IllegalArgumentException("Bad number of rounds");
+      }
+      return 1L << log_rounds;
+    }
+
+    private byte[] crypt_raw(byte password[], byte salt[], int log_rounds) {
+      long rounds;
+      if (log_rounds < 4 || log_rounds > 31) {
+        throw new IllegalArgumentException("Bad number of rounds");
+      }
+      rounds = roundsForLogRounds(log_rounds);
+      for (long r = 0; r < rounds; r++) {
+        key(password);
+      }
+      return password;
+    }
+
+    private void key(byte[] password) {}
+  }
+  ```

@@ -1,11 +1,18 @@
 // powershell framework adapter (docs/07) — framework→concept content.
-// A cmdlet/command is modeled as a call; $env:CGI vars + param() are sources.
+// A cmdlet/command is modeled as a call.
 adapter powershell {
-  meta { fidelity: resolved }
+  meta {
+    fidelity: resolved
+    source_var_event: shell_input
+    source_var_case: upper
+    source_var_strip_prefix: ["ENV:"]
+    source_var_exact: ["QUERY_STRING"]
+    source_var_prefix: ["HTTP_", "REQUEST_", "CONTENT_", "PATH_INFO", "REMOTE_"]
+  }
 
   // untrusted input
   source "shell_input" -> code.HttpInput
-  source "http_input" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:script_param" -> code.HttpInput
 
   // code evaluation
   sink path "Invoke-Expression" -> code.CodeEval
@@ -42,6 +49,8 @@ adapter powershell {
   sink path "Select-Xml" -> code.XmlParse
 
   // path / file
+  source "entry.FullName" -> code.ArchiveEntryName
+
   sink path "Get-Content" -> code.FilePathAccess
   sink path "Set-Content" -> code.FilePathAccess
   sink path "Add-Content" -> code.FilePathAccess
@@ -53,5 +62,10 @@ adapter powershell {
   sink path "New-Item" -> code.FilePathAccess
   sink path "Test-Path" -> code.FilePathAccess
   sink path "Import-Module" -> code.DynamicCodeLoad
+  sink path "System.IO.Compression.ZipFileExtensions.ExtractToFile" arg 1 -> code.ArchiveEntryWrite
+
+  control "System.IO.Path.GetFullPath" -> core.PathCanonicalization
+  control "IO.Path.GetFullPath" -> core.PathCanonicalization
+  control method "StartsWith" -> core.PathAccessCheck
 
 }

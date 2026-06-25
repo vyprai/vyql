@@ -8,10 +8,10 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
@@ -25,9 +25,9 @@ import (
 
 func cmdTrace(args []string) error {
 	fs := flag.NewFlagSet("trace", flag.ExitOnError)
-	from := fs.String("from", "", "only trace sources whose concept contains this substring (e.g. HttpInput)")
-	to := fs.String("to", "", "only count sinks whose concept contains this substring (e.g. SqlExecution)")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	from := fs.String("from", "", "only trace sources whose concept contains this substring")
+	to := fs.String("to", "", "only count sinks whose concept contains this substring")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -42,15 +42,16 @@ func cmdTrace(args []string) error {
 		fmt.Println("(no analyzable source)")
 		return nil
 	}
+	onto := ontology.Seed()
 	nodes, _ := g.AllNodes()
 	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
 
 	connected, dead := 0, 0
 	for _, n := range nodes {
-		if !isSource(g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
+		if !isSource(onto, g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
 			continue
 		}
-		path, sink := shortestToSink(g, n.ID, *to)
+		path, sink := shortestToSink(onto, g, n.ID, *to)
 		fmt.Printf("\nSOURCE %s @ %s {%s}\n", n.ID, n.Prop("loc"), conceptsOf(g, n.ID))
 		if sink != "" {
 			connected++
@@ -62,7 +63,7 @@ func cmdTrace(args []string) error {
 		}
 		dead++
 		fmt.Printf("  ✗ reaches no %ssink — taint stops at:\n", toLabel(*to))
-		for _, f := range frontier(g, n.ID) {
+		for _, f := range frontier(onto, g, n.ID) {
 			fmt.Printf("      ⊣ %s\n", traceNode(g, f))
 		}
 	}
@@ -79,14 +80,14 @@ func toLabel(to string) string {
 
 // shortestToSink BFSes FLOWS edges and returns the shortest path (excluding the source) to the
 // first reachable sink-labelled node, or ("",[]) if none. `to` filters the sink concept.
-func shortestToSink(g usg.Store, src, to string) ([]string, string) {
+func shortestToSink(onto *ontology.Ontology, g usg.Store, src, to string) ([]string, string) {
 	type item struct{ id, prev string }
 	prev := map[string]string{src: ""}
 	queue := []string{src}
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
-		if cur != src && isSink(g, cur) && (to == "" || conceptMatch(g, cur, to)) {
+		if cur != src && isSink(onto, g, cur) && (to == "" || conceptMatch(g, cur, to)) {
 			var rev []string
 			for x := cur; x != "" && x != src; x = prev[x] {
 				rev = append([]string{x}, rev...)
@@ -107,7 +108,7 @@ func shortestToSink(g usg.Store, src, to string) ([]string, string) {
 // frontier returns the nodes where taint stopped: reachable Call nodes whose taint goes no
 // further toward a labelled node, plus any control (sanitizer/guard/assumption) that was hit.
 // These are the candidate "broken edges" — most often an unresolved or cross-package call.
-func frontier(g usg.Store, src string) []string {
+func frontier(onto *ontology.Ontology, g usg.Store, src string) []string {
 	seen := map[string]bool{src: true}
 	queue := []string{src}
 	var order []string
@@ -132,7 +133,7 @@ func frontier(g usg.Store, src string) []string {
 		// a terminal Call (taint reaches it but it has no outgoing FLOWS) is a likely
 		// unresolved/external callee — the classic cross-package dead-end.
 		es, _ := g.OutEdges(id, "FLOWS")
-		isControl := conceptsOf(g, id) != "" && !isSource(g, id)
+		isControl := conceptsOf(g, id) != "" && !isSource(onto, g, id)
 		if (n.Type == "code.Call" && len(es) == 0) || isControl {
 			out = append(out, id)
 		}
@@ -190,26 +191,25 @@ func locOf(g usg.Store, id string) string {
 	return "?"
 }
 
-// isSink reports whether a node carries a sink concept label (a `code.*` sink, i.e. not a
-// source and not a bare control).
-func isSink(g usg.Store, id string) bool {
+// isSink reports whether a node carries a sink concept label according to the loaded ontology.
+func isSink(onto *ontology.Ontology, g usg.Store, id string) bool {
 	for _, l := range labelsOf(g, id) {
-		if sinkConceptName(l) {
+		if ontologyConceptKind(onto, l) == "sink" {
 			return true
 		}
 	}
 	return false
 }
 
-func sinkConceptName(c string) bool {
-	for _, s := range []string{"Execution", "Eval", "Render", "PathAccess", "Query", "Redirect",
-		"UrlFetch", "Deserial", "TemplateRender", "TrustBoundary", "RegexCompile", "MassAssign",
-		"ProtoPollute", "ExpressionEval", "WeakHash", "WeakCipher", "WeakRandom", "InsecureCookie"} {
-		if strings.Contains(c, s) {
-			return true
-		}
+func ontologyConceptKind(onto *ontology.Ontology, c string) string {
+	if onto == nil {
+		return ""
 	}
-	return false
+	cc, err := onto.Get(c)
+	if err != nil {
+		return ""
+	}
+	return cc.Kind
 }
 
 // ── vyql explain ────────────────────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ func sinkConceptName(c string) bool {
 func cmdExplain(args []string) error {
 	fs := flag.NewFlagSet("explain", flag.ExitOnError)
 	rulesPath := fs.String("rules", "", "rule file/dir (default: vyql/packs)")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -231,7 +231,7 @@ func cmdExplain(args []string) error {
 	if err != nil {
 		return err
 	}
-	all, _, err := scanPaths(paths, src)
+	all, _, _, err := scanPaths(paths, src)
 	if err != nil {
 		return err
 	}
@@ -255,8 +255,8 @@ func cmdExplain(args []string) error {
 			}
 			fmt.Printf("  %s %s: %s\n", mark, ne.Clause, ne.Detail)
 		}
-		for _, ec := range f.ExploitConditions {
-			fmt.Printf("  exploit: %s", ec.Condition)
+		for _, ec := range f.ReviewConditions {
+			fmt.Printf("  review: %s", ec.Condition)
 			if ec.Category != "" {
 				fmt.Printf(" [%s]", ec.Category)
 			}
@@ -277,12 +277,12 @@ func cmdExplain(args []string) error {
 
 // ── vyql match ──────────────────────────────────────────────────────────────────────
 // Show every node an adapter labelled — what matched which concept, and via which adapter.
-// Groups by concept role (source/sink/control/other) so a missing sink (e.g. md5.Sum before a
-// mark exists) shows up as absent.
+// Groups by concept role (source/sink/control/other) so a missing concept label shows up
+// as absent.
 
 func cmdMatch(args []string) error {
 	fs := flag.NewFlagSet("match", flag.ExitOnError)
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -297,6 +297,7 @@ func cmdMatch(args []string) error {
 		fmt.Println("(no analyzable source)")
 		return nil
 	}
+	onto := ontology.Seed()
 	nodes, _ := g.AllNodes()
 	sort.Slice(nodes, func(i, j int) bool { return nodeOrder(nodes[i]) < nodeOrder(nodes[j]) })
 	type row struct{ role, line string }
@@ -306,9 +307,9 @@ func cmdMatch(args []string) error {
 		for _, l := range labels {
 			role := "control/other"
 			switch {
-			case isSourceConcept(l.Concept):
+			case isSourceConcept(onto, l.Concept):
 				role = "source"
-			case sinkConceptName(l.Concept):
+			case ontologyConceptKind(onto, l.Concept) == "sink":
 				role = "sink"
 			}
 			prov := l.Provenance.Adapter
@@ -345,10 +346,8 @@ func calleeKey(n usg.Node) string {
 	return n.Type
 }
 
-func isSourceConcept(c string) bool {
-	return strings.Contains(c, "Input") || strings.Contains(c, "UserControlled") ||
-		strings.Contains(c, "Argument") || strings.Contains(c, "DatabaseRead") ||
-		strings.Contains(c, "EnvVariable") || strings.Contains(c, "Cookie")
+func isSourceConcept(onto *ontology.Ontology, c string) bool {
+	return ontologyConceptKind(onto, c) == "source"
 }
 
 // ── vyql resolve ────────────────────────────────────────────────────────────────────
@@ -357,7 +356,7 @@ func isSourceConcept(c string) bool {
 
 func cmdResolve(args []string) error {
 	fs := flag.NewFlagSet("resolve", flag.ExitOnError)
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -418,7 +417,7 @@ func cmdResolve(args []string) error {
 func cmdGraph(args []string) error {
 	fs := flag.NewFlagSet("graph", flag.ExitOnError)
 	taint := fs.Bool("taint", false, "show per-source FLOWS reachability instead of the full graph")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -434,7 +433,7 @@ func cmdGraph(args []string) error {
 		return nil
 	}
 	if *taint {
-		return printTaint(g)
+		return printTaint(ontology.Seed(), g)
 	}
 	return printUSG(g)
 }
@@ -584,16 +583,16 @@ func cmdValidateAdapter(args []string) error {
 // scorecards.
 
 type jsonFinding struct {
-	RuleID            string                      `json:"rule"`
-	Severity          string                      `json:"severity"`
-	Confidence        string                      `json:"confidence,omitempty"`
-	WitnessKind       string                      `json:"witness_kind,omitempty"`
-	FP                string                      `json:"fp"`
-	Source            string                      `json:"source"`
-	Sink              string                      `json:"sink"`
-	Path              []string                    `json:"path,omitempty"`
-	Noted             bool                        `json:"assumption_noted"`
-	ExploitConditions []findings.ExploitCondition `json:"exploit_conditions,omitempty"`
+	RuleID           string                     `json:"rule"`
+	Severity         string                     `json:"severity"`
+	Confidence       string                     `json:"confidence,omitempty"`
+	WitnessKind      string                     `json:"witness_kind,omitempty"`
+	FP               string                     `json:"fp"`
+	Source           string                     `json:"source"`
+	Sink             string                     `json:"sink"`
+	Path             []string                   `json:"path,omitempty"`
+	Noted            bool                       `json:"assumption_noted"`
+	ReviewConditions []findings.ReviewCondition `json:"review_conditions,omitempty"`
 }
 
 func findingsJSON(all []*findings.Finding) []jsonFinding {
@@ -617,7 +616,7 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 			}
 		}
 		jf.Path = f.PathLocs
-		jf.ExploitConditions = f.ExploitConditions
+		jf.ReviewConditions = f.ReviewConditions
 		out = append(out, jf)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].FP < out[j].FP })
@@ -686,22 +685,22 @@ func readFindingsJSON(path string) ([]jsonFinding, error) {
 // then list them, count them, or show their edges. The general "grep the analysis graph" tool
 // the other commands specialize. Predicates AND together; all are substring matches.
 //
-//	vyql query -type code.Call -call db.Query <path>...        # nodes
-//	vyql query -concept HttpInput -edges <path>...             # + outgoing FLOWS
-//	vyql query -concept SqlExecution -count <path>...          # just the count
-//	vyql query -from HttpInput -to SqlExecution <path>...      # reachability (source→sink)
+//	vyql query -type code.Call -call some.path <path>...       # nodes
+//	vyql query -concept SomeConcept -edges <path>...           # + outgoing FLOWS
+//	vyql query -concept SomeConcept -count <path>...           # just the count
+//	vyql query -from SourceConcept -to SinkConcept <path>...   # reachability
 
 func cmdQuery(args []string) error {
 	fs := flag.NewFlagSet("query", flag.ExitOnError)
-	typ := fs.String("type", "", "match node type (substring, e.g. code.Call)")
-	concept := fs.String("concept", "", "match a concept label (substring, e.g. HttpInput)")
+	typ := fs.String("type", "", "match node type substring")
+	concept := fs.String("concept", "", "match concept label substring")
 	call := fs.String("call", "", "match callee_path/method (substring, e.g. db.Query)")
 	loc := fs.String("loc", "", "match location (substring, e.g. .go or a filename)")
 	from := fs.String("from", "", "reachability mode: source concept (with -to)")
 	to := fs.String("to", "", "reachability mode: sink concept (with -from)")
 	edges := fs.Bool("edges", false, "also print each matching node's outgoing edges")
 	count := fs.Bool("count", false, "print only the number of matches")
-	profileName := fs.String("profile", "auto", "threat-model profile")
+	profileName := fs.String("profile", "auto", "analysis profile")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -723,12 +722,13 @@ func cmdQuery(args []string) error {
 	// reachability mode: every -from source that reaches a -to sink (path-aware, like trace
 	// but terse — one line per connected pair).
 	if *from != "" || *to != "" {
+		onto := ontology.Seed()
 		pairs := 0
 		for _, n := range nodes {
-			if !isSource(g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
+			if !isSource(onto, g, n.ID) || (*from != "" && !conceptMatch(g, n.ID, *from)) {
 				continue
 			}
-			if path, sink := shortestToSink(g, n.ID, *to); sink != "" {
+			if path, sink := shortestToSink(onto, g, n.ID, *to); sink != "" {
 				pairs++
 				if !*count {
 					fmt.Printf("%s @ %s  →[%d hops]→  %s @ %s {%s}\n",
@@ -778,14 +778,11 @@ func cmdQuery(args []string) error {
 
 // ── scan -stats profiler ──────────────────────────────────────────────────────────────
 
-// printScanStats re-runs the pipeline with per-phase timing and reports graph size plus
-// taint-hub warnings (high FLOWS in/out-degree nodes — the shared callees that cause
-// super-linear blowup). Flag-driven, no env var.
-func printScanStats(paths []string) {
-	t0 := time.Now()
-	g, stats, err := buildGraph(paths)
-	tBuild := time.Since(t0)
-	if err != nil || g == nil {
+// printScanStats reports graph size plus taint-hub warnings (high FLOWS in/out-degree nodes —
+// the shared callees that cause super-linear blowup). It uses the graph already built for the
+// scan; rebuilding here would double the work for `scan --stats`.
+func printScanStats(g usg.Store, stats scanStats) {
+	if g == nil {
 		fmt.Println("\n[stats] no graph built")
 		return
 	}
@@ -798,6 +795,7 @@ func printScanStats(paths []string) {
 	}
 	indeg := map[string]int{}
 	var nodeDeg []deg
+	onto := ontology.Seed()
 	for _, n := range nodes {
 		out := 0
 		for _, et := range edgeTypes {
@@ -810,10 +808,10 @@ func printScanStats(paths []string) {
 			}
 		}
 		edges += out
-		if isSource(g, n.ID) {
+		if isSource(onto, g, n.ID) {
 			srcCount++
 		}
-		if isSink(g, n.ID) {
+		if isSink(onto, g, n.ID) {
 			sinkCount++
 		}
 		nodeDeg = append(nodeDeg, deg{id: n.ID, out: out, loc: n.Prop("loc"), path: calleeKey(n)})
@@ -821,8 +819,8 @@ func printScanStats(paths []string) {
 	for i := range nodeDeg {
 		nodeDeg[i].in = indeg[nodeDeg[i].id]
 	}
-	fmt.Printf("\n[stats] build %s | files %d | nodes %d | edges %d | sources %d | sinks %d\n",
-		tBuild.Round(time.Millisecond), totalFiles(stats), len(nodes), edges, srcCount, sinkCount)
+	fmt.Printf("[stats] files %d | nodes %d | edges %d | sources %d | sinks %d\n",
+		totalFiles(stats), len(nodes), edges, srcCount, sinkCount)
 
 	// taint hubs: high FLOWS in-degree = a callee shared by many call sites; the cross-product
 	// of in×out paths through such a node is what makes path-enumeration blow up.

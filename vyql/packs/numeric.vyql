@@ -15,4 +15,20 @@ rule TaintedDivisionDenominator {
 rule TaintedIntegerSizeArithmetic {
   meta { id: "VYQL-NUM-003", severity: low, cwe: [CWE_190], confidence_floor: low }
   taint core.UserControlledData -> code.IntegerSizeArithmetic
+  unless guarded_by core.IntegerOverflowGuard
+}
+
+rule UnderwidthFormattedIndex {
+  meta { id: "VYQL-NUM-004", severity: medium, cwe: [CWE_192, CWE_125], confidence_floor: medium }
+  match code.UnderwidthFormattedIndex as idx
+}
+
+rule UncheckedEncodedLengthArithmetic {
+  meta { id: "VYQL-NUM-005", severity: medium, cwe: [CWE_190, CWE_835], confidence_floor: medium }
+  match code.UncheckedEncodedLengthArithmetic as arithmetic
+}
+
+rule PointerOffsetBoundsCheck {
+  meta { id: "VYQL-NUM-006", severity: medium, cwe: [CWE_20, CWE_125, CWE_190], confidence_floor: medium }
+  match code.PointerOffsetBoundsCheck as bounds
 }

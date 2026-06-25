@@ -41,7 +41,7 @@ func containsDot(s string) bool {
 }
 
 // ConceptDecl is an ontology concept declaration. The kind is a type
-// annotation in the header — `concept Deserialization : sink { … }` — not a
+// annotation in the header — `concept SomeConcept : sink { ... }` — not a
 // redundant body field. Name is the short PascalCase name; Package is the
 // enclosing `module <namespace>` (or the prefix if the header name is dotted).
 // Fields holds the kind-dependent typing/standards attributes (values are
@@ -76,17 +76,22 @@ func (*AdapterDecl) isDecl() {}
 
 // AdapterMapping is one `source`/`sink`/`type`/`control` line in an adapter.
 type AdapterMapping struct {
-	Kind       string   // "source" | "sink_method" | "sink_path" | "type" | "control"
-	Pattern    string   // the callee path / method token (a string literal or dotted name)
-	Concept    string   // the concept it maps to (qualified); for "type", the type name
-	Constraint string   // optional `on <type>` receiver-type constraint for sinks
-	ArgIndex   int      // which argument is the dangerous one (default 0; `arg N`)
-	ValMatches []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
-	ValAbsents []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
-	Packages   []string // inherited from `package "name" { ... }` — fire only when import/SBOM package evidence is present
-	Collection bool     // `collection` — also flag a Seq/collection-literal arg (e.g. ldap search options {filter})
-	Exact      bool     // exact path match (currently used by `mark exact`)
-	About      string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
+	Kind             string   // "source" | "sink_method" | "sink_path" | "type" | "control" variants
+	Pattern          string   // the callee path / method token (a string literal or dotted name)
+	Concept          string   // the concept it maps to (qualified); for "type", the type name
+	Constraint       string   // optional `on <type>` receiver-type constraint for sinks
+	ArgIndex         int      // which argument position is targeted (default 0; `arg N`)
+	ValMatches       []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
+	ValAbsents       []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
+	Packages         []string // inherited from `package "name" { ... }` — fire only when import/SBOM package evidence is present
+	Collection       bool     // `collection` — also flag a Seq/collection-literal arg
+	CollectionFirst  bool     // `collection first` — target element 0 of a Seq/collection arg when present
+	CollectionIndex  int      // `collection N` / `collection first` target index; defaults to 0 when CollectionFirst is set
+	Exact            bool     // exact path match (used by `sink exact` and `mark exact`)
+	About            string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
+	FlowDestArg      int      // for `flow`: destination out-param argument index
+	FlowSourceArg    int      // for `flow`: first source argument index; -1 when source is the call result
+	FlowSourceResult bool     // for `flow`: call result flows into destination out-param
 }
 
 // ThreatDecl is a `threat <ns>.<Name> { cwe: [...] }` weakness-class declaration
@@ -105,6 +110,16 @@ func (t *ThreatDecl) QualifiedName() string {
 	}
 	return t.Package + "." + t.Name
 }
+
+// ReviewDecl attaches review/triage presentation metadata to a concept. The
+// scanner still labels concepts through adapters/rules; this declaration only
+// controls `vyql review` categorization, expected checks, and reader guidance.
+type ReviewDecl struct {
+	Concept string
+	Fields  map[string]any
+}
+
+func (*ReviewDecl) isDecl() {}
 
 // ProfileDecl is an application-archetype threat-modelling profile
 // (`profile <name> { title:…  detect:[…]  entrypoints:[…]  packs:[…] }`). It
@@ -280,4 +295,4 @@ func (NotIn) isExpr()          {}
 
 // FlowVerbs / SolverVerbs (docs/05).
 var FlowVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "assume": true}
-var SolverVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "assume": true, "can_access": true}
+var SolverVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "assume": true, "can_access": true, "dominates": true}

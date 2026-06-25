@@ -130,7 +130,7 @@ func TestScanRobustness(t *testing.T) {
 			t.Fatalf("full scan PANICKED on adversarial corpus: %v", r)
 		}
 	}()
-	if _, _, err := scanPaths([]string{dir}, rules); err != nil {
+	if _, _, _, err := scanPaths([]string{dir}, rules); err != nil {
 		// an error is acceptable (e.g. nothing analyzable); a panic is not.
 		t.Logf("scan returned error on adversarial corpus (acceptable): %v", err)
 	}

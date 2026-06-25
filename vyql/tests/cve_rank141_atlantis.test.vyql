@@ -1,0 +1,50 @@
+# Rank 141 / CVE-2022-24912: Atlantis compared a GitLab webhook secret with
+# ordinary string equality, leaking timing/observable discrepancy information.
+
+test "rank141: go webhook secret ordinary comparison requires review"
+  lang go
+  expect_review code.SecretComparisonReview
+  code
+  ```
+  package events
+
+  import (
+    "fmt"
+    "net/http"
+  )
+
+  const secretHeader = "X-Gitlab-Token"
+
+  func ParseAndValidate(r *http.Request, secret []byte) (interface{}, error) {
+    headerSecret := r.Header.Get(secretHeader)
+    secretStr := string(secret)
+    if len(secret) != 0 && headerSecret != secretStr {
+      return nil, fmt.Errorf("header %s=%s did not match expected secret", secretHeader, headerSecret)
+    }
+    return nil, nil
+  }
+  ```
+
+test "rank141: go webhook secret constant-time comparison is clean"
+  lang go
+  reject_review code.SecretComparisonReview
+  code
+  ```
+  package events
+
+  import (
+    "crypto/subtle"
+    "fmt"
+    "net/http"
+  )
+
+  const secretHeader = "X-Gitlab-Token"
+
+  func ParseAndValidate(r *http.Request, secret []byte) (interface{}, error) {
+    headerSecret := r.Header.Get(secretHeader)
+    if len(secret) != 0 && subtle.ConstantTimeCompare(secret, []byte(headerSecret)) != 1 {
+      return nil, fmt.Errorf("header %s=%s did not match expected secret", secretHeader, headerSecret)
+    }
+    return nil, nil
+  }
+  ```

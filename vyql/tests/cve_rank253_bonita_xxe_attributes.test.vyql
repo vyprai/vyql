@@ -1,0 +1,32 @@
+# Rank 253 / CVE-2020-36640: Bonita hardened XML factories by setting
+# ACCESS_EXTERNAL_* attributes before creating the parser/transformer.
+
+test "rank253: DocumentBuilderFactory without external entity restrictions is XXE"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilderFactory;
+  class SecureWSConnector {
+    void build() throws Exception {
+      DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+    }
+  }
+  ```
+
+test "rank253: DocumentBuilderFactory ACCESS_EXTERNAL attributes suppress XXE"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import javax.xml.XMLConstants;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  class SecureWSConnector {
+    void build() throws Exception {
+      DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+      documentBuilderFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+      documentBuilderFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+      documentBuilderFactory.newDocumentBuilder().newDocument();
+    }
+  }
+  ```

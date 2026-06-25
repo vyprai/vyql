@@ -9,32 +9,31 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// Mirrors poc/cases/case_04: internet -> PII database; witness names the SG rule.
 func TestReachWithAssetFilter(t *testing.T) {
 	src := `
-package vypr.cloud;
-rule PublicDatabase {
-  meta { id: "VYQL-CLD-003", severity: critical }
-  reach cloud.Internet -> cloud.Database
-  where cloud.Database holds_asset_kind [data.Pii]
+package test;
+rule ReachAsset {
+  meta { id: "TEST-REACH", severity: critical }
+  reach custom.Edge -> custom.Asset
+  where custom.Asset holds_asset_kind [custom.Important]
 }
 `
-	onto := ontology.Seed()
+	onto := solverContractOntology()
 	decls, _ := parser.Parse(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
 	}
 	s := usg.NewInMemStore()
-	s.AddNode(usg.Node{ID: "internet", Type: "cloud.Internet", Props: map[string]string{"loc": "0.0.0.0/0"}})
-	s.AddLabel("internet", usg.Label{Concept: "cloud.Internet"})
-	s.AddNode(usg.Node{ID: "alb", Type: "cloud.LoadBalancer"})
-	s.AddNode(usg.Node{ID: "svc", Type: "cloud.Container"})
-	s.AddNode(usg.Node{ID: "db", Type: "cloud.Database", Props: map[string]string{"loc": "orders-db"}})
-	s.AddLabel("db", usg.Label{Concept: "cloud.Database", Detail: map[string]string{"asset_kinds": "data.Pii"}})
-	s.AddEdge(usg.Edge{Type: "NET", Src: "internet", Dst: "alb", Props: map[string]string{"rule": "sg-pub:443", "proto": "tcp", "port": "443"}})
-	s.AddEdge(usg.Edge{Type: "NET", Src: "alb", Dst: "svc", Props: map[string]string{"rule": "sg-app:8080", "proto": "tcp", "port": "8080"}})
-	s.AddEdge(usg.Edge{Type: "NET", Src: "svc", Dst: "db", Props: map[string]string{"rule": "sg-db:5432", "proto": "tcp", "port": "5432"}})
+	s.AddNode(usg.Node{ID: "edge", Type: "custom.Edge", Props: map[string]string{"loc": "edge"}})
+	s.AddLabel("edge", usg.Label{Concept: "custom.Edge"})
+	s.AddNode(usg.Node{ID: "hop1", Type: "custom.Hop"})
+	s.AddNode(usg.Node{ID: "hop2", Type: "custom.Hop"})
+	s.AddNode(usg.Node{ID: "asset", Type: "custom.Asset", Props: map[string]string{"loc": "asset"}})
+	s.AddLabel("asset", usg.Label{Concept: "custom.Asset", Detail: map[string]string{"asset_kinds": "custom.Important"}})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "hop1", Props: map[string]string{"rule": "edge-hop"}})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "hop1", Dst: "hop2", Props: map[string]string{"rule": "middle-hop"}})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "hop2", Dst: "asset", Props: map[string]string{"rule": "asset-hop"}})
 
 	eng := New(onto, s)
 	fs, _ := eng.Evaluate(compiled[0])
@@ -43,40 +42,39 @@ rule PublicDatabase {
 	}
 	named := false
 	for _, w := range fs[0].Witness {
-		if strings.Contains(w, "sg-db:5432") {
+		if strings.Contains(w, "asset-hop") {
 			named = true
 		}
 	}
 	if !named {
-		t.Fatalf("witness should name the db-port SG rule: %v", fs[0].Witness)
+		t.Fatalf("witness should name the final edge rule: %v", fs[0].Witness)
 	}
 }
 
-// Mirrors poc/cases/case_05: external principal -> admin via an ability chain.
 func TestAssumeEscalation(t *testing.T) {
 	src := `
-package vypr.identity;
-rule ExternalToAdmin {
-  meta { id: "VYQL-IDN-002", severity: critical }
-  assume identity.ExternalPrincipal -> identity.AdminPrivilege
+package test;
+rule ActorToCapability {
+  meta { id: "TEST-ASSUME", severity: critical }
+  assume custom.Actor -> custom.Capability
 }
 `
-	onto := ontology.Seed()
+	onto := solverContractOntology()
 	decls, _ := parser.Parse(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
 	}
 	s := usg.NewInMemStore()
-	s.AddNode(usg.Node{ID: "ext", Type: "identity.User", Props: map[string]string{"loc": "external-user"}})
-	s.AddLabel("ext", usg.Label{Concept: "identity.ExternalPrincipal"})
-	s.AddNode(usg.Node{ID: "dev", Type: "identity.Role"})
-	s.AddNode(usg.Node{ID: "deploy", Type: "identity.Role", Props: map[string]string{"priv_level": "WRITE"}})
-	s.AddNode(usg.Node{ID: "admin", Type: "identity.Role", Props: map[string]string{"priv_level": "ADMIN"}})
-	s.AddLabel("admin", usg.Label{Concept: "identity.AdminPrivilege"})
-	s.AddEdge(usg.Edge{Type: "STEP", Src: "ext", Dst: "dev", Props: map[string]string{"ability": "sts:AssumeRole"}})
-	s.AddEdge(usg.Edge{Type: "STEP", Src: "dev", Dst: "deploy", Props: map[string]string{"ability": "iam:PassRole"}})
-	s.AddEdge(usg.Edge{Type: "STEP", Src: "deploy", Dst: "admin", Props: map[string]string{"ability": "iam:PutRolePolicy"}})
+	s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor", Props: map[string]string{"loc": "actor"}})
+	s.AddLabel("actor", usg.Label{Concept: "custom.Actor"})
+	s.AddNode(usg.Node{ID: "step1", Type: "custom.Step"})
+	s.AddNode(usg.Node{ID: "step2", Type: "custom.Step", Props: map[string]string{"priv_level": "WRITE"}})
+	s.AddNode(usg.Node{ID: "capability", Type: "custom.Capability", Props: map[string]string{"priv_level": "ADMIN"}})
+	s.AddLabel("capability", usg.Label{Concept: "custom.Capability"})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "actor", Dst: "step1", Props: map[string]string{"ability": "first"}})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "step1", Dst: "step2", Props: map[string]string{"ability": "second"}})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "step2", Dst: "capability", Props: map[string]string{"ability": "third"}})
 
 	eng := New(onto, s)
 	fs, _ := eng.Evaluate(compiled[0])
@@ -86,7 +84,46 @@ rule ExternalToAdmin {
 	if len(fs[0].Witness) != 3 {
 		t.Fatalf("expected a 3-step ability chain, got %v", fs[0].Witness)
 	}
-	if !strings.Contains(fs[0].Witness[0], "sts:AssumeRole") {
+	if !strings.Contains(fs[0].Witness[0], "first") {
 		t.Fatalf("witness first step wrong: %v", fs[0].Witness)
+	}
+}
+
+func TestAssumeMinLevelComesFromOntology(t *testing.T) {
+	src := `
+module custom;
+concept External : principal { }
+concept Elevated : privilege {
+  assume_min_level: ADMIN
+}
+rule ExternalToElevated {
+  assume custom.External -> custom.Elevated
+}
+`
+	onto := ontology.New()
+	cs, err := ontology.LoadConceptText(src)
+	if err != nil {
+		t.Fatalf("load concepts: %v", err)
+	}
+	for _, c := range cs {
+		onto.Add(c)
+	}
+	decls, _ := parser.Parse(src)
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "ext", Type: "custom.Principal"})
+	s.AddLabel("ext", usg.Label{Concept: "custom.External"})
+	s.AddNode(usg.Node{ID: "role", Type: "custom.Role", Props: map[string]string{"priv_level": "ADMIN"}})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "ext", Dst: "role", Props: map[string]string{"ability": "assume"}})
+
+	fs, err := New(onto, s).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("expected data-driven min-level assume finding, got %d", len(fs))
 	}
 }

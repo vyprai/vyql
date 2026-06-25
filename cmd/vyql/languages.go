@@ -9,22 +9,10 @@ import (
 	"github.com/vyprai/vyql/extract/frontend"
 	cfgfront "github.com/vyprai/vyql/extract/frontend/config"
 	"github.com/vyprai/vyql/extract/frontend/golang"
-	"github.com/vyprai/vyql/extract/frontend/secretscan"
+	"github.com/vyprai/vyql/extract/frontend/textpattern"
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/nir"
 )
-
-// secretscanExts: source + config/env formats where hardcoded secrets commonly live.
-// secretscan runs ALONGSIDE the real frontend (extractAll runs every matching language),
-// adding HardcodedSecret nodes without affecting the source parse.
-var secretscanExts = map[string]bool{
-	".go": true, ".py": true, ".js": true, ".jsx": true, ".ts": true, ".tsx": true,
-	".rb": true, ".java": true, ".php": true, ".cs": true, ".c": true, ".cpp": true,
-	".rs": true, ".sh": true, ".bash": true, ".scala": true, ".kt": true, ".kts": true,
-	".swift": true, ".pl": true, ".ex": true, ".exs": true, ".dart": true, ".groovy": true,
-	".env": true, ".yaml": true, ".yml": true, ".properties": true, ".json": true,
-	".toml": true, ".ini": true, ".cfg": true, ".conf": true, ".tf": true,
-}
 
 // language ties a file extension set to its real source→NIR frontend and the
 // framework adapters that label its graph. Adding a language is a frontend +
@@ -39,7 +27,7 @@ type language struct {
 var languages = []language{
 	{"go", map[string]bool{".go": true}, golang.Extract, frontend.GoAdapters},
 	{"python", map[string]bool{".py": true}, treesitter.ExtractPython, frontend.PythonAdapters},
-	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true},
+	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true},
 		treesitter.ExtractJavaScript, frontend.JsAdapters},
 	{"ruby", map[string]bool{".rb": true}, treesitter.ExtractRuby, frontend.RubyAdapters},
 	{"java", map[string]bool{".java": true}, treesitter.ExtractJava, frontend.JavaAdapters},
@@ -64,10 +52,8 @@ var languages = []language{
 	// Terraform, JSP/Jelly templates) — a non-tree-sitter frontend; non-matching files yield no nodes so
 	// other repos are unaffected. "dockerfile" matches by basename (no extension).
 	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
-		".tf": true, ".jelly": true, ".jsp": true, ".tag": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
-	// hardcoded-secret scanner — runs over source + config/env files (alongside the real
-	// frontend), emitting HardcodedSecret nodes from provider tokens / secret literals.
-	{"secretscan", secretscanExts, secretscan.Extract, frontend.SecretscanAdapters},
+		".tf": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
+	{"textpattern", textpattern.Extensions(), textpattern.Extract, frontend.TextPatternAdapters},
 }
 
 // scanStats reports per-language file counts for the run summary.
@@ -125,16 +111,11 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 			stats.languages = append(stats.languages, lg.name)
 		}
 	}
-	// the PII taxonomy is a cross-language labeler (not a frontend) — apply it once
-	// whenever any source was parsed, so `user.ssn` is a PII source in every language.
 	if len(prog.Modules) > 0 {
-		ads = append(ads, frontend.PiiAdapters()...)
-		ads = append(ads, frontend.LibraryAdapters()...)
-		ads = append(ads, frontend.CryptoReviewAdapters()...) // inert unless possibility mode
-		ads = append(ads, frontend.AuditReviewAdapters()...)  // inert unless possibility mode
+		ads = append(ads, frontend.AutoAdapters()...)
 	}
-	// bundled .properties config — resolved key→value so a `getProperty("hashAlg1")`
-	// read folds to its real value during lowering (CWE-327/328 via config indirection).
+	// Bundled .properties config is resolved to a flat key->value map so frontends can
+	// preserve configuration constants through lowering.
 	if props := collectProperties(paths); len(props) > 0 {
 		prog.Properties = props
 	}

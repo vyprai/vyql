@@ -259,6 +259,33 @@ test "lua exhaustive: validated trust-boundary values are clean"
   end
   ```
 
+test "lua exhaustive: APISIX basic-auth password logged is secret exposure"
+  lang lua
+  expect VYQL-SEC-001
+  code
+  ```
+  local core = { log = {}, request = {} }
+  function core.log.info(...) end
+  function f()
+    local obj = { username = "", password = "" }
+    obj.username = "alice"
+    obj.password = "plain-secret"
+    core.log.info("plugin access phase, authorization: ", obj.username, ": ", obj.password)
+  end
+  ```
+
+test "lua exhaustive: ordinary APISIX info log is not secret exposure"
+  lang lua
+  reject VYQL-SEC-001
+  code
+  ```
+  local core = { log = {} }
+  function core.log.info(...) end
+  function f()
+    core.log.info("plugin started")
+  end
+  ```
+
 test "lua exhaustive: auth and IDOR findings are reported"
   lang lua
   expect VYQL-AUTH-001

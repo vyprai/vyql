@@ -5,49 +5,41 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/adapters"
-	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
-// TestToyEndToEndSlice is the Phase-0 acceptance slice (plan/phase-0 AC4): a
-// SINGLE hand-built graph exercised by FIVE rules of different forms — taint,
-// command-injection taint, reach, assume, and a match composing reach+assume —
-// asserting full proof trees, including label provenance (from the adapter
-// layer) and negation evidence (the unsatisfied `unless`).
 func TestToyEndToEndSlice(t *testing.T) {
-	onto := ontology.Seed()
+	onto := solverContractOntology()
 	s := buildToyGraph(t)
 
 	rules := `
-package vypr.injection;
-rule Sql {
-  meta { id: "VYQL-INJ-001", severity: high, cwe: [CWE_89] }
-  taint code.HttpInput -> code.SqlExecution
-  unless sanitized_by core.SqlParameterization
+package test;
+rule FirstFlow {
+  meta { id: "TEST-FLOW-001", severity: high }
+  taint custom.Input -> custom.Target
+  unless sanitized_by custom.Transform
 }
-rule Command {
-  meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78] }
-  taint code.HttpInput -> code.CommandExecution
-  unless sanitized_by core.ShellEscape
-}
-
-package vypr.cloud;
-rule PublicPiiDatabase {
-  meta { id: "VYQL-CLD-003", severity: critical }
-  reach cloud.Internet -> cloud.Database
-  where cloud.Database holds_asset_kind [data.Pii]
+rule SecondFlow {
+  meta { id: "TEST-FLOW-002", severity: critical }
+  taint custom.Input -> custom.OtherTarget
+  unless sanitized_by custom.OtherTargetTransform
 }
 
-package vypr.identity;
-rule ExternalToAdmin {
-  meta { id: "VYQL-IDN-004", severity: critical }
-  assume identity.ExternalPrincipal -> identity.AdminPrivilege
+rule ReachAsset {
+  meta { id: "TEST-REACH-003", severity: critical }
+  reach custom.Edge -> custom.Asset
+  where custom.Asset holds_asset_kind [custom.Important]
 }
-rule ToxicCombination {
-  meta { id: "VYQL-IDN-005", severity: critical }
-  match identity.WorkloadIdentity as w
-  where reach(cloud.Internet, w.workload) and assume(w, identity.AdminPrivilege)
+
+rule ActorCapability {
+  meta { id: "TEST-ASSUME-004", severity: critical }
+  assume custom.Actor -> custom.Capability
+}
+rule ComposedMatch {
+  meta { id: "TEST-MATCH-005", severity: critical }
+  match custom.WorkItem as w
+  where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
 }
 `
 	decls, err := parser.Parse(rules)
@@ -95,11 +87,11 @@ rule ToxicCombination {
 	}
 
 	want := map[string]int{
-		"VYQL-INJ-001": 1, // SQLi: req -> query (unsanitized)
-		"VYQL-INJ-002": 1, // command injection: req -> exec
-		"VYQL-CLD-003": 1, // internet -> PII database
-		"VYQL-IDN-004": 1, // external principal -> admin
-		"VYQL-IDN-005": 1, // toxic combination (reach + assume)
+		"TEST-FLOW-001":   1,
+		"TEST-FLOW-002":   1,
+		"TEST-REACH-003":  1,
+		"TEST-ASSUME-004": 1,
+		"TEST-MATCH-005":  1,
 	}
 	for id, n := range want {
 		if byID[id] != n {
@@ -113,71 +105,61 @@ rule ToxicCombination {
 		t.Fatal("no finding carried negation evidence for an unsatisfied unless-clause")
 	}
 
-	// Spot-check the SQLi proof tree names the adapter and carries the path.
-	sqliFindings, _ := eng.Evaluate(compiled[0])
-	render := sqliFindings[0].Render()
+	flowFindings, _ := eng.Evaluate(compiled[0])
+	render := flowFindings[0].Render()
 	if !strings.Contains(render, "taint path:") {
-		t.Fatalf("SQLi render should show the taint path:\n%s", render)
+		t.Fatalf("flow render should show the taint path:\n%s", render)
 	}
 }
 
-// buildToyGraph constructs one graph covering all five rule forms. Code-layer
-// concept labels are attached through the adapter layer (so bindings carry
-// provenance); cloud/identity facts are attached directly.
 func buildToyGraph(t *testing.T) usg.Store {
 	t.Helper()
 	s := usg.NewInMemStore()
 
-	// --- code layer: two tainted flows from one request ---
 	for _, n := range []struct{ id, loc string }{
-		{"req", "app/handlers.go:10"},
-		{"query", "app/db.go:42"},
-		{"exec", "app/shell.go:8"},
+		{"input", "flow/input:10"},
+		{"target", "flow/target:42"},
+		{"otherTarget", "flow/other-target:8"},
 	} {
 		s.AddNode(usg.Node{ID: n.id, Type: "code.X", Props: map[string]string{"loc": n.loc}})
 	}
-	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "req", Dst: "query"})
-	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "req", Dst: "exec"})
+	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "target"})
+	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "otherTarget"})
 
-	// label the code nodes through adapters so bindings get provenance
-	codeAdapter := adapters.Adapter{
-		Name: "go.nethttp+databasesql", Technology: "go", Specificity: 2,
+	flowAdapter := adapters.Adapter{
+		Name: "test.flow", Technology: "test", Specificity: 2,
 		Fidelity: "resolved", Confidence: "high",
 		Apply: func(usg.Store) []adapters.Mapping {
 			return []adapters.Mapping{
-				{NodeID: "req", Concept: "code.HttpInput"},
-				{NodeID: "query", Concept: "code.SqlExecution"},
-				{NodeID: "exec", Concept: "code.CommandExecution"},
+				{NodeID: "input", Concept: "custom.Input"},
+				{NodeID: "target", Concept: "custom.Target"},
+				{NodeID: "otherTarget", Concept: "custom.OtherTarget"},
 			}
 		},
 	}
-	if _, _, err := adapters.Apply(s, []adapters.Adapter{codeAdapter}, nil); err != nil {
+	if _, _, err := adapters.Apply(s, []adapters.Adapter{flowAdapter}, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	// --- cloud layer: internet -> ... -> PII database ---
-	s.AddNode(usg.Node{ID: "internet", Type: "cloud.Internet", Props: map[string]string{"loc": "0.0.0.0/0"}})
-	s.AddLabel("internet", usg.Label{Concept: "cloud.Internet"})
-	s.AddNode(usg.Node{ID: "alb", Type: "cloud.LoadBalancer"})
-	s.AddNode(usg.Node{ID: "pod", Type: "cloud.Container", Props: map[string]string{"loc": "pod/orders"}})
-	s.AddNode(usg.Node{ID: "db", Type: "cloud.Database", Props: map[string]string{"loc": "orders-db"}})
-	s.AddLabel("db", usg.Label{Concept: "cloud.Database", Detail: map[string]string{"asset_kinds": "data.Pii"}})
-	s.AddEdge(usg.Edge{Type: "NET", Src: "internet", Dst: "alb", Props: map[string]string{"rule": "sg-pub:443", "proto": "tcp", "port": "443"}})
-	s.AddEdge(usg.Edge{Type: "NET", Src: "alb", Dst: "pod", Props: map[string]string{"rule": "sg-app:8080", "proto": "tcp", "port": "8080"}})
-	s.AddEdge(usg.Edge{Type: "NET", Src: "pod", Dst: "db", Props: map[string]string{"rule": "sg-db:5432", "proto": "tcp", "port": "5432"}})
+	s.AddNode(usg.Node{ID: "edge", Type: "custom.Edge", Props: map[string]string{"loc": "edge"}})
+	s.AddLabel("edge", usg.Label{Concept: "custom.Edge"})
+	s.AddNode(usg.Node{ID: "hop", Type: "custom.Hop"})
+	s.AddNode(usg.Node{ID: "workload", Type: "custom.Workload", Props: map[string]string{"loc": "workload"}})
+	s.AddNode(usg.Node{ID: "asset", Type: "custom.Asset", Props: map[string]string{"loc": "asset"}})
+	s.AddLabel("asset", usg.Label{Concept: "custom.Asset", Detail: map[string]string{"asset_kinds": "custom.Important"}})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "edge", Dst: "hop", Props: map[string]string{"rule": "edge-hop"}})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "hop", Dst: "workload", Props: map[string]string{"rule": "hop-workload"}})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "workload", Dst: "asset", Props: map[string]string{"rule": "workload-asset"}})
 
-	// --- identity layer: external principal escalates to admin; the pod's
-	// workload identity is internet-reachable AND escalatable (toxic combo) ---
-	s.AddNode(usg.Node{ID: "ext", Type: "identity.User", Props: map[string]string{"loc": "external-user"}})
-	s.AddLabel("ext", usg.Label{Concept: "identity.ExternalPrincipal"})
-	s.AddNode(usg.Node{ID: "admin", Type: "identity.Role", Props: map[string]string{"priv_level": "ADMIN"}})
-	s.AddLabel("admin", usg.Label{Concept: "identity.AdminPrivilege"})
-	s.AddEdge(usg.Edge{Type: "STEP", Src: "ext", Dst: "admin", Props: map[string]string{"ability": "sts:AssumeRole"}})
+	s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor", Props: map[string]string{"loc": "actor"}})
+	s.AddLabel("actor", usg.Label{Concept: "custom.Actor"})
+	s.AddNode(usg.Node{ID: "capability", Type: "custom.Capability", Props: map[string]string{"priv_level": "ADMIN"}})
+	s.AddLabel("capability", usg.Label{Concept: "custom.Capability"})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "actor", Dst: "capability", Props: map[string]string{"ability": "actor-capability"}})
 
-	// workload identity bound to the internet-reachable pod, escalatable to admin
-	s.AddNode(usg.Node{ID: "wid", Type: "identity.ServiceAccount", Props: map[string]string{"loc": "sa/orders", "workload": "pod"}})
-	s.AddLabel("wid", usg.Label{Concept: "identity.WorkloadIdentity"})
-	s.AddEdge(usg.Edge{Type: "STEP", Src: "wid", Dst: "admin", Props: map[string]string{"ability": "create-pod+mount-sa-token"}})
+	s.AddNode(usg.Node{ID: "workItem", Type: "custom.WorkItem", Props: map[string]string{"loc": "work-item", "workload": "workload"}})
+	s.AddLabel("workItem", usg.Label{Concept: "custom.WorkItem"})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "workItem", Dst: "capability", Props: map[string]string{"ability": "workitem-capability"}})
 
 	return s
 }

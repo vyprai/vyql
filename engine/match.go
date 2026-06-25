@@ -7,7 +7,7 @@ import (
 )
 
 // evalMatch evaluates `match <concept> as id where <expr> unless guarded_by C`.
-// Composes solver calls in `where` through the engine (toxic combinations).
+// Composes solver calls in `where` through the engine.
 func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.MatchStmt)
 	if body.TargetKind == "transition" {
@@ -60,7 +60,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		out = append(out, &findings.Finding{
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "match",
 			NegationEvidence: ne, Confidence: e.conf(node), Context: ctx,
-			ExploitConditions: e.exploitConditions(node, body.Concept),
+			ReviewConditions: e.reviewConditions(node, body.Concept),
 			Bindings: []findings.Binding{
 				{Name: body.Binding, NodeID: node, Concept: body.Concept, Loc: e.loc(node), LabelProvenance: e.prov(node, body.Concept)},
 			},
@@ -72,7 +72,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 // evalTransition evaluates `match transition F -> T on M as t unless <expr>`.
 func (e *Engine) evalTransition(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.MatchStmt)
-	nodes, _ := e.Store.NodesOfType("business.Transition")
+	nodes, _ := e.Store.NodesOfType("analysis.Transition")
 	var out []*findings.Finding
 	for _, id := range nodes {
 		n, _, _ := e.Store.GetNode(id)
@@ -142,9 +142,6 @@ func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []stri
 	case parser.Has:
 		id := e.resolveRef(a.Ref, env)
 		return id != "" && e.nodeHasConcept(id, a.Concept), nil
-	case parser.Colocated:
-		id := e.resolveRef(a.Ref, env)
-		return id != "" && e.colocated(id, a.Concept), nil
 	case parser.Is:
 		return e.resolveScalar(a.Ref, env) == a.Concept, nil
 	case parser.NotIn:
@@ -191,18 +188,23 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 		}
 	case "assume":
 		bConcept := call.Args[1].Ref.String()
-		minLevel := ""
-		if bConcept == "identity.AdminPrivilege" {
-			minLevel = "ADMIN"
-		}
 		bIDs := e.resolveArg(call.Args[1], env)
-		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, minLevel)
+		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, e.assumeMinLevel(bConcept))
 		if len(paths) > 0 {
 			var w []string
 			for _, s := range paths[0].Steps {
 				w = append(w, "assume "+s.From+"->"+s.To+" ["+s.Ability+"]")
 			}
 			return true, w
+		}
+	case "dominates":
+		bIDs := e.resolveArg(call.Args[1], env)
+		for _, a := range aIDs {
+			for _, b := range bIDs {
+				if solvers.Dominates(e.Store, a, b) {
+					return true, []string{"dominates " + a + " -> " + b}
+				}
+			}
 		}
 	}
 	return false, nil
@@ -269,33 +271,6 @@ func (e *Engine) resolveScalar(ref parser.Ref, env map[string]string) string {
 func (e *Engine) nodeHasConcept(nodeID, concept string) bool {
 	for _, l := range e.labels(nodeID) {
 		if l.Concept == concept {
-			return true
-		}
-	}
-	return false
-}
-
-// colocated reports whether nodeID's enclosing function (its `func` scope) also
-// contains a node carrying `concept`. This is a context gate, not a dataflow path:
-// it answers "is this operation inside the same function as a node labelled X" —
-// e.g. a privileged sink sitting in an HTTP request handler (`op colocated
-// code.HttpInput`). Nodes without a `func` property never co-locate (avoids
-// matching module-scope nodes against each other).
-func (e *Engine) colocated(nodeID, concept string) bool {
-	n, ok, _ := e.Store.GetNode(nodeID)
-	if !ok {
-		return false
-	}
-	fn := n.Prop("func")
-	if fn == "" {
-		return false
-	}
-	peers, _ := e.Store.NodesWithConcept(concept)
-	for _, pid := range peers {
-		if pid == nodeID {
-			continue
-		}
-		if pn, ok, _ := e.Store.GetNode(pid); ok && pn.Prop("func") == fn {
 			return true
 		}
 	}

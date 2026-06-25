@@ -2,7 +2,7 @@
 module vypr.request_forgery;
 
 rule Ssrf {
-  meta { id: "VYQL-RF-001", severity: high, cwe: [CWE_918] }
+  meta { id: "VYQL-RF-001", severity: high, cwe: [CWE_918, CWE_20] }
   taint core.UserControlledData -> code.UrlFetch
   unless sanitized_by core.AllowlistValidation
   unless guarded_by core.AllowlistValidation
@@ -18,11 +18,36 @@ rule IncompleteServerPortValidation {
   match code.IncompleteServerPortValidation as guard
 }
 
+rule RequestHostUrlValidationBypass {
+  meta { id: "VYQL-RF-010", severity: high, cwe: [CWE_918, CWE_20], confidence_floor: medium }
+  match code.RequestHostUrlValidationBypass as guard
+}
+
 rule OpenRedirect {
-  meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601] }
+  meta { id: "VYQL-RF-002", severity: medium, cwe: [CWE_601], benchmark: redirect }
   taint core.UserControlledData -> code.RedirectTarget
   unless sanitized_by core.RedirectAllowlist
   unless guarded_by core.RedirectAllowlist
+}
+
+rule MethodGatedRedirectValidationBypass {
+  meta { id: "VYQL-RF-008", severity: high, cwe: [CWE_601], confidence_floor: medium }
+  match code.MethodGatedRedirectValidationBypass as bypass
+}
+
+rule ChecksumErrorLogoutRedirect {
+  meta { id: "VYQL-RF-009", severity: medium, cwe: [CWE_601], confidence_floor: medium }
+  match code.ChecksumErrorLogoutRedirect as redirect
+}
+
+rule IncompleteCsrfTokenValidation {
+  meta { id: "VYQL-RF-006", severity: medium, cwe: [CWE_352], confidence_floor: medium }
+  match code.IncompleteCsrfTokenValidation as guard
+}
+
+rule MissingHttpMethodAssertion {
+  meta { id: "VYQL-RF-007", severity: medium, cwe: [CWE_352, CWE_749], confidence_floor: medium }
+  match code.MissingHttpMethodAssertion as action
 }
 
 rule Csrf {

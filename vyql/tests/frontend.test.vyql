@@ -27,6 +27,36 @@ test "DOM-XSS: location.search -> document.write"
   document.write(window.location.search);
   ```
 
+test "DOM-XSS: window.location object string -> append HTML"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  function replaceQueryString(url, param, value) {
+    return url + '&' + param + '=' + value;
+  }
+  el.append('<a href="' + replaceQueryString(String(window.location), 'tag', 'x') + '">x</a>');
+  ```
+
+test "DOM-XSS: escaped window.location object string is clean"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  function replaceQueryString(url, param, value) {
+    return url + '&' + param + '=' + value;
+  }
+  el.append('<a href="' + replaceQueryString(escapeHTML(String(window.location)), 'tag', 'x') + '">x</a>');
+  ```
+
+test "DOM-XSS: encoded HTML entities are clean"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  el.append('<p>' + encodeEntities(location.hash) + '</p>');
+  ```
+
 test "DOM-XSS: window.name -> outerHTML"
   lang javascript
   expect VYQL-INJ-004
@@ -41,6 +71,108 @@ test "DOM-XSS: localStorage value -> insertAdjacentHTML"
   code
   ```
   el.insertAdjacentHTML('beforeend', localStorage.getItem('msg'));
+  ```
+
+test "DOM-XSS: parsed API model field -> innerHTML"
+  lang javascript
+  expect VYQL-INJ-004
+  file state.js
+  ```
+  let workspace;
+  export async function initializeWorkspace(id) {
+    const response = await fetch('/api/workspaces/' + id);
+    const data = await response.json();
+    workspace = data.results;
+  }
+  export function getCurrentWorkspace() {
+    return workspace;
+  }
+  ```
+  file editor.js
+  ```
+  import { getCurrentWorkspace } from './state.js';
+  function renderTopic(i) {
+    const span = document.createElement('span');
+    span.innerHTML = getCurrentWorkspace().topics[i].topicName;
+  }
+  ```
+
+test "clean: parsed API model field -> textContent"
+  lang javascript
+  reject VYQL-INJ-004
+  file state.js
+  ```
+  let workspace;
+  export async function initializeWorkspace(id) {
+    const response = await fetch('/api/workspaces/' + id);
+    const data = await response.json();
+    workspace = data.results;
+  }
+  export function getCurrentWorkspace() {
+    return workspace;
+  }
+  ```
+  file editor.js
+  ```
+  import { getCurrentWorkspace } from './state.js';
+  function renderTopic(i) {
+    const span = document.createElement('span');
+    span.textContent = getCurrentWorkspace().topics[i].topicName;
+  }
+  ```
+
+test "DOM-XSS: reassigned API array element -> innerHTML"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  document.addEventListener("DOMContentLoaded", async () => {
+    let discordMembers = [];
+    async function loadDiscordMembers() {
+      const response = await fetch("/api/discord-members");
+      const data = await response.json();
+      if (data.success && data.members) {
+        discordMembers = data.members;
+        populateDiscordMemberSelect();
+      }
+    }
+    function populateDiscordMemberSelect() {
+      const optionsContainer = document.querySelector(".custom-select-options");
+      discordMembers.forEach((member) => {
+        const option = document.createElement("div");
+        option.innerHTML = `<img src="${member.avatar}" alt="">`;
+        optionsContainer.appendChild(option);
+      });
+    }
+  });
+  ```
+
+test "clean: reassigned API array element rendered with DOM API"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  document.addEventListener("DOMContentLoaded", async () => {
+    let discordMembers = [];
+    async function loadDiscordMembers() {
+      const response = await fetch("/api/discord-members");
+      const data = await response.json();
+      if (data.success && data.members) {
+        discordMembers = data.members;
+        populateDiscordMemberSelect();
+      }
+    }
+    function populateDiscordMemberSelect() {
+      const optionsContainer = document.querySelector(".custom-select-options");
+      discordMembers.forEach((member) => {
+        const option = document.createElement("div");
+        const avatar = document.createElement("img");
+        avatar.src = member.avatar;
+        option.appendChild(avatar);
+        optionsContainer.appendChild(option);
+      });
+    }
+  });
   ```
 
 test "open redirect: location.hash -> location.href"

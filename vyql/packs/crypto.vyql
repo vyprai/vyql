@@ -4,13 +4,13 @@ module vypr.crypto;
 // Use of a broken/weak hash or cipher — a PRESENCE rule (`match`), not a taint
 // flow: it fires wherever a weak primitive is labeled (code.WeakHash).
 rule WeakCrypto {
-  meta { id: "VYQL-CRY-001", severity: medium, cwe: [CWE_327] }
+  meta { id: "VYQL-CRY-001", severity: medium, cwe: [CWE_327], benchmark: hash }
   match code.WeakHash as h
 }
 
-// Use of a broken/weak symmetric cipher (DES/RC4/Blowfish) — presence (CWE-327).
+// Use of a broken/weak symmetric cipher or mode — presence (CWE-327/CWE-326).
 rule WeakCipher {
-  meta { id: "VYQL-CRY-002", severity: medium, cwe: [CWE_327] }
+  meta { id: "VYQL-CRY-002", severity: medium, cwe: [CWE_327, CWE_326], benchmark: crypto }
   match code.WeakCipher as c
 }
 
@@ -20,11 +20,21 @@ rule WeakCipher {
 // security sink is what makes it a weakness (CWE-330). Secure RNG (secrets / os.urandom
 // / crypto.randomBytes / SecureRandom) is simply not a source, so it never fires.
 rule WeakRandomness {
-  meta { id: "VYQL-CRY-003", severity: medium, cwe: [CWE_330] }
+  meta { id: "VYQL-CRY-003", severity: medium, cwe: [CWE_330], benchmark: weakrand }
   match code.WeakRandomValue as r
 }
 
 rule StaticIvOrNonce {
   meta { id: "VYQL-CRY-004", severity: medium, cwe: [CWE_329], confidence_floor: low }
   match code.StaticIv as iv
+}
+
+rule ShortSecurityIdentifierTrust {
+  meta { id: "VYQL-CRY-005", severity: medium, cwe: [CWE_358, CWE_347] }
+  taint code.ShortSecurityIdentifier -> code.SecurityKeyTrustOperation
+}
+
+rule SecretComparisonObservableDiscrepancy {
+  meta { id: "VYQL-CRY-006", severity: medium, cwe: [CWE_203, CWE_208], confidence_floor: medium }
+  match code.SecretComparisonReview as cmp
 }

@@ -13,6 +13,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -178,7 +179,7 @@ type conv struct {
 	file string
 	// hoisted holds synthetic FuncDefs lifted from func-literal expressions (inline
 	// HTTP handlers / goroutines / callbacks). They are flushed into the module body so
-	// their bodies are analyzed (and *http.Request params seeded), instead of dropped.
+	// their bodies and parameter-entry facts are analyzed instead of dropped.
 	hoisted []nir.Stmt
 	anonSeq int
 }
@@ -203,10 +204,14 @@ func (c *conv) imports(f *ast.File) []nir.Import {
 
 func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	var out []nir.Stmt
+	methods := c.methodMap(decls)
 	for _, d := range decls {
 		switch fn := d.(type) {
 		case *ast.FuncDecl:
 			out = append(out, c.funcDef(fn.Name.Name, fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
+		case *ast.GenDecl:
+			out = append(out, c.typeContextStmts(fn, methods)...)
+			out = append(out, c.valueDeclStmts(fn)...)
 		}
 	}
 	// Flush func-literal bodies hoisted while lowering this decl set, so inline HTTP
@@ -216,9 +221,128 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	return out
 }
 
+func (c *conv) valueDeclStmts(gd *ast.GenDecl) []nir.Stmt {
+	var out []nir.Stmt
+	for _, spec := range gd.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok || len(vs.Names) == 0 {
+			continue
+		}
+		var targets []string
+		for _, n := range vs.Names {
+			targets = append(targets, n.Name)
+		}
+		typ := c.typeName(vs.Type)
+		if len(vs.Values) == 0 {
+			out = append(out, nir.Assign{Targets: targets, Value: nir.Const{Loc: c.loc(vs.Pos())}, Type: typ, Decl: true, Loc: c.loc(vs.Pos())})
+			continue
+		}
+		if len(vs.Values) == 1 {
+			out = append(out, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0]), Type: typ, Decl: true, Loc: c.loc(vs.Pos())})
+			continue
+		}
+		limit := len(vs.Values)
+		if len(targets) < limit {
+			limit = len(targets)
+		}
+		for i := 0; i < limit; i++ {
+			out = append(out, nir.Assign{Targets: []string{targets[i]}, Value: c.expr(vs.Values[i]), Type: typ, Decl: true, Loc: c.loc(vs.Pos())})
+		}
+	}
+	return out
+}
+
+func (c *conv) methodMap(decls []ast.Decl) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	for _, d := range decls {
+		fn, ok := d.(*ast.FuncDecl)
+		if !ok || fn.Recv == nil || fn.Name == nil {
+			continue
+		}
+		recv := c.receiverType(fn.Recv)
+		if recv == "" {
+			continue
+		}
+		if out[recv] == nil {
+			out[recv] = map[string]bool{}
+		}
+		out[recv][fn.Name.Name] = true
+	}
+	return out
+}
+
+func (c *conv) receiverType(recv *ast.FieldList) string {
+	if recv == nil || len(recv.List) == 0 {
+		return ""
+	}
+	return c.typeName(recv.List[0].Type)
+}
+
+func (c *conv) typeContextStmts(g *ast.GenDecl, methods map[string]map[string]bool) []nir.Stmt {
+	var out []nir.Stmt
+	if g == nil || g.Tok != token.TYPE {
+		return out
+	}
+	for _, spec := range g.Specs {
+		ts, ok := spec.(*ast.TypeSpec)
+		if !ok || ts.Name == nil {
+			continue
+		}
+		fields := c.structFieldNames(ts.Type)
+		if len(fields) == 0 && len(methods[ts.Name.Name]) == 0 {
+			continue
+		}
+		tokens := []string{"type_name:" + ts.Name.Name}
+		for _, f := range fields {
+			tokens = append(tokens, "field:"+f)
+		}
+		var ms []string
+		for m := range methods[ts.Name.Name] {
+			ms = append(ms, m)
+		}
+		sort.Strings(ms)
+		for _, m := range ms {
+			tokens = append(tokens, "method:"+m)
+		}
+		out = append(out, nir.ExprStmt{Value: analysisCall("analysis.type.context", "context", c.loc(ts.Pos()), tokens...)})
+	}
+	return out
+}
+
+func (c *conv) structFieldNames(expr ast.Expr) []string {
+	st, ok := expr.(*ast.StructType)
+	if !ok || st.Fields == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, f := range st.Fields.List {
+		for _, n := range f.Names {
+			if n == nil || n.Name == "_" || seen[n.Name] {
+				continue
+			}
+			seen[n.Name] = true
+			out = append(out, n.Name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func analysisCall(path, method, loc string, tokens ...string) nir.Call {
+	args := make([]nir.Expr, 0, len(tokens))
+	for _, tok := range tokens {
+		if tok == "" {
+			continue
+		}
+		args = append(args, nir.Const{Loc: loc, Value: strconv.Quote(tok)})
+	}
+	return nir.Call{Callee: nir.Name{ID: path, Loc: loc}, Args: args, Path: path, Method: method, Loc: loc}
+}
+
 // funcDef builds a FuncDef from a function type+body (shared by top-level FuncDecl and
-// hoisted func literals): extracts params/types, seeds each *http.Request param as an
-// http_input source (Java/C#-symmetric handler-param tainting), and lowers the body.
+// hoisted func literals): extracts params/types, records neutral parameter-entry facts,
+// and lowers the body.
 func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, exported bool, loc string) nir.FuncDef {
 	var params []string
 	paramTypes := map[string]string{}
@@ -237,23 +361,179 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 	if bodyNode != nil {
 		body = c.stmts(bodyNode.List)
 	}
-	var seed []nir.Stmt
-	for _, p := range params {
-		if paramTypes[p] == "http.Request" {
-			seed = append(seed, nir.Assign{Targets: []string{p},
-				Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: loc}, Path: "http_input", Method: "http_input", Loc: loc}})
-		}
-	}
-	if len(seed) > 0 {
-		body = append(seed, body...)
-	}
-	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc, Exported: exported}
+	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
+		ContextTokens: c.goFunctionTokens(name, bodyNode),
+		ParamEntries:  c.goParamEntries(name, params, paramTypes), Exported: exported}
 }
 
-// callOutParams returns the identifiers a call writes THROUGH as out-parameters:
-// every `&x` address-of arg (`json.Unmarshal(b,&v)`, `c.Bind(&form)`), plus — when the
-// callee name is a bind/parse verb — every plain-identifier arg (`parseForm(r, form)`).
-// These are the destination variables a request is decoded into.
+func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 128 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	if name != "" {
+		add("function_name:" + name)
+	}
+	if body == nil {
+		return out
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		if len(out) >= 128 {
+			return false
+		}
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
+		switch x := n.(type) {
+		case *ast.BasicLit:
+			if x.Kind != token.STRING {
+				return true
+			}
+			v, err := strconv.Unquote(x.Value)
+			if err != nil || v == "" {
+				return true
+			}
+			if len(v) > 256 {
+				v = v[:256]
+			}
+			add("literal:" + v)
+		case *ast.SelectorExpr:
+			if p := c.path(x); p != "" {
+				add("selector:" + p)
+			}
+		case *ast.CallExpr:
+			p := c.path(x.Fun)
+			if p == "" {
+				return true
+			}
+			add("call_path:" + p)
+			if i := strings.LastIndex(p, "."); i >= 0 {
+				add("call:" + p[i+1:])
+			} else {
+				add("call:" + p)
+			}
+		case *ast.BinaryExpr:
+			if tok := c.goBinaryToken(x); tok != "" {
+				add(tok)
+			}
+		case *ast.IndexExpr:
+			for _, tok := range c.goIndexTokens(x.X, x.Index) {
+				add(tok)
+			}
+		case *ast.SliceExpr:
+			for _, tok := range c.goSliceTokens(x) {
+				add(tok)
+			}
+		}
+		return true
+	})
+	return out
+}
+
+func (c *conv) goIndexTokens(base ast.Expr, index ast.Expr) []string {
+	p := c.path(base)
+	if p == "" {
+		return nil
+	}
+	tokens := []string{"index:" + p}
+	if idx := c.goAtomToken(index); idx != "" {
+		tokens = append(tokens, "index:"+p+":"+idx)
+	}
+	return tokens
+}
+
+func (c *conv) goSliceTokens(x *ast.SliceExpr) []string {
+	p := c.path(x.X)
+	if p == "" {
+		return nil
+	}
+	tokens := []string{"slice:" + p}
+	if x.Low != nil {
+		if low := c.goAtomToken(x.Low); low != "" {
+			tokens = append(tokens, "slice:"+p+":"+low+":")
+		}
+	}
+	if x.High != nil {
+		if high := c.goAtomToken(x.High); high != "" {
+			tokens = append(tokens, "slice:"+p+"::"+high)
+		}
+	}
+	return tokens
+}
+
+func (c *conv) goBinaryToken(x *ast.BinaryExpr) string {
+	left := c.goAtomToken(x.X)
+	right := c.goAtomToken(x.Y)
+	if left == "" || right == "" {
+		return ""
+	}
+	return "binary:" + left + x.Op.String() + right
+}
+
+func (c *conv) goAtomToken(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.Ident:
+		return x.Name
+	case *ast.SelectorExpr:
+		if p := c.path(x); p != "" {
+			return p
+		}
+	case *ast.BasicLit:
+		if x.Kind == token.STRING {
+			v, err := strconv.Unquote(x.Value)
+			if err != nil || len(v) > 64 {
+				return ""
+			}
+			return strconv.Quote(v)
+		}
+		if len(x.Value) <= 64 {
+			return x.Value
+		}
+	case *ast.CallExpr:
+		p := c.path(x.Fun)
+		if p == "len" && len(x.Args) == 1 {
+			arg := c.goAtomToken(x.Args[0])
+			if arg != "" {
+				return "len(" + arg + ")"
+			}
+		}
+	case *ast.BinaryExpr:
+		left := c.goAtomToken(x.X)
+		right := c.goAtomToken(x.Y)
+		if left != "" && right != "" && len(left)+len(right) <= 120 {
+			switch x.Op {
+			case token.ADD, token.SUB:
+				return left + x.Op.String() + right
+			}
+		}
+	case *ast.ParenExpr:
+		return c.goAtomToken(x.X)
+	}
+	return ""
+}
+func (c *conv) goParamEntries(name string, params []string, paramTypes map[string]string) []nir.ParamEntry {
+	var out []nir.ParamEntry
+	for i, p := range params {
+		if p == "" || p == "_" {
+			continue
+		}
+		tokens := []string{"function_name:" + name, "param_name:" + p, "param_index:" + strconv.Itoa(i)}
+		if typ := paramTypes[p]; typ != "" {
+			tokens = append(tokens, "param_type:"+typ)
+		}
+		out = append(out, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return out
+}
+
+// callOutParams returns the identifiers a call writes through as out-parameters:
+// every `&x` address-of arg, plus, when the callee name is a bind/parse/decode
+// verb, every plain-identifier arg.
 func (c *conv) callOutParams(call *ast.CallExpr) []string {
 	var outs []string
 	for _, a := range call.Args {
@@ -277,12 +557,10 @@ func (c *conv) callOutParams(call *ast.CallExpr) []string {
 // taint-JOIN, not a redefinition: a plain `o = …` would SHADOW any taint o already had, so
 // f(&taintedVar) would clear it (false negative). The join adds taint AND preserves o's.
 //
-// For a `&x` arg on an arbitrary call (`json.Unmarshal(b,&v)`) the joined taint is the call
-// itself — the dominant case being a bind/decode SOURCE whose result IS the request data. But
-// a custom decode HELPER (`parseForm(r, form)`, `decoder.Decode(f, r.Form)`) is NOT a labelled
-// source; its return is a clean error, while the request flows in through an INPUT arg. So for
-// a bind-name call we additionally join the receiver and the call's simple argument
-// expressions, so whichever of them carries the request taint reaches the decoded dest.
+// For `&x` on an arbitrary call, the joined taint is the call itself. For
+// bind/parse/decode helpers, the return is often only an error while the input
+// value flows into the destination arg, so also join simple receiver/argument
+// expressions that can safely be re-evaluated.
 func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc string) []nir.Stmt {
 	outs := c.callOutParams(call)
 	if len(outs) == 0 {
@@ -291,11 +569,11 @@ func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc strin
 	srcs := []nir.Expr{callExpr}
 	if isBindName(calleeName(call.Fun)) {
 		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
-			if e := c.simpleTaintExpr(sel.X); e != nil { // the receiver may hold the request
+			if e := c.simpleTaintExpr(sel.X); e != nil {
 				srcs = append(srcs, e)
 			}
 		}
-		for _, a := range call.Args { // an input arg may hold the request (decode reads it)
+		for _, a := range call.Args {
 			if e := c.simpleTaintExpr(a); e != nil {
 				srcs = append(srcs, e)
 			}
@@ -310,10 +588,8 @@ func (c *conv) outParamJoinsFor(call *ast.CallExpr, callExpr nir.Expr, loc strin
 	return stmts
 }
 
-// simpleTaintExpr lowers an argument/receiver expression ONLY when it is side-effect-free
-// (an identifier, field access, address-of, or deref) so it can be safely re-evaluated inside
-// an out-param taint-join. Nested calls are skipped to avoid duplicating a side-effectful
-// node; their taint still reaches the dest through the call result already in the join.
+// simpleTaintExpr lowers an argument/receiver expression only when it is
+// side-effect-free, so the out-param join can safely evaluate it again.
 func (c *conv) simpleTaintExpr(e ast.Expr) nir.Expr {
 	switch x := e.(type) {
 	case *ast.Ident:
@@ -331,8 +607,7 @@ func (c *conv) simpleTaintExpr(e ast.Expr) nir.Expr {
 	return nil
 }
 
-// calleeName returns the last identifier of a call's function expression
-// (`pkg.parseForm` → "parseForm", `parseForm` → "parseForm").
+// calleeName returns the last identifier of a call's function expression.
 func calleeName(fun ast.Expr) string {
 	switch f := fun.(type) {
 	case *ast.Ident:
@@ -343,9 +618,6 @@ func calleeName(fun ast.Expr) string {
 	return ""
 }
 
-// isBindName reports whether a function name reads external/request data into a
-// destination argument (a custom bind/parse/decode helper). Scoped to these verbs
-// so the no-`&` out-param treatment stays precise.
 func isBindName(name string) bool {
 	if name == "" {
 		return false
@@ -405,24 +677,20 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 			if ix, ok := st.Lhs[0].(*ast.IndexExpr); ok {
 				if base, ok := ix.X.(*ast.Ident); ok && base.Name != "_" {
 					return nir.Assign{Targets: []string{base.Name},
-						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: base.Name, Loc: c.loc(base.Pos())}, c.expr(st.Rhs[0])}, Loc: c.loc(st.Pos())}}
+						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: base.Name, Loc: c.loc(base.Pos())}, c.expr(st.Rhs[0])}, Loc: c.loc(st.Pos())},
+						Loc:   c.loc(st.Pos())}
 				}
 			}
 		}
 		var targets []string
 		for _, lhs := range st.Lhs {
-			if id, ok := lhs.(*ast.Ident); ok {
-				targets = append(targets, id.Name)
-			} else {
-				targets = append(targets, "_")
-			}
+			targets = append(targets, c.assignTarget(lhs))
 		}
 		if len(st.Rhs) == 1 {
-			assign := nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0])}
-			// `err := bind(&v)` / `err := parseForm(r, form)`: the result goes to err, but the
-			// call also writes through its out-param destinations — taint those too. The
-			// dominant idiom is `if err := decode(...); err != nil`, an AssignStmt (the ExprStmt
-			// path below only covers the discarded-result form).
+			assign := nir.Assign{Targets: targets, Value: c.expr(st.Rhs[0]), Loc: c.loc(st.Pos())}
+			// The result goes to err, but the call can also write through
+			// address-of out-parameter destinations; taint those too. The
+			// AssignStmt path covers `if err := f(&x); err != nil`.
 			if call, ok := st.Rhs[0].(*ast.CallExpr); ok {
 				if joins := c.outParamJoinsFor(call, c.expr(st.Rhs[0]), c.loc(st.Pos())); len(joins) > 0 {
 					stmts := append([]nir.Stmt{assign}, joins...)
@@ -435,7 +703,7 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		blk := nir.Block{}
 		for i := range st.Lhs {
 			if i < len(st.Rhs) {
-				blk.Stmts = append(blk.Stmts, nir.Assign{Targets: []string{targets[i]}, Value: c.expr(st.Rhs[i])})
+				blk.Stmts = append(blk.Stmts, nir.Assign{Targets: []string{targets[i]}, Value: c.expr(st.Rhs[i]), Loc: c.loc(st.Pos())})
 			}
 		}
 		return blk
@@ -445,12 +713,8 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		}
 		return nir.Return{}
 	case *ast.ExprStmt:
-		// out-parameter taint: a bare call passing the address of a local
-		// (`json.Unmarshal(b, &v)`, `c.ShouldBind(&form)`, `decoder.Decode(&x)`)
-		// writes through that pointer, so model it as a (re)definition of the
-		// variable from the call. This is what lets a bind/decode SOURCE taint
-		// the struct the request is decoded into — the dominant web-handler
-		// pattern — instead of the (discarded) error return.
+		// Out-parameter taint: a bare call passing the address of a local writes
+		// through that pointer, so model it as a join from the call result.
 		if call, ok := st.X.(*ast.CallExpr); ok {
 			if stmts := c.outParamJoinsFor(call, c.expr(st.X), c.loc(st.Pos())); len(stmts) > 0 {
 				if len(stmts) == 1 {
@@ -484,7 +748,13 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 	case *ast.ForStmt:
 		return nir.Loop{Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 	case *ast.RangeStmt:
-		return nir.Loop{Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
+		var vars []string
+		for _, e := range []ast.Expr{st.Key, st.Value} {
+			if id, ok := e.(*ast.Ident); ok && id.Name != "_" {
+				vars = append(vars, id.Name)
+			}
+		}
+		return nir.Loop{Iter: c.expr(st.X), Vars: vars, Body: c.stmts(st.Body.List), Loc: c.loc(st.Pos())}
 	case *ast.SwitchStmt:
 		return c.switchStmt(st.Body, st.Tag)
 	// NOTE: *ast.TypeSwitchStmt is intentionally left to the nil default (it was a no-op
@@ -493,6 +763,20 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		return nir.Block{Stmts: c.stmts(st.Body)}
 	}
 	return nil
+}
+
+func (c *conv) assignTarget(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.Ident:
+		return x.Name
+	case *ast.SelectorExpr:
+		if p := c.path(x); p != "" {
+			return p
+		}
+	case *ast.StarExpr:
+		return c.assignTarget(x.X)
+	}
+	return "_"
 }
 
 // switchStmt converts a switch body to a branch-structured nir.Switch. Each case clause
@@ -541,7 +825,7 @@ func (c *conv) declStmt(st *ast.DeclStmt) nir.Stmt {
 			targets = append(targets, n.Name)
 		}
 		if len(vs.Values) == 1 {
-			blk.Stmts = append(blk.Stmts, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0])})
+			blk.Stmts = append(blk.Stmts, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0]), Loc: c.loc(vs.Pos())})
 		}
 	}
 	return blk
@@ -557,8 +841,8 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 	switch ex := e.(type) {
 	case *ast.Ident:
 		if ex.Name == "true" || ex.Name == "false" {
-			// boolean keyword → a literal value, so value-matching sees
-			// InsecureSkipVerify=true etc. (Go booleans are predeclared idents).
+			// Boolean keywords are literal values, so adapter value-matching can
+			// inspect struct fields and call arguments consistently.
 			return nir.Const{Loc: c.loc(ex.Pos()), Value: ex.Name}
 		}
 		return nir.Name{ID: ex.Name, Loc: c.loc(ex.Pos())}
@@ -579,8 +863,8 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 	case *ast.FuncLit:
 		// An inline closure (HTTP handler registered via http.HandleFunc/router.GET, a
 		// goroutine, a callback). Its body would otherwise be dropped. Hoist it as a
-		// synthetic anonymous FuncDef so the body is analyzed and its params (incl. a
-		// seeded *http.Request) carry taint; the closure value itself flows nothing.
+		// synthetic anonymous FuncDef so the body and parameter-entry facts are analyzed;
+		// the closure value itself flows nothing.
 		c.anonSeq++
 		fd := c.funcDef("func#"+strconv.Itoa(c.anonSeq), ex.Type, ex.Body, false, c.loc(ex.Pos()))
 		c.hoisted = append(c.hoisted, fd)
@@ -600,10 +884,10 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 				parts = append(parts, c.expr(el))
 			}
 		}
-		// A NAMED struct literal (T{…} / pkg.T{…}) is modeled as a constructor call
-		// so its field values are reachable by value-matching marks — e.g.
-		// tls.Config{InsecureSkipVerify: true}. Slice/map/array literals (whose type
-		// is *ast.ArrayType/MapType, not a name) stay as Seq.
+		// A NAMED struct literal (T{...} / pkg.T{...}) is modeled as a constructor
+		// call so its field values are reachable by adapter value-matching. Slice,
+		// map, and array literals (whose type is *ast.ArrayType/MapType, not a
+		// name) stay as Seq.
 		if p := c.path(ex.Type); p != "" {
 			method := p
 			if i := strings.LastIndex(p, "."); i >= 0 {
@@ -630,7 +914,7 @@ func (c *conv) call(ex *ast.CallExpr) nir.Call {
 }
 
 // path builds a dotted callee path for adapter matching, e.g. r.URL.Query().Get
-// -> "r.URL.Query.Get", db.Exec -> "db.Exec".
+// -> "r.URL.Query.Get", svc.Run -> "svc.Run".
 func (c *conv) path(e ast.Expr) string {
 	switch ex := e.(type) {
 	case *ast.Ident:

@@ -42,7 +42,7 @@ type Name struct {
 type Const struct {
 	Loc string
 	// Value is the unquoted literal text for STRING constants, used by
-	// value-matching sinks (`val "..."`, e.g. CORS '*', cipher 'ECB'); empty otherwise.
+	// value-matching adapters (`val "..."`, e.g. option names or modes); empty otherwise.
 	Value string
 }
 
@@ -67,14 +67,24 @@ type Index struct {
 // Call is a call expression; Path is the callee path (e.g. "db.query") and
 // Method is its last segment (e.g. "query").
 type Call struct {
-	Callee Expr
-	Args   []Expr
-	Path   string
-	Method string
-	Loc    string
+	Callee  Expr
+	Args    []Expr
+	Path    string
+	Method  string
+	Loc     string
+	Effects []CallEffect
 	// IsCtor marks a constructor / `new T(args)` call: the constructed object contains its
 	// arguments, so the lowerer flows tainted args into the call result (wrapper-object taint).
 	IsCtor bool
+}
+
+// CallEffect is adapter-declared dataflow for calls with out-parameters or accumulator
+// arguments. It is intentionally generic: adapters name the API, while lowering only
+// applies "argument/result flows into destination argument".
+type CallEffect struct {
+	DestArg      int
+	SourceArg    int
+	SourceResult bool
 }
 
 // Format is a taint-propagating string build (f-string, %, +, .format).
@@ -85,13 +95,14 @@ type Format struct {
 
 // Seq is a tuple / list / array.
 type Seq struct {
-	Parts []Expr
-	Loc   string
+	Parts   []Expr
+	Loc     string
+	KeyPath []string
 }
 
-// Pair is a named key/value entry: a keyword argument (`verify=False`), a
-// dict/object/hash entry (`{algorithm: "none"}`), or a struct field
-// (`tls.Config{InsecureSkipVerify: true}`). Key is the literal name; taint flows
+// Pair is a named key/value entry: a keyword argument (`enabled=false`), a
+// dict/object/hash entry (`{mode: "fast"}`), or a struct field
+// (`Options{Limit: 10}`). Key is the literal name; taint flows
 // through Value. Used by named-value matching (`val "key=value"`); frontends that
 // don't emit Pair keep flattening such entries to their Value (no key).
 type Pair struct {
@@ -102,10 +113,12 @@ type Pair struct {
 
 // Lambda is an inline anonymous function (e.g. an Express arrow handler).
 type Lambda struct {
-	Params     []string
-	ParamTypes map[string]string
-	Body       []Stmt
-	Loc        string
+	Params        []string
+	ParamTypes    map[string]string
+	ParamEntries  []ParamEntry
+	Body          []Stmt
+	Loc           string
+	ContextTokens []string
 }
 
 // Thru is a transparent wrapper (await, starred) that passes taint through.
@@ -159,6 +172,8 @@ type Assign struct {
 	Targets []string
 	Value   Expr
 	Type    string
+	Decl    bool // true when this assignment came from a declaration (let/const/var, etc.)
+	Loc     string
 }
 
 // AugAssign is x += y.
@@ -181,37 +196,37 @@ type FuncDef struct {
 	ParamTypes map[string]string
 	Body       []Stmt
 	Loc        string
-	// EndLoc is the file:line of the function's last line (closing brace / dedent).
-	// With Loc it gives the full line range VyPr reconciles against its
-	// structural_functions rows. Empty if the frontend doesn't yet emit it.
-	EndLoc string
-	// IsRoute marks a web request handler whose framework SENDS a raw string return as the
-	// response body (Flask/FastAPI/Nest @route functions). The lowering treats a returned
-	// freshly-built string (Concat/Format) as written to the HTTP response body — a
-	// reflected-XSS sink — since the framework does not escape raw string returns (only
-	// template renders). Call-registration frameworks that do NOT auto-send returns (Express:
-	// the handler must call res.send) set HTTPMethod/HTTPPath WITHOUT IsRoute — they are route
-	// entrypoints for export, but returning a string there is not a sink.
-	IsRoute bool
-	// IsValidator marks a function annotated `# vyql: validator` — a custom
-	// input-validator/authenticator the tool can't infer by name. Its return value is
-	// treated as validated (clears the trust-boundary threat), so storing it across a
-	// trust boundary is legitimate.
-	IsValidator bool
-	// HTTPMethod and HTTPPath carry route metadata for a handler detected from a
-	// call-registration framework (Express `app.get("/x", h)`, etc.). HTTPMethod is the
-	// upper-cased verb ("GET", "POST", "ALL"); HTTPPath is the literal route path, or
-	// empty when the registration's path argument is not a string literal. Both empty for
-	// non-route functions. VyPr merges these into its canonical CodeEntrypoint
-	// (docs/21 §5) — VyQL only emits the fact.
-	HTTPMethod string
-	HTTPPath   string
+	// ContextTokens records syntax-level evidence attached to the enclosing function
+	// itself (for example its name or language-native annotations). Lowering preserves
+	// these on generic function-return events; adapters decide what any token means.
+	ContextTokens []string
+	// Decorators records syntax-level annotation/decorator tokens attached to this function.
+	// Lowering preserves them on generic function-return events; adapters decide what any
+	// specific decorator means for a domain.
+	Decorators []string
+	// ParamEntries records syntax-level evidence that a parameter is populated by an
+	// external caller or framework. Lowering emits generic parameter-entry events from this
+	// data; adapters decide which events are source concepts.
+	ParamEntries []ParamEntry
+	// ResultEntries records syntax-level evidence attached to values returned by this
+	// function. Lowering emits generic result events; adapters decide which events are
+	// controls, sinks, or other domain concepts.
+	ResultEntries []ResultEntry
 	// Exported marks a function/method as part of the PUBLIC API surface (per the
 	// language's visibility rules: Go capitalization, `pub`, `public`, `export`, no
 	// leading underscore, …). The library/SDK archetype treats exported-function
 	// parameters as an external-entry taint source; internal helpers are reached by
 	// ordinary interprocedural propagation, so they must NOT be entry points.
 	Exported bool
+}
+
+type ParamEntry struct {
+	Param  string
+	Tokens []string
+}
+
+type ResultEntry struct {
+	Tokens []string
 }
 
 // ClassDef is a class definition.
@@ -243,9 +258,13 @@ type If struct {
 	Loc  string
 }
 
-// Loop covers while/for/foreach — a Cond (may be nil for infinite/range loops) and Body.
+// Loop covers while/for/foreach. Cond may be nil for infinite/range loops.
+// Iter/Vars are optional foreach/range metadata: values from Iter may bind to
+// each variable in Vars before the loop body.
 type Loop struct {
 	Cond Expr
+	Iter Expr
+	Vars []string
 	Body []Stmt
 	Loc  string
 }
@@ -315,7 +334,7 @@ type Program struct {
 	Modules  []Module
 	SelfName string
 	// Properties holds resolved key→value pairs from bundled config files
-	// (.properties, etc.), so a config-read like `getProperty("hashAlg1")` can be
+	// (.properties, etc.), so a config-read like `getProperty("featureMode")` can be
 	// const-folded to its real value during lowering.
 	Properties map[string]string
 }

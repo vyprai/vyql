@@ -1,0 +1,55 @@
+test "rank198: Baileys self-only protocol messages without origin guard require review"
+  lang javascript
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  async function processMessage(message: WAMessage, ev: EventBus, keyStore: KeyStore) {
+    const content = normalizeMessageContent(message.message)
+    const protocolMsg = content?.protocolMessage
+    if (protocolMsg) {
+      switch (protocolMsg.type) {
+        case proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION:
+          ev.emit('messaging-history.set', {})
+          break
+        case proto.Message.ProtocolMessage.Type.APP_STATE_SYNC_KEY_SHARE:
+          await keyStore.set({ 'app-state-sync-key': {} })
+          break
+        case proto.Message.ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE:
+          await placeholderResendCache?.del(message.key.id)
+          break
+      }
+    }
+  }
+  ```
+
+test "rank198: Baileys self-only protocol messages reject non-self origin"
+  lang javascript
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  async function processMessage(message: WAMessage, ev: EventBus, keyStore: KeyStore) {
+    const content = normalizeMessageContent(message.message)
+    const protocolMsg = content?.protocolMessage
+    if (protocolMsg) {
+      const SELF_ONLY_TYPES = new Set<proto.Message.ProtocolMessage.Type>([
+        proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION,
+        proto.Message.ProtocolMessage.Type.APP_STATE_SYNC_KEY_SHARE,
+        proto.Message.ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE
+      ])
+      if (SELF_ONLY_TYPES.has(protocolMsg.type) && !message.key.fromMe) {
+        return
+      }
+      switch (protocolMsg.type) {
+        case proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION:
+          ev.emit('messaging-history.set', {})
+          break
+        case proto.Message.ProtocolMessage.Type.APP_STATE_SYNC_KEY_SHARE:
+          await keyStore.set({ 'app-state-sync-key': {} })
+          break
+        case proto.Message.ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE:
+          await placeholderResendCache?.del(message.key.id)
+          break
+      }
+    }
+  }
+  ```

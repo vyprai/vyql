@@ -199,6 +199,9 @@ func TestReachabilityGatedSCA(t *testing.T) {
 	if err := sca.LinkReachability(g); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err := adapters.Apply(g, frontend.AutoAdapters(), nil); err != nil {
+		t.Fatal(err)
+	}
 
 	vuln, _ := g.NodesWithConcept("sbom.VulnerableDependency")
 	if len(vuln) != 2 {
@@ -270,6 +273,9 @@ func TestVulnerableEntrypointExploitabilityFunnel(t *testing.T) {
 		Advisory: "CVE-2017-18342", Package: "pyyaml", Version: "3.12",
 		Symbol: "yaml.load", VulnClass: "code.Deserialization", TaintedArg: 0, CWE: []string{"CWE_502"},
 	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := adapters.Apply(g, frontend.AutoAdapters(), nil); err != nil {
 		t.Fatal(err)
 	}
 

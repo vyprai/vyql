@@ -35,16 +35,39 @@ test "config: AndroidManifest debuggable is flagged"
   </manifest>
   ```
 
+test "config: AndroidManifest missing allowBackup false is flagged"
+  lang config
+  expect VYQL-MOB-006
+  file AndroidManifest.xml
+  ```
+  <?xml version="1.0" encoding="utf-8"?>
+  <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.x">
+    <application android:label="x"/>
+  </manifest>
+  ```
+
+test "config: AndroidManifest allowBackup true is flagged"
+  lang config
+  expect VYQL-MOB-006
+  file AndroidManifest.xml
+  ```
+  <?xml version="1.0" encoding="utf-8"?>
+  <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.x">
+    <application android:allowBackup="true"/>
+  </manifest>
+  ```
+
 test "config: a hardened AndroidManifest is clean"
   lang config
   reject VYQL-MOB-003
   reject VYQL-MOB-004
   reject VYQL-MOB-005
+  reject VYQL-MOB-006
   file AndroidManifest.xml
   ```
   <?xml version="1.0" encoding="utf-8"?>
   <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.x">
-    <application android:usesCleartextTraffic="false" android:debuggable="false">
+    <application android:allowBackup="false" android:usesCleartextTraffic="false" android:debuggable="false">
       <activity android:name=".Main" android:exported="false"/>
     </application>
   </manifest>

@@ -21,6 +21,47 @@ test "path: canonicalized archive entry name is clean (javascript)"
   }
   ```
 
+test "path: adm-zip bulk extraction from untrusted archive is reported (javascript)"
+  lang javascript
+  expect VYQL-PATH-004
+  code
+  ```
+  const path = require("path");
+  const AdmZip = require("adm-zip");
+
+  function importPlugin(req) {
+    const zipFilePath = path.resolve("/tmp/plugins", req.query.name + ".zip");
+    const pluginFolder = path.resolve("/tmp/plugins", req.query.name);
+    const zip = new AdmZip(zipFilePath);
+    zip.extractAllTo(pluginFolder);
+  }
+  ```
+
+test "path: adm-zip bulk extraction with entry containment check is clean (javascript)"
+  lang javascript
+  reject VYQL-PATH-004
+  code
+  ```
+  const path = require("path");
+  const AdmZip = require("adm-zip");
+  const { isWithin } = require("./files");
+
+  function importPlugin(req) {
+    const zipFilePath = path.resolve("/tmp/plugins", req.query.name + ".zip");
+    const pluginFolder = path.resolve("/tmp/plugins", req.query.name);
+    const zip = new AdmZip(zipFilePath);
+
+    for (const entry of zip.getEntries()) {
+      const entryPath = path.resolve(pluginFolder, entry.entryName);
+      if (!isWithin(pluginFolder, entryPath) && pluginFolder !== entryPath) {
+        throw new Error("bad zip entry");
+      }
+    }
+
+    zip.extractAllTo(pluginFolder);
+  }
+  ```
+
 test "path: python archive entry name reaching extraction is reported"
   lang python
   expect VYQL-PATH-004
@@ -53,6 +94,86 @@ test "path: php archive entry name reaching extraction is reported"
   ?>
   ```
 
+test "path: php archive metadata name reaching file write is reported"
+  lang php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+  class Zip {
+      private $metadata;
+
+      function extract($destination, $buffer) {
+          $path = Path::clean($destination . "/" . $this->metadata[0]["name"]);
+          File::write($path, $buffer);
+      }
+  }
+  ?>
+  ```
+
+test "path: php archive metadata file write with containment guard is clean"
+  lang php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+  class Zip {
+      private $metadata;
+
+      function extract($destination, $buffer) {
+          $path = Path::clean($destination . "/" . $this->metadata[0]["name"]);
+          if (!$this->isBelow($destination, $destination . "/" . $this->metadata[0]["name"])) {
+              throw new RuntimeException("outside destination");
+          }
+          File::write($path, $buffer);
+      }
+  }
+  ?>
+  ```
+
+test "deserialization: php archive filename validator missing phar scheme is reported"
+  lang php
+  expect VYQL-DESER-005
+  code
+  ```
+  <?php
+  class Archive_Tar {
+      private function _maliciousFilename($file) {
+          if (strpos($file, '/../') !== false) {
+              return true;
+          }
+          if (strpos($file, '../') === 0) {
+              return true;
+          }
+          return false;
+      }
+  }
+  ?>
+  ```
+
+test "deserialization: php archive filename validator with phar scheme check is clean"
+  lang php
+  reject VYQL-DESER-005
+  code
+  ```
+  <?php
+  class Archive_Tar {
+      private function _maliciousFilename($file) {
+          if (strpos($file, 'phar://') === 0) {
+              return true;
+          }
+          if (strpos($file, '/../') !== false) {
+              return true;
+          }
+          if (strpos($file, '../') === 0) {
+              return true;
+          }
+          return false;
+      }
+  }
+  ?>
+  ```
+
 test "path: ruby archive entry name reaching extraction is reported"
   lang ruby
   expect VYQL-PATH-004
@@ -71,6 +192,27 @@ test "path: java archive entry name reaching extraction is reported"
   class App {
     void handler(Request req, Extractor extractor) {
       extractor.extractEntry(req.getParameter("name"));
+    }
+  }
+  ```
+
+test "path: java ZipEntry name reaching file write is reported"
+  lang java
+  expect VYQL-PATH-001
+  code
+  ```
+  import java.io.File;
+  import java.io.FileOutputStream;
+  import java.util.zip.ZipEntry;
+  import java.util.zip.ZipInputStream;
+
+  class App {
+    void extract(ZipInputStream zipIn, File folder) throws Exception {
+      ZipEntry zipEntry;
+      while ((zipEntry = zipIn.getNextEntry()) != null) {
+        File file = new File(folder, zipEntry.getName());
+        new FileOutputStream(file);
+      }
     }
   }
   ```
@@ -96,5 +238,38 @@ test "path: csharp archive entry name reaching extraction is reported"
     void Handler(dynamic Request, dynamic entry) {
       entry.ExtractToFile(Request.Query["name"]);
     }
+  }
+  ```
+
+test "path: powershell zip entry full name reaching extraction is reported"
+  lang powershell
+  expect VYQL-PATH-004
+  code
+  ```
+  Function Extract-Zip($src, $dest) {
+      foreach ($entry in $archive.Entries) {
+          $archive_name = $entry.FullName
+          $entry_target_path = [System.IO.Path]::Combine($dest, $archive_name)
+          [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $entry_target_path, $true)
+      }
+  }
+  ```
+
+test "path: powershell canonical destination guard cleans zip extraction"
+  lang powershell
+  reject VYQL-PATH-004
+  code
+  ```
+  Function Extract-Zip($src, $dest) {
+      foreach ($entry in $archive.Entries) {
+          $archive_name = $entry.FullName
+          $entry_target_path = [System.IO.Path]::Combine($dest, $archive_name)
+          $full_target_path = [System.IO.Path]::GetFullPath($entry_target_path)
+          $full_dest_path = [System.IO.Path]::GetFullPath($dest + [System.IO.Path]::DirectorySeparatorChar)
+          if (-not $full_target_path.StartsWith($full_dest_path)) {
+              Fail-Json -obj $result -message "bad path"
+          }
+          [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $entry_target_path, $true)
+      }
   }
   ```

@@ -1,0 +1,53 @@
+test "rank203: file extension validator ignores stored string filenames"
+  lang php
+  expect VYQL-INJ-037
+  code
+  ```
+  <?php
+  class BcAppModel {
+    public function fileExt($check, $exts) {
+      $file = $check[key($check)];
+      if (!empty($file['name'])) {
+        if (!is_array($exts)) {
+          $exts = explode(',', $exts);
+        }
+        $ext = decodeContent($file['type'], $file['name']);
+        if (in_array($ext, $exts)) {
+          return true;
+        } else {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+  ```
+
+test "rank203: file extension validator also checks stored string filenames"
+  lang php
+  reject VYQL-INJ-037
+  code
+  ```
+  <?php
+  class BcAppModel {
+    public function fileExt($check, $exts) {
+      $file = $check[key($check)];
+      if (!is_array($exts)) {
+        $exts = explode(',', $exts);
+      }
+      if (!empty($file['name'])) {
+        $ext = decodeContent($file['type'], $file['name']);
+        if (!in_array($ext, $exts)) {
+          return false;
+        }
+      }
+      if (!empty($file) && is_string($file)) {
+        $ext = pathinfo($file, PATHINFO_EXTENSION);
+        if (!in_array($ext, $exts)) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+  ```

@@ -30,6 +30,8 @@ func TestProfileAutoDetect(t *testing.T) {
 		{"cli", map[string]string{"go.mod": "module x\nrequire github.com/spf13/cobra v1.8.0\n"}},
 		{"worker", map[string]string{"requirements.txt": "celery==5.3\n"}},
 		{"api", map[string]string{"requirements.txt": "fastapi==0.110\n"}},
+		{"web", map[string]string{"requirements.txt": "flask==1.0.2\nclick==6.7\ncelery==4.2.1\n"}},
+		{"web", map[string]string{"Pipfile": "[packages]\nflask = \"*\"\n"}},
 		{"library", map[string]string{"setup.py": "from setuptools import setup\n"}},
 		{"library", map[string]string{"package.json": `{"name":"pkg","main":"index.js"}`}},
 		{"library", map[string]string{"package.json": `{"name":"pkg","author":"Matthew <m@example.test>","main":"index.js"}`}},
@@ -108,6 +110,27 @@ func TestNpmLibraryDetectsDotRoot(t *testing.T) {
 	}()
 	if got := Detect([]string{"."}, profiles); got.Name != "library" {
 		t.Fatalf("Detect('.') = %q, want library", got.Name)
+	}
+}
+
+func TestLibraryDetectsFromNestedSourceFile(t *testing.T) {
+	profiles, err := Load()
+	if err != nil {
+		t.Fatalf("load profiles: %v", err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "setup.py"), []byte("from setuptools import setup\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "pkg", "subpkg", "module.py")
+	if err := os.MkdirAll(filepath.Dir(src), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(src, []byte("def f(x):\n    return x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := Detect([]string{src}, profiles); got.Name != "library" {
+		t.Fatalf("Detect(nested source file) = %q, want library", got.Name)
 	}
 }
 

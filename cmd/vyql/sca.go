@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -17,14 +18,13 @@ var manifestParsers = []struct {
 	parse func(string) []sca.Dep
 }{
 	{"requirements.txt", "pypi", sca.ParseRequirements},
+	{"setup.py", "pypi", sca.ParseSetupPy},
 	{"package.json", "npm", sca.ParsePackageJSON},
 }
 
 // applySCA discovers dependency manifests under the scanned paths, adds SBOM nodes to the
-// graph, then runs the reputation pipeline (vulnerable / malicious / typosquat /
-// unreviewed-version) per ecosystem and links reachability — so SCA rules (SCA-001..004)
-// evaluate against the SAME graph as the SAST rules. Manifest/IO errors are non-fatal:
-// SCA augments a scan, it never gates it.
+// graph, then runs the package reputation pipeline per ecosystem and links reachability.
+// Manifest/IO errors are non-fatal: package analysis augments a scan, it never gates it.
 func applySCA(g usg.Store, paths []string) {
 	ecos := map[string]bool{}
 	for _, p := range paths {
@@ -53,6 +53,20 @@ func applySCA(g usg.Store, paths []string) {
 				}
 			}
 		}
+		for _, root := range scaRoots(p, info) {
+			gm := filepath.Join(root, ".gitmodules")
+			b, err := os.ReadFile(gm)
+			if err != nil {
+				continue
+			}
+			deps := sca.ParseGitmodules(string(b), gitSubmoduleCommits(root))
+			if len(deps) == 0 {
+				continue
+			}
+			if sca.BuildSBOM(g, "git", deps, relFrom(root, gm)) == nil {
+				ecos["git"] = true
+			}
+		}
 	}
 	if len(ecos) == 0 {
 		return
@@ -61,6 +75,39 @@ func applySCA(g usg.Store, paths []string) {
 	for eco := range ecos {
 		_, _, _, _ = sca.Analyze(g, eco)
 	}
+}
+
+func scaRoots(p string, info os.FileInfo) []string {
+	if info.IsDir() {
+		return []string{p}
+	}
+	if strings.EqualFold(filepath.Base(p), ".gitmodules") {
+		return []string{filepath.Dir(p)}
+	}
+	return nil
+}
+
+func gitSubmoduleCommits(root string) map[string]string {
+	out := map[string]string{}
+	cmd := exec.Command("git", "-C", root, "ls-tree", "-rz", "HEAD")
+	b, err := cmd.Output()
+	if err != nil {
+		return out
+	}
+	for _, raw := range strings.Split(string(b), "\x00") {
+		if raw == "" || !strings.HasPrefix(raw, "160000 ") {
+			continue
+		}
+		meta, path, ok := strings.Cut(raw, "\t")
+		if !ok {
+			continue
+		}
+		fields := strings.Fields(meta)
+		if len(fields) >= 3 {
+			out[path] = fields[2]
+		}
+	}
+	return out
 }
 
 // relFrom renders a manifest path relative to the scanned root for tidy finding locations.

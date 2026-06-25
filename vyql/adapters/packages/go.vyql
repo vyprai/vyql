@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, RegexCompile, NullableDeref, UserIdentityMappingReview, AuthFailureResponseReview}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter go {
@@ -96,5 +96,14 @@ adapter go {
   }
   package "github.com/casbin/casbin" {
     control method "Can" -> AuthorizationCheck
+  }
+  package "github.com/free5gc/ausf/internal/context" {
+    mark exact "analysis.function.context" val "function_name:UeAuthPostRequestProcedure" val "selector:updateAuthenticationInfo.ResynchronizationInfo" val "call:GetSupiFromSuciSupiMap" val "call:GetAusfUeContext" val "selector:ausfCurrentContext.Rand" nval "call:CheckIfSuciSupiPairExists" nval "call:CheckIfAusfUeContextExists" -> NullableDeref
+  }
+  package "github.com/ubuntu/authd" {
+    mark exact "analysis.function.context" val "function_name:userPreCheck" val "call_path:json.Unmarshal" val "call_path:s.userManager.GenerateUID" val "call_path:s.userManager.GenerateGID" nval "call_path:s.userManager.RegisterUserPreAuth" -> UserIdentityMappingReview
+  }
+  package "github.com/authelia/authelia" {
+    mark "ctx.Error" val "Unable to parse target URL" -> AuthFailureResponseReview
   }
 }

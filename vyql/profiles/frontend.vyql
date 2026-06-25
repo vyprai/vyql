@@ -4,7 +4,9 @@
 // same package, so keep HTTP request entry points active as well.
 profile frontend {
   title: "Frontend / single-page app (browser)"
+  priority: "70"
   detect: ["dep:react", "dep:vue", "dep:@angular/core", "dep:svelte", "dep:preact",
            "file:angular.json", "ext:.jsx", "ext:.tsx", "ext:.vue", "ext:.svelte"]
-  entrypoints: [DomInput, HttpInput, HttpHeader, Cookie, FileUpload, SecretValue]
+  entrypoints: [DomInput, HttpInput, HttpHeader, Cookie, FileUpload, SecretValue, ComputedSizeValue,
+                ArchiveEntryName]
 }

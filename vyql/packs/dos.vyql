@@ -10,6 +10,41 @@ rule ReDoS {
 // Untrusted data matched against a regex pattern with static catastrophic-backtracking
 // structure — ReDoS (CWE-1333).
 rule StaticRegexReDoS {
-  meta { id: "VYQL-DOS-002", severity: medium, cwe: [CWE_1333], confidence_floor: low }
+  meta { id: "VYQL-DOS-002", severity: medium, cwe: [CWE_1333, CWE_400], confidence_floor: low }
   taint core.UserControlledData -> code.RegexMatch
+}
+
+rule StaticCatastrophicRegex {
+  meta { id: "VYQL-DOS-003", severity: medium, cwe: [CWE_1333, CWE_400], confidence_floor: low }
+  match code.CatastrophicRegex as r
+}
+
+rule UnstoppedLimitedStream {
+  meta { id: "VYQL-DOS-004", severity: high, cwe: [CWE_400, CWE_772], confidence_floor: medium }
+  match code.UnstoppedLimitedStream as stream
+}
+
+rule UnboundedReportPeriod {
+  meta { id: "VYQL-DOS-005", severity: high, cwe: [CWE_400], confidence_floor: medium }
+  match code.UnboundedReportPeriod as period
+}
+
+rule LengthDerivedAllocation {
+  meta { id: "VYQL-DOS-006", severity: high, cwe: [CWE_400, CWE_789], confidence_floor: medium }
+  match code.LengthDerivedAllocation as allocation
+}
+
+rule UnboundedDelimiterSplitCount {
+  meta { id: "VYQL-DOS-007", severity: high, cwe: [CWE_400], confidence_floor: medium }
+  match code.UnboundedDelimiterSplitCount as split
+}
+
+rule UnboundedProtocolStateByIdentifier {
+  meta { id: "VYQL-DOS-008", severity: high, cwe: [CWE_400, CWE_770], confidence_floor: medium }
+  match code.UnboundedProtocolStateByIdentifier as state
+}
+
+rule ZeroStepSequenceExpansion {
+  meta { id: "VYQL-DOS-009", severity: high, cwe: [CWE_400], confidence_floor: high }
+  match code.ZeroStepSequenceExpansion as loop
 }

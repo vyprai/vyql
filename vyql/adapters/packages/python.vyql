@@ -1,4 +1,4 @@
-import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile}
+import code.{HttpInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, FilePathAccess, ArchiveEntryWrite, PackageEntryPointScriptWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, DatabaseRead, ProtocolStateReview, UnboundedResourceOperation, RedirectTarget}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter python {
@@ -16,6 +16,15 @@ adapter python {
     control method "login_required" -> AuthenticationCheck
     control method "permission_required" -> AuthorizationCheck
     control "csrf_protect" -> CsrfProtection
+  }
+  package "authentik" {
+    mark exact "analysis.function.context" val "name=__post_init_code" val "self.authorization_code.code_challenge" val "self.code_verifier" val "new_code_challenge!=self.authorization_code.code_challenge" nval "ifnotself.authorization_code.code_challengeandself.code_verifier" -> ProtocolStateReview
+  }
+  package "autobahn" {
+    source path "self.http_request_params.__subscript" -> HttpInput
+    source path "self.http_request_params[].__subscript" -> HttpInput
+    sink method "sendRedirect" -> RedirectTarget
+    sink method "sendServerStatus" -> RedirectTarget
   }
   package "djangorestframework" {
     source "request.query_params" -> HttpInput
@@ -54,6 +63,22 @@ adapter python {
     control "sqlalchemy.text" -> SqlParameterization
     control method "bindparams" -> SqlParameterization
   }
+  package "flask-sqlalchemy" {
+    source path "query.get" -> DatabaseRead
+    source path "query.get_or_404" -> DatabaseRead
+    source path "query.first" -> DatabaseRead
+    source path "query.one" -> DatabaseRead
+    source path "query.one_or_none" -> DatabaseRead
+    source path "query.all" -> DatabaseRead
+  }
+  package "sqlalchemy" {
+    source path "query.get" -> DatabaseRead
+    source path "query.get_or_404" -> DatabaseRead
+    source path "query.first" -> DatabaseRead
+    source path "query.one" -> DatabaseRead
+    source path "query.one_or_none" -> DatabaseRead
+    source path "query.all" -> DatabaseRead
+  }
   package "psycopg2" {
     sink method "execute" -> SqlExecution
   }
@@ -86,6 +111,9 @@ adapter python {
   package "pyyaml" {
     sink path "yaml.load" -> Deserialization
     control "yaml.safe_load" -> SafeDeserialization
+  }
+  package "pip" {
+    mark exact "analysis.function.context" val "PipScriptMaker" val "super().make" val "_raise_for_invalid_entrypoint(specification)" nval "self.target_dir" -> PackageEntryPointScriptWrite
   }
   package "pickle" {
     sink path "pickle.loads" -> Deserialization
@@ -120,6 +148,12 @@ adapter python {
   }
   package "re" {
     sink path "re.compile" -> RegexCompile
+  }
+  package "zlib" {
+    mark path "zlib.decompress" -> UnboundedResourceOperation
+  }
+  package "hyperlink" {
+    control "to_uri.normalize.to_text" -> RedirectAllowlist
   }
   package "builtins" {
     sink path "eval" -> CodeEval

@@ -5,18 +5,26 @@ adapter php {
 
   // superglobals (subscripted) -> HTTP input
   source "$argv" -> code.CliArgument
-  source "http_input" -> code.HttpInput   // synthetic seed (MediaWiki parser-hook user params)
+  source path "analysis.parameter.entry" val "function_param_type:Parser" nval "param_type:Parser" nval "param_type:PPFrame" nval "param_type:OutputPage" nval "param_type:Skin" nval "param_type:Title" nval "param_type:MimeAnalyzer" -> code.HttpInput
+  source path "analysis.parameter.entry" val "function_param_type:PPFrame" nval "param_type:Parser" nval "param_type:PPFrame" nval "param_type:OutputPage" nval "param_type:Skin" nval "param_type:Title" nval "param_type:MimeAnalyzer" -> code.HttpInput
   source "$_GET" -> code.HttpInput
   source "$_POST" -> code.HttpInput
   source "$_REQUEST" -> code.HttpInput
   source "$_COOKIE" -> code.HttpInput
   source "$_FILES" -> code.HttpInput
   source "$_SERVER" -> code.HttpInput
+  source path "Request.post" -> code.HttpInput
+  source path "$request.request.all" -> code.HttpInput
+  source path "$this.metadata" -> code.ArchiveEntryName
+  source method "getNameIndex" -> code.ArchiveEntryName
   // framework request-object accessors (Utopia/Appwrite, Symfony-style): the request URI /
   // query / path are attacker-controlled. Method form → receiver-agnostic.
   source method "getURI" -> code.HttpInput
   source method "getQuery" -> code.HttpInput
   source method "getPathInfo" -> code.HttpInput
+  // Aimeos media uploads must derive the storage path from the uploaded file,
+  // not from an existing item URL controlled through media metadata.
+  source "$item.getUrl" -> code.FileUpload
   // getenv() reading request-controlled CGI vars — untrusted (X-Forwarded-For SQLi/SSRF).
   // val-gated so benign getenv('PATH')/getenv('HOME') stay clean.
   source "getenv" val "HTTP_" -> code.HttpInput
@@ -24,16 +32,72 @@ adapter php {
   source "getenv" val "REQUEST_" -> code.HttpInput
   source "getenv" val "REMOTE_ADDR" -> code.HttpInput
   source "getenv" val "PATH_INFO" -> code.HttpInput
-  mark "security.php.server_port_validation.incomplete" -> code.IncompleteServerPortValidation
-  mark "security.php.session_flash.unescaped" -> code.UnescapedSessionFlash
+  mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "$port<1024" -> code.IncompleteServerPortValidation
+  mark exact "analysis.module.context" val "lang=php" val "connect(" val "is_numeric($port)" val "explode(" val "server" val "1024>$port" -> code.IncompleteServerPortValidation
+  mark exact "analysis.module.context" val "lang=php" val "param('params'" val "unserialize($params" nval "substr" nval "a:" -> code.UnrestrictedRequestParamDeserialization
+  mark exact "analysis.module.context" val "lang=php" val "CHttpRequest::get_Value('period')" val "DateTimeUtil::getLastDaysIntervals($period)" val "getStoredBytes" val "getStoredFiles" nval "array_key_exists" nval "filter_var($period" -> code.UnboundedReportPeriod
+  mark exact "analysis.function.context" val "lang=php" val "Tar" val "extract(" val "manifest" val "file_get_contents" val "unserialize" nval "allowed_classes" -> code.ArchiveManifestDeserialization
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION['info']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"info\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION['message']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"message\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION['flash']" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.function.context" val "lang=php" val "$_SESSION[\"flash\"]" val "$" nval "htmlspecialchars" nval "htmlentities" nval "esc_html" nval "strip_tags" -> code.UnescapedSessionFlash
+  mark exact "analysis.module.context" val "lang=php" val "$GLOBALS[" val "$_GET[" val "$this->_tplVars=$this->_globalVar" nval "htmlspecialchars($_GET" nval "htmlentities($_GET" nval "esc_html($_GET" nval "strip_tags($_GET" -> code.UnescapedRequestGlobalTemplateVar
+  mark exact "analysis.function.context" val "lang=php" val "$this->last_headers" val "$log.=$this->last_headers" val "$result['log']=$log" nval "$log.=htmlentities($this->last_headers" -> code.UnescapedDiagnosticHtml
+  // Review-only access-policy config: nested PHP arrays such as
+  // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]
+  // carry key-path tokens, so broad role grants on sensitive resource groups can
+  // be surfaced without forcing a confirmed authz finding.
+  mark exact "__object_literal" val "locale/site/groups" val "admin" -> code.AccessPolicyReview
+  mark exact "__object_literal" val "locale/language/groups" val "admin" -> code.AccessPolicyReview
+  mark exact "__object_literal" val "locale/currency/groups" val "admin" -> code.AccessPolicyReview
+  // Review-only workflow policy: Aimeos-style digital download access queries must
+  // constrain both ownership and payment status. If the condition array checks the
+  // customer and product attribute but has no order.statuspayment term, surface it
+  // for AI/manual review instead of emitting a confirmed scan finding.
+  mark exact "__object_literal" val "order.customerid" val "order.product.attribute.id" nval "order.statuspayment" -> code.WorkflowPolicyReview
+  // Review-only IDOR policy: Aimeos review deletes must constrain the selected
+  // review ids by the current customer. Missing review.customerid is the
+  // CVE-2024-39319 pattern; the confirmed authz rule remains untouched.
+  mark exact "__object_literal" val "review.id" nval "review.customerid" -> code.IdorPolicyReview
+  // Review-only resource-scope policy: returning authorization/workflow rules for a
+  // file-scoped request should include an access/ownership check for the supplied file.
+  mark exact "analysis.function.context" val "lang=php" val "fileId" val "getRules(" val "return$userRules;" nval "userHasAccessTo" -> code.IdorPolicyReview
+  // Review-only WordPress public endpoint policy: returning post/meta data by a request
+  // selected object id should show either a publish-status gate or a read permission check.
+  mark exact "analysis.function.context" val "lang=php" val "audioigniter_playlist_id" val "get_post(" val "get_post_meta(" val "wp_send_json(" nval "post_status" nval "current_user_can" -> code.IdorPolicyReview
+  // Review-only WordPress/BuddyPress settings policy: submitted blog IDs and default role
+  // slugs that are persisted into group-blog settings need target blog permissions and
+  // role allowlist validation before saving.
+  mark exact "analysis.function.context" val "lang=php" val "groupblog_edit_settings" val "groupblog-blogid" val "groupblog_edit_base_settings" nval "groups_is_user_admin" nval "current_user_can_for_blog" -> code.AccessPolicyReview
+  mark exact "analysis.function.context" val "lang=php" val "bp_groupblog_create_screen_save" val "default-administrator" val "default-moderator" val "default-member" val "groupblog_edit_base_settings" nval "bp_groupblog_is_role_allowed" nval "current_user_can_for_blog" -> code.AccessPolicyReview
+  // Review-only credentialed cloud-resource endpoint: posted credentials used to enumerate
+  // buckets should have an admin/authorization gate before returning JSON.
+  mark exact "analysis.function.context" val "lang=php" val "getRequiredBodyParam" val "loadBucketList" val "asJson" nval "requireAdmin" -> code.CredentialedEndpointReview
+  mark exact "analysis.function.context" val "lang=php" val "getRequiredBodyParam" val "loadContainerList" val "asJson" nval "requireAdmin" -> code.CredentialedEndpointReview
+  mark exact "analysis.function.context" val "lang=php" val "MfaRequiredException" val "redirectToMfaEndpoint" val "!$mfaRequested" val "!$this->isLoggedInBackendUserRequired" -> code.MfaRedirectBypass
+  // Review-only HTML attribute rewrites: string/regex-based lazyload rewrites that splice a
+  // dynamic placeholder into generated image markup should be inspected for attribute breakouts.
+  mark exact "analysis.function.context" val "lang=php" val "autoptimize_filter_imgopt_lazyload_placeholder" val "preg_replace" val "$placeholder" val "data-src" val "data-srcset" -> code.HtmlAttributeRewriteReview
+  mark exact "analysis.function.context" val "lang=php" val "_maliciousFilename" val "strpos(" val "/../" val "../" nval "phar://" -> code.IncompleteArchiveFilenameValidation
+  mark exact "analysis.function.context" val "lang=php" val "name=fileExt" val "decodeContent" val "$file['type']" val "$file['name']" val "in_array($ext,$exts)" nval "pathinfo" nval "PATHINFO_EXTENSION" nval "is_string" -> code.IncompleteFileExtensionValidation
+  // Review-only installer/config entry point: rewriting a live PHP configuration file from
+  // request data should have an install-state or authorization gate before the write.
+  mark exact "analysis.module.context" val "lang=php" val "$_POST['systemRootPath']" val "videos/configuration.php" val "fopen" nval "../videos/configuration.php" -> code.PrivilegedEntryPointReview
+  // SSRF review: public thumbnail helpers that pass a request URL to ffmpeg (`-i`) need
+  // host parsing plus private/internal address rejection, not only URL syntax checks.
+  mark exact "analysis.module.context" val "lang=php" val "base64Url" val "get_ffmpeg()" val "-i" nval "parse_url($url)" nval "ip_is_private" -> code.IncompleteIpDenylist
 
   // SQL — procedural query is arg1 (mysqli_query($link,$sql)); OO is arg0
+  mark exact "analysis.function.context" val "lang=php" val "toLegacyOrderBy" val "toLegacyOrderWay" val "orderBy" nval "isOrderBy" nval "isOrderWay" -> code.UnparameterizedSqlQueryParser
   sink path "mysqli_query" arg 1 -> code.SqlExecution
   sink path "mysqli_real_query" arg 1 -> code.SqlExecution
   sink path "mysqli_multi_query" arg 1 -> code.SqlExecution
   sink path "mysql_query" -> code.SqlExecution
   sink path "pg_query" arg 1 -> code.SqlExecution
   sink path "sqlite_query" -> code.SqlExecution
+  sink path "queryDB" -> code.SqlExecution
   sink method "query" -> code.SqlExecution
   sink method "exec" -> code.SqlExecution
   sink method "prepare" -> code.SqlExecution
@@ -108,6 +172,9 @@ adapter php {
   sink path "Html.rawElement" arg 2 -> code.HtmlRender
   sink path "Html.element" arg 1 -> code.HtmlRender
   sink "wp.list_table.render" -> code.HtmlRender
+  // Stored CMS/page HTML writes. Aimeos text reference items are later rendered as page
+  // content, so writing editor-controlled HTML through the ref item must be sanitized.
+  mark "$refItem.fromArray" -> code.StoredHtmlWrite
 
   // server-side template injection (CWE-1336) — Twig compiles a STRING template
   sink method "createTemplate" -> code.TemplateRender
@@ -116,13 +183,22 @@ adapter php {
   // authorization checks (guards BIZ-001) — Laravel Gate predicates (path-sensitive via B1).
   control "Gate.allows" -> core.AuthorizationCheck
   control "Gate.authorize" -> core.AuthorizationCheck
+  control method "access" -> core.AuthorizationCheck
+  control "current_user_can" -> core.AuthorizationCheck
+  control "current_user_can_for_blog" -> core.AuthorizationCheck
+  control "groups_is_user_admin" -> core.AuthorizationCheck
   control "requireAuth" -> core.AuthenticationCheck
+  control "requireAdmin" -> core.AuthorizationCheck
   control "ensureAuthenticated" -> core.AuthenticationCheck
   control "isAuthenticated" -> core.AuthenticationCheck
+  control "is_user_logged_in" -> core.AuthenticationCheck
   control "auth.check" -> core.AuthenticationCheck
   control "checkOwnership" -> core.OwnershipCheck
   control "requireOwner" -> core.OwnershipCheck
   control "isOwner" -> core.OwnershipCheck
+  control "analysis.function.context" val "customer_id" val "auth()->guard" val "user()->id" -> core.OwnershipCheck
+  control method "userHasAccessTo" -> core.AuthorizationCheck
+  mark exact "analysis.function.context" val "ResetPassword" val "createToken" val "account:login-token" val "absolute: true" val "$email->text" nval "buildBaseUrl" nval "resolveUri" -> code.PasswordRecoveryLinkHostControl
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
   control "esc_html" -> core.HtmlEscape
@@ -131,6 +207,7 @@ adapter php {
   control "wp_kses" -> core.HtmlEscape
   control "wp_kses_post" -> core.HtmlEscape
   control "strip_tags" -> core.HtmlEscape
+  control method "purify" -> core.HtmlEscape
   control "escapeshellarg" -> core.ShellEscape
   control "escapeshellcmd" -> core.ShellEscape
   control "mysqli_real_escape_string" -> core.SqlParameterization
@@ -140,6 +217,8 @@ adapter php {
   // core.PathAccessCheck). Leaving it out lets realpath-without-check traversal surface.
   // control "realpath" -> core.PathCanonicalization
   control "basename" -> core.PathCanonicalization
+  control "in_array" val "$tpl" val "$templates" -> core.PathAccessCheck
+  control method "isBelow" -> core.PathAccessCheck
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "preg_match" -> code.RegexCompile
@@ -149,6 +228,9 @@ adapter php {
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "fill" -> code.MassAssign
   sink method "forceFill" -> code.MassAssign
+  // Review-only: model bulk hydration/update helpers as sensitive because they may bind
+  // security-critical account fields depending on the object type and allowed field list.
+  mark method "fromArray" -> code.SensitiveOperation
   sink method "find" -> code.ObjectLookupByUserInput
   sink method "findOrFail" -> code.ObjectLookupByUserInput
   sink method "findById" -> code.ObjectLookupByUserInput
@@ -172,6 +254,16 @@ adapter php {
   mark method "insert" -> code.StateChangingOp
   mark method "update" -> code.StateChangingOp
   mark method "delete" -> code.StateChangingOp
+  sink method "setFromPost" -> code.StateChangingOp
+  mark exact "analysis.class.context" val "Action" val "deleteBy" val "redirect" nval "assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
+  mark exact "analysis.class.context" val "Action" val "$this->addToCompareList" val "$this->removeFromCompareList" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
+  mark exact "analysis.class.context" val "Action" val "PasswordReset::class" val "->initiateReset" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
+  mark exact "analysis.class.context" val "Action" val "$this->backendUserSessionRepository->terminateSessionByIdentifier" nval "$this->assertAllowedHttpMethod" -> code.MissingHttpMethodAssertion
+  mark exact "analysis.function.context" val "lang=php" val "name=restart" val "delete_option" val "$wpdb->query" val "DELETE FROM" nval "check_admin_referer" nval "wp_verify_nonce" -> code.IncompleteCsrfTokenValidation
+  sink path "queryDB" val "insert into" -> code.StateChangingOp
+  sink path "queryDB" val "replace into" -> code.StateChangingOp
+  sink path "queryDB" val "update " val " set " -> code.StateChangingOp
+  sink path "queryDB" val "delete from" -> code.StateChangingOp
   mark "changePassword" -> code.AuthenticationRequiredOp
   mark "updatePassword" -> code.AuthenticationRequiredOp
   mark "resetPassword" -> code.AuthenticationRequiredOp
@@ -182,8 +274,12 @@ adapter php {
   mark "makeAdmin" -> code.AuthenticationRequiredOp
 
   // CSV injection (CWE-1236) + unrestricted upload (CWE-434)
+  mark exact "analysis.function.context" val "lang=php" val "imagecopyresampled" val "$imgt($new_image,$thumb_path)" val "$imgt($old_image,$source_path)" val "returntrue" nval "===false" nval "return$imgt" -> code.UncheckedUploadedImageProcessing
   sink path "fputcsv" arg 1 collection -> code.CsvCell
   sink path "move_uploaded_file" arg 1 -> code.UnsafeUpload
+  sink path "FileSystem.write" -> code.UnsafeUpload
+  sink path "$this.context.fs.write" -> code.UnsafeUpload
+  sink path "File.write" -> code.FilePathAccess
   sink method "extractTo" arg all -> code.ArchiveEntryWrite
   sink path "ZipArchive.extractTo" arg all -> code.ArchiveEntryWrite
 
@@ -207,6 +303,7 @@ adapter php {
   mark "openssl_encrypt" val "rc2" -> code.WeakCipher
   mark "openssl_encrypt" val "bf-" -> code.WeakCipher
   mark "openssl_encrypt" val "ecb" -> code.WeakCipher
+  mark exact "analysis.function.context" val "lang=php" val "openssl_decrypt" val "VAL_CRYPTO_ALGO" val "base64_decode" val "['tag']" nval "strlen($tag)" -> code.AuthenticatedDecryptionTagReview
   mark "mcrypt_encrypt" val "des" -> code.WeakCipher
   mark "mcrypt_encrypt" val "rc4" -> code.WeakCipher
   mark "openssl_encrypt" val "0000000000000000" -> code.StaticIv
@@ -224,20 +321,32 @@ adapter php {
   // JWT signature not verified (CWE-347) — firebase/php-jwt decode allowing alg "none"
   mark "JWT.decode" val "none" -> code.JwtUnverified
   mark "withoutMiddleware" val "VerifyCsrfToken" -> code.CsrfDisabled
+  control "csrf_token" -> core.CsrfProtection
+  control "validate_csrf_token" -> core.CsrfProtection
+  control "check_csrf_token" -> core.CsrfProtection
+  control "verify_csrf_token" -> core.CsrfProtection
+  control method "isCsrfTokenValid" -> core.CsrfProtection
+  control method "checkToken" -> core.CsrfProtection
+  control "check_admin_referer" -> core.CsrfProtection
+  control "wp_verify_nonce" -> core.CsrfProtection
 
   // TLS cert validation disabled (CWE-295) — curl_setopt_array([CURLOPT_SSL_VERIFYPEER => false])
   mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYPEER=false" -> code.CertValidationDisabled
   mark "curl_setopt_array" val "CURLOPT_SSL_VERIFYHOST=0" -> code.CertValidationDisabled
   mark "chmod" val "0777" -> code.InsecurePermission
   mark "chmod" val "0666" -> code.InsecurePermission
+  // Review-only: private key generation helpers should be followed by restrictive
+  // file permissions; function-context text suppresses this when chmod is present.
+  mark exact "analysis.function.context" val "generateKey" val "keyfile" nval "chmod" -> code.SecretFilePermissionReview
   mark "fopen" val "/tmp/" val "w" -> code.InsecureTempFile
   mark "fopen" -> code.ResourceHandle
   mark "fsockopen" -> code.ResourceHandle
   control "fclose" -> core.ResourceRelease
   // PDF previews can execute embedded script in-browser when streamed/rendered before
   // content scanning. Match only explicit PDF responses and suppress once a scan gate runs.
-  mark "security.php.pdf_preview.unscanned" -> code.UnscannedPdfPreview
-  mark "security.php.variable_variable.unrestricted" -> code.UnrestrictedVariableVariableAssignment
+  mark exact "analysis.function.context" val "lang=php" val "StreamedResponse" val "application/pdf" nval "getResponseByScanStatus" nval "getScanStatus" nval "scan_pdf" -> code.UnscannedPdfPreview
+  mark exact "analysis.module.context" val "lang=php" val "foreach" val "$_GET" val "$$" nval "preg_match" nval "in_array" nval "array_key_exists" -> code.UnrestrictedVariableVariableAssignment
+  mark exact "analysis.function.context" val "lang=php" val "foreach" val "$_GET" val "$$" nval "preg_match" nval "in_array" nval "array_key_exists" -> code.UnrestrictedVariableVariableAssignment
   control method "getScanStatus" -> core.PdfScanCheck
   control "getResponseByScanStatus" -> core.PdfScanCheck
 

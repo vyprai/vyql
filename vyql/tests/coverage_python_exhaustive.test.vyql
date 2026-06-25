@@ -106,6 +106,38 @@ test "python exhaustive: URL allowlist basename and safe archive path suppress f
       archive.extract(path)
   ```
 
+test "python: HTTP_PROXY environment controls urllib3 proxy manager"
+  lang python
+  expect VYQL-RF-001
+  code
+  ```
+  import os
+  import urllib3
+
+  def make_transport():
+      proxy_url = os.environ.get("HTTPS_PROXY", os.environ.get("HTTP_PROXY"))
+      if proxy_url:
+          return urllib3.ProxyManager(proxy_url)
+      return urllib3.PoolManager()
+  ```
+
+test "python: stdlib proxy lookup with bypass check is clean"
+  lang python
+  reject VYQL-RF-001
+  code
+  ```
+  import urllib3
+  from elasticapm.utils import compat
+
+  def make_transport(url):
+      url_parts = compat.urlparse.urlparse(url)
+      proxies = compat.getproxies_environment()
+      proxy_url = proxies.get("https", proxies.get("http", None))
+      if proxy_url and not compat.proxy_bypass_environment(url_parts.netloc):
+          return urllib3.ProxyManager(proxy_url)
+      return urllib3.PoolManager()
+  ```
+
 test "python exhaustive: realpath base plus separator guard suppresses path traversal"
   lang python
   reject VYQL-PATH-001
@@ -118,6 +150,64 @@ test "python exhaustive: realpath base plus separator guard suppresses path trav
       if not (path.startswith(base + os.sep) or path == base):
           raise PermissionError("outside workspace")
       return open(path).read()
+  ```
+
+test "python exhaustive: pathlib relative_to guard suppresses path traversal"
+  lang python
+  reject VYQL-PATH-001
+  code
+  ```
+  from pathlib import Path
+  from fastapi import APIRouter, HTTPException
+
+  router = APIRouter()
+  ROOT = Path("prompts").resolve()
+
+  def safe_prompt_path(filename: str) -> Path:
+      try:
+          resolved = (ROOT / filename).resolve()
+          resolved.relative_to(ROOT)
+      except ValueError:
+          raise HTTPException(status_code=400, detail="invalid filename")
+      return resolved
+
+  @router.get("/{filename}")
+  def get_prompt(filename: str):
+      path = safe_prompt_path(filename)
+      with open(path, "r", encoding="utf-8") as f:
+          return f.read()
+  ```
+
+test "python exhaustive: pathlib parents guard suppresses path traversal"
+  lang python
+  reject VYQL-PATH-001
+  code
+  ```
+  from pathlib import Path
+  from fastapi import HTTPException
+  from fastapi.responses import FileResponse
+
+  @router.get("/static-files/{path:path}/")
+  async def serve_static_files(path):
+      root = "/app/ui/build"
+      static_file_name = "/".join((root, path))
+      if not Path(root) in Path(static_file_name).resolve().parents:
+          raise HTTPException(404)
+      return FileResponse(static_file_name)
+  ```
+
+test "python exhaustive: substring blocklist does not suppress path traversal"
+  lang python
+  expect VYQL-PATH-001
+  expect_evidence VYQL-PATH-001 assumption
+  code
+  ```
+  def handler():
+      bar = request.cookies.get("x", "")
+      if '../' in bar:
+          return "bad"
+      fd = open(f'/data/{bar}', 'rb')
+      return fd
   ```
 
 test "python exhaustive: HTML template header log CSV mass assignment and NoSQL sinks receive taint"

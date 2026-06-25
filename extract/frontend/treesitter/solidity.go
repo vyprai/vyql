@@ -11,10 +11,8 @@ import (
 )
 
 // solConv walks a tree-sitter Solidity CST into NIR. Solidity wraps operands in
-// `expression` nodes (peeled by solUnwrap). A public/external function's
-// parameters are attacker-controllable (model-bound like a web handler), so they
-// are seeded as sources. For a low-level call (to.call/to.transfer) the RECEIVER
-// address is the dangerous value, so it is modeled as arg0.
+// `expression` nodes (peeled by solUnwrap). For a low-level call
+// (to.call/to.transfer) the receiver address is modeled as arg0.
 type solConv struct {
 	src  []byte
 	file string
@@ -74,15 +72,14 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "function_definition", "modifier_definition", "constructor_definition", "fallback_receive_definition":
 		params := c.params(n)
 		body := c.block(c.solBody(n))
-		if c.isPublicFn(n) {
-			var seed []nir.Stmt
-			for _, p := range params {
-				seed = append(seed, nir.Assign{Targets: []string{p},
-					Value: nir.Call{Callee: nir.Name{ID: "http_input", Loc: L}, Path: "http_input", Method: "http_input", Loc: L}})
-			}
-			body = append(seed, body...)
-		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: c.paramTypes(n), Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{
+			Name:         c.text(field(n, "name")),
+			Params:       params,
+			ParamTypes:   c.paramTypes(n),
+			ParamEntries: c.solParamEntries(n, params),
+			Body:         body,
+			Loc:          L,
+		}}
 	case "statement":
 		var out []nir.Stmt
 		for _, ch := range namedChildren(n) {
@@ -140,8 +137,7 @@ func (c *solConv) exprStmt(n *tree_sitter.Node) []nir.Stmt {
 		if left != nil && left.Kind() == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
-		// a member / index target (balances[x] = …, self.owner = …) is a STORAGE write —
-		// emit a markable state_write node (B2 reentrancy: external_call before state_write).
+		// A member/index assignment writes contract storage; emit a markable state-write event.
 		L := c.loc(n)
 		sw := nir.Call{Callee: nir.Name{ID: "state_write", Loc: L}, Path: "state_write", Method: "state_write", Loc: L}
 		return []nir.Stmt{nir.ExprStmt{Value: right}, nir.ExprStmt{Value: sw}}
@@ -267,10 +263,39 @@ func (c *solConv) isPublicFn(n *tree_sitter.Node) bool {
 			return v == "public" || v == "external"
 		}
 	}
-	// fallback/receive and constructors are externally reachable; functions with
-	// no explicit visibility default to public in old Solidity.
+	// fallback/receive and constructors have no visibility child here; functions
+	// with no explicit visibility default to public in old Solidity.
 	k := n.Kind()
 	return k == "fallback_receive_definition" || k == "constructor_definition" || k == "function_definition"
+}
+
+func (c *solConv) solVisibility(n *tree_sitter.Node) string {
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "visibility" {
+			return c.text(ch)
+		}
+	}
+	if c.isPublicFn(n) {
+		return "implicit_public"
+	}
+	return ""
+}
+
+func (c *solConv) solParamEntries(fn *tree_sitter.Node, params []string) []nir.ParamEntry {
+	vis := c.solVisibility(fn)
+	if vis == "" {
+		return nil
+	}
+	var out []nir.ParamEntry
+	for i, p := range params {
+		out = append(out, nir.ParamEntry{Param: p, Tokens: []string{
+			"function_kind:" + fn.Kind(),
+			"function_visibility:" + vis,
+			"param_name:" + p,
+			"param_index:" + itoa(i),
+		}})
+	}
+	return out
 }
 
 func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {

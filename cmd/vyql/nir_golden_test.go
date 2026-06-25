@@ -1,8 +1,8 @@
 package main
 
 // T0.7 (plan/test-coverage-tasklist.md): NIR/USG golden snapshots. For a representative
-// snippet per language, snapshot the lowered structural output (the code.Call/code.Attr
-// callee paths) and assert it stays stable — catching SILENT frontend regressions that no
+// snippet per language, snapshot the lowered structural output (call/attr
+// callee paths) and assert it stays stable — catching silent frontend regressions that no
 // rule spec happens to exercise. Regenerate with VYQL_UPDATE_GOLDEN=1.
 //
 // Goldens are DATA (testdata/golden/<lang>.golden); only this runner is Go.
@@ -19,16 +19,16 @@ import (
 
 // nirGoldenCases: a representative snippet per language exercising source/assign/concat/call.
 var nirGoldenCases = map[string]struct{ ext, code string }{
-	"go":         {".go", "package m\nimport \"net/http\"\nfunc h(r *http.Request) {\n\tx := r.URL.Query().Get(\"q\")\n\tdb.Query(\"SELECT \" + x)\n}\n"},
-	"python":     {".py", "def h():\n    x = request.args.get('q')\n    cursor.execute('SELECT ' + x)\n"},
-	"javascript": {".js", "function h(req) {\n  var x = req.query.q;\n  db.query('SELECT ' + x);\n}\n"},
-	"java":       {".java", "class C {\n  void h(HttpServletRequest r) {\n    String x = r.getParameter(\"q\");\n    st.executeQuery(\"SELECT \" + x);\n  }\n}\n"},
-	"ruby":       {".rb", "def h\n  x = params[:q]\n  conn.execute('SELECT ' + x)\nend\n"},
-	"php":        {".php", "<?php\n$x = $_GET['q'];\nmysqli_query($c, 'SELECT ' . $x);\n"},
-	"rust":       {".rs", "fn h() {\n  let u = std::env::var(\"Q\").unwrap();\n  let _ = std::process::Command::new(\"sh\").arg(u);\n}\n"},
-	"elixir":     {".ex", "defmodule H do\n  def h(conn, params) do\n    name = params[\"q\"]\n    System.cmd(\"sh\", [name])\n  end\nend\n"},
-	"dart":       {".dart", "void h() {\n  var u = Platform.environment[\"Q\"];\n  db.rawQuery(\"SELECT \" + u);\n}\n"},
-	"groovy":     {".groovy", "def h(name) {\n  def b = params.BRANCH\n  sh(\"echo \" + b)\n}\n"},
+	"go":         {".go", "package m\nfunc h(source Source, worker Worker) {\n\tx := source.Value(\"q\")\n\tworker.Run(\"prefix \" + x)\n}\n"},
+	"python":     {".py", "def h(source, worker):\n    x = source.value('q')\n    worker.run('prefix ' + x)\n"},
+	"javascript": {".js", "function h(source, worker) {\n  var x = source.value('q');\n  worker.run('prefix ' + x);\n}\n"},
+	"java":       {".java", "class C {\n  void h(Source source, Worker worker) {\n    String x = source.value(\"q\");\n    worker.run(\"prefix \" + x);\n  }\n}\n"},
+	"ruby":       {".rb", "def h(source, worker)\n  x = source.value('q')\n  worker.run('prefix ' + x)\nend\n"},
+	"php":        {".php", "<?php\nfunction h($source, $worker) {\n  $x = $source->value('q');\n  $worker->run('prefix ' . $x);\n}\n"},
+	"rust":       {".rs", "fn h(source: Source, worker: Worker) {\n  let u = source.value(\"q\");\n  worker.run(format!(\"prefix {}\", u));\n}\n"},
+	"elixir":     {".ex", "defmodule H do\n  def h(source, worker) do\n    name = Source.value(source, \"q\")\n    Worker.run(worker, \"prefix \" <> name)\n  end\nend\n"},
+	"dart":       {".dart", "void h(source, worker) {\n  var u = source.value(\"q\");\n  worker.run(\"prefix \" + u);\n}\n"},
+	"groovy":     {".groovy", "def h(source, worker) {\n  def v = source.value(\"q\")\n  worker.run(\"prefix \" + v)\n}\n"},
 }
 
 func usgStructuralSummary(t *testing.T, ext, code string) string {

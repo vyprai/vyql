@@ -1,4 +1,4 @@
-import code.{HttpInput, DomInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, ProtoPollute, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile}
+import code.{HttpInput, DomInput, ExternalApiResponse, SecretValue, SqlExecution, NosqlQuery, CommandExecution, CodeEval, Deserialization, ProtoPollute, FilePathAccess, ArchiveEntryWrite, UrlFetch, XmlParse, XpathQuery, LdapQuery, HtmlRender, TemplateRender, ResponseHeaderWrite, RegexCompile, ProtocolStateReview}
 import core.{HtmlEscape, SqlParameterization, ShellEscape, PathCanonicalization, XmlHardening, SafeDeserialization, XpathEscape, LdapEscape, RedirectAllowlist, AuthenticationCheck, AuthorizationCheck, CsrfProtection}
 
 adapter javascript {
@@ -19,6 +19,7 @@ adapter javascript {
   }
   package "next" {
     source "searchParams" -> HttpInput
+    mark exact "analysis.function.context" val "name=updateSession" val "request.headers" val "getSessionFromCookie" val "verifyAccessToken" val "newRequestHeaders.set(sessionHeaderName" val "NextResponse.next" nval "newRequestHeaders.delete(sessionHeaderName)" -> ProtocolStateReview
   }
   package "@nestjs/common" {
     source "context.params" -> HttpInput

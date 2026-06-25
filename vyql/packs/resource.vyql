@@ -7,3 +7,9 @@ rule ResourceLeak {
   match code.ResourceHandle as h
   unless closed_by core.ResourceRelease
 }
+
+rule OwnerFieldClearedBeforeFree {
+  meta { id: "VYQL-RES-002", severity: medium, cwe: [CWE_401], confidence_floor: low }
+  match code.OwnerFieldClear as clear
+  where dominates(clear, code.OwnerFree)
+}

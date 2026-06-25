@@ -1,0 +1,67 @@
+test "rank185: AzuraCast password reset email uses request-derived absolute URL"
+  lang php
+  expect VYQL-AUTH-003
+  file ForgotPasswordAction.php
+  code
+  ```
+  <?php
+
+  final readonly class ForgotPasswordAction
+  {
+      public function __invoke(ServerRequest $request, Response $response, array $params): ResponseInterface
+      {
+          $email = $this->mail->createMessage();
+          [$token] = $this->loginTokenRepo->createToken(
+              $user,
+              LoginTokenTypes::ResetPassword,
+              'Self-service password reset'
+          );
+
+          $router = $request->getRouter();
+          $url = $router->named(
+              routeName: 'account:login-token',
+              routeParams: ['token' => $token],
+              absolute: true
+          );
+
+          $email->text($view->render('mail/forgot', ['url' => $url]));
+          $this->mail->send($email);
+      }
+  }
+  ```
+
+test "rank185: AzuraCast password reset email uses configured base URL"
+  lang php
+  reject VYQL-AUTH-003
+  file ForgotPasswordAction.php
+  code
+  ```
+  <?php
+
+  use App\Http\Router;
+
+  final readonly class ForgotPasswordAction
+  {
+      public function __invoke(ServerRequest $request, Response $response, array $params): ResponseInterface
+      {
+          $email = $this->mail->createMessage();
+          [$token] = $this->loginTokenRepo->createToken(
+              $user,
+              LoginTokenTypes::ResetPassword,
+              'Self-service password reset'
+          );
+
+          $router = $request->getRouter();
+          $url = (string)Router::resolveUri(
+              $router->buildBaseUrl(false),
+              $router->named(
+                  routeName: 'account:login-token',
+                  routeParams: ['token' => $token]
+              )
+          );
+
+          $email->text($view->render('mail/forgot', ['url' => $url]));
+          $this->mail->send($email);
+      }
+  }
+  ```

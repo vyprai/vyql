@@ -1,0 +1,51 @@
+test "rank165: Avian FileOutputStream offset plus length bounds check needs overflow review"
+  lang java
+  expect_review code.IntegerSizeArithmetic
+  code
+  ```
+  package java.io;
+
+  public class FileOutputStream extends OutputStream {
+    private int fd;
+    private static native void write(int fd, byte[] b, int offset, int length)
+      throws IOException;
+
+    public void write(byte[] b, int offset, int length) throws IOException {
+      if (b == null) {
+        throw new NullPointerException();
+      }
+
+      if (offset < 0 || offset + length > b.length) {
+        throw new ArrayIndexOutOfBoundsException();
+      }
+
+      write(fd, b, offset, length);
+    }
+  }
+  ```
+
+test "rank165: Avian FileOutputStream non-overflowing range guard is clean"
+  lang java
+  reject_review code.IntegerSizeArithmetic
+  code
+  ```
+  package java.io;
+
+  public class FileOutputStream extends OutputStream {
+    private int fd;
+    private static native void write(int fd, byte[] b, int offset, int length)
+      throws IOException;
+
+    public void write(byte[] b, int offset, int length) throws IOException {
+      if (b == null) {
+        throw new NullPointerException();
+      }
+
+      if (offset < 0 || length < 0 || length > b.length || offset > b.length - length) {
+        throw new ArrayIndexOutOfBoundsException();
+      }
+
+      write(fd, b, offset, length);
+    }
+  }
+  ```

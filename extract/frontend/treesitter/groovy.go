@@ -26,7 +26,8 @@ func ExtractGroovy(files []string, root string) (nir.Program, error) {
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &gvConv{src: src, file: rel, key: moduleKey(root, abs, ".groovy")}
-			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+			body := append(c.gvModuleContext(tree.RootNode()), c.decls(tree.RootNode())...)
+			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
@@ -40,6 +41,22 @@ func (c *gvConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *gvConv) gvModuleContext(n *tree_sitter.Node) []nir.Stmt {
+	loc := c.file + ":1"
+	text := c.text(n)
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=groovy"},
+			nir.Const{Loc: loc, Value: text},
+			nir.Const{Loc: loc, Value: compactNoSpace(text)},
+		},
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
 }
 
 func (c *gvConv) decls(n *tree_sitter.Node) []nir.Stmt {
@@ -73,7 +90,7 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 		body := c.block(lastChildKind(n, "closure"))
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.gvFunctionContext(name, n)}}
 	case "declaration":
 		kids := namedChildren(n)
 		if len(kids) >= 2 && kids[0].Kind() == "identifier" {
@@ -106,6 +123,32 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{c.gvSwitch(n)}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *gvConv) gvFunctionContext(name string, n *tree_sitter.Node) []string {
+	body := lastChildKind(n, "closure")
+	if body == nil {
+		return nil
+	}
+	bodyText := c.text(body)
+	return []string{
+		"lang=groovy\x00name=" + name,
+		bodyText,
+		compactNoSpace(bodyText),
+	}
+}
+
+func compactNoSpace(s string) string {
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		switch r {
+		case ' ', '\t', '\n', '\r':
+			continue
+		default:
+			out = append(out, r)
+		}
+	}
+	return string(out)
 }
 
 func (c *gvConv) block(n *tree_sitter.Node) []nir.Stmt {
@@ -238,15 +281,15 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "identifier":
-		// tree-sitter-groovy parses boolean/null literals as bare identifiers; carry their
-		// value so value-matching marks (setSecure(false) → InsecureCookie) fire.
+		// tree-sitter-groovy parses boolean/null literals as bare identifiers; carry
+		// their value so value-matching marks can inspect them.
 		if t := c.text(n); t == "true" || t == "false" || t == "null" {
 			return nir.Const{Loc: L, Value: t}
 		}
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "number_literal", "integer", "decimal", "float", "boolean", "null",
 		"boolean_literal", "null_literal":
-		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding (setSecure(false))
+		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string", "gstring":
 		var parts []nir.Expr
 		var content string
