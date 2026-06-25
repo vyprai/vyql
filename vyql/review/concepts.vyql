@@ -611,6 +611,12 @@ review code.NextcloudFileDropShareScopeBypass {
   expected: [core.AuthorizationCheck, core.OwnershipCheck]
   text: "review Nextcloud file-drop metadata updates for share-root containment checks before accepting a requested file id"
 }
+review code.AbsoluteUriUserFolderLookup {
+  category: "access_control"
+  kind: "target"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "verify absolute file URI resolvers ignore caller-supplied user components and resolve user folders from the authenticated principal"
+}
 review code.CollectivesPublicTrashMissingEditPermission {
   category: "access_control"
   kind: "attention"

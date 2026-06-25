@@ -2375,6 +2375,15 @@ concept NextcloudFileDropShareScopeBypass : sink {
   review_assumption: "an external share recipient can supply the share token and choose the file id parameter for the public metadata endpoint"
   review_confidence: high
 }
+concept AbsoluteUriUserFolderLookup : sink {
+  vulnerable_to: [access_control.Idor, access_control.IncorrectAuthorization]
+  cwe: [CWE_639, CWE_863]
+  review_category: "access_control"
+  review_condition: "an absolute file URI user component selects the user folder used for a file lookup"
+  review_evidence: "absolute URI resolver {pattern} parses the URI and calls getUserFolder without deriving the user id from the active session"
+  review_assumption: "the absolute URI can originate from a client-controlled path or DAV request and should not authorize access to another principal's folder"
+  review_confidence: high
+}
 concept CollectivesPublicTrashMissingEditPermission : sink {
   vulnerable_to: [access_control.BrokenAccess]
   cwe: [CWE_284]

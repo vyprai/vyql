@@ -981,6 +981,14 @@ adapter php {
     lacks "getFirstNodeById"
     lacks "isEncrypted()"
   }
+  flag code.AbsoluteUriUserFolderLookup in function {
+    lang "php"
+    name contains_any ["AbsoluteUri", "AbsoluteURI", "AbsolutePath"]
+    call path "explode"
+    call path "$this.rootFolder.getUserFolder"
+    not call path "$this.userSession.getUser"
+    not call path "$user.getUID"
+  }
   flag code.CollectivesPublicTrashMissingEditPermission in function {
     lang "php"
     name "index"
