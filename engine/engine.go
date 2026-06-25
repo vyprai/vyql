@@ -984,8 +984,13 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	// connect it to exactly the sinks it covers (path-sensitive: a check in one branch does
 	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free
 	// graphs — those rely on the explicit edge above.
+	guards, _ := e.Store.NodesWithConcept(control)
+	for _, gid := range guards {
+		if gid != sinkID && e.sameFunctionContextGuarded(gid, sinkID) {
+			return true
+		}
+	}
 	if sinkCFG {
-		guards, _ := e.Store.NodesWithConcept(control)
 		for _, gid := range guards {
 			if gid != sinkID && e.hasCFG(gid) && solvers.Dominates(e.Store, gid, sinkID) {
 				return true
@@ -1001,6 +1006,35 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 		return true
 	}
 	return false
+}
+
+func (e *Engine) sameFunctionContextGuarded(guardID, sinkID string) bool {
+	guard, ok1, _ := e.Store.GetNode(guardID)
+	sink, ok2, _ := e.Store.GetNode(sinkID)
+	if !ok1 || !ok2 {
+		return false
+	}
+	if guard.Prop("callee_path") != "analysis.function.context" {
+		return false
+	}
+	return functionScopeKey(guard) != "" && functionScopeKey(guard) == functionScopeKey(sink)
+}
+
+func functionScopeKey(n usg.Node) string {
+	scope := n.Scope
+	if scope == "" {
+		scope = n.Prop("region")
+	}
+	if at := strings.IndexByte(scope, '@'); at >= 0 {
+		scope = scope[:at]
+	}
+	parts := strings.Split(scope, "/")
+	for i, part := range parts {
+		if strings.HasPrefix(part, "fn") {
+			return strings.Join(parts[:i+1], "/")
+		}
+	}
+	return ""
 }
 
 func (e *Engine) sameReceiverXmlFactoryGuarded(sinkID, control string) bool {
