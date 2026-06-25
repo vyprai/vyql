@@ -1,0 +1,42 @@
+# Rank 946 / CVE-2021-21669: Generic Webhook Trigger parsed XPath XML with a
+# DocumentBuilderFactory before disabling DOCTYPE declarations.
+
+test "rank946: document builder factory without doctype hardening"
+  lang java
+  file PostContentParameterResolver.java
+  expect VYQL-DESER-004
+  expect_review code.XmlParserCreate
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.xml.sax.InputSource;
+
+  class PostContentParameterResolver {
+      void resolveXPath(InputSource inputSource) throws Exception {
+          DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          builder.parse(inputSource);
+      }
+  }
+  ```
+
+test "rank946: document builder factory disallows doctype"
+  lang java
+  file PostContentParameterResolver.java
+  reject VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.xml.sax.InputSource;
+
+  class PostContentParameterResolver {
+      void resolveXPath(InputSource inputSource) throws Exception {
+          DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+          factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          builder.parse(inputSource);
+      }
+  }
+  ```
