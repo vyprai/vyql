@@ -1369,6 +1369,16 @@ adapter javascript {
     call path "__js_dynamic_property_write"
     not literal "__proto__"
   }
+  flag code.NestedPathInheritedPropertyPrototypePollution in function {
+    lang "javascript"
+    index "keys.__subscript"
+    index "object.__subscript"
+    expr "nextinobject"
+    call path "__js_dynamic_property_write"
+    not literal "__proto__"
+    not literal "constructor"
+    not literal "prototype"
+  }
   flag code.CoerciblePathSegmentPrototypePollution in function {
     lang "javascript"
     has "path.length-1"

@@ -1,0 +1,59 @@
+test "rank893: forge setPath writes array path segments through inherited keys"
+  lang javascript
+  file util.js
+  expect VYQL-INJ-134
+  expect_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  util.setPath = function(object, keys, value) {
+    if(typeof(object) === 'object' && object !== null) {
+      var i = 0;
+      var len = keys.length;
+      while(i < len) {
+        var next = keys[i++];
+        if(i == len) {
+          object[next] = value;
+        } else {
+          var hasNext = (next in object);
+          if(!hasNext ||
+            (hasNext && typeof(object[next]) !== 'object') ||
+            (hasNext && object[next] === null)) {
+            object[next] = {};
+          }
+          object = object[next];
+        }
+      }
+    }
+  };
+  ```
+
+test "rank893: guarded array path setter rejects prototype segments"
+  lang javascript
+  file util.js
+  reject VYQL-INJ-134
+  reject_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  util.setPath = function(object, keys, value) {
+    if(typeof(object) === 'object' && object !== null) {
+      var i = 0;
+      var len = keys.length;
+      while(i < len) {
+        var next = keys[i++];
+        if(next === '__proto__' || next === 'constructor' || next === 'prototype') {
+          return;
+        }
+        if(i == len) {
+          object[next] = value;
+        } else {
+          if(!Object.prototype.hasOwnProperty.call(object, next) ||
+            typeof(object[next]) !== 'object' ||
+            object[next] === null) {
+            object[next] = {};
+          }
+          object = object[next];
+        }
+      }
+    }
+  };
+  ```
