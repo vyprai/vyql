@@ -2069,12 +2069,43 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 }
 
 func contextTokenValuePredicate(op string, values []string, text string) bool {
+	if op == "equals" || op == "equals_any" {
+		if contextTokenEqualsPredicate(op, values, text) {
+			return true
+		}
+	}
 	if op == "contains" || op == "" || op == "contains_any" {
 		if contextTokenContainsPredicate(op, values, text) {
 			return true
 		}
 	}
 	return valuePredicate(op, values, text)
+}
+
+func contextTokenEqualsPredicate(op string, values []string, text string) bool {
+	if len(values) == 0 {
+		return false
+	}
+	all := op != "equals_any"
+	for _, v := range values {
+		prefix, want, ok := splitContextTokenPredicateValue(v)
+		hit := false
+		if ok {
+			for _, tok := range strings.Split(text, "\x00") {
+				if strings.HasPrefix(tok, prefix) && strings.TrimPrefix(tok, prefix) == want {
+					hit = true
+					break
+				}
+			}
+		}
+		if all && !hit {
+			return false
+		}
+		if !all && hit {
+			return true
+		}
+	}
+	return all
 }
 
 func contextTokenContainsPredicate(op string, values []string, text string) bool {

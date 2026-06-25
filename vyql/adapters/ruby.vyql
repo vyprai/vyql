@@ -228,6 +228,15 @@ adapter ruby {
     has "reset"
     lacks "@persistent_socket_reusable"
   }
+  flag code.UnboundedNaturalLanguageScheduleParse in function {
+    lang "ruby"
+    function equals "parse"
+    call path "s.strip"
+    call path "Parser.parse"
+    call path "opts.merge"
+    call path "slots.to_crons"
+    not call path "s.length"
+  }
   sink path "ERB.new" -> code.TemplateRender
   sink path "Erubi.new" -> code.TemplateRender
   sink path "Erubis.new" -> code.TemplateRender

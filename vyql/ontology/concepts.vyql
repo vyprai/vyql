@@ -421,6 +421,15 @@ concept UnboundedEmailRegexValidation : sink {
   review_assumption: "attackers can submit very long email strings to the validator and consume regex or downstream processing resources"
   review_confidence: high
 }
+concept UnboundedNaturalLanguageScheduleParse : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "natural-language schedule parsing runs an internal grammar parser before bounding input length"
+  review_evidence: "natural-language schedule parse context {pattern} strips caller input, invokes Parser.parse, and converts parser slots to cron schedules without an observed string-length guard"
+  review_assumption: "attackers can pass very long schedule text through the public parser API and consume CPU in the grammar parser"
+  review_confidence: high
+}
 concept OversizedWebsocketPayloadDefault : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400]

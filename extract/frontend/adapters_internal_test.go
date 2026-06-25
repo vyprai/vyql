@@ -1183,6 +1183,43 @@ adapter php {
 	}
 }
 
+func TestContextFlagStructuredTokenEqualsUsesTokenBoundary(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter ruby {
+  flag custom.ExactParse in function {
+    function equals "parse"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context exact-token flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "parse", Type: "code.Call", Props: map[string]string{
+		"loc":         "nat.rb:10",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00function_name:parse",
+	}})
+	store.AddNode(usg.Node{ID: "do-parse", Type: "code.Call", Props: map[string]string{
+		"loc":         "nat.rb:20",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00function_name:do_parse",
+	}})
+	store.AddNode(usg.Node{ID: "parse-cron", Type: "code.Call", Props: map[string]string{
+		"loc":         "nat.rb:30",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00function_name:parse_cron",
+	}})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "parse" {
+		t.Fatalf("context exact-token flag should only match function_name:parse, got %+v", got)
+	}
+}
+
 func TestContextFlagAstPredicatesUseRegionWhenScopeIsEmpty(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter php {

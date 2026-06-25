@@ -1452,6 +1452,12 @@ review code.ZeroLengthRadiusAttributeValueParse {
   expected: [core.InputValidation]
   text: "review RADIUS attribute parsers for zero-length VSA/Tunnel-Password payload checks before value construction"
 }
+review code.UnboundedNaturalLanguageScheduleParse {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review natural-language schedule parsers for an input-length guard before grammar parsing"
+}
 review code.BufReadDiscardLoopWithoutEofGuard {
   category: "resource"
   kind: "target"
