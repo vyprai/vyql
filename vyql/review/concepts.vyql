@@ -1103,6 +1103,12 @@ review code.UnboundedResourceOperation {
   kind: "attention"
   text: "review long-lived resource operation for timeouts, message limits, and cancellation"
 }
+review code.EmptySourceSliceMemoryExpansion {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify empty source slices cannot still expand memory or zero-fill a caller-selected target size"
+}
 review code.ChatterBotSqlalchemySessionPoolExhaustion {
   category: "resource"
   kind: "attention"

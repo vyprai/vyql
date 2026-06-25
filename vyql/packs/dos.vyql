@@ -133,3 +133,8 @@ rule DnsUdpResponseValidationAfterLoop {
   meta { id: "VYQL-DOS-026", severity: high, cwe: [CWE_400, CWE_248], confidence_floor: high }
   match code.DnsUdpResponseValidationAfterLoop as response
 }
+
+rule EmptySourceSliceMemoryExpansion {
+  meta { id: "VYQL-DOS-027", severity: high, cwe: [CWE_400, CWE_770, CWE_789], confidence_floor: high }
+  match code.EmptySourceSliceMemoryExpansion as memory
+}

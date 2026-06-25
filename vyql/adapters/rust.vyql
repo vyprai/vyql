@@ -98,6 +98,15 @@ adapter rust {
     has ".next().await"
     lacks "timeout"
   }
+  flag code.EmptySourceSliceMemoryExpansion in function {
+    lang "rust"
+    name "set"
+    has "lettarget_size=target_size.unwrap_or(value.len());"
+    has "self.data.resize(offset+target_size,0)"
+    has "forindexin0..target_size"
+    has "value.len()>index"
+    lacks "value.is_empty()"
+  }
   flag code.ConduitHyperUnboundedBodyToBytes in function {
     lang "rust"
     name "blocking_handler"

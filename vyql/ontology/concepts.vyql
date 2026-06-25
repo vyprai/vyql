@@ -2409,6 +2409,15 @@ concept UnboundedResourceOperation : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_772]
 }
+concept EmptySourceSliceMemoryExpansion : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770, CWE_789]
+  review_category: "resource"
+  review_condition: "an empty source slice can still drive target-size memory expansion and zero-fill writes"
+  review_evidence: "memory setter context {pattern} unwraps a caller-supplied target size, resizes storage, and loops over the target size without an empty-source guard"
+  review_assumption: "callers can request a large target size while the selected source slice is empty"
+  review_confidence: high
+}
 concept BlockingReadInAcceptLoop : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_667]
