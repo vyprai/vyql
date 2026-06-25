@@ -307,6 +307,13 @@ adapter php {
     lacks "$internalname=htmlspecialchars($internalname)"
     lacks "$internalname=esc_html($internalname)"
   }
+  flag code.PhpWindowOpenerCallbackNameXss in module {
+    lang "php"
+    call path "echo"
+    literal contains_any ["window.opener.", "typeofwindow.opener."]
+    assign contains_any ["$func=$_GET", "$func=@$_GET", "$func=(isset($_GET['func']))?$_GET['func']"]
+    not assign contains "$func=var_out"
+  }
   flag code.BbcodeUrlTagProtocolXss in function {
     lang "php"
     call "preg_replace"

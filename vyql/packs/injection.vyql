@@ -277,6 +277,11 @@ rule Xss {
   unless guarded_by core.SafeResponseContentType
 }
 
+rule PhpWindowOpenerCallbackNameXss {
+  meta { id: "VYQL-INJ-190", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.PhpWindowOpenerCallbackNameXss as sink
+}
+
 rule ErbHrefInterpolationHtmlEscapeMissing {
   meta { id: "VYQL-INJ-185", severity: high, cwe: [CWE_79, CWE_116], confidence_floor: high }
   match code.ErbHrefInterpolationHtmlEscapeMissing as sink

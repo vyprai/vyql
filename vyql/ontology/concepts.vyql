@@ -3979,6 +3979,15 @@ concept HtmlRender : sink {
   cwe: [CWE_79]
   excluded_chars: "<>&\"'"
 }
+concept PhpWindowOpenerCallbackNameXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "PHP file-browser callback name from request data is emitted into a window.opener JavaScript property access"
+  review_evidence: "PHP module context {pattern} assigns func from $_GET and renders window.opener.<func> without var_out or an equivalent JavaScript-safe identifier escape"
+  review_assumption: "the file-browser endpoint is reachable by an authenticated user and the callback name parameter can contain JavaScript metacharacters"
+  review_confidence: high
+}
 concept ErbHrefInterpolationHtmlEscapeMissing : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79, CWE_116]

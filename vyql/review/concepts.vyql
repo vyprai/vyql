@@ -1799,6 +1799,12 @@ review code.IncompleteHtmlEntityEscape {
   expected: [core.HtmlEscape]
   text: "review strip_tags-only or partial entity escaping before browser-rendered HTML output"
 }
+review code.PhpWindowOpenerCallbackNameXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "verify request-controlled callback names rendered into window.opener JavaScript are escaped or restricted to safe identifiers"
+}
 review code.StoredHtmlWrite {
   category: "xss"
   kind: "attention"
