@@ -2080,6 +2080,15 @@ concept OAuthReauthenticationUserMismatch : sink {
   review_assumption: "an attacker can complete the OAuth verification step with a different valid OAuth-linked account while operating a stale victim session"
   review_confidence: high
 }
+concept UnanchoredOAuthEmailRegexAuthBypass : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, authentication.AuthenticationBypass, validation.ImproperInputValidation]
+  cwe: [CWE_287, CWE_184]
+  review_category: "auth"
+  review_condition: "OAuth callback email authorization uses prefix regex matching against configured auth patterns instead of exact or full-string matching"
+  review_evidence: "OAuth email authorization call {pattern} uses re.match with the configured auth pattern and an email-like identity operand"
+  review_assumption: "configured auth patterns may be literal emails or domains where prefix regex matching lets attacker-controlled suffixes pass authorization"
+  review_confidence: high
+}
 concept MissingGuestFallbackForWebAuth : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]

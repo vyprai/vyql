@@ -1052,7 +1052,16 @@ func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
 		}
 		return nir.Seq{Parts: parts, Loc: loc}
 	}
-	out := c.expr(body)
+	parts := []nir.Expr{c.expr(body)}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "if_clause" {
+			parts = append(parts, c.expr(ch))
+		}
+	}
+	var out nir.Expr = parts[0]
+	if len(parts) > 1 {
+		out = nir.Seq{Parts: parts, Loc: loc}
+	}
 	for _, ch := range namedChildren(n) {
 		if ch.Kind() != "for_in_clause" {
 			continue

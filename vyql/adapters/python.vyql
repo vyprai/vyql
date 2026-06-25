@@ -570,6 +570,15 @@ adapter python {
       "current_user.id==user.id",
     ]
   }
+  flag code.UnanchoredOAuthEmailRegexAuthBypass on call {
+    path "re.match"
+    operand {
+      path "self.application.options.auth"
+    }
+    operand {
+      key contains_any ["email", "mail"]
+    }
+  }
   flag code.SnsCertificateUrlTrustBypass in function {
     name "_get_cert_url"
     has "SigningCertURL"

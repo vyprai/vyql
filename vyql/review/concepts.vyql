@@ -167,6 +167,12 @@ review code.OAuthReauthenticationUserMismatch {
   expected: [core.AuthenticationCheck]
   text: "verify OAuth reauthentication callbacks require the OAuth-resolved user to match the current authenticated user before refreshing session freshness"
 }
+review code.UnanchoredOAuthEmailRegexAuthBypass {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.InputValidation]
+  text: "verify OAuth email authorization uses exact or full-string matching instead of prefix regex matching"
+}
 review code.MissingGuestFallbackForWebAuth {
   category: "auth"
   kind: "attention"

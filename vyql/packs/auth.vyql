@@ -249,6 +249,11 @@ rule OAuthReauthenticationUserMismatch {
   match code.OAuthReauthenticationUserMismatch as auth
 }
 
+rule UnanchoredOAuthEmailRegexAuthBypass {
+  meta { id: "VYQL-AUTH-063", severity: high, cwe: [CWE_287, CWE_184], confidence_floor: high }
+  match code.UnanchoredOAuthEmailRegexAuthBypass as auth
+}
+
 rule JobOutputEventUpdateAuthorizationBypass {
   meta { id: "VYQL-AUTH-030", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.JobOutputEventUpdateAuthorizationBypass as handler
