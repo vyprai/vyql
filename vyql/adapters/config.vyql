@@ -39,7 +39,8 @@ adapter config {
       "pest|dangerous_url = { \"data:\" ~ !(\"image/\"|analysis.config.comrak_dangerous_url_case_sensitive"
     ],
     config_file_contains_all_events: [
-      "yaml|analysis.config.github_actions.privileged_pr_framework_execution|pull_request_target;;git show \"$PR_SHA:$file\" > \"$file\";;python manage.py makemigrations"
+      "yaml|analysis.config.github_actions.privileged_pr_framework_execution|pull_request_target;;git show \"$PR_SHA:$file\" > \"$file\";;python manage.py makemigrations",
+      "schematron|analysis.config.schematron_link_href_case_sensitive_script_denylist|xlink:href;;contains(@*[name()='xlink:href'];;javascript:;;vbscript:"
     ],
     config_line_exact_compact_events: [
       "yaml|- ipykernel|analysis.config.python.jupyter_kernel_dependency_unbounded",
@@ -194,6 +195,9 @@ adapter config {
   }
   flag code.ComrakDangerousUrlCaseSensitiveGrammar on any {
     path "analysis.config.comrak_dangerous_url_case_sensitive"
+  }
+  flag code.SchematronLinkHrefUnsafeSchemeDenylist on any {
+    path "analysis.config.schematron_link_href_case_sensitive_script_denylist"
   }
   flag code.ExternalLinkReferrerLeak on any {
     path "analysis.config.html.external_link_missing_noreferrer"

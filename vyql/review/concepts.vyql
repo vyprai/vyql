@@ -1458,6 +1458,12 @@ review code.ComrakDangerousUrlCaseSensitiveGrammar {
   expected: [core.InputValidation]
   text: "review Comrak dangerous URL grammar for case-insensitive blocking of data:, javascript:, vbscript:, and file: schemes"
 }
+review code.SchematronLinkHrefUnsafeSchemeDenylist {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Schematron xlink:href validation for lowercased safe-scheme allowlisting and dangerous character rejection"
+}
 review code.CentreonMyAccountContactXss {
   category: "xss"
   kind: "attention"

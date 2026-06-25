@@ -768,6 +768,11 @@ rule FlarumTranslatorRawStringParameterXss {
   match code.FlarumTranslatorRawStringParameterXss as sink
 }
 
+rule SchematronLinkHrefUnsafeSchemeDenylist {
+  meta { id: "VYQL-INJ-169", severity: high, cwe: [CWE_79, CWE_178], confidence_floor: high }
+  match code.SchematronLinkHrefUnsafeSchemeDenylist as sink
+}
+
 rule RailsRawTranslationHtmlInterpolationXss {
   meta { id: "VYQL-INJ-148", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.RailsRawTranslationHtmlInterpolationXss as sink

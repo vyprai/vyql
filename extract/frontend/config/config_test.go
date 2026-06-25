@@ -51,3 +51,35 @@ func TestJellyTemplateAliasesJSetInputVariables(t *testing.T) {
 		t.Fatalf("jelly input count = %d, want 1; nodes=%#v", inputCount, nodes)
 	}
 }
+
+func TestSchematronLinkHrefDenylistSignature(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "docbook.iso.sch")
+	src := []byte(`<s:schema xmlns:s="http://purl.oclc.org/dsdl/schematron">
+  <s:rule context="db:link">
+    <s:assert test="not(contains(@*[name()='xlink:href'], 'javascript:') or contains(@*[name()='xlink:href'], 'vbscript:'))">using scripts in links is not allowed</s:assert>
+  </s:rule>
+</s:schema>
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Prop("callee_path") == "analysis.config.schematron_link_href_case_sensitive_script_denylist" {
+			return
+		}
+	}
+	t.Fatalf("schematron signature event not emitted; nodes=%#v", nodes)
+}

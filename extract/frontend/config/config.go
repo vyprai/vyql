@@ -51,6 +51,8 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanSetupCfg(src, rel)
 		case k == "pest":
 			body = scanPest(src, rel)
+		case k == "schematron":
+			body = scanSchematron(src, rel)
 		case k == "concretephp":
 			body = scanConcretePHP(src, rel)
 		case k == "jelly":
@@ -112,6 +114,9 @@ func kind(path string, src []byte) string {
 	}
 	if ext == ".pest" {
 		return "pest"
+	}
+	if ext == ".sch" {
+		return "schematron"
 	}
 	if ext == ".php" {
 		slashPath := filepath.ToSlash(strings.ToLower(path))
@@ -181,6 +186,21 @@ func scanConcretePHP(src []byte, file string) []nir.Stmt {
 			continue
 		}
 		out = append(out, scopedContainsEvents(cfg, "concretephp", line, file, i+1)...)
+	}
+	return out
+}
+
+func scanSchematron(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	text := string(src)
+	var out []nir.Stmt
+	out = append(out, scopedFileContainsAllEvents(cfg, "schematron", text, file)...)
+	for i, raw := range strings.Split(text, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "schematron", line, file, i+1)...)
 	}
 	return out
 }

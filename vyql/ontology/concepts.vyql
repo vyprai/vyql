@@ -3457,6 +3457,15 @@ concept ComrakDangerousUrlCaseSensitiveGrammar : sink {
   review_assumption: "rendered Markdown links can carry mixed-case unsafe schemes such as Data: or Javascript: into HTML output"
   review_confidence: high
 }
+concept SchematronLinkHrefUnsafeSchemeDenylist : sink {
+  vulnerable_to: [injection.Xss, validation.ImproperInputValidation]
+  cwe: [CWE_79, CWE_178]
+  review_category: "xss"
+  review_condition: "Schematron link href validation uses a case-sensitive unsafe-scheme denylist"
+  review_evidence: "Schematron context {pattern} checks xlink:href with contains(..., javascript:/vbscript:) instead of lowercasing and allowlisting safe schemes"
+  review_assumption: "rich-text or XML link href values can be author-controlled and later rendered as browser links"
+  review_confidence: high
+}
 concept JenkinsPluginForkedDirectoryBrowserWithoutCsp : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
