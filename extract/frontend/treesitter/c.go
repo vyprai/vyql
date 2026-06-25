@@ -256,6 +256,17 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			return
 		}
 		switch n.Kind() {
+		case "case_statement":
+			if lv := field(n, "value"); lv != nil {
+				if label := atom(lv); label != "" {
+					add("switch_case:" + label)
+				}
+			} else {
+				add("switch_default")
+				for _, call := range c.ccCallPaths(n) {
+					add("switch_default_call:" + call)
+				}
+			}
 		case "call_expression":
 			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
 				add("call_path:" + path)
@@ -299,6 +310,28 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 		case "string_literal", "concatenated_string", "raw_string_literal":
 			if lit := strings.Trim(cStringText(c.text(n)), "\""); lit != "" {
 				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *ccConv) ccCallPaths(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "call_expression" {
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" && !seen[path] {
+				seen[path] = true
+				out = append(out, path)
 			}
 		}
 		for _, ch := range namedChildren(n) {

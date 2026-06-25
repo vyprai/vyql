@@ -151,6 +151,62 @@ static void merge_param(HashTable *params, zval *zdata) {
 	t.Fatalf("merge_param function not extracted: %#v", prog.Modules[0].Body)
 }
 
+func TestCPPFunctionContextIncludesSwitchCaseAndDefaultCallTokens(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "switch.cpp")
+	src := []byte(`
+bool parse(int tag, XDR* xdrs) {
+  switch (tag) {
+  case isc_arg_number:
+  default:
+    if (!xdr_long(xdrs, &tag))
+      goto brk;
+    break;
+  }
+brk:
+  return false;
+}
+
+bool fixed(int tag, XDR* xdrs) {
+  switch (tag) {
+  case isc_arg_number:
+    if (!xdr_long(xdrs, &tag))
+      goto brk;
+    break;
+  default:
+    goto brk;
+  }
+brk:
+  return false;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractCPP([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parseTokens := cFuncContextTokens(prog.Modules[0].Body, "parse")
+	for _, want := range []string{
+		"switch_case:isc_arg_number",
+		"switch_default",
+		"switch_default_call:xdr_long",
+	} {
+		if !strings.Contains(parseTokens, want) {
+			t.Fatalf("parse context missing %q; context=%q", want, parseTokens)
+		}
+	}
+	fixedTokens := cFuncContextTokens(prog.Modules[0].Body, "fixed")
+	if !strings.Contains(fixedTokens, "switch_case:isc_arg_number") || !strings.Contains(fixedTokens, "switch_default") {
+		t.Fatalf("fixed context missing switch case/default tokens; context=%q", fixedTokens)
+	}
+	if strings.Contains(fixedTokens, "switch_default_call:xdr_long") {
+		t.Fatalf("fixed default should not call xdr_long; context=%q", fixedTokens)
+	}
+}
+
 func TestCZeroCountLastIndexObservationRequiresNonZeroGuard(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "frames.c")
@@ -198,6 +254,16 @@ func hasCFuncCall(stmts []nir.Stmt, funcName, method string) bool {
 		return hasCStmtCall(fn.Body, method)
 	}
 	return false
+}
+
+func cFuncContextTokens(stmts []nir.Stmt, funcName string) string {
+	for _, st := range stmts {
+		fn, ok := st.(nir.FuncDef)
+		if ok && fn.Name == funcName {
+			return strings.Join(fn.ContextTokens, "\x00")
+		}
+	}
+	return ""
 }
 
 func cFuncHasAnalysisToken(stmts []nir.Stmt, funcName, path, token string) bool {

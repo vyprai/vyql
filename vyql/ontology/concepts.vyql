@@ -2777,6 +2777,15 @@ concept ProtocolListAmplification : sink {
   review_assumption: "a remote peer can send zero-sized list metadata with a very large element count and force per-element iteration"
   review_confidence: medium
 }
+concept ProtocolStatusVectorUnknownArgumentFallback : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_228, CWE_248, CWE_400]
+  review_category: "resource"
+  review_condition: "a protocol status-vector decoder falls back to consuming an additional scalar for unknown argument tags instead of rejecting malformed tags"
+  review_evidence: "status-vector parser context {pattern} decodes scalar and string argument forms and pushes decoded status entries without enumerating all supported numeric argument tags"
+  review_assumption: "a remote peer can send a crafted status-vector packet containing an unsupported argument tag such as cstring and trigger malformed decoding or crash handling"
+  review_confidence: high
+}
 concept DnsUdpResponseValidationAfterLoop : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_248]

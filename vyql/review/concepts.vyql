@@ -1310,6 +1310,12 @@ review code.ProtocolListAmplification {
   kind: "attention"
   text: "review zero-sized protocol list readers for traversal-budget amplification checks"
 }
+review code.ProtocolStatusVectorUnknownArgumentFallback {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review protocol status-vector decoders for fail-closed handling of unknown argument tags"
+}
 review code.UnboundedAllocationReview {
   category: "resource"
   kind: "attention"
