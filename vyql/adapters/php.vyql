@@ -92,6 +92,14 @@ adapter php {
     not token subscript "$u['homedir']"
     not token subscript "$u['role']"
   }
+  flag code.ShareLinkDeletionMissingAuthGuard in function {
+    lang "php"
+    name contains_any ["deleteShare", "removeShare", "revokeShare"]
+    token subscript contains_any ["$_POST['token']", "$_REQUEST['token']"]
+    call path contains_any ["deleteShareLink", "deleteSharedLink", "removeShareLink", "revokeShareLink"]
+    not call contains_any ["checkCsrf", "verifyCsrf", "validateCsrf", "check_admin_referer", "wp_verify_nonce"]
+    not call contains_any ["requireAuth", "checkAuth", "requireLogin", "isAuthenticated", "authorize", "requireAdmin"]
+  }
   flag code.UnvalidatedNumericSqlInterpolation in class {
     lang "php"
     has "getMessageParam('iid'"

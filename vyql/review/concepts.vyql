@@ -239,6 +239,12 @@ review code.SessionHashMissingAuthorizationState {
   expected: [core.AuthorizationCheck]
   text: "verify session validity hashes include mutable authorization state such as role, permissions, and home directory"
 }
+review code.ShareLinkDeletionMissingAuthGuard {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck, core.CsrfProtection]
+  text: "verify share-link deletion endpoints require an authenticated authorized caller and CSRF protection before deleting token-selected links"
+}
 review code.ShopwareStoreApiManyToManyCriteriaBypass {
   category: "access_control"
   kind: "attention"

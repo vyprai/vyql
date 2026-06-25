@@ -109,6 +109,11 @@ rule SessionHashMissingAuthorizationState {
   match code.SessionHashMissingAuthorizationState as session
 }
 
+rule ShareLinkDeletionMissingAuthGuard {
+  meta { id: "VYQL-AUTH-059", severity: critical, cwe: [CWE_306, CWE_352, CWE_862], confidence_floor: high }
+  match code.ShareLinkDeletionMissingAuthGuard as endpoint
+}
+
 rule ExpiredCachedAuthTokenReuse {
   meta { id: "VYQL-AUTH-043", severity: medium, cwe: [CWE_613], confidence_floor: high }
   match code.ExpiredCachedAuthTokenReuse as cache
