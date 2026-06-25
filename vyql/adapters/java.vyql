@@ -684,6 +684,14 @@ adapter java {
     not call "checkPermission"
     not call "hasPermission"
   }
+  flag code.JenkinsRemoteValidationMissingPermission in function {
+    function "doTestConnection"
+    call path contains_any ["getClient", "buildClient", "testConnection"]
+    call path contains_any ["getCurrentUser", "getProjects", "getSystemProfiles", "testConnection"]
+    token identifier contains_any ["url", "host", "endpoint", "apiTokenId", "credentialsId", "clientBuilderId", "ignoreCertificateErrors"]
+    not call "checkPermission"
+    not call "hasPermission"
+  }
   flag code.JenkinsRemoteValidationMissingPostPermission in function {
     function "doTest"
     call "testConnection"
