@@ -303,17 +303,22 @@ func (c *csConv) csFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	loc := c.loc(fn)
+	name := c.text(field(fn, "name"))
 	text := c.text(body)
 	path := "analysis.function.context"
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=csharp"},
+		nir.Const{Loc: loc, Value: "name=" + name},
+		nir.Const{Loc: loc, Value: "function_name:" + name},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: csCompactText(text)},
+	}
+	for _, tok := range c.csStructuredContextTokens(fn, name) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=csharp"},
-			nir.Const{Loc: loc, Value: "name=" + c.text(field(fn, "name"))},
-			nir.Const{Loc: loc, Value: "function_name:" + c.text(field(fn, "name"))},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: csCompactText(text)},
-		},
+		Args:   args,
 		Path:   path,
 		Method: "context",
 		Loc:    loc,
@@ -322,6 +327,158 @@ func (c *csConv) csFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 
 func csCompactText(s string) string {
 	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
+}
+
+func (c *csConv) csStructuredContextTokens(fn *tree_sitter.Node, name string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	if name != "" {
+		add("function_name:" + name)
+	}
+	if params := field(fn, "parameters"); params != nil {
+		for i, p := range c.params(params) {
+			if p == "" || p == "_" {
+				continue
+			}
+			add("param_name:" + p)
+			add("param_index:" + itoa(i))
+			if typ := c.paramTypes(params)[p]; typ != "" {
+				add("param_type:" + typ)
+				if short := lastSeg(typ); short != "" && short != typ {
+					add("param_type:" + short)
+				}
+			}
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment_expression":
+			left, right := field(n, "left"), field(n, "right")
+			if lhs := c.csContextPath(left); lhs != "" {
+				if rhs := csContextValue(c.text(right)); rhs != "" {
+					add("assign:" + lhs + "=" + rhs)
+				}
+				if right != nil && right.Kind() == "invocation_expression" {
+					if path := c.dotted(field(right, "function")); path != "" && path != "?" {
+						add("assign_call:" + lhs + ":" + path)
+					}
+				}
+			}
+		case "local_declaration_statement":
+			for _, ch := range namedChildren(n) {
+				if ch.Kind() != "variable_declaration" {
+					continue
+				}
+				for _, d := range namedChildren(ch) {
+					if d.Kind() != "variable_declarator" {
+						continue
+					}
+					lhs := c.csContextPath(field(d, "name"))
+					right := c.declaratorValue(d)
+					if lhs == "" || right == nil {
+						continue
+					}
+					if rhs := csContextValue(c.text(right)); rhs != "" {
+						add("assign:" + lhs + "=" + rhs)
+					}
+					if right.Kind() == "invocation_expression" {
+						if path := c.dotted(field(right, "function")); path != "" && path != "?" {
+							add("assign_call:" + lhs + ":" + path)
+						}
+					}
+				}
+			}
+		case "invocation_expression":
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+			}
+		case "object_creation_expression":
+			if typ := c.text(field(n, "type")); typ != "" {
+				add("call_path:" + typ)
+				add("call:" + lastSeg(typ))
+			}
+		case "member_access_expression":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "identifier":
+			if ident := csContextCompact(c.text(n)); ident != "" {
+				add("identifier:" + ident)
+			}
+		case "element_access_expression":
+			if idx := c.dotted(n); idx != "" && idx != "?" {
+				add("index:" + idx)
+			}
+			if base := c.dotted(field(n, "expression")); base != "" && base != "?" {
+				add("index_base:" + base)
+			}
+			if key := c.csContextPath(field(n, "subscript")); key != "" {
+				add("index_key:" + key)
+			}
+		case "binary_expression":
+			if expr := csContextCompact(c.text(n)); expr != "" {
+				add("expr:" + expr)
+			}
+		case "string_literal", "verbatim_string_literal", "raw_string_literal", "integer_literal", "real_literal", "character_literal", "boolean_literal", "null_literal":
+			if lit := csContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	body := field(fn, "body")
+	if body == nil {
+		body = fn
+	}
+	walk(body)
+	return out
+}
+
+func (c *csConv) csContextPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if p := c.dotted(n); p != "" && p != "?" {
+		return p
+	}
+	return csContextValue(c.text(n))
+}
+
+func csContextValue(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 2 {
+		if q := s[0]; (q == '\'' || q == '"' || q == '`') && s[len(s)-1] == q {
+			s = s[1 : len(s)-1]
+		}
+	}
+	if strings.HasPrefix(s, "@\"") && strings.HasSuffix(s, "\"") && len(s) >= 3 {
+		s = s[2 : len(s)-1]
+	}
+	return csContextCompact(s)
+}
+
+func csContextCompact(raw string) string {
+	s := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	if len(s) > 160 {
+		return ""
+	}
+	return s
 }
 
 func (c *csConv) declaratorValue(d *tree_sitter.Node) *tree_sitter.Node {

@@ -122,6 +122,17 @@ adapter csharp {
     lacks "StartsWith(path.RootVolume.RootDirectory"
   }
   sink path "ExtractToFile" -> code.ArchiveEntryWrite
+  flag code.UnsanitizedSvgUpload in function {
+    lang "csharp"
+    name "Create"
+    param name "fileContent"
+    param type "Stream"
+    call path contains_any ["Upload", "UploadAsync", "Save", "SaveAsync", "Write", "WriteAsync", "CopyTo"]
+    selector contains_any ["file.Name", "file.NormalizedName", "file.ContentType", "file.Extension"]
+    token identifier contains_any ["fileContent", "FileService"]
+    not call path contains_any ["SanitizeSvg", "sanitizeSvg", "svgSanitize", "XmlReader.Create", "XDocument.Load", "HtmlSanitizer"]
+    not token identifier contains_any ["SanitizeSvg", "sanitizeSvg", "svgSanitize", "HtmlSanitizer"]
+  }
 
   // SSRF
   sink method "DownloadString" -> code.UrlFetch
