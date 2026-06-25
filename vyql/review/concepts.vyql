@@ -527,6 +527,12 @@ review code.DesktopProtocolRedirectWithoutAllowlist {
   expected: [core.RedirectAllowlist, core.InputValidation]
   text: "review desktop deep-link redirects for an explicit trusted protocol allowlist before assigning window.location"
 }
+review code.GitPackSignatureSearchParsingBypass {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Git push pack parsers for packet-line offset parsing and PACK signature validation instead of searching the request body for PACK bytes"
+}
 review code.WebViewServerRedirectUrlValidationBypass {
   category: "xss"
   kind: "target"

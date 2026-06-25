@@ -776,6 +776,14 @@ adapter javascript {
     literal contains_any ["clone${repository}", "clone${remote}", "clone${url}"]
     not literal contains_any ["--${repository}", "--${remote}", "--${url}"]
   }
+  flag code.GitPackSignatureSearchParsingBypass in function {
+    call path contains_any ["?.lastIndexOf", "req.body.lastIndexOf"]
+    literal "PACK"
+    call path contains_any ["?.slice", "req.body.slice"]
+    call path "getPackMeta"
+    not token identifier "packDataOffset"
+    not literal "PACK_SIGNATURE"
+  }
   flag code.GitDirShellCommandStringExecution in class {
     lang "javascript"
     call path "child_process.exec"

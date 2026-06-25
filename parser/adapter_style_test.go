@@ -197,6 +197,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 		"code.ExternalSettingTokenSyncUrlExposure":      true,
 		"code.BrowserPostExportMissingOriginGuard":      true,
 		"code.UrlPathParameterCaseNormalizationBypass":  true,
+		"code.GitPackSignatureSearchParsingBypass":      true,
 	}
 
 	var hits []string

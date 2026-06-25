@@ -77,3 +77,8 @@ rule DnsInterfaceNewlineValidationMissing {
   meta { id: "VYQL-VAL-015", severity: high, cwe: [CWE_20, CWE_74], confidence_floor: high }
   match code.DnsInterfaceNewlineValidationMissing as config
 }
+
+rule GitPackSignatureSearchParsingBypass {
+  meta { id: "VYQL-VAL-016", severity: high, cwe: [CWE_20, CWE_115], confidence_floor: high }
+  match code.GitPackSignatureSearchParsingBypass as parser
+}

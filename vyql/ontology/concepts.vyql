@@ -1279,6 +1279,15 @@ concept DnsInterfaceNewlineValidationMissing : sink {
   review_assumption: "the interface setting can be written through configuration input and later rendered into dnsmasq or resolver configuration"
   review_confidence: high
 }
+concept GitPackSignatureSearchParsingBypass : sink {
+  vulnerable_to: [validation.ImproperInputValidation, injection.ProtocolStateConfusion]
+  cwe: [CWE_20, CWE_115]
+  review_category: "input_validation"
+  review_condition: "Git smart-push pack parsing locates PACK bytes by searching the request body instead of deriving the pack offset from packet-line framing"
+  review_evidence: "Git pack parser context {pattern} searches req.body for PACK and slices at that offset before getPackMeta"
+  review_assumption: "a pusher can place PACK bytes in later commit or blob content so policy checks parse the wrong pack data"
+  review_confidence: high
+}
 concept RegexLineCommentStripWithoutCharWhitelist : sink {
   vulnerable_to: [validation.ImproperInputValidation]
   cwe: [CWE_20]
