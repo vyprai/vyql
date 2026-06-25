@@ -1909,6 +1909,12 @@ review code.PermissiveCors {
   kind: "attention"
   text: "review permissive CORS configuration and restrict allowed origins to trusted domains"
 }
+review code.WebSocketUpgradeMissingOriginCheck {
+  category: "request"
+  kind: "target"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "review WebSocket upgrade handlers for trusted Origin validation before handleUpgrade"
+}
 review code.CallFutureRawWeakStateRef {
   category: "resource"
   kind: "attention"

@@ -233,6 +233,14 @@ adapter javascript {
     lacks "CORS_ENABLED:false"
     lacks "CORS_ORIGIN:false"
   }
+  flag code.WebSocketUpgradeMissingOriginCheck in class {
+    lang "javascript"
+    token prop "noServer=true"
+    call "handleUpgrade"
+    call "bind"
+    token literal "sec-websocket-protocol"
+    lacks "origin"
+  }
   flag code.IncompleteHtmlEventHandlerStrip in module {
     lang "javascript"
     has "ViewSource"
