@@ -334,6 +334,7 @@ func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *jvConv) tryStmt(n *tree_sitter.Node) nir.Try {
 	var body []nir.Stmt
+	var resourceNames []string
 	var handlers [][]nir.Stmt
 	var handlerParams []string
 	var finally []nir.Stmt
@@ -342,6 +343,7 @@ func (c *jvConv) tryStmt(n *tree_sitter.Node) nir.Try {
 		switch ch.Kind() {
 		case "resource_specification":
 			body = append(body, c.collectBlocks(ch)...)
+			resourceNames = append(resourceNames, c.resourceNames(ch)...)
 		case "block":
 			if !bodySeen {
 				body = append(body, c.block(ch)...)
@@ -357,7 +359,40 @@ func (c *jvConv) tryStmt(n *tree_sitter.Node) nir.Try {
 	if !bodySeen && len(body) == 0 {
 		body = c.collectBlocks(n)
 	}
+	for _, name := range resourceNames {
+		body = append(body, c.implicitClose(name, c.loc(n)))
+	}
 	return nir.Try{Body: body, Handlers: handlers, HandlerParams: handlerParams, Finally: finally, Loc: c.loc(n)}
+}
+
+func (c *jvConv) resourceNames(n *tree_sitter.Node) []string {
+	var names []string
+	var walk func(*tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil {
+			return
+		}
+		if m.Kind() == "resource" {
+			if nm := field(m, "name"); nm != nil {
+				names = append(names, c.text(nm))
+			}
+			return
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return names
+}
+
+func (c *jvConv) implicitClose(name, loc string) nir.Stmt {
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Attr{Base: nir.Name{ID: name, Loc: loc}, Attr: "close", Path: name + ".close", Loc: loc},
+		Path:   name + ".close",
+		Method: "close",
+		Loc:    loc,
+	}}
 }
 
 func (c *jvConv) catchParam(n *tree_sitter.Node) string {

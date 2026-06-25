@@ -987,6 +987,18 @@ adapter java {
     path "Files.setPosixFilePermissions"
     has "OTHERS_WRITE"
   }
+  flag code.InsecurePermission in function {
+    function "createTempFile"
+    call path "File.createTempFile"
+    not call path "setReadable"
+    not call path "Files.setPosixFilePermissions"
+  }
+  flag code.InsecurePermission in function {
+    function "createTempFile"
+    call path "File.createTempFile"
+    not call path "setWritable"
+    not call path "Files.setPosixFilePermissions"
+  }
   flag code.InsecureTempFile on any {
     path "Files.createFile"
     has "/tmp/"
