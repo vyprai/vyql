@@ -70,6 +70,7 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 			body := []nir.Stmt{c.ccModuleContext(tree.RootNode())}
 			body = append(body, c.decls(tree.RootNode())...)
 			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
+			body = append(body, c.ccReallocFailureInputFreeObservations(tree.RootNode())...)
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -114,6 +115,7 @@ func (c *ccConv) ccModuleContext(root *tree_sitter.Node) nir.Stmt {
 var (
 	ccNewAssignRe = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\b`)
 	ccDeleteRe    = regexp.MustCompile(`delete\s*(?:\[\]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*;`)
+	ccReallocRe   = regexp.MustCompile(`\brealloc\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,`)
 )
 
 func (c *ccConv) ccLifetimeReleaseReturnObservations(root *tree_sitter.Node) []nir.Stmt {
@@ -159,6 +161,60 @@ func (c *ccConv) ccLifetimeReleaseReturnObservations(root *tree_sitter.Node) []n
 					},
 					Path:   path,
 					Method: "release_then_return",
+					Loc:    loc,
+				}})
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *ccConv) ccReallocFailureInputFreeObservations(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "function_definition" {
+			text := c.text(n)
+			for _, m := range ccReallocRe.FindAllStringSubmatchIndex(text, -1) {
+				if len(m) < 4 {
+					continue
+				}
+				ptr := text[m[2]:m[3]]
+				tail := text[m[1]:]
+				freeRe := regexp.MustCompile(`\bfree\s*\(\s*` + regexp.QuoteMeta(ptr) + `\s*\)\s*;`)
+				freeLoc := freeRe.FindStringIndex(tail)
+				if freeLoc == nil {
+					continue
+				}
+				afterFree := tail[freeLoc[1]:]
+				if !strings.Contains(afterFree, "return nullptr") &&
+					!strings.Contains(afterFree, "return NULL") &&
+					!strings.Contains(afterFree, "return 0") {
+					continue
+				}
+				loc := c.locAt(n, text, m[1]+freeLoc[0])
+				if seen[loc] {
+					continue
+				}
+				seen[loc] = true
+				path := "analysis.lifetime.realloc_failure_input_free"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Args: []nir.Expr{
+						nir.Const{Loc: loc, Value: "allocator=realloc"},
+						nir.Const{Loc: loc, Value: "release=free"},
+						nir.Const{Loc: loc, Value: "return=null"},
+					},
+					Path:   path,
+					Method: "realloc_failure_input_free",
 					Loc:    loc,
 				}})
 			}

@@ -1575,6 +1575,15 @@ concept ConditionalFallbackListDoubleFree : sink {
   review_assumption: "the list pointer remains in scope after the successful fallback path and the common cleanup frees it again"
   review_confidence: high
 }
+concept ReallocFailurePathInputFree : sink {
+  vulnerable_to: [memory.DoubleFree]
+  cwe: [CWE_415]
+  review_category: "memory"
+  review_condition: "a realloc wrapper frees the input pointer on the failure path before returning null"
+  review_evidence: "reallocation wrapper context {pattern} calls realloc on the owned pointer and also frees a pointer before returning null"
+  review_assumption: "the caller follows realloc semantics and may still own or release the original pointer when the wrapper returns null"
+  review_confidence: high
+}
 concept ReentrantQueueCleanupReview : sink {
   vulnerable_to: [memory.DoubleFree, memory.UseAfterFree]
   cwe: [CWE_415, CWE_416]

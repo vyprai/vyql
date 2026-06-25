@@ -82,6 +82,12 @@ adapter cpp {
   flag code.ZeroSizeReallocation on any {
     path "reallocarray"
   }
+  flag code.ReallocFailurePathInputFree on any {
+    path "analysis.lifetime.realloc_failure_input_free"
+    fact allocator "realloc"
+    fact release "free"
+    fact return "null"
+  }
   flag code.StackAllocationSmell on any {
     path "alloca"
   }

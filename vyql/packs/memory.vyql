@@ -183,6 +183,11 @@ rule ConditionalFallbackListDoubleFree {
   match code.ConditionalFallbackListDoubleFree as free
 }
 
+rule ReallocFailurePathInputFree {
+  meta { id: "VYQL-MEM-049", severity: high, cwe: [CWE_415], confidence_floor: high }
+  match code.ReallocFailurePathInputFree as free
+}
+
 rule ReentrantQueueCleanup {
   meta { id: "VYQL-MEM-019", severity: high, cwe: [CWE_415, CWE_416], confidence_floor: medium }
   match code.ReentrantQueueCleanupReview as cleanup

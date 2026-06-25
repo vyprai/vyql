@@ -2817,6 +2817,12 @@ review code.ConditionalFallbackListDoubleFree {
   expected: [core.ResourceRelease]
   text: "review fallback error paths that free a parsed list before a successful fallback can continue into shared cleanup"
 }
+review code.ReallocFailurePathInputFree {
+  category: "memory"
+  kind: "target"
+  expected: [core.ResourceRelease]
+  text: "verify realloc failure paths preserve caller ownership of the original pointer instead of freeing it before returning null"
+}
 review code.PointerFree {
   category: "memory"
   kind: "attention"
