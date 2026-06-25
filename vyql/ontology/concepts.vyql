@@ -4751,6 +4751,15 @@ concept RequestPathPercentSLogInjection : sink {
   review_assumption: "request paths can contain encoded control characters or terminal/log separators supplied by remote clients"
   review_confidence: high
 }
+concept TextAccessLogDefaultFormatInjection : sink {
+  vulnerable_to: [injection.LogInjection]
+  cwe: [CWE_117, CWE_150]
+  review_category: "injection"
+  review_condition: "a proxy access-log translator defaults to text formatting instead of structured JSON formatting"
+  review_evidence: "access-log translator context {pattern} constructs a default text-format access log, allowing request-derived log fields to be rendered without JSON escaping"
+  review_assumption: "generated access logs include request headers or paths supplied by remote clients and are consumed as structured log records"
+  review_confidence: high
+}
 concept LogWrite : sink {
   vulnerable_to: [secrets.SecretLeak]
   enabled_by: [taint.SecretValue]

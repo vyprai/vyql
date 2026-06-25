@@ -705,6 +705,11 @@ rule RequestPathPercentSLogInjection {
   match code.RequestPathPercentSLogInjection as diagnostic
 }
 
+rule TextAccessLogDefaultFormatInjection {
+  meta { id: "VYQL-INJ-184", severity: medium, cwe: [CWE_117, CWE_150], confidence_floor: high }
+  match code.TextAccessLogDefaultFormatInjection as diagnostic
+}
+
 rule HttpResponseSplitting {
   meta { id: "VYQL-INJ-010", severity: medium, cwe: [CWE_113] }
   taint core.UserControlledData -> code.ResponseHeaderWrite

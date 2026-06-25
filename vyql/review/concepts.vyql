@@ -2176,6 +2176,12 @@ review code.RequestPathPercentSLogInjection {
   expected: [core.OutputEncoding]
   text: "review request-path diagnostic logging for repr-style escaping or explicit control-character neutralization"
 }
+review code.TextAccessLogDefaultFormatInjection {
+  category: "injection"
+  kind: "target"
+  expected: [core.OutputEncoding]
+  text: "verify proxy access-log defaults use structured JSON formatting or equivalent JSON escaping for request-derived fields"
+}
 review code.VerboseHttpClientAuthorizationLog {
   category: "secret"
   kind: "attention"
