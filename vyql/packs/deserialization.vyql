@@ -94,3 +94,8 @@ rule PickleUnsafeImportBlocklistGap {
   meta { id: "VYQL-DESER-017", severity: high, cwe: [CWE_184, CWE_502], confidence_floor: high }
   match code.PickleUnsafeImportBlocklistGap as analyzer
 }
+
+rule PickleLoadsJoblibModelLoader {
+  meta { id: "VYQL-DESER-018", severity: high, cwe: [CWE_502], confidence_floor: high }
+  match code.PickleLoadsJoblibModelLoader as loader
+}

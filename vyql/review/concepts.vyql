@@ -314,6 +314,12 @@ review code.PickleUnsafeImportBlocklistGap {
   expected: [core.SafeDeserialization]
   text: "verify pickle safety analyzers blocklist dangerous import modules such as ctypes and pydoc before trusting analysis results"
 }
+review code.PickleLoadsJoblibModelLoader {
+  category: "deserialization"
+  kind: "target"
+  expected: [core.SafeDeserialization]
+  text: "verify model-loading helpers do not pass joblib-loaded artifacts into pickle.loads unless artifacts are strictly trusted or loaded with a restricted unpickler"
+}
 review code.UncheckedPrototypeConfigKey {
   category: "prototype_pollution"
   kind: "attention"

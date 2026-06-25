@@ -676,6 +676,13 @@ adapter python {
   sink path "joblib.load" -> code.Deserialization
   sink path "numpy.load" -> code.Deserialization
   sink path "pandas.read_pickle" -> code.Deserialization
+  flag code.PickleLoadsJoblibModelLoader in function {
+    function contains_any ["load", "load_model", "from_pretrained", "restore"]
+    call path "pickle.loads"
+    call path "joblib.load"
+    not call path "RestrictedUnpickler"
+    not call path "safe_load"
+  }
   flag code.RequestSelectedDeserializationFormat in function {
     name "api_endpoint"
     has "request.headers.get"

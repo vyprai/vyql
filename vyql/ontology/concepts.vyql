@@ -3248,6 +3248,15 @@ concept UnsafeYamlLoad : sink {
   vulnerable_to: [deserialization.DeserializationAbuse]
   cwe: [CWE_502]
 }
+concept PickleLoadsJoblibModelLoader : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse]
+  cwe: [CWE_502]
+  review_category: "deserialization"
+  review_condition: "a model-loading helper feeds data from joblib.load into pickle.loads without a restricted unpickler"
+  review_evidence: "model loader context {pattern} calls pickle.loads on joblib-loaded data"
+  review_assumption: "the model file path or artifact can be supplied from an untrusted or semi-trusted source"
+  review_confidence: high
+}
 concept UnrestrictedRequestParamDeserialization : sink {
   vulnerable_to: [deserialization.DeserializationAbuse]
   cwe: [CWE_502]
