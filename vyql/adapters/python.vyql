@@ -932,6 +932,17 @@ adapter python {
     lacks "absreal(os.path.join(path_base,self.vpath[5:]))"
     lacks "static_path.startswith(path_base)"
   }
+  flag code.PublicUploadChunkPathTraversal in function {
+    lang "python"
+    name contains_any ["Chunk", "chunk"]
+    literal contains_any ["/api/uploadChunked/public", "/uploadChunked/public"]
+    call path "request.form.get"
+    literal "checkSum"
+    call path "os.path.join"
+    call path "open"
+    not call path "re.sub"
+    not call path "os.path.realpath.startswith"
+  }
   flag code.InternalServiceUrlPathTraversal in function {
     name "_prepare_request"
     has "plugin_daemon_inner_api_baseurl"

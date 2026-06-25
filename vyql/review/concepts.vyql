@@ -1976,6 +1976,12 @@ review code.CopypartyCprStaticPathTraversal {
   expected: [core.PathAccessCheck]
   text: "review copyparty /.cpr static file serving for canonical containment under the embedded web directory"
 }
+review code.PublicUploadChunkPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review public chunk-upload temp path construction for checksum sanitization and realpath containment before append writes"
+}
 review code.TempPathJoinBeforeSeparatorCheck {
   category: "path"
   kind: "attention"

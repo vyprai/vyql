@@ -3414,6 +3414,15 @@ concept CopypartyCprStaticPathTraversal : sink {
   review_assumption: "unauthenticated clients can request /.cpr paths containing traversal components"
   review_confidence: high
 }
+concept PublicUploadChunkPathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "public chunk-upload handlers join a request checksum into a temporary file path before writes without sanitization or canonical containment"
+  review_evidence: "public upload chunk context {pattern} reads a checksum-like form field, joins it into a temp path, and opens the path before a sanitizer or realpath containment check"
+  review_assumption: "unauthenticated or public upload callers can supply checksum values containing traversal components"
+  review_confidence: high
+}
 concept AssemblyLoadPathTraversal : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]

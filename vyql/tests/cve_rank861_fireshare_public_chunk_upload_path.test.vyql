@@ -1,0 +1,57 @@
+# Rank 861 / CVE-2026-34745: Fireshare public chunked upload used a
+# caller-provided checksum in the temporary upload path without sanitizing it.
+
+test "rank861: Python public chunk upload writes checksum path without traversal guard"
+  lang python
+  file api.py
+  expect VYQL-PATH-046
+  expect_review code.PublicUploadChunkPathTraversal
+  code
+  ```
+  import os
+  from flask import request, Response
+
+  @api.route('/api/uploadChunked/public', methods=['POST'])
+  def public_upload_videoChunked():
+      blob = request.files.get('blob')
+      chunkPart = int(request.form.get('chunkPart'))
+      totalChunks = int(request.form.get('totalChunks'))
+      checkSum = request.form.get('checkSum')
+      filename = secure_filename(blob.filename)
+      filetype = filename.split('.')[-1]
+      upload_directory = paths['video'] / upload_folder
+      tempPath = os.path.join(upload_directory, f"{checkSum}.{filetype}")
+      with open(tempPath, 'ab') as f:
+          f.write(blob.read())
+      return Response(status=202)
+  ```
+
+test "rank861: Python public chunk upload sanitizes checksum and confines path"
+  lang python
+  file api.py
+  reject VYQL-PATH-046
+  reject_review code.PublicUploadChunkPathTraversal
+  code
+  ```
+  import os
+  import re
+  from flask import request, Response
+
+  @api.route('/api/uploadChunked/public', methods=['POST'])
+  def public_upload_videoChunked():
+      blob = request.files.get('blob')
+      chunkPart = int(request.form.get('chunkPart'))
+      totalChunks = int(request.form.get('totalChunks'))
+      checkSum = re.sub(r'[^a-zA-Z0-9_-]', '', request.form.get('checkSum'))
+      if not checkSum:
+          return Response(status=400)
+      filename = secure_filename(blob.filename)
+      filetype = filename.split('.')[-1]
+      upload_directory = paths['video'] / upload_folder
+      tempPath = os.path.join(upload_directory, f"{checkSum}.{filetype}")
+      if not os.path.realpath(tempPath).startswith(os.path.realpath(upload_directory) + os.sep):
+          return Response(status=400)
+      with open(tempPath, 'ab') as f:
+          f.write(blob.read())
+      return Response(status=202)
+  ```

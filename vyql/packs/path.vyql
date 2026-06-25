@@ -232,3 +232,8 @@ rule LockFileCreateMissingNoFollow {
   meta { id: "VYQL-PATH-045", severity: high, cwe: [CWE_59, CWE_367], confidence_floor: medium }
   match code.LockFileCreateMissingNoFollow as sink
 }
+
+rule PublicUploadChunkPathTraversal {
+  meta { id: "VYQL-PATH-046", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.PublicUploadChunkPathTraversal as sink
+}
