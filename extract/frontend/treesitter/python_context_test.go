@@ -70,6 +70,11 @@ func TestPythonModuleContextIncludesStructuredTokens(t *testing.T) {
 
 with open("/var/feast/feature_store.yaml") as f:
     feast_config = yaml.load(f, Loader=yaml.Loader)
+
+viewer_scopes = [
+    CLIENT_READ,
+    CONFIG_READ,
+]
 `)
 	if err := os.WriteFile(path, src, 0o600); err != nil {
 		t.Fatal(err)
@@ -96,6 +101,8 @@ with open("/var/feast/feature_store.yaml") as f:
 			"function_name:module",
 			"assign:feast_config=yaml.load(f,Loader=yaml.Loader)",
 			"assign_call:feast_config:yaml.load",
+			"assign_item:viewer_scopes:CLIENT_READ",
+			"assign_item:viewer_scopes:CONFIG_READ",
 			"call_path:yaml.load",
 			"selector:yaml.Loader",
 			"literal:/var/feast/feature_store.yaml",

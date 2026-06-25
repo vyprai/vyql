@@ -605,6 +605,9 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 				if rhs := pyContextValue(c.text(right)); rhs != "" {
 					add("assign:" + lhs + "=" + rhs)
 				}
+				for _, item := range c.pyContextAssignmentItems(right) {
+					add("assign_item:" + lhs + ":" + item)
+				}
 				if right != nil && right.Kind() == "call" {
 					if path := c.dotted(field(right, "function")); path != "" && path != "?" {
 						add("assign_call:" + lhs + ":" + path)
@@ -650,6 +653,29 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 		body = fn
 	}
 	walk(body)
+	return out
+}
+
+func (c *pyConv) pyContextAssignmentItems(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	switch n.Kind() {
+	case "list", "tuple", "set":
+	default:
+		return nil
+	}
+	var out []string
+	for _, ch := range namedChildren(n) {
+		item := c.pyContextPath(ch)
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+		if len(out) >= 64 {
+			break
+		}
+	}
 	return out
 }
 

@@ -719,7 +719,7 @@ review code.OverbroadRolePermissionGrant {
   category: "auth"
   kind: "target"
   expected: [core.AuthorizationCheck]
-  text: "review non-admin role permission tables for backup, restore, or privileged operation grants"
+  text: "review non-admin or read-only role permission tables for configuration, backup, restore, or other privileged operation grants"
 }
 review code.RefererBasedAdminUserCreation {
   category: "auth"

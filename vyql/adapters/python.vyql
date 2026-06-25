@@ -357,6 +357,18 @@ adapter python {
     lacks "has_permission"
     lacks "permission_required"
   }
+  flag code.OverbroadRolePermissionGrant in module {
+    lang "python"
+    token assign_item contains_any [
+      "viewer_scopes:CONFIG_READ",
+      "viewer_scopes:CONFIG_UPDATE",
+      "viewer_scopes:ADMIN",
+      "read_only_scopes:CONFIG_READ",
+      "read_only_scopes:CONFIG_UPDATE",
+      "guest_scopes:CONFIG_READ",
+      "public_scopes:CONFIG_READ"
+    ]
+  }
   control method "check_ownership" -> core.OwnershipCheck
   control method "require_owner" -> core.OwnershipCheck
   control method "is_owner" -> core.OwnershipCheck
