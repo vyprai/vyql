@@ -2164,6 +2164,12 @@ review code.PointerOffsetBoundsCheck {
   kind: "attention"
   text: "review pointer-plus-length bounds comparisons; compare the length to remaining buffer size before advancing the pointer"
 }
+review code.PointerAddOverflowAllocation {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review allocator pointer-plus-size arithmetic for wraparound checks before committing or returning the advanced pointer"
+}
 review code.OffsetLengthBoundsOverflow {
   category: "numeric"
   kind: "attention"

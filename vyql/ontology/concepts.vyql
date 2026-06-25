@@ -1613,6 +1613,15 @@ concept PointerOffsetBoundsCheck : sink {
   review_assumption: "a malformed serialized length can move the pointer outside the valid buffer before the check"
   review_confidence: medium
 }
+concept PointerAddOverflowAllocation : sink {
+  vulnerable_to: [memory.IntegerOverflow, memory.OobWrite]
+  cwe: [CWE_190, CWE_787]
+  review_category: "memory"
+  review_condition: "allocator end pointer is computed with pointer-plus-size before checking for addition wraparound"
+  review_evidence: "allocator context {pattern} computes end = start + size and checks only the upper bound before returning or committing the advanced pointer"
+  review_assumption: "a caller-controlled or model-controlled allocation size can wrap the end pointer below the aligned start"
+  review_confidence: high
+}
 concept OffsetLengthBoundsOverflow : sink {
   vulnerable_to: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
   cwe: [CWE_190, CWE_125]

@@ -108,6 +108,11 @@ rule DhcpOptionLengthUncheckedRead {
   match code.DhcpOptionLengthUncheckedRead as parser
 }
 
+rule PointerAddOverflowAllocation {
+  meta { id: "VYQL-MEM-038", severity: high, cwe: [CWE_190, CWE_787], confidence_floor: high }
+  match code.PointerAddOverflowAllocation as alloc
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse

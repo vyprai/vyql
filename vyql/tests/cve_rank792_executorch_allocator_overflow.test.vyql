@@ -1,0 +1,64 @@
+# Rank 792 / CVE-2025-30404: ExecuTorch MemoryAllocator computed end = start + size
+# and only checked end > end_, missing pointer wraparound when size overflowed.
+
+test "rank792: allocator pointer addition checks only upper bound"
+  lang cpp
+  file memory_allocator.h
+  expect VYQL-MEM-038
+  expect_review code.PointerAddOverflowAllocation
+  code
+  ```
+  class MemoryAllocator {
+   public:
+    virtual void* allocate(size_t size, size_t alignment = kDefaultAlignment) {
+      if (!isPowerOf2(alignment)) {
+        return nullptr;
+      }
+
+      uint8_t* start = alignPointer(cur_, alignment);
+      uint8_t* end = start + size;
+
+      if (end > end_) {
+        return nullptr;
+      }
+
+      cur_ = end;
+      return static_cast<void*>(start);
+    }
+
+   private:
+    uint8_t* const end_;
+    uint8_t* cur_;
+  };
+  ```
+
+test "rank792: allocator pointer addition checks wraparound"
+  lang cpp
+  file memory_allocator.h
+  reject VYQL-MEM-038
+  reject_review code.PointerAddOverflowAllocation
+  code
+  ```
+  class MemoryAllocator {
+   public:
+    virtual void* allocate(size_t size, size_t alignment = kDefaultAlignment) {
+      if (!isPowerOf2(alignment)) {
+        return nullptr;
+      }
+
+      uint8_t* start = alignPointer(cur_, alignment);
+      uint8_t* end = start + size;
+
+      if (end > end_ || end < start) {
+        return nullptr;
+      }
+
+      cur_ = end;
+      return static_cast<void*>(start);
+    }
+
+   private:
+    uint8_t* const end_;
+    uint8_t* cur_;
+  };
+  ```
