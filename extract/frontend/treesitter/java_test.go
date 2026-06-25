@@ -141,6 +141,60 @@ class PackagePrivateChecksum {
 	}
 }
 
+func TestJavaFunctionContextIncludesReturnTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ResultName.java")
+	src := []byte(`public class ResultName {
+  private String name;
+  public String getName() {
+    return hudson.Util.escape(name);
+  }
+}
+class RawResultName {
+  private String name;
+  public String getName() {
+    return name;
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawEscaped, sawRaw bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "class_name:ResultName") &&
+			strings.Contains(args, "function_name:getName") &&
+			strings.Contains(args, "return_call_path:hudson.Util.escape") &&
+			strings.Contains(args, "return_identifier:name") {
+			sawEscaped = true
+		}
+		if strings.Contains(args, "class_name:RawResultName") &&
+			strings.Contains(args, "function_name:getName") &&
+			strings.Contains(args, "return_identifier:name") &&
+			!strings.Contains(args, "return_call_path:hudson.Util.escape") {
+			sawRaw = true
+		}
+	}
+	if !sawEscaped || !sawRaw {
+		t.Fatalf("function context did not include return tokens; escaped=%v raw=%v nodes=%#v", sawEscaped, sawRaw, nodes)
+	}
+}
+
 func TestJavaThreadLocalLifecycleContextTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "RequestScopedCache.java")

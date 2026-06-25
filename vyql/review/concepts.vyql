@@ -1571,6 +1571,12 @@ review code.JenkinsProjectDisplayNameXss {
   expected: [core.HtmlEscape]
   text: "review Jenkins project display names for HTML escaping before graph or UI rendering"
 }
+review code.JenkinsTestResultNameXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Jenkins test result getName accessors for hudson.Util.escape or equivalent HTML escaping"
+}
 review code.PrestaShopContactformMessageEmailXss {
   category: "xss"
   kind: "attention"

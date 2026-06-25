@@ -310,6 +310,17 @@ adapter java {
     not call path "StringEscapeUtils.escapeHtml"
     not call path "Util.escape"
   }
+  flag code.JenkinsTestResultNameXss in function {
+    function "getName"
+    class base "TestResult"
+    token return_identifier "name"
+    not token return_call_path contains_any [
+      "hudson.Util.escape",
+      "Util.escape",
+      "StringEscapeUtils.escapeHtml",
+      "StringEscapeUtils.escapeHtml4"
+    ]
+  }
   flag code.JenkinsPluginForkedDirectoryBrowserWithoutCsp on any {
     path exact "DirectoryBrowserSupport"
     has "Compare Html Report"
@@ -948,6 +959,8 @@ adapter java {
   control method "escapeHtml4" -> core.HtmlEscape
   control method "escapeHtml3" -> core.HtmlEscape
   control method "htmlEscape" -> core.HtmlEscape
+  control "hudson.Util.escape" -> core.HtmlEscape
+  control "Util.escape" -> core.HtmlEscape
 
   // format string (CWE-134) — tainted FORMAT argument
   sink path "String.format" arg 0 -> code.FormatString

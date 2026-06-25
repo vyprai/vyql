@@ -624,12 +624,52 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 		}
 	}
 	prevCall := ""
+	var addReturnTokens func(*tree_sitter.Node)
+	addReturnTokens = func(ret *tree_sitter.Node) {
+		kids := namedChildren(ret)
+		if len(kids) == 0 {
+			return
+		}
+		expr := kids[0]
+		if tok := javaExprToken(c.text(expr)); tok != "" {
+			add("return_expr:" + tok)
+		}
+		var walkExpr func(*tree_sitter.Node)
+		walkExpr = func(x *tree_sitter.Node) {
+			if x == nil {
+				return
+			}
+			switch x.Kind() {
+			case "method_invocation":
+				if p := c.dotted(x); p != "" && p != "?" {
+					add("return_call_path:" + p)
+				}
+				if nm := c.text(field(x, "name")); nm != "" {
+					add("return_call:" + nm)
+				}
+			case "identifier":
+				if ident := c.text(x); ident != "" {
+					add("return_identifier:" + ident)
+				}
+			case "field_access":
+				if p := c.dotted(x); p != "" && p != "?" {
+					add("return_selector:" + p)
+				}
+			}
+			for _, ch := range namedChildren(x) {
+				walkExpr(ch)
+			}
+		}
+		walkExpr(expr)
+	}
 	var walk func(*tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		if m == nil || len(out) >= 512 {
 			return
 		}
 		switch m.Kind() {
+		case "return_statement":
+			addReturnTokens(m)
 		case "method_invocation":
 			if p := c.dotted(m); p != "" && p != "?" {
 				if prevCall != "" {

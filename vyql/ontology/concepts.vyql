@@ -4049,6 +4049,15 @@ concept JenkinsProjectDisplayNameXss : sink {
   review_assumption: "job or folder display names can include attacker-controlled HTML that is rendered by the plugin UI"
   review_confidence: high
 }
+concept JenkinsTestResultNameXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "Jenkins test-result names are returned from UI-facing getName accessors without HTML escaping"
+  review_evidence: "Jenkins TestResult name context {pattern} returns the stored name field before hudson.Util.escape or equivalent HTML escaping"
+  review_assumption: "test result names can be influenced by build or report input and later rendered by Jenkins test result UI routes"
+  review_confidence: high
+}
 concept PrestaShopContactformMessageEmailXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

@@ -335,6 +335,11 @@ rule JenkinsProjectDisplayNameXss {
   match code.JenkinsProjectDisplayNameXss as sink
 }
 
+rule JenkinsTestResultNameXss {
+  meta { id: "VYQL-INJ-173", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.JenkinsTestResultNameXss as sink
+}
+
 rule PrestaShopContactformMessageEmailXss {
   meta { id: "VYQL-INJ-101", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.PrestaShopContactformMessageEmailXss as sink
