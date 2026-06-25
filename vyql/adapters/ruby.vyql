@@ -334,9 +334,9 @@ adapter ruby {
     has "/^[0-9a-f]{24}$/i"
   }
   flag code.RubyFfiWindowsPosixLibrarySearchPath in function {
-    lang "ruby"
-    name "ffi_lib"
     call path "FFI.DynamicLibrary.open"
+    lang "ruby"
+    function "ffi_lib"
     call path "File.exist?"
     literal "/usr/lib/"
     literal "/usr/local/lib/"
