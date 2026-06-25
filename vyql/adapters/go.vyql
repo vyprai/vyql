@@ -497,6 +497,15 @@ adapter go {
     selector "messageBusInfo.Optional"
     not selector "bootstrapMessaging.OptionsPasswordKey"
   }
+  flag code.KubernetesTemplateSecretLookupExposure in function {
+    call path "ctrlcfg.GetConfig"
+    call path "kubernetes.NewForConfig"
+    call path "clientset.CoreV1.Secrets.Get"
+    call arg "clientset.CoreV1.Secrets:namespace"
+    index "secret.Data"
+    index "secret.Data:keyName"
+    not call contains_any ["SelfSubjectAccessReview", "SubjectAccessReview", "CheckAccess", "Authorize"]
+  }
   // Review-only: protocol/state handlers that stop a registration timer without
   // first checking the corresponding state can accept out-of-sequence messages.
   flag code.ProtocolStateReview in function {

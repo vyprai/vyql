@@ -2776,6 +2776,15 @@ concept SessionKeyTemplateExposure : sink {
   review_assumption: "session primary keys are bearer credentials that allow session hijacking if disclosed"
   review_confidence: high
 }
+concept KubernetesTemplateSecretLookupExposure : sink {
+  vulnerable_to: [secrets.SecretLeak, access_control.MissingAuthorization]
+  cwe: [CWE_200, CWE_522, CWE_863]
+  review_category: "secret"
+  review_condition: "a template helper can read arbitrary Kubernetes Secret keys through the in-cluster client"
+  review_evidence: "Kubernetes template helper context {pattern} builds an in-cluster client and reads CoreV1 Secrets using caller-supplied secret, namespace, and key inputs"
+  review_assumption: "lower-trust users can author or influence templates executed by a controller service account with broader Secret read permissions"
+  review_confidence: high
+}
 concept CinnyServiceWorkerMediaAuthLeak : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_20, CWE_200, CWE_522]

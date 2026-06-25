@@ -1757,6 +1757,12 @@ review code.VerboseHttpClientAuthorizationLog {
   expected: [core.SecretRedaction]
   text: "review verbose HTTP client logging for authorization-header, cookie, token, or request-body redaction before production use"
 }
+review code.KubernetesTemplateSecretLookupExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Kubernetes template helper secret reads for namespace scoping and caller authorization before exposing the helper to templates"
+}
 review code.AnsibleSnmpFactsCredentialsNoLogMissing {
   category: "secret"
   kind: "attention"
