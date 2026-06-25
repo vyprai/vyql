@@ -102,6 +102,16 @@ adapter php {
     not token subscript "$u['homedir']"
     not token subscript "$u['role']"
   }
+  flag code.MemberStoreMissingCreateAuthorization in function {
+    lang "php"
+    name "store"
+    call path "$request.getParsedBody"
+    call path "$member.setSelfMembership"
+    call path "$member.canEdit"
+    call path "$member.store"
+    call path "$this.isSelfMembership"
+    not call path "$member.canCreate"
+  }
   flag code.CustomerThreadEditMissingMailboxAuthorization in function {
     lang "php"
     name "edit"

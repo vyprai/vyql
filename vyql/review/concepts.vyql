@@ -263,6 +263,12 @@ review code.SessionHashMissingAuthorizationState {
   expected: [core.AuthorizationCheck]
   text: "verify session validity hashes include mutable authorization state such as role, permissions, and home directory"
 }
+review code.MemberStoreMissingCreateAuthorization {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify member storage endpoints enforce create permissions on the POST store path, not only on the form-rendering route"
+}
 review code.ShareLinkDeletionMissingAuthGuard {
   category: "auth"
   kind: "target"
