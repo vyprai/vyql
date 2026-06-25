@@ -418,6 +418,14 @@ adapter javascript {
     call path "db.users.insert"
     lacks call path "db.users.count"
   }
+  flag code.ExpressParamArrayValuePollution on any {
+    path exact "analysis.function.context"
+    lang "javascript"
+    has "req.params"
+    has "req.body"
+    has "req.query"
+    lacks "Array.isArray"
+  }
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verifyCsrfToken" -> core.CsrfProtection
   control "validateCsrfToken" -> core.CsrfProtection

@@ -1003,6 +1003,12 @@ review code.SecurityKeyTrustOperation {
   kind: "target"
   text: "verify trust/key operations use a full collision-resistant identifier"
 }
+review code.ExpressParamArrayValuePollution {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review Express parameter lookup helpers for duplicate-parameter array normalization or rejection"
+}
 review code.PublicKeyHashBindingReview {
   category: "crypto"
   kind: "attention"
