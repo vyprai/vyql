@@ -786,6 +786,67 @@ adapter python {
 	}
 }
 
+func TestContextFlagAstScopedBinaryPredicate(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter go {
+  flag custom.EmptyPayloadCheck in function {
+    lang "go"
+    binary "len(payload)==0"
+    not binary "len(checked)==0"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context binary flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "handler.go:1",
+		Scope: "handler.go/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=go",
+		},
+	})
+	for _, node := range []usg.Node{
+		{ID: "payload", Type: "code.Param", Loc: "handler.go:1", Scope: "handler.go/fn1", Props: map[string]string{"name": "payload"}},
+		{ID: "len-call", Type: "code.Call", Loc: "handler.go:4", Scope: "handler.go/fn1/if1", Props: map[string]string{"callee_path": "len", "method": "len"}},
+		{ID: "zero", Type: "code.Const", Loc: "handler.go:4", Scope: "handler.go/fn1/if1", Props: map[string]string{"str_args": "0"}},
+		{ID: "arg0", Type: "code.Arg", Loc: "handler.go:4", Scope: "handler.go/fn1/if1"},
+		{ID: "arg1", Type: "code.Arg", Loc: "handler.go:4", Scope: "handler.go/fn1/if1"},
+		{ID: "cmp", Type: "code.BinOp", Loc: "handler.go:4", Scope: "handler.go/fn1/if1", Props: map[string]string{"op": "==", "callee_path": "__binop.eq", "method": "eq", "arg0": "arg0", "arg1": "arg1"}},
+	} {
+		store.AddNode(node)
+	}
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "payload", Dst: "len-call"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "len-call", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "zero", Dst: "arg1"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST binary flag did not match scoped binop: %+v", got)
+	}
+
+	for _, node := range []usg.Node{
+		{ID: "checked", Type: "code.Param", Loc: "handler.go:1", Scope: "handler.go/fn1", Props: map[string]string{"name": "checked"}},
+		{ID: "checked-len", Type: "code.Call", Loc: "handler.go:5", Scope: "handler.go/fn1/if2", Props: map[string]string{"callee_path": "len", "method": "len"}},
+		{ID: "checked-zero", Type: "code.Const", Loc: "handler.go:5", Scope: "handler.go/fn1/if2", Props: map[string]string{"str_args": "0"}},
+		{ID: "checked-arg0", Type: "code.Arg", Loc: "handler.go:5", Scope: "handler.go/fn1/if2"},
+		{ID: "checked-arg1", Type: "code.Arg", Loc: "handler.go:5", Scope: "handler.go/fn1/if2"},
+		{ID: "checked-cmp", Type: "code.BinOp", Loc: "handler.go:5", Scope: "handler.go/fn1/if2", Props: map[string]string{"op": "==", "callee_path": "__binop.eq", "method": "eq", "arg0": "checked-arg0", "arg1": "checked-arg1"}},
+	} {
+		store.AddNode(node)
+	}
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked", Dst: "checked-len"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked-len", Dst: "checked-arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked-zero", Dst: "checked-arg1"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context AST binary flag should skip scoped negative binop: %+v", got)
+	}
+}
+
 func TestContextFlagAstSoftLockNoFollowPredicateMix(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter python {

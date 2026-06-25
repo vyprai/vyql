@@ -1670,6 +1670,8 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 				prefix = "subscript:"
 			}
 			return true, flagScopeSubscriptHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
+		case strings.HasPrefix(v, "binary:"):
+			return true, flagScopeBinopHit(s, pred, n, trimFlagValuePrefix(pred.Values, "binary:"), tech, crossLang)
 		case strings.HasPrefix(v, "name="), strings.HasPrefix(v, "function_name:"):
 			return false, false
 		default:
@@ -1677,6 +1679,131 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 		}
 	}
 	return true, flagScopeNodeHit(s, probe, n, nodeTypes, tech, crossLang)
+}
+
+func flagScopeBinopHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
+	prefix := locFile(n.Prop("loc"))
+	scope := nodeLexicalScope(n)
+	ids, _ := s.NodesOfType("code.BinOp")
+	for _, id := range ids {
+		cand, ok, err := s.GetNode(id)
+		if err != nil || !ok || cand.ID == n.ID {
+			continue
+		}
+		candScope := nodeLexicalScope(cand)
+		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
+			continue
+		}
+		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
+			continue
+		}
+		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
+			continue
+		}
+		if binopPredicateMatches(s, pred.Op, values, cand) {
+			return true
+		}
+	}
+	return false
+}
+
+func binopPredicateMatches(s usg.Store, op string, values []string, n usg.Node) bool {
+	if len(values) == 0 {
+		return false
+	}
+	all := op != "contains_any" && op != "any"
+	for _, value := range values {
+		hit := binopValueMatches(s, value, n)
+		if all && !hit {
+			return false
+		}
+		if !all && hit {
+			return true
+		}
+	}
+	return all
+}
+
+func binopValueMatches(s usg.Store, value string, n usg.Node) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	if valuePredicate("contains", []string{value}, nodeSearchText(n)) {
+		return true
+	}
+	left, op, right, ok := splitBinaryPredicate(value)
+	if !ok {
+		return false
+	}
+	if n.Prop("op") != op {
+		return false
+	}
+	operands := flagOperandCandidates(s, &flowTokenIndex{}, n)
+	if len(operands) < 2 {
+		return false
+	}
+	if binopOperandTextMatches(left, operands[0]) && binopOperandTextMatches(right, operands[1]) {
+		return true
+	}
+	switch op {
+	case "==", "===", "!=", "!==":
+		return binopOperandTextMatches(left, operands[1]) && binopOperandTextMatches(right, operands[0])
+	default:
+		return false
+	}
+}
+
+func splitBinaryPredicate(value string) (left, op, right string, ok bool) {
+	for _, candidate := range []string{"!==", "===", "==", "!=", "<=", ">=", "&&", "||", "<<", ">>", "+", "-", "*", "/", "%", "<", ">"} {
+		if idx := strings.Index(value, candidate); idx > 0 {
+			left = strings.TrimSpace(value[:idx])
+			right = strings.TrimSpace(value[idx+len(candidate):])
+			if left != "" && right != "" {
+				return left, candidate, right, true
+			}
+		}
+	}
+	return "", "", "", false
+}
+
+func binopOperandTextMatches(want string, nodes []usg.Node) bool {
+	want = normalizeFlagExprFragment(want)
+	if want == "" {
+		return false
+	}
+	var texts []string
+	for _, n := range nodes {
+		texts = append(texts, normalizeFlagExprFragment(nodeSearchText(n)+"\x00"+n.ID+"\x00"+n.Prop("name")))
+	}
+	text := strings.Join(texts, "\x00")
+	if strings.Contains(text, want) {
+		return true
+	}
+	if open := strings.IndexByte(want, '('); open > 0 && strings.HasSuffix(want, ")") {
+		fn := want[:open]
+		argText := strings.TrimSuffix(want[open+1:], ")")
+		if fn != "" && !strings.Contains(text, fn) {
+			return false
+		}
+		for _, part := range strings.Split(argText, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" && !strings.Contains(text, part) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func normalizeFlagExprFragment(s string) string {
+	s = strings.TrimSpace(s)
+	for strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") && len(s) > 1 {
+		s = strings.TrimSpace(s[1 : len(s)-1])
+	}
+	repl := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "", `"`, "", "'", "", "`", "")
+	return repl.Replace(s)
 }
 
 func flagScopeSubscriptHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
