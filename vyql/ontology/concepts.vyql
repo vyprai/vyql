@@ -4683,6 +4683,15 @@ concept LogoutReturnUrlRedirectWithoutAllowlist : sink {
   review_assumption: "an attacker can place an absolute or scheme-relative URL in the return query parameter and cause the browser to follow the logout redirect"
   review_confidence: high
 }
+concept UnsignedOidcStateDestinationRedirect : sink {
+  vulnerable_to: [request_forgery.OpenRedirect]
+  cwe: [CWE_601]
+  review_category: "request_forgery"
+  review_condition: "OIDC callback redirects to a destination carried through the provider-controlled state value without signing or verifying that destination"
+  review_evidence: "OIDC state redirect context {pattern} serializes a destination into state and later redirects the recovered destination without destination_serializer signing"
+  review_assumption: "the identity provider or an attacker controlling the callback state value can alter the post-login destination"
+  review_confidence: high
+}
 concept SamlRelayStateOpenRedirect : sink {
   vulnerable_to: [request_forgery.OpenRedirect]
   cwe: [CWE_601]

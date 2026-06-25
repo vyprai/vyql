@@ -426,6 +426,12 @@ review code.LogoutReturnUrlRedirectWithoutAllowlist {
   expected: [core.RedirectAllowlist]
   text: "verify logout return-url redirects use same-origin or configured-domain allowlist validation before constructing RedirectResponse"
 }
+review code.UnsignedOidcStateDestinationRedirect {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.RedirectAllowlist]
+  text: "verify OIDC state-carried post-login destinations are signed or allowlisted before redirecting after callback"
+}
 review code.PathMatcherNormalizationOrderBypass {
   category: "request_forgery"
   kind: "attention"

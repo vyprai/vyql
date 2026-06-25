@@ -527,6 +527,17 @@ adapter python {
     lacks "is_safe_url"
     lacks "get_account_adapter"
   }
+  flag code.UnsignedOidcStateDestinationRedirect in module {
+    lang "python"
+    call path "json.dumps"
+    call path "json.loads"
+    call path contains_any ["redirect", "flask.redirect"]
+    attr path "request.args"
+    token subscript "state"
+    token subscript "destination"
+    not call path contains_any ["destination_serializer.dumps", "destination_serializer.loads"]
+    not identifier contains_any ["BadSignature", "RedirectAllowlist"]
+  }
   flag code.OAuthStateCookieValidationMissing in function {
     function contains_any ["verify_and_process", "oauth_callback", "auth_callback", "callback"]
     literal "state"
