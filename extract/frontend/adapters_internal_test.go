@@ -847,6 +847,62 @@ adapter go {
 	}
 }
 
+func TestCContextFlagMatchesICMPEchoLengthUnderflowTokens(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter c {
+  flag custom.IcmpEchoPayloadLengthUnderflow in function {
+    lang "c"
+    name "prvProcessICMPMessage_IPv6"
+    token switch_case "ipICMP_PING_REPLY_IPv6"
+    selector contains "usPayloadLength"
+    assign contains "uxDataLength=uxDataLength-sizeof"
+    selector "pxICMPEchoHeader.usIdentifier"
+    call path "FreeRTOS_ntohs"
+    call path "vApplicationPingReplyHook"
+    binary contains_any ["uxDataLength-sizeof(*pxICMPEchoHeader)", "uxDataLength-sizeof"]
+    not binary contains_any ["uxDataLength<sizeof(*pxICMPEchoHeader)", "sizeof(*pxICMPEchoHeader)>uxDataLength"]
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse C context flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	tokens := strings.Join([]string{
+		"lang=c",
+		"name=prvProcessICMPMessage_IPv6",
+		"switch_case:ipICMP_PING_REPLY_IPv6",
+		"assign:uxDataLength=uxDataLength-sizeof(*pxICMPEchoHeader)",
+		"call_path:FreeRTOS_ntohs",
+		"call_path:vApplicationPingReplyHook",
+		"binary:uxDataLength-sizeof(*pxICMPEchoHeader)",
+	}, "\x00")
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "FreeRTOS_ND.c:1", Scope: "FreeRTOS_ND.c/fn1", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    tokens,
+	}})
+	store.AddNode(usg.Node{ID: "payload", Type: "code.Attr", Loc: "FreeRTOS_ND.c:10", Scope: "FreeRTOS_ND.c/fn1/case0", Props: map[string]string{
+		"path": "pxICMPPacket.xIPHeader.usPayloadLength",
+	}})
+	store.AddNode(usg.Node{ID: "ident", Type: "code.Attr", Loc: "FreeRTOS_ND.c:20", Scope: "FreeRTOS_ND.c/fn1/case0", Props: map[string]string{
+		"path": "pxICMPEchoHeader.usIdentifier",
+	}})
+	store.AddNode(usg.Node{ID: "ntohs", Type: "code.Call", Loc: "FreeRTOS_ND.c:10", Scope: "FreeRTOS_ND.c/fn1/case0", Props: map[string]string{
+		"callee_path": "FreeRTOS_ntohs",
+		"method":      "FreeRTOS_ntohs",
+	}})
+	store.AddNode(usg.Node{ID: "hook", Type: "code.Call", Loc: "FreeRTOS_ND.c:20", Scope: "FreeRTOS_ND.c/fn1/case0", Props: map[string]string{
+		"callee_path": "vApplicationPingReplyHook",
+		"method":      "vApplicationPingReplyHook",
+	}})
+
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("C ICMP echo context flag did not match, got %+v", got)
+	}
+}
+
 func TestContextFlagAstSoftLockNoFollowPredicateMix(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter python {

@@ -2029,10 +2029,14 @@ func flagPredicateMatchesNodeOnly(pred flagPredicate, n usg.Node) bool {
 func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 	switch pred.Property {
 	case "path":
-		path := n.Prop("callee_path")
-		for _, v := range pred.Values {
-			if pred.Exact && path == v || !pred.Exact && matchSinkPath(path, v) {
-				return true
+		for _, path := range []string{n.Prop("callee_path"), n.Prop("path")} {
+			if path == "" {
+				continue
+			}
+			for _, v := range pred.Values {
+				if pred.Exact && path == v || !pred.Exact && matchSinkPath(path, v) {
+					return true
+				}
 			}
 		}
 		return false
