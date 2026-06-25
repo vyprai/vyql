@@ -24,6 +24,14 @@ adapter sca {
     path exact "analysis.sca.package"
     fact advisory_cwe "CWE_295"
   }
+  flag sbom.SsrfDependency on any {
+    path exact "analysis.sca.package"
+    fact advisory_cwe "CWE-918"
+  }
+  flag sbom.SsrfDependency on any {
+    path exact "analysis.sca.package"
+    fact advisory_cwe "CWE_918"
+  }
   flag sbom.SuspiciousDependency on any {
     path exact "analysis.sca.package"
     fact status "suspicious"

@@ -22,6 +22,11 @@ rule CertValidationDependency {
   match sbom.CertValidationDependency as p
 }
 
+rule SsrfDependency {
+  meta { id: "VYQL-SCA-008", severity: high, cwe: [CWE_918] }
+  match sbom.SsrfDependency as p
+}
+
 rule UnboundedJupyterKernelDependency {
   meta { id: "VYQL-SCA-007", severity: high, cwe: [CWE_1104] }
   match code.UnboundedJupyterKernelDependency as p
