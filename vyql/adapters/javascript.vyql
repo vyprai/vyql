@@ -852,7 +852,7 @@ adapter javascript {
     call path "create"
     attr path "self._path"
     attr path "self.type"
-    not attr path "current.nlink"
+    not binary "current.nlink>1"
   }
   flag code.ConvertSvgMultiSvgSanitizerBypass in function {
     lang "javascript"
