@@ -1,0 +1,59 @@
+# Rank 936 / CVE-2013-2241: Gallery's data_rest file endpoint used generic
+# view authorization before serving full-size originals.
+
+test "rank936: data_rest full file uses only generic view permission"
+  lang php
+  file data_rest.php
+  expect VYQL-AUTH-070
+  expect_review code.FullSizeMediaFileMissingViewFullAuthorization
+  code
+  ```
+  <?php
+  class data_rest_Core {
+    static function get($request) {
+      $item = rest::resolve($request->url);
+      access::required("view", $item);
+      $p = $request->params;
+      if ($p->size == "full") {
+        $file = $item->file_path();
+      } else if ($p->size == "resize") {
+        $file = $item->resize_path();
+      } else {
+        $file = $item->thumb_path();
+      }
+      readfile($file);
+    }
+  }
+  ?>
+  ```
+
+test "rank936: data_rest full file requires view_full"
+  lang php
+  file data_rest.php
+  reject VYQL-AUTH-070
+  reject_review code.FullSizeMediaFileMissingViewFullAuthorization
+  code
+  ```
+  <?php
+  class data_rest_Core {
+    static function get($request) {
+      $item = rest::resolve($request->url);
+      $p = $request->params;
+      if ($p->size == "full") {
+        if ($item->is_album()) {
+          throw new Kohana_404_Exception();
+        }
+        access::required("view_full", $item);
+        $file = $item->file_path();
+      } else if ($p->size == "resize") {
+        access::required("view", $item);
+        $file = $item->resize_path();
+      } else {
+        access::required("view", $item);
+        $file = $item->thumb_path();
+      }
+      readfile($file);
+    }
+  }
+  ?>
+  ```

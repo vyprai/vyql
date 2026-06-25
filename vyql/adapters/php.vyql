@@ -1473,6 +1473,16 @@ adapter php {
     call path "print"
     not call path contains_any ["htmlspecialchars", "htmlentities", "esc_html", "html_escape", "strip_tags"]
   }
+  flag code.FullSizeMediaFileMissingViewFullAuthorization in function {
+    lang "php"
+    selector contains_any ["size"]
+    literal "full"
+    literal "view"
+    call path "access.required"
+    call path "$item.file_path"
+    call path contains_any ["readfile", "file_get_contents"]
+    not literal "view_full"
+  }
   flag code.RequestBackedFooterScriptXss in module {
     lang "php"
     token subscript contains_any ["$_REQUEST[\"footerScripts\"]", "$_REQUEST['footerScripts']"]

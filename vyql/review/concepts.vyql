@@ -269,6 +269,12 @@ review code.MemberStoreMissingCreateAuthorization {
   expected: [core.AuthorizationCheck]
   text: "verify member storage endpoints enforce create permissions on the POST store path, not only on the form-rendering route"
 }
+review code.FullSizeMediaFileMissingViewFullAuthorization {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify full-size media/data file endpoints require the stronger full-view permission before streaming original files"
+}
 review code.ShareLinkDeletionMissingAuthGuard {
   category: "auth"
   kind: "target"

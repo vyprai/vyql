@@ -119,6 +119,11 @@ rule MemberStoreMissingCreateAuthorization {
   match code.MemberStoreMissingCreateAuthorization as store
 }
 
+rule FullSizeMediaFileMissingViewFullAuthorization {
+  meta { id: "VYQL-AUTH-070", severity: high, cwe: [CWE_862, CWE_863], confidence_floor: high }
+  match code.FullSizeMediaFileMissingViewFullAuthorization as file
+}
+
 rule ShareLinkDeletionMissingAuthGuard {
   meta { id: "VYQL-AUTH-059", severity: critical, cwe: [CWE_306, CWE_352, CWE_862], confidence_floor: high }
   match code.ShareLinkDeletionMissingAuthGuard as endpoint

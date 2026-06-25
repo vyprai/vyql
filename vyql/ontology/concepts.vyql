@@ -2181,6 +2181,15 @@ concept MemberStoreMissingCreateAuthorization : sink {
   review_assumption: "route-level form checks can be bypassed by direct POSTs or alternate create routes, so the store path must enforce create authorization itself"
   review_confidence: high
 }
+concept FullSizeMediaFileMissingViewFullAuthorization : sink {
+  vulnerable_to: [access_control.MissingAuthorization, access_control.IncorrectAuthorization]
+  cwe: [CWE_862, CWE_863]
+  review_category: "access_control"
+  review_condition: "a media/data file endpoint serves the original full-size file with only generic view authorization instead of a stronger full-view permission"
+  review_evidence: "file-serving context {pattern} accepts a full-size option, resolves the original file path, and streams file bytes without an observed view_full-style authorization check"
+  review_assumption: "full/original media files are more sensitive than thumbnails or resized derivatives and require a distinct permission"
+  review_confidence: high
+}
 concept ShareLinkDeletionMissingAuthGuard : sink {
   vulnerable_to: [authentication.MissingAuthentication, access_control.MissingAuthorization, request_forgery.Csrf]
   cwe: [CWE_306, CWE_352, CWE_862]
