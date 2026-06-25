@@ -745,6 +745,11 @@ adapter javascript {
     not literal "shell-quote"
     not call path "shellQuote.quote"
   }
+  flag code.CommandStringWrapperExecution in function {
+    call path contains_any ["utils.run", "run"]
+    call arg contains_any ["utils.run:gitclone", "utils.run:git clone", "run:gitclone", "run:git clone"]
+    not call path contains_any ["runWithSpawn", "spawn", "execFile"]
+  }
   flag code.GitDirShellCommandStringExecution in class {
     lang "javascript"
     call path "child_process.exec"

@@ -1007,6 +1007,39 @@ adapter php {
 	}
 }
 
+func TestContextFlagAstScopedCallArgPredicatesInspectArgumentNodes(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.GitCloneWrapper in function {
+    call path "utils.run"
+    call arg contains "utils.run:git clone"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "index.js:1", Scope: "index.js/fn1", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+	}})
+	store.AddNode(usg.Node{ID: "run", Type: "code.Call", Loc: "index.js:20", Scope: "index.js/fn1/try2", Props: map[string]string{
+		"callee_path": "utils.run",
+		"method":      "run",
+	}})
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Loc: "index.js:20", Scope: "index.js/fn1/try2"})
+	store.AddNode(usg.Node{ID: "fmt", Type: "code.Format", Loc: "index.js:20", Scope: "index.js/fn1/try2", Props: map[string]string{
+		"str_args": "git clone ${remoteUrl} ${tmpDir}",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fmt", Dst: "arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "run"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST call-arg flag did not inspect argument expression nodes: %+v", got)
+	}
+}
+
 func TestDirectFlagCallArgPredicatesUseCallArguments(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter python {

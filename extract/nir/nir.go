@@ -94,6 +94,7 @@ type CallEffect struct {
 // Format is a taint-propagating string build (f-string, %, +, .format).
 type Format struct {
 	Parts []Expr
+	Text  string
 	Loc   string
 }
 

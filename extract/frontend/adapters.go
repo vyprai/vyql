@@ -1898,7 +1898,93 @@ func flagScopeCallArgHit(s usg.Store, pred flagPredicate, n usg.Node, tech strin
 		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
 			continue
 		}
-		if contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokens(cand)) {
+		if contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokensScoped(s, cand, tech, crossLang)) {
+			return true
+		}
+	}
+	return false
+}
+
+func callArgContextTokensScoped(s usg.Store, n usg.Node, tech string, crossLang bool) string {
+	tokens := callArgContextTokens(n)
+	path := n.Prop("callee_path")
+	method := n.Prop("method")
+	if path == "" && method == "" {
+		return tokens
+	}
+	var out []string
+	if tokens != "" {
+		out = append(out, strings.Split(tokens, "\x00")...)
+	}
+	seen := map[string]bool{}
+	add := func(text string) {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			return
+		}
+		if path != "" {
+			tok := "call_arg:" + path + ":" + text
+			if !seen[tok] {
+				seen[tok] = true
+				out = append(out, tok)
+			}
+		}
+		if method != "" {
+			tok := "call_arg_method:" + method + ":" + text
+			if !seen[tok] {
+				seen[tok] = true
+				out = append(out, tok)
+			}
+		}
+	}
+	addNode := func(node usg.Node) {
+		add(node.Prop("str_args"))
+		for _, part := range strings.Split(nodeSearchText(node), "\x00") {
+			add(part)
+		}
+		add(node.Prop("name"))
+		add(node.ID)
+	}
+	argIDs, _ := s.NodesOfType("code.Arg")
+	for _, argID := range argIDs {
+		arg, ok, err := s.GetNode(argID)
+		if err != nil || !ok || !scopedCallArgCandidate(arg, n, tech, crossLang) || !nodeFlowsTo(s, arg.ID, n.ID) {
+			continue
+		}
+		addNode(arg)
+		for _, nodeType := range []string{"code.Format", "code.Const", "code.Name", "code.Attr", "code.Seq"} {
+			ids, _ := s.NodesOfType(nodeType)
+			for _, srcID := range ids {
+				src, ok, err := s.GetNode(srcID)
+				if err != nil || !ok || !scopedCallArgCandidate(src, n, tech, crossLang) || !nodeFlowsTo(s, src.ID, arg.ID) {
+					continue
+				}
+				addNode(src)
+			}
+		}
+	}
+	return strings.Join(out, "\x00")
+}
+
+func scopedCallArgCandidate(cand, anchor usg.Node, tech string, crossLang bool) bool {
+	scope := nodeLexicalScope(anchor)
+	candScope := nodeLexicalScope(cand)
+	if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
+		return false
+	}
+	if prefix := locFile(anchor.Prop("loc")); prefix != "" && locFile(cand.Prop("loc")) != prefix {
+		return false
+	}
+	if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
+		return false
+	}
+	return true
+}
+
+func nodeFlowsTo(s usg.Store, srcID, dstID string) bool {
+	edges, _ := s.OutEdges(srcID, "FLOWS")
+	for _, e := range edges {
+		if e.Dst == dstID {
 			return true
 		}
 	}

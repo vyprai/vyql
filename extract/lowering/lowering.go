@@ -1971,6 +1971,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Format:
 		props := map[string]string{}
 		var valToks []string
+		if ex.Text != "" {
+			valToks = append(valToks, ex.Text)
+		}
 		collectValTokens(ex, "", &valToks)
 		if len(valToks) > 0 {
 			props["str_args"] = strings.Join(valToks, "\x00")
@@ -2426,6 +2429,9 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 			collectValTokens(p, key, out) // inherit key so list elements pair with it
 		}
 	case nir.Format:
+		if ex.Text != "" {
+			*out = append(*out, ex.Text)
+		}
 		for _, p := range ex.Parts {
 			collectValTokens(p, key, out)
 		}

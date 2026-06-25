@@ -545,6 +545,40 @@ function evaluate(tokens, expr, values) {
 	t.Fatalf("function context did not include subscript/regex tokens; nodes=%#v", nodes)
 }
 
+func TestJavaScriptTemplateFormatCarriesStaticText(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "clone.js")
+	src := []byte(`
+async function clone(remoteUrl, tmpDir) {
+  await utils.run(` + "`git clone ${remoteUrl} ${tmpDir}`" + `);
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids, _ := g.NodesOfType("code.Format")
+	for _, id := range ids {
+		n, ok, err := g.GetNode(id)
+		if err != nil || !ok {
+			continue
+		}
+		if strings.Contains(n.Prop("str_args"), "gitclone") &&
+			strings.Contains(n.Prop("str_args"), "remoteUrl") {
+			return
+		}
+	}
+	t.Fatalf("template format did not carry static command text")
+}
+
 func TestJavaScriptRegexMayBacktrackAmbiguousAdjacentQuantifiers(t *testing.T) {
 	tests := []struct {
 		name string

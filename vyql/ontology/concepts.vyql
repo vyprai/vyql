@@ -364,8 +364,8 @@ concept CommandStringWrapperExecution : sink {
   cwe: [CWE_78, CWE_88, CWE_150, CWE_157]
   review_category: "command"
   review_condition: "a command execution wrapper receives one formatted shell command string instead of an argv array"
-  review_evidence: "command wrapper context {pattern} builds a command string from request-controlled values before execute"
-  review_assumption: "request-controlled command fragments can contain shell or argument delimiter characters interpreted by the wrapper"
+  review_evidence: "command wrapper context {pattern} builds a command string from caller- or request-controlled values before execute"
+  review_assumption: "caller- or request-controlled command fragments can contain shell or argument delimiter characters interpreted by the wrapper"
   review_confidence: high
 }
 concept McpToolCommandTemplateExecution : sink {

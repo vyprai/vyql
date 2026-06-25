@@ -2220,7 +2220,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		if len(parts) > 0 {
-			return nir.Format{Parts: parts, Loc: L}
+			return nir.Format{Parts: parts, Text: jsContextValue(c.text(n)), Loc: L}
 		}
 		return nir.Const{Loc: L}
 	case "string":
