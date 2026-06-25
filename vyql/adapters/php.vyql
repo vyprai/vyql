@@ -13,6 +13,14 @@ adapter php {
   source "$_REQUEST" -> code.HttpInput
   source "$_COOKIE" -> code.HttpInput
   source "$_FILES" -> code.HttpInput
+  source "$HTTP_GET_VARS" -> code.HttpInput
+  source "$HTTP_POST_VARS" -> code.HttpInput
+  source "$HTTP_POST_FILES" -> code.HttpInput
+  source "$HTTP_COOKIE_VARS" -> code.HttpInput
+  source "$HTTP_SERVER_VARS" val "HTTP_" -> code.HttpInput
+  source "$HTTP_SERVER_VARS" val "REQUEST_URI" -> code.HttpInput
+  source "$HTTP_SERVER_VARS" val "QUERY_STRING" -> code.HttpInput
+  source "$HTTP_SERVER_VARS" val "PATH_INFO" -> code.HttpInput
   source "$_SERVER" val "HTTP_" -> code.HttpInput
   source "$_SERVER" val "REQUEST_URI" -> code.HttpInput
   source "$_SERVER" val "QUERY_STRING" -> code.HttpInput
@@ -120,6 +128,13 @@ adapter php {
     name "actionDownloadFile"
     has "'model_id'=>$id"
     lacks "(int)$id"
+  }
+  flag code.UnvalidatedNumericSqlInterpolation in module {
+    lang "php"
+    token subscript "$HTTP_GET_VARS['lid']"
+    has "where l.lid=$lid"
+    call path "$xoopsDB.query"
+    lacks "is_numeric($lid)"
   }
   flag code.WordPressPostsWhereDateSqlInjection in function {
     lang "php"

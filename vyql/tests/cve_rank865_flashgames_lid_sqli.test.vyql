@@ -1,0 +1,48 @@
+# Rank 865 / CVE-2008-10003: Flashgames used the legacy PHP
+# $HTTP_GET_VARS['lid'] value directly in a numeric SQL predicate.
+
+test "rank865: legacy GET lid reaches numeric SQL predicate without validation"
+  lang php
+  file game.php
+  expect VYQL-INJ-073
+  expect_review code.UnvalidatedNumericSqlInterpolation
+  code
+  ```
+  <?php
+  $lid = $HTTP_GET_VARS['lid'];
+  $q = "select l.lid from ".$xoopsDB->prefix("flashgames_games")." l where l.lid=$lid and status>0";
+  $result = $xoopsDB->query($q);
+  ```
+
+test "rank865: numeric lid guard suppresses focused SQL interpolation finding"
+  lang php
+  file game.php
+  reject VYQL-INJ-073
+  reject_review code.UnvalidatedNumericSqlInterpolation
+  code
+  ```
+  <?php
+  $lid = $HTTP_GET_VARS['lid'];
+  if (!is_numeric($lid) or $lid<=0) {
+      exit;
+  }
+  $q = "select l.lid from ".$xoopsDB->prefix("flashgames_games")." l where l.lid=$lid and status>0";
+  $result = $xoopsDB->query($q);
+  ```
+
+test "rank865: dominating numeric guard suppresses generic SQL taint in functions"
+  lang php
+  file guarded.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  function show($xoopsDB) {
+      $lid = $_GET['lid'];
+      if (!is_numeric($lid)) {
+          return;
+      }
+      $q = "select l.lid from ".$xoopsDB->prefix("flashgames_games")." l where l.lid=$lid and status>0";
+      $result = $xoopsDB->query($q);
+  }
+  ```
