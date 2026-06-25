@@ -1426,8 +1426,18 @@ adapter php {
   sink path "unserialize" -> code.Deserialization
   flag code.PhpSimplexmlEntityLoaderXxe in function {
     lang "php"
-    has "simplexml_load_string"
-    lacks "libxml_disable_entity_loader"
+    call path "simplexml_load_string"
+    not call path "libxml_disable_entity_loader"
+  }
+  flag code.PhpSimplexmlUnscopedEntityLoaderXxe in function {
+    lang "php"
+    call path "simplexml_load_string"
+    call path "libxml_disable_entity_loader"
+    not assign contains "libxml_disable_entity_loader"
+    not call arg contains "libxml_disable_entity_loader:$loader"
+  }
+  flag code.PhpSimplexmlUnscopedEntityLoaderXxe on any {
+    path exact "analysis.php.simplexml_unscoped_entity_loader"
   }
 
   // file inclusion (include/require modeled as include() call)

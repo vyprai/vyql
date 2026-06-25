@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"strings"
 	"unicode"
 
@@ -33,6 +34,7 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 			c := &phConv{src: src, root: root, file: rel}
 			body := c.block(tree.RootNode())
 			body = append(body, c.phpModuleContext(tree.RootNode())...)
+			body = append(body, c.phpSimplexmlLoaderObservations()...)
 			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -86,6 +88,14 @@ func phpNormalizeLegacyScriptTags(src []byte) []byte {
 
 func (c *phConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
+}
+
+func (c *phConv) locAtByte(offset int) string {
+	if offset < 0 || offset > len(c.src) {
+		offset = 0
+	}
+	line := 1 + bytes.Count(c.src[:offset], []byte{'\n'})
+	return c.file + ":" + itoa(line)
 }
 
 func (c *phConv) text(n *tree_sitter.Node) string {
@@ -378,6 +388,51 @@ func (c *phConv) phpContextCall(path, loc, method string, tokens []string, text 
 		Method: method,
 		Loc:    loc,
 	}}}
+}
+
+func (c *phConv) phpSimplexmlLoaderObservations() []nir.Stmt {
+	compact := phpCompactText(string(c.src))
+	if !strings.Contains(compact, "simplexml_load_string(") ||
+		!strings.Contains(compact, "libxml_disable_entity_loader(true)") {
+		return nil
+	}
+	if strings.Contains(compact, "=libxml_disable_entity_loader(true)") &&
+		strings.Contains(compact, "libxml_disable_entity_loader($") {
+		return nil
+	}
+	loader := phpSavedEntityLoaderVar(compact)
+	if loader != "" && strings.Contains(compact, "libxml_disable_entity_loader("+loader+")") {
+		return nil
+	}
+	loc := c.locAtByte(bytes.Index(c.src, []byte("simplexml_load_string")))
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.php.simplexml_unscoped_entity_loader", Loc: loc},
+		Path:   "analysis.php.simplexml_unscoped_entity_loader",
+		Method: "simplexml_unscoped_entity_loader",
+		Loc:    loc,
+	}}}
+}
+
+func phpSavedEntityLoaderVar(compact string) string {
+	const marker = "=libxml_disable_entity_loader(true)"
+	idx := strings.Index(compact, marker)
+	if idx <= 0 {
+		return ""
+	}
+	start := idx - 1
+	for start >= 0 {
+		ch := compact[start]
+		if ch == '$' || ch == '_' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' {
+			start--
+			continue
+		}
+		break
+	}
+	name := compact[start+1 : idx]
+	if strings.HasPrefix(name, "$") {
+		return name
+	}
+	return ""
 }
 
 func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {

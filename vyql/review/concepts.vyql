@@ -2578,6 +2578,18 @@ review code.CodeIgniterRestserverXmlEntityLoaderXxe {
   expected: [core.XmlHardening]
   text: "review CodeIgniter Rest Server XML request parsing for libxml_disable_entity_loader(true) before Format parses the body"
 }
+review code.PhpSimplexmlEntityLoaderXxe {
+  category: "xml"
+  kind: "attention"
+  expected: [core.XmlHardening]
+  text: "review PHP SimpleXML parsing for libxml entity-loader hardening before externally influenced XML is parsed"
+}
+review code.PhpSimplexmlUnscopedEntityLoaderXxe {
+  category: "xml"
+  kind: "attention"
+  expected: [core.XmlHardening]
+  text: "review PHP SimpleXML parsing that toggles libxml entity loading without saving and restoring the previous loader state"
+}
 review code.UnboundedCopy {
   category: "memory"
   kind: "attention"

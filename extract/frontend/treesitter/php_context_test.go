@@ -390,6 +390,57 @@ $searchResult = eZSearch::search( $searchText, array(
 	t.Fatalf("analysis.module.context not found")
 }
 
+func TestPHPSimplexmlLoaderObservationRequiresScopedRestore(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "vuln.php")
+	fixed := filepath.Join(dir, "fixed.php")
+	if err := os.WriteFile(vuln, []byte(`<?php
+function XML2array($XMLstring) {
+    libxml_disable_entity_loader(true);
+    return simplexml_load_string($XMLstring);
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`<?php
+function XML2array($XMLstring) {
+    $loader = libxml_disable_entity_loader(true);
+    $xml = simplexml_load_string($XMLstring, 'SimpleXMLElement', LIBXML_NOENT);
+    libxml_disable_entity_loader($loader);
+    return $xml;
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{vuln, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seenVuln := false
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.php.simplexml_unscoped_entity_loader" {
+			continue
+		}
+		if strings.Contains(n.Prop("loc"), "fixed.php") {
+			t.Fatalf("fixed scoped loader emitted unscoped observation at %s", n.Prop("loc"))
+		}
+		if strings.Contains(n.Prop("loc"), "vuln.php") {
+			seenVuln = true
+		}
+	}
+	if !seenVuln {
+		t.Fatalf("vulnerable unscoped loader observation not found; nodes=%#v", nodes)
+	}
+}
+
 func TestPHPClassContextIncludesPropertyAndMethodInventory(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "FileService.php")

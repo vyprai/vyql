@@ -104,3 +104,8 @@ rule ConfigurableCacheUnserializeWrapper {
   meta { id: "VYQL-DESER-019", severity: high, cwe: [CWE_502, CWE_248], confidence_floor: high }
   match code.ConfigurableCacheUnserializeWrapper as wrapper
 }
+
+rule PhpSimplexmlUnscopedEntityLoaderXxe {
+  meta { id: "VYQL-DESER-020", severity: high, cwe: [CWE_611], confidence_floor: medium }
+  match code.PhpSimplexmlUnscopedEntityLoaderXxe as parser
+}
