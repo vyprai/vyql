@@ -428,7 +428,7 @@ adapter php {
   }
   flag code.PersistentModelTitleStoredXss on call {
     path exact "$this.request.request.get"
-    flows to path exact "$column"
+    flows to path exact "$column.__setitem__"
     lacks call contains_any ["noHtml", "htmlspecialchars", "htmlentities", "strip_tags"]
   }
   flag code.QuickAppsUserRealNameStoredXss in class {
