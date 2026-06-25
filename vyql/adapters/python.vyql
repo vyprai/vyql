@@ -665,6 +665,16 @@ adapter python {
     not name "api_endpoint_wrapper"
     lacks "UNSUPPORTED_MEDIA_TYPE"
   }
+  flag code.PickleUnsafeImportBlocklistGap in function {
+    function "unsafe_imports"
+    literal contains_any ["runpy", "cProfile", "marshal", "types", "subprocess", "os"]
+    not literal "ctypes"
+  }
+  flag code.PickleUnsafeImportBlocklistGap in function {
+    function "unsafe_imports"
+    literal contains_any ["runpy", "cProfile", "marshal", "types", "subprocess", "os"]
+    not literal "pydoc"
+  }
   flag code.ServerSideBrowserActiveHtmlRendering in function {
     name "_render_with_browser"
     has "sync_playwright"

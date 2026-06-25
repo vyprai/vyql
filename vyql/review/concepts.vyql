@@ -278,6 +278,12 @@ review code.RequestSelectedDeserializationFormat {
   kind: "attention"
   text: "review request-selected deserialization formats for unsafe codecs such as pickle"
 }
+review code.PickleUnsafeImportBlocklistGap {
+  category: "deserialization"
+  kind: "target"
+  expected: [core.SafeDeserialization]
+  text: "verify pickle safety analyzers blocklist dangerous import modules such as ctypes and pydoc before trusting analysis results"
+}
 review code.UncheckedPrototypeConfigKey {
   category: "prototype_pollution"
   kind: "attention"

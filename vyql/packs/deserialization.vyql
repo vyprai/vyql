@@ -89,3 +89,8 @@ rule UnsafeYamlLoad {
   meta { id: "VYQL-DESER-016", severity: high, cwe: [CWE_502], confidence_floor: medium }
   match code.UnsafeYamlLoad as loader
 }
+
+rule PickleUnsafeImportBlocklistGap {
+  meta { id: "VYQL-DESER-017", severity: high, cwe: [CWE_184, CWE_502], confidence_floor: high }
+  match code.PickleUnsafeImportBlocklistGap as analyzer
+}
