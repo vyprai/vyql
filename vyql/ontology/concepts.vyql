@@ -1215,6 +1215,15 @@ concept CaptchaValidationTruthyReturnBypass : sink {
   review_assumption: "callers may compare validation failure with == False or otherwise require a real boolean false result"
   review_confidence: high
 }
+concept XmlLeadByteNameValidationMissing : sink {
+  vulnerable_to: [validation.ImproperInputValidation, memory.OobRead]
+  cwe: [CWE_20, CWE_125]
+  review_category: "input_validation"
+  review_condition: "XML tokenizer lead-byte name parsing checks name character classes without first rejecting invalid encoded characters"
+  review_evidence: "XML tokenizer macro context {pattern} checks IS_NAME_CHAR and IS_NMSTRT_CHAR for BT_LEAD bytes without an IS_INVALID_CHAR guard"
+  review_assumption: "attacker-controlled XML input can contain invalid multibyte lead-byte sequences that reach these tokenizer paths"
+  review_confidence: high
+}
 concept RegexLineCommentStripWithoutCharWhitelist : sink {
   vulnerable_to: [validation.ImproperInputValidation]
   cwe: [CWE_20]

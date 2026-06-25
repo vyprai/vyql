@@ -330,6 +330,43 @@ void prvProcessICMPMessage_IPv6(NetworkBufferDescriptor_t *pxNetworkBuffer)
 	}
 }
 
+func TestCModuleContextIncludesMacroBodyTokens(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "xmltok_impl.c")
+	src := []byte(`
+#define CHECK_NAME_CASE(n, enc, ptr, end, nextTokPtr) \
+   case BT_LEAD ## n: \
+     if (end - ptr < n) \
+       return XML_TOK_PARTIAL_CHAR; \
+     if (!IS_NAME_CHAR(enc, ptr, n)) { \
+       *nextTokPtr = ptr; \
+       return XML_TOK_INVALID; \
+     } \
+     ptr += n; \
+     break;
+
+int marker(void) { return 0; }
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := cModuleContextTokens(prog.Modules[0].Body)
+	for _, want := range []string{
+		"macro_name:CHECK_NAME_CASE",
+		"macro_body:CHECK_NAME_CASE:",
+		"if(!IS_NAME_CHAR(enc,ptr,n))",
+	} {
+		if !strings.Contains(tokens, want) {
+			t.Fatalf("C module context missing macro token %q; context=%q", want, tokens)
+		}
+	}
+}
+
 func TestCZeroCountLastIndexObservationRequiresNonZeroGuard(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "frames.c")
@@ -384,6 +421,27 @@ func cFuncContextTokens(stmts []nir.Stmt, funcName string) string {
 		fn, ok := st.(nir.FuncDef)
 		if ok && fn.Name == funcName {
 			return strings.Join(fn.ContextTokens, "\x00")
+		}
+	}
+	return ""
+}
+
+func cModuleContextTokens(stmts []nir.Stmt) string {
+	for _, st := range stmts {
+		expr, ok := st.(nir.ExprStmt)
+		if !ok {
+			continue
+		}
+		call, ok := expr.Value.(nir.Call)
+		if ok && call.Path == "analysis.module.context" {
+			var tokens []string
+			for _, arg := range call.Args {
+				c, ok := arg.(nir.Const)
+				if ok {
+					tokens = append(tokens, c.Value)
+				}
+			}
+			return strings.Join(tokens, "\x00")
 		}
 	}
 	return ""

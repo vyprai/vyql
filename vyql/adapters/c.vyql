@@ -280,6 +280,17 @@ adapter c {
     has "dlist+=39"
     lacks "xmalloc(4+addrs*40+1)"
   }
+  flag code.XmlLeadByteNameValidationMissing in module {
+    lang "c"
+    token macro_name "CHECK_NAME_CASE"
+    token macro_name "CHECK_NMSTRT_CASE"
+    token macro_body contains "CHECK_NAME_CASE:"
+    token macro_body contains "if(!IS_NAME_CHAR(enc,ptr,n))"
+    token macro_body contains "CHECK_NMSTRT_CASE:"
+    token macro_body contains "if(!IS_NMSTRT_CHAR(enc,ptr,n))"
+    not token macro_body contains "IS_INVALID_CHAR(enc,ptr,n)||!IS_NAME_CHAR(enc,ptr,n)"
+    not token macro_body contains "IS_INVALID_CHAR(enc,ptr,n)||!IS_NMSTRT_CHAR(enc,ptr,n)"
+  }
   flag code.IcmpEchoPayloadLengthUnderflow in function {
     lang "c"
     name "prvProcessICMPMessage_IPv6"

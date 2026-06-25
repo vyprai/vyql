@@ -1527,6 +1527,12 @@ review code.FrameworkRequestBeforeSessionValidation {
   expected: [core.InputValidation]
   text: "review request/session validation ordering before framework request or transport state is created"
 }
+review code.XmlLeadByteNameValidationMissing {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review XML tokenizer lead-byte name parsing for invalid-character rejection before accepting name characters"
+}
 review code.UnvalidatedChoiceControlField {
   category: "input_validation"
   kind: "attention"

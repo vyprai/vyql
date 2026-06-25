@@ -92,12 +92,19 @@ func (c *ccConv) ccModuleContext(root *tree_sitter.Node) nir.Stmt {
 		loc = c.loc(root)
 	}
 	path := "analysis.module.context"
+	tokens := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=" + c.lang},
+		nir.Const{Loc: loc, Value: compactCExprText(string(c.src))},
+	}
+	for _, tok := range c.ccStructuredContextTokens(root) {
+		tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
+	}
+	for _, tok := range c.ccMacroContextTokens() {
+		tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
+	}
 	return nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=" + c.lang},
-			nir.Const{Loc: loc, Value: compactCExprText(string(c.src))},
-		},
+		Args:   tokens,
 		Path:   path,
 		Method: "context",
 		Loc:    loc,
@@ -257,6 +264,13 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			return
 		}
 		switch n.Kind() {
+		case "preproc_def", "preproc_function_def":
+			if name, body := cMacroNameAndBody(c.text(n)); name != "" {
+				add("macro_name:" + name)
+				if body != "" {
+					add("macro_body:" + name + ":" + body)
+				}
+			}
 		case "case_statement":
 			if lv := field(n, "value"); lv != nil {
 				if label := atom(lv); label != "" {
@@ -319,6 +333,81 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 	}
 	walk(root)
 	return out
+}
+
+func (c *ccConv) ccMacroContextTokens() []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	lines := strings.Split(string(c.src), "\n")
+	for i := 0; i < len(lines); i++ {
+		raw := strings.TrimSpace(lines[i])
+		if !strings.HasPrefix(raw, "#") {
+			continue
+		}
+		for strings.HasSuffix(strings.TrimSpace(raw), "\\") && i+1 < len(lines) {
+			raw = strings.TrimSuffix(strings.TrimSpace(raw), "\\") + " " + strings.TrimSpace(lines[i+1])
+			i++
+		}
+		name, body := cMacroNameAndBody(raw)
+		if name == "" {
+			continue
+		}
+		add("macro_name:" + name)
+		if body != "" {
+			add("macro_body:" + name + ":" + body)
+		}
+	}
+	return out
+}
+
+func cMacroNameAndBody(raw string) (string, string) {
+	s := strings.TrimSpace(raw)
+	s = strings.TrimPrefix(s, "#")
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "define") {
+		return "", ""
+	}
+	s = strings.TrimSpace(strings.TrimPrefix(s, "define"))
+	if s == "" {
+		return "", ""
+	}
+	i := 0
+	for i < len(s) {
+		ch := s[i]
+		if !(ch == '_' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || i > 0 && ch >= '0' && ch <= '9') {
+			break
+		}
+		i++
+	}
+	if i == 0 {
+		return "", ""
+	}
+	name := s[:i]
+	rest := strings.TrimSpace(s[i:])
+	if strings.HasPrefix(rest, "(") {
+		depth := 0
+		for j, ch := range rest {
+			switch ch {
+			case '(':
+				depth++
+			case ')':
+				depth--
+				if depth == 0 {
+					rest = strings.TrimSpace(rest[j+1:])
+					return name, compactCExprText(rest)
+				}
+			}
+		}
+		return name, ""
+	}
+	return name, compactCExprText(rest)
 }
 
 func (c *ccConv) ccCallPaths(root *tree_sitter.Node) []string {

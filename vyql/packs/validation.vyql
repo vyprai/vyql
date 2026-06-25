@@ -67,3 +67,8 @@ rule UrlPathParameterCaseNormalizationBypass {
   meta { id: "VYQL-VAL-013", severity: high, cwe: [CWE_178, CWE_863], confidence_floor: high }
   match code.UrlPathParameterCaseNormalizationBypass as params
 }
+
+rule XmlLeadByteNameValidationMissing {
+  meta { id: "VYQL-VAL-014", severity: high, cwe: [CWE_20, CWE_125], confidence_floor: high }
+  match code.XmlLeadByteNameValidationMissing as tokenizer
+}
