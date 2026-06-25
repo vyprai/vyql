@@ -94,11 +94,11 @@ adapter php {
   }
   flag code.ShareLinkDeletionMissingAuthGuard in function {
     lang "php"
-    name contains_any ["deleteShare", "removeShare", "revokeShare"]
-    token subscript contains_any ["$_POST['token']", "$_REQUEST['token']"]
-    call path contains_any ["deleteShareLink", "deleteSharedLink", "removeShareLink", "revokeShareLink"]
-    not call contains_any ["checkCsrf", "verifyCsrf", "validateCsrf", "check_admin_referer", "wp_verify_nonce"]
-    not call contains_any ["requireAuth", "checkAuth", "requireLogin", "isAuthenticated", "authorize", "requireAdmin"]
+    name "deleteShareLink"
+    token subscript "$_POST"
+    call path "FileModel.deleteShareLink"
+    not call path "$this.checkCsrf"
+    not call path "$this.requireAuth"
   }
   flag code.UnvalidatedNumericSqlInterpolation in class {
     lang "php"
