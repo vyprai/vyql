@@ -2336,6 +2336,12 @@ review code.CallerControlledFilenameComponentPathTraversal {
   expected: [core.PathCanonicalization]
   text: "review filename builders that concatenate caller-controlled name or version components without component encoding"
 }
+review code.EmbeddedDotSegmentFilenameWrite {
+  category: "path"
+  kind: "target"
+  expected: [core.PathCanonicalization]
+  text: "reject embedded parent-directory segments in caller-provided filenames before writing them under a storage directory"
+}
 review code.PrefixWildcardKeyEnumeration {
   category: "path"
   kind: "attention"

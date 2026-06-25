@@ -715,6 +715,14 @@ adapter java {
     token identifier contains_any ["filename", "fileName"]
     not call path contains_any ["Util.rawEncode", "URLEncoder.encode", "encodeURIComponent", "FilenameUtils.getName", "Paths.get"]
   }
+  flag code.EmbeddedDotSegmentFilenameWrite in function {
+    call path contains_any ["getFilename", "getOriginalFilename"]
+    call path contains_any ["Files.copy", "Files.write", "FileUtils.copyInputStreamToFile", "MultipartFile.transferTo"]
+    call path contains_any ["createTempFile", "resolve", "new File"]
+    call path contains_any ["getCanonicalPath", "normalize", "toRealPath"]
+    call arg contains_any ["filename.equals:..", "fileName.equals:.."]
+    not call arg contains_any ["filename.contains:..", "fileName.contains:.."]
+  }
   flag code.JenkinsStaplerStateChangeMissingPost in function {
     function contains_any ["doSave", "doSubmit", "doConfigure"]
     call contains_any ["bindJSON", "save", "configure"]

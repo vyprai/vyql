@@ -3878,6 +3878,15 @@ concept CallerControlledFilenameComponentPathTraversal : sink {
   review_assumption: "the returned filename is later joined under a storage directory or used for persisted XML/report files"
   review_confidence: high
 }
+concept EmbeddedDotSegmentFilenameWrite : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22, CWE_184]
+  review_category: "path"
+  review_condition: "a caller-provided filename is written under a storage directory after rejecting exact '..' but not embedded dot segments"
+  review_evidence: "filename storage context {pattern} checks the exact parent-directory token but lacks a contains/segment rejection before writing the filename"
+  review_assumption: "the filename can contain embedded parent-directory segments that survive the storage path construction"
+  review_confidence: high
+}
 concept PrefixWildcardKeyEnumeration : sink {
   vulnerable_to: [path.PathTraversal, secrets.SecretLeak]
   cwe: [CWE_22, CWE_200]

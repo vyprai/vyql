@@ -258,6 +258,11 @@ rule CallerControlledFilenameComponentPathTraversal {
   match code.CallerControlledFilenameComponentPathTraversal as sink
 }
 
+rule EmbeddedDotSegmentFilenameWrite {
+  meta { id: "VYQL-PATH-053", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
+  match code.EmbeddedDotSegmentFilenameWrite as sink
+}
+
 rule EncodedDotSegmentStaticPathBypass {
   meta { id: "VYQL-PATH-050", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
   match code.EncodedDotSegmentStaticPathBypass as sink
