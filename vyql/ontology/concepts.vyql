@@ -2505,6 +2505,15 @@ concept WebhookUrlFetchMissingSsrfGuard : sink {
   review_assumption: "webhook or callback URLs can be configured by a tenant, user, or database record and the service has access to internal network targets"
   review_confidence: high
 }
+concept ConfigUrlStoredBeforeSchemeValidation : sink {
+  vulnerable_to: [request_forgery.Ssrf, validation.ImproperInputValidation]
+  cwe: [CWE_918, CWE_20]
+  review_category: "request_forgery"
+  review_condition: "import or connector configuration stores a caller-supplied service URL before enforcing URL syntax and allowed schemes"
+  review_evidence: "configuration handler context {pattern} copies a URL field from request data into persisted connection configuration and performs a connection check without an observed URL/scheme validation helper"
+  review_assumption: "the configured URL is later used by a server-side connector with access to internal network targets"
+  review_confidence: high
+}
 concept ServerSideBrowserActiveHtmlRendering : sink {
   vulnerable_to: [request_forgery.Ssrf, injection.Xss, secrets.SecretLeak]
   cwe: [CWE_918, CWE_79, CWE_200]

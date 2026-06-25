@@ -68,6 +68,11 @@ rule WebhookUrlFetchMissingSsrfGuard {
   match code.WebhookUrlFetchMissingSsrfGuard as webhook
 }
 
+rule ConfigUrlStoredBeforeSchemeValidation {
+  meta { id: "VYQL-RF-036", severity: high, cwe: [CWE_918, CWE_20], confidence_floor: high }
+  match code.ConfigUrlStoredBeforeSchemeValidation as config
+}
+
 rule OAuthStateCookieValidationMissing {
   meta { id: "VYQL-RF-032", severity: high, cwe: [CWE_352, CWE_287], confidence_floor: high }
   match code.OAuthStateCookieValidationMissing as flow

@@ -1143,6 +1143,17 @@ adapter php {
     lacks "FILTER_FLAG_NO_PRIV_RANGE"
     lacks "FILTER_FLAG_NO_RES_RANGE"
   }
+  flag code.ConfigUrlStoredBeforeSchemeValidation in function {
+    lang "php"
+    name contains_any ["configureJob", "store", "update"]
+    token subscript "$data['fints_url']"
+    token subscript "$config['fints_url']"
+    call path "$this.repository.setConfiguration"
+    call path "$finTS.checkConnection"
+    not call path "$this.validURI"
+    not call path "filter_var"
+    not call path "parse_url"
+  }
   flag code.SvgNestedResourceValidationBypass in function {
     lang "php"
     name "resolve_url"
