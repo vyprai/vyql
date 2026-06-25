@@ -26,3 +26,8 @@ rule BlockingReadInAcceptLoop {
   meta { id: "VYQL-LIFE-005", severity: high, cwe: [CWE_400, CWE_667], confidence_floor: high }
   match code.BlockingReadInAcceptLoop as read
 }
+
+rule StateCommitBeforeExternalWriteAccounting {
+  meta { id: "VYQL-LIFE-006", severity: high, cwe: [CWE_696, CWE_755], confidence_floor: high }
+  match code.StateCommitBeforeExternalWriteAccounting as op
+}

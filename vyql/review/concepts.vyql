@@ -37,6 +37,11 @@ review code.StateMutationBeforeOperationPreconditions {
   expected: [core.AuthorizationCheck, core.InputValidation]
   text: "review operation application ordering so durable state mutation happens only after all operation preconditions pass"
 }
+review code.StateCommitBeforeExternalWriteAccounting {
+  category: "lifecycle"
+  kind: "target"
+  text: "verify durable state is not committed before fallible external write accounting or metering succeeds"
+}
 review core.XmlHardening {
   category: "xml"
   kind: "check"

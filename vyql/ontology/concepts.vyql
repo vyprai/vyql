@@ -1215,6 +1215,15 @@ concept StateMutationBeforeOperationPreconditions : sink {
   review_assumption: "an attacker-controlled operation can pass transaction-level checks but fail a later operation-specific authorization or validation check"
   review_confidence: high
 }
+concept StateCommitBeforeExternalWriteAccounting : sink {
+  vulnerable_to: [business_logic.BusinessLogic]
+  cwe: [CWE_696, CWE_755]
+  review_category: "lifecycle"
+  review_condition: "state commit occurs before fallible external write accounting or metering succeeds"
+  review_evidence: "create-cleanup context {pattern} exits the substate as succeeded before recording the external write operation"
+  review_assumption: "a failing external accounting hook can return an error after the durable create substate has already been committed"
+  review_confidence: high
+}
 concept UnboundedCopy : sink {
   vulnerable_to: [memory.OobWrite]
   enabled_by: [taint.UntrustedData]

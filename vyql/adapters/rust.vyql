@@ -161,6 +161,14 @@ adapter rust {
     has "ok_or_else(||CoinError::ValidationError(\"nostaketounstake\".into()))?"
     lacks "tx.fee.saturating_add(*amount)"
   }
+  flag code.StateCommitBeforeExternalWriteAccounting in function {
+    lang "rust"
+    name "cleanup_for_create"
+    has "record_deposit(out.len())"
+    has "letexit_result=self.exit_substate(StackExitKind::Succeeded);ifletErr(e)=self.record_external_operation"
+    has "ExternalOperation::Write(U256::from(out.len()))"
+    has "self.state.set_code(address,out)"
+  }
   flag code.PeerLimitUnderflow in function {
     lang "rust"
     name "poll"

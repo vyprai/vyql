@@ -1,0 +1,58 @@
+# Rank 785 / CVE-2024-21629: rust-evm committed create substate before
+# fallible external write accounting, allowing an error after state commit.
+
+test "rank785: Rust EVM create cleanup commits before external write accounting"
+  lang rust
+  file executor.rs
+  expect VYQL-LIFE-006
+  expect_review code.StateCommitBeforeExternalWriteAccounting
+  code
+  ```
+  impl<S> StackExecutor<S> {
+      fn cleanup_for_create(&mut self, address: H160, out: Vec<u8>) -> Result<(), ExitError> {
+          match self.state.metadata_mut().gasometer.record_deposit(out.len()) {
+              Ok(()) => {
+                  let exit_result = self.exit_substate(StackExitKind::Succeeded);
+                  if let Err(e) = self.record_external_operation(
+                      crate::ExternalOperation::Write(U256::from(out.len())),
+                  ) {
+                      return Err(e);
+                  }
+                  self.state.set_code(address, out);
+                  exit_result?;
+                  Ok(())
+              }
+              Err(e) => Err(e),
+          }
+      }
+  }
+  ```
+
+test "rank785: Rust EVM create cleanup records external write before commit"
+  lang rust
+  file executor.rs
+  reject VYQL-LIFE-006
+  reject_review code.StateCommitBeforeExternalWriteAccounting
+  code
+  ```
+  impl<S> StackExecutor<S> {
+      fn cleanup_for_create(&mut self, address: H160, out: Vec<u8>) -> Result<(), ExitError> {
+          match self.state.metadata_mut().gasometer.record_deposit(out.len()) {
+              Ok(()) => {
+                  if let Err(e) = self.record_external_operation(
+                      crate::ExternalOperation::Write(U256::from(out.len())),
+                  ) {
+                      self.state.metadata_mut().gasometer.fail();
+                      let _ = self.exit_substate(StackExitKind::Failed);
+                      return Err(e);
+                  }
+                  let exit_result = self.exit_substate(StackExitKind::Succeeded);
+                  self.state.set_code(address, out);
+                  exit_result?;
+                  Ok(())
+              }
+              Err(e) => Err(e),
+          }
+      }
+  }
+  ```
