@@ -1,0 +1,51 @@
+test "rank887: Focus iOS WKWebView server redirects bypass URL fixup validation"
+  lang swift
+  expect VYQL-INJ-176
+  expect_review code.WebViewServerRedirectUrlValidationBypass
+  code
+  ```
+  import WebKit
+
+  class WebViewController: UIViewController, WKNavigationDelegate {
+      let browserView: WKWebView
+
+      func webView(_ webView: WKWebView,
+                   decidePolicyFor navigationAction: WKNavigationAction,
+                   preferences: WKWebpagePreferences,
+                   decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void) {
+          let allowDecision = WKNavigationActionPolicy.allow
+          let decision: WKNavigationActionPolicy = RequestHandler().handle(request: navigationAction.request, alertCallback: present) ? allowDecision : .cancel
+          decisionHandler(decision, preferences)
+      }
+  }
+  ```
+
+test "rank887: Focus iOS validates server redirects with URIFixup"
+  lang swift
+  reject VYQL-INJ-176
+  reject_review code.WebViewServerRedirectUrlValidationBypass
+  code
+  ```
+  import WebKit
+
+  class WebViewController: UIViewController, WKNavigationDelegate {
+      let browserView: WKWebView
+
+      func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+          guard let urlString = webView.url?.absoluteString,
+                URIFixup.getURL(entry: urlString) != nil else {
+              stop()
+              return
+          }
+      }
+
+      func webView(_ webView: WKWebView,
+                   decidePolicyFor navigationAction: WKNavigationAction,
+                   preferences: WKWebpagePreferences,
+                   decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void) {
+          let allowDecision = WKNavigationActionPolicy.allow
+          let decision: WKNavigationActionPolicy = RequestHandler().handle(request: navigationAction.request, alertCallback: present) ? allowDecision : .cancel
+          decisionHandler(decision, preferences)
+      }
+  }
+  ```

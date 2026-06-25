@@ -4782,6 +4782,15 @@ concept WeakRedirectUrlValidation : sink {
   review_assumption: "attackers can provide a next/redirect URL that reaches this validation helper"
   review_confidence: high
 }
+concept WebViewServerRedirectUrlValidationBypass : sink {
+  vulnerable_to: [injection.Xss, validation.ImproperInputValidation]
+  cwe: [CWE_79, CWE_20]
+  review_category: "xss"
+  review_condition: "WKWebView server redirects continue without validating the redirected URL through the app's URL-fixup logic"
+  review_evidence: "Swift WKNavigationDelegate context {pattern} handles navigation actions but lacks didReceiveServerRedirectForProvisionalNavigation validation before loading proceeds"
+  review_assumption: "a web response can issue a server redirect to a URL shape that leads to universal cross-site scripting"
+  review_confidence: high
+}
 concept SamlRelayStateOpenRedirect : sink {
   vulnerable_to: [request_forgery.OpenRedirect]
   cwe: [CWE_601]

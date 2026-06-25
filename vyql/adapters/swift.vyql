@@ -48,6 +48,13 @@ adapter swift {
   // SSRF
   sink path "URL" -> code.UrlFetch
   sink path "URLRequest" -> code.UrlFetch
+  flag code.WebViewServerRedirectUrlValidationBypass in module {
+    lang "swift"
+    call path "RequestHandler.handle"
+    call path "decisionHandler"
+    selector "navigationAction.request"
+    not token param_label "didReceiveServerRedirectForProvisionalNavigation"
+  }
 
   // regex compile (ReDoS) — tainted PATTERN
   sink path "NSRegularExpression" -> code.RegexCompile

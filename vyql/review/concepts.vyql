@@ -456,6 +456,12 @@ review code.WeakRedirectUrlValidation {
   expected: [core.RedirectAllowlist, core.InputValidation]
   text: "review redirect URL validators for scheme/netloc parity, slash normalization, control-character rejection, and exact external-host matching"
 }
+review code.WebViewServerRedirectUrlValidationBypass {
+  category: "xss"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify WKWebView server redirects are validated through URL-fixup or allowlist logic before provisional navigation continues"
+}
 review code.PathMatcherNormalizationOrderBypass {
   category: "request_forgery"
   kind: "attention"

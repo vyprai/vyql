@@ -265,6 +265,11 @@ rule JavaScriptUrlRedirectXss {
   match code.JavaScriptUrlRedirectXss as sink
 }
 
+rule WebViewServerRedirectUrlValidationBypass {
+  meta { id: "VYQL-INJ-176", severity: high, cwe: [CWE_79, CWE_20], confidence_floor: high }
+  match code.WebViewServerRedirectUrlValidationBypass as sink
+}
+
 rule UnescapedJsonTreeLabelXss {
   meta { id: "VYQL-INJ-125", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.UnescapedJsonTreeLabelXss as sink

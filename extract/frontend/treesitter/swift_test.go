@@ -13,7 +13,18 @@ import (
 func TestSwiftModuleContextIncludesRawAndCompactText(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "main.swift")
-	src := "server.applyPolicyToFilter()\nlet initialRules = server.mergedRules()\nadapter.start(initialRules: initialRules, onXProtectChanged: { server.handleXProtectChange() })\n"
+	src := `server.applyPolicyToFilter()
+let initialRules = server.mergedRules()
+adapter.start(initialRules: initialRules, onXProtectChanged: { server.handleXProtectChange() })
+
+func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+    guard let urlString = webView.url?.absoluteString,
+          URIFixup.getURL(entry: urlString) != nil else {
+        stop()
+        return
+    }
+}
+`
 	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +58,11 @@ func TestSwiftModuleContextIncludesRawAndCompactText(t *testing.T) {
 		"lang=swift",
 		"server.applyPolicyToFilter()",
 		"adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})",
+		"function_name:webView",
+		"param_label:didReceiveServerRedirectForProvisionalNavigation",
+		"call_path:URIFixup.getURL",
+		"call_path:stop",
+		"selector:webView.url",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("module context missing %q in %q", want, joined)
