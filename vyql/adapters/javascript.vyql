@@ -1675,6 +1675,18 @@ adapter javascript {
     lacks "path.relative"
     lacks "widgetIdPattern"
   }
+  flag code.EncodedDotSegmentStaticPathBypass in function {
+    lang "javascript"
+    selector "req.isStaticFile"
+    selector "req.uri.pathname"
+    call path "req.uri.pathname.indexOf"
+    literal "./"
+    call path "req.$total_file"
+    not literal "%2e"
+    not literal "%2E"
+    not call path "decodeURIComponent"
+    not call path "decodeURI"
+  }
   flag code.ClientAuthFailureResponseReview in function {
     name "<lambda>"
     has "callbackData.hasOwnProperty(\"status\")"

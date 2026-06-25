@@ -3608,6 +3608,15 @@ concept LeadingDotSegmentOnlyRouteFilter : sink {
   review_assumption: "request paths can contain nested '/.' or '/../' segments that reach later file resolution or package asset access"
   review_confidence: high
 }
+concept EncodedDotSegmentStaticPathBypass : sink {
+  vulnerable_to: [path.PathTraversal, validation.ImproperInputValidation]
+  cwe: [CWE_22, CWE_184]
+  review_category: "path"
+  review_condition: "static-file path filtering rejects literal dot-slash traversal but misses percent-encoded dot segments"
+  review_evidence: "static-file path context {pattern} checks request pathname for './' before file serving without decoding or rejecting %2e dot encodings"
+  review_assumption: "request paths can contain percent-encoded dot segments that downstream URL or filesystem handling normalizes before static file resolution"
+  review_confidence: high
+}
 concept TemplatePathComponentTraversal : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]

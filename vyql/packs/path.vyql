@@ -252,3 +252,8 @@ rule CallerControlledFilenameComponentPathTraversal {
   meta { id: "VYQL-PATH-049", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.CallerControlledFilenameComponentPathTraversal as sink
 }
+
+rule EncodedDotSegmentStaticPathBypass {
+  meta { id: "VYQL-PATH-050", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
+  match code.EncodedDotSegmentStaticPathBypass as sink
+}
