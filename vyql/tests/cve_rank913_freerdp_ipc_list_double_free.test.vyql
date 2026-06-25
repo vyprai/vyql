@@ -1,0 +1,77 @@
+# Rank 913 / CVE-2020-4031: FreeRDP freed the parsed IPC socket list before
+# a successful fallback open could continue into the common free(list).
+
+test "rank913: fallback open can continue after early list free"
+  lang c
+  file shadow_server.c
+  expect VYQL-MEM-044
+  expect_review code.ConditionalFallbackListDoubleFree
+  code
+  ```
+  int shadow_server_start(rdpShadowServer* server)
+  {
+      size_t x, count;
+      char** list = CommandLineParseCommaSeparatedValuesEx(NULL, server->ipcSocket, &count);
+      if (!list || (count <= 1))
+      {
+          free(list);
+          if (server->ipcSocket == NULL)
+          {
+              if (!open_port(server, NULL))
+                  return -1;
+          }
+          else
+              return -1;
+      }
+      for (x = 1; x < count; x++)
+      {
+          if (!open_port(server, list[x]))
+          {
+              free(list);
+              return -1;
+          }
+      }
+      free(list);
+      return 0;
+  }
+  ```
+
+test "rank913: fallback open frees list only on failure"
+  lang c
+  file shadow_server.c
+  reject VYQL-MEM-044
+  reject_review code.ConditionalFallbackListDoubleFree
+  code
+  ```
+  int shadow_server_start(rdpShadowServer* server)
+  {
+      size_t x, count;
+      char** list = CommandLineParseCommaSeparatedValuesEx(NULL, server->ipcSocket, &count);
+      if (!list || (count <= 1))
+      {
+          if (server->ipcSocket == NULL)
+          {
+              if (!open_port(server, NULL))
+              {
+                  free(list);
+                  return -1;
+              }
+          }
+          else
+          {
+              free(list);
+              return -1;
+          }
+      }
+      for (x = 1; x < count; x++)
+      {
+          if (!open_port(server, list[x]))
+          {
+              free(list);
+              return -1;
+          }
+      }
+      free(list);
+      return 0;
+  }
+  ```

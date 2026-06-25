@@ -196,6 +196,17 @@ adapter c {
     fact return "false"
     fact storage "nonlocal"
   }
+  flag code.ConditionalFallbackListDoubleFree in function {
+    lang "c"
+    call path "CommandLineParseCommaSeparatedValuesEx"
+    call path "open_port"
+    call path "free"
+    has "free(list)"
+    has "server->ipcSocket==NULL"
+    has "open_port(server,NULL)"
+    has "return-1"
+    lacks "if(!open_port(server,NULL)){free(list);return-1;}"
+  }
   flag code.MissingPostCopyBoundsCheck in function {
     lang "c"
     name "patch"

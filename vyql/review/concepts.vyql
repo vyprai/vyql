@@ -2679,6 +2679,12 @@ review code.ZeroSizeReallocation {
   kind: "attention"
   text: "review reallocation size guards and zero-size lifetime behavior"
 }
+review code.ConditionalFallbackListDoubleFree {
+  category: "memory"
+  kind: "attention"
+  expected: [core.ResourceRelease]
+  text: "review fallback error paths that free a parsed list before a successful fallback can continue into shared cleanup"
+}
 review code.PointerFree {
   category: "memory"
   kind: "attention"

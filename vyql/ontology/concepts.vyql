@@ -1485,6 +1485,15 @@ concept FailurePathOwnedBufferFree : sink {
   vulnerable_to: [memory.DoubleFree]
   cwe: [CWE_415]
 }
+concept ConditionalFallbackListDoubleFree : sink {
+  vulnerable_to: [memory.DoubleFree, memory.UseAfterFree]
+  cwe: [CWE_415, CWE_416]
+  review_category: "memory"
+  review_condition: "a fallback branch frees a parsed list before a successful fallback open can continue to the shared list cleanup"
+  review_evidence: "conditional fallback ownership context {pattern} frees the parsed list before an open_port fallback and later reaches common list cleanup"
+  review_assumption: "the list pointer remains in scope after the successful fallback path and the common cleanup frees it again"
+  review_confidence: high
+}
 concept ReentrantQueueCleanupReview : sink {
   vulnerable_to: [memory.DoubleFree, memory.UseAfterFree]
   cwe: [CWE_415, CWE_416]
