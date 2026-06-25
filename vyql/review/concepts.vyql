@@ -275,6 +275,12 @@ review code.FullSizeMediaFileMissingViewFullAuthorization {
   expected: [core.AuthorizationCheck]
   text: "verify full-size media/data file endpoints require the stronger full-view permission before streaming original files"
 }
+review code.ClusterDeployFunctionMissingPermission {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify cluster functions that deploy uploaded JARs declare privileged deploy/manage permissions before execution"
+}
 review code.ShareLinkDeletionMissingAuthGuard {
   category: "auth"
   kind: "target"

@@ -2199,6 +2199,15 @@ concept FullSizeMediaFileMissingViewFullAuthorization : sink {
   review_assumption: "full/original media files are more sensitive than thumbnails or resized derivatives and require a distinct permission"
   review_confidence: high
 }
+concept ClusterDeployFunctionMissingPermission : sink {
+  vulnerable_to: [access_control.MissingAuthorization, access_control.PrivilegeEscalation]
+  cwe: [CWE_862, CWE_863, CWE_269]
+  review_category: "access_control"
+  review_condition: "a cluster function can deploy uploaded code without declaring a privileged execution permission"
+  review_evidence: "cluster deploy function context {pattern} stages uploaded JAR content and calls the runtime jar deployer without a getRequiredPermissions override or internal-function marker"
+  review_assumption: "remote users can execute the function through the cluster function service using lower privileges than required for code deployment"
+  review_confidence: high
+}
 concept ShareLinkDeletionMissingAuthGuard : sink {
   vulnerable_to: [authentication.MissingAuthentication, access_control.MissingAuthorization, request_forgery.Csrf]
   cwe: [CWE_306, CWE_352, CWE_862]

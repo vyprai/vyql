@@ -1,0 +1,82 @@
+# Rank 950 / CVE-2017-15695: Geode's deploy function accepted uploaded
+# JAR streams but did not declare the privileged deployment permission.
+
+test "rank950: cluster deploy function stages uploaded jars without required permission"
+  lang java
+  profile api
+  file DeployFunction.java
+  expect VYQL-AUTH-071
+  expect_review code.ClusterDeployFunctionMissingPermission
+  code
+  ```
+  import java.util.List;
+  import java.util.Map;
+  import com.healthmarketscience.rmiio.RemoteInputStream;
+  import com.healthmarketscience.rmiio.RemoteInputStreamClient;
+  import org.apache.commons.io.IOUtils;
+  import org.apache.geode.cache.execute.Function;
+  import org.apache.geode.cache.execute.FunctionContext;
+  import org.apache.geode.internal.ClassPathLoader;
+  import org.apache.geode.internal.InternalEntity;
+
+  public class DeployFunction implements Function, InternalEntity {
+    public void execute(FunctionContext context) {
+      Object[] args = (Object[]) context.getArguments();
+      List<String> jarFilenames = (List<String>) args[0];
+      List<RemoteInputStream> jarStreams = (List<RemoteInputStream>) args[1];
+      Map<String, java.io.File> stagedFiles = stageJarContent(jarFilenames, jarStreams);
+      ClassPathLoader.getLatest().getJarDeployer().deploy(stagedFiles);
+    }
+
+    private Map<String, java.io.File> stageJarContent(List<String> jarNames,
+        List<RemoteInputStream> jarStreams) throws java.io.IOException {
+      java.io.InputStream input = RemoteInputStreamClient.wrap(jarStreams.get(0));
+      IOUtils.copyLarge(input, new java.io.ByteArrayOutputStream());
+      return new java.util.HashMap<>();
+    }
+  }
+  ```
+
+test "rank950: privileged deploy permission suppresses cluster deploy finding"
+  lang java
+  profile api
+  file DeployFunction.java
+  reject VYQL-AUTH-071
+  reject_review code.ClusterDeployFunctionMissingPermission
+  code
+  ```
+  import java.util.Collection;
+  import java.util.Collections;
+  import java.util.List;
+  import java.util.Map;
+  import com.healthmarketscience.rmiio.RemoteInputStream;
+  import com.healthmarketscience.rmiio.RemoteInputStreamClient;
+  import org.apache.commons.io.IOUtils;
+  import org.apache.geode.cache.execute.Function;
+  import org.apache.geode.cache.execute.FunctionContext;
+  import org.apache.geode.internal.ClassPathLoader;
+  import org.apache.geode.internal.InternalEntity;
+  import org.apache.geode.management.internal.security.ResourcePermissions;
+  import org.apache.geode.security.ResourcePermission;
+
+  public class DeployFunction implements Function, InternalEntity {
+    public void execute(FunctionContext context) {
+      Object[] args = (Object[]) context.getArguments();
+      List<String> jarFilenames = (List<String>) args[0];
+      List<RemoteInputStream> jarStreams = (List<RemoteInputStream>) args[1];
+      Map<String, java.io.File> stagedFiles = stageJarContent(jarFilenames, jarStreams);
+      ClassPathLoader.getLatest().getJarDeployer().deploy(stagedFiles);
+    }
+
+    public Collection<ResourcePermission> getRequiredPermissions(String regionName) {
+      return Collections.singleton(ResourcePermissions.CLUSTER_MANAGE_DEPLOY);
+    }
+
+    private Map<String, java.io.File> stageJarContent(List<String> jarNames,
+        List<RemoteInputStream> jarStreams) throws java.io.IOException {
+      java.io.InputStream input = RemoteInputStreamClient.wrap(jarStreams.get(0));
+      IOUtils.copyLarge(input, new java.io.ByteArrayOutputStream());
+      return new java.util.HashMap<>();
+    }
+  }
+  ```

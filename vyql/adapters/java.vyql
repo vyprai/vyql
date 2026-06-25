@@ -723,6 +723,14 @@ adapter java {
     call arg contains_any ["filename.equals:..", "fileName.equals:.."]
     not call arg contains_any ["filename.contains:..", "fileName.contains:.."]
   }
+  flag code.ClusterDeployFunctionMissingPermission in class {
+    class base "Function"
+    class name contains_any ["DeployFunction", "InstallFunction", "UploadFunction"]
+    call path contains_any ["getJarDeployer.deploy", "ClassPathLoader.getLatest.getJarDeployer.deploy"]
+    call path contains_any ["stageJarContent", "RemoteInputStreamClient.wrap", "IOUtils.copyLarge"]
+    not function "getRequiredPermissions"
+    not class base "InternalFunction"
+  }
   flag code.JenkinsStaplerStateChangeMissingPost in function {
     function contains_any ["doSave", "doSubmit", "doConfigure"]
     call contains_any ["bindJSON", "save", "configure"]

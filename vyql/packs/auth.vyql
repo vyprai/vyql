@@ -124,6 +124,11 @@ rule FullSizeMediaFileMissingViewFullAuthorization {
   match code.FullSizeMediaFileMissingViewFullAuthorization as file
 }
 
+rule ClusterDeployFunctionMissingPermission {
+  meta { id: "VYQL-AUTH-071", severity: critical, cwe: [CWE_862, CWE_863, CWE_269], confidence_floor: high }
+  match code.ClusterDeployFunctionMissingPermission as function
+}
+
 rule ShareLinkDeletionMissingAuthGuard {
   meta { id: "VYQL-AUTH-059", severity: critical, cwe: [CWE_306, CWE_352, CWE_862], confidence_floor: high }
   match code.ShareLinkDeletionMissingAuthGuard as endpoint
