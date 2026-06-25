@@ -1528,9 +1528,11 @@ func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, 
 		n.Prop("callee_path") == "analysis.module.context" ||
 		n.Prop("callee_path") == "analysis.class.context" {
 		if ok, hit := flagContextPredicateMatchesAST(s, pred, n, tech, crossLang); ok {
-			probe := pred
-			probe.Negative = false
-			hit = hit || flagPredicateMatchesNodeOnly(probe, n)
+			if !flagPredicateUsesCallArg(pred) {
+				probe := pred
+				probe.Negative = false
+				hit = hit || flagPredicateMatchesNodeOnly(probe, n)
+			}
 			if pred.Negative {
 				return !hit
 			}
@@ -1538,6 +1540,18 @@ func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, 
 		}
 	}
 	return flagPredicateMatchesNodeOnly(pred, n)
+}
+
+func flagPredicateUsesCallArg(pred flagPredicate) bool {
+	if pred.Property != "tokens" {
+		return false
+	}
+	for _, v := range pred.Values {
+		if strings.HasPrefix(v, "call_arg:") {
+			return true
+		}
+	}
+	return false
 }
 
 func flagFlowToNodeHit(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {

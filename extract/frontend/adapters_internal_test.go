@@ -725,6 +725,32 @@ adapter php {
 	}
 }
 
+func TestContextFlagCallArgDoesNotUseCompactTokenFallback(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter php {
+  flag custom.DirectJsonEncode in function {
+    lang "php"
+    call arg "json_encode:$data[$field_name]"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "fields.php:1",
+		"region":      "fields.php/fn1",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=php\x00call_arg:json_encode:$data[$field_name]",
+	}})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context call-arg flag should require scoped AST call evidence, got %+v", got)
+	}
+}
+
 func TestContextFlagAstPredicatesUseRegionWhenScopeIsEmpty(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter php {
