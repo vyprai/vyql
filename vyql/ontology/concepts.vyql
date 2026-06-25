@@ -2415,6 +2415,15 @@ concept JenkinsRemoteValidationMissingPostPermission : sink {
   review_assumption: "a user with Overall/Read or a browser-backed request can invoke descriptor validation endpoints with attacker-controlled URL or proxy parameters"
   review_confidence: high
 }
+concept JenkinsDescriptorPropertyFileValidationMissingPost : sink {
+  vulnerable_to: [request_forgery.Csrf, request_forgery.Ssrf, path.PathTraversal]
+  cwe: [CWE_352, CWE_918, CWE_22]
+  review_category: "request_forgery"
+  review_condition: "Jenkins descriptor property-file validation endpoint loads a request-supplied file or URL without requiring POST"
+  review_evidence: "Jenkins descriptor endpoint context {pattern} accepts QueryParameter property-file values, constructs File or URL inputs, and executes property loading before an observed @POST/@RequirePOST guard"
+  review_assumption: "a browser-backed request can invoke descriptor validation endpoints with attacker-controlled property-file paths or URLs"
+  review_confidence: high
+}
 
 concept JenkinsStaplerStateChangeMissingPost : sink {
   vulnerable_to: [request_forgery.Csrf]

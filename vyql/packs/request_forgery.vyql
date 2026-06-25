@@ -140,6 +140,11 @@ rule JenkinsRemoteValidationMissingPostPermission {
   match code.JenkinsRemoteValidationMissingPostPermission as endpoint
 }
 
+rule JenkinsDescriptorPropertyFileValidationMissingPost {
+  meta { id: "VYQL-RF-030", severity: medium, cwe: [CWE_352, CWE_918, CWE_22], confidence_floor: high }
+  match code.JenkinsDescriptorPropertyFileValidationMissingPost as endpoint
+}
+
 rule JenkinsStaplerStateChangeMissingPost {
   meta { id: "VYQL-RF-029", severity: high, cwe: [CWE_352], confidence_floor: high }
   match code.JenkinsStaplerStateChangeMissingPost as endpoint

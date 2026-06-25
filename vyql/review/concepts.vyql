@@ -425,6 +425,12 @@ review code.JenkinsRemoteValidationMissingPostPermission {
   expected: [core.CsrfProtection, core.AuthorizationCheck]
   text: "review Jenkins descriptor remote-validation endpoints for @POST and administrator permission checks before testing supplied URLs"
 }
+review code.JenkinsDescriptorPropertyFileValidationMissingPost {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.CsrfProtection]
+  text: "review Jenkins descriptor property-file validation endpoints for @POST before loading request-supplied file paths or URLs"
+}
 review code.MultiOptionUrlValidationBypass {
   category: "request_forgery"
   kind: "attention"

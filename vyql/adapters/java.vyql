@@ -656,6 +656,25 @@ adapter java {
     not call "checkPermission"
     not call "hasPermission"
   }
+  flag code.JenkinsDescriptorPropertyFileValidationMissingPost in function {
+    class base "ParameterDescriptor"
+    function "doCheckPropertyFile"
+    annotation "QueryParameter"
+    call path "Property"
+    call path "File"
+    call path "URL"
+    call path "property.execute"
+    not annotation "POST"
+    not annotation "RequirePOST"
+  }
+  flag code.JenkinsDescriptorPropertyFileValidationMissingPost in function {
+    class base "ParameterDescriptor"
+    function contains_any ["doCheckPropertyKey", "doCheckDefaultPropertyFile", "doCheckDefaultPropertyKey"]
+    annotation "QueryParameter"
+    call path "doCheckPropertyFile"
+    not annotation "POST"
+    not annotation "RequirePOST"
+  }
   flag code.JenkinsStaplerStateChangeMissingPost in function {
     function contains_any ["doSave", "doSubmit", "doConfigure"]
     call contains_any ["bindJSON", "save", "configure"]
