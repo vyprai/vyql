@@ -196,6 +196,16 @@ concept ProtocolCommandInjection : sink {
   cwe: [CWE_349]
 }
 
+concept CredentialProtocolNewlineInjection : sink {
+  vulnerable_to: [injection.ProtocolStateConfusion, injection.CrlfInjection, secrets.SecretLeak]
+  cwe: [CWE_93, CWE_349, CWE_200]
+  review_category: "injection"
+  review_condition: "a line-oriented credential protocol writes key/value records without rejecting embedded newlines"
+  review_evidence: "credential protocol writer context {pattern} emits key=value records with newline delimiters before an observed newline rejection"
+  review_assumption: "credential values can be decoded from attacker-controlled URLs or helper input and an embedded newline can inject additional protocol records"
+  review_confidence: high
+}
+
 concept CommandLineAssemblyReview : sink {
   vulnerable_to: [injection.CommandInjection, injection.ArgumentInjection, injection.UnsafeDynamicLoading]
   cwe: [CWE_77, CWE_88, CWE_829]

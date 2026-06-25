@@ -108,6 +108,13 @@ adapter c {
     assign contains "conf.dns.interface.c=validate_stub"
     not assign contains_any ["conf.dns.interface.c=validate_str_no_newline"]
   }
+  flag code.CredentialProtocolNewlineInjection in function {
+    lang "c"
+    name "credential_write_item"
+    call path "fprintf"
+    literal contains "%s=%s"
+    not call path "strchr"
+  }
 
   // dynamic loading (untrusted path -> code load)
   sink path "dlopen" -> code.DynamicCodeLoad

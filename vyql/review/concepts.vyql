@@ -333,6 +333,12 @@ review code.ProtocolFrameBindingReview {
   expected: [core.AuthenticationCheck]
   text: "review protocol frame/session identifier binding before accepting the frame as belonging to an existing authenticated session"
 }
+review code.CredentialProtocolNewlineInjection {
+  category: "injection"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "reject embedded newlines before writing line-oriented credential protocol key/value records"
+}
 review code.AuthFailureResponseReview {
   category: "auth"
   kind: "attention"
