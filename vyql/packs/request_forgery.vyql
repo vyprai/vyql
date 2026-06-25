@@ -155,6 +155,11 @@ rule WeakRedirectUrlValidation {
   match code.WeakRedirectUrlValidation as redirect
 }
 
+rule DesktopProtocolRedirectWithoutAllowlist {
+  meta { id: "VYQL-RF-041", severity: medium, cwe: [CWE_601, CWE_20], confidence_floor: high }
+  match code.DesktopProtocolRedirectWithoutAllowlist as redirect
+}
+
 rule SamlRelayStateOpenRedirect {
   meta { id: "VYQL-RF-024", severity: medium, cwe: [CWE_601], confidence_floor: high }
   match code.SamlRelayStateOpenRedirect as redirect

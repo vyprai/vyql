@@ -588,6 +588,16 @@ adapter javascript {
     lacks "redirect[0]==='/'"
     lacks "redirect[1]!=='/'"
   }
+  flag code.DesktopProtocolRedirectWithoutAllowlist in function {
+    name contains_any ["openDesktopIDE", "openExternal", "openDesktop", "redirectToDesktop"]
+    call path "URL"
+    call path "window.location.href"
+    token identifier contains_any ["url", "desktopLink", "redirect"]
+    literal "http:"
+    literal "https:"
+    not call path contains_any ["trustedProtocols.includes", "allowedProtocols.includes"]
+    not literal contains_any ["vscode:", "vscode-insiders:", "jetbrains-gateway:"]
+  }
   control "isSafeRedirect" -> core.RedirectAllowlist
   control "isValidRedirect" -> core.RedirectAllowlist
   control "isAllowedRedirect" -> core.RedirectAllowlist
