@@ -804,14 +804,13 @@ adapter php {
     lacks "htmlentities"
     lacks "e($tasks->title"
   }
-  flag code.PgEscapeStringSqlFilterInjection on any {
-    path exact "analysis.function.context"
+  flag code.PgEscapeStringSqlFilterInjection in function {
     name "freedomrss_search"
-    has "GetHttpVars"
-    has "pg_escape_string"
-    has "SearchDoc"
-    has "addFilter"
-    lacks "pg_escape_literal"
+    call path "GetHttpVars"
+    call path "pg_escape_string"
+    call path "SearchDoc"
+    call path "addFilter"
+    not call path "pg_escape_literal"
   }
   // Review-only access-policy config: nested PHP arrays such as
   // ['locale' => ['site' => ['groups' => ['admin', 'super']]]]

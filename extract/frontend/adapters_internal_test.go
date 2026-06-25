@@ -1162,8 +1162,15 @@ adapter ruby {
 		"loc":         "secret_token_fixed.rb:1",
 		"callee_path": "analysis.module.context",
 		"method":      "context",
-		"str_args":    "lang=ruby\x00expr:Rails.env=='test'\x00assign:FatFreeCRM.Application.config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
+		"str_args":    "lang=ruby\x00assign:FatFreeCRM.Application.config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
 	}})
+	store.AddNode(usg.Node{ID: "fixed-env", Type: "code.Param", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module", Props: map[string]string{"name": "Rails.env"}})
+	store.AddNode(usg.Node{ID: "fixed-test", Type: "code.Const", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module", Props: map[string]string{"str_args": "test"}})
+	store.AddNode(usg.Node{ID: "fixed-arg0", Type: "code.Arg", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module"})
+	store.AddNode(usg.Node{ID: "fixed-arg1", Type: "code.Arg", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module"})
+	store.AddNode(usg.Node{ID: "fixed-cmp", Type: "code.BinOp", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module", Props: map[string]string{"op": "==", "callee_path": "__binop.eq", "method": "eq", "arg0": "fixed-arg0", "arg1": "fixed-arg1"}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixed-env", Dst: "fixed-arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixed-test", Dst: "fixed-arg1"})
 	got = spec.flagAdapter().Apply(store)
 	if len(got) != 1 {
 		t.Fatalf("context structured-token flag should skip test-only guarded scope, got %+v", got)

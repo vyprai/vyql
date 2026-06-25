@@ -480,6 +480,44 @@ adapter python {
   sink path "subprocess.getstatusoutput" -> code.CommandExecution
   sink path "commands.getoutput" -> code.CommandExecution
   sink path "commands.getstatusoutput" -> code.CommandExecution
+  flag code.CommandStringWrapperExecution in function {
+    lang "python"
+    call path contains_any [
+      "subprocess.run",
+      "subprocess.call",
+      "subprocess.Popen",
+      "subprocess.check_output",
+      "subprocess.check_call",
+    ]
+    fact shell "True"
+    assign contains_any [
+      "command=f\"",
+      "command=f'",
+      "cmd=f\"",
+      "cmd=f'",
+      "shell_command=f\"",
+      "shell_command=f'",
+    ]
+    call arg contains_any [
+      "subprocess.run:command",
+      "subprocess.call:command",
+      "subprocess.Popen:command",
+      "subprocess.check_output:command",
+      "subprocess.check_call:command",
+      "subprocess.run:cmd",
+      "subprocess.call:cmd",
+      "subprocess.Popen:cmd",
+      "subprocess.check_output:cmd",
+      "subprocess.check_call:cmd",
+      "subprocess.run:shell_command",
+      "subprocess.call:shell_command",
+      "subprocess.Popen:shell_command",
+      "subprocess.check_output:shell_command",
+      "subprocess.check_call:shell_command",
+    ]
+    not call path contains_any ["shlex.quote", "shlex.join", "subprocess.list2cmdline"]
+    not identifier "pkgmgr"
+  }
   flag code.ShellTruePackageManagerProbe on any {
     path exact "analysis.function.context"
     name "check_for_libaio_pkg"
@@ -1155,14 +1193,12 @@ adapter python {
     has "__default_field__"
     has "=ANY("
   }
-  flag code.UnvalidatedSqlIdentifierInterpolation on any {
-    path exact "analysis.function.context"
+  flag code.UnvalidatedSqlIdentifierInterpolation in function {
     name "update_profile"
-    has "UPDATE users SET"
-    has "field[0]"
-    has "nonquery"
-    lacks "field[0] in [\"firstname\", \"lastname\"]"
-    lacks "field[0]in[\"firstname\",\"lastname\"]"
+    literal "UPDATE users SET"
+    token subscript "field[0]"
+    call path "nonquery"
+    not expr "field[0]in[\"firstname\",\"lastname\"]"
   }
   flag code.AmbiguousQueryParameterSeparator in function {
     name "_parse_qsl"

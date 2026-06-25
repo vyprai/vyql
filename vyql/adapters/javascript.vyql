@@ -1349,13 +1349,12 @@ adapter javascript {
     has "defaultsDeep(val,value)"
     lacks "key==='__proto__'"
   }
-  flag code.TemplateDirectoryHiddenGlobCopy on any {
-    path exact "analysis.function.context"
+  flag code.TemplateDirectoryHiddenGlobCopy in function {
     lang "javascript"
     name "downloadTemplate"
-    has "fs.statSync(file).isDirectory()"
-    has "d.copy(file,dist)"
-    lacks "hide:false"
+    call path "fs.statSync"
+    call path "d.copy"
+    not token prop "hide=false"
   }
   flag code.NestedPathInheritedPropertyPrototypePollution in function {
     lang "javascript"

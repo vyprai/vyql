@@ -1670,8 +1670,12 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 				prefix = "subscript:"
 			}
 			return true, flagScopeSubscriptHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
-		case strings.HasPrefix(v, "binary:"):
-			return true, flagScopeBinopHit(s, pred, n, trimFlagValuePrefix(pred.Values, "binary:"), tech, crossLang)
+		case strings.HasPrefix(v, "binary:"), strings.HasPrefix(v, "expr:"):
+			prefix := "binary:"
+			if strings.HasPrefix(v, "expr:") {
+				prefix = "expr:"
+			}
+			return true, flagScopeBinopHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
 		case strings.HasPrefix(v, "name="), strings.HasPrefix(v, "function_name:"):
 			return false, false
 		default:
