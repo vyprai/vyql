@@ -264,6 +264,11 @@ rule UnvalidatedModelSelection {
   match code.UnvalidatedModelSelection as selector
 }
 
+rule FrappeLinkExpansionMissingReadPermission {
+  meta { id: "VYQL-AUTH-065", severity: high, cwe: [CWE_862, CWE_863], confidence_floor: high }
+  match code.FrappeLinkExpansionMissingReadPermission as expansion
+}
+
 rule InsecureDirectObjectReference {
   meta { id: "VYQL-AUTH-002", severity: high, cwe: [CWE_639] }
   taint core.UserControlledData -> code.ObjectLookupByUserInput

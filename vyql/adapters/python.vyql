@@ -1255,6 +1255,15 @@ adapter python {
   sink method "get_order" -> code.ObjectLookupByUserInput
   sink method "find_by_id" -> code.ObjectLookupByUserInput
   sink method "get_by_id" -> code.ObjectLookupByUserInput
+  flag code.FrappeLinkExpansionMissingReadPermission in function {
+    lang "python"
+    name "get_values_for_link_and_dynamic_link_fields"
+    call path "meta.get_link_fields"
+    call path "meta.get_dynamic_link_fields"
+    call path "frappe.get_doc"
+    call path "doc_dict.update"
+    not call path "link_doc.apply_fieldlevel_read_permissions"
+  }
   sink path "analysis.function.context.sink" val "name=generate_auth_token" val "RemoteAuthToken.user_id==user_id" val "auth_token.user_id=user_id" nval "current_user.id!=user_id" -> code.ObjectLookupByUserInput
   sink path "analysis.function.context.sink" val "name=delete_auth_token" val "RemoteAuthToken.user_id==user_id" val "delete()" nval "current_user.id!=user_id" -> code.ObjectLookupByUserInput
 

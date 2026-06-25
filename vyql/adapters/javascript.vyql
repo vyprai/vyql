@@ -1415,6 +1415,15 @@ adapter javascript {
     token index_key "item.value"
     lacks fact prototype_name_guard "true"
   }
+  flag code.GeneratedPathAccessorPrototypePollution in function {
+    lang "javascript"
+    call path "parsepath"
+    call path "builder.push"
+    call path "Function"
+    literal contains_any ["__proto__", "constructor", "prototype"]
+    not call path contains_any ["Object.hasOwn", "hasOwnProperty"]
+    not literal contains_any ["removed method"]
+  }
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute

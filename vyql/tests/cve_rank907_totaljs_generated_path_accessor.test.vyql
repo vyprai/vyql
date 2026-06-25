@@ -1,0 +1,52 @@
+# Rank 907 / CVE-2021-23390: Total.js removed generated path accessors
+# whose caller-controlled path strings were compiled with Function.
+
+test "rank907: generated path accessor compiles caller path segments"
+  lang javascript
+  file utils.js
+  expect VYQL-INJ-179
+  expect_review code.GeneratedPathAccessorPrototypePollution
+  code
+  ```
+  exports.set = function(obj, path, value) {
+    var cachekey = 'S+' + path;
+    if (F.temporary.other[cachekey])
+      return F.temporary.other[cachekey](obj, value);
+
+    var arr = parsepath(path);
+    var builder = [];
+    for (var i = 0; i < arr.length - 1; i++) {
+      var p = 'w' + (arr[i][0] === '[' ? '' : '.') + arr[i];
+      builder.push('if(typeof(' + p + ')!=="object")' + p + '={};');
+    }
+
+    var a = builder.join(';') + ';return w';
+    if ((/__proto__|constructor|prototype|eval/).test(a))
+      throw new Error('Potential vulnerability');
+
+    var fn = new Function('w', 'a', 'b', a);
+    F.temporary.other[cachekey] = fn;
+    fn(obj, value, path);
+  };
+
+  function parsepath(path) {
+    var arr = path.split('.');
+    var builder = [];
+    return builder;
+  }
+  ```
+
+test "rank907: generated path accessor removed"
+  lang javascript
+  file utils.js
+  reject VYQL-INJ-179
+  reject_review code.GeneratedPathAccessorPrototypePollution
+  code
+  ```
+  exports.async = function(fn, isApply) {
+    return function(complete) {
+      var generator = fn.apply(this, []);
+      return generator.value;
+    };
+  };
+  ```

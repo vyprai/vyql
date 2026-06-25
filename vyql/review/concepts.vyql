@@ -322,6 +322,12 @@ review code.ObjectLookupByUserInput {
   expected: [core.OwnershipCheck, core.AuthorizationCheck]
   text: "verify object access is constrained to the current principal"
 }
+review code.FrappeLinkExpansionMissingReadPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Frappe link expansion helpers for read permission checks and field-level read filtering before returning linked documents"
+}
 review code.DeserializableInvocationHandler {
   category: "deserialization"
   kind: "attention"
@@ -1014,6 +1020,12 @@ review code.ExpressionEvaluatorPrototypeNameAccess {
   kind: "attention"
   expected: [core.PrototypePollutionGuard]
   text: "review expression evaluators for __proto__/constructor/prototype rejection before resolving variable or member tokens"
+}
+review code.GeneratedPathAccessorPrototypePollution {
+  category: "prototype_pollution"
+  kind: "target"
+  expected: [core.PrototypePollutionGuard]
+  text: "review generated path accessor helpers for removal or strict path-segment validation before Function compilation"
 }
 review code.McpToolCommandTemplateExecution {
   category: "command"

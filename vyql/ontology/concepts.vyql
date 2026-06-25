@@ -562,6 +562,15 @@ concept ExpressionEvaluatorPrototypeNameAccess : sink {
   review_assumption: "a caller can evaluate attacker-controlled expressions containing variable or member names"
   review_confidence: high
 }
+concept GeneratedPathAccessorPrototypePollution : sink {
+  vulnerable_to: [injection.PrototypePollution, injection.CodeInjection]
+  cwe: [CWE_1321, CWE_94]
+  review_category: "prototype_pollution"
+  review_condition: "nested path accessors generate JavaScript property-access code from caller path strings and compile it with Function"
+  review_evidence: "path accessor context {pattern} splits a path, builds property access strings, caches the generated function, and compiles it with new Function"
+  review_assumption: "a caller can provide path segments such as __proto__, constructor, prototype, or code metacharacters that affect the generated accessor"
+  review_confidence: high
+}
 concept SchemaCodegenValidationBypass : sink {
   vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
   cwe: [CWE_1321, CWE_915]
@@ -2289,6 +2298,15 @@ concept ObjectLookupByUserInput : sink {
   review_evidence: "lookup primitive {pattern} receives tainted input"
   review_assumption: "the object is not constrained to the authenticated principal or tenant"
   review_confidence: medium
+}
+concept FrappeLinkExpansionMissingReadPermission : sink {
+  vulnerable_to: [access_control.MissingAuthorization, access_control.BrokenAccess]
+  cwe: [CWE_862, CWE_863]
+  review_category: "auth"
+  review_condition: "Frappe document link expansion fetches linked documents without enforcing read permission and field-level read filtering"
+  review_evidence: "link expansion context {pattern} resolves Link and Dynamic Link fields through frappe.get_doc before updating the response document"
+  review_assumption: "expanded linked documents may reference records or fields the caller cannot read directly"
+  review_confidence: high
 }
 // A privileged / state-changing operation (delete/grant/setRole/admin, DB writes) whose
 // access-control can't be verified statically. POSSIBILITY-tier review concept (broader than

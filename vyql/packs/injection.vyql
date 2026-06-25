@@ -799,6 +799,11 @@ rule ExpressionEvaluatorPrototypeNameAccess {
   match code.ExpressionEvaluatorPrototypeNameAccess as sink
 }
 
+rule GeneratedPathAccessorPrototypePollution {
+  meta { id: "VYQL-INJ-179", severity: high, cwe: [CWE_1321, CWE_94], confidence_floor: high }
+  match code.GeneratedPathAccessorPrototypePollution as sink
+}
+
 rule CordysRequestParamXssFilterDisabled {
   meta { id: "VYQL-INJ-108", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.CordysRequestParamXssFilterDisabled as sink
