@@ -184,6 +184,13 @@ adapter php {
     has "unserialize"
     lacks "allowed_classes"
   }
+  flag code.ConfigurableCacheUnserializeWrapper in function {
+    lang "php"
+    name "unserialize"
+    param type "string"
+    call path "is_numeric"
+    call path "$unserialize"
+  }
   flag code.UnescapedSessionFlash in function {
     lang "php"
     has "$_SESSION['info']"

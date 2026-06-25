@@ -330,6 +330,17 @@ func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	}
 	name := c.text(field(fn, "name"))
 	tokens := []string{"lang=php", "name=" + name}
+	ptypes := c.paramTypes(field(fn, "parameters"))
+	seenTypes := map[string]bool{}
+	for _, p := range c.params(field(fn, "parameters")) {
+		if t := ptypes[p]; t != "" {
+			tokens = append(tokens, "param_type:"+t)
+			if !seenTypes[t] {
+				seenTypes[t] = true
+				tokens = append(tokens, "function_param_type:"+t)
+			}
+		}
+	}
 	tokens = append(tokens, c.phpAstContextTokens(body)...)
 	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", tokens, c.text(body))
 }

@@ -350,6 +350,12 @@ review code.PickleLoadsJoblibModelLoader {
   expected: [core.SafeDeserialization]
   text: "verify model-loading helpers do not pass joblib-loaded artifacts into pickle.loads unless artifacts are strictly trusted or loaded with a restricted unpickler"
 }
+review code.ConfigurableCacheUnserializeWrapper {
+  category: "deserialization"
+  kind: "attention"
+  expected: [core.SafeDeserialization]
+  text: "review configurable cache unserialize wrappers for unsafe unserializers and vulnerable cache-data type handling"
+}
 review code.UncheckedPrototypeConfigKey {
   category: "prototype_pollution"
   kind: "attention"

@@ -99,3 +99,8 @@ rule PickleLoadsJoblibModelLoader {
   meta { id: "VYQL-DESER-018", severity: high, cwe: [CWE_502], confidence_floor: high }
   match code.PickleLoadsJoblibModelLoader as loader
 }
+
+rule ConfigurableCacheUnserializeWrapper {
+  meta { id: "VYQL-DESER-019", severity: high, cwe: [CWE_502, CWE_248], confidence_floor: high }
+  match code.ConfigurableCacheUnserializeWrapper as wrapper
+}

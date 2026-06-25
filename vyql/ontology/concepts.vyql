@@ -3387,6 +3387,15 @@ concept RequestSelectedDeserializationFormat : sink {
   review_assumption: "the selected serde registry includes an unsafe object deserialization format"
   review_confidence: medium
 }
+concept ConfigurableCacheUnserializeWrapper : sink {
+  vulnerable_to: [deserialization.DeserializationAbuse, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_502, CWE_248]
+  review_category: "deserialization"
+  review_condition: "a framework cache driver wrapper selects an unserializer from configuration and applies it to cached data using a restrictive vulnerable signature"
+  review_evidence: "cache unserialize context {pattern} reads the unserializer callable from options and invokes it on cache data"
+  review_assumption: "cache contents may be attacker-influenced through cache poisoning, shared backing stores, or application-controlled cache writes"
+  review_confidence: high
+}
 concept PickleUnsafeImportBlocklistGap : sink {
   vulnerable_to: [deserialization.DeserializationAbuse, injection.CodeInjection]
   cwe: [CWE_184, CWE_502]

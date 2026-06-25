@@ -58,6 +58,48 @@ class TasksController {
 	t.Fatalf("analysis.function.context for anyData not found")
 }
 
+func TestPHPFunctionContextIncludesParameterTypes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Driver.php")
+	src := []byte(`<?php
+class Driver {
+  protected function unserialize(string $data) {
+    if (is_numeric($data)) {
+      return $data;
+    }
+    $unserialize = $this->options['serialize'][1] ?? "unserialize";
+    return $unserialize($data);
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.function.context" && strings.Contains(n.Prop("str_args"), "name=unserialize") {
+			args := n.Prop("str_args")
+			for _, want := range []string{"param_type:string", "function_param_type:string"} {
+				if !strings.Contains(args, want) {
+					t.Fatalf("PHP function context missing %q; context=%q", want, args)
+				}
+			}
+			return
+		}
+	}
+	t.Fatalf("analysis.function.context for unserialize not found")
+}
+
 func TestPHPFunctionContextIncludesAssignmentFacts(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "TempPath.php")
