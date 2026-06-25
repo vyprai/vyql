@@ -479,6 +479,10 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 					}
 				}
 			}
+		case "array":
+			for _, tok := range c.jsGitCloneArgvTokens(n) {
+				add(tok)
+			}
 		case "binary_expression":
 			if expr := jsContextCompact(c.text(n)); expr != "" {
 				add("expr:" + expr)
@@ -540,6 +544,77 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 	}
 	walk(root)
 	return out
+}
+
+func (c *jsConv) jsGitCloneArgvTokens(n *tree_sitter.Node) []string {
+	if n == nil || n.Kind() != "array" {
+		return nil
+	}
+	var elems []string
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "string", "template_string":
+			if v := jsContextValue(c.text(ch)); v != "" {
+				elems = append(elems, v)
+			}
+		case "identifier":
+			if v := jsContextCompact(c.text(ch)); v != "" {
+				elems = append(elems, v)
+			}
+		default:
+			if v := jsContextCompact(c.text(ch)); v != "" {
+				elems = append(elems, v)
+			}
+		}
+	}
+	cloneIndex := -1
+	for i, elem := range elems {
+		if elem == "clone" {
+			cloneIndex = i
+			break
+		}
+	}
+	if cloneIndex < 0 {
+		return nil
+	}
+	remoteIndex := -1
+	for i := cloneIndex + 1; i < len(elems); i++ {
+		if jsGitRemoteArgName(elems[i]) {
+			remoteIndex = i
+			break
+		}
+	}
+	if remoteIndex < 0 {
+		return nil
+	}
+	hasDelimiter := false
+	for i := cloneIndex + 1; i < remoteIndex; i++ {
+		if elems[i] == "--" {
+			hasDelimiter = true
+			break
+		}
+	}
+	seq := jsContextCompact(strings.Join(elems, " "))
+	out := []string{"git_clone_argv_sequence=" + seq}
+	if hasDelimiter {
+		out = append(out, "git_clone_argv_delimited=true")
+	} else {
+		out = append(out, "git_clone_argv_missing_delimiter=true")
+	}
+	return out
+}
+
+func jsGitRemoteArgName(s string) bool {
+	s = strings.ToLower(jsContextCompact(s))
+	if s == "" || strings.HasPrefix(s, "--") {
+		return false
+	}
+	for _, part := range []string{"url", "uri", "repo", "repository", "remote", "origin", "giturl", "git"} {
+		if strings.Contains(s, part) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *jsConv) jsSecretConfigObjectVars(root *tree_sitter.Node) map[string]bool {

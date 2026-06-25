@@ -648,6 +648,65 @@ export class Git {
 	}
 }
 
+func TestJavaScriptGitCloneArgvContextTokensShowEndOfOptionsDelimiter(t *testing.T) {
+	dir := t.TempDir()
+	vulnerable := filepath.Join(dir, "vulnerable.js")
+	fixed := filepath.Join(dir, "fixed.js")
+	vulnerableSrc := []byte(`
+function cloneRepo(url, outPath, depth) {
+  const flag = depth < Infinity ? '--depth=' + depth : '--single-branch';
+  const args = ['clone', flag, url, outPath];
+  spawn('git', args, {}, cb);
+}
+`)
+	fixedSrc := []byte(`
+function cloneRepo(url, outPath, depth) {
+  const flag = depth < Infinity ? '--depth=' + depth : '--single-branch';
+  const args = ['clone', flag, '--', url, outPath];
+  spawn('git', args, {}, cb);
+}
+`)
+	if err := os.WriteFile(vulnerable, vulnerableSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, fixedSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{vulnerable, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVulnerable, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		switch {
+		case strings.Contains(n.Prop("loc"), "vulnerable.js") &&
+			strings.Contains(tokens, "git_clone_argv_sequence=cloneflagurloutPath") &&
+			strings.Contains(tokens, "git_clone_argv_missing_delimiter=true"):
+			sawVulnerable = true
+		case strings.Contains(n.Prop("loc"), "fixed.js") &&
+			strings.Contains(tokens, "git_clone_argv_sequence=cloneflag--urloutPath") &&
+			strings.Contains(tokens, "git_clone_argv_delimited=true") &&
+			!strings.Contains(tokens, "git_clone_argv_missing_delimiter=true"):
+			sawFixed = true
+		}
+	}
+	if !sawVulnerable || !sawFixed {
+		t.Fatalf("git clone argv context tokens did not distinguish delimiter: vulnerable=%v fixed=%v nodes=%#v", sawVulnerable, sawFixed, nodes)
+	}
+}
+
 func TestJavaScriptRegexMayBacktrackAmbiguousAdjacentQuantifiers(t *testing.T) {
 	tests := []struct {
 		name string

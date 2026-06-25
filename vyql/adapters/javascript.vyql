@@ -776,6 +776,10 @@ adapter javascript {
     literal contains_any ["clone${repository}", "clone${remote}", "clone${url}"]
     not literal contains_any ["--${repository}", "--${remote}", "--${url}"]
   }
+  flag code.CommandOptionInjection in function {
+    call path contains_any ["spawn", "crossSpawn", "child_process.spawn", "spawnSync"]
+    fact git_clone_argv_missing_delimiter "true"
+  }
   flag code.GitPackSignatureSearchParsingBypass in function {
     call path contains_any ["?.lastIndexOf", "req.body.lastIndexOf"]
     literal "PACK"
