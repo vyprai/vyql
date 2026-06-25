@@ -292,6 +292,12 @@ review code.AuthAttemptLimitReview {
   expected: [core.RateLimit]
   text: "review authentication challenge or failed-attempt limit logic for brute-force resistance and concurrent bypasses"
 }
+review code.PasswordRecoveryLinkHostControl {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review password recovery links for configured base URLs instead of request-derived host or absolute-route generation"
+}
 review code.ProtocolFrameBindingReview {
   category: "auth"
   kind: "attention"

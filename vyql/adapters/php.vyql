@@ -1466,6 +1466,18 @@ adapter php {
     lacks "buildBaseUrl"
     lacks "resolveUri"
   }
+  flag code.PasswordRecoveryLinkHostControl in function {
+    lang "php"
+    name "toMail"
+    call path "MailMessage"
+    call path "?.line.action"
+    call path "route"
+    literal "password.reset"
+    selector "$this.token"
+    not call path "url"
+    not call path "config"
+    not literal "app.url"
+  }
   control "htmlspecialchars" -> core.HtmlEscape
   control "htmlentities" -> core.HtmlEscape
   control "dol_htmlentities" -> core.HtmlEscape
