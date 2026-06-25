@@ -275,6 +275,11 @@ rule ErbHrefUrlHtmlEscapeOnly {
   match code.ErbHrefUrlHtmlEscapeOnly as sink
 }
 
+rule ExpressSpaAssetFallbackReflectedXss {
+  meta { id: "VYQL-INJ-187", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.ExpressSpaAssetFallbackReflectedXss as sink
+}
+
 rule JavaScriptTemplateHtmlEscapeMismatch {
   meta { id: "VYQL-INJ-171", severity: high, cwe: [CWE_79, CWE_116], confidence_floor: high }
   match code.JavaScriptTemplateHtmlEscapeMismatch as sink

@@ -1735,6 +1735,15 @@ adapter javascript {
     not call path "decodeURIComponent"
     not call path "decodeURI"
   }
+  flag code.ExpressSpaAssetFallbackReflectedXss in module {
+    lang "javascript"
+    call path "express.static"
+    literal "/*"
+    literal contains_any ["./build/index.html", "./src/client/index.html"]
+    not literal "/js/*"
+    not literal "/images/*"
+    not literal "/styles/*"
+  }
   flag code.DecodedRequestStaticPathTraversal in function {
     lang "javascript"
     attr path "config.staticFilePath"

@@ -1794,6 +1794,12 @@ review code.ErbHrefUrlHtmlEscapeOnly {
   expected: [core.InputValidation]
   text: "validate or URI-encode URL-like values before rendering them into ERB href attributes; HTML escaping alone does not make a URL safe"
 }
+review code.ExpressSpaAssetFallbackReflectedXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "add explicit 404 handlers for static asset URL prefixes before an Express catch-all index.html fallback"
+}
 review code.UnescapedHtmlOptionRenderer {
   category: "xss"
   kind: "attention"

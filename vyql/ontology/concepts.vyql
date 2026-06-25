@@ -3970,6 +3970,15 @@ concept ErbHrefUrlHtmlEscapeOnly : sink {
   review_assumption: "the rendered URL-like value can contain a scriptable URL scheme or unsafe URL characters interpreted by the browser"
   review_confidence: high
 }
+concept ExpressSpaAssetFallbackReflectedXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "an Express SPA catch-all route serves index.html for asset-like paths without explicit 404 guards"
+  review_evidence: "Express routing context {pattern} registers a wildcard static index.html fallback without observed /js, /images, and /styles 404 handlers"
+  review_assumption: "missing asset routes can reflect attacker-controlled path fragments or content type expectations through the SPA fallback response"
+  review_confidence: high
+}
 concept StoredHtmlWrite : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]
