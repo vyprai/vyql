@@ -90,6 +90,12 @@ type lowerer struct {
 	// than the whole (over-approximated) container. Keyed by container node id.
 	containers map[string]*containerInfo
 
+	// constSeqs records variables bound to a constant array/slice literal (by bare name), so a
+	// `for _, x := range denylist` loop can expose the collection's constant element literals on
+	// the iteration variable for value-matching (e.g. a `strings.Contains(p, x)` traversal guard
+	// over ["..","~","\\"]). Value-matching enrichment only — never affects taint.
+	constSeqs map[string][]nir.Expr
+
 	// lambdaParams maps a lowered function-value node (a passed callback) to its parameter
 	// node ids, so a higher-order call (arr.map(cb), p.then(cb)) can route the receiver's
 	// taint into the callback's parameters.
@@ -1197,6 +1203,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		importTables:    map[string]map[string]importEntry{},
 		moduleGlobals:   map[string]map[string]string{},
 		containers:      map[string]*containerInfo{},
+		constSeqs:       map[string][]nir.Expr{},
 		lambdaParams:    map[string][]string{},
 		directMembers:   map[string]map[string]bool{},
 		classBaseNames:  map[string][]string{},
@@ -1740,6 +1747,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		for _, t := range st.Targets {
+			// Track array/slice-literal bindings so a `range` loop over this var can expose its
+			// constant element literals for value-matching (see lowerer.constSeqs).
+			if seq, ok := l.seqOf(st.Value); ok {
+				l.constSeqs[t] = seq
+			} else {
+				delete(l.constSeqs, t)
+			}
 			localDecl := st.Decl && l.region != ""
 			targetTyp, targetHasTyp := typ, hasTyp
 			if !targetHasTyp {
@@ -1905,13 +1919,40 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.eval(st.Cond, sc)
 		before := cloneStrMap(sc.node)
 		iterNode := l.eval(st.Iter, sc)
+		// If iterating a constant array/slice (inline `[...]` or a var bound to one), the
+		// iteration variable takes one of its constant elements. Expose all element literals on
+		// the var (NUL-joined) for value-matching — so a denylist guard like
+		// `strings.Contains(p, na)` over ["..","~","\\"] matches `val ".." val "\\"`. Value
+		// enrichment only; taint still flows via sc.node below.
+		iterSeq, _ := l.seqOf(st.Iter)
+		if iterSeq == nil {
+			if nm, ok := st.Iter.(nir.Name); ok {
+				iterSeq = l.constSeqs[nm.ID]
+			}
+		}
+		iterConst := ""
+		if len(iterSeq) > 0 {
+			var lits []string
+			for _, el := range iterSeq {
+				if s, ok := l.constStrVal(el, sc); ok {
+					lits = append(lits, s)
+				}
+			}
+			if len(lits) > 0 {
+				iterConst = strings.Join(lits, "\x00")
+			}
+		}
 		if iterNode != "" {
 			for _, name := range st.Vars {
 				if name == "" || name == "_" {
 					continue
 				}
 				sc.node[name] = iterNode
-				delete(sc.cnst, name)
+				if iterConst != "" {
+					sc.cnst[name] = iterConst
+				} else {
+					delete(sc.cnst, name)
+				}
 			}
 		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
