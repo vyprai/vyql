@@ -114,6 +114,11 @@ rule SessionHashMissingAuthorizationState {
   match code.SessionHashMissingAuthorizationState as session
 }
 
+rule MissingSessionRotationAfterAuthentication {
+  meta { id: "VYQL-AUTH-074", severity: high, cwe: [CWE_384], confidence_floor: medium }
+  match code.MissingSessionRotationAfterAuthentication as session
+}
+
 rule MemberStoreMissingCreateAuthorization {
   meta { id: "VYQL-AUTH-069", severity: high, cwe: [CWE_862, CWE_863], confidence_floor: high }
   match code.MemberStoreMissingCreateAuthorization as store
