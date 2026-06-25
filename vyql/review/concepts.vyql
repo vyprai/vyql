@@ -1957,6 +1957,12 @@ review code.IncompleteGeneratedJsIdentifierReservedWords {
   expected: [core.InputValidation]
   text: "verify generated JavaScript identifier validation rejects eval and arguments before names enter generated source"
 }
+review code.UnescapedGeneratedJavaStringFieldName {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review generated Java source templates for Java string escaping before embedding logical field names"
+}
 review code.UnfilteredAgentCommandTag {
   category: "code_execution"
   kind: "attention"

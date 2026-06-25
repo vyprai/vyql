@@ -566,6 +566,15 @@ concept SchemaCodegenValidationBypass : sink {
   vulnerable_to: [injection.PrototypePollution, injection.MassAssignment]
   cwe: [CWE_1321, CWE_915]
 }
+concept UnescapedGeneratedJavaStringFieldName : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94, CWE_116]
+  review_category: "code_execution"
+  review_condition: "logical field names are embedded into generated Java string literals without Java string escaping"
+  review_evidence: "row codegen context {pattern} reads logical field names and emits generated member code without an observed escapeJava call"
+  review_assumption: "a caller can define row field names containing quote, slash, newline, or other Java-literal metacharacters before code generation"
+  review_confidence: high
+}
 
 concept WeakHash : sink {
   vulnerable_to: [crypto.WeakHash]

@@ -315,6 +315,11 @@ rule IncompleteGeneratedJsIdentifierReservedWords {
   match code.IncompleteGeneratedJsIdentifierReservedWords as validator
 }
 
+rule UnescapedGeneratedJavaStringFieldName {
+  meta { id: "VYQL-INJ-175", severity: high, cwe: [CWE_94, CWE_116], confidence_floor: high }
+  match code.UnescapedGeneratedJavaStringFieldName as codegen
+}
+
 rule UnfilteredAgentCommandTag {
   meta { id: "VYQL-INJ-153", severity: critical, cwe: [CWE_94], confidence_floor: high }
   match code.UnfilteredAgentCommandTag as sink

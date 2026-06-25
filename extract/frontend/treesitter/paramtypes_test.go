@@ -233,6 +233,49 @@ struct WireHelpers {
 	}
 }
 
+func TestScalaFunctionContextIncludesStructuredTokens(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "sample.scala")
+	src := `
+object JsonGenerateUtils {
+  private def generateRowConverter(ctx: CodeGeneratorContext, rowType: LogicalType): String = {
+    val fieldNames = toScala(LogicalTypeChecks.getFieldNames(rowType)).map(EncodingUtils.escapeJava)
+    val populateObjectCode = fieldNames.zipWithIndex.map {
+      case (fieldName, idx) =>
+        objNode.set(fieldName, createNullableNodeTerm(ctx, "rowData", idx.toString, fieldType))
+    }.mkString
+    ctx.addReusableMember(populateObjectCode.stripMargin)
+    "convertRow"
+  }
+}
+`
+	if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractScala([]string{p}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := findFunc(prog, "generateRowConverter")
+	if !ok {
+		t.Fatalf("generateRowConverter not extracted; program=%#v", prog)
+	}
+	context := strings.Join(fn.ContextTokens, "\x00")
+	for _, want := range []string{
+		"lang=scala",
+		"function_name:generateRowConverter",
+		"call_path:LogicalTypeChecks.getFieldNames",
+		"call_path:fieldNames.zipWithIndex.map",
+		"call_path:createNullableNodeTerm",
+		"call_path:ctx.addReusableMember",
+		"selector:EncodingUtils.escapeJava",
+	} {
+		if !strings.Contains(context, want) {
+			t.Fatalf("Scala function context missing %q; context=%q", want, context)
+		}
+	}
+}
+
 func findFuncParamType(prog nir.Program, fn, param string) (string, bool) {
 	for _, mod := range prog.Modules {
 		if got, ok := findParamTypeInStmts(mod.Body, fn, param); ok {

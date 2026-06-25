@@ -160,6 +160,16 @@ adapter scala {
     has "X-Frame-Options"
     has "ALLOWALL"
   }
+  flag code.UnescapedGeneratedJavaStringFieldName in function {
+    lang "scala"
+    function "generateRowConverter"
+    call path "LogicalTypeChecks.getFieldNames"
+    call path "fieldNames.zipWithIndex.map"
+    call path "createNullableNodeTerm"
+    call path "ctx.addReusableMember"
+    selector "?.stripMargin"
+    not selector "EncodingUtils.escapeJava"
+  }
 
   // expression-language injection (CWE-917)
   sink method "parseExpression" -> code.ExpressionEval
