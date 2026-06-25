@@ -1158,6 +1158,12 @@ review code.ZeroStepSequenceExpansion {
   kind: "attention"
   text: "review sequence expansion loops for parsed zero steps that prevent loop progress"
 }
+review code.BufReadDiscardLoopWithoutEofGuard {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation, core.ExceptionHandling]
+  text: "review buffered discard loops for an empty-buffer EOF guard before consuming and subtracting progress"
+}
 review code.UnboundedStateGrowthReview {
   category: "resource"
   kind: "attention"

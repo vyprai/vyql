@@ -107,6 +107,16 @@ adapter rust {
     has "value.len()>index"
     lacks "value.is_empty()"
   }
+  flag code.BufReadDiscardLoopWithoutEofGuard in function {
+    lang "rust"
+    has "whilelen>0"
+    has "self.fill_buf()"
+    has "buf.len().min(len)"
+    has "self.consume(consume_len)"
+    has "len-=consume_len"
+    lacks "buf.is_empty()"
+    lacks "UnexpectedEof"
+  }
   flag code.ConduitHyperUnboundedBodyToBytes in function {
     lang "rust"
     name "blocking_handler"

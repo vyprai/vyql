@@ -138,3 +138,8 @@ rule EmptySourceSliceMemoryExpansion {
   meta { id: "VYQL-DOS-027", severity: high, cwe: [CWE_400, CWE_770, CWE_789], confidence_floor: high }
   match code.EmptySourceSliceMemoryExpansion as memory
 }
+
+rule BufReadDiscardLoopWithoutEofGuard {
+  meta { id: "VYQL-DOS-028", severity: high, cwe: [CWE_400, CWE_835], confidence_floor: high }
+  match code.BufReadDiscardLoopWithoutEofGuard as discard
+}
