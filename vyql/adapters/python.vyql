@@ -429,6 +429,14 @@ adapter python {
     has "dkim['k']"
     lacks "_warnmsg(\"Unknown DKIM key type\")"
   }
+  flag code.RequestPathPercentSLogInjection in function {
+    lang "python"
+    call path contains_any ["LOG.debug", "logger.debug", "logging.debug", "log.debug"]
+    attr path "request.path"
+    call arg contains_any ["LOG.debug:Request to '%s'", "logger.debug:request path %s", "logging.debug:path %s", "log.debug:path %s"]
+    not call arg contains_any ["LOG.debug:Request to '%r'", "logger.debug:request path %r", "logging.debug:path %r", "log.debug:path %r"]
+    not call path contains_any ["repr", "escape", "sanitize"]
+  }
   flag code.LogWrite on any {
     path "logging.info"
   }

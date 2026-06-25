@@ -4367,6 +4367,15 @@ concept UnneutralizedDiagnosticValue : sink {
   vulnerable_to: [injection.LogInjection]
   cwe: [CWE_150, CWE_117]
 }
+concept RequestPathPercentSLogInjection : sink {
+  vulnerable_to: [injection.LogInjection]
+  cwe: [CWE_117, CWE_150]
+  review_category: "injection"
+  review_condition: "HTTP request paths are written to diagnostic logs through string-format substitution without repr-style escaping"
+  review_evidence: "request-path log context {pattern} passes request.path to a debug log whose format string uses %s for the path slot"
+  review_assumption: "request paths can contain encoded control characters or terminal/log separators supplied by remote clients"
+  review_confidence: high
+}
 concept LogWrite : sink {
   vulnerable_to: [secrets.SecretLeak]
   enabled_by: [taint.SecretValue]

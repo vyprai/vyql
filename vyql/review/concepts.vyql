@@ -1942,6 +1942,12 @@ review code.RemoteUrlObjectDebugLog {
   expected: [core.SecretRedaction]
   text: "verify remote repository URL objects are not logged before credentials, query strings, and fragments are stripped"
 }
+review code.RequestPathPercentSLogInjection {
+  category: "injection"
+  kind: "attention"
+  expected: [core.OutputEncoding]
+  text: "review request-path diagnostic logging for repr-style escaping or explicit control-character neutralization"
+}
 review code.VerboseHttpClientAuthorizationLog {
   category: "secret"
   kind: "attention"

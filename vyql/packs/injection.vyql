@@ -665,6 +665,11 @@ rule UnneutralizedDiagnosticValue {
   match code.UnneutralizedDiagnosticValue as diagnostic
 }
 
+rule RequestPathPercentSLogInjection {
+  meta { id: "VYQL-INJ-174", severity: medium, cwe: [CWE_117, CWE_150], confidence_floor: high }
+  match code.RequestPathPercentSLogInjection as diagnostic
+}
+
 rule HttpResponseSplitting {
   meta { id: "VYQL-INJ-010", severity: medium, cwe: [CWE_113] }
   taint core.UserControlledData -> code.ResponseHeaderWrite
