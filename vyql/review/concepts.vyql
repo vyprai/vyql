@@ -1716,6 +1716,12 @@ review code.AbsolutePathDisclosure {
   kind: "attention"
   text: "review externally visible identifiers or diagnostics for resolved local filesystem paths"
 }
+review code.PhpNegativeOffsetStringSearchWarningDisclosure {
+  category: "secret"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review PHP negative-offset string searches on request keys for a strlen lower-bound guard"
+}
 review code.SensitiveConfigInfoLog {
   category: "secret"
   kind: "attention"

@@ -2790,6 +2790,15 @@ concept AbsolutePathDisclosure : sink {
   review_assumption: "the output may be observable outside the host boundary or persisted for later comparison"
   review_confidence: possibility
 }
+concept PhpNegativeOffsetStringSearchWarningDisclosure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_209]
+  review_category: "secret"
+  review_condition: "PHP string search uses a negative offset on request-controlled keys before proving minimum length"
+  review_evidence: "PHP request-routing context {pattern} calls strrpos with a negative offset before a matching strlen lower-bound guard"
+  review_assumption: "short request parameter names can trigger PHP warning output that discloses path or diagnostic details"
+  review_confidence: high
+}
 concept ArchiveEntryWrite : sink {
   vulnerable_to: [path.PathTraversal, path.LinkFollowing]
   enabled_by: [taint.UntrustedData]

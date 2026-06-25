@@ -292,6 +292,13 @@ adapter php {
     lacks "function_exists('add_action')"
     lacks "function_exists(\"add_action\")"
   }
+  flag code.PhpNegativeOffsetStringSearchWarningDisclosure in function {
+    lang "php"
+    has "$_REQUEST"
+    has "strrpos($key,'_id',-3)"
+    lacks "strlen($key)>=3"
+    lacks "strlen($key)>2"
+  }
   flag code.StatamicAssetUploadPhpExtensionValidationBypass in function {
     lang "php"
     name "extraRules"
