@@ -339,7 +339,9 @@ func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt 
 	if body == nil {
 		return nil
 	}
-	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", []string{"lang=php", "name=" + name}, c.text(body))
+	tokens := []string{"lang=php", "name=" + name}
+	tokens = append(tokens, c.phpAstContextTokens(body)...)
+	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", tokens, c.text(body))
 }
 
 func (c *phConv) phpContextCall(path, loc, method string, tokens []string, text string) []nir.Stmt {
@@ -382,6 +384,18 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 			return
 		}
 		switch cur.Kind() {
+		case "function_definition", "method_declaration":
+			if name := c.text(field(cur, "name")); name != "" {
+				add("function_name:" + name)
+			}
+		case "property_declaration":
+			prop := phpCompactText(c.text(cur))
+			if prop != "" && strings.Contains(prop, "$") {
+				add("property:" + prop)
+			}
+			for _, lit := range c.phpLiteralTokens(cur) {
+				add("property_literal:" + lit)
+			}
 		case "assignment_expression", "augmented_assignment_expression":
 			left := field(cur, "left")
 			right := field(cur, "right")

@@ -200,6 +200,56 @@ $searchResult = eZSearch::search( $searchText, array(
 	t.Fatalf("analysis.module.context not found")
 }
 
+func TestPHPClassContextIncludesPropertyAndMethodInventory(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "FileService.php")
+	src := []byte(`<?php
+class FileService {
+  protected $fallbackExtensions = 'jpg,jpeg,png,gif,bmp,svg,tif,tiff';
+
+  protected function validFileExtension(): bool {
+    $fileInfo = pathinfo($this->fileName);
+    return GeneralUtility::inList($this->fallbackExtensions, strtolower($fileInfo['extension']))
+      && GeneralUtility::verifyFilenameAgainstDenyPattern($this->fileName);
+  }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.class.context" && strings.Contains(n.Prop("str_args"), "name=FileService") {
+			args := n.Prop("str_args")
+			for _, want := range []string{
+				"function_name:validFileExtension",
+				"property:protected$fallbackExtensions='jpg,jpeg,png,gif,bmp,svg,tif,tiff';",
+				"property_literal:jpg,jpeg,png,gif,bmp,svg,tif,tiff",
+				"call_path:pathinfo",
+				"call_path:GeneralUtility.inList",
+				"call_path:GeneralUtility.verifyFilenameAgainstDenyPattern",
+			} {
+				if !strings.Contains(args, want) {
+					t.Fatalf("PHP class context missing %q; context=%q", want, args)
+				}
+			}
+			return
+		}
+	}
+	t.Fatalf("analysis.class.context for FileService not found")
+}
+
 func TestPHPLegacyScriptLanguageTagParsesStatements(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "search_opensearch.php")

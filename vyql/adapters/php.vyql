@@ -509,6 +509,15 @@ adapter php {
     lacks "svgSanitize"
     lacks "Sanitizer"
   }
+  flag code.UnsanitizedSvgUpload in class {
+    lang "php"
+    function contains_any ["validFileExtension", "isEverythingValid", "validateFileExtension"]
+    token property contains_any ["svg"]
+    call path "pathinfo"
+    call path "GeneralUtility.inList"
+    call path "GeneralUtility.verifyFilenameAgainstDenyPattern"
+    not call contains_any ["sanitizeSvg", "svgSanitize", "Sanitizer"]
+  }
   flag code.CommonMarkPreserveEntitiesUrlAttributeXss in function {
     lang "php"
     name "render"
