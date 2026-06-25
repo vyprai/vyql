@@ -270,6 +270,11 @@ rule WebViewServerRedirectUrlValidationBypass {
   match code.WebViewServerRedirectUrlValidationBypass as sink
 }
 
+rule RequestBackedFooterScriptXss {
+  meta { id: "VYQL-INJ-177", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RequestBackedFooterScriptXss as sink
+}
+
 rule UnescapedJsonTreeLabelXss {
   meta { id: "VYQL-INJ-125", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.UnescapedJsonTreeLabelXss as sink

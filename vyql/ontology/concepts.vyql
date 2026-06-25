@@ -3686,6 +3686,15 @@ concept UnsanitizedSvgUpload : sink {
   review_assumption: "stored SVG files can be served back to users and scriptable SVG content can execute in a browser"
   review_confidence: high
 }
+concept RequestBackedFooterScriptXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "footer script rendering reads script markup from the merged request bag instead of server-only state"
+  review_evidence: "PHP footer/script context {pattern} references $_REQUEST['footerScripts'] before printing scripts"
+  review_assumption: "attackers can supply GET, POST, or cookie parameters named footerScripts that reach the footer renderer"
+  review_confidence: high
+}
 concept UnescapedJsonTreeLabelXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

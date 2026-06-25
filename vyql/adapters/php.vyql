@@ -1386,6 +1386,12 @@ adapter php {
     lacks "htmlspecialchars($_SERVER"
     lacks "html_escape($_SERVER"
   }
+  flag code.RequestBackedFooterScriptXss in module {
+    lang "php"
+    token subscript contains_any ["$_REQUEST[\"footerScripts\"]", "$_REQUEST['footerScripts']"]
+    call path contains_any ["print", "echo"]
+    not token subscript contains_any ["$GLOBALS[\"footerScripts\"]", "$GLOBALS['footerScripts']"]
+  }
   // MediaWiki Html builder: rawElement emits its content arg RAW (unescaped) and both
   // element/rawElement pass the attributes array through WITHOUT validating attribute names,
   // so a tainted attributes array is attribute-injection XSS (CVE-2025-59332; the upstream fix

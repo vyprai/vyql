@@ -462,6 +462,12 @@ review code.WebViewServerRedirectUrlValidationBypass {
   expected: [core.InputValidation]
   text: "verify WKWebView server redirects are validated through URL-fixup or allowlist logic before provisional navigation continues"
 }
+review code.RequestBackedFooterScriptXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review footer script storage so rendered scripts come only from server-owned state, not $_REQUEST/GET/POST/COOKIE data"
+}
 review code.PathMatcherNormalizationOrderBypass {
   category: "request_forgery"
   kind: "attention"
