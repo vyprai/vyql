@@ -336,8 +336,8 @@ adapter ruby {
   }
   flag code.CatastrophicRegex in module {
     lang "ruby"
-    token regex contains_any ["(?:[^\\\"]|\\\\.)*?", "(?:[^\\\"]|\\\\.)*)"]
-    not token regex contains_any ["(?:[^\\\"]|\\\\\")*?", "(?:[^\\\"]|\\\\\")*)"]
+    literal contains_any ["(?:[^\\\"]|\\\\.)*?", "(?:[^\\\"]|\\\\.)*)"]
+    not literal contains_any ["(?:[^\\\"]|\\\\\")*?", "(?:[^\\\"]|\\\\\")*)"]
   }
   flag code.RubyLineAnchorValidationBypass in function {
     lang "ruby"
