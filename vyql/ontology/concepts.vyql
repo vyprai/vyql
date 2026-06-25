@@ -1397,6 +1397,15 @@ concept UnderallocatedFormattedAddressList : sink {
   review_assumption: "the address count can be influenced by a malformed network option"
   review_confidence: medium
 }
+concept IcmpEchoPayloadLengthUnderflow : sink {
+  vulnerable_to: [memory.OobRead, memory.IntegerOverflow]
+  cwe: [CWE_125, CWE_191]
+  review_category: "memory"
+  review_condition: "ICMP echo reply handling subtracts the echo header size from the IPv6 payload length before proving the payload is large enough"
+  review_evidence: "ICMP echo payload context {pattern} derives uxDataLength from the IPv6 payload length and subtracts sizeof(*pxICMPEchoHeader) before iterating over the remaining bytes"
+  review_assumption: "a peer can send a short or zero-length ICMPv6 echo reply payload that makes the size_t subtraction wrap"
+  review_confidence: high
+}
 concept ContikiSicslowpanFragmentOffsetOobWrite : sink {
   vulnerable_to: [memory.OobWrite]
   cwe: [CWE_787]

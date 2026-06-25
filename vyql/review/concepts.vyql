@@ -2664,6 +2664,12 @@ review code.UnderwidthFormattedIndex {
   kind: "attention"
   text: "review formatted numeric strings before fixed-position indexing"
 }
+review code.IcmpEchoPayloadLengthUnderflow {
+  category: "memory"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ICMP echo payload length handling for minimum-size checks before subtracting the echo header"
+}
 review code.UnsignedIndexConversionGuardBypass {
   category: "numeric"
   kind: "attention"

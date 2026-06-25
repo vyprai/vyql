@@ -95,6 +95,50 @@ int wrapped(void) {
 	}
 }
 
+func TestCSwitchIncludesCasesInsidePreprocessorWrappers(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "switch_preproc.c")
+	src := []byte(`
+void process(int tag) {
+  switch (tag) {
+  case PING_REQUEST:
+    reply();
+    break;
+#if SUPPORT_OUTGOING_PINGS
+  case PING_REPLY:
+    validate();
+    hook();
+    break;
+#endif
+  case NEIGHBOR:
+    refresh();
+    break;
+  }
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := cFuncContextTokens(prog.Modules[0].Body, "process")
+	for _, want := range []string{
+		"switch_case:PING_REPLY",
+		"call_path:validate",
+		"call_path:hook",
+	} {
+		if !strings.Contains(tokens, want) {
+			t.Fatalf("preprocessor-wrapped switch case missing context token %q; context=%q", want, tokens)
+		}
+	}
+	if !hasCFuncCall(prog.Modules[0].Body, "process", "hook") {
+		t.Fatalf("preprocessor-wrapped switch case body was not lowered: %#v", prog.Modules[0].Body)
+	}
+}
+
 func TestCFunctionContextIncludesStructuredTokens(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "params.c")
@@ -235,6 +279,57 @@ func TestCFunctionContextIncludesLateCallsInLargeFunction(t *testing.T) {
 	}
 }
 
+func TestCFunctionContextIncludesICMPEchoLengthTokens(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "FreeRTOS_ND.c")
+	src := []byte(`
+void prvProcessICMPMessage_IPv6(NetworkBufferDescriptor_t *pxNetworkBuffer)
+{
+    switch (pxICMPHeader_IPv6->ucType)
+    {
+    case ipICMP_PING_REPLY_IPv6:
+    {
+        const ICMPEcho_IPv6_t * pxICMPEchoHeader = ( ( const ICMPEcho_IPv6_t * ) pxICMPHeader_IPv6 );
+        size_t uxDataLength, uxCount;
+        const uint8_t * pucByte;
+        uxDataLength = ipNUMERIC_CAST( size_t, FreeRTOS_ntohs( pxICMPPacket->xIPHeader.usPayloadLength ) );
+        uxDataLength = uxDataLength - sizeof( *pxICMPEchoHeader );
+        pucByte = &( pucByte[ sizeof( *pxICMPEchoHeader ) ] );
+        for( uxCount = 0; uxCount < uxDataLength; uxCount++ )
+        {
+            pucByte++;
+        }
+        vApplicationPingReplyHook( eSuccess, pxICMPEchoHeader->usIdentifier );
+        break;
+    }
+    }
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := cFuncContextTokens(prog.Modules[0].Body, "prvProcessICMPMessage_IPv6")
+	for _, want := range []string{
+		"name=prvProcessICMPMessage_IPv6",
+		"switch_case:ipICMP_PING_REPLY_IPv6",
+		"selector:pxICMPPacket.xIPHeader.usPayloadLength",
+		"assign:uxDataLength=uxDataLength-sizeof(*pxICMPEchoHeader)",
+		"selector:pxICMPEchoHeader.usIdentifier",
+		"call_path:FreeRTOS_ntohs",
+		"call_path:vApplicationPingReplyHook",
+		"binary:uxDataLength-sizeof(*pxICMPEchoHeader)",
+	} {
+		if !strings.Contains(tokens, want) {
+			t.Fatalf("ICMP echo context missing %q; context=%q", want, tokens)
+		}
+	}
+}
+
 func TestCZeroCountLastIndexObservationRequiresNonZeroGuard(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "frames.c")
@@ -324,7 +419,9 @@ func hasCStmtCall(stmts []nir.Stmt, method string) bool {
 	for _, st := range stmts {
 		switch s := st.(type) {
 		case nir.ExprStmt:
-			return hasCExprCall(s.Value, method)
+			if hasCExprCall(s.Value, method) {
+				return true
+			}
 		case nir.Block:
 			if hasCStmtCall(s.Stmts, method) {
 				return true
@@ -335,6 +432,15 @@ func hasCStmtCall(stmts []nir.Stmt, method string) bool {
 			}
 		case nir.Loop:
 			if hasCStmtCall(s.Body, method) {
+				return true
+			}
+		case nir.Switch:
+			for _, c := range s.Cases {
+				if hasCStmtCall(c, method) {
+					return true
+				}
+			}
+			if hasCStmtCall(s.Default, method) {
 				return true
 			}
 		}

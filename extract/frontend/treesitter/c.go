@@ -733,10 +733,7 @@ func (c *ccConv) cSwitch(n *tree_sitter.Node) nir.Stmt {
 	var deflt []nir.Stmt
 	var pending []nir.Expr
 	if b := field(n, "body"); b != nil {
-		for _, cs := range namedChildren(b) {
-			if cs.Kind() != "case_statement" {
-				continue
-			}
+		for _, cs := range c.cSwitchCases(b) {
 			lv := field(cs, "value")
 			var stmts []nir.Stmt
 			for _, ch := range namedChildren(cs) {
@@ -758,6 +755,26 @@ func (c *ccConv) cSwitch(n *tree_sitter.Node) nir.Stmt {
 		}
 	}
 	return nir.Switch{Subject: c.expr(field(n, "condition")), Cases: cases, Labels: labels, Default: deflt}
+}
+
+func (c *ccConv) cSwitchCases(body *tree_sitter.Node) []*tree_sitter.Node {
+	var out []*tree_sitter.Node
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			switch {
+			case ch.Kind() == "case_statement":
+				out = append(out, ch)
+			case strings.HasPrefix(ch.Kind(), "preproc_") || ch.IsError():
+				walk(ch)
+			}
+		}
+	}
+	walk(body)
+	return out
 }
 
 func (c *ccConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {

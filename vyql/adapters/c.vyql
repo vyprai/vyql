@@ -280,6 +280,18 @@ adapter c {
     has "dlist+=39"
     lacks "xmalloc(4+addrs*40+1)"
   }
+  flag code.IcmpEchoPayloadLengthUnderflow in function {
+    lang "c"
+    name "prvProcessICMPMessage_IPv6"
+    token switch_case "ipICMP_PING_REPLY_IPv6"
+    selector contains "usPayloadLength"
+    assign contains "uxDataLength=uxDataLength-sizeof"
+    selector "pxICMPEchoHeader.usIdentifier"
+    call path "FreeRTOS_ntohs"
+    call path "vApplicationPingReplyHook"
+    binary contains_any ["uxDataLength-sizeof(*pxICMPEchoHeader)", "uxDataLength-sizeof"]
+    not binary contains_any ["uxDataLength<sizeof(*pxICMPEchoHeader)", "sizeof(*pxICMPEchoHeader)>uxDataLength"]
+  }
   flag code.ContikiSicslowpanFragmentOffsetOobWrite in function {
     lang "c"
     name "copy_frags2uip"

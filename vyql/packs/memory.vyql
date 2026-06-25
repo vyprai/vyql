@@ -33,6 +33,11 @@ rule UnderallocatedFormattedAddressList {
   match code.UnderallocatedFormattedAddressList as c
 }
 
+rule IcmpEchoPayloadLengthUnderflow {
+  meta { id: "VYQL-MEM-045", severity: high, cwe: [CWE_125, CWE_191], confidence_floor: high }
+  match code.IcmpEchoPayloadLengthUnderflow as len
+}
+
 rule PythonUnicodeEscapeWideUnderallocation {
   meta { id: "VYQL-MEM-030", severity: high, cwe: [CWE_787], confidence_floor: high }
   match code.PythonUnicodeEscapeWideUnderallocation as c
