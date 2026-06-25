@@ -158,6 +158,7 @@ var (
 func scanJelly(src []byte, file string) []nir.Stmt {
 	cfg := loadProfile()
 	out := scanTemplateExpressions(src, file, "jelly")
+	out = append(out, scanJenkinsJellySecretTextboxes(src, file)...)
 	text := string(src)
 	out = append(out, scopedFileContainsAllEvents(cfg, "jelly", text, file)...)
 	for i, raw := range strings.Split(text, "\n") {
@@ -168,6 +169,71 @@ func scanJelly(src []byte, file string) []nir.Stmt {
 		out = append(out, scopedContainsEvents(cfg, "jelly", line, file, i+1)...)
 	}
 	return out
+}
+
+func scanJenkinsJellySecretTextboxes(src []byte, file string) []nir.Stmt {
+	var out []nir.Stmt
+	inSecretEntry := false
+	entryLine := 0
+	for i, raw := range strings.Split(string(src), "\n") {
+		lineNo := i + 1
+		line := strings.TrimSpace(raw)
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "<f:entry") {
+			inSecretEntry = jellyEntryFieldLooksSecret(line)
+			entryLine = lineNo
+		}
+		if !inSecretEntry {
+			continue
+		}
+		if strings.Contains(lower, "<f:password") {
+			inSecretEntry = false
+			continue
+		}
+		if strings.Contains(lower, "<f:textbox") {
+			locLine := lineNo
+			if entryLine > 0 {
+				locLine = entryLine
+			}
+			out = append(out, nir.ExprStmt{Value: call("analysis.config.jenkins_jelly_secret_textbox", file, locLine)})
+			inSecretEntry = false
+			continue
+		}
+		if strings.Contains(lower, "</f:entry") {
+			inSecretEntry = false
+		}
+	}
+	return out
+}
+
+func jellyEntryFieldLooksSecret(line string) bool {
+	field := strings.ToLower(attributeValue(line, "field"))
+	if field == "" {
+		return false
+	}
+	for _, part := range []string{"secret", "password", "passwd", "token", "credential", "apikey", "api_key", "privatekey", "private_key"} {
+		if strings.Contains(field, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func attributeValue(line, name string) string {
+	for _, quote := range []byte{'"', '\''} {
+		prefix := name + "=" + string(quote)
+		start := strings.Index(line, prefix)
+		if start < 0 {
+			continue
+		}
+		start += len(prefix)
+		end := strings.IndexByte(line[start:], quote)
+		if end < 0 {
+			return line[start:]
+		}
+		return line[start : start+end]
+	}
+	return ""
 }
 
 func scanPest(src []byte, file string) []nir.Stmt {

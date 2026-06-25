@@ -2523,6 +2523,12 @@ review code.NuxtPublicRuntimeConfigSecretExposure {
   expected: [core.SecretRedaction]
   text: "keep tokens and credentials out of Nuxt public runtime config; merge them only into private runtimeConfig"
 }
+review code.JenkinsJellySecretTextboxExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "render Jenkins secret-like configuration fields with f:password so stored values are masked and round-tripped encrypted"
+}
 review code.ExternalSettingTokenSyncUrlExposure {
   category: "secret"
   kind: "target"

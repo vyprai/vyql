@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/extract/lowering"
@@ -49,6 +50,58 @@ func TestJellyTemplateAliasesJSetInputVariables(t *testing.T) {
 	}
 	if inputCount != 1 {
 		t.Fatalf("jelly input count = %d, want 1; nodes=%#v", inputCount, nodes)
+	}
+}
+
+func TestJellySecretEntryTextboxSignature(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "config-vuln.jelly")
+	fixed := filepath.Join(dir, "config-fixed.jelly")
+	if err := os.WriteFile(vuln, []byte(`<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:entry title="Client Secret" field="clientSecret">
+    <f:textbox />
+  </f:entry>
+</j:jelly>
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:entry title="Client Secret" field="clientSecret">
+    <f:password />
+  </f:entry>
+</j:jelly>
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := Extract([]string{vuln, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := false
+	for _, n := range nodes {
+		if n.Prop("callee_path") != "analysis.config.jenkins_jelly_secret_textbox" {
+			continue
+		}
+		if strings.Contains(n.Prop("loc"), "config-fixed.jelly") {
+			t.Fatalf("password field should suppress secret textbox event at %s", n.Prop("loc"))
+		}
+		if strings.Contains(n.Prop("loc"), "config-vuln.jelly") {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Fatalf("secret textbox event not emitted; nodes=%#v", nodes)
 	}
 }
 

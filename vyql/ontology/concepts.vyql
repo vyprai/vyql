@@ -5057,6 +5057,15 @@ concept NuxtPublicRuntimeConfigSecretExposure : sink {
   review_assumption: "Nuxt public runtime config is serialized to client-side application code or otherwise readable by untrusted users"
   review_confidence: high
 }
+concept JenkinsJellySecretTextboxExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_200, CWE_522]
+  review_category: "secret"
+  review_condition: "a Jenkins Jelly configuration view renders a secret-like form field with a normal textbox"
+  review_evidence: "Jenkins Jelly form context {pattern} uses f:textbox for a secret, password, token, credential, or key field instead of f:password"
+  review_assumption: "normal Jenkins textboxes round-trip and display field values in clear text to users who can view the configuration form"
+  review_confidence: high
+}
 concept ExternalSettingTokenSyncUrlExposure : sink {
   vulnerable_to: [secrets.SecretLeak, injection.Xss]
   cwe: [CWE_79, CWE_200]

@@ -205,6 +205,9 @@ adapter config {
   flag code.ExternalLinkReferrerLeak on any {
     path "analysis.config.html.external_link_missing_noreferrer"
   }
+  flag code.JenkinsJellySecretTextboxExposure on any {
+    path "analysis.config.jenkins_jelly_secret_textbox"
+  }
   // Jenkins Jelly views: template model fields such as it.name/it.description
   // rendered into HTML-bearing attributes need escaping before display.
   source "analysis.template.jelly.input" -> core.UserControlledData
