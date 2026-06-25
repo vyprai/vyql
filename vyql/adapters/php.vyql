@@ -1369,6 +1369,7 @@ adapter php {
   flag code.StateChangingOp on any {
     method "delete"
   }
+  sink path "update_option" -> code.StateChangingOp
   sink method "setFromPost" -> code.StateChangingOp
   flag code.MissingHttpMethodAssertion in class {
     has "Action"
@@ -1410,6 +1411,13 @@ adapter php {
     has "update_option"
     lacks "check_admin_referer"
     lacks "wp_nonce_field"
+  }
+  flag code.WordPressOptionUpdateMissingCsrf in function {
+    lang "php"
+    has "$_POST"
+    has "update_option"
+    lacks "check_admin_referer"
+    lacks "wp_verify_nonce"
   }
   sink path "queryDB" val "insert into" -> code.StateChangingOp
   sink path "queryDB" val "replace into" -> code.StateChangingOp

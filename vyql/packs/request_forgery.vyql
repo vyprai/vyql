@@ -43,6 +43,11 @@ rule BestWebSoftContactFormSettingsCsrf {
   match code.BestWebSoftContactFormSettingsCsrf as action
 }
 
+rule WordPressOptionUpdateMissingCsrf {
+  meta { id: "VYQL-RF-028", severity: medium, cwe: [CWE_352], confidence_floor: high }
+  match code.WordPressOptionUpdateMissingCsrf as action
+}
+
 rule CloudBaseOpenUrlSsrf {
   meta { id: "VYQL-RF-016", severity: high, cwe: [CWE_918], confidence_floor: high }
   match code.CloudBaseOpenUrlSsrf as action

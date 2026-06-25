@@ -4469,6 +4469,15 @@ concept BestWebSoftContactFormSettingsCsrf : sink {
   review_assumption: "an authenticated administrator can be induced to submit the plugin settings form cross-site"
   review_confidence: high
 }
+concept WordPressOptionUpdateMissingCsrf : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352]
+  review_category: "csrf"
+  review_condition: "WordPress option updates consume request data without nonce verification"
+  review_evidence: "WordPress settings context {pattern} reads request parameters and calls update_option without check_admin_referer or wp_verify_nonce"
+  review_assumption: "an authenticated administrator can be induced to submit the settings request cross-site"
+  review_confidence: high
+}
 concept IncompleteCsrfTokenValidation : sink {
   vulnerable_to: [request_forgery.Csrf]
   cwe: [CWE_352]

@@ -638,6 +638,12 @@ review code.BestWebSoftContactFormSettingsCsrf {
   expected: [core.CsrfProtection]
   text: "review BestWebSoft Contact Form settings saves for check_admin_referer and a matching wp_nonce_field"
 }
+review code.WordPressOptionUpdateMissingCsrf {
+  category: "csrf"
+  kind: "target"
+  expected: [core.CsrfProtection]
+  text: "review WordPress option updates for check_admin_referer or wp_verify_nonce before saving request data"
+}
 review code.CsrfDisabled {
   category: "request"
   kind: "target"
