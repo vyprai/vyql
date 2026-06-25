@@ -865,6 +865,16 @@ adapter go {
     not call path "os.Stat"
     not call path "GetInput"
   }
+  flag code.HardlinkedFileOverwriteWithoutClobber in function {
+    call path "filepath.Abs"
+    call path "os.Stat"
+    call path "os.Create"
+    token identifier contains_any ["filename", "filePath", "filepath", "path"]
+    not call path "os.Lstat"
+    not call path "os.Remove"
+    not call path "os.OpenFile"
+    not selector "os.O_EXCL"
+  }
   flag code.CiliumBroadTcFilterCleanup in function {
     function "getTCFilters"
     selector "bpfFilter.Name"

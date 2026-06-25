@@ -3504,7 +3504,7 @@ concept HardlinkedFileOverwriteWithoutClobber : sink {
   cwe: [CWE_59]
   review_category: "path"
   review_condition: "file writer reuses an existing hard-linked file path instead of clobbering it before writing"
-  review_evidence: "file writer stat context {pattern} removes type-mismatched targets before create/write but lacks a current.nlink hard-link guard"
+  review_evidence: "file writer context {pattern} opens an existing target for create/write without exclusive replacement or hard-link/symlink clobber protection"
   review_assumption: "the writer is used on archive or package entries where an attacker can arrange an existing hard link at the target path"
   review_confidence: high
 }
