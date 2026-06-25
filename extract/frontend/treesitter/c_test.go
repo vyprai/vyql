@@ -426,6 +426,54 @@ void fixed(void) {
 	}
 }
 
+func TestCFunctionContextIncludesFlowSpecLoopBoundTokens(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "flowspec.c")
+	src := []byte(`
+int bgp_flowspec_op_decode(int type, unsigned char *nlri_ptr,
+                           unsigned int max_len, void *result, int *error)
+{
+  int op[8];
+  int value, value_size, loop = 0;
+  unsigned int offset = 0;
+  struct bgp_pbr_match_val *mval = (struct bgp_pbr_match_val *)result;
+
+  do {
+    if (loop > BGP_PBR_MATCH_VAL_MAX) {
+      *error = -2;
+      return offset;
+    }
+    hex2bin(&nlri_ptr[offset], op);
+    value_size = 1 << (2 * op[2] + op[3]);
+    value = hexstr2num(&nlri_ptr[offset], value_size);
+    mval->value = value;
+    mval++;
+    loop++;
+  } while (op[0] == 0 && offset < max_len - 1);
+  return offset;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := cFuncContextTokens(prog.Modules[0].Body, "bgp_flowspec_op_decode")
+	for _, want := range []string{
+		"call_path:hex2bin",
+		"call_path:hexstr2num",
+		"binary:loop>BGP_PBR_MATCH_VAL_MAX",
+		"selector:mval.value",
+	} {
+		if !strings.Contains(tokens, want) {
+			t.Fatalf("FlowSpec loop context missing %q; context=%q", want, tokens)
+		}
+	}
+}
+
 func TestCZeroCountLastIndexObservationRequiresNonZeroGuard(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "frames.c")

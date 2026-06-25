@@ -312,6 +312,14 @@ adapter c {
     index "run_per_isolate_level[]"
     not binary contains "isolate_level<FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL-1"
   }
+  flag code.FlowSpecOperatorLoopBoundOffByOne in function {
+    lang "c"
+    call path "hex2bin"
+    call path "hexstr2num"
+    selector "mval.value"
+    binary "loop>BGP_PBR_MATCH_VAL_MAX"
+    not binary "loop>=BGP_PBR_MATCH_VAL_MAX"
+  }
   flag code.ContikiSicslowpanFragmentOffsetOobWrite in function {
     lang "c"
     name "copy_frags2uip"

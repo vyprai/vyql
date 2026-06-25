@@ -2585,6 +2585,12 @@ review code.ChakraScopeSlotArrayUncheckedIndex {
   kind: "attention"
   text: "review Chakra scope-slot array writes for a checked helper before indexing property-id storage"
 }
+review code.FlowSpecOperatorLoopBoundOffByOne {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review FlowSpec chained operator decoders for an inclusive loop bound before writing match-value array entries"
+}
 review code.BinarySearchTableIndexGuardBypass {
   category: "memory"
   kind: "attention"

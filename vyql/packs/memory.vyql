@@ -43,6 +43,11 @@ rule IsolateLevelIncrementWithoutCap {
   match code.IsolateLevelIncrementWithoutCap as level
 }
 
+rule FlowSpecOperatorLoopBoundOffByOne {
+  meta { id: "VYQL-MEM-047", severity: high, cwe: [CWE_193, CWE_787], confidence_floor: high }
+  match code.FlowSpecOperatorLoopBoundOffByOne as loop
+}
+
 rule PythonUnicodeEscapeWideUnderallocation {
   meta { id: "VYQL-MEM-030", severity: high, cwe: [CWE_787], confidence_floor: high }
   match code.PythonUnicodeEscapeWideUnderallocation as c

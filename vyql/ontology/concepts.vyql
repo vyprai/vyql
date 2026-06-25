@@ -1665,6 +1665,15 @@ concept Fat12SuccessorEntryBoundsBypass : sink {
   review_assumption: "a crafted FAT12 filesystem can drive writes near the last FAT entry and make the stale successor entry corrupt later memory accesses"
   review_confidence: high
 }
+concept FlowSpecOperatorLoopBoundOffByOne : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_193, CWE_787]
+  review_category: "memory"
+  review_condition: "a chained FlowSpec operator decoder writes match values while allowing the loop counter to reach the fixed match-value capacity"
+  review_evidence: "FlowSpec operator decode context {pattern} checks loop > BGP_PBR_MATCH_VAL_MAX before writing mval and advancing it"
+  review_assumption: "a crafted FlowSpec component can contain enough chained operators to reach the fixed mval array limit"
+  review_confidence: high
+}
 concept JpegSubsamplingRatioValidationMissing : sink {
   vulnerable_to: [memory.OobRead, memory.OobWrite]
   cwe: [CWE_125, CWE_787]
