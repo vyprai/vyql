@@ -741,6 +741,12 @@ review code.ConvertSvgMultiSvgSanitizerBypass {
   expected: [core.HtmlEscape, core.PathAccessCheck]
   text: "review convert-svg multi-SVG conversion for selecting only the first SVG before sanitizing and rendering in Puppeteer"
 }
+review code.UrlDecodedTraversalCheckExceptionBypass {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization, core.PathAccessCheck]
+  text: "review URL-decoded path traversal checks for malformed percent escapes that bypass later parent-directory validation"
+}
 review code.ProtocolStateReview {
   category: "request"
   kind: "attention"

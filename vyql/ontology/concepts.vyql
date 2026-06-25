@@ -3549,6 +3549,15 @@ concept CanonicalPathStringPrefixContainment : sink {
   review_assumption: "an attacker-controlled path can share the parent path string prefix while residing outside the intended parent directory"
   review_confidence: high
 }
+concept UrlDecodedTraversalCheckExceptionBypass : sink {
+  vulnerable_to: [path.PathTraversal, validation.ImproperInputValidation]
+  cwe: [CWE_22, CWE_184]
+  review_category: "path"
+  review_condition: "URL-decoded request paths are validated for parent-directory traversal only after a decode operation that can throw on malformed percent escapes"
+  review_evidence: "URL path check context {pattern} calls URLDecoder.decode and then PARENT_DIRECTORY_REGEX.matcher(...).find(), but lacks an IllegalArgumentException catch that falls through to the regex check"
+  review_assumption: "request paths may contain malformed percent escapes or already-decoded percent characters that make URL decoding throw before parent-directory validation runs"
+  review_confidence: high
+}
 concept LeadingDotSegmentOnlyRouteFilter : sink {
   vulnerable_to: [path.PathTraversal, validation.ImproperInputValidation]
   cwe: [CWE_22, CWE_184]

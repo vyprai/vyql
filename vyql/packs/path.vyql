@@ -242,3 +242,8 @@ rule PathBasedSandboxExposeBindRace {
   meta { id: "VYQL-PATH-047", severity: critical, cwe: [CWE_59, CWE_367, CWE_22], confidence_floor: high }
   match code.PathBasedSandboxExposeBindRace as sink
 }
+
+rule UrlDecodedTraversalCheckExceptionBypass {
+  meta { id: "VYQL-PATH-048", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
+  match code.UrlDecodedTraversalCheckExceptionBypass as sink
+}

@@ -413,6 +413,40 @@ class DBBuilder { void metadata(String k, String v){} }
 	t.Fatalf("large function context lost sensitive metadata export token")
 }
 
+func TestJavaFunctionContextIncludesCatchTypes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "HandlerHelper.java")
+	src := []byte(`import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
+class HandlerHelper {
+  static boolean isPathUnsafe(String path) {
+    try {
+      path = URLDecoder.decode(path, StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new RuntimeException(e);
+    } catch (IllegalArgumentException ex) {
+      // Check the decoded path as-is.
+    }
+    return path.contains("..");
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !javaFunctionContextContains(prog.Modules[0].Body, "isPathUnsafe", "catch_type:UnsupportedEncodingException") {
+		t.Fatalf("function context did not include UnsupportedEncodingException catch type")
+	}
+	if !javaFunctionContextContains(prog.Modules[0].Body, "isPathUnsafe", "catch_type:IllegalArgumentException") {
+		t.Fatalf("function context did not include IllegalArgumentException catch type")
+	}
+}
+
 func javaFunctionContextContains(stmts []nir.Stmt, name, token string) bool {
 	for _, st := range stmts {
 		switch x := st.(type) {

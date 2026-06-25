@@ -321,6 +321,7 @@ var structuredFlagTokenPrefixes = []string{
 	"call_arg:",
 	"call_order:",
 	"call_path:",
+	"catch_type:",
 	"class_base:",
 	"class_bases=",
 	"class_name:",

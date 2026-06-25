@@ -417,6 +417,64 @@ func (c *jvConv) catchParam(n *tree_sitter.Node) string {
 	return found
 }
 
+func (c *jvConv) catchTypes(n *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(typ string) {
+		typ = strings.TrimSpace(typ)
+		if typ == "" || seen[typ] {
+			return
+		}
+		seen[typ] = true
+		out = append(out, typ)
+		if i := strings.LastIndex(typ, "."); i >= 0 && i+1 < len(typ) {
+			short := typ[i+1:]
+			if short != "" && !seen[short] {
+				seen[short] = true
+				out = append(out, short)
+			}
+		}
+	}
+	var walkType func(*tree_sitter.Node)
+	walkType = func(m *tree_sitter.Node) {
+		if m == nil {
+			return
+		}
+		switch m.Kind() {
+		case "type_identifier", "scoped_type_identifier":
+			add(c.text(m))
+			return
+		}
+		for _, ch := range namedChildren(m) {
+			walkType(ch)
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil {
+			return
+		}
+		if m.Kind() == "catch_formal_parameter" || m.Kind() == "formal_parameter" {
+			if typ := field(m, "type"); typ != nil {
+				walkType(typ)
+			} else {
+				for _, ch := range namedChildren(m) {
+					if ch.Kind() == "variable_declarator_id" || ch.Kind() == "identifier" {
+						break
+					}
+					walkType(ch)
+				}
+			}
+			return
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
 func (c *jvConv) block(block *tree_sitter.Node) []nir.Stmt {
 	if block == nil {
 		return nil
@@ -668,6 +726,10 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 			return
 		}
 		switch m.Kind() {
+		case "catch_clause":
+			for _, typ := range c.catchTypes(m) {
+				add("catch_type:" + typ)
+			}
 		case "return_statement":
 			addReturnTokens(m)
 		case "method_invocation":

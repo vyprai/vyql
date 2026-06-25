@@ -833,6 +833,13 @@ adapter java {
     call "startsWith"
     not call "toPath"
   }
+  flag code.UrlDecodedTraversalCheckExceptionBypass in function {
+    call path "URLDecoder.decode"
+    call path "PARENT_DIRECTORY_REGEX.matcher"
+    call path "PARENT_DIRECTORY_REGEX.matcher.find"
+    token catch_type "UnsupportedEncodingException"
+    not token catch_type "IllegalArgumentException"
+  }
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.
   flag code.SensitiveOperation on any {
