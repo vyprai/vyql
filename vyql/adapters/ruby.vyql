@@ -246,6 +246,7 @@ adapter ruby {
   }
   flag code.RailsBasicAuthWeakCsrfStrategy in class {
     lang "ruby"
+    class base "ActionController.Base"
     call path "protect_from_forgery"
     call path "http_basic_authenticate_with"
     not call arg "protect_from_forgery:with=exception"

@@ -178,12 +178,13 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		})
 		return out
 	case "class", "module":
-		out := c.rubyClassContext(n)
+		bases := c.rubyClassBases(n)
+		out := c.rubyClassContext(n, bases)
 		oldVisibility := c.visibility
 		c.visibility = "public"
 		body := c.body(field(n, "body"))
 		c.visibility = oldVisibility
-		out = append(out, nir.ClassDef{Name: c.text(field(n, "name")), Body: body, Loc: L})
+		out = append(out, nir.ClassDef{Name: c.text(field(n, "name")), Bases: bases, Body: body, Loc: L})
 		return out
 	case "singleton_class":
 		oldVisibility := c.visibility
@@ -321,7 +322,7 @@ func (c *rbConv) rubyModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	}}}
 }
 
-func (c *rbConv) rubyClassContext(cls *tree_sitter.Node) []nir.Stmt {
+func (c *rbConv) rubyClassContext(cls *tree_sitter.Node, bases []string) []nir.Stmt {
 	body := field(cls, "body")
 	if body == nil {
 		return nil
@@ -330,7 +331,7 @@ func (c *rbConv) rubyClassContext(cls *tree_sitter.Node) []nir.Stmt {
 	loc := c.loc(cls)
 	text := c.text(body)
 	args := []nir.Expr{
-		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name + "\x00class_name:" + name},
+		nir.Const{Loc: loc, Value: rubyClassTokenString(name, bases)},
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
 	}
@@ -344,6 +345,42 @@ func (c *rbConv) rubyClassContext(cls *tree_sitter.Node) []nir.Stmt {
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func rubyClassTokenString(name string, bases []string) string {
+	tokens := []string{"lang=ruby", "name=" + name, "class_name:" + name}
+	for _, base := range bases {
+		if base == "" {
+			continue
+		}
+		tokens = append(tokens, "class_base:"+base)
+	}
+	if len(bases) > 0 {
+		tokens = append(tokens, "class_bases="+strings.Join(bases, ","))
+	}
+	return strings.Join(tokens, "\x00")
+}
+
+func (c *rbConv) rubyClassBases(cls *tree_sitter.Node) []string {
+	if cls == nil || cls.Kind() != "class" {
+		return nil
+	}
+	base := field(cls, "superclass")
+	if base == nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, value := range []string{c.dotted(base), rbCompactText(c.text(base)), strings.ReplaceAll(rbCompactText(c.text(base)), "::", ".")} {
+		value = strings.TrimPrefix(value, "<")
+		value = strings.TrimSpace(value)
+		if value == "" || value == "?" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {

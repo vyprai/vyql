@@ -139,6 +139,49 @@ end
 	t.Fatalf("analysis.function.context for ffi_lib not found; nodes=%#v", nodes)
 }
 
+func TestRubyClassContextIncludesSuperclassTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "base_controller.rb")
+	src := []byte(`module FieldTest
+  class BaseController < ActionController::Base
+    protect_from_forgery
+  end
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.class.context" || !strings.Contains(n.Prop("str_args"), "class_name:BaseController") {
+			continue
+		}
+		args := n.Prop("str_args")
+		for _, want := range []string{
+			"class_base:ActionController::Base",
+			"class_base:ActionController.Base",
+			"class_bases=ActionController::Base,ActionController.Base",
+		} {
+			if !strings.Contains(args, want) {
+				t.Fatalf("ruby class context missing %q; context=%q", want, args)
+			}
+		}
+		return
+	}
+	t.Fatalf("analysis.class.context for BaseController not found; nodes=%#v", nodes)
+}
+
 func rubyHasFuncWithParam(mods []nir.Module, name, param string) bool {
 	var walk func([]nir.Stmt) bool
 	walk = func(stmts []nir.Stmt) bool {
