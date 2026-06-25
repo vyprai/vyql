@@ -1416,6 +1416,7 @@ adapter php {
 
   // server-side template injection (CWE-1336) — Twig compiles a STRING template
   sink method "createTemplate" -> code.TemplateRender
+  sink path "Variables.getParsedValue" -> code.TemplateRender
 
   // controls (sanitizers/validators)
   // authorization checks (guards BIZ-001) — Laravel Gate predicates (path-sensitive via B1).
