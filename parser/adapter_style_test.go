@@ -303,5 +303,43 @@ func flagHasFlowPredicate(flag *AdapterFlag) bool {
 }
 
 func isStructuredFlagToken(value string) bool {
-	return strings.Contains(value, ":") || strings.Contains(value, "=")
+	for _, prefix := range structuredFlagTokenPrefixes {
+		if strings.HasPrefix(value, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+var structuredFlagTokenPrefixes = []string{
+	"annotation:",
+	"assign:",
+	"attr_path:",
+	"binary:",
+	"bound:",
+	"call:",
+	"call_arg:",
+	"call_order:",
+	"call_path:",
+	"class_base:",
+	"class_bases=",
+	"class_name:",
+	"decorator_path:",
+	"expr:",
+	"field:",
+	"function_name:",
+	"identifier:",
+	"index:",
+	"lang=",
+	"literal:",
+	"name=",
+	"param_index:",
+	"param_name:",
+	"param_type:",
+	"prop:",
+	"selector:",
+	"slice:",
+	"subscript:",
+	"trait:",
+	"var_name:",
 }
