@@ -123,115 +123,112 @@ adapter javascript {
   source method "parseFromString" -> core.UserControlledData
   flag code.StoredHtmlWrite in function {
     lang "javascript"
-    has "copyIn"
-    has "file.path"
-    has "info.extension"
-    lacks "sanitizeSvg"
-    lacks "DOMPurify"
+    call path "copyIn"
+    selector "file.path"
+    selector "info.extension"
+    not call path "sanitizeSvg"
+    not call path "DOMPurify"
   }
   flag code.UnescapedHtmlOptionRenderer in function {
     lang "javascript"
-    has "newTomSelect"
-    has "directoryName"
-    has "return`<"
-    lacks "sanitizeDirectoryName"
-    lacks "textContent"
-    lacks "innerHTML"
+    call path "newTomSelect"
+    identifier "directoryName"
+    literal "<"
+    not call path "sanitizeDirectoryName"
+    not selector "textContent"
+    not selector "innerHTML"
   }
   flag code.UnescapedHtmlOptionRenderer in function {
     lang "javascript"
-    has "getAttribute"
-    has "data-content"
-    has "optionContent"
-    has "innerHTML"
-    has "appendChild"
-    lacks "sanitizeHtml"
-    lacks "DOMPurify"
-    lacks "sanitize-html"
+    call path "getAttribute"
+    literal "data-content"
+    identifier "optionContent"
+    selector "innerHTML"
+    call path "appendChild"
+    not call path "sanitizeHtml"
+    not call path "DOMPurify"
+    not literal "sanitize-html"
   }
   flag code.HighlightedSearchResultHtmlEscapeMissing on any {
     path exact "analysis.function.context"
     lang "javascript"
     name "search"
-    has "ignoreDiacriticalMarks"
-    has "search-keyword"
-    has "matchingPost"
-    lacks "escapeHtml("
+    call path "ignoreDiacriticalMarks"
+    literal "search-keyword"
+    identifier "matchingPost"
+    not call path "escapeHtml"
   }
   flag code.UnescapedTableExportHtml in module {
     lang "javascript"
-    has "onCellHtmlData"
-    has "htmlData"
-    has "returnhtmlData"
-    has "tableExport"
-    has "escape:false"
-    lacks "escape:true"
-    lacks "returncell.text"
-    lacks "returncell.text()"
+    identifier "onCellHtmlData"
+    identifier "htmlData"
+    call path "tableExport"
+    token prop "escape=false"
+    not token prop "escape=true"
+    not call path "cell.text"
   }
   flag code.UnescapedHtmlPresenter in module {
     lang "javascript"
-    has "presentType=\"html\""
-    has "present(encodings)"
-    has "Utils.printable"
-    has "<td>${value}</td>"
-    lacks "Utils.escapeHtml"
-    lacks "DOMPurify"
+    token prop "presentType=html"
+    call path "present"
+    call path "Utils.printable"
+    literal "<td>${value}</td>"
+    not call path "Utils.escapeHtml"
+    not call path "DOMPurify"
   }
   flag code.UninitializedBufferExposure in module {
     lang "javascript"
-    has "name.encode=function(str,buf,offset)"
-    has "Buffer.allocUnsafe(name.encodingLength(str))"
-    has "constn=str.replace(/^\\.|\\.$/gm,'')"
-    has "name.encodingLength=function(n)"
-    has "returnBuffer.byteLength(n)+2"
-    lacks "returnBuffer.byteLength(n.replace(/^\\.|\\.$/gm,''))+2"
+    selector "name.encode"
+    call path "Buffer.allocUnsafe"
+    call path "name.encodingLength"
+    call path "str.replace"
+    selector "name.encodingLength"
+    call path "Buffer.byteLength"
+    not call arg "Buffer.byteLength:n.replace"
   }
   flag code.UnescapedChartTooltipHtml in function {
     lang "javascript"
-    has "tooltipModel.body"
-    has "tooltipModel.labelColors"
-    has "generateTooltipContent"
-    has "innerHTML"
-    lacks "replaceChildren"
-    lacks "textContent"
+    selector "tooltipModel.body"
+    selector "tooltipModel.labelColors"
+    call path "generateTooltipContent"
+    selector "innerHTML"
+    not call path "replaceChildren"
+    not selector "textContent"
   }
   flag code.UnescapedChartTooltipDataName in function {
     lang "javascript"
     name "formatTooltip"
-    has "itemModel.get('name')"
-    has "if(name){returnname;}"
-    has "createTooltipMarkup('nameValue'"
-    lacks "name:itemName"
-    lacks "encodeHTML(name)"
-    lacks "escapeHTML(name)"
-    lacks "escapeHtml(name)"
+    call arg "itemModel.get:name"
+    identifier "name"
+    call arg "createTooltipMarkup:nameValue"
+    not token prop "name=itemName"
+    not call arg "encodeHTML:name"
+    not call arg "escapeHTML:name"
+    not call arg "escapeHtml:name"
   }
   flag code.DropdownEntryLabelInnerHtmlXss in function {
     lang "javascript"
     name "addDropDownEntry"
-    has "li.innerHTML"
-    has "dropdown-item"
-    has "label"
-    lacks "sanitizeHTML(label)"
-    lacks "textContent"
+    selector "li.innerHTML"
+    literal "dropdown-item"
+    identifier "label"
+    not call arg "sanitizeHTML:label"
+    not selector "textContent"
   }
   flag code.PrivilegedContainer in function {
     lang "javascript"
-    has "dockerrun-dt"
-    has "--privileged=true"
-    has "--cap-addSYS_ADMIN"
-    has "--device/dev/fuse"
-    has "exec(cmd"
-    lacks "appConfig.capabilities"
-    lacks "--privileged=false"
+    literal contains_any ["docker run -dt", "dockerrun-dt"]
+    literal contains_any ["--privileged=true", "--cap-add SYS_ADMIN", "--cap-addSYS_ADMIN", "--device /dev/fuse", "--device/dev/fuse"]
+    call path "exec"
+    not selector "appConfig.capabilities"
+    not literal "--privileged=false"
   }
   flag code.DefaultPermissiveCorsConfig in module {
     lang "javascript"
-    has "CORS_ENABLED:true"
-    has "CORS_ORIGIN:true"
-    lacks "CORS_ENABLED:false"
-    lacks "CORS_ORIGIN:false"
+    token prop "CORS_ENABLED=true"
+    token prop "CORS_ORIGIN=true"
+    not token prop "CORS_ENABLED=false"
+    not token prop "CORS_ORIGIN=false"
   }
   flag code.WebSocketUpgradeMissingOriginCheck in class {
     lang "javascript"
@@ -239,7 +236,8 @@ adapter javascript {
     call "handleUpgrade"
     call "bind"
     token literal "sec-websocket-protocol"
-    lacks "origin"
+    not selector contains_any ["headers.origin", ".origin"]
+    not literal contains_any ["origin", "Origin"]
   }
   flag code.IncompleteHtmlEventHandlerStrip in module {
     lang "javascript"
@@ -293,11 +291,11 @@ adapter javascript {
     lacks "new URL"
   }
   flag code.JobOutputEventUpdateAuthorizationBypass in function {
-    has "Got job update from child"
-    has "update_event"
-    has "job[key]=data[key]"
-    lacks "allow_event_updates_from_jobs"
-    lacks "delete data.update_event"
+    literal "Got job update from child"
+    literal "update_event"
+    assign "job[key]=data[key]"
+    not literal "allow_event_updates_from_jobs"
+    not selector "data.update_event"
   }
   flag code.PublicVisibilityCacheInvalidationMissing in module {
     lang "javascript"
@@ -444,6 +442,15 @@ adapter javascript {
     selector "req.query"
     lacks call path "Array.isArray"
   }
+  flag code.BrowserPostExportMissingOriginGuard in function {
+    lang "javascript"
+    name "<lambda>"
+    call path "app.post"
+    selector "req.body.path"
+    call path "exportAll"
+    not selector "req.headers.origin"
+    not call contains_any ["verifyCsrfToken", "validateCsrfToken", "checkCsrf", "csrf"]
+  }
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verifyCsrfToken" -> core.CsrfProtection
   control "validateCsrfToken" -> core.CsrfProtection
@@ -500,22 +507,21 @@ adapter javascript {
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
   flag code.MethodGatedRedirectValidationBypass in function {
     lang "javascript"
-    has "ctx.request?.method"
-    has "POST"
-    has "return;"
-    has "callbackURL"
-    has "redirectTo"
-    has "trustedOrigins"
-    has "validateURL"
+    selector contains_any ["ctx.request.method", "ctx.request?.method"]
+    literal "POST"
+    identifier "callbackURL"
+    identifier "redirectTo"
+    identifier "trustedOrigins"
+    call path "validateURL"
   }
   flag code.CinnyServiceWorkerMediaAuthLeak in function {
     lang "javascript"
-    has "event.respondWith"
-    has "askForAccessToken(client)"
-    has "fetchConfig(token)"
-    has "/_matrix/client/v1/media/download"
-    has "/_matrix/client/v1/media/thumbnail"
-    lacks "validMediaRequest(url,session.baseUrl)"
+    call path "event.respondWith"
+    call path "askForAccessToken"
+    call path "fetchConfig"
+    literal "/_matrix/client/v1/media/download"
+    literal "/_matrix/client/v1/media/thumbnail"
+    not call path "validMediaRequest"
   }
   flag code.IncompleteIpDenylist in function {
     lang "javascript"
@@ -707,21 +713,21 @@ adapter javascript {
   }
   flag code.McpToolCommandTemplateExecution in module {
     lang "javascript"
-    has "server.tool"
-    has "lsof -t -i tcp:${port}"
-    has "ps -p ${pid} -o comm="
-    lacks "execFile("
+    call path "server.tool"
+    literal contains_any ["lsof -t -i tcp:${port}", "ps -p ${pid} -o comm="]
+    not call path "execFile"
   }
   flag code.CommandStringWrapperExecution in function {
     lang "javascript"
     name "writeConfigRemote"
-    has "execAsyncRemote"
-    has "echo'${traefikConfig}'"
-    has ">${configPath}"
-    lacks "encodeBase64(traefikConfig)"
-    lacks "base64 -d"
-    lacks "shell-quote"
-    lacks "shellQuote.quote"
+    call path "execAsyncRemote"
+    identifier "traefikConfig"
+    identifier "configPath"
+    literal "echo"
+    not call arg "encodeBase64:traefikConfig"
+    not literal "base64 -d"
+    not literal "shell-quote"
+    not call path "shellQuote.quote"
   }
   flag code.DynamicFunctionMutableObjectEval in function {
     lang "javascript"
@@ -1488,10 +1494,10 @@ adapter javascript {
   flag code.DefaultExternalRelaySecretExposure in function {
     lang "javascript"
     name "buildRelayUrl"
-    has "herokuapp.com"
-    has "encodeURIComponent(gurl)"
-    has "token"
-    lacks "configuredRelayHost"
+    literal "herokuapp.com"
+    call arg "encodeURIComponent:gurl"
+    identifier contains_any ["token", "gurl"]
+    not identifier "configuredRelayHost"
   }
   // Runtime/default settings that choose auth/session token sync URLs must be
   // constrained to same-origin paths before token-bearing requests are installed.

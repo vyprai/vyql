@@ -1,0 +1,57 @@
+# Rank 856 / CVE-2024-4128: Firebase Tools allowed browser-origin POSTs to
+# trigger emulator export before checking the Origin header.
+
+test "rank856: TypeScript POST export endpoint lacks browser Origin guard"
+  lang javascript
+  file hub.ts
+  expect VYQL-RF-034
+  expect_review code.BrowserPostExportMissingOriginGuard
+  code
+  ```
+  import * as express from "express";
+
+  class EmulatorHub {
+    static PATH_EXPORT = "/emulators:export";
+
+    protected async createExpressApp(): Promise<express.Express> {
+      const app = express();
+      app.post(EmulatorHub.PATH_EXPORT, async (req, res) => {
+        const path: string = req.body.path;
+        const initiatedBy: string = req.body.initiatedBy || "unknown";
+        await new HubExport("demo", { path, initiatedBy }).exportAll();
+        res.status(200).send({ message: "OK" });
+      });
+      return app;
+    }
+  }
+  ```
+
+test "rank856: TypeScript POST export endpoint checks browser Origin"
+  lang javascript
+  file hub.ts
+  reject VYQL-RF-034
+  reject_review code.BrowserPostExportMissingOriginGuard
+  code
+  ```
+  import * as express from "express";
+
+  class EmulatorHub {
+    static PATH_EXPORT = "/emulators:export";
+
+    protected async createExpressApp(): Promise<express.Express> {
+      const app = express();
+      app.post(EmulatorHub.PATH_EXPORT, async (req, res) => {
+        if (req.headers.origin) {
+          res.status(403).json({
+            message: `Export cannot be triggered by external callers.`,
+          });
+        }
+        const path: string = req.body.path;
+        const initiatedBy: string = req.body.initiatedBy || "unknown";
+        await new HubExport("demo", { path, initiatedBy }).exportAll();
+        res.status(200).send({ message: "OK" });
+      });
+      return app;
+    }
+  }
+  ```

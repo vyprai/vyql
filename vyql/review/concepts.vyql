@@ -2040,6 +2040,12 @@ review code.WebSocketUpgradeMissingOriginCheck {
   expected: [core.CsrfProtection, core.AuthenticationCheck]
   text: "review WebSocket upgrade handlers for trusted Origin validation before handleUpgrade"
 }
+review code.BrowserPostExportMissingOriginGuard {
+  category: "request"
+  kind: "target"
+  expected: [core.CsrfProtection]
+  text: "review browser-reachable POST export endpoints for Origin or CSRF validation before export operations"
+}
 review code.CallFutureRawWeakStateRef {
   category: "resource"
   kind: "attention"

@@ -58,6 +58,11 @@ rule WebSocketUpgradeMissingOriginCheck {
   match code.WebSocketUpgradeMissingOriginCheck as upgrade
 }
 
+rule BrowserPostExportMissingOriginGuard {
+  meta { id: "VYQL-RF-034", severity: high, cwe: [CWE_352, CWE_346], confidence_floor: high }
+  match code.BrowserPostExportMissingOriginGuard as endpoint
+}
+
 rule OAuthStateCookieValidationMissing {
   meta { id: "VYQL-RF-032", severity: high, cwe: [CWE_352, CWE_287], confidence_floor: high }
   match code.OAuthStateCookieValidationMissing as flow

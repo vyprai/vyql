@@ -160,6 +160,71 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 	}
 }
 
+func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	path := filepath.Join(root, "vyql", "adapters", "javascript.vyql")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decls, err := Parse(string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	structuralConcepts := map[string]bool{
+		"code.StoredHtmlWrite":                          true,
+		"code.UnescapedHtmlOptionRenderer":              true,
+		"code.HighlightedSearchResultHtmlEscapeMissing": true,
+		"code.UnescapedTableExportHtml":                 true,
+		"code.UnescapedHtmlPresenter":                   true,
+		"code.UninitializedBufferExposure":              true,
+		"code.UnescapedChartTooltipHtml":                true,
+		"code.UnescapedChartTooltipDataName":            true,
+		"code.DropdownEntryLabelInnerHtmlXss":           true,
+		"code.PrivilegedContainer":                      true,
+		"code.DefaultPermissiveCorsConfig":              true,
+		"code.WebSocketUpgradeMissingOriginCheck":       true,
+		"code.JobOutputEventUpdateAuthorizationBypass":  true,
+		"code.MethodGatedRedirectValidationBypass":      true,
+		"code.CinnyServiceWorkerMediaAuthLeak":          true,
+		"code.McpToolCommandTemplateExecution":          true,
+		"code.CommandStringWrapperExecution":            true,
+		"code.DefaultExternalRelaySecretExposure":       true,
+		"code.ExternalSettingTokenSyncUrlExposure":      true,
+		"code.BrowserPostExportMissingOriginGuard":      true,
+	}
+
+	var hits []string
+	for _, decl := range decls {
+		ad, ok := decl.(*AdapterDecl)
+		if !ok {
+			continue
+		}
+		for _, mapping := range ad.Mappings {
+			if !structuralConcepts[mapping.Concept] || mapping.Flag == nil {
+				continue
+			}
+			for _, pred := range mapping.Flag.Predicates {
+				if pred.Property != "tokens" {
+					continue
+				}
+				for _, value := range pred.Values {
+					if !isStructuredFlagToken(value) {
+						hits = append(hits, mapping.Concept+": raw token predicate "+strconv.Quote(value))
+					}
+				}
+			}
+		}
+	}
+	if len(hits) > 0 {
+		t.Fatalf("JavaScript context-flow flags must use AST-backed predicates, not raw has/lacks text:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
 func isStructuredFlagToken(value string) bool {
 	return strings.Contains(value, ":") || strings.Contains(value, "=")
 }

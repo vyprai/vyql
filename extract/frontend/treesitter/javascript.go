@@ -1487,6 +1487,12 @@ func isJSIdent(s string) bool {
 
 func (c *jsConv) markCallLambdaParams(path string, lam nir.Lambda, L string) nir.Lambda {
 	method := lastSeg(path)
+	lam.ContextTokens = append(lam.ContextTokens,
+		"call_path:"+path,
+		"call:"+method,
+		"call_method:"+method,
+		"param_count:"+itoa(len(lam.Params)),
+	)
 	for i, p := range lam.Params {
 		if p == "" || p == "_" {
 			continue

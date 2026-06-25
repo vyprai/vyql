@@ -320,6 +320,65 @@ export const middleware = createAuthMiddleware(async (ctx) => {
 	t.Fatalf("inline lambda context was not lowered; nodes=%#v", nodes)
 }
 
+func TestJavaScriptSiblingInlineLambdaContextsUseDistinctScopes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "routes.ts")
+	src := []byte(`
+export function setup(app: any) {
+  app.post(PATH_EXPORT, async (req, res) => {
+    const path = req.body.path;
+    await exportAll(path);
+  });
+  app.post(PATH_DISABLE, async (req, res) => {
+    res.status(200).send({ ok: true });
+  });
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exportCtx, disableCtx, exportCallScope string
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.function.context" {
+			tokens := n.Prop("str_args")
+			switch {
+			case strings.Contains(tokens, "name=<lambda>") && strings.Contains(tokens, "call_path:app.post") && strings.Contains(tokens, "req.body.path") && strings.Contains(tokens, "exportAll"):
+				exportCtx = n.Region
+			case strings.Contains(tokens, "name=<lambda>") && strings.Contains(tokens, "call_path:app.post") && strings.Contains(tokens, "res.status") && strings.Contains(tokens, "send"):
+				disableCtx = n.Region
+			}
+		}
+		if n.Type == "code.Call" && n.Prop("callee_path") == "exportAll" {
+			exportCallScope = n.Region
+		}
+	}
+	if exportCtx == "" || disableCtx == "" {
+		t.Fatalf("missing sibling lambda contexts: export=%q disable=%q nodes=%#v", exportCtx, disableCtx, nodes)
+	}
+	if exportCtx == disableCtx {
+		t.Fatalf("sibling inline lambda contexts share scope %q", exportCtx)
+	}
+	if exportCallScope == "" || !strings.HasPrefix(exportCallScope, exportCtx) {
+		t.Fatalf("exportAll call scope %q is not nested under export lambda context %q", exportCallScope, exportCtx)
+	}
+	if strings.HasPrefix(exportCallScope, disableCtx) {
+		t.Fatalf("exportAll call scope %q is incorrectly nested under sibling lambda context %q", exportCallScope, disableCtx)
+	}
+}
+
 func TestJavaScriptModuleContextIncludesStructuredTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "init.js")

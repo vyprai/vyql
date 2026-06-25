@@ -2057,6 +2057,8 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return l.eval(ex.Value, sc)
 	case nir.Lambda:
 		l.promoteCapturedJSBindings(ex.Body, ex.Params, sc, ex.Loc)
+		saveRegion := l.region
+		l.region = l.curNS + "/fn" + l.nextBranch()
 		l.functionContextAnalysisEvent(ex.Loc, ex.ContextTokens)
 		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
@@ -2085,6 +2087,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 		}
 		l.block(ex.Body, inner)
+		l.region = saveRegion
 		fn := l.node("Func", ex.Loc, nil)
 		l.lambdaParams[fn] = paramNodes // for higher-order callback dispatch
 		return fn
