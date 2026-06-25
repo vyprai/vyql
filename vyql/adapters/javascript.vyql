@@ -451,6 +451,14 @@ adapter javascript {
     not selector "req.headers.origin"
     not call contains_any ["verifyCsrfToken", "validateCsrfToken", "checkCsrf", "csrf"]
   }
+  flag code.WebhookUrlFetchMissingSsrfGuard in function {
+    lang "javascript"
+    name contains_any ["callWebhook", "sendWebhook", "deliverWebhook", "postWebhook"]
+    call path contains_any ["axios.post", "axios.request", "request.post", "undici.fetch", "fetch"]
+    selector contains_any ["webhookUrl.url", "webhook.url", "callbackUrl", "callback.url"]
+    not token identifier "secureDispatcher"
+    not call contains_any ["safeFetch", "fetchWithSsrfGuard", "validateUrl", "assertPublicUrl"]
+  }
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verifyCsrfToken" -> core.CsrfProtection
   control "validateCsrfToken" -> core.CsrfProtection

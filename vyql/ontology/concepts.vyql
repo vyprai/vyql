@@ -2496,6 +2496,15 @@ concept CloudBaseOpenUrlSsrf : sink {
   review_assumption: "the interactive open-url endpoint is reachable by a remote or browser-backed attacker"
   review_confidence: high
 }
+concept WebhookUrlFetchMissingSsrfGuard : sink {
+  vulnerable_to: [request_forgery.Ssrf]
+  cwe: [CWE_918]
+  review_category: "request_forgery"
+  review_condition: "webhook or callback delivery fetches a caller-configured URL without an SSRF-safe dispatcher or URL validation guard"
+  review_evidence: "webhook delivery context {pattern} posts to a webhook/callback URL through a general outbound HTTP client without an observed secure dispatcher or URL guard"
+  review_assumption: "webhook or callback URLs can be configured by a tenant, user, or database record and the service has access to internal network targets"
+  review_confidence: high
+}
 concept ServerSideBrowserActiveHtmlRendering : sink {
   vulnerable_to: [request_forgery.Ssrf, injection.Xss, secrets.SecretLeak]
   cwe: [CWE_918, CWE_79, CWE_200]

@@ -63,6 +63,11 @@ rule BrowserPostExportMissingOriginGuard {
   match code.BrowserPostExportMissingOriginGuard as endpoint
 }
 
+rule WebhookUrlFetchMissingSsrfGuard {
+  meta { id: "VYQL-RF-035", severity: high, cwe: [CWE_918], confidence_floor: high }
+  match code.WebhookUrlFetchMissingSsrfGuard as webhook
+}
+
 rule OAuthStateCookieValidationMissing {
   meta { id: "VYQL-RF-032", severity: high, cwe: [CWE_352, CWE_287], confidence_floor: high }
   match code.OAuthStateCookieValidationMissing as flow

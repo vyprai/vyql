@@ -461,6 +461,12 @@ review code.CloudBaseOpenUrlSsrf {
   expected: [core.AllowlistValidation]
   text: "review CloudBase MCP open-url requests for scheme, hostname, and private-address validation before opening URLs"
 }
+review code.WebhookUrlFetchMissingSsrfGuard {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.AllowlistValidation]
+  text: "review webhook or callback delivery for SSRF-safe dispatchers or URL validation before outbound fetches"
+}
 review code.CodeServerPathProxyPortConfusedProxy {
   category: "request_forgery"
   kind: "attention"
