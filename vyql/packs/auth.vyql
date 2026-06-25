@@ -320,6 +320,11 @@ rule ExternalResourceNamespaceControl {
   match code.ExternalResourceNamespaceControl as namespace
 }
 
+rule KubernetesNamespaceNotInEgressPolicy {
+  meta { id: "VYQL-AUTH-068", severity: critical, cwe: [CWE_284, CWE_863], confidence_floor: high }
+  match code.KubernetesNamespaceNotInEgressPolicy as policy
+}
+
 rule TenantServiceAccountAdmissionBypass {
   meta { id: "VYQL-AUTH-009", severity: high, cwe: [CWE_863], confidence_floor: medium }
   match code.TenantServiceAccountAdmissionBypass as admission

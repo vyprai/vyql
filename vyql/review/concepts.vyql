@@ -641,6 +641,12 @@ review code.ExternalResourceNamespaceControl {
   expected: [core.AuthorizationCheck]
   text: "review Kubernetes object namespace selection against the reconciled resource namespace"
 }
+review code.KubernetesNamespaceNotInEgressPolicy {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Kubernetes egress NetworkPolicies using namespace metadata.name NotIn the current namespace"
+}
 review code.TenantServiceAccountAdmissionBypass {
   category: "auth"
   kind: "attention"

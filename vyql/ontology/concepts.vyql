@@ -2515,6 +2515,15 @@ concept ExternalResourceNamespaceControl : sink {
   review_assumption: "the custom resource can be created or updated by a lower-privileged tenant in a namespace watched by the controller"
   review_confidence: medium
 }
+concept KubernetesNamespaceNotInEgressPolicy : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization]
+  cwe: [CWE_284, CWE_863]
+  review_category: "auth"
+  review_condition: "a Kubernetes NetworkPolicy egress rule allows namespaces selected by metadata.name NotIn the current namespace"
+  review_evidence: "Kubernetes NetworkPolicy context {pattern} builds an egress peer NamespaceSelector with kubernetes.io/metadata.name NotIn the resource namespace"
+  review_assumption: "the policy was intended to isolate workloads from adjacent namespaces, but NetworkPolicy egress rules are allow rules"
+  review_confidence: high
+}
 concept TenantServiceAccountAdmissionBypass : sink {
   vulnerable_to: [access_control.IncorrectAuthorization]
   cwe: [CWE_863]
