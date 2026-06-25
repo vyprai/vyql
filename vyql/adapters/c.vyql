@@ -303,6 +303,15 @@ adapter c {
     binary contains_any ["uxDataLength-sizeof(*pxICMPEchoHeader)", "uxDataLength-sizeof"]
     not binary contains_any ["uxDataLength<sizeof(*pxICMPEchoHeader)", "sizeof(*pxICMPEchoHeader)>uxDataLength"]
   }
+  flag code.IsolateLevelIncrementWithoutCap in function {
+    lang "c"
+    name "fribidi_get_par_embedding_levels_ex"
+    call path "FRIBIDI_IS_ISOLATE"
+    assign "RL_ISOLATE_LEVEL=isolate_level++"
+    assign "base_level_per_iso_level[]=new_level"
+    index "run_per_isolate_level[]"
+    not binary contains "isolate_level<FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL-1"
+  }
   flag code.ContikiSicslowpanFragmentOffsetOobWrite in function {
     lang "c"
     name "copy_frags2uip"

@@ -1,0 +1,66 @@
+# Rank 917 / CVE-2019-18397: FriBidi incremented isolate_level past the
+# explicit-level cap before using it as an isolate-level array index.
+
+test "rank917: bidi isolate level increments without cap before array indexing"
+  lang c
+  file fribidi-bidi.c
+  expect VYQL-MEM-046
+  expect_review code.IsolateLevelIncrementWithoutCap
+  code
+  ```
+  void fribidi_get_par_embedding_levels_ex(void)
+  {
+      FriBidiLevel base_level_per_iso_level[FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL];
+      FriBidiRun *run_per_isolate_level[FRIBIDI_BIDI_MAX_RESOLVED_LEVELS];
+      int isolate_level = 0;
+      FriBidiRun *pp;
+      int this_type;
+      int new_level;
+
+      if (FRIBIDI_IS_ISOLATE(this_type))
+      {
+          RL_LEVEL (pp) = level;
+          RL_ISOLATE_LEVEL (pp) = isolate_level++;
+          base_level_per_iso_level[isolate_level] = new_level;
+      }
+
+      for_run_list (pp, main_run_list)
+      {
+          int isolate_level = RL_ISOLATE_LEVEL (pp);
+          run_per_isolate_level[isolate_level] = pp;
+      }
+  }
+  ```
+
+test "rank917: bidi isolate level caps before incrementing"
+  lang c
+  file fribidi-bidi.c
+  reject VYQL-MEM-046
+  reject_review code.IsolateLevelIncrementWithoutCap
+  code
+  ```
+  void fribidi_get_par_embedding_levels_ex(void)
+  {
+      FriBidiLevel base_level_per_iso_level[FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL];
+      FriBidiRun *run_per_isolate_level[FRIBIDI_BIDI_MAX_RESOLVED_LEVELS];
+      int isolate_level = 0;
+      FriBidiRun *pp;
+      int this_type;
+      int new_level;
+
+      if (FRIBIDI_IS_ISOLATE(this_type))
+      {
+          RL_LEVEL (pp) = level;
+          RL_ISOLATE_LEVEL (pp) = isolate_level;
+          if (isolate_level < FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL-1)
+              isolate_level++;
+          base_level_per_iso_level[isolate_level] = new_level;
+      }
+
+      for_run_list (pp, main_run_list)
+      {
+          int isolate_level = RL_ISOLATE_LEVEL (pp);
+          run_per_isolate_level[isolate_level] = pp;
+      }
+  }
+  ```

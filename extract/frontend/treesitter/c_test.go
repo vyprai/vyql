@@ -367,6 +367,65 @@ int marker(void) { return 0; }
 	}
 }
 
+func TestCFunctionContextIncludesIsolateLevelCapTokens(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "fribidi-bidi.c")
+	src := []byte(`
+void vulnerable(void) {
+  int isolate_level = 0;
+  int this_type;
+  int new_level;
+  void *pp;
+  int base_level_per_iso_level[FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL];
+  void *run_per_isolate_level[FRIBIDI_BIDI_MAX_RESOLVED_LEVELS];
+
+  if (FRIBIDI_IS_ISOLATE(this_type)) {
+    RL_ISOLATE_LEVEL(pp) = isolate_level++;
+    base_level_per_iso_level[isolate_level] = new_level;
+  }
+  run_per_isolate_level[isolate_level] = pp;
+}
+
+void fixed(void) {
+  int isolate_level = 0;
+  int this_type;
+  int new_level;
+  void *pp;
+  int base_level_per_iso_level[FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL];
+
+  if (FRIBIDI_IS_ISOLATE(this_type)) {
+    RL_ISOLATE_LEVEL(pp) = isolate_level;
+    if (isolate_level < FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL - 1)
+      isolate_level++;
+    base_level_per_iso_level[isolate_level] = new_level;
+  }
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vulnTokens := cFuncContextTokens(prog.Modules[0].Body, "vulnerable")
+	for _, want := range []string{
+		"call_path:FRIBIDI_IS_ISOLATE",
+		"assign:RL_ISOLATE_LEVEL=isolate_level++",
+		"assign:base_level_per_iso_level[]=new_level",
+		"index:run_per_isolate_level[]",
+	} {
+		if !strings.Contains(vulnTokens, want) {
+			t.Fatalf("vulnerable isolate-level context missing %q; context=%q", want, vulnTokens)
+		}
+	}
+	fixedTokens := cFuncContextTokens(prog.Modules[0].Body, "fixed")
+	if !strings.Contains(fixedTokens, "binary:isolate_level<FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL-1") {
+		t.Fatalf("fixed isolate-level context missing cap guard token; context=%q", fixedTokens)
+	}
+}
+
 func TestCZeroCountLastIndexObservationRequiresNonZeroGuard(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "frames.c")

@@ -1415,6 +1415,15 @@ concept IcmpEchoPayloadLengthUnderflow : sink {
   review_assumption: "a peer can send a short or zero-length ICMPv6 echo reply payload that makes the size_t subtraction wrap"
   review_confidence: high
 }
+concept IsolateLevelIncrementWithoutCap : sink {
+  vulnerable_to: [memory.OobWrite, memory.OobRead]
+  cwe: [CWE_787, CWE_125]
+  review_category: "memory"
+  review_condition: "Unicode bidi isolate nesting increments isolate_level without capping it before using it as an isolate-level array index"
+  review_evidence: "bidi isolate context {pattern} stores RL_ISOLATE_LEVEL from isolate_level++ and then indexes base_level_per_iso_level or run_per_isolate_level by isolate_level"
+  review_assumption: "attacker-controlled bidi isolate characters can drive nesting high enough to exceed the explicit-level array bounds"
+  review_confidence: high
+}
 concept ContikiSicslowpanFragmentOffsetOobWrite : sink {
   vulnerable_to: [memory.OobWrite]
   cwe: [CWE_787]

@@ -2682,6 +2682,12 @@ review code.IcmpEchoPayloadLengthUnderflow {
   expected: [core.InputValidation]
   text: "review ICMP echo payload length handling for minimum-size checks before subtracting the echo header"
 }
+review code.IsolateLevelIncrementWithoutCap {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review bidi isolate nesting level updates for a cap before isolate-level array indexing"
+}
 review code.UnsignedIndexConversionGuardBypass {
   category: "numeric"
   kind: "attention"

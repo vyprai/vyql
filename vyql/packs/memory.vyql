@@ -38,6 +38,11 @@ rule IcmpEchoPayloadLengthUnderflow {
   match code.IcmpEchoPayloadLengthUnderflow as len
 }
 
+rule IsolateLevelIncrementWithoutCap {
+  meta { id: "VYQL-MEM-046", severity: high, cwe: [CWE_787, CWE_125], confidence_floor: high }
+  match code.IsolateLevelIncrementWithoutCap as level
+}
+
 rule PythonUnicodeEscapeWideUnderallocation {
   meta { id: "VYQL-MEM-030", severity: high, cwe: [CWE_787], confidence_floor: high }
   match code.PythonUnicodeEscapeWideUnderallocation as c
