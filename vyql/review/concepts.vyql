@@ -1299,6 +1299,12 @@ review code.Free5gcChfRechargeInfoSplitPanic {
   expected: [core.MemoryBoundsCheck]
   text: "review recharge route parsing for a split-result length check before indexing rating-group fields"
 }
+review code.NilMapMergeWritePanic {
+  category: "resource"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review optional map merge paths for an empty-map initialization before writing merged values"
+}
 review code.CookieMaxAgeDurationSecondsPanic {
   category: "resource"
   kind: "attention"

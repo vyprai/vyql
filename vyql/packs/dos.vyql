@@ -169,3 +169,8 @@ rule ProtocolStatusVectorUnknownArgumentFallback {
   meta { id: "VYQL-DOS-033", severity: high, cwe: [CWE_228, CWE_248, CWE_400], confidence_floor: high }
   match code.ProtocolStatusVectorUnknownArgumentFallback as parser
 }
+
+rule NilMapMergeWritePanic {
+  meta { id: "VYQL-DOS-034", severity: high, cwe: [CWE_248, CWE_400], confidence_floor: high }
+  match code.NilMapMergeWritePanic as s
+}

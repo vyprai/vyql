@@ -2724,6 +2724,15 @@ concept Free5gcChfRechargeInfoSplitPanic : sink {
   review_assumption: "a valid authenticated caller can supply a recharge route value without the underscore delimiter and repeatedly trigger panic recovery"
   review_confidence: high
 }
+concept NilMapMergeWritePanic : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_248, CWE_400]
+  review_category: "resource"
+  review_condition: "optional Helm values are merged into a map that can still be nil"
+  review_evidence: "values merge context {pattern} assigns values from optional Helm data and calls mergeValues over ValuesFrom without an empty-map guard"
+  review_assumption: "a user-controlled bundle with Helm valuesFrom and no base values can repeatedly trigger a nil-map assignment panic during deployment"
+  review_confidence: high
+}
 concept CookieMaxAgeDurationSecondsPanic : sink {
   vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
   cwe: [CWE_20, CWE_400]
