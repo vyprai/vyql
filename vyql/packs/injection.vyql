@@ -265,6 +265,11 @@ rule Xss {
   unless guarded_by core.SafeResponseContentType
 }
 
+rule ErbHrefInterpolationHtmlEscapeMissing {
+  meta { id: "VYQL-INJ-185", severity: high, cwe: [CWE_79, CWE_116], confidence_floor: high }
+  match code.ErbHrefInterpolationHtmlEscapeMissing as sink
+}
+
 rule JavaScriptTemplateHtmlEscapeMismatch {
   meta { id: "VYQL-INJ-171", severity: high, cwe: [CWE_79, CWE_116], confidence_floor: high }
   match code.JavaScriptTemplateHtmlEscapeMismatch as sink

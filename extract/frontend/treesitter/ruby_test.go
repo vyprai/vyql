@@ -182,6 +182,57 @@ end
 	t.Fatalf("analysis.class.context for BaseController not found; nodes=%#v", nodes)
 }
 
+func TestRubyERBExtractsUnescapedHrefInterpolationObservation(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "vuln.erb")
+	fixed := filepath.Join(dir, "fixed.erb")
+	if err := os.WriteFile(vuln, []byte(`<% spec.authors.map do |author|
+  "<a href='#{spec.homepage}'>#{author}</a>"
+end.join(', ') %>
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`<% spec.authors.map do |author|
+  "<a href='#{h(spec.homepage)}'>#{author}</a>"
+end.join(', ') %>
+<%= ("a".."z").map{|i| "<a href='#jump_#{i}'>#{i}</a>" }.join(" - ") %>
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractRuby([]string{vuln, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits := 0
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.erb.unescaped_href_interpolation" {
+			continue
+		}
+		hits++
+		args := n.Prop("str_args")
+		for _, want := range []string{"template=erb", "attr=href", "expr=spec.homepage"} {
+			if !strings.Contains(args, want) {
+				t.Fatalf("ERB href interpolation observation missing %q; args=%q", want, args)
+			}
+		}
+		if strings.Contains(n.Prop("loc"), "fixed.erb") {
+			t.Fatalf("escaped ERB href interpolation should not emit observation: %#v", n)
+		}
+	}
+	if hits != 1 {
+		t.Fatalf("got %d ERB href interpolation observations, want 1; nodes=%#v", hits, nodes)
+	}
+}
+
 func rubyHasFuncWithParam(mods []nir.Module, name, param string) bool {
 	var walk func([]nir.Stmt) bool
 	walk = func(stmts []nir.Stmt) bool {

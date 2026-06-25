@@ -3952,6 +3952,15 @@ concept HtmlRender : sink {
   cwe: [CWE_79]
   excluded_chars: "<>&\"'"
 }
+concept ErbHrefInterpolationHtmlEscapeMissing : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79, CWE_116]
+  review_category: "xss"
+  review_condition: "Ruby ERB interpolates a dynamic value into an HTML href attribute without an HTML escaping helper"
+  review_evidence: "ERB template context {pattern} renders a href attribute interpolation without h, html_escape, escape_html, or equivalent escaping"
+  review_assumption: "the interpolated href value can be supplied by gem metadata, content, or another attacker-controlled stored field"
+  review_confidence: high
+}
 concept StoredHtmlWrite : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

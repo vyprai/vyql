@@ -194,6 +194,11 @@ adapter ruby {
   sink path "content_tag" -> code.HtmlRender
   sink exact "concat" -> code.HtmlRender
   sink path "safe_concat" -> code.HtmlRender
+  flag code.ErbHrefInterpolationHtmlEscapeMissing on any {
+    path "analysis.erb.unescaped_href_interpolation"
+    fact template "erb"
+    fact attr "href"
+  }
   flag code.RailsRawTranslationHtmlInterpolationXss on call {
     path "raw"
     operand {

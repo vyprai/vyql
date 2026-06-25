@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -79,11 +80,68 @@ func parseERBModules(
 		tree.Close()
 		parser.Close()
 		if good {
+			m.Body = append(m.Body, erbUnescapedHrefInterpolationObservations(src, relPath(root, f)+"#erb.rb")...)
 			m.Hash = contentHash(src)
 			out = append(out, m)
 		}
 	}
 	return out
+}
+
+var erbHrefInterpolationRe = regexp.MustCompile(`(?i)\bhref\s*=\s*["'][^"']*#\{([^}]*)\}`)
+
+func erbUnescapedHrefInterpolationObservations(src []byte, rel string) []nir.Stmt {
+	var out []nir.Stmt
+	for i, line := range strings.Split(string(src), "\n") {
+		for _, m := range erbHrefInterpolationRe.FindAllStringSubmatch(line, -1) {
+			if len(m) < 2 {
+				continue
+			}
+			expr := strings.TrimSpace(m[1])
+			if expr == "" || erbInterpolationExprEscaped(expr) || !erbHrefInterpolationExprNeedsEscaping(expr) {
+				continue
+			}
+			loc := rel + ":" + itoa(i+1)
+			path := "analysis.erb.unescaped_href_interpolation"
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: path, Loc: loc},
+				Args: []nir.Expr{
+					nir.Const{Loc: loc, Value: "lang=ruby"},
+					nir.Const{Loc: loc, Value: "template=erb"},
+					nir.Const{Loc: loc, Value: "attr=href"},
+					nir.Const{Loc: loc, Value: "expr=" + expr},
+				},
+				Path:   path,
+				Method: "unescaped_href_interpolation",
+				Loc:    loc,
+			}})
+		}
+	}
+	return out
+}
+
+func erbInterpolationExprEscaped(expr string) bool {
+	expr = strings.TrimSpace(expr)
+	for _, prefix := range []string{
+		"h(",
+		"html_escape(",
+		"escape_html(",
+		"Rack::Utils.escape_html(",
+		"ERB::Util.html_escape(",
+		"CGI.escapeHTML(",
+	} {
+		if strings.HasPrefix(expr, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func erbHrefInterpolationExprNeedsEscaping(expr string) bool {
+	expr = strings.TrimSpace(expr)
+	return strings.Contains(expr, ".") ||
+		strings.Contains(expr, "[") ||
+		strings.HasPrefix(expr, "@")
 }
 
 func erbRubySource(src []byte) ([]byte, bool) {

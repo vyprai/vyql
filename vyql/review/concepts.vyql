@@ -1782,6 +1782,12 @@ review code.StoredHtmlWrite {
   expected: [core.HtmlEscape]
   text: "review stored HTML writes for server-side sanitization before the value is rendered"
 }
+review code.ErbHrefInterpolationHtmlEscapeMissing {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "escape Ruby ERB values interpolated into href attributes with h, html_escape, escape_html, or an equivalent HTML attribute escape helper"
+}
 review code.UnescapedHtmlOptionRenderer {
   category: "xss"
   kind: "attention"
