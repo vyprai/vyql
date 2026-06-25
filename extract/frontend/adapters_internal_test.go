@@ -428,6 +428,7 @@ func TestContextFlagSyntaxBuildsScopedFlag(t *testing.T) {
 adapter javascript {
   flag custom.SecretComparison in function {
     lang "javascript"
+    call path "parseOut"
     selector "data.x-csrf-token"
     token identifier "providedToken"
     not call path "crypto.timingSafeEqual"
@@ -446,11 +447,12 @@ adapter javascript {
 		t.Fatalf("expected one flag spec, got %#v", spec.Flags)
 	}
 	flag := spec.Flags[0]
-	if flag.Scope != "function" || len(flag.Predicates) != 4 ||
+	if flag.Scope != "function" || len(flag.Predicates) != 5 ||
 		flag.Predicates[0].Values[0] != "lang=javascript" ||
-		flag.Predicates[1].Values[0] != "selector:data.x-csrf-token" ||
-		flag.Predicates[2].Values[0] != "identifier:providedToken" ||
-		!flag.Predicates[3].Negative {
+		flag.Predicates[1].Values[0] != "call_path:parseOut" ||
+		flag.Predicates[2].Values[0] != "selector:data.x-csrf-token" ||
+		flag.Predicates[3].Values[0] != "identifier:providedToken" ||
+		!flag.Predicates[4].Negative {
 		t.Fatalf("unexpected context flag spec: %#v", flag)
 	}
 
@@ -461,20 +463,35 @@ adapter javascript {
 		"method":      "context",
 		"str_args":    "lang=javascript\x00selector:data.x-csrf-token\x00identifier:providedToken",
 	}})
+	store.AddNode(usg.Node{ID: "parse", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.js:5",
+		"callee_path": "parseOut",
+		"method":      "parseOut",
+	}})
 	got := spec.flagAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.SecretComparison" {
 		t.Fatalf("context flag did not label matching context node: %+v", got)
 	}
 
 	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
-		"loc":         "sample.js:2",
+		"loc":         "sample-fixed.js:2",
 		"callee_path": "analysis.function.context",
 		"method":      "context",
 		"str_args":    "lang=javascript\x00selector:data.x-csrf-token\x00identifier:providedToken\x00call_path:crypto.timingSafeEqual",
 	}})
+	store.AddNode(usg.Node{ID: "fixed-parse", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample-fixed.js:5",
+		"callee_path": "parseOut",
+		"method":      "parseOut",
+	}})
+	store.AddNode(usg.Node{ID: "fixed-safe", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample-fixed.js:6",
+		"callee_path": "crypto.timingSafeEqual",
+		"method":      "timingSafeEqual",
+	}})
 	got = spec.flagAdapter().Apply(store)
 	if len(got) != 1 {
-		t.Fatalf("context flag should skip node with lacks token present, got %+v", got)
+		t.Fatalf("context flag should skip scope with matching excluded call, got %+v", got)
 	}
 }
 

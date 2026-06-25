@@ -1475,11 +1475,60 @@ func flagOperandMatches(spec flagOperandSpec, nodes []usg.Node) bool {
 
 func flagPredicateMatches(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) bool {
 	if pred.Subject == "scope_call" {
-		hit := false
-		probe := pred
-		probe.Negative = false
-		prefix := locFile(n.Prop("loc"))
-		ids, _ := s.NodesOfType("code.Call")
+		hit := flagScopeNodeHit(s, pred, n, []string{"code.Call"}, tech, crossLang)
+		if pred.Negative {
+			return !hit
+		}
+		return hit
+	}
+	if n.Prop("callee_path") == "analysis.function.context" ||
+		n.Prop("callee_path") == "analysis.module.context" ||
+		n.Prop("callee_path") == "analysis.class.context" {
+		if ok, hit := flagContextPredicateMatchesAST(s, pred, n, tech, crossLang); ok {
+			if pred.Negative {
+				return !hit
+			}
+			return hit
+		}
+	}
+	return flagPredicateMatchesNodeOnly(pred, n)
+}
+
+func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) (bool, bool) {
+	if pred.Property != "tokens" || len(pred.Values) == 0 {
+		return false, false
+	}
+	var probe flagPredicate
+	var nodeTypes []string
+	for _, v := range pred.Values {
+		switch {
+		case strings.HasPrefix(v, "call_path:"):
+			probe = flagPredicate{Property: "path", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "call_path:"), Exact: pred.Exact}
+			nodeTypes = []string{"code.Call"}
+		case strings.HasPrefix(v, "call:"):
+			probe = flagPredicate{Property: "method", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "call:"), Exact: pred.Exact}
+			nodeTypes = []string{"code.Call"}
+		default:
+			return false, false
+		}
+	}
+	return true, flagScopeNodeHit(s, probe, n, nodeTypes, tech, crossLang)
+}
+
+func trimFlagValuePrefix(values []string, prefix string) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		out = append(out, strings.TrimPrefix(v, prefix))
+	}
+	return out
+}
+
+func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []string, tech string, crossLang bool) bool {
+	probe := pred
+	probe.Negative = false
+	prefix := locFile(n.Prop("loc"))
+	for _, nodeType := range nodeTypes {
+		ids, _ := s.NodesOfType(nodeType)
 		for _, id := range ids {
 			cand, ok, err := s.GetNode(id)
 			if err != nil || !ok || cand.ID == n.ID {
@@ -1492,16 +1541,11 @@ func flagPredicateMatches(s usg.Store, pred flagPredicate, n usg.Node, tech stri
 				continue
 			}
 			if flagPredicateMatchesNodeOnly(probe, cand) {
-				hit = true
-				break
+				return true
 			}
 		}
-		if pred.Negative {
-			return !hit
-		}
-		return hit
 	}
-	return flagPredicateMatchesNodeOnly(pred, n)
+	return false
 }
 
 func flagPredicateMatchesNodeOnly(pred flagPredicate, n usg.Node) bool {
