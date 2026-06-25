@@ -2334,6 +2334,15 @@ concept JenkinsDescriptorConfigEnumerationMissingPermission : sink {
   review_assumption: "the doFill endpoint is reachable from users with less privilege than Item/Configure or Overall/Administer"
   review_confidence: high
 }
+concept JenkinsCredentialEndpointMissingPostPermission : sink {
+  vulnerable_to: [access_control.MissingAuthorization, request_forgery.Csrf]
+  cwe: [CWE_862, CWE_352]
+  review_category: "auth"
+  review_condition: "Jenkins descriptor endpoint creates or tests external credentials without requiring POST and an administrator permission check"
+  review_evidence: "credential endpoint context {pattern} handles token creation or remote repository/account tests before observed @POST and checkPermission/hasPermission guards"
+  review_assumption: "the Stapler doCreate/doCheck/doTest endpoint is reachable from users with less privilege than Overall/Administer or from CSRF-triggerable requests"
+  review_confidence: high
+}
 concept JenkinsBuildScheduleMissingPermission : sink {
   vulnerable_to: [access_control.MissingAuthorization]
   cwe: [CWE_862]

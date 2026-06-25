@@ -622,6 +622,12 @@ adapter java {
     not call "hasPermission"
     not call "checkPermission"
   }
+  flag code.JenkinsCredentialEndpointMissingPostPermission in function {
+    function contains_any ["doCreateApiToken", "doCheckRepoAccess", "doTestGithubAccess"]
+    call path contains_any ["createToken", "getRepository", "getMyself"]
+    not call path contains_any ["checkPermission", "hasPermission"]
+    not annotation contains_any ["POST", "RequirePOST"]
+  }
   flag code.JenkinsBuildScheduleMissingPermission in function {
     function "doBuild"
     call path "Jenkins.get.getQueue.schedule"

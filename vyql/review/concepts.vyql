@@ -238,6 +238,12 @@ review code.JenkinsDescriptorConfigEnumerationMissingPermission {
   expected: [core.AuthorizationCheck]
   text: "review Jenkins descriptor fill endpoint for missing Item/Configure or Overall/Administer permission checks before listing configuration or credential identifiers"
 }
+review code.JenkinsCredentialEndpointMissingPostPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck, core.CsrfProtection]
+  text: "review Jenkins descriptor credential creation and remote-test endpoints for @POST plus Overall/Administer permission checks"
+}
 review code.JenkinsBuildScheduleMissingPermission {
   category: "auth"
   kind: "attention"
