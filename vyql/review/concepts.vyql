@@ -1534,6 +1534,12 @@ review code.ResponseWriterScriptWindowIdXss {
   expected: [core.HtmlEscape]
   text: "review JSF ResponseWriter script output for writeText or equivalent escaping around window identifiers"
 }
+review code.PreservedRequestHiddenInputValueXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review PHP hidden input builders for HTML escaping before preserving request or plugin parameters"
+}
 review code.CollectiveContactWidgetTitleXss {
   category: "xss"
   kind: "attention"

@@ -778,6 +778,11 @@ rule InstallerHiddenFieldXss {
   match code.InstallerHiddenFieldXss as sink
 }
 
+rule PreservedRequestHiddenInputValueXss {
+  meta { id: "VYQL-INJ-168", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.PreservedRequestHiddenInputValueXss as sink
+}
+
 rule HighlightedSearchResultHtmlEscapeMissing {
   meta { id: "VYQL-INJ-144", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.HighlightedSearchResultHtmlEscapeMissing as sink

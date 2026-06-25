@@ -673,6 +673,23 @@ adapter php {
     lacks "htmlspecialchars($uchidden"
     lacks "htmlentities($uchidden"
   }
+  flag code.PreservedRequestHiddenInputValueXss in function {
+    lang "php"
+    has "piVars"
+    has "<input type="
+    has "hidden"
+    has "value=\""
+    has "$hiddenFields[]"
+    has "implode("
+    lacks "cleanFormValue"
+    lacks "htmlspecialchars"
+    lacks "htmlentities"
+    lacks "esc_attr"
+    lacks "esc_html"
+    lacks "strip_tags"
+    lacks "removeXSS"
+    lacks "FILTER_SANITIZE_STRING"
+  }
   flag code.RawDatatablesAttributeXss in function {
     lang "php"
     call path "Datatables.of"

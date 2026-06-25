@@ -3421,6 +3421,15 @@ concept InstallerHiddenFieldXss : sink {
   review_assumption: "the installer step can receive attacker-controlled uchidden state"
   review_confidence: high
 }
+concept PreservedRequestHiddenInputValueXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "PHP code preserves request/plugin parameters in hidden input values without HTML escaping"
+  review_evidence: "hidden-input builder context {pattern} appends piVars-derived values into value attributes and lacks an escaping or sanitizer call"
+  review_assumption: "preserved request parameters can be attacker-controlled and the generated hidden fields are rendered into a browser response"
+  review_confidence: high
+}
 concept DotcmsSqlUtilBlacklistBypass : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]
