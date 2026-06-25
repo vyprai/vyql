@@ -1,7 +1,8 @@
-# Rank 842 / CVE-2024-43369: Ibexa FieldType RichText used a
-# case-sensitive javascript:/vbscript: Schematron denylist for xlink:href.
+# Rank 842 / CVE-2024-43369: Ibexa FieldType RichText inherited the same
+# Schematron xlink:href case-sensitive script-scheme denylist pattern as the
+# eZ Platform RichText package covered by rank 807.
 
-test "rank842: Ibexa RichText Schematron href script denylist is case-sensitive"
+test "rank842: Ibexa RichText Schematron xlink href uses case-sensitive script denylist"
   lang config
   file docbook.iso.sch
   expect VYQL-INJ-169
@@ -17,10 +18,11 @@ test "rank842: Ibexa RichText Schematron href script denylist is case-sensitive"
   </s:schema>
   ```
 
-test "rank842: Ibexa RichText Schematron href lowercased allowlist is clean"
+test "rank842: Ibexa RichText Schematron xlink href lowercases and allowlists safe schemes"
   lang config
   file docbook.iso.sch
   reject VYQL-INJ-169
+  reject_review code.SchematronLinkHrefUnsafeSchemeDenylist
   code
   ```
   <s:schema xmlns:s="http://purl.oclc.org/dsdl/schematron">

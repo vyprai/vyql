@@ -28,3 +28,17 @@ func TestCollectReviewItemsDeduplicatesSameCallSite(t *testing.T) {
 		t.Fatalf("review items = %d, want 1", len(got))
 	}
 }
+
+func TestCollectReviewItemsHandlesNilStore(t *testing.T) {
+	reviewConcepts := map[string]reviewConceptInfo{
+		"code.StructuredInputDecode": {
+			category: "input_validation",
+			kind:     "attention",
+			review:   "review structured decoder output validation",
+		},
+	}
+
+	if got := collectReviewItemsWith(nil, reviewConcepts); len(got) != 0 {
+		t.Fatalf("review items = %d, want 0", len(got))
+	}
+}

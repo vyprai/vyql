@@ -181,6 +181,9 @@ func collectReviewItems(g usg.Store) []reviewItem {
 }
 
 func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConceptInfo) []reviewItem {
+	if g == nil {
+		return nil
+	}
 	nodes, _ := g.AllNodes()
 	byID := map[string]usg.Node{}
 	for _, n := range nodes {
