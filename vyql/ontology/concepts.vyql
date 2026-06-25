@@ -1460,6 +1460,15 @@ concept IsolateLevelIncrementWithoutCap : sink {
   review_assumption: "attacker-controlled bidi isolate characters can drive nesting high enough to exceed the explicit-level array bounds"
   review_confidence: high
 }
+concept FlacDecoderBufferReuseWithoutBlocksizeCheck : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "a FLAC decoder reuses the callback sample buffer after only checking against the maximum FLAC block size"
+  review_evidence: "FLAC buffer copy context {pattern} copies frame->header.blocksize samples from the cached write buffer into rbuffer without tracking the actual callback buffer size"
+  review_assumption: "a malformed or changing FLAC stream can make the current frame blocksize exceed the cached callback buffer capacity before reuse"
+  review_confidence: high
+}
 concept ContikiSicslowpanFragmentOffsetOobWrite : sink {
   vulnerable_to: [memory.OobWrite]
   cwe: [CWE_787]

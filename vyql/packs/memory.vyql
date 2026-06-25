@@ -48,6 +48,11 @@ rule FlowSpecOperatorLoopBoundOffByOne {
   match code.FlowSpecOperatorLoopBoundOffByOne as loop
 }
 
+rule FlacDecoderBufferReuseWithoutBlocksizeCheck {
+  meta { id: "VYQL-MEM-048", severity: high, cwe: [CWE_125, CWE_787], confidence_floor: high }
+  match code.FlacDecoderBufferReuseWithoutBlocksizeCheck as frame
+}
+
 rule PythonUnicodeEscapeWideUnderallocation {
   meta { id: "VYQL-MEM-030", severity: high, cwe: [CWE_787], confidence_floor: high }
   match code.PythonUnicodeEscapeWideUnderallocation as c

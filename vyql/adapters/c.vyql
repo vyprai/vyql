@@ -329,6 +329,17 @@ adapter c {
     binary "loop>BGP_PBR_MATCH_VAL_MAX"
     not binary "loop>=BGP_PBR_MATCH_VAL_MAX"
   }
+  flag code.FlacDecoderBufferReuseWithoutBlocksizeCheck in function {
+    lang "c"
+    name "flac_buffer_copy"
+    call path "memcpy"
+    selector "frame.header.blocksize"
+    attr path "pflac.wbuffer"
+    attr path "pflac.rbuffer"
+    binary contains "frame->header.blocksize>FLAC__MAX_BLOCK_SIZE"
+    not attr path "pflac.wbuffer_size"
+    not binary contains "frame->header.blocksize>pflac->wbuffer_size"
+  }
   flag code.ContikiSicslowpanFragmentOffsetOobWrite in function {
     lang "c"
     name "copy_frags2uip"

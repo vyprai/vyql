@@ -2754,6 +2754,12 @@ review code.IsolateLevelIncrementWithoutCap {
   expected: [core.MemoryBoundsCheck]
   text: "review bidi isolate nesting level updates for a cap before isolate-level array indexing"
 }
+review code.FlacDecoderBufferReuseWithoutBlocksizeCheck {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review FLAC decoder cached-buffer reuse for a blocksize check against the actual callback buffer capacity"
+}
 review code.UnsignedIndexConversionGuardBypass {
   category: "numeric"
   kind: "attention"
