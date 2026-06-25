@@ -951,6 +951,48 @@ adapter php {
 	}
 }
 
+func TestDirectFlagCallArgPredicatesUseCallArguments(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter python {
+  flag custom.UnhardenedXmlParser on call {
+    path "etree.XMLParser"
+    call arg "etree.XMLParser:huge_tree=True"
+    not call arg "etree.XMLParser:resolve_entities=False"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse direct call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:   "parser",
+		Type: "code.Call",
+		Props: map[string]string{
+			"callee_path": "etree.XMLParser",
+			"method":      "XMLParser",
+			"str_args":    "huge_tree=True",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "parser" {
+		t.Fatalf("direct call-arg flag should match call arguments: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:   "hardened",
+		Type: "code.Call",
+		Props: map[string]string{
+			"callee_path": "etree.XMLParser",
+			"method":      "XMLParser",
+			"str_args":    "huge_tree=True\x00resolve_entities=False",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "parser" {
+		t.Fatalf("direct call-arg flag should reject hardened call arguments: %+v", got)
+	}
+}
+
 func TestContextFlagAstSubscriptPredicatesHonorKeys(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter php {
