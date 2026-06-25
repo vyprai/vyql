@@ -1649,6 +1649,15 @@ concept ShiftedClusterSizeAllocationMissingBounds : sink {
   review_assumption: "a malformed filesystem header can provide sector or sectors-per-cluster shift values that make derived allocation sizes wrap or undersize buffers"
   review_confidence: high
 }
+concept PhpZvalArrayMergeMissingDestTypeCheck : sink {
+  vulnerable_to: [memory.TypeConfusion, memory.OobRead, memory.OobWrite]
+  cwe: [CWE_843, CWE_787, CWE_125]
+  review_category: "memory"
+  review_condition: "PHP C API array-merge logic descends through a destination zval as an array after only checking the incoming zval type"
+  review_evidence: "PHP zval merge context {pattern} checks Z_TYPE_PP(test_ptr) before using Z_ARRVAL_PP(ptr) without an observed Z_TYPE_PP(ptr) array guard"
+  review_assumption: "crafted nested query or parameter data can make the existing destination zval non-array while the incoming zval is an array"
+  review_confidence: high
+}
 concept OffsetLengthBoundsOverflow : sink {
   vulnerable_to: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
   cwe: [CWE_190, CWE_125]

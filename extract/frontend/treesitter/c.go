@@ -204,7 +204,81 @@ func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node) []string
 	if body == nil {
 		return nil
 	}
-	return []string{"lang=" + c.lang, "name=" + name, compactCExprText(c.text(body))}
+	tokens := []string{"lang=" + c.lang, "name=" + name, compactCExprText(c.text(body))}
+	tokens = append(tokens, c.ccStructuredContextTokens(body)...)
+	return tokens
+}
+
+func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	atom := func(n *tree_sitter.Node) string {
+		if n == nil {
+			return ""
+		}
+		if p := c.dotted(n); p != "" && p != "?" {
+			return p
+		}
+		return compactCExprText(c.text(n))
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "call_expression":
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+				add("call_path:" + path)
+				add("call:" + lastSeg(path))
+				for _, arg := range namedChildren(field(n, "arguments")) {
+					if a := atom(arg); a != "" {
+						add("call_arg:" + path + ":" + a)
+					}
+				}
+			}
+		case "field_expression":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "subscript_expression":
+			if idx := c.dotted(n); idx != "" && idx != "?" {
+				add("index:" + idx)
+			}
+			if base := atom(field(n, "argument")); base != "" {
+				add("index_base:" + base)
+			}
+			if key := atom(field(n, "index")); key != "" {
+				add("index_key:" + key)
+			}
+		case "assignment_expression":
+			left := atom(field(n, "left"))
+			right := atom(field(n, "right"))
+			if left != "" && right != "" {
+				add("assign:" + left + "=" + right)
+			}
+		case "binary_expression":
+			if expr := compactCExprText(c.text(n)); expr != "" {
+				add("binary:" + expr)
+			}
+		case "string_literal", "concatenated_string", "raw_string_literal":
+			if lit := strings.Trim(cStringText(c.text(n)), "\""); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
 }
 
 func (c *ccConv) decls(n *tree_sitter.Node) []nir.Stmt {

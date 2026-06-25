@@ -3,6 +3,7 @@ package treesitter
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/extract/nir"
@@ -92,6 +93,58 @@ int wrapped(void) {
 	if !hasCFuncCall(prog.Modules[0].Body, "wrapped", "sink") {
 		t.Fatalf("function inside recovered preprocessor region was not extracted: %#v", prog.Modules[0].Body)
 	}
+}
+
+func TestCFunctionContextIncludesStructuredTokens(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "params.c")
+	src := []byte(`
+static void merge_param(HashTable *params, zval *zdata) {
+  zval **ptr, **test_ptr;
+  php_http_array_hashkey_t hkey;
+  if (Z_TYPE_PP(test_ptr) == IS_ARRAY) {
+    if (SUCCESS == zend_hash_find(Z_ARRVAL_PP(ptr), hkey.str, hkey.len, (void *) &ptr)) {
+      value = test_ptr;
+    } else if (SUCCESS == zend_hash_index_find(Z_ARRVAL_PP(ptr), hkey.num, (void *) &ptr)) {
+      value = test_ptr;
+    }
+  }
+  secret.Data[keyName] = value;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, st := range prog.Modules[0].Body {
+		fn, ok := st.(nir.FuncDef)
+		if !ok || fn.Name != "merge_param" {
+			continue
+		}
+		tokens := strings.Join(fn.ContextTokens, "\x00")
+		for _, want := range []string{
+			"name=merge_param",
+			"call_path:Z_TYPE_PP",
+			"call_path:zend_hash_find",
+			"call_arg:zend_hash_find:Z_ARRVAL_PP",
+			"call_arg:Z_ARRVAL_PP:ptr",
+			"call_path:zend_hash_index_find",
+			"selector:secret.Data",
+			"index:secret.Data[]",
+			"index_key:keyName",
+			"assign:secret.Data[]=value",
+		} {
+			if !strings.Contains(tokens, want) {
+				t.Fatalf("C function context missing %q; context=%q", want, tokens)
+			}
+		}
+		return
+	}
+	t.Fatalf("merge_param function not extracted: %#v", prog.Modules[0].Body)
 }
 
 func hasCFuncCall(stmts []nir.Stmt, funcName, method string) bool {

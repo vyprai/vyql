@@ -2165,6 +2165,12 @@ review code.BinarySearchTableIndexGuardBypass {
   kind: "attention"
   text: "review binary-search table lookups for min/max guards before indexing by the recomputed midpoint"
 }
+review code.PhpZvalArrayMergeMissingDestTypeCheck {
+  category: "memory"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review PHP C API zval merge loops for destination zval array-type checks before Z_ARRVAL_PP(ptr)"
+}
 review code.IntegerSizeArithmetic {
   category: "numeric"
   kind: "attention"

@@ -202,6 +202,14 @@ adapter c {
     has "ef->sb->spc_bits"
     lacks "ef->sb->sector_bits<9"
   }
+  flag code.PhpZvalArrayMergeMissingDestTypeCheck in function {
+    lang "c"
+    call path "Z_ARRVAL_PP"
+    call path "zend_hash_find"
+    call path "zend_hash_index_find"
+    binary "Z_TYPE_PP(test_ptr)==IS_ARRAY"
+    not binary "Z_TYPE_PP(test_ptr)==IS_ARRAY&&Z_TYPE_PP(ptr)==IS_ARRAY"
+  }
   flag code.UnderallocatedFormattedAddressList in function {
     lang "c"
     name "option_to_env"

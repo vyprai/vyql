@@ -118,6 +118,11 @@ rule ShiftedClusterSizeAllocationMissingBounds {
   match code.ShiftedClusterSizeAllocationMissingBounds as alloc
 }
 
+rule PhpZvalArrayMergeMissingDestTypeCheck {
+  meta { id: "VYQL-MEM-040", severity: high, cwe: [CWE_843, CWE_787, CWE_125], confidence_floor: high }
+  match code.PhpZvalArrayMergeMissingDestTypeCheck as merge
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse
