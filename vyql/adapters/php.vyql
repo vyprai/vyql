@@ -546,19 +546,14 @@ adapter php {
   }
   flag code.UnsanitizedSvgUpload in class {
     lang "php"
-    has "UploadedFile"
-    has "getClientOriginalExtension"
-    has "$file->storeAs"
-    has "$extension==='svg'"
-    has "$file->getContent()"
-    lacks "sanitizeSvg"
-    lacks "svgSanitize"
-    lacks "Sanitizer"
+    literal contains_any ["svg", "image/svg+xml"]
+    call path contains_any ["getClientOriginalExtension", "storeAs", "getContent"]
+    not call contains_any ["sanitizeSvg", "svgSanitize", "Sanitizer"]
   }
   flag code.UnsanitizedSvgUpload in class {
     lang "php"
     function contains_any ["validFileExtension", "isEverythingValid", "validateFileExtension"]
-    token property contains_any ["svg"]
+    literal contains_any ["svg", "image/svg+xml"]
     call path "pathinfo"
     call path "GeneralUtility.inList"
     call path "GeneralUtility.verifyFilenameAgainstDenyPattern"

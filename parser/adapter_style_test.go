@@ -307,6 +307,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		"code.ShellTruePackageManagerProbe":              true,
 		"code.TemplateDirectoryHiddenGlobCopy":           true,
 		"code.UnfilteredAgentCommandTag":                 true,
+		"code.UnsanitizedSvgUpload":                      true,
 		"code.UnvalidatedSqlIdentifierInterpolation":     true,
 	}
 

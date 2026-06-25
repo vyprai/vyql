@@ -124,14 +124,11 @@ adapter csharp {
   sink path "ExtractToFile" -> code.ArchiveEntryWrite
   flag code.UnsanitizedSvgUpload in function {
     lang "csharp"
-    name "Create"
-    param name "fileContent"
-    param type "Stream"
+    param type contains_any ["Stream", "IFormFile", "IBrowserFile"]
     call path contains_any ["Upload", "UploadAsync", "Save", "SaveAsync", "Write", "WriteAsync", "CopyTo"]
-    selector contains_any ["file.Name", "file.NormalizedName", "file.ContentType", "file.Extension"]
-    token identifier contains_any ["fileContent", "FileService"]
+    selector contains_any [".Name", ".FileName", ".NormalizedName", ".ContentType", ".Extension"]
+    token identifier contains_any ["file", "stream", "content", "upload"]
     not call path contains_any ["SanitizeSvg", "sanitizeSvg", "svgSanitize", "XmlReader.Create", "XDocument.Load", "HtmlSanitizer"]
-    not token identifier contains_any ["SanitizeSvg", "sanitizeSvg", "svgSanitize", "HtmlSanitizer"]
   }
 
   // SSRF
