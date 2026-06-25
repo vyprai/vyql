@@ -218,6 +218,14 @@ adapter go {
     call order "strings.TrimRight>path.Clean"
     call "HasSuffix"
   }
+  flag code.UnicodeNormalizationAfterFilterBypass in function {
+    function contains_any ["Preprocess", "preprocess", "Normalize", "normalize", "Canonical", "canonical", "Lookup", "lookup"]
+    call path "regexp.MustCompile.ReplaceAllString"
+    call path "norm.NFKD.String"
+    call order "norm.NFKD.String>regexp.MustCompile.ReplaceAllString"
+    not call order "regexp.MustCompile.ReplaceAllString>norm.NFKD.String"
+    literal contains_any ["-_ .", "[-_ .]", "-_."]
+  }
   flag code.LeadingDotSegmentOnlyRouteFilter on any {
     path exact "analysis.function.context"
     call path "strings.HasPrefix"

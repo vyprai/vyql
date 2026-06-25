@@ -1197,6 +1197,15 @@ concept ExpressParamArrayValuePollution : sink {
   review_assumption: "callers can supply duplicated HTTP parameters that Express exposes as arrays"
   review_confidence: high
 }
+concept UnicodeNormalizationAfterFilterBypass : sink {
+  vulnerable_to: [validation.ImproperInputValidation, injection.CodeInjection]
+  cwe: [CWE_176, CWE_74]
+  review_category: "input_validation"
+  review_condition: "security lookup preprocessing should normalize Unicode before removing ignored separator characters"
+  review_evidence: "normalization context {pattern} applies a character filter before Unicode normalization"
+  review_assumption: "callers can supply Unicode compatibility characters that normalize into characters the filter intended to remove"
+  review_confidence: high
+}
 concept OwnerFieldClear : sink {
   vulnerable_to: [resource.ResourceLeak]
   cwe: [CWE_401]

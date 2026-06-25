@@ -378,6 +378,12 @@ review code.PathMatcherNormalizationOrderBypass {
   expected: [core.PathCanonicalization]
   text: "review path matcher normalization order; canonical cleaning should happen before suffix trimming used for platform quirks"
 }
+review code.UnicodeNormalizationAfterFilterBypass {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Unicode normalization order; compatibility normalization should happen before character filtering used by lookups or allowlists"
+}
 review code.WindowsReservedDeviceNameBypass {
   category: "path"
   kind: "attention"

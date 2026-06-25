@@ -42,3 +42,8 @@ rule ExpressParamArrayValuePollution {
   meta { id: "VYQL-VAL-008", severity: medium, cwe: [CWE_20, CWE_235], confidence_floor: high }
   match code.ExpressParamArrayValuePollution as param
 }
+
+rule UnicodeNormalizationAfterFilterBypass {
+  meta { id: "VYQL-VAL-009", severity: medium, cwe: [CWE_176, CWE_74], confidence_floor: high }
+  match code.UnicodeNormalizationAfterFilterBypass as normalizer
+}
