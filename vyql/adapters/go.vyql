@@ -300,6 +300,14 @@ adapter go {
     literal contains "%s %s\n%s"
     not literal contains "%#v"
   }
+  flag code.RequestPluginNamePathTraversal in function {
+    call path "ShouldBindJSON"
+    selector contains ".PlugName"
+    selector contains ".Snake"
+    call path contains_any ["CreatePlug", "GeneratePlug", "CreatePlugin", "GeneratePlugin", "CreateModule", "GenerateModule"]
+    not call path contains_any ["filepath.Base", "path.Base", "regexp.MatchString"]
+    not call arg contains_any ["strings.Contains:filepath.Separator", "strings.Contains:os.PathSeparator", "strings.Contains:/", "strings.Contains:\\"]
+  }
   flag code.TextAccessLogDefaultFormatInjection on call {
     path "cfgcore.DataSource_InlineString"
     operand {

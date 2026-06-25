@@ -3905,6 +3905,15 @@ concept TemplatePathComponentTraversal : sink {
   review_assumption: "at least one interpolated template path component can contain a path separator, absolute path, or parent-directory segment"
   review_confidence: high
 }
+concept RequestPluginNamePathTraversal : sink {
+  vulnerable_to: [path.PathTraversal]
+  cwe: [CWE_22]
+  review_category: "path"
+  review_condition: "a request-bound plugin or module name is passed into code-generation file creation without rejecting path separators"
+  review_evidence: "plugin creation context {pattern} binds request JSON, derives a filesystem component from a plugin name, and calls a create/generate helper before an observed path-separator rejection"
+  review_assumption: "the plugin or module name is later joined under generated server or web plugin directories"
+  review_confidence: high
+}
 concept CallerControlledFilenameComponentPathTraversal : sink {
   vulnerable_to: [path.PathTraversal]
   cwe: [CWE_22]

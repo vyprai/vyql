@@ -2395,6 +2395,12 @@ review code.TemplatePathComponentTraversal {
   expected: [core.PathCanonicalization]
   text: "review template or resource path builders for basename canonicalization of interpolated path components before returning template paths"
 }
+review code.RequestPluginNamePathTraversal {
+  category: "path"
+  kind: "target"
+  expected: [core.PathAccessCheck]
+  text: "reject path separators in request-bound plugin or module names before code-generation file creation"
+}
 review code.CallerControlledFilenameComponentPathTraversal {
   category: "path"
   kind: "attention"
