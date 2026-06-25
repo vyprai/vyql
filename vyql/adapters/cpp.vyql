@@ -203,13 +203,10 @@ adapter cpp {
   flag code.ProtocolStatusVectorUnknownArgumentFallback in function {
     lang "cpp"
     name "xdr_status_vector"
-    token switch_case "isc_arg_number"
-    token switch_default_call "xdr_long"
-    not token switch_case "isc_arg_unix"
-    not token switch_case "isc_arg_win32"
-    not token switch_case "isc_arg_gds"
-    not token switch_case "isc_arg_warning"
-    not token switch_case "isc_arg_next_mach"
+    call path "xdr_long"
+    call path "xdr_wrapstring"
+    call path "vectorDecode.push"
+    not token identifier contains_any ["isc_arg_unix", "isc_arg_win32", "isc_arg_gds", "isc_arg_warning", "isc_arg_next_mach"]
   }
   flag code.ChakraScopeSlotArrayUncheckedIndex in function {
     lang "cpp"
