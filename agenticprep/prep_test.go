@@ -844,10 +844,29 @@ csrf.valid = csrf.validate = function (data, token) {
 	narrow := Proposal{AdapterFiles: []AdapterFile{{
 		Language: "javascript",
 		Source: `adapter javascript {
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "==="]
+    operand {
+      key contains_any ["csrf-token", "x-csrf-token", "xsrf-token"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key"]
+    }
+    lacks call contains_any ["scmp", "timingSafeEqual"]
+  }
+}
+`,
+		Evidence: []string{src},
+	}}}
+	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
+		t.Fatalf("expected narrow secret-comparison AST flag to validate: %v", err)
+	}
+	brittle := Proposal{AdapterFiles: []AdapterFile{{
+		Language: "javascript",
+		Source: `adapter javascript {
   flag code.SecretComparisonReview in function {
-    has "lang=javascript"
+    lang "javascript"
     has "data['x-csrf-token']===token"
-    has "deletedata['x-csrf-token']"
     lacks "scmp"
     lacks "timingSafeEqual"
   }
@@ -855,8 +874,8 @@ csrf.valid = csrf.validate = function (data, token) {
 `,
 		Evidence: []string{src},
 	}}}
-	if err := ValidateProposal(profile, narrow, Config{}); err != nil {
-		t.Fatalf("expected narrow secret-comparison context flag to validate: %v", err)
+	if err := ValidateProposal(profile, brittle, Config{}); err == nil || !strings.Contains(err.Error(), "AST flag form") {
+		t.Fatalf("expected brittle secret-comparison context flag rejection, got %v", err)
 	}
 }
 

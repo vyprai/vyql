@@ -617,7 +617,7 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 		}
 		onto := ontology.Seed()
 		seen := false
-		localContext := false
+		localFlag := false
 		for _, d := range decls {
 			ad, ok := d.(*parser.AdapterDecl)
 			if !ok {
@@ -631,8 +631,8 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				return fmt.Errorf("agentic prep: adapter %q has no mappings", lang)
 			}
 			for _, m := range ad.Mappings {
-				if localExactContextMapping(m) {
-					localContext = true
+				if localRepoFlagMapping(m) {
+					localFlag = true
 				}
 				if m.Concept != "" && !onto.Exists(m.Concept) {
 					return fmt.Errorf("agentic prep: adapter %q references unknown concept %q", lang, m.Concept)
@@ -661,10 +661,13 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				if invalidDefaultRelaySecretMark(m) {
 					return fmt.Errorf("agentic prep: adapter %q maps default relay secret exposure too broadly; include concrete relay/proxy/tunnel/default-host URL evidence, embedded token/gurl/connection metadata, and an nval for trusted-host or explicit configured-host hardening", lang)
 				}
+				if invalidSecretComparisonContextMark(m) {
+					return fmt.Errorf("agentic prep: adapter %q maps secret comparison with brittle context text; use the AST flag form `flag code.SecretComparisonReview on binop` with `op`, `operand`, and `lacks call` predicates so token/header comparisons are matched structurally", lang)
+				}
 				if localExactContextMapping(m) && len(m.Packages) > 0 {
 					return fmt.Errorf("agentic prep: adapter %q package-scopes an exact context flag; keep exact context flags unscoped and put package/dependency evidence in adapter evidence instead of a package gate", lang)
 				}
-				if requirePackageScope && len(m.Packages) == 0 && !localExactContextMapping(m) {
+				if requirePackageScope && len(m.Packages) == 0 && !localRepoFlagMapping(m) {
 					return fmt.Errorf("agentic prep: adapter %q mapping %q -> %s is not package-scoped; wrap repo-local/generated mappings in package \"<dependency-or-project-package>\" { ... }", lang, m.Pattern, m.Concept)
 				}
 				for _, pkg := range m.Packages {
@@ -680,8 +683,8 @@ func ValidateProposal(profile Profile, proposal Proposal, cfg Config) error {
 				return fmt.Errorf("agentic prep: adapter %q only broadens public parameters as sources; add a concrete sink/flag/control mapping or return an empty overlay", lang)
 			}
 		}
-		if localContext && !adapterEvidenceTouchesTarget(profile, f) {
-			return fmt.Errorf("agentic prep: adapter %q uses target-local context flag evidence outside profile.target.files", lang)
+		if localFlag && !adapterEvidenceTouchesTarget(profile, f) {
+			return fmt.Errorf("agentic prep: adapter %q uses target-local flag evidence outside profile.target.files", lang)
 		}
 		if !seen {
 			return fmt.Errorf("agentic prep: adapter %q contains no adapter declaration", lang)
@@ -1119,6 +1122,48 @@ func invalidCryptoImproperBlindingMark(m parser.AdapterMapping) bool {
 func localExactContextMapping(m parser.AdapterMapping) bool {
 	_, _, _, ok := contextFlagParts(m)
 	return ok
+}
+
+func localRepoFlagMapping(m parser.AdapterMapping) bool {
+	if localExactContextMapping(m) {
+		return true
+	}
+	if m.Kind != "flag" || m.Flag == nil || m.Flag.Scope != "" {
+		return false
+	}
+	switch strings.ToLower(m.Flag.NodeKind) {
+	case "binop", "binary":
+		return true
+	}
+	if len(m.Flag.Operands) > 0 {
+		return true
+	}
+	for _, pred := range m.Flag.Predicates {
+		if pred.Subject == "flow_to" {
+			return true
+		}
+	}
+	return false
+}
+
+func invalidSecretComparisonContextMark(m parser.AdapterMapping) bool {
+	if m.Concept != "code.SecretComparisonReview" {
+		return false
+	}
+	scope, vals, _, ok := contextFlagParts(m)
+	if !ok || scope != "function" {
+		return false
+	}
+	for _, v := range vals {
+		lv := strings.ToLower(v)
+		if strings.Contains(lv, "==") ||
+			strings.Contains(lv, "!=") ||
+			strings.Contains(lv, ".equals(") ||
+			strings.Contains(lv, "equals(") {
+			return true
+		}
+	}
+	return false
 }
 
 func contextFlagParts(m parser.AdapterMapping) (scope string, vals, nvals []string, ok bool) {

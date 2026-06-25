@@ -174,18 +174,30 @@ Rules:
   expansion. If source-only parameter expansion is the best available idea,
   call finish_overlay with no adapter files and explain the missing concrete
   security mapping.
-- For repo-local anti-patterns that need context instead of taint, use an
-  exact context flag with existing review concepts:
+- For repo-local anti-patterns that need context instead of taint, use
+  structured flag predicates with existing review concepts. Prefer AST node
+  flags when the condition is an expression, comparison, call, or operand
+  relationship:
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "==="]
+    operand {
+      key contains_any ["csrf-token", "x-csrf-token", "auth-token", "api-key", "signature", "secret"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key", "password"]
+    }
+    lacks call contains_any ["scmp", "timingSafeEqual", "ConstantTimeCompare", "compare_digest"]
+  }
   flag code.UnparameterizedSqlQueryParser in function {
-    has "name=orderBy"
-    has "$direction"
-    has "processOrderBy"
-    lacks "QUERY_ORDER_DESC"
+    function "orderBy"
+    identifier "$direction"
+    call "processOrderBy"
+    not token identifier "QUERY_ORDER_DESC"
   }
   flag code.ProtocolStateReview in function {
-    has "name=verify_and_process"
-    has "request.query_params.get(\"state\")"
-    lacks "request.cookies.get(\"sso_state\")"
+    function "verify_and_process"
+    call path "request.query_params.get"
+    not call path "request.cookies.get"
   }
 - Invalid syntax examples: sink arg 2 "do_cmd" -> ...,
   sink "do_cmd" -> concept:, sink path "do_cmd" concept: ...
@@ -224,16 +236,19 @@ Rules:
   the one missing piece or finish empty. This is a planning checkpoint, not an
   adapter by itself.
 - Before writing flag <concept> in function, call function_context
-  for the target function and choose has/lacks substrings from that returned
-  single function context. Do not combine values from different functions. For Go
-  function contexts, use the returned suggested_vals token
+  for the target function and choose structured predicates from suggested_vals
+  when available: function, call, call path, selector, identifier, literal,
+  assign, binary, param, token, or fact. Use has/lacks only for evidence that
+  cannot be represented structurally. Do not combine values from different
+  functions. For Go function contexts, use the returned suggested_vals token
   function_name:<Name>; do not use name=<Name>, which is not emitted by the Go
   frontend and will not match.
 - Before writing flag <concept> in module, call module_context
-  for the target file and choose has/lacks substrings from one returned top-level
-  declaration context. Use this for static role, permission, route, or policy maps.
+  for the target file and choose structured predicates from one returned
+  top-level declaration context. Use has/lacks only when no structured predicate
+  exists. Use this for static role, permission, route, or policy maps.
 - Before writing flag <concept> in class, call class_context
-  for the target class and choose has/lacks tokens from one returned class
+  for the target class and choose structured tokens from one returned class
   context. Prefer structured tokens such as class_name:, class_base:,
   function_name:, call_path:, and annotation: over loose source-text substrings.
 - For scan catch-rate work, prefer concepts with surface=scan from
@@ -2762,9 +2777,9 @@ adapter <language> {
     sink path "call.name" -> code.FilePathAccess
     sink path "call.name" arg 1 -> code.SqlExecution
     sink path "call.name" arg all -> code.CommandExecution
-    flag code.SomeReviewConcept on any { path "call_or_context"; has "required-substring"; lacks "missing-hardening" }
-    flag code.ProtocolStateReview in function { has "name=handler"; has "dangerous call"; lacks "patched guard" }
-    flag code.OverbroadRolePermissionGrant in module { has "var_name:PermissionsByRole"; has "RoleNetworkManager"; has "PermBackup"; lacks "RoleAdmin:{PermBackup" }
+    flag code.SecretComparisonReview on binop { op any ["==", "==="]; operand { key contains_any ["csrf-token", "secret"] }; operand { identifier contains_any ["token", "secret", "key"] }; lacks call contains_any ["scmp", "timingSafeEqual"] }
+    flag code.ProtocolStateReview in function { function "handler"; call path "request.query_params.get"; not call path "request.cookies.get" }
+    flag code.OverbroadRolePermissionGrant in module { var "PermissionsByRole"; token identifier "RoleNetworkManager"; token identifier "PermBackup"; lacks "RoleAdmin:{PermBackup" }
   }
 }
 
@@ -2775,14 +2790,15 @@ Do not package-wrap first-party workspace package names from local manifests.
 Use path/method/receiver only before the quoted pattern. Put arg after the pattern.
 Use source param only when the same overlay also adds a concrete sink, flag, or
 control for the package. Do not emit source-only source param overlays.
+Use flag <concept> on binop/call/subscript/name for expression-level evidence.
 Use flag <concept> in function for narrow local patterns already visible in the scanned function.
 Use flag <concept> in module for top-level role, route, permission, ACL, or policy maps.
 Use flag <concept> in class for class-level evidence that spans multiple methods.
-Call function_context before function flags and copy short returned substrings from one context only.
+Call function_context before function flags and copy structured suggested_vals from one context only.
 Call class_context before class flags and copy structured tokens from one context only.
-Call module_context before module flags and copy short returned substrings from one context only.
-For context flags, each has value must be present in the compact context returned
-by function_context, class_context, or module_context, and each lacks value must be absent.
+Call module_context before module flags and copy structured suggested_vals from one context only.
+For context flags, prefer function/call/call path/selector/identifier/literal/assign/binary/param/token/fact predicates.
+Use has/lacks only when the context evidence has no structured predicate.
 Use existing code.* concepts only. Common target concepts include:
 code.CommandExecution, code.CodeEval, code.FilePathAccess, code.SqlExecution,
 code.HtmlRender, code.UrlFetch, code.Deserialization, code.RedirectTarget,
