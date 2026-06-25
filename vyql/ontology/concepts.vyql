@@ -4612,6 +4612,15 @@ concept DropdownEntryLabelInnerHtmlXss : sink {
   review_assumption: "dropdown labels can originate from user-controlled names or external API data"
   review_confidence: high
 }
+concept PostMessageHtmlWriteMissingOriginCheck : sink {
+  vulnerable_to: [injection.Xss, access_control.OriginValidationError]
+  cwe: [CWE_79, CWE_346]
+  review_category: "xss"
+  review_condition: "a browser postMessage handler writes message data into HTML without validating the sender origin"
+  review_evidence: "message handler context {pattern} reads message.data and writes parsed or raw HTML before an observed origin check"
+  review_assumption: "an attacker-controlled window can post crafted HTML to the preview frame or same handler"
+  review_confidence: high
+}
 concept IncompleteHtmlEventHandlerStrip : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

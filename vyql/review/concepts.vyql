@@ -2125,6 +2125,12 @@ review code.UnescapedChartTooltipDataName {
   expected: [core.HtmlEscape]
   text: "review chart tooltip formatters that return raw data item names instead of passing them through structured tooltip markup or escaping"
 }
+review code.PostMessageHtmlWriteMissingOriginCheck {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "verify postMessage handlers validate sender origin before writing message.data into document.write, parsed HTML, or innerHTML"
+}
 review code.CheckmkPendingChangeTextUnescapeXss {
   category: "xss"
   kind: "attention"

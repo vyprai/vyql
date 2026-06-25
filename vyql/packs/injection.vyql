@@ -492,6 +492,11 @@ rule DropdownEntryLabelInnerHtmlXss {
   match code.DropdownEntryLabelInnerHtmlXss as sink
 }
 
+rule PostMessageHtmlWriteMissingOriginCheck {
+  meta { id: "VYQL-INJ-192", severity: high, cwe: [CWE_79, CWE_346], confidence_floor: high }
+  match code.PostMessageHtmlWriteMissingOriginCheck as sink
+}
+
 rule AjaxBackslashProtocolRelativeUrlXss {
   meta { id: "VYQL-INJ-140", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.AjaxBackslashProtocolRelativeUrlXss as sink

@@ -239,6 +239,14 @@ adapter javascript {
     not selector contains_any ["headers.origin", ".origin"]
     not literal contains_any ["origin", "Origin"]
   }
+  flag code.PostMessageHtmlWriteMissingOriginCheck in function {
+    lang "javascript"
+    selector "message.data"
+    call path contains_any ["document.write", "parseFromString"]
+    selector contains "innerHTML"
+    not selector contains_any ["message.origin", "event.origin", ".origin"]
+    not literal contains_any ["origin", "Origin"]
+  }
   flag code.IncompleteHtmlEventHandlerStrip in module {
     lang "javascript"
     has "ViewSource"
