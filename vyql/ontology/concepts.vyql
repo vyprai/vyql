@@ -2724,6 +2724,15 @@ concept NumericParserMissingProgressCheck : sink {
   review_assumption: "malformed numeric input can leave the parse cursor unchanged and cause repeated parser work or an infinite loop"
   review_confidence: high
 }
+concept RecursiveObjectParentResolveWithoutCycleGuard : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_674]
+  review_category: "resource"
+  review_condition: "object parent traversal repeatedly resolves parent references without sharing a visited-object or recursion guard"
+  review_evidence: "parent traversal context {pattern} resolves dictionary Parent references through the object resolver while no shared ensured/visited object list is passed"
+  review_assumption: "a crafted object graph can contain cyclic parent references and force repeated resolution until resource exhaustion or recursion failure"
+  review_confidence: high
+}
 concept WorldCoordinateSafeRangeMissing : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_20]
@@ -4611,7 +4620,7 @@ concept DefaultExternalRelaySecretExposure : sink {
   review_confidence: medium
 }
 concept ExternalSettingTokenSyncUrlExposure : sink {
-  vulnerable_to: [secrets.SecretLeak, injection.XSS]
+  vulnerable_to: [secrets.SecretLeak, injection.Xss]
   cwe: [CWE_79, CWE_200]
   review_category: "secret"
   review_condition: "an externally supplied runtime/default setting selects the URL used for auth or session token synchronization without same-origin path validation"

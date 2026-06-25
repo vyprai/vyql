@@ -1,6 +1,6 @@
 test "rank867: missing user login path skips dummy password hash"
   lang python
-  expect VYQL-AUTH-055
+  expect VYQL-AUTH-064
   expect_review code.PasswordHashMissingUserBalance
   code
   ```
@@ -41,7 +41,7 @@ test "rank867: missing user login path skips dummy password hash"
 
 test "rank867: dummy hash balances missing user login path"
   lang python
-  reject VYQL-AUTH-055
+  reject VYQL-AUTH-064
   code
   ```
   from werkzeug.security import check_password_hash

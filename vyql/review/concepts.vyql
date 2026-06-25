@@ -1386,6 +1386,12 @@ review code.NumericParserMissingProgressCheck {
   expected: [core.InputValidation]
   text: "review numeric parsers for a cursor-progress guard before retrying fallback parse paths"
 }
+review code.RecursiveObjectParentResolveWithoutCycleGuard {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review object parent traversal for a shared visited-object or recursion guard across repeated parent resolution"
+}
 review code.WorldCoordinateSafeRangeMissing {
   category: "resource"
   kind: "target"

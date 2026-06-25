@@ -578,6 +578,15 @@ adapter php {
     not call path "HtmlSanitizer"
     not call path "sanitizeHtml"
   }
+  flag code.RecursiveObjectParentResolveWithoutCycleGuard in function {
+    lang "php"
+    name contains_any ["getAttribute", "getInheritedAttribute", "resolveInherited", "findInherited"]
+    call path "PdfType.resolve"
+    call path "PdfDictionary.get"
+    literal "Parent"
+    token subscript "$parentDict.value['Parent']"
+    not call arg contains_any ["$ensuredObjectList", "$visitedObjects", "$visitedObjectList", "$visited"]
+  }
   flag code.BladeRawMarkdownRenderWithoutSanitizer on any {
     path exact "analysis.module.context"
     lang "php"

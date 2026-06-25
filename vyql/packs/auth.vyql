@@ -240,7 +240,7 @@ rule RefererBasedAdminUserCreation {
 }
 
 rule PasswordHashMissingUserBalance {
-  meta { id: "VYQL-AUTH-055", severity: medium, cwe: [CWE_203, CWE_208], confidence_floor: high }
+  meta { id: "VYQL-AUTH-064", severity: medium, cwe: [CWE_203, CWE_208], confidence_floor: high }
   match code.PasswordHashMissingUserBalance as auth
 }
 

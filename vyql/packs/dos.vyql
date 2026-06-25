@@ -174,3 +174,8 @@ rule NilMapMergeWritePanic {
   meta { id: "VYQL-DOS-034", severity: high, cwe: [CWE_248, CWE_400], confidence_floor: high }
   match code.NilMapMergeWritePanic as s
 }
+
+rule RecursiveObjectParentResolveWithoutCycleGuard {
+  meta { id: "VYQL-DOS-035", severity: high, cwe: [CWE_400, CWE_674], confidence_floor: high }
+  match code.RecursiveObjectParentResolveWithoutCycleGuard as resolver
+}
