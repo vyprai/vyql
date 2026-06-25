@@ -2441,10 +2441,14 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 }
 
 func jsPathRegexGuardAdapter() adapters.Adapter {
+	concept := singleOntologyRoleConcept(ontology.AnalysisRolePathAccessCheck)
 	return adapters.Adapter{
 		Name: "javascript.path-regex-guards", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
 		Apply: func(s usg.Store) []adapters.Mapping {
+			if concept == "" {
+				return nil
+			}
 			ids, _ := s.NodesOfType("code.Call")
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -2463,7 +2467,7 @@ func jsPathRegexGuardAdapter() adapters.Adapter {
 				if !safeJSPathComponentRegex(n.Prop("lit0")) {
 					continue
 				}
-				out = append(out, adapters.Mapping{NodeID: id, Concept: "core.PathAccessCheck", Specificity: 2})
+				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
 			}
 			return out
 		},
@@ -2471,10 +2475,14 @@ func jsPathRegexGuardAdapter() adapters.Adapter {
 }
 
 func jsSafePathResolverAdapter() adapters.Adapter {
+	concept := singleOntologyRoleConcept(ontology.AnalysisRolePathAccessCheck)
 	return adapters.Adapter{
 		Name: "javascript.safe-path-resolver-summaries", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
 		Apply: func(s usg.Store) []adapters.Mapping {
+			if concept == "" {
+				return nil
+			}
 			contexts, _ := s.NodesOfType("code.Call")
 			safe := map[string]bool{}
 			for _, id := range contexts {
@@ -2509,7 +2517,7 @@ func jsSafePathResolverAdapter() adapters.Adapter {
 				method := n.Prop("method")
 				for name := range safe {
 					if path == name || method == name || strings.HasSuffix(path, "."+name) {
-						out = append(out, adapters.Mapping{NodeID: id, Concept: "core.PathAccessCheck", Specificity: 2})
+						out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
 						break
 					}
 				}
@@ -2628,10 +2636,14 @@ func jsRegexBody(lit string) (string, bool) {
 }
 
 func processArgVectorAdapter(tech string) adapters.Adapter {
+	concept := singleOntologyRoleConcept(ontology.AnalysisRoleProcessArgVector)
 	return adapters.Adapter{
 		Name: "process-arg-vector.controls", Technology: tech, Specificity: 1,
 		Fidelity: "semantic", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
+			if concept == "" {
+				return nil
+			}
 			ids, _ := s.NodesOfType("code.Seq")
 			var idx collectionFlowIndex
 			var out []adapters.Mapping
@@ -2646,7 +2658,7 @@ func processArgVectorAdapter(tech string) adapters.Adapter {
 				if !safeProcessArgVectorSeq(s, &idx, id) {
 					continue
 				}
-				out = append(out, adapters.Mapping{NodeID: id, Concept: "core.ProcessArgVector", Specificity: 1})
+				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 1})
 			}
 			return out
 		},

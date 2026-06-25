@@ -61,6 +61,8 @@ const (
 	AnalysisRoleAttributeSink         = "attribute_sink"
 	AnalysisRoleCharFilter            = "char_filter"
 	AnalysisRoleNeutralizerAssumption = "neutralizer_assumption"
+	AnalysisRolePathAccessCheck       = "path_access_check"
+	AnalysisRoleProcessArgVector      = "process_arg_vector"
 )
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.
