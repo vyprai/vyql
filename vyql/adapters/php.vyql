@@ -567,6 +567,17 @@ adapter php {
     has "Xml::escape($inline->getUrl(),true)"
     lacks "Xml::escape($inline->getUrl())"
   }
+  flag code.LeagueCommonMarkUnsafeHtmlMode in function {
+    lang "php"
+    call path "Environment"
+    call path "MarkdownConverter"
+    call path "CommonMarkCoreExtension"
+    not literal "html_input"
+    not call path "DisallowedRawHtmlExtension"
+    not call path "HTMLPurifier"
+    not call path "HtmlSanitizer"
+    not call path "sanitizeHtml"
+  }
   flag code.BladeRawMarkdownRenderWithoutSanitizer on any {
     path exact "analysis.module.context"
     lang "php"

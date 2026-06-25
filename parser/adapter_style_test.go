@@ -310,6 +310,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		"code.UnfilteredAgentCommandTag":                 true,
 		"code.UnsanitizedSvgUpload":                      true,
 		"code.UnvalidatedSqlIdentifierInterpolation":     true,
+		"code.LeagueCommonMarkUnsafeHtmlMode":            true,
 	}
 
 	var hits []string

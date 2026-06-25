@@ -4319,6 +4319,15 @@ concept CommonMarkPreserveEntitiesUrlAttributeXss : sink {
   review_assumption: "applications may render attacker-controlled Markdown output in a browser context"
   review_confidence: high
 }
+concept LeagueCommonMarkUnsafeHtmlMode : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79]
+  review_category: "xss"
+  review_condition: "league/commonmark renders Markdown with raw HTML enabled by default"
+  review_evidence: "CommonMark converter context {pattern} creates a Markdown environment without html_input escaping, DisallowedRawHtmlExtension, or an observed HTML sanitizer"
+  review_assumption: "Markdown content can be supplied by lower-trust authors and rendered in another user's browser"
+  review_confidence: high
+}
 concept DocumizeMarkdownRenderWithoutSanitizer : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

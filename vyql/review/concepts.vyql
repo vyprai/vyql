@@ -1957,6 +1957,12 @@ review code.CommonMarkPreserveEntitiesUrlAttributeXss {
   expected: [core.HtmlEscape]
   text: "review CommonMark URL attribute escaping for entity preservation that can reconstitute unsafe schemes in browsers"
 }
+review code.LeagueCommonMarkUnsafeHtmlMode {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review League CommonMark Markdown conversion for html_input escaping, DisallowedRawHtmlExtension, or an HTML sanitizer"
+}
 review code.DocumizeMarkdownRenderWithoutSanitizer {
   category: "xss"
   kind: "attention"

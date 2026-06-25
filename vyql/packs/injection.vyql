@@ -480,6 +480,11 @@ rule CommonMarkPreserveEntitiesUrlAttributeXss {
   match code.CommonMarkPreserveEntitiesUrlAttributeXss as sink
 }
 
+rule LeagueCommonMarkUnsafeHtmlMode {
+  meta { id: "VYQL-INJ-178", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.LeagueCommonMarkUnsafeHtmlMode as sink
+}
+
 rule DocumizeMarkdownRenderWithoutSanitizer {
   meta { id: "VYQL-INJ-093", severity: high, cwe: [CWE_79], confidence_floor: high }
   match code.DocumizeMarkdownRenderWithoutSanitizer as sink
