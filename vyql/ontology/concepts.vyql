@@ -4425,6 +4425,7 @@ concept DomInput : source {
   taint: [taint.UntrustedData]
   cwe: [CWE_20]
   refines: core.UserControlledData
+  analysis_role: dom_input
 }
 concept IntentInput : source {
   taint: [taint.UntrustedData]

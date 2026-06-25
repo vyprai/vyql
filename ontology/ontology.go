@@ -60,6 +60,7 @@ type Concept struct {
 const (
 	AnalysisRoleAttributeSink         = "attribute_sink"
 	AnalysisRoleCharFilter            = "char_filter"
+	AnalysisRoleDomInput              = "dom_input"
 	AnalysisRoleNeutralizerAssumption = "neutralizer_assumption"
 	AnalysisRolePathAccessCheck       = "path_access_check"
 	AnalysisRoleProcessArgVector      = "process_arg_vector"

@@ -994,6 +994,7 @@ adapter javascript {
   sink method "html" -> code.HtmlRender
   sink method "append" -> code.HtmlRender
   sink method "prepend" -> code.HtmlRender
+  sink method "replaceWith" -> code.HtmlRender
   // Contao/SimpleModal-style modal helpers render the `title` field as HTML.
   sink path "M.show" arg 0 collection val "title" -> code.HtmlRender
   // Stored XSS: writing attacker-controlled markup into high-signal HTML-bearing

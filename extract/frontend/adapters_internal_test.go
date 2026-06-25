@@ -1521,6 +1521,29 @@ func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
 	}
 }
 
+func TestJSDomValueInputAdapterUsesFlowIndex(t *testing.T) {
+	want := singleOntologyRoleConcept(ontology.AnalysisRoleDomInput)
+	if want == "" {
+		t.Fatal("DomInput analysis role did not resolve")
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "lookup", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:1", "callee_path": "document.getElementById",
+	}})
+	store.AddNode(usg.Node{ID: "value", Type: "code.Attr", Props: map[string]string{
+		"loc": "sample.js:2", "callee_path": "source.value",
+	}})
+	store.AddNode(usg.Node{ID: "plain", Type: "code.Attr", Props: map[string]string{
+		"loc": "sample.js:3", "callee_path": "model.value",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "lookup", Dst: "value"})
+
+	got := jsDomValueInputAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "value" || got[0].Concept != want {
+		t.Fatalf("DOM value source mapping wrong: %+v want concept %s", got, want)
+	}
+}
+
 func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",

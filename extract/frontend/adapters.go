@@ -526,6 +526,7 @@ type adapterSpec struct {
 func AdaptersFor(tech string) []adapters.Adapter {
 	out := adaptersFromSpec(loadSpec(tech))
 	if tech == "javascript" {
+		out = append(out, jsDomValueInputAdapter())
 		out = append(out, jsPathRegexGuardAdapter())
 		out = append(out, jsSafePathResolverAdapter())
 	}
@@ -2479,6 +2480,63 @@ func jsPathRegexGuardAdapter() adapters.Adapter {
 			return out
 		},
 	}
+}
+
+func jsDomValueInputAdapter() adapters.Adapter {
+	concept := singleOntologyRoleConcept(ontology.AnalysisRoleDomInput)
+	return adapters.Adapter{
+		Name: "javascript.dom-value-inputs", Technology: "javascript", Specificity: 2,
+		Fidelity: "semantic", Origin: "deterministic",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			if concept == "" {
+				return nil
+			}
+			attrs, _ := s.NodesOfType("code.Attr")
+			var out []adapters.Mapping
+			var flowIdx flowTokenIndex
+			for _, id := range attrs {
+				n, ok, err := s.GetNode(id)
+				if err != nil || !ok {
+					continue
+				}
+				if t := nodeTechFromNode(n); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+					continue
+				}
+				path := n.Prop("callee_path")
+				if path == "" {
+					path = n.Prop("path")
+				}
+				if path != "value" && !strings.HasSuffix(path, ".value") {
+					continue
+				}
+				if !jsAttrReceiverFromDomLookup(s, &flowIdx, id) {
+					continue
+				}
+				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
+			}
+			return out
+		},
+	}
+}
+
+func jsAttrReceiverFromDomLookup(s usg.Store, idx *flowTokenIndex, attrID string) bool {
+	idx.ensure(s)
+	for _, src := range idx.rev[attrID] {
+		n, ok, err := s.GetNode(src)
+		if err != nil || !ok || n.Type != "code.Call" {
+			continue
+		}
+		path := n.Prop("callee_path")
+		if path == "document.getElementById" ||
+			path == "document.querySelector" ||
+			path == "document.querySelectorAll" ||
+			path == "document.getElementsByName" ||
+			path == "document.getElementsByClassName" ||
+			path == "document.getElementsByTagName" {
+			return true
+		}
+	}
+	return false
 }
 
 func jsSafePathResolverAdapter() adapters.Adapter {
