@@ -184,6 +184,50 @@ func TestLoweringCarriesLiteralTokensOnFormatAndSubscript(t *testing.T) {
 	}
 }
 
+func TestLoweringMapsJSArgumentsToSyntheticExportParam(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "pkg",
+		File: "index.js",
+		Body: []nir.Stmt{
+			nir.FuncDef{
+				Name:     "__default_export__",
+				Params:   []string{nir.JSArgumentsParam},
+				Loc:      "index.js:1",
+				Exported: true,
+				Body: []nir.Stmt{
+					nir.Return{Value: nir.Index{
+						Base: nir.Name{ID: "arguments", Loc: "index.js:2"},
+						Key:  nir.Const{Value: "0", Loc: "index.js:2"},
+						Path: "arguments.__subscript",
+						Loc:  "index.js:2",
+					}},
+				},
+			},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+
+	src := findNodeID(t, g, "code.Param", "name", nir.JSArgumentsParam)
+	subscriptIDs, err := g.NodesOfType("code.Subscript")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subscriptIDs) != 1 {
+		t.Fatalf("expected one arguments subscript, got %v", subscriptIDs)
+	}
+	dst := subscriptIDs[0]
+	reachable, err := usg.BFS(g, src, "FLOWS", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[dst] {
+		t.Fatalf("synthetic JS arguments param did not flow to arguments subscript")
+	}
+}
+
 func TestExplicitSelfMethodCallDispatchesInheritedOverride(t *testing.T) {
 	prog := nir.Program{SelfName: "self", Modules: []nir.Module{{
 		Key:  "app.py",

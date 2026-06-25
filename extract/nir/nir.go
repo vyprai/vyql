@@ -16,6 +16,10 @@ package nir
 
 import "encoding/gob"
 
+// JSArgumentsParam is a synthetic parameter used by the JavaScript frontend for
+// exported functions that read the `arguments` object.
+const JSArgumentsParam = "__arguments__"
+
 // register every concrete Expr/Stmt so gob can (de)serialize the interface fields of Module
 // — used by the parse cache and the incremental-lowering delta cache.
 func init() {

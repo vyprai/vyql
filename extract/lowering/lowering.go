@@ -1568,6 +1568,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					}
 				}
 			}
+			if argsParam := info.params[nir.JSArgumentsParam]; argsParam != "" {
+				inner.node["arguments"] = argsParam
+			}
 			inner.node["__ret__"] = info.ret
 		}
 		if info != nil {
@@ -2702,6 +2705,11 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 					l.aliasReceiverSelf(argVals[i], pnode)
 				}
 				mapped[i] = true
+			}
+		}
+		if argsParam := target.params[nir.JSArgumentsParam]; argsParam != "" {
+			for _, a := range args {
+				l.flow(a, argsParam)
 			}
 		}
 		l.flow(target.ret, result)

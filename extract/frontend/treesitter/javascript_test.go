@@ -128,6 +128,35 @@ export default function (obj, keys, val) {
 	}
 }
 
+func TestJavaScriptCommonJSArgumentsExportAddsSyntheticPublicParam(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "index.js")
+	src := []byte(`
+module.exports = function () {
+  const commands = Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.apply(arguments);
+  return commands[0];
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := findFuncDef(prog, "__default_export__")
+	if !ok {
+		t.Fatalf("CommonJS default export function was not extracted; program=%#v", prog)
+	}
+	if !fn.Exported {
+		t.Fatalf("CommonJS default export should be marked exported; fn=%#v", fn)
+	}
+	if len(fn.Params) != 1 || fn.Params[0] != nir.JSArgumentsParam {
+		t.Fatalf("exported arguments-using function should get synthetic param; params=%#v", fn.Params)
+	}
+}
+
 func TestJavaScriptExportedClassThisAssignedHelperIsPublicEntry(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "parser.js")
@@ -187,6 +216,29 @@ import workos from '@workos-inc/node';
 			t.Fatalf("missing import %q; imports=%#v", want, prog.Modules[0].Imports)
 		}
 	}
+}
+
+func TestJavaScriptRequireMemberImportIsExtracted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "index.js")
+	src := []byte(`
+const quote = require("shell-quote").quote;
+quote(command);
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imp := range prog.Modules[0].Imports {
+		if imp.Local == "quote" && imp.Module == "shell-quote" && imp.Symbol == "quote" && !imp.IsModule {
+			return
+		}
+	}
+	t.Fatalf("missing require member import for shell-quote.quote; imports=%#v", prog.Modules[0].Imports)
 }
 
 func TestJavaScriptNestedRegExpInConditionalChainIsLowered(t *testing.T) {
