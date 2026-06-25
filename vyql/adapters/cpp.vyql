@@ -35,6 +35,17 @@ adapter cpp {
   sink path "fstream" -> code.FilePathAccess
   sink path "remove" -> code.FilePathAccess
   sink path "unlink" -> code.FilePathAccess
+  flag code.ManualZipEntryFileWrite in function {
+    lang "cpp"
+    call path "mapProperties.value"
+    token identifier "XBinary::FPART_PROP_ORIGINALNAME"
+    call path "QDir.separator"
+    call path "file.setFileName"
+    call path "file.open"
+    token identifier "QIODevice::ReadWrite"
+    not call path "QDir.cleanPath"
+    not call path "startsWith"
+  }
 
   // dynamic loading
   sink path "dlopen" -> code.DynamicCodeLoad
