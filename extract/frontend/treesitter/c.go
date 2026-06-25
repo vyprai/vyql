@@ -1032,6 +1032,27 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 					}})
 				}
 			}
+			if count, ok := ccLastElementCountExpr(compactIdx); ok {
+				loc := c.loc(n)
+				prefixText := compactCExprText(c.textBefore(body, n))
+				guard := "guard=missing_nonzero"
+				if ccHasNonZeroGuard(prefixText, count) {
+					guard = "guard=nonzero"
+				}
+				path := "analysis.zero_count.last_index"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Args: []nir.Expr{
+						nir.Const{Loc: loc, Value: "index_kind=field_minus_one"},
+						nir.Const{Loc: loc, Value: guard},
+						nir.Const{Loc: loc, Value: "index=" + compactIdx},
+						nir.Const{Loc: loc, Value: "count=" + count},
+					},
+					Path:   path,
+					Method: "last_index",
+					Loc:    loc,
+				}})
+			}
 		}
 		for _, ch := range namedChildren(n) {
 			walk(ch)
@@ -1050,6 +1071,39 @@ func ccHasUpperBoundGuard(bodyText, idx string) bool {
 		strings.Contains(bodyText, idx+"<=") ||
 		strings.Contains(bodyText, ">"+idx) ||
 		strings.Contains(bodyText, ">="+idx)
+}
+
+func ccLastElementCountExpr(compactIdx string) (string, bool) {
+	count := strings.TrimSuffix(compactIdx, "-1")
+	if count == compactIdx || count == "" || !ccStructuredIndex(count) {
+		return "", false
+	}
+	return count, true
+}
+
+func ccHasNonZeroGuard(bodyText, expr string) bool {
+	for _, v := range []string{expr, strings.ReplaceAll(expr, "->", ".")} {
+		if v == "" {
+			continue
+		}
+		if strings.Contains(bodyText, "!"+v) ||
+			strings.Contains(bodyText, v+"==0") ||
+			strings.Contains(bodyText, "0=="+v) ||
+			strings.Contains(bodyText, v+"<=0") ||
+			strings.Contains(bodyText, "0>="+v) ||
+			strings.Contains(bodyText, v+"<1") ||
+			strings.Contains(bodyText, "1>"+v) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *ccConv) textBefore(scope, n *tree_sitter.Node) string {
+	if scope == nil || n == nil || n.StartByte() < scope.StartByte() {
+		return ""
+	}
+	return string(c.src[scope.StartByte():n.StartByte()])
 }
 
 func compactCExprText(s string) string {

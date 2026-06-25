@@ -151,6 +151,44 @@ static void merge_param(HashTable *params, zval *zdata) {
 	t.Fatalf("merge_param function not extracted: %#v", prog.Modules[0].Body)
 }
 
+func TestCZeroCountLastIndexObservationRequiresNonZeroGuard(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "frames.c")
+	src := []byte(`
+struct Frame { int size; };
+struct Ctx { unsigned count; struct Frame *items; };
+
+void vulnerable(struct Ctx *ctx) {
+  ctx->items[ctx->count - 1].size = 4;
+  int later = ctx->count == 0 ? 0 : 1;
+}
+
+void fixed(struct Ctx *ctx) {
+  if (!ctx->count) {
+    return;
+  }
+  ctx->items[ctx->count - 1].size = 4;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable", "analysis.zero_count.last_index", "guard=missing_nonzero") {
+		t.Fatalf("vulnerable function missing zero-count last-index observation: %#v", prog.Modules[0].Body)
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "fixed", "analysis.zero_count.last_index", "guard=nonzero") {
+		t.Fatalf("fixed function missing guarded zero-count last-index observation: %#v", prog.Modules[0].Body)
+	}
+	if cFuncHasAnalysisToken(prog.Modules[0].Body, "fixed", "analysis.zero_count.last_index", "guard=missing_nonzero") {
+		t.Fatalf("fixed function should not emit missing_nonzero zero-count observation: %#v", prog.Modules[0].Body)
+	}
+}
+
 func hasCFuncCall(stmts []nir.Stmt, funcName, method string) bool {
 	for _, st := range stmts {
 		fn, ok := st.(nir.FuncDef)
@@ -158,6 +196,32 @@ func hasCFuncCall(stmts []nir.Stmt, funcName, method string) bool {
 			continue
 		}
 		return hasCStmtCall(fn.Body, method)
+	}
+	return false
+}
+
+func cFuncHasAnalysisToken(stmts []nir.Stmt, funcName, path, token string) bool {
+	for _, st := range stmts {
+		fn, ok := st.(nir.FuncDef)
+		if !ok || fn.Name != funcName {
+			continue
+		}
+		for _, bodyStmt := range fn.Body {
+			exprStmt, ok := bodyStmt.(nir.ExprStmt)
+			if !ok {
+				continue
+			}
+			call, ok := exprStmt.Value.(nir.Call)
+			if !ok || call.Path != path {
+				continue
+			}
+			for _, arg := range call.Args {
+				c, ok := arg.(nir.Const)
+				if ok && c.Value == token {
+					return true
+				}
+			}
+		}
 	}
 	return false
 }

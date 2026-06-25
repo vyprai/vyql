@@ -2220,6 +2220,12 @@ review code.FieldDerivedIndexAccess {
   kind: "attention"
   text: "review field-derived array index access and the dominating upper-bound checks"
 }
+review code.ZeroCountLastElementAccess {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review count-derived last-element accesses for an explicit nonzero element-count guard before indexing"
+}
 review code.ChakraScopeSlotArrayUncheckedIndex {
   category: "memory"
   kind: "attention"

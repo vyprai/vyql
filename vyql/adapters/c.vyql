@@ -171,6 +171,11 @@ adapter c {
     fact index_kind "field_derived"
     fact guard "missing_upper_bound"
   }
+  flag code.ZeroCountLastElementAccess on any {
+    path "analysis.zero_count.last_index"
+    fact index_kind "field_minus_one"
+    fact guard "missing_nonzero"
+  }
   flag code.FailurePathOwnedBufferFree on any {
     path "analysis.lifetime.release_then_return"
     fact release "delete"

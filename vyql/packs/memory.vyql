@@ -200,6 +200,11 @@ rule CountDerivedElementAccess {
   unless guarded_by core.MemoryBoundsCheck
 }
 
+rule ZeroCountLastElementAccess {
+  meta { id: "VYQL-MEM-041", severity: high, cwe: [CWE_129, CWE_125, CWE_787], confidence_floor: high }
+  match code.ZeroCountLastElementAccess as idx
+}
+
 rule UncheckedNullableResultDeref {
   meta { id: "VYQL-MEM-018", severity: medium, cwe: [CWE_476], confidence_floor: medium }
   match code.UncheckedNullableResultDeref as deref

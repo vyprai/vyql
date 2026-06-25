@@ -1566,6 +1566,15 @@ concept CountDerivedElementAccess : sink {
   review_assumption: "a malformed or attacker-influenced container can have zero elements"
   review_confidence: medium
 }
+concept ZeroCountLastElementAccess : sink {
+  vulnerable_to: [memory.OobRead, memory.OobWrite]
+  cwe: [CWE_129, CWE_125, CWE_787]
+  review_category: "memory"
+  review_condition: "a count-derived allocation or table can be indexed at count - 1 without first rejecting zero elements"
+  review_evidence: "last-element index context {pattern} uses a field-derived count minus one without a nonzero guard"
+  review_assumption: "a malformed or attacker-influenced container can declare zero elements and make count - 1 underflow or access outside an empty allocation"
+  review_confidence: high
+}
 concept DivisionDenominator : sink {
   vulnerable_to: [numeric.DivideByZero]
   enabled_by: [taint.UntrustedData]
