@@ -1,0 +1,37 @@
+# Rank 787 / CVE-2018-16637: Evolution CMS rendered resource titles and
+# metadata in manager document data without HTML escaping.
+
+test "rank787: Evolution CMS renders resource pagetitle without escaping"
+  lang php
+  file document_data.static.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  $pagetitle = $_REQUEST['pagetitle'];
+  $private = '';
+  $class = ' publish';
+  $title = '<span class="doc-item' . $private . '">'
+      . '<a href="index.php?a=27&amp;id=1">'
+      . '<span class="' . $class . '">' . $pagetitle . '</span></a></span>';
+  echo $title;
+  ?>
+  ```
+
+test "rank787: Evolution CMS escapes resource pagetitle before rendering"
+  lang php
+  file document_data.static.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  $pagetitle = $_REQUEST['pagetitle'];
+  $private = '';
+  $class = ' publish';
+  $safeTitle = html_escape($pagetitle, $modx->config['modx_charset']);
+  $title = '<span class="doc-item' . $private . '">'
+      . '<a href="index.php?a=27&amp;id=1">'
+      . '<span class="' . $class . '">' . $safeTitle . '</span></a></span>';
+  echo $title;
+  ?>
+  ```
