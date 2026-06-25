@@ -101,6 +101,105 @@ function zipdl($args) {
 	t.Fatalf("analysis.function.context for zipdl not found")
 }
 
+func TestPHPModuleContextIncludesAstInventory(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "search.php")
+	src := []byte(`<?php
+$pageLimit = $http->variable('BrowsePageLimit');
+$result = eZSearch::search($searchText, array('SearchLimit' => $pageLimit));
+$tpl->setVariable('search_page_limit', $pageLimit);
+foreach ($subTreeList as $subTreeItem) {
+  if ($subTreeItem > 0) {
+    $subTreeArray[] = $subTreeItem;
+  }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.module.context" {
+			args := n.Prop("str_args")
+			for _, want := range []string{
+				"call_path:$http.variable",
+				"call_path:eZSearch.search",
+				"call_path:$tpl.setVariable",
+				"subscript:$subTreeArray[]",
+			} {
+				if !strings.Contains(args, want) {
+					t.Fatalf("PHP module context missing %q; context=%q", want, args)
+				}
+			}
+			return
+		}
+	}
+	t.Fatalf("analysis.module.context not found")
+}
+
+func TestPHPModuleContextIncludesCallArgsAndCastFacts(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "search.php")
+	src := []byte(`<?php
+$http = eZHTTPTool::instance();
+$pageLimit = (int)$http->variable('BrowsePageLimit');
+$searchSectionID = (int)$http->variable('SectionID');
+foreach ( $subTreeList as $subTreeItem ) {
+    if ( is_numeric( $subTreeItem ) && $subTreeItem > 0 )
+        $subTreeArray[] = $subTreeItem;
+}
+$searchResult = eZSearch::search( $searchText, array(
+    'SearchSectionID' => $searchSectionID,
+    'SearchSubTreeArray' => $subTreeArray,
+    'SearchLimit' => $pageLimit
+) );
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.module.context" {
+			args := n.Prop("str_args")
+			for _, want := range []string{
+				"call_path:eZSearch.search",
+				"call_arg:is_numeric:$subTreeItem",
+				"assign_call:$pageLimit:$http.variable",
+				"cast_call_literal:int:$http.variable:BrowsePageLimit",
+				"cast_call_literal:int:$http.variable:SectionID",
+			} {
+				if !strings.Contains(args, want) {
+					t.Fatalf("PHP module context missing %q; context=%q", want, args)
+				}
+			}
+			return
+		}
+	}
+	t.Fatalf("analysis.module.context not found")
+}
+
 func TestPHPLegacyScriptLanguageTagParsesStatements(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "search_opensearch.php")

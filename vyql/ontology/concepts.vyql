@@ -3547,6 +3547,15 @@ concept WordPressAddQueryArgHrefXss : sink {
   review_assumption: "the generated URL may include request-controlled current-URL data and is served to a browser as HTML"
   review_confidence: high
 }
+concept EzPublishSearchNumericParamXss : sink {
+  vulnerable_to: [injection.Xss]
+  cwe: [CWE_79, CWE_20]
+  review_category: "xss"
+  review_condition: "eZ Publish search or browse parameters are reused in search state and templates without numeric narrowing"
+  review_evidence: "procedural PHP module context {pattern} reads numeric request fields through eZHTTPTool::variable and passes them into eZSearch/template state before the patched casts and is_numeric guard"
+  review_assumption: "the search state or browse module response renders these request-derived numeric fields into browser-visible markup or URLs"
+  review_confidence: high
+}
 concept UnescapedQueueQueryStringXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79]

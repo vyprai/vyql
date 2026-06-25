@@ -411,6 +411,56 @@ adapter php {
     lacks "esc_attr(add_query_arg("
     lacks "htmlspecialchars(add_query_arg("
   }
+  flag code.EzPublishSearchNumericParamXss in module {
+    lang "php"
+    call path "eZSearch.search"
+    call path "$tpl.setVariable"
+    token assign_call "$pageLimit:$http.variable"
+    token assign_literal "$pageLimit:BrowsePageLimit"
+    token call_arg "eZSearch.search:array"
+    token call_arg "$tpl.setVariable:$pageLimit"
+    not token cast_call_literal "int:$http.variable:BrowsePageLimit"
+  }
+  flag code.EzPublishSearchNumericParamXss in module {
+    lang "php"
+    call path "eZSearch.search"
+    call path "$tpl.setVariable"
+    token assign_call "$searchPageLimit:$http.variable"
+    token assign_literal "$searchPageLimit:SearchPageLimit"
+    token call_arg "$tpl.setVariable:$searchPageLimit"
+    not token cast_call_literal "int:$http.variable:SearchPageLimit"
+  }
+  flag code.EzPublishSearchNumericParamXss in module {
+    lang "php"
+    call path "eZSearch.search"
+    call path "$tpl.setVariable"
+    token assign_call "$searchSectionID:$http.variable"
+    token assign_literal "$searchSectionID:SectionID"
+    token call_arg "eZSearch.search:array"
+    token call_arg "$tpl.setVariable:$searchSectionID"
+    not token cast_call_literal "int:$http.variable:SectionID"
+  }
+  flag code.EzPublishSearchNumericParamXss in module {
+    lang "php"
+    call path "eZSearch.search"
+    call path "$tpl.setVariable"
+    token assign_call "$searchTimestamp:$http.variable"
+    token assign_literal "$searchTimestamp:SearchTimestamp"
+    token call_arg "eZSearch.search:array"
+    token call_arg "$tpl.setVariable:$searchTimestamp"
+    not token cast_call_literal "int:$http.variable:SearchTimestamp"
+  }
+  flag code.EzPublishSearchNumericParamXss in module {
+    lang "php"
+    call path "eZSearch.search"
+    call path "$tpl.setVariable"
+    token assign_call "$subTreeList:$http.variable"
+    token assign_literal "$subTreeList:SubTreeArray"
+    token call_arg "eZSearch.search:array"
+    token call_arg "$tpl.setVariable:$subTreeArray"
+    token subscript "$subTreeArray[]"
+    not token call_arg "is_numeric:$subTreeItem"
+  }
   flag code.PrestaShopContactformMessageEmailXss in function {
     lang "php"
     name "sendMessage"

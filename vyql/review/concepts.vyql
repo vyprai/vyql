@@ -1522,6 +1522,12 @@ review code.WordPressAddQueryArgHrefXss {
   expected: [core.HtmlEscape]
   text: "review WordPress add_query_arg URLs for esc_url or equivalent escaping before href attribute rendering"
 }
+review code.EzPublishSearchNumericParamXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation, core.HtmlEscape]
+  text: "review eZ Publish search module request numeric parameters for integer casts or is_numeric checks before template/search-state reuse"
+}
 review code.UnescapedQueueQueryStringXss {
   category: "xss"
   kind: "attention"

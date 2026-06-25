@@ -318,7 +318,9 @@ func (c *phConv) phpModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	if root == nil {
 		return nil
 	}
-	return c.phpContextCall("analysis.module.context", c.loc(root), "module", []string{"lang=php"}, c.text(root))
+	tokens := []string{"lang=php"}
+	tokens = append(tokens, c.phpAstContextTokens(root)...)
+	return c.phpContextCall("analysis.module.context", c.loc(root), "module", tokens, c.text(root))
 }
 
 func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
@@ -415,10 +417,43 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 			if method := lastSeg(path); method != "" {
 				add("call:" + method)
 			}
+			if args := field(cur, "arguments"); args != nil {
+				for _, arg := range namedChildren(args) {
+					argText := phpCompactText(c.text(arg))
+					if argText == "" {
+						continue
+					}
+					add("call_arg:" + path + ":" + argText)
+					if method := lastSeg(path); method != "" {
+						add("call_arg_method:" + method + ":" + argText)
+					}
+				}
+			}
 		case "member_access_expression":
 			add("attr_path:" + c.dotted(cur))
 		case "subscript_expression":
 			add("subscript:" + phpCompactText(c.text(cur)))
+		case "cast_expression":
+			castType := phpCastType(c.text(cur))
+			if castType == "" {
+				break
+			}
+			add("cast:" + castType)
+			kids := namedChildren(cur)
+			if len(kids) == 0 {
+				break
+			}
+			expr := kids[len(kids)-1]
+			exprText := phpCompactText(c.text(expr))
+			if exprText != "" {
+				add("cast:" + castType + ":" + exprText)
+			}
+			for _, path := range c.phpCallPaths(expr) {
+				add("cast_call:" + castType + ":" + path)
+				for _, lit := range c.phpLiteralTokens(expr) {
+					add("cast_call_literal:" + castType + ":" + path + ":" + lit)
+				}
+			}
 		}
 		for _, ch := range namedChildren(cur) {
 			walk(ch)
@@ -426,6 +461,33 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 	}
 	walk(n)
 	return out
+}
+
+func phpCastType(text string) string {
+	compact := strings.ToLower(phpCompactText(text))
+	if !strings.HasPrefix(compact, "(") {
+		return ""
+	}
+	end := strings.Index(compact, ")")
+	if end <= 1 {
+		return ""
+	}
+	switch strings.TrimSpace(compact[1:end]) {
+	case "int", "integer":
+		return "int"
+	case "bool", "boolean":
+		return "bool"
+	case "float", "double", "real":
+		return "float"
+	case "string":
+		return "string"
+	case "array":
+		return "array"
+	case "object":
+		return "object"
+	default:
+		return ""
+	}
 }
 
 func (c *phConv) phpCallPaths(n *tree_sitter.Node) []string {
