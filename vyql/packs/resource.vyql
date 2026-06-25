@@ -28,3 +28,8 @@ rule RateLimitedMbufResponseLeak {
   meta { id: "VYQL-RES-005", severity: high, cwe: [CWE_772, CWE_400], confidence_floor: high }
   match code.RateLimitedMbufResponseLeak as leak
 }
+
+rule UnboundedRouteFilenameCacheAccess {
+  meta { id: "VYQL-RES-006", severity: high, cwe: [CWE_20, CWE_400], confidence_floor: high }
+  match code.UnboundedRouteFilenameCacheAccess as filename
+}

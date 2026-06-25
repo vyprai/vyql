@@ -314,6 +314,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		"code.UnvalidatedSqlIdentifierInterpolation":          true,
 		"code.LeagueCommonMarkUnsafeHtmlMode":                 true,
 		"code.IsolateLevelIncrementWithoutCap":                true,
+		"code.UnboundedRouteFilenameCacheAccess":              true,
 	}
 
 	var hits []string
@@ -397,6 +398,7 @@ var structuredFlagTokenPrefixes = []string{
 	"class_bases=",
 	"class_name:",
 	"decorator_path:",
+	"decorator_method:",
 	"expr:",
 	"field:",
 	"function_name:",

@@ -2837,6 +2837,15 @@ concept ChatterBotSqlalchemySessionPoolExhaustion : sink {
   review_assumption: "concurrent get_response calls can partially consume generator results or hit exceptional paths that hold database sessions long enough to exhaust the pool"
   review_confidence: medium
 }
+concept UnboundedRouteFilenameCacheAccess : sink {
+  vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+  cwe: [CWE_20, CWE_400]
+  review_category: "resource"
+  review_condition: "a routed filename or route-derived filename is materialized under a cache directory without a length cap"
+  review_evidence: "route filename context {pattern} accepts a route parameter, calls secure_filename, and joins the result into a cache path before a len(...) bound"
+  review_assumption: "attackers can supply an overlong route segment that survives filename sanitization and triggers filesystem errors or repeated expensive cache work"
+  review_confidence: high
+}
 concept Free5gcChfRechargeInfoSplitPanic : sink {
   vulnerable_to: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
   cwe: [CWE_129, CWE_400]

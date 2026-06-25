@@ -1098,6 +1098,24 @@ adapter python {
     has "yieldself.model_to_object(statement)"
     lacks "finally"
   }
+  flag code.UnboundedRouteFilenameCacheAccess in function {
+    lang "python"
+    token decorator_method "route"
+    token param_name contains_any ["file_name", "filename", "camera_name", "path"]
+    call path contains_any ["secure_filename", "werkzeug.utils.secure_filename"]
+    call path "os.path.join"
+    token identifier contains_any ["CACHE_DIR", "cache_dir", "preview_dir"]
+    not expr contains_any [
+      "len(file_name)>1000",
+      "len(file_name)>=1000",
+      "1000<len(file_name)",
+      "1000<=len(file_name)",
+      "len(filename)>1000",
+      "len(filename)>=1000",
+      "1000<len(filename)",
+      "1000<=len(filename)"
+    ]
+  }
   flag code.CheckmkPendingChangeTextUnescapeXss in function {
     name "get_all_data_required_for_activation_popout"
     has "PendingChangeSummary("
