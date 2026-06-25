@@ -2195,7 +2195,7 @@ review code.SensitiveModelJsonSerializationExposure {
   category: "secret"
   kind: "attention"
   expected: [core.SecretRedaction]
-  text: "return explicit safe fields instead of serializing full user or model objects in JSON success responses"
+  text: "return explicit safe fields or a public serializer instead of exposing full or privileged user/model representations"
 }
 review code.PermissiveCors {
   category: "auth"

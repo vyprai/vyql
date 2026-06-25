@@ -3010,8 +3010,8 @@ concept SensitiveModelJsonSerializationExposure : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_200, CWE_522]
   review_category: "secret"
-  review_condition: "a framework JSON success response serializes a full user or model object instead of returning an explicit safe data map"
-  review_evidence: "model serialization context {pattern} returns the model object through a JSON response helper"
+  review_condition: "a framework response serializes a full or privileged user/model representation instead of returning an explicit safe data map"
+  review_evidence: "model serialization context {pattern} returns the model object or privileged serializer through a response helper"
   review_assumption: "the serialized model may include password, token, MFA secret, credential, or other sensitive attributes by default"
   review_confidence: high
 }

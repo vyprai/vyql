@@ -390,6 +390,15 @@ adapter php {
     has "return$this->asModelSuccess($user,modelName:'user',data:$return)"
     lacks "return$this->asSuccess(data:$return)"
   }
+  flag code.SensitiveModelJsonSerializationExposure in class {
+    lang "php"
+    name "UpdateUserController"
+    has "CurrentUserSerializer::class"
+    call path "$request.getQueryParams"
+    call path "$request.getAttribute"
+    call path "EditUser"
+    not call path "$this.serializer"
+  }
   flag code.PersistentModelTitleStoredXss in function {
     lang "php"
     name "onSaveElement"
