@@ -2335,6 +2335,15 @@ concept FrappeLinkExpansionMissingReadPermission : sink {
   review_assumption: "expanded linked documents may reference records or fields the caller cannot read directly"
   review_confidence: high
 }
+concept CustomerThreadEditMissingMailboxAuthorization : sink {
+  vulnerable_to: [access_control.MissingAuthorization, access_control.IncorrectAuthorization]
+  cwe: [CWE_862, CWE_863]
+  review_category: "auth"
+  review_condition: "a customer-thread edit policy allows customer-created conversation threads without checking the user's mailbox or conversation access"
+  review_evidence: "thread policy context {pattern} allows Thread::TYPE_CUSTOMER edits for customer-created threads without userHasAccessToMailbox"
+  review_assumption: "mailbox membership limits which users may edit customer-originated conversation threads"
+  review_confidence: high
+}
 // A privileged / state-changing operation (delete/grant/setRole/admin, DB writes) whose
 // access-control can't be verified statically. POSSIBILITY-tier review concept (broader than
 // the curated AuthenticationRequiredOp the confirmed AUTH rules use): surfaces "verify this

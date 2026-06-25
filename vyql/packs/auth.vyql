@@ -269,6 +269,11 @@ rule FrappeLinkExpansionMissingReadPermission {
   match code.FrappeLinkExpansionMissingReadPermission as expansion
 }
 
+rule CustomerThreadEditMissingMailboxAuthorization {
+  meta { id: "VYQL-AUTH-066", severity: high, cwe: [CWE_862, CWE_863], confidence_floor: high }
+  match code.CustomerThreadEditMissingMailboxAuthorization as policy
+}
+
 rule InsecureDirectObjectReference {
   meta { id: "VYQL-AUTH-002", severity: high, cwe: [CWE_639] }
   taint core.UserControlledData -> code.ObjectLookupByUserInput

@@ -144,6 +144,54 @@ function zipdl($args) {
 	t.Fatalf("analysis.function.context for zipdl not found")
 }
 
+func TestPHPFunctionContextIncludesPolicyAccessTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ThreadPolicy.php")
+	src := []byte(`<?php
+class ThreadPolicy {
+  public function edit(User $user, Thread $thread) {
+    if (($thread->created_by_customer_id && in_array($thread->type, [Thread::TYPE_CUSTOMER]))) {
+      return true;
+    }
+    return false;
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.function.context" && strings.Contains(n.Prop("str_args"), "name=edit") {
+			args := n.Prop("str_args")
+			for _, want := range []string{
+				"param_type:User",
+				"param_type:Thread",
+				"attr_path:$thread.created_by_customer_id",
+				"attr_path:$thread.type",
+				"call_path:in_array",
+				"Thread::TYPE_CUSTOMER",
+			} {
+				if !strings.Contains(args, want) {
+					t.Fatalf("PHP policy function context missing %q; context=%q", want, args)
+				}
+			}
+			return
+		}
+	}
+	t.Fatalf("analysis.function.context for edit not found")
+}
+
 func TestPHPObjectCreationArgumentsCarryAssignedTaint(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "Redirect.php")

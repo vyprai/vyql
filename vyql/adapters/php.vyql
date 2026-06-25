@@ -102,6 +102,18 @@ adapter php {
     not token subscript "$u['homedir']"
     not token subscript "$u['role']"
   }
+  flag code.CustomerThreadEditMissingMailboxAuthorization in function {
+    lang "php"
+    name "edit"
+    param type "User"
+    param type "Thread"
+    attr path "$thread.created_by_customer_id"
+    attr path "$thread.type"
+    call path "in_array"
+    call arg contains "Thread::TYPE_CUSTOMER"
+    has "returntrue;"
+    not call path "userHasAccessToMailbox"
+  }
   flag code.ShareLinkDeletionMissingAuthGuard in function {
     lang "php"
     name "deleteShareLink"

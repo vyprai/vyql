@@ -328,6 +328,12 @@ review code.FrappeLinkExpansionMissingReadPermission {
   expected: [core.AuthorizationCheck]
   text: "review Frappe link expansion helpers for read permission checks and field-level read filtering before returning linked documents"
 }
+review code.CustomerThreadEditMissingMailboxAuthorization {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "review customer-thread edit policies for mailbox or conversation access checks before allowing customer-originated thread edits"
+}
 review code.DeserializableInvocationHandler {
   category: "deserialization"
   kind: "attention"
