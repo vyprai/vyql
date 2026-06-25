@@ -193,6 +193,15 @@ adapter c {
     has "cluster!=fs->clusters-1"
     lacks "cluster!=fs->clusters+1"
   }
+  flag code.ShiftedClusterSizeAllocationMissingBounds in function {
+    lang "c"
+    name "exfat_mount"
+    has "malloc(CLUSTER_SIZE(*ef->sb))"
+    has "verify_vbr_checksum(ef->dev,ef->zero_cluster,SECTOR_SIZE(*ef->sb))"
+    has "ef->sb->sector_bits"
+    has "ef->sb->spc_bits"
+    lacks "ef->sb->sector_bits<9"
+  }
   flag code.UnderallocatedFormattedAddressList in function {
     lang "c"
     name "option_to_env"

@@ -2170,6 +2170,12 @@ review code.PointerAddOverflowAllocation {
   expected: [core.MemoryBoundsCheck]
   text: "review allocator pointer-plus-size arithmetic for wraparound checks before committing or returning the advanced pointer"
 }
+review code.ShiftedClusterSizeAllocationMissingBounds {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck, core.IntegerOverflowGuard]
+  text: "review filesystem cluster-size allocation for sector-bit and cluster-bit bounds before shift-derived sizes are used"
+}
 review code.OffsetLengthBoundsOverflow {
   category: "numeric"
   kind: "attention"

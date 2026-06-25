@@ -1622,6 +1622,15 @@ concept PointerAddOverflowAllocation : sink {
   review_assumption: "a caller-controlled or model-controlled allocation size can wrap the end pointer below the aligned start"
   review_confidence: high
 }
+concept ShiftedClusterSizeAllocationMissingBounds : sink {
+  vulnerable_to: [memory.IntegerOverflow, memory.OobWrite]
+  cwe: [CWE_190, CWE_787]
+  review_category: "memory"
+  review_condition: "cluster-size allocation uses filesystem sector and cluster shift fields before validating their safe range"
+  review_evidence: "mount context {pattern} allocates CLUSTER_SIZE-derived memory and verifies sectors before the sector/cluster bit bounds are observed"
+  review_assumption: "a malformed filesystem header can provide sector or sectors-per-cluster shift values that make derived allocation sizes wrap or undersize buffers"
+  review_confidence: high
+}
 concept OffsetLengthBoundsOverflow : sink {
   vulnerable_to: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
   cwe: [CWE_190, CWE_125]

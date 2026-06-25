@@ -113,6 +113,11 @@ rule PointerAddOverflowAllocation {
   match code.PointerAddOverflowAllocation as alloc
 }
 
+rule ShiftedClusterSizeAllocationMissingBounds {
+  meta { id: "VYQL-MEM-039", severity: high, cwe: [CWE_190, CWE_787], confidence_floor: high }
+  match code.ShiftedClusterSizeAllocationMissingBounds as alloc
+}
+
 rule PotentialUseAfterFree {
   meta { id: "VYQL-MEM-007", severity: high, cwe: [CWE_416], confidence_floor: low }
   order code.PointerFree before code.PointerUse
