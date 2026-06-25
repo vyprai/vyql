@@ -3291,7 +3291,7 @@ concept JenkinsPlaintextDataboundCredential : sink {
   cwe: [CWE_312, CWE_522]
   review_category: "secret"
   review_condition: "Jenkins plugin databinds credential-like configuration fields as plain strings"
-  review_evidence: "Jenkins databound constructor context {pattern} accepts API login/token configuration as String values instead of protected Secret storage"
+  review_evidence: "Jenkins configuration context {pattern} accepts or reads API login/token configuration as String values instead of protected Secret storage"
   review_assumption: "Jenkins persists job configuration fields in config.xml where users with Extended Read or filesystem access may read them"
   review_confidence: high
 }
