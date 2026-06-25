@@ -4853,6 +4853,11 @@ concept CsvEscape : control {
   cwe: [CWE_1236]
   applies: path
 }
+concept RegexEscape : control {
+  neutralizes: [dos.ReDoS]
+  cwe: [CWE_1333]
+  applies: path
+}
 concept OwnershipCheck : control {
   neutralizes: [access_control.BrokenAccess, access_control.Idor]
   applies: endpoint

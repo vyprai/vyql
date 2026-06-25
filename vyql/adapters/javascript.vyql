@@ -1113,6 +1113,10 @@ adapter javascript {
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "RegExp" -> code.RegexCompile
+  control method "escapeRegExp" -> core.RegexEscape
+  control method "escapeStringRegexp" -> core.RegexEscape
+  control method "replace" val "\\$&" -> core.RegexEscape
+  control method "replace" val "[.\\-+*:]" val "\\\\." -> core.RegexEscape
   sink receiver "replace" val "+)*m" -> code.RegexMatch
   flag code.CatastrophicRegex on any {
     path "RegExp"

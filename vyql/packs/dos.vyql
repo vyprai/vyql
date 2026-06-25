@@ -5,6 +5,7 @@ module vypr.dos;
 rule ReDoS {
   meta { id: "VYQL-DOS-001", severity: medium, cwe: [CWE_1333] }
   taint core.UserControlledData -> code.RegexCompile
+  unless sanitized_by core.RegexEscape
 }
 
 // Untrusted data matched against a regex pattern with static catastrophic-backtracking
