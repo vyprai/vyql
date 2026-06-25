@@ -155,6 +155,12 @@ review code.AuthFlowBypassReview {
   expected: [core.AuthenticationCheck]
   text: "review alternate UI or navigation exit paths in this authentication flow"
 }
+review code.OAuthReauthenticationUserMismatch {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck]
+  text: "verify OAuth reauthentication callbacks require the OAuth-resolved user to match the current authenticated user before refreshing session freshness"
+}
 review code.MissingGuestFallbackForWebAuth {
   category: "auth"
   kind: "attention"

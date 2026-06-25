@@ -545,6 +545,20 @@ adapter python {
     call contains_any ["process_login", "exchange_code", "fetch_token"]
     not literal "sso_state"
   }
+  flag code.OAuthReauthenticationUserMismatch in function {
+    lang "python"
+    function contains_any ["oauth_verify_response", "verify_response", "reauth"]
+    call path "_oauth_response_common"
+    call path "session.__setitem__"
+    call path contains_any ["redirect", "flask.redirect"]
+    literal contains_any ["fs_paa", "REAUTHENTICATION_SUCCESSFUL", "POST_OAUTH_VERIFY_VIEW"]
+    not binary contains_any [
+      "user.email==current_user.email",
+      "current_user.email==user.email",
+      "user.id==current_user.id",
+      "current_user.id==user.id",
+    ]
+  }
   flag code.SnsCertificateUrlTrustBypass in function {
     name "_get_cert_url"
     has "SigningCertURL"

@@ -2053,6 +2053,15 @@ concept AuthFlowBypassReview : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]
 }
+concept OAuthReauthenticationUserMismatch : sink {
+  vulnerable_to: [authentication.ImproperAuthentication, authentication.AuthenticationBypass]
+  cwe: [CWE_287]
+  review_category: "auth"
+  review_condition: "OAuth reauthentication marks the current session fresh after resolving any OAuth user, without requiring that resolved user to match the current session user"
+  review_evidence: "OAuth reauthentication context {pattern} sets session freshness after provider identity resolution without a current-user identity comparison"
+  review_assumption: "an attacker can complete the OAuth verification step with a different valid OAuth-linked account while operating a stale victim session"
+  review_confidence: high
+}
 concept MissingGuestFallbackForWebAuth : sink {
   vulnerable_to: [authentication.ImproperAuthentication]
   cwe: [CWE_287]

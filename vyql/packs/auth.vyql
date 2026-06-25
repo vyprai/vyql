@@ -239,6 +239,11 @@ rule PasswordHashMissingUserBalance {
   match code.PasswordHashMissingUserBalance as auth
 }
 
+rule OAuthReauthenticationUserMismatch {
+  meta { id: "VYQL-AUTH-056", severity: medium, cwe: [CWE_287], confidence_floor: high }
+  match code.OAuthReauthenticationUserMismatch as auth
+}
+
 rule JobOutputEventUpdateAuthorizationBypass {
   meta { id: "VYQL-AUTH-030", severity: high, cwe: [CWE_862], confidence_floor: high }
   match code.JobOutputEventUpdateAuthorizationBypass as handler

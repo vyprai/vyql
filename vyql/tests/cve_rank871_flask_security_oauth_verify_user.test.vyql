@@ -1,0 +1,53 @@
+# Rank 871 / CVE-2026-46715: Flask-Security-Too OAuth reauthentication
+# refreshed the current session after any valid OAuth user was resolved, without
+# requiring that OAuth user to be the current authenticated user.
+
+test "rank871: oauth verify refreshes session freshness for any resolved user"
+  lang python
+  expect VYQL-AUTH-056
+  expect_review code.OAuthReauthenticationUserMismatch
+  code
+  ```
+  import time
+  from flask import redirect, session
+  from flask_login import current_user
+
+  def _oauth_response_common(name):
+      field_value = "attacker@example.com"
+      user = datastore.find_user(email=field_value)
+      return field_value, user
+
+  def oauth_verify_response(name):
+      field_value, user = _oauth_response_common(name)
+      next_loc = session.pop("fs_oauth_next", None)
+      if user:
+          session["fs_paa"] = time.time()
+          do_flash("REAUTHENTICATION_SUCCESSFUL")
+          return redirect(get_post_action_redirect("SECURITY_POST_VERIFY_VIEW", dict(next=next_loc)))
+      return redirect("/verify")
+  ```
+
+test "rank871: oauth verify compares resolved user to current user before freshness"
+  lang python
+  reject VYQL-AUTH-056
+  reject_review code.OAuthReauthenticationUserMismatch
+  code
+  ```
+  import time
+  from flask import redirect, session
+  from flask_login import current_user
+
+  def _oauth_response_common(name):
+      field_value = "current@example.com"
+      user = datastore.find_user(email=field_value)
+      return field_value, user
+
+  def oauth_verify_response(name):
+      field_value, user = _oauth_response_common(name)
+      next_loc = session.pop("fs_oauth_next", None)
+      if user and user.email == current_user.email:
+          session["fs_paa"] = time.time()
+          do_flash("REAUTHENTICATION_SUCCESSFUL")
+          return redirect(get_post_action_redirect("SECURITY_POST_VERIFY_VIEW", dict(next=next_loc)))
+      return redirect("/verify")
+  ```
