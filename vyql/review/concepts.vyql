@@ -956,6 +956,12 @@ review code.CommandLineAssemblyReview {
   kind: "attention"
   text: "review command-line assembly for unquoted placeholder values before process or application launch"
 }
+review code.GitDirShellCommandStringExecution {
+  category: "command"
+  kind: "target"
+  expected: [core.ProcessArgVector, core.ShellEscape]
+  text: "review git command helpers for execFile-style argv execution instead of shell command strings"
+}
 review code.UnsafeBuildClientCommandAssembly {
   category: "command"
   kind: "attention"

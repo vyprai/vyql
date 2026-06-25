@@ -737,6 +737,14 @@ adapter javascript {
     not literal "shell-quote"
     not call path "shellQuote.quote"
   }
+  flag code.GitDirShellCommandStringExecution in class {
+    lang "javascript"
+    call path "child_process.exec"
+    call path "args.join"
+    literal "git --git-dir="
+    attr path "?.path"
+    not call path "child_process.execFile"
+  }
   flag code.DynamicFunctionMutableObjectEval in function {
     lang "javascript"
     has "newFunction('node'"

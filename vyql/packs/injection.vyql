@@ -92,6 +92,11 @@ rule CommandLineAssembly {
   match code.CommandLineAssemblyReview as sink
 }
 
+rule GitDirShellCommandStringExecution {
+  meta { id: "VYQL-INJ-182", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.GitDirShellCommandStringExecution as sink
+}
+
 rule MsgfmtPathShellCommandInterpolation {
   meta { id: "VYQL-INJ-139", severity: critical, cwe: [CWE_78], confidence_floor: high }
   match code.MsgfmtPathShellCommandInterpolation as sink

@@ -196,6 +196,15 @@ concept CommandLineAssemblyReview : sink {
   review_assumption: "the appended value can be influenced through a document, URI, desktop action, or caller-controlled parameter"
   review_confidence: medium
 }
+concept GitDirShellCommandStringExecution : sink {
+  vulnerable_to: [injection.CommandInjection]
+  cwe: [CWE_78]
+  review_category: "command"
+  review_condition: "git repository paths are interpolated into a shell command string before execution"
+  review_evidence: "git command helper context {pattern} builds git --git-dir=... with joined arguments and sends the result to child_process.exec"
+  review_assumption: "the repository path, ref, or object path can be influenced by the caller"
+  review_confidence: high
+}
 concept MsgfmtPathShellCommandInterpolation : sink {
   vulnerable_to: [injection.CommandInjection]
   cwe: [CWE_78]
