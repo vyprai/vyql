@@ -656,6 +656,12 @@ review code.ClockworkWebJobCsrf {
   expected: [core.CsrfProtection]
   text: "verify Clockwork Web job enable/disable actions require Rails forgery protection"
 }
+review code.RailsBasicAuthWeakCsrfStrategy {
+  category: "csrf"
+  kind: "target"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "verify Rails HTTP Basic auth controllers use protect_from_forgery with: :exception so CSRF failures fail closed"
+}
 review code.BestWebSoftContactFormSettingsCsrf {
   category: "csrf"
   kind: "attention"

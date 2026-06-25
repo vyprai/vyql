@@ -4662,6 +4662,15 @@ concept ClockworkWebJobCsrf : sink {
   review_assumption: "the job action is reachable through the mounted Rails engine POST route"
   review_confidence: high
 }
+concept RailsBasicAuthWeakCsrfStrategy : sink {
+  vulnerable_to: [request_forgery.Csrf]
+  cwe: [CWE_352]
+  review_category: "csrf"
+  review_condition: "Rails controller uses HTTP Basic authentication with protect_from_forgery but does not force exception strategy"
+  review_evidence: "Ruby controller context {pattern} calls protect_from_forgery and http_basic_authenticate_with without protect_from_forgery with: :exception"
+  review_assumption: "the controller authenticates browser-reachable non-session requests where null-session fallback would not fail closed"
+  review_confidence: high
+}
 concept BestWebSoftContactFormSettingsCsrf : sink {
   vulnerable_to: [request_forgery.Csrf]
   cwe: [CWE_352]

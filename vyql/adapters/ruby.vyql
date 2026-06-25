@@ -244,6 +244,12 @@ adapter ruby {
     has "ClockworkWeb.disable(job)"
     lacks "protect_from_forgery"
   }
+  flag code.RailsBasicAuthWeakCsrfStrategy in class {
+    lang "ruby"
+    call path "protect_from_forgery"
+    call path "http_basic_authenticate_with"
+    not call arg "protect_from_forgery:with=exception"
+  }
   flag code.ColorscoreImagemagickCommandInjection in function {
     lang "ruby"
     name "initialize"

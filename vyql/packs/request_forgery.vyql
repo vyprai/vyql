@@ -38,6 +38,11 @@ rule ClockworkWebJobCsrf {
   match code.ClockworkWebJobCsrf as action
 }
 
+rule RailsBasicAuthWeakCsrfStrategy {
+  meta { id: "VYQL-RF-033", severity: medium, cwe: [CWE_352], confidence_floor: high }
+  match code.RailsBasicAuthWeakCsrfStrategy as action
+}
+
 rule BestWebSoftContactFormSettingsCsrf {
   meta { id: "VYQL-RF-021", severity: medium, cwe: [CWE_352], confidence_floor: high }
   match code.BestWebSoftContactFormSettingsCsrf as action
