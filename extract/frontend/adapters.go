@@ -141,6 +141,7 @@ func valCondsLower(lowerTokens string, vals, nvals []string) bool {
 type flowTokenIndex struct {
 	built bool
 	rev   map[string][]string
+	fwd   map[string][]string
 }
 
 func (idx *flowTokenIndex) ensure(s usg.Store) {
@@ -149,12 +150,14 @@ func (idx *flowTokenIndex) ensure(s usg.Store) {
 	}
 	idx.built = true
 	idx.rev = map[string][]string{}
+	idx.fwd = map[string][]string{}
 	rangeNodes(s, func(n usg.Node) bool {
 		if rg, ok := s.(interface {
 			RangeOutEdges(string, string, func(string) bool)
 		}); ok {
 			rg.RangeOutEdges(n.ID, "FLOWS", func(dst string) bool {
 				idx.rev[dst] = append(idx.rev[dst], n.ID)
+				idx.fwd[n.ID] = append(idx.fwd[n.ID], dst)
 				return true
 			})
 			return true
@@ -162,6 +165,7 @@ func (idx *flowTokenIndex) ensure(s usg.Store) {
 		edges, _ := s.OutEdges(n.ID, "FLOWS")
 		for _, edge := range edges {
 			idx.rev[edge.Dst] = append(idx.rev[edge.Dst], edge.Src)
+			idx.fwd[n.ID] = append(idx.fwd[n.ID], edge.Dst)
 		}
 		return true
 	})
@@ -1188,6 +1192,37 @@ func nodeTechFromNode(n usg.Node) string {
 	return nodeTech(n.Prop("loc"))
 }
 
+func nodeTechFromNodeWithFileContext(n usg.Node, fileTech map[string]string) string {
+	if t := contextNodeTech(n); t != "" {
+		return t
+	}
+	if fileTech != nil {
+		if t := fileTech[locFile(n.Prop("loc"))]; t != "" {
+			return t
+		}
+	}
+	return nodeTech(n.Prop("loc"))
+}
+
+func fileContextTechs(s usg.Store) map[string]string {
+	out := map[string]string{}
+	ids, _ := s.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, ok, err := s.GetNode(id)
+		if err != nil || !ok {
+			continue
+		}
+		t := contextNodeTech(n)
+		if t == "" {
+			continue
+		}
+		if file := locFile(n.Prop("loc")); file != "" {
+			out[file] = t
+		}
+	}
+	return out
+}
+
 func contextNodeTech(n usg.Node) string {
 	if n.Type != "code.Call" || !strings.HasPrefix(n.Prop("callee_path"), "analysis.") {
 		return ""
@@ -1299,6 +1334,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			fileTech := fileContextTechs(s)
 			allowed := make([]bool, len(spec.Flags))
 			for i := range spec.Flags {
 				allowed[i] = packageAllowed(spec.Flags[i].Packages, pkgs)
@@ -1327,7 +1363,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 					if err != nil || !ok {
 						continue
 					}
-					if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
+					if t := nodeTechFromNodeWithFileContext(n, fileTech); !spec.crossLang && t != "" && t != spec.Technology {
 						continue
 					}
 					for _, i := range flagIdx.candidates(n.Prop("method"), n.Prop("callee_path")) {
@@ -1338,7 +1374,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 						if !flagNodeKindAllows(fl, n) {
 							continue
 						}
-						if !flagMatchesNode(s, &flowIdx, fl, n, spec.Technology, spec.crossLang) {
+						if !flagMatchesNode(s, &flowIdx, fl, n, spec.Technology, spec.crossLang, fileTech) {
 							continue
 						}
 						detail, conf := reviewDetail(fl.Concept, flagPattern(fl))
@@ -1399,12 +1435,12 @@ func flagNodeKindAllows(fl flagSpec, n usg.Node) bool {
 	}
 }
 
-func flagMatchesNode(s usg.Store, idx *flowTokenIndex, fl flagSpec, n usg.Node, tech string, crossLang bool) bool {
+func flagMatchesNode(s usg.Store, idx *flowTokenIndex, fl flagSpec, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
 	if fl.Scope != "" && n.Prop("callee_path") != "analysis."+strings.ToLower(fl.Scope)+".context" {
 		return false
 	}
 	for _, pred := range fl.Predicates {
-		if !flagPredicateMatches(s, pred, n, tech, crossLang) {
+		if !flagPredicateMatches(s, idx, pred, n, tech, crossLang, fileTech) {
 			return false
 		}
 	}
@@ -1473,7 +1509,14 @@ func flagOperandMatches(spec flagOperandSpec, nodes []usg.Node) bool {
 	return true
 }
 
-func flagPredicateMatches(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) bool {
+func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
+	if pred.Subject == "flow_to" {
+		hit := flagFlowToNodeHit(s, idx, pred, n, tech, crossLang, fileTech)
+		if pred.Negative {
+			return !hit
+		}
+		return hit
+	}
 	if pred.Subject == "scope_call" {
 		hit := flagScopeNodeHit(s, pred, n, []string{"code.Call"}, tech, crossLang)
 		if pred.Negative {
@@ -1492,6 +1535,50 @@ func flagPredicateMatches(s usg.Store, pred flagPredicate, n usg.Node, tech stri
 		}
 	}
 	return flagPredicateMatchesNodeOnly(pred, n)
+}
+
+func flagFlowToNodeHit(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
+	if idx == nil {
+		return false
+	}
+	idx.ensure(s)
+	probe := pred
+	probe.Subject = "node"
+	probe.Negative = false
+	prefix := locFile(n.Prop("loc"))
+	seen := map[string]bool{n.ID: true}
+	type item struct {
+		id    string
+		depth int
+	}
+	q := []item{{id: n.ID}}
+	for len(q) > 0 && len(seen) < 256 {
+		cur := q[0]
+		q = q[1:]
+		if cur.depth >= 6 {
+			continue
+		}
+		for _, dstID := range idx.fwd[cur.id] {
+			if seen[dstID] {
+				continue
+			}
+			seen[dstID] = true
+			dst, ok, err := s.GetNode(dstID)
+			if err == nil && ok {
+				if prefix != "" && locFile(dst.Prop("loc")) != prefix {
+					continue
+				}
+				if t := nodeTechFromNodeWithFileContext(dst, fileTech); !crossLang && t != "" && t != tech {
+					continue
+				}
+				if flagPredicateMatchesNodeOnly(probe, dst) {
+					return true
+				}
+			}
+			q = append(q, item{id: dstID, depth: cur.depth + 1})
+		}
+	}
+	return false
 }
 
 func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) (bool, bool) {

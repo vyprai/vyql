@@ -62,6 +62,42 @@ rule ComposedMatch {
 	}
 }
 
+func TestMatchConfidenceIgnoresUnrelatedCoLocatedLabel(t *testing.T) {
+	rule := `
+package test;
+rule PreciseMatch {
+  meta { id: "X-MATCH", confidence_floor: high }
+  match custom.Precise as p
+}
+`
+	decls, err := parser.Parse(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	onto := ontology.New()
+	onto.Add(ontology.Concept{Name: "Precise", Package: "custom", Kind: "sink"})
+	onto.Add(ontology.Concept{Name: "Generic", Package: "custom", Kind: "sink"})
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "n", Type: "code.BinOp", Props: map[string]string{"loc": "x:1"}})
+	g.AddLabel("n", usg.Label{Concept: "custom.Precise", Provenance: usg.Provenance{Confidence: "high", Fidelity: "resolved"}})
+	g.AddLabel("n", usg.Label{Concept: "custom.Generic", Provenance: usg.Provenance{Confidence: "low", Fidelity: "syntactic"}})
+
+	fs, err := New(onto, g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("expected high-confidence precise match despite colocated generic label, got %d", len(fs))
+	}
+	if fs[0].Confidence != "high" {
+		t.Fatalf("confidence = %q, want high", fs[0].Confidence)
+	}
+}
+
 func TestConceptMatchAndTransition(t *testing.T) {
 	actionRule := `
 package test;

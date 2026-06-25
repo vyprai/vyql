@@ -542,6 +542,60 @@ adapter javascript {
 	}
 }
 
+func TestAstFlagMatchesDownstreamFlowPredicate(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter cpp {
+  flag custom.PointerAddOverflow on binop {
+    op "+"
+    operand {
+      path "alignPointer"
+    }
+    flows to op ">"
+    not flows to op "<"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse ast flow flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.h:1",
+		"callee_path": "analysis.module.context",
+		"method":      "context",
+		"str_args":    "lang=cpp",
+	}})
+	store.AddNode(usg.Node{ID: "add", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.h:10", "op": "+", "callee_path": "__binop.add", "arg0": "a0", "arg1": "a1",
+	}})
+	store.AddNode(usg.Node{ID: "a0", Type: "code.Arg", Props: map[string]string{"loc": "sample.h:10"}})
+	store.AddNode(usg.Node{ID: "a1", Type: "code.Arg", Props: map[string]string{"loc": "sample.h:10"}})
+	store.AddNode(usg.Node{ID: "align", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.h:9", "callee_path": "alignPointer", "method": "alignPointer",
+	}})
+	store.AddNode(usg.Node{ID: "upper", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.h:12", "op": ">", "callee_path": "__binop.gt",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "align", Dst: "a0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "a0", Dst: "add"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "a1", Dst: "add"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "add", Dst: "upper"})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "add" || got[0].Concept != "custom.PointerAddOverflow" {
+		t.Fatalf("AST flow flag did not label vulnerable add: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "wrap", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.h:12", "op": "<", "callee_path": "__binop.lt",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "add", Dst: "wrap"})
+	got = spec.flagAdapter().Apply(store)
+	if len(got) != 0 {
+		t.Fatalf("AST flow flag should skip add with downstream wraparound check: %+v", got)
+	}
+}
+
 func TestCollectionFirstSinkTargetsIndexedElement(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",

@@ -167,7 +167,7 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 			}
 			out = append(out, &findings.Finding{
 				RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "order",
-				Confidence:       e.conf(a),
+				Confidence:       e.confBindings(bindingRef{nodeID: a, concept: body.First.Concept}, bindingRef{nodeID: b, concept: body.Second.Concept}),
 				ReviewConditions: append(e.reviewConditions(a, body.First.Concept), e.reviewConditions(b, body.Second.Concept)...),
 				Bindings: []findings.Binding{
 					{Name: "first", NodeID: a, Concept: body.First.Concept, Loc: e.loc(a), LabelProvenance: e.prov(a, body.First.Concept)},
@@ -204,7 +204,7 @@ func (e *Engine) evalReach(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		out = append(out, &findings.Finding{
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "reach", Witness: w,
-			Confidence: e.conf(p.TargetID),
+			Confidence: e.confConcept(p.TargetID, body.Dst.Concept),
 			Bindings: []findings.Binding{
 				{Name: "source", NodeID: p.SourceID, Concept: body.Src.Concept, Loc: e.loc(p.SourceID)},
 				{Name: "target", NodeID: p.TargetID, Concept: body.Dst.Concept, Loc: e.loc(p.TargetID), LabelProvenance: e.prov(p.TargetID, body.Dst.Concept)},
@@ -230,7 +230,7 @@ func (e *Engine) evalAssume(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		out = append(out, &findings.Finding{
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "assume", Witness: w,
-			Confidence: e.conf(p.SourceID),
+			Confidence: e.confConcept(p.SourceID, body.Src.Concept),
 			Bindings: []findings.Binding{
 				{Name: "principal", NodeID: p.SourceID, Concept: body.Src.Concept, Loc: e.loc(p.SourceID)},
 				{Name: "target", NodeID: p.TargetID, Concept: body.Dst.Concept, Loc: e.loc(p.TargetID)},
@@ -667,7 +667,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
-		conf := e.conf(fl.SourceID, fl.SinkID)
+		conf := e.confBindings(bindingRef{nodeID: fl.SourceID, concept: srcC}, bindingRef{nodeID: fl.SinkID, concept: snkC})
 		review := e.reviewConditions(fl.SinkID, snkC)
 		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourcePolicy == "caller_conditional" {
 			n, _, _ := e.Store.GetNode(fl.SourceID)
@@ -880,29 +880,70 @@ func firstString(vals []string) string {
 // resolved/semantic matches may be high.
 var fidelityCeil = map[string]int{"syntactic": 2, "resolved": 3, "semantic": 3}
 
-func (e *Engine) conf(nodeIDs ...string) string {
+type bindingRef struct {
+	nodeID  string
+	concept string
+}
+
+func (e *Engine) confBindings(refs ...bindingRef) string {
 	best := 3
-	for _, id := range nodeIDs {
-		for _, l := range e.labels(id) {
-			c := l.Provenance.Confidence
-			if c == "" {
-				c = "high"
-			}
-			eff := confOrder[c]
-			if eff == 0 {
-				eff = 3
-			}
-			// a label is only as trustworthy as the fidelity of the match that
-			// produced it
-			if ceil, ok := fidelityCeil[l.Provenance.Fidelity]; ok && ceil < eff {
-				eff = ceil
-			}
-			if eff < best {
-				best = eff
-			}
+	for _, ref := range refs {
+		eff := e.confConceptRank(ref.nodeID, ref.concept)
+		if eff < best {
+			best = eff
 		}
 	}
-	switch best {
+	return confidenceName(best)
+}
+
+func (e *Engine) confConcept(nodeID, concept string) string {
+	return confidenceName(e.confConceptRank(nodeID, concept))
+}
+
+func (e *Engine) confConceptRank(nodeID, concept string) int {
+	best := 3
+	matched := false
+	for _, l := range e.labels(nodeID) {
+		if concept != "" && l.Concept != concept {
+			continue
+		}
+		matched = true
+		eff := labelConfidenceRank(l)
+		if eff < best {
+			best = eff
+		}
+	}
+	if matched || concept == "" {
+		return best
+	}
+	for _, l := range e.labels(nodeID) {
+		eff := labelConfidenceRank(l)
+		if eff < best {
+			best = eff
+		}
+	}
+	return best
+}
+
+func labelConfidenceRank(l usg.Label) int {
+	c := l.Provenance.Confidence
+	if c == "" {
+		c = "high"
+	}
+	eff := confOrder[c]
+	if eff == 0 {
+		eff = 3
+	}
+	// a label is only as trustworthy as the fidelity of the match that
+	// produced it
+	if ceil, ok := fidelityCeil[l.Provenance.Fidelity]; ok && ceil < eff {
+		eff = ceil
+	}
+	return eff
+}
+
+func confidenceName(rank int) string {
+	switch rank {
 	case 1:
 		return "low"
 	case 2:

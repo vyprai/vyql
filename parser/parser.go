@@ -824,6 +824,13 @@ func (p *parser) parseAdapterFlagPredicate(subject string) AdapterFlagPredicate 
 		p.next()
 		return AdapterFlagPredicate{Subject: subject, Property: "tokens", Op: "contains", Values: []string{p.parsePattern()}}
 	}
+	if p.atWord("flows") {
+		p.next()
+		if p.atWord("to") {
+			p.next()
+		}
+		return p.parseAdapterFlagStructuredPredicate("flow_to", false)
+	}
 	return p.parseAdapterFlagStructuredPredicate(subject, false)
 }
 
