@@ -341,7 +341,15 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 					if name := c.text(field(ch, "name")); name != "" {
 						out[name] = true
 					}
+				} else if ch.Kind() == "class_declaration" || ch.Kind() == "abstract_class_declaration" {
+					if name := c.text(field(ch, "name")); name != "" {
+						out[name] = true
+					}
 				}
+			}
+		case "class_declaration", "abstract_class_declaration":
+			if name := c.text(field(n, "name")); name != "" && out[name] {
+				c.markThisAssignedHelpers(field(n, "body"), out)
 			}
 		case "assignment_expression":
 			left, rhs := field(n, "left"), field(n, "right")
@@ -365,6 +373,32 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	}
 	walk(root)
 	return out
+}
+
+func (c *jsConv) markThisAssignedHelpers(body *tree_sitter.Node, out map[string]bool) {
+	if body == nil {
+		return
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "assignment_expression" {
+			left, rhs := field(n, "left"), field(n, "right")
+			if left != nil && left.Kind() == "member_expression" && rhs != nil && rhs.Kind() == "identifier" {
+				if c.text(field(left, "object")) == "this" {
+					if prop := c.text(field(left, "property")); prop != "" && !strings.HasPrefix(prop, "_") {
+						out[c.text(rhs)] = true
+					}
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
 }
 
 func jsModuleKey(root, f string) string {

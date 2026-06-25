@@ -128,6 +128,37 @@ export default function (obj, keys, val) {
 	}
 }
 
+func TestJavaScriptExportedClassThisAssignedHelperIsPublicEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "parser.js")
+	src := []byte(`
+export default class Parser {
+  constructor() {
+    this.addExternalEntities = addExternalEntities;
+  }
+}
+
+function addExternalEntities(externalEntities) {
+  return new RegExp("&" + Object.keys(externalEntities)[0] + ";", "g");
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := findFuncDef(prog, "addExternalEntities")
+	if !ok {
+		t.Fatalf("this-assigned helper function was not extracted; program=%#v", prog)
+	}
+	if !fn.Exported {
+		t.Fatalf("this-assigned helper on exported class should be marked exported; fn=%#v", fn)
+	}
+}
+
 func TestTypeScriptImportsAreExtracted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.ts")
