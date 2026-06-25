@@ -1676,6 +1676,15 @@ concept LengthMultiplierFormattedExpansionUnderallocation : sink {
   review_assumption: "the generated formatted tokens can grow beyond the per-input multiplier as numeric indexes gain digits"
   review_confidence: high
 }
+concept GzipDeflateFixedExpansionUnderallocation : sink {
+  vulnerable_to: [memory.OobWrite]
+  cwe: [CWE_119, CWE_787]
+  review_category: "memory"
+  review_condition: "a gzip or deflate output buffer is sized as input length plus a fixed constant"
+  review_evidence: "gzip/deflate context {pattern} initializes deflate, allocates output from input length plus a fixed additive slack, and then compresses into that buffer"
+  review_assumption: "some inputs can expand by more than the fixed slack under the deflate worst-case expansion bound"
+  review_confidence: high
+}
 concept UncheckedEncodedLengthArithmetic : sink {
   vulnerable_to: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
   cwe: [CWE_190, CWE_835]

@@ -484,6 +484,10 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 			if sel := c.dotted(n); sel != "" && sel != "?" {
 				add("selector:" + sel)
 			}
+		case "identifier":
+			if ident := jsContextCompact(c.text(n)); ident != "" {
+				add("identifier:" + ident)
+			}
 		case "subscript_expression":
 			if idx := c.dotted(n); idx != "" && idx != "?" {
 				add("index:" + idx)

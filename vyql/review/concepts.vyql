@@ -2501,6 +2501,11 @@ review code.LengthMultiplierFormattedExpansionUnderallocation {
   kind: "attention"
   text: "review strlen-multiplier output allocations before formatted numeric token expansion; digit growth may exceed the reserved per-character budget"
 }
+review code.GzipDeflateFixedExpansionUnderallocation {
+  category: "memory"
+  kind: "attention"
+  text: "review gzip/deflate output buffers sized as input length plus a fixed constant instead of worst-case expansion"
+}
 review code.UncheckedEncodedLengthArithmetic {
   category: "numeric"
   kind: "attention"

@@ -626,6 +626,10 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 			if sel := c.dotted(n); sel != "" && sel != "?" {
 				add("selector:" + sel)
 			}
+		case "identifier":
+			if ident := pyContextCompact(c.text(n)); ident != "" {
+				add("identifier:" + ident)
+			}
 		case "subscript":
 			if sub := pyContextCompact(c.text(n)); sub != "" {
 				add("subscript:" + sub)

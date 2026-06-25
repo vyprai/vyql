@@ -210,6 +210,11 @@ rule FixedChunkCapacityGrowthIndex {
   match code.FixedChunkCapacityGrowthIndex as idx
 }
 
+rule GzipDeflateFixedExpansionUnderallocation {
+  meta { id: "VYQL-MEM-043", severity: high, cwe: [CWE_119, CWE_787], confidence_floor: high }
+  match code.GzipDeflateFixedExpansionUnderallocation as alloc
+}
+
 rule UncheckedNullableResultDeref {
   meta { id: "VYQL-MEM-018", severity: medium, cwe: [CWE_476], confidence_floor: medium }
   match code.UncheckedNullableResultDeref as deref

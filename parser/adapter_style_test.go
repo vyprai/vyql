@@ -293,6 +293,69 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 	}
 }
 
+func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	adapterRoot := filepath.Join(root, "vyql", "adapters")
+	structuralConcepts := map[string]bool{
+		"code.EnvFileVariableInjection":                  true,
+		"code.ForOwnRecursiveDefaultsPrototypePollution": true,
+		"code.PgEscapeStringSqlFilterInjection":          true,
+		"code.TemplateDirectoryHiddenGlobCopy":           true,
+		"code.UnvalidatedSqlIdentifierInterpolation":     true,
+	}
+
+	var hits []string
+	err := filepath.WalkDir(adapterRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".vyql" {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		decls, err := Parse(string(data))
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		for _, decl := range decls {
+			ad, ok := decl.(*AdapterDecl)
+			if !ok {
+				continue
+			}
+			for _, mapping := range ad.Mappings {
+				if !structuralConcepts[mapping.Concept] || mapping.Flag == nil {
+					continue
+				}
+				for _, pred := range mapping.Flag.Predicates {
+					if pred.Property != "tokens" {
+						continue
+					}
+					for _, value := range pred.Values {
+						if !isStructuredFlagToken(value) {
+							hits = append(hits, rel+": "+mapping.Concept+" raw token predicate "+strconv.Quote(value))
+						}
+					}
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) > 0 {
+		t.Fatalf("converted context flags must use AST/structured predicates, not raw has/lacks text:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
 func flagHasFlowPredicate(flag *AdapterFlag) bool {
 	for _, pred := range flag.Predicates {
 		if pred.Subject == "flow_to" {
@@ -339,6 +402,7 @@ var structuredFlagTokenPrefixes = []string{
 	"param_type:",
 	"prop:",
 	"selector:",
+	"shell=",
 	"slice:",
 	"subscript:",
 	"trait:",

@@ -485,6 +485,8 @@ function evaluate(tokens, expr, values) {
 		if strings.Contains(tokens, "index_base:values") &&
 			strings.Contains(tokens, "index_key:item.value") &&
 			strings.Contains(tokens, "subscript:values[item.value]") &&
+			strings.Contains(tokens, "identifier:item") &&
+			strings.Contains(tokens, "identifier:values") &&
 			strings.Contains(tokens, "regex:^__proto__|prototype|constructor$") &&
 			strings.Contains(tokens, "prototype_name_guard=true") {
 			return

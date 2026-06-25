@@ -417,6 +417,24 @@ adapter c {
     lacks "*6+16"
     lacks "snprintf("
   }
+  flag code.GzipDeflateFixedExpansionUnderallocation in function {
+    lang "c"
+    call path "deflateInit2"
+    call path "deflate"
+    call path contains_any ["malloc", "flb_malloc"]
+    assign contains_any [
+      "out_size=in_len+",
+      "out_size=input_len+",
+      "out_size=source_len+",
+      "out_size=src_len+"
+    ]
+    not assign contains_any [
+      "max_input_expansion",
+      "compressBound",
+      "deflateBound"
+    ]
+    not call path contains_any ["compressBound", "deflateBound"]
+  }
   flag code.ClamavWwpackStructsPointerOobWrite in function {
     lang "c"
     name "wwunpack"

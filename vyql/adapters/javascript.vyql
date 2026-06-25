@@ -788,17 +788,14 @@ adapter javascript {
     has "tagPattern"
     lacks "dyad-command"
   }
-  flag code.EnvFileVariableInjection on any {
-    path exact "analysis.function.context"
+  flag code.EnvFileVariableInjection in function {
     lang "javascript"
     name "updateEnvFile"
-    has "Object.entries(updates)"
-    has "newLine=`${key}=\"${value}\"`"
-    has "writeFileSync(envPath,envContent"
-    lacks "dotenv.parse"
-    lacks "stringify("
-    lacks "replace(/\\n"
-    lacks "JSON.stringify(value)"
+    call path "Object.entries"
+    literal "${key}=\"${value}\""
+    call path "fs.writeFileSync"
+    not call path "dotenv.parse"
+    not call contains_any ["stringify", "JSON.stringify"]
   }
   sink path "globalEval" -> code.CodeEval
   sink path "require" -> code.DynamicCodeLoad
@@ -1340,14 +1337,13 @@ adapter javascript {
     lacks "invalids.includes(key)"
     lacks "'__proto__'"
   }
-  flag code.ForOwnRecursiveDefaultsPrototypePollution on any {
-    path exact "analysis.function.context"
+  flag code.ForOwnRecursiveDefaultsPrototypePollution in function {
     lang "javascript"
     name "copy"
-    has "lazy.forOwn(current,function(value,key)"
-    has "target[key]=value"
-    has "defaultsDeep(val,value)"
-    lacks "key==='__proto__'"
+    call path "lazy.forOwn"
+    token subscript "target[key]"
+    call path "defaultsDeep"
+    not expr "key==='__proto__'"
   }
   flag code.TemplateDirectoryHiddenGlobCopy in function {
     lang "javascript"

@@ -51,6 +51,8 @@ func TestPythonFunctionContextIncludesStructuredTokens(t *testing.T) {
 			"assign:self._state=request.query_params.get(\"state\")",
 			"assign_call:self._state:request.query_params.get",
 			"call_path:request.cookies.get",
+			"identifier:sso_state",
+			"identifier:request",
 			"literal:sso_state",
 			"selector:self._state",
 			"expr:sso_state!=self._state",
