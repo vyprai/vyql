@@ -1913,7 +1913,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		}
 		return l.node("Name", ex.Loc, props)
 	case nir.Const:
-		return l.node("Const", ex.Loc, nil)
+		props := map[string]string{}
+		if v := unquoteLit(ex.Value); v != "" {
+			props["str_args"] = v
+		}
+		return l.node("Const", ex.Loc, props)
 	case nir.Thru:
 		return l.eval(ex.Inner, sc)
 	case nir.Attr:

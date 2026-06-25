@@ -611,6 +611,63 @@ adapter javascript {
 	}
 }
 
+func TestContextFlagAstScopedLiteralAndSubscriptPredicates(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.PrototypeMerge in function {
+    lang "javascript"
+    index "base.__subscript"
+    token subscript "obj[key]"
+    not literal "__proto__"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context ast flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "merge.js:1",
+		Scope: "merge.js/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=javascript",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "base-sub",
+		Type:  "code.Subscript",
+		Loc:   "merge.js:9",
+		Scope: "merge.js/fn1/loop",
+		Props: map[string]string{"callee_path": "base.__subscript", "method": "[]"},
+	})
+	store.AddNode(usg.Node{
+		ID:    "obj-sub",
+		Type:  "code.Subscript",
+		Loc:   "merge.js:6",
+		Scope: "merge.js/fn1/loop",
+		Props: map[string]string{"callee_path": "obj.__subscript", "method": "[]"},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST flag did not match scoped subscript nodes: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "proto-literal",
+		Type:  "code.Const",
+		Loc:   "merge.js:5",
+		Scope: "merge.js/fn1",
+		Props: map[string]string{"str_args": "__proto__"},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context AST flag should skip scoped prototype literal guard: %+v", got)
+	}
+}
+
 func TestAstFlagMatchesDownstreamFlowPredicate(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter cpp {

@@ -1261,8 +1261,8 @@ adapter javascript {
   }
   flag code.ControlledMergeInheritedKeyPrototypePollution in function {
     lang "javascript"
-    token subscript "base[key]"
-    token subscript "obj[key]"
+    index "base.__subscript"
+    index "obj.__subscript"
     expr "typeofvalue==='object'"
     call path "Array.isArray"
     not literal "__proto__"

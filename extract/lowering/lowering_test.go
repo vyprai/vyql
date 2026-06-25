@@ -145,6 +145,7 @@ func TestLoweringCarriesLiteralTokensOnFormatAndSubscript(t *testing.T) {
 				},
 				Loc: "app.py:2",
 			}},
+			nir.Assign{Targets: []string{"guard"}, Value: nir.Const{Loc: "app.py:3", Value: "\"__proto__\""}},
 		},
 	}}}
 	g, err := Lower(prog, true)
@@ -169,6 +170,17 @@ func TestLoweringCarriesLiteralTokensOnFormatAndSubscript(t *testing.T) {
 	}
 	if !sawSubscript || !sawFormat {
 		t.Fatalf("literal tokens missing: subscript=%v format=%v", sawSubscript, sawFormat)
+	}
+	var sawConst bool
+	ids, _ = g.NodesOfType("code.Const")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if strings.Contains(n.Prop("str_args"), "__proto__") {
+			sawConst = true
+		}
+	}
+	if !sawConst {
+		t.Fatalf("const literal token missing")
 	}
 }
 

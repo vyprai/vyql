@@ -1595,6 +1595,21 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 		case strings.HasPrefix(v, "call:"):
 			probe = flagPredicate{Property: "method", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "call:"), Exact: pred.Exact}
 			nodeTypes = []string{"code.Call"}
+		case strings.HasPrefix(v, "literal:"):
+			probe = flagPredicate{Property: "tokens", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "literal:"), Exact: pred.Exact}
+			nodeTypes = []string{"code.Const"}
+		case strings.HasPrefix(v, "identifier:"):
+			probe = flagPredicate{Property: "identifier", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "identifier:"), Exact: pred.Exact}
+			nodeTypes = []string{"code.Name", "code.Param"}
+		case strings.HasPrefix(v, "index:"), strings.HasPrefix(v, "subscript:"):
+			prefix := "index:"
+			if strings.HasPrefix(v, "subscript:") {
+				prefix = "subscript:"
+			}
+			probe = flagPredicate{Property: "path", Op: pred.Op, Values: normalizeSubscriptFlagValues(trimFlagValuePrefix(pred.Values, prefix)), Exact: pred.Exact}
+			nodeTypes = []string{"code.Subscript"}
+		case strings.HasPrefix(v, "name="), strings.HasPrefix(v, "function_name:"):
+			return false, false
 		default:
 			return false, false
 		}
@@ -1606,6 +1621,19 @@ func trimFlagValuePrefix(values []string, prefix string) []string {
 	out := make([]string, 0, len(values))
 	for _, v := range values {
 		out = append(out, strings.TrimPrefix(v, prefix))
+	}
+	return out
+}
+
+func normalizeSubscriptFlagValues(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if strings.HasSuffix(v, "]") {
+			if i := strings.LastIndex(v, "["); i > 0 {
+				v = v[:i] + ".__subscript"
+			}
+		}
+		out = append(out, v)
 	}
 	return out
 }
