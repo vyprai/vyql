@@ -1494,6 +1494,13 @@ adapter php {
     lacks "check_admin_referer"
     lacks "wp_verify_nonce"
   }
+  flag code.WordPressOptionUpdateMissingCsrf in function {
+    lang "php"
+    has "$_REQUEST"
+    has "update_option"
+    lacks "check_admin_referer"
+    lacks "wp_verify_nonce"
+  }
   sink path "queryDB" val "insert into" -> code.StateChangingOp
   sink path "queryDB" val "replace into" -> code.StateChangingOp
   sink path "queryDB" val "update " val " set " -> code.StateChangingOp
