@@ -220,10 +220,10 @@ adapter go {
   }
   flag code.LeadingDotSegmentOnlyRouteFilter on any {
     path exact "analysis.function.context"
-    has "call_path:strings.HasPrefix"
-    has "literal:/."
-    has "selector:ctx.R.URL.Path"
-    lacks "call_path:strings.Contains"
+    call path "strings.HasPrefix"
+    literal "/."
+    selector "ctx.R.URL.Path"
+    lacks call path "strings.Contains"
   }
   flag code.AuthAttemptLimitReview in function {
     function "SolveChallenge"
@@ -959,7 +959,7 @@ adapter go {
   flag code.CsrfDisabled in function {
     function "CheckOrigin"
     param type "http.Request"
-    has "return:true"
+    token return "true"
     not call path "r.Header.Get"
     not selector "r.Host"
   }
@@ -974,10 +974,10 @@ adapter go {
     not binary "0==h.epoch"
   }
   flag code.GrpcGatewayCommonNameAuthenticationBypass in function {
-    has "call_path:peer.FromContext"
-    has "selector:tlsInfo.State.VerifiedChains"
-    has "selector:chains.Subject.CommonName"
-    lacks "literal:grpcgateway-accept"
+    call path "peer.FromContext"
+    selector "tlsInfo.State.VerifiedChains"
+    selector "chains.Subject.CommonName"
+    lacks literal "grpcgateway-accept"
   }
   flag code.UnverifiedFederationMissingEvents in function {
     call path "missingResp.Events.UntrustedEvents"

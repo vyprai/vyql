@@ -349,7 +349,7 @@ adapter python {
     path "DIRAC.FrameworkSystem.Utilities.TokenManagementUtilities.getCachedToken"
   }
   flag code.FlaskEntityDetailMissingAuthorization in function {
-    has "decorator_method:route"
+    token decorator_method "route"
     has ".query.get_or_404"
     has "jsonify"
     has "permissions"

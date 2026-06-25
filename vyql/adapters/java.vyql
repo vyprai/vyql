@@ -180,8 +180,8 @@ adapter java {
     not call "sha256hash160"
   }
   flag code.PublicWeakChecksumUtility in class {
-    has "class_name:Checksum"
-    has "class_modifier:public"
+    class name "Checksum"
+    token class_modifier "public"
     literal "SHA-1"
     literal "CRC32"
     call path "MessageDigest.getInstance"
@@ -274,7 +274,7 @@ adapter java {
     not call path "HtmlUtils.htmlEscape"
   }
   flag code.SvgOnclickWindowOpenLinkXss in function {
-    has "identifier:link"
+    token identifier "link"
     has "window.open"
     has "cursor: pointer"
     call "escapeHtml"
@@ -951,12 +951,12 @@ adapter java {
     path "NoopHostnameVerifier"
   }
   flag code.JavaMailSmtpSslIdentityVerificationMissing in function {
-    has "function_name:createSession"
-    has "call_path:props.put"
-    has "literal:mail.smtp.socketFactory.class"
-    has "literal:javax.net.ssl.SSLSocketFactory"
-    has "literal:mail.smtp.socketFactory.fallback"
-    lacks "literal:mail.smtp.ssl.checkserveridentity"
+    function "createSession"
+    call path "props.put"
+    literal "mail.smtp.socketFactory.class"
+    literal "javax.net.ssl.SSLSocketFactory"
+    literal "mail.smtp.socketFactory.fallback"
+    lacks literal "mail.smtp.ssl.checkserveridentity"
   }
   flag code.JwtUnverified on any {
     path "Algorithm.none"
