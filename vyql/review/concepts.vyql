@@ -294,7 +294,7 @@ review code.AuthAttemptLimitReview {
 }
 review code.PasswordRecoveryLinkHostControl {
   category: "auth"
-  kind: "attention"
+  kind: "target"
   expected: [core.AllowlistValidation]
   text: "review password recovery links for configured base URLs instead of request-derived host or absolute-route generation"
 }
