@@ -56,6 +56,7 @@ adapter java {
   // Secret material exposed by credential/key APIs. These are only findings when they
   // flow to a sink such as a log write or persistence target.
   source method "getKeyMaterial" -> code.SecretValue
+  source method "getKeyPassword" -> code.SecretValue
   source method "getPrivateKey" -> code.SecretValue
 
   // receiver-type tracking — a variable assigned `new FileWriter(...)` carries that type so
@@ -1198,6 +1199,7 @@ adapter java {
   sink path "log.error" arg all -> code.LogOutput
   sink path "log.debug" arg all -> code.LogOutput
   sink path "LOG.info" arg all -> code.LogOutput
+  sink path "LOGGER.info" arg all -> code.LogOutput
   sink path "LOG.error" arg all -> code.LogOutput
   sink path "System.out.println" arg all -> code.LogOutput
   sink method "logInfo" arg all -> code.LogOutput
@@ -1212,6 +1214,7 @@ adapter java {
   sink path "log.error" arg all -> code.LogWrite
   sink path "log.debug" arg all -> code.LogWrite
   sink path "LOG.info" arg all -> code.LogWrite
+  sink path "LOGGER.info" arg all -> code.LogWrite
   sink path "LOG.error" arg all -> code.LogWrite
   sink path "System.out.println" arg all -> code.LogWrite
   sink method "logInfo" arg all -> code.LogWrite
