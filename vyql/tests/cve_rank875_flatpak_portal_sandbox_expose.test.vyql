@@ -5,7 +5,7 @@ test "rank875: Flatpak portal uses path-based sandbox expose arguments"
   lang c
   file portal/flatpak-portal.c
   expect VYQL-PATH-047
-  expect_review code.FlatpakPortalSandboxExposePathRace
+  expect_review code.PathBasedSandboxExposeBindRace
   code
   ```
   static char *filesystem_arg(const char *path, int readonly) {
@@ -52,7 +52,7 @@ test "rank875: Flatpak portal remaps exposed paths to bind fds"
   lang c
   file portal/flatpak-portal.c
   reject VYQL-PATH-047
-  reject_review code.FlatpakPortalSandboxExposePathRace
+  reject_review code.PathBasedSandboxExposeBindRace
   code
   ```
   static int validate_opath_fd(int fd, int needs_writable, GError **error) {

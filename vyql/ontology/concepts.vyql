@@ -3182,12 +3182,12 @@ concept ContainersCommonFipsModeMountSymlink : sink {
   review_assumption: "a container image can place symlinks under the mounted root so ordinary path joins can resolve outside the intended container filesystem"
   review_confidence: high
 }
-concept FlatpakPortalSandboxExposePathRace : sink {
+concept PathBasedSandboxExposeBindRace : sink {
   vulnerable_to: [path.LinkFollowing, path.PathTraversal, concurrency.Toctou]
   cwe: [CWE_59, CWE_367, CWE_22]
   review_category: "path"
-  review_condition: "Flatpak portal sandbox-expose options are converted back into path-based filesystem arguments before spawning the sandbox"
-  review_evidence: "portal spawn context {pattern} reads sandbox-expose options, builds filesystem_sandbox_arg/filesystem_arg path arguments, and appends them to flatpak_argv without fd remapping"
+  review_condition: "portal or sandbox launcher expose options are converted back into path-based filesystem arguments before spawning the sandbox"
+  review_evidence: "sandbox spawn context {pattern} reads sandbox-expose options, builds filesystem_sandbox_arg/filesystem_arg path arguments, and appends them to the sandbox argv without fd remapping"
   review_assumption: "the spawned process or filesystem can race or redirect the path between validation and bind mounting"
   review_confidence: high
 }

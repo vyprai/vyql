@@ -85,7 +85,7 @@ adapter c {
     lacks "strcmp(cp,\".\")==0"
     lacks "*cp=='\\0'"
   }
-  flag code.FlatpakPortalSandboxExposePathRace in module {
+  flag code.PathBasedSandboxExposeBindRace in module {
     lang "c"
     call path "g_variant_lookup"
     literal "sandbox-expose"

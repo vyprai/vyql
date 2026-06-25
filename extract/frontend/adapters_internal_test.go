@@ -1170,6 +1170,80 @@ adapter ruby {
 	}
 }
 
+func TestModuleContextFlagStructuredPredicatesUseAstNodes(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter c {
+  flag custom.PathBasedSandboxExposeBindRace in module {
+    lang "c"
+    call path "filesystem_sandbox_arg"
+    literal "sandbox-expose"
+    not call path "fd_map_remap_fd"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse module context ast flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "portal.c:1",
+		Scope: "portal.c",
+		Props: map[string]string{
+			"callee_path": "analysis.module.context",
+			"method":      "context",
+			"str_args":    "lang=c",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "lookup",
+		Type:  "code.Call",
+		Loc:   "portal.c:12",
+		Scope: "portal.c/handle_spawn",
+		Props: map[string]string{
+			"callee_path": "g_variant_lookup",
+			"method":      "g_variant_lookup",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "literal",
+		Type:  "code.Const",
+		Loc:   "portal.c:12",
+		Scope: "portal.c/handle_spawn",
+		Props: map[string]string{"str_args": "sandbox-expose"},
+	})
+	store.AddNode(usg.Node{
+		ID:    "arg",
+		Type:  "code.Call",
+		Loc:   "portal.c:16",
+		Scope: "portal.c/handle_spawn",
+		Props: map[string]string{
+			"callee_path": "filesystem_sandbox_arg",
+			"method":      "filesystem_sandbox_arg",
+		},
+	})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.PathBasedSandboxExposeBindRace" {
+		t.Fatalf("module context flag should match AST call/literal predicates even when context tokens are sparse: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "safe",
+		Type:  "code.Call",
+		Loc:   "portal.c:20",
+		Scope: "portal.c/handle_spawn",
+		Props: map[string]string{
+			"callee_path": "fd_map_remap_fd",
+			"method":      "fd_map_remap_fd",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("module context flag should honor AST negative call predicates: %+v", got)
+	}
+}
+
 func TestAstFlagMatchesDownstreamFlowPredicate(t *testing.T) {
 	decls, err := parser.Parse(`
 adapter cpp {

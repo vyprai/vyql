@@ -238,7 +238,7 @@ rule PublicUploadChunkPathTraversal {
   match code.PublicUploadChunkPathTraversal as sink
 }
 
-rule FlatpakPortalSandboxExposePathRace {
+rule PathBasedSandboxExposeBindRace {
   meta { id: "VYQL-PATH-047", severity: critical, cwe: [CWE_59, CWE_367, CWE_22], confidence_floor: high }
-  match code.FlatpakPortalSandboxExposePathRace as sink
+  match code.PathBasedSandboxExposeBindRace as sink
 }
