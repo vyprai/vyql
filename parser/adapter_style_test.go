@@ -302,15 +302,16 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
 	adapterRoot := filepath.Join(root, "vyql", "adapters")
 	structuralConcepts := map[string]bool{
-		"code.EnvFileVariableInjection":                  true,
-		"code.ForOwnRecursiveDefaultsPrototypePollution": true,
-		"code.PgEscapeStringSqlFilterInjection":          true,
-		"code.ShellTruePackageManagerProbe":              true,
-		"code.TemplateDirectoryHiddenGlobCopy":           true,
-		"code.UnfilteredAgentCommandTag":                 true,
-		"code.UnsanitizedSvgUpload":                      true,
-		"code.UnvalidatedSqlIdentifierInterpolation":     true,
-		"code.LeagueCommonMarkUnsafeHtmlMode":            true,
+		"code.EnvFileVariableInjection":                       true,
+		"code.ForOwnRecursiveDefaultsPrototypePollution":      true,
+		"code.PgEscapeStringSqlFilterInjection":               true,
+		"code.ShellTruePackageManagerProbe":                   true,
+		"code.TemplateDirectoryHiddenGlobCopy":                true,
+		"code.CallerControlledFilenameComponentPathTraversal": true,
+		"code.UnfilteredAgentCommandTag":                      true,
+		"code.UnsanitizedSvgUpload":                           true,
+		"code.UnvalidatedSqlIdentifierInterpolation":          true,
+		"code.LeagueCommonMarkUnsafeHtmlMode":                 true,
 	}
 
 	var hits []string

@@ -247,3 +247,8 @@ rule UrlDecodedTraversalCheckExceptionBypass {
   meta { id: "VYQL-PATH-048", severity: high, cwe: [CWE_22, CWE_184], confidence_floor: high }
   match code.UrlDecodedTraversalCheckExceptionBypass as sink
 }
+
+rule CallerControlledFilenameComponentPathTraversal {
+  meta { id: "VYQL-PATH-049", severity: high, cwe: [CWE_22], confidence_floor: high }
+  match code.CallerControlledFilenameComponentPathTraversal as sink
+}

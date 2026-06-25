@@ -708,6 +708,13 @@ adapter java {
     not annotation "POST"
     not annotation "RequirePOST"
   }
+  flag code.CallerControlledFilenameComponentPathTraversal in function {
+    function contains_any ["buildFilename", "buildFileName", "makeFilename", "makeFileName"]
+    token identifier "appName"
+    token identifier "appVersion"
+    token identifier contains_any ["filename", "fileName"]
+    not call path contains_any ["Util.rawEncode", "URLEncoder.encode", "encodeURIComponent", "FilenameUtils.getName", "Paths.get"]
+  }
   flag code.JenkinsStaplerStateChangeMissingPost in function {
     function contains_any ["doSave", "doSubmit", "doConfigure"]
     call contains_any ["bindJSON", "save", "configure"]

@@ -2144,6 +2144,12 @@ review code.TemplatePathComponentTraversal {
   expected: [core.PathCanonicalization]
   text: "review template or resource path builders for basename canonicalization of interpolated path components before returning template paths"
 }
+review code.CallerControlledFilenameComponentPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization]
+  text: "review filename builders that concatenate caller-controlled name or version components without component encoding"
+}
 review code.PrefixWildcardKeyEnumeration {
   category: "path"
   kind: "attention"
