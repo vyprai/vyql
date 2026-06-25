@@ -124,6 +124,8 @@ end
 		}
 		args := n.Prop("str_args")
 		for _, want := range []string{
+			"param_name:names",
+			"param_index:0",
 			"call_path:FFI.DynamicLibrary.open",
 			"call_path:FFI.Platform.windows?",
 			"call_path:File.exist?",

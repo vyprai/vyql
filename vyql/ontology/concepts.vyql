@@ -5289,6 +5289,15 @@ concept UnvalidatedNumericSqlInterpolation : sink {
   review_assumption: "attackers can choose the route or request parameter used as the numeric identifier"
   review_confidence: high
 }
+concept UnvalidatedCoordinateSqlInterpolation : sink {
+  vulnerable_to: [injection.SqlInjection, validation.ImproperInputValidation]
+  cwe: [CWE_89, CWE_20]
+  review_category: "sql"
+  review_condition: "coordinate boundary values are interpolated into SQL range predicates without numeric coercion"
+  review_evidence: "SQL geospatial helper context {pattern} formats latitude or longitude boundary values into BETWEEN predicates before coercing them to numeric values"
+  review_assumption: "application callers can pass request-controlled coordinate strings into the geospatial query helper"
+  review_confidence: high
+}
 concept WordPressPostsWhereDateSqlInjection : sink {
   vulnerable_to: [injection.SqlInjection, validation.ImproperInputValidation]
   cwe: [CWE_89, CWE_20]

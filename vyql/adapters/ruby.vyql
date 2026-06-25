@@ -239,6 +239,17 @@ adapter ruby {
     has "reset"
     lacks "@persistent_socket_reusable"
   }
+  flag code.UnvalidatedCoordinateSqlInterpolation in function {
+    literal "BETWEEN"
+    lang "ruby"
+    function contains_any ["within_bounding_box", "bounding_box", "bbox"]
+    token param_name contains_any ["sw_lat", "southwest_lat", "south_lat", "min_lat", "lat_min"]
+    token param_name contains_any ["ne_lat", "northeast_lat", "north_lat", "max_lat", "lat_max"]
+    token param_name contains_any ["sw_lng", "sw_lon", "southwest_lng", "southwest_lon", "west_lng", "west_lon", "min_lng", "min_lon", "lng_min", "lon_min"]
+    token param_name contains_any ["ne_lng", "ne_lon", "northeast_lng", "northeast_lon", "east_lng", "east_lon", "max_lng", "max_lon", "lng_max", "lon_max"]
+    not call path contains_any ["sw_lat.to_f", "southwest_lat.to_f", "south_lat.to_f", "min_lat.to_f", "lat_min.to_f"]
+    not call path contains_any ["ne_lat.to_f", "northeast_lat.to_f", "north_lat.to_f", "max_lat.to_f", "lat_max.to_f"]
+  }
   flag code.UnboundedNaturalLanguageScheduleParse in function {
     lang "ruby"
     function equals "parse"

@@ -1198,6 +1198,12 @@ review code.UnvalidatedNumericSqlInterpolation {
   expected: [core.InputValidation]
   text: "review request-derived numeric identifiers before ORM primary-key lookups or SQL predicates"
 }
+review code.UnvalidatedCoordinateSqlInterpolation {
+  category: "sql"
+  kind: "target"
+  expected: [core.InputValidation, core.SqlParameterization]
+  text: "verify geospatial SQL helpers coerce coordinate bounds before interpolating them into BETWEEN predicates"
+}
 review code.WordPressPostsWhereDateSqlInjection {
   category: "sql"
   kind: "attention"

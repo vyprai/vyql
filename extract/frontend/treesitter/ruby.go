@@ -407,12 +407,19 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	name := c.text(field(fn, "name"))
+	params := c.params(field(fn, "parameters"))
 	loc := c.loc(fn)
 	text := c.text(body)
 	args := []nir.Expr{
 		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name + "\x00function_name:" + name},
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	for i, p := range params {
+		args = append(args,
+			nir.Const{Loc: loc, Value: "param_name:" + p},
+			nir.Const{Loc: loc, Value: "param_index:" + itoa(i)},
+		)
 	}
 	for _, tok := range c.rbStructuredContextTokens(body) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})

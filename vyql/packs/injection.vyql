@@ -44,6 +44,11 @@ rule UnvalidatedNumericSqlInterpolation {
   match code.UnvalidatedNumericSqlInterpolation as sink
 }
 
+rule UnvalidatedCoordinateSqlInterpolation {
+  meta { id: "VYQL-INJ-188", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.UnvalidatedCoordinateSqlInterpolation as sink
+}
+
 rule WordPressPostsWhereDateSqlInjection {
   meta { id: "VYQL-INJ-158", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
   match code.WordPressPostsWhereDateSqlInjection as sink
