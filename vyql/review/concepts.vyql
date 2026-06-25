@@ -650,6 +650,12 @@ review code.WordPressOptionUpdateMissingCsrf {
   expected: [core.CsrfProtection]
   text: "review WordPress option updates for check_admin_referer or wp_verify_nonce before saving request data"
 }
+review code.OAuthStateCookieValidationMissing {
+  category: "auth"
+  kind: "target"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "review OAuth/SSO callbacks for state cookie/session storage and comparison before token exchange"
+}
 review code.CsrfDisabled {
   category: "request"
   kind: "target"

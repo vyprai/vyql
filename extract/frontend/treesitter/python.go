@@ -517,6 +517,9 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	for _, tok := range decorators {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
+	for _, tok := range c.pyStructuredContextTokens(fn, name) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	contextPath := "analysis.function.context"
 	sourcePath := "analysis.function.context.source"
 	sinkPath := "analysis.function.context.sink"
@@ -545,6 +548,105 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 			Loc:    loc,
 		}},
 	}
+}
+
+func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	add("function_name:" + name)
+	for i, p := range c.params(field(fn, "parameters")) {
+		add("param_name:" + p)
+		add("param_index:" + itoa(i))
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment":
+			left, right := field(n, "left"), field(n, "right")
+			if lhs := c.pyContextPath(left); lhs != "" {
+				if rhs := pyContextValue(c.text(right)); rhs != "" {
+					add("assign:" + lhs + "=" + rhs)
+				}
+				if right != nil && right.Kind() == "call" {
+					if path := c.dotted(field(right, "function")); path != "" && path != "?" {
+						add("assign_call:" + lhs + ":" + path)
+					}
+				}
+			}
+		case "call":
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+			}
+		case "attribute":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "subscript":
+			if sub := pyContextCompact(c.text(n)); sub != "" {
+				add("subscript:" + sub)
+			}
+			if base := c.dotted(field(n, "value")); base != "" && base != "?" {
+				add("index_base:" + base)
+			}
+			if key := c.pyContextPath(field(n, "subscript")); key != "" {
+				add("index_key:" + key)
+			}
+		case "comparison_operator", "boolean_operator":
+			if expr := pyContextCompact(c.text(n)); expr != "" {
+				add("expr:" + expr)
+			}
+		case "string", "concatenated_string", "integer", "float", "true", "false", "none":
+			if lit := pyContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(field(fn, "body"))
+	return out
+}
+
+func (c *pyConv) pyContextPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if p := c.dotted(n); p != "" && p != "?" {
+		return p
+	}
+	return pyContextValue(c.text(n))
+}
+
+func pyContextValue(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 2 {
+		if q := s[0]; (q == '\'' || q == '"' || q == '`') && s[len(s)-1] == q {
+			s = s[1 : len(s)-1]
+		}
+	}
+	return pyContextCompact(s)
+}
+
+func pyContextCompact(raw string) string {
+	s := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	if len(s) > 160 {
+		return ""
+	}
+	return s
 }
 
 func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string) []string {

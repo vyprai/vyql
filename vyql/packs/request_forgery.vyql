@@ -53,6 +53,11 @@ rule WebSocketUpgradeMissingOriginCheck {
   match code.WebSocketUpgradeMissingOriginCheck as upgrade
 }
 
+rule OAuthStateCookieValidationMissing {
+  meta { id: "VYQL-RF-032", severity: high, cwe: [CWE_352, CWE_287], confidence_floor: high }
+  match code.OAuthStateCookieValidationMissing as flow
+}
+
 rule CloudBaseOpenUrlSsrf {
   meta { id: "VYQL-RF-016", severity: high, cwe: [CWE_918], confidence_floor: high }
   match code.CloudBaseOpenUrlSsrf as action

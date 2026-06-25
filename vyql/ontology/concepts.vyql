@@ -4586,6 +4586,15 @@ concept WordPressOptionUpdateMissingCsrf : sink {
   review_assumption: "an authenticated administrator can be induced to submit the settings request cross-site"
   review_confidence: high
 }
+concept OAuthStateCookieValidationMissing : sink {
+  vulnerable_to: [request_forgery.Csrf, authentication.AuthenticationBypass]
+  cwe: [CWE_352, CWE_287]
+  review_category: "auth"
+  review_condition: "an OAuth/SSO login flow sends a state parameter but does not bind callback state to a stored cookie/session value"
+  review_evidence: "SSO context {pattern} passes state into the authorization URL and reads callback state before process_login without storing or comparing sso_state"
+  review_assumption: "attackers can supply or replay OAuth callback state values unless the callback compares them with a value stored during login initiation"
+  review_confidence: high
+}
 concept IncompleteCsrfTokenValidation : sink {
   vulnerable_to: [request_forgery.Csrf]
   cwe: [CWE_352]
