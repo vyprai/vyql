@@ -4393,6 +4393,15 @@ concept DefaultExternalRelaySecretExposure : sink {
   review_assumption: "the fallback host may be outside the product trust boundary or operational owner for the supplied connection metadata"
   review_confidence: medium
 }
+concept ExternalSettingTokenSyncUrlExposure : sink {
+  vulnerable_to: [secrets.SecretLeak, injection.XSS]
+  cwe: [CWE_79, CWE_200]
+  review_category: "secret"
+  review_condition: "an externally supplied runtime/default setting selects the URL used for auth or session token synchronization without same-origin path validation"
+  review_evidence: "token sync URL setting context {pattern} reads a URL-like auth/session setting and hands it to a token synchronization helper without a relative-path guard"
+  review_assumption: "an attacker can preset or influence the runtime/default setting and receive token-bearing synchronization requests"
+  review_confidence: high
+}
 concept AnsibleSnmpFactsCredentialsNoLogMissing : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_532]

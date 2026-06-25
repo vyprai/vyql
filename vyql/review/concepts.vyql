@@ -2080,6 +2080,12 @@ review code.DefaultExternalRelaySecretExposure {
   expected: [core.AllowlistValidation]
   text: "review default relay/proxy/websocket hosts for product-owned trust boundaries before embedding tokens or upstream URLs"
 }
+review code.ExternalSettingTokenSyncUrlExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.AllowlistValidation]
+  text: "verify auth/session synchronization URLs read from runtime defaults are constrained to same-origin paths before token-bearing requests"
+}
 review code.CinnyServiceWorkerMediaAuthLeak {
   category: "secret"
   kind: "attention"

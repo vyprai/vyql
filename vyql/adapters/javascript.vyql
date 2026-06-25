@@ -1493,6 +1493,15 @@ adapter javascript {
     has "token"
     lacks "configuredRelayHost"
   }
+  // Runtime/default settings that choose auth/session token sync URLs must be
+  // constrained to same-origin paths before token-bearing requests are installed.
+  flag code.ExternalSettingTokenSyncUrlExposure in function {
+    lang "javascript"
+    call path "getExperimentalSetting"
+    literal contains_any ["authTokenSyncURL", "tokenSyncURL", "tokenSyncUrl", "sessionSyncURL", "sessionSyncUrl"]
+    call path contains_any ["mintCookieFactory", "syncToken", "syncSession", "tokenSync", "sessionSync"]
+    not call path "startsWith"
+  }
 
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.
