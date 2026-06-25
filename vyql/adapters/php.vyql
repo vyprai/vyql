@@ -350,6 +350,17 @@ adapter php {
     has "$model->snapshot=$this->afterSnapshot"
     lacks "$model->title=Html::encode($title)"
   }
+  flag code.PersistentModelTitleStoredXss in function {
+    lang "php"
+    function "setColumnOption"
+    call path "$this.request.request.get"
+    token assign "$column[$key]=$newValue"
+    token assign "$column['children'][0][$key]=$newValue"
+    not call "noHtml"
+    not call "htmlspecialchars"
+    not call "htmlentities"
+    not call "strip_tags"
+  }
   flag code.QuickAppsUserRealNameStoredXss in class {
     lang "php"
     name "User"
