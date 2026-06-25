@@ -97,6 +97,12 @@ adapter go {
     selector contains ".Body"
     selector contains ".TLS"
   }
+  flag code.UnescapedMysqlDsnDatabaseName in function {
+    lang "go"
+    call path "sql.NewParserFromAlterStatement"
+    selector "migrationContext.DatabaseName"
+    not call path "url.QueryEscape"
+  }
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution

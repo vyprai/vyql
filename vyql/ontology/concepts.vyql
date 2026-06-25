@@ -5316,6 +5316,15 @@ concept EscapedSqlValueFunctionCallAllowed : sink {
   review_assumption: "application callers can pass array-shaped values into the condition builder while expecting escaped or parameterized value handling"
   review_confidence: high
 }
+concept UnescapedMysqlDsnDatabaseName : sink {
+  vulnerable_to: [injection.SqlInjection, validation.ImproperInputValidation]
+  cwe: [CWE_89, CWE_20]
+  review_category: "sql"
+  review_condition: "a caller-selected MySQL database name is kept in migration or connection context without URL escaping before DSN use"
+  review_evidence: "migration CLI context {pattern} accepts or derives DatabaseName and continues without an observed url.QueryEscape normalization"
+  review_assumption: "the database name later becomes the path component of a MySQL DSN where query separators can alter connection parameters"
+  review_confidence: high
+}
 concept UnvalidatedSqlOrderDirection : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]

@@ -1204,6 +1204,12 @@ review code.EscapedSqlValueFunctionCallAllowed {
   expected: [core.SqlParameterization, core.InputValidation]
   text: "verify escaped SQL value builders reject array-backed database function calls before composing SQL"
 }
+review code.UnescapedMysqlDsnDatabaseName {
+  category: "sql"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify MySQL database names are URL-escaped before being stored in connection context or interpolated into DSN strings"
+}
 review code.UnvalidatedSqlOrderDirection {
   category: "sql"
   kind: "target"

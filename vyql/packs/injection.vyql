@@ -29,6 +29,11 @@ rule EscapedSqlValueFunctionCallAllowed {
   match code.EscapedSqlValueFunctionCallAllowed as sink
 }
 
+rule UnescapedMysqlDsnDatabaseName {
+  meta { id: "VYQL-INJ-191", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.UnescapedMysqlDsnDatabaseName as sink
+}
+
 rule UnvalidatedSqlOrderDirection {
   meta { id: "VYQL-INJ-124", severity: high, cwe: [CWE_89], confidence_floor: high }
   match code.UnvalidatedSqlOrderDirection as sink
