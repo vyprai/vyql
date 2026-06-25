@@ -1,0 +1,60 @@
+# Rank 853 / CVE-2026-32630: file-type manually read ZIP entry content using
+# zipHeader.compressedSize during type detection, allowing ZIP-bomb memory growth.
+
+test "rank853: ZIP mimetype read is sized by compressed ZIP header"
+  lang javascript
+  file core.js
+  expect VYQL-DOS-031
+  expect_review code.ZipEntryCompressedSizeTokenRead
+  code
+  ```
+  import * as Token from 'token-types';
+
+  export class FileTypeParser {
+    async parse(tokenizer) {
+      const zipHeader = {
+        compressedSize: 0,
+        uncompressedSize: 0,
+        filenameLength: 0,
+        extraFieldLength: 0,
+      };
+
+      if (zipHeader.filename === 'mimetype' && zipHeader.compressedSize === zipHeader.uncompressedSize) {
+        let mimeType = await tokenizer.readToken(new Token.StringType(zipHeader.compressedSize, 'utf-8'));
+        mimeType = mimeType.trim();
+        return mimeType;
+      }
+    }
+  }
+  ```
+
+test "rank853: ZIP handler delegates bounded entry reads"
+  lang javascript
+  file core.js
+  reject VYQL-DOS-031
+  reject_review code.ZipEntryCompressedSizeTokenRead
+  code
+  ```
+  import {ZipHandler} from '@tokenizer/inflate';
+
+  export class FileTypeParser {
+    async parse(tokenizer) {
+      let fileType;
+      await new ZipHandler(tokenizer).unzip(zipHeader => {
+        if (zipHeader.filename === 'mimetype') {
+          return {
+            async handler(fileData) {
+              const mimeType = new TextDecoder('utf-8').decode(fileData).trim();
+              fileType = mimeType;
+            },
+            stop: true,
+          };
+        }
+
+        return {};
+      });
+
+      return fileType ?? {ext: 'zip', mime: 'application/zip'};
+    }
+  }
+  ```

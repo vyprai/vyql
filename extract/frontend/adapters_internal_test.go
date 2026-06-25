@@ -1216,6 +1216,49 @@ adapter javascript {
 	}
 }
 
+func TestAstFlagCallOperandFallsBackToIncomingArgFlow(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.ZipCompressedSizeRead on call {
+    path "tokenizer.readToken"
+    operand {
+      path "Token.StringType"
+      path "zipHeader.compressedSize"
+    }
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse call operand flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "size", Type: "code.Attr", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "zipHeader.compressedSize",
+	}})
+	store.AddNode(usg.Node{ID: "size-arg", Type: "code.Arg", Props: map[string]string{
+		"loc": "file.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "string-type", Type: "code.Call", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "Token.StringType", "method": "StringType",
+	}})
+	store.AddNode(usg.Node{ID: "read-arg", Type: "code.Arg", Props: map[string]string{
+		"loc": "file.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "read-token", Type: "code.Call", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "tokenizer.readToken", "method": "readToken",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "size", Dst: "size-arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "size-arg", Dst: "string-type"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "string-type", Dst: "read-arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "read-arg", Dst: "read-token"})
+
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "read-token" || got[0].Concept != "custom.ZipCompressedSizeRead" {
+		t.Fatalf("call operand flag did not use incoming arg flow fallback: %+v", got)
+	}
+}
+
 func TestCollectionFirstSinkTargetsIndexedElement(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",

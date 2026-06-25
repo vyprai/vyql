@@ -154,3 +154,13 @@ rule WorldCoordinateSafeRangeMissing {
   meta { id: "VYQL-DOS-030", severity: high, cwe: [CWE_400, CWE_20], confidence_floor: high }
   match code.WorldCoordinateSafeRangeMissing as world
 }
+
+rule ZipEntryCompressedSizeTokenRead {
+  meta { id: "VYQL-DOS-031", severity: high, cwe: [CWE_400], confidence_floor: high }
+  match code.ZipEntryCompressedSizeTokenRead as zip
+}
+
+rule DeflateDecompressionMaxSafeIntegerLimit {
+  meta { id: "VYQL-DOS-032", severity: high, cwe: [CWE_400, CWE_770], confidence_floor: high }
+  match code.DeflateDecompressionMaxSafeIntegerLimit as inflate
+}

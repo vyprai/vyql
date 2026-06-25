@@ -2715,6 +2715,24 @@ concept ZeroStepSequenceExpansion : sink {
   review_assumption: "a zero step leaves the loop variable unchanged while the loop condition remains true"
   review_confidence: high
 }
+concept ZipEntryCompressedSizeTokenRead : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400]
+  review_category: "resource"
+  review_condition: "ZIP entry parsing reads a StringType sized directly from the compressed-size header before applying an inflate/output limit"
+  review_evidence: "ZIP parser call {pattern} passes zipHeader.compressedSize into Token.StringType for tokenizer.readToken"
+  review_assumption: "attacker-controlled ZIP metadata can select a large or amplification-prone entry consumed during type detection"
+  review_confidence: high
+}
+concept DeflateDecompressionMaxSafeIntegerLimit : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_770]
+  review_category: "resource"
+  review_condition: "deflate decompression uses JavaScript's Number.MAX_SAFE_INTEGER as the output length limit"
+  review_evidence: "deflate decompression call {pattern} receives a maximumLength value derived from Number.MAX_SAFE_INTEGER"
+  review_assumption: "attacker-controlled compressed input can understate or hide its final expanded size and force excessive memory or CPU before rejection"
+  review_confidence: high
+}
 concept UnstoppedLimitedStream : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_772]

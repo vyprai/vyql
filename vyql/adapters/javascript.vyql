@@ -1541,6 +1541,19 @@ adapter javascript {
     has "i+=incr"
     lacks "Math.max(Math.abs(numeric(n[2])),1)"
   }
+  flag code.ZipEntryCompressedSizeTokenRead on call {
+    path "tokenizer.readToken"
+    operand {
+      path "Token.StringType"
+      path "zipHeader.compressedSize"
+    }
+  }
+  flag code.DeflateDecompressionMaxSafeIntegerLimit on call {
+    path "decompressDeflateRawWithLimit"
+    operand {
+      path "Number.MAX_SAFE_INTEGER"
+    }
+  }
   flag code.FoldedHeaderContinuationCrash in function {
     lang "javascript"
     has "this.buffer.split(RE_CRLF)"

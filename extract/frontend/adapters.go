@@ -1480,11 +1480,7 @@ func flagMatchesNode(s usg.Store, idx *flowTokenIndex, fl flagSpec, n usg.Node, 
 func flagOperandCandidates(s usg.Store, idx *flowTokenIndex, n usg.Node) [][]usg.Node {
 	idx.ensure(s)
 	var out [][]usg.Node
-	for ai := 0; ; ai++ {
-		argID := n.Prop("arg" + strconv.Itoa(ai))
-		if argID == "" {
-			break
-		}
+	addArg := func(argID string) {
 		var nodes []usg.Node
 		if arg, ok, err := s.GetNode(argID); err == nil && ok {
 			nodes = append(nodes, arg)
@@ -1508,6 +1504,24 @@ func flagOperandCandidates(s usg.Store, idx *flowTokenIndex, n usg.Node) [][]usg
 		}
 		collectUpstream(argID, 0)
 		out = append(out, nodes)
+	}
+	hadArgProps := false
+	for ai := 0; ; ai++ {
+		argID := n.Prop("arg" + strconv.Itoa(ai))
+		if argID == "" {
+			break
+		}
+		hadArgProps = true
+		addArg(argID)
+	}
+	if !hadArgProps {
+		for _, srcID := range idx.rev[n.ID] {
+			src, ok, err := s.GetNode(srcID)
+			if err != nil || !ok || src.Type != "code.Arg" {
+				continue
+			}
+			addArg(srcID)
+		}
 	}
 	return out
 }

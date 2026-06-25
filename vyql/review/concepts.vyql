@@ -1260,6 +1260,18 @@ review code.ZeroStepSequenceExpansion {
   kind: "attention"
   text: "review sequence expansion loops for parsed zero steps that prevent loop progress"
 }
+review code.ZipEntryCompressedSizeTokenRead {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review ZIP entry parsing for an inflate/output limit before reading entry content sized from compressed ZIP metadata"
+}
+review code.DeflateDecompressionMaxSafeIntegerLimit {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify deflate decompression output is capped to a small archive-entry limit instead of Number.MAX_SAFE_INTEGER"
+}
 review code.BufReadDiscardLoopWithoutEofGuard {
   category: "resource"
   kind: "target"
