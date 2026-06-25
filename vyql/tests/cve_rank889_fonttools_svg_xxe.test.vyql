@@ -1,0 +1,40 @@
+test "rank889: fonttools parses OT-SVG with unhardened lxml XMLParser"
+  lang python
+  expect VYQL-DESER-004
+  expect_review code.XmlParserCreate
+  code
+  ```
+  from lxml import etree
+
+  def subset_glyphs(self, s):
+      for doc in self.docList:
+          svg = etree.fromstring(
+              doc.data.encode("utf-8"),
+              parser=etree.XMLParser(
+                  huge_tree=True,
+                  remove_blank_text=True,
+              ),
+          )
+          return svg
+  ```
+
+test "rank889: fonttools disables entity resolution for OT-SVG XMLParser"
+  lang python
+  reject VYQL-DESER-004
+  reject_review code.XmlParserCreate
+  code
+  ```
+  from lxml import etree
+
+  def subset_glyphs(self, s):
+      for doc in self.docList:
+          svg = etree.fromstring(
+              doc.data.encode("utf-8"),
+              parser=etree.XMLParser(
+                  huge_tree=True,
+                  remove_blank_text=True,
+                  resolve_entities=False,
+              ),
+          )
+          return svg
+  ```

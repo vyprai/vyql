@@ -2040,6 +2040,9 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 	case "op":
 		return valuePredicate(pred.Op, pred.Values, n.Prop("op"))
 	case "tokens":
+		if flagPredicateUsesCallArg(pred) {
+			return contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokens(n))
+		}
 		return contextTokenValuePredicate(pred.Op, pred.Values, n.Prop("str_args"))
 	case "identifier":
 		if n.Type != "code.Name" && n.Type != "code.Param" {

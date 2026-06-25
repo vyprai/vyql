@@ -847,6 +847,14 @@ adapter python {
   sink path "lxml.etree.fromstring" -> code.XmlParse
   sink path "objectify.parse" -> code.XmlParse
   sink path "lxml.objectify.parse" -> code.XmlParse
+  flag code.XmlParserCreate on any {
+    path "etree.XMLParser"
+    not prop "str_args" contains_any ["resolve_entities=False", "no_network=True"]
+  }
+  flag code.XmlParserCreate on any {
+    path "lxml.etree.XMLParser"
+    not prop "str_args" contains_any ["resolve_entities=False", "no_network=True"]
+  }
   flag code.XmlParserCreate on any { path "objectify.parse" }
   flag code.XmlParserCreate on any { path "lxml.objectify.parse" }
   sink path "xml.dom.minidom.parse" -> code.XmlParse
