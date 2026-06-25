@@ -480,6 +480,8 @@ func (c *conv) goFunctionTokens(name string, typ *ast.FuncType, body *ast.BlockS
 		return out
 	}
 	prevCall := ""
+	var priorCalls []string
+	seenCallPath := map[string]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
 		if len(out) >= 512 {
 			return false
@@ -529,6 +531,16 @@ func (c *conv) goFunctionTokens(name string, typ *ast.FuncType, body *ast.BlockS
 			p := c.path(x.Fun)
 			if p == "" {
 				return true
+			}
+			for _, before := range priorCalls {
+				add("call_before:" + before + ">" + p)
+			}
+			if !seenCallPath[p] {
+				seenCallPath[p] = true
+				priorCalls = append(priorCalls, p)
+				if len(priorCalls) > 32 {
+					priorCalls = priorCalls[1:]
+				}
 			}
 			if prevCall != "" {
 				add("call_order:" + prevCall + ">" + p)

@@ -227,6 +227,12 @@ review code.ShareInfoDirectDownloadTokenExposure {
   expected: [core.AuthenticationCheck, core.AuthorizationCheck]
   text: "verify public share-info responses do not include tokenized direct-download URLs before the share password or access challenge"
 }
+review code.CommandAllowlistBeforeParsing {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify command allowlists and execution permission checks run on the canonical parsed command that is later executed"
+}
 review code.ShopwareStoreApiManyToManyCriteriaBypass {
   category: "access_control"
   kind: "attention"

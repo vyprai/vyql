@@ -165,6 +165,51 @@ func fixed(config *ContainerConfig, imageConfig *ImageConfig) {
 	}
 }
 
+func TestGoFunctionContextIncludesNonAdjacentCallBeforeTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "commands.go")
+	src := []byte(`package http
+
+import "os/exec"
+
+func handler(raw string, d *data) {
+	if !d.user.CanExecute(strings.Split(raw, " ")[0]) {
+		return
+	}
+	command, _ := runner.ParseCommand(d.settings, raw)
+	exec.Command(command[0], command[1:]...)
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "function_name:handler") &&
+			strings.Contains(tokens, "call_before:d.user.CanExecute>runner.ParseCommand") &&
+			strings.Contains(tokens, "call_before:d.user.CanExecute>exec.Command") {
+			return
+		}
+	}
+	t.Fatalf("Go function context did not include non-adjacent call_before tokens; nodes=%#v", nodes)
+}
+
 func TestGoModuleContextIncludesTopLevelVarInitializer(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "authorization.go")

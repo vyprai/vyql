@@ -89,7 +89,6 @@ adapter go {
     call arg "getShareURL:shareLink.Token"
     call path "renderJSON"
   }
-
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
@@ -890,6 +889,14 @@ adapter go {
     call "append"
     call "Mount"
     not call "ParseIP"
+  }
+  flag code.CommandAllowlistBeforeParsing in function {
+    lang "go"
+    call path "strings.Split"
+    call path "d.user.CanExecute"
+    call path "runner.ParseCommand"
+    call path "exec.Command"
+    token call_before "d.user.CanExecute>runner.ParseCommand"
   }
   flag code.ApiScanFoundActionCommandExecution in function {
     function "postScanHandler"

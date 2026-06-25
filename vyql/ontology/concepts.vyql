@@ -1965,6 +1965,15 @@ concept ShareInfoDirectDownloadTokenExposure : sink {
   review_assumption: "the public share-info response is reachable with only the share hash and its direct download URL bypasses password-gated share access"
   review_confidence: high
 }
+concept CommandAllowlistBeforeParsing : sink {
+  vulnerable_to: [access_control.IncorrectAuthorization, injection.CommandInjection]
+  cwe: [CWE_863, CWE_78]
+  review_category: "auth"
+  review_condition: "a command allowlist or execution permission check runs on a raw split command token before canonical command parsing"
+  review_evidence: "command runner context {pattern} checks an allowlist from strings.Split/Fields before runner.ParseCommand and later executes the parsed command"
+  review_assumption: "the parser can reinterpret quoting, escaping, or command boundaries so the executed command differs from the raw split token"
+  review_confidence: high
+}
 concept ClearanceKitPolicyApplyBeforeAdapterStart : sink {
   vulnerable_to: [access_control.PrivilegeEscalation]
   cwe: [CWE_269]

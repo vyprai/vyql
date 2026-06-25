@@ -99,6 +99,11 @@ rule ShareInfoDirectDownloadTokenExposure {
   match code.ShareInfoDirectDownloadTokenExposure as endpoint
 }
 
+rule CommandAllowlistBeforeParsing {
+  meta { id: "VYQL-AUTH-057", severity: high, cwe: [CWE_863, CWE_78], confidence_floor: high }
+  match code.CommandAllowlistBeforeParsing as command
+}
+
 rule ExpiredCachedAuthTokenReuse {
   meta { id: "VYQL-AUTH-043", severity: medium, cwe: [CWE_613], confidence_floor: high }
   match code.ExpiredCachedAuthTokenReuse as cache
