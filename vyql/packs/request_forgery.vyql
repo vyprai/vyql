@@ -73,6 +73,11 @@ rule ConfigUrlStoredBeforeSchemeValidation {
   match code.ConfigUrlStoredBeforeSchemeValidation as config
 }
 
+rule SwaggerParserExternalRefDereference {
+  meta { id: "VYQL-RF-040", severity: high, cwe: [CWE_918, CWE_22, CWE_20], confidence_floor: high }
+  match code.SwaggerParserExternalRefDereference as parser
+}
+
 rule OAuthStateCookieValidationMissing {
   meta { id: "VYQL-RF-032", severity: high, cwe: [CWE_352, CWE_287], confidence_floor: high }
   match code.OAuthStateCookieValidationMissing as flow

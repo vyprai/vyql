@@ -563,6 +563,12 @@ review code.ConfigUrlStoredBeforeSchemeValidation {
   expected: [core.AllowlistValidation, core.InputValidation]
   text: "review connector URL configuration for URL syntax and scheme validation before storing or testing server-side connections"
 }
+review code.SwaggerParserExternalRefDereference {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.AllowlistValidation, core.InputValidation]
+  text: "review Swagger/OpenAPI parser validation for disabled external $ref dereferencing"
+}
 review code.CodeServerPathProxyPortConfusedProxy {
   category: "request_forgery"
   kind: "attention"

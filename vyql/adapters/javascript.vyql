@@ -844,6 +844,13 @@ adapter javascript {
     has "page.goto(request.url,requestOptions)"
     lacks "request.url.trim().toLowerCase().substring(0,4)==='file'"
   }
+  flag code.SwaggerParserExternalRefDereference in function {
+    lang "javascript"
+    call path "yaml.safeLoad"
+    call path "swaggerParser.validate"
+    token identifier "loaded"
+    not token prop "external=false"
+  }
   flag code.HardlinkedFileOverwriteWithoutClobber in function {
     lang "javascript"
     name "statCb"

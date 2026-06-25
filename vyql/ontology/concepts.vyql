@@ -2753,6 +2753,15 @@ concept ConfigUrlStoredBeforeSchemeValidation : sink {
   review_assumption: "the configured URL is later used by a server-side connector with access to internal network targets"
   review_confidence: high
 }
+concept SwaggerParserExternalRefDereference : sink {
+  vulnerable_to: [request_forgery.Ssrf, path.PathTraversal, validation.ImproperInputValidation]
+  cwe: [CWE_918, CWE_22, CWE_20]
+  review_category: "request_forgery"
+  review_condition: "Swagger/OpenAPI validation dereferences external references from caller-supplied documents"
+  review_evidence: "Swagger parser context {pattern} calls validate on the loaded document without a $refs.external=false option"
+  review_assumption: "the parsed Swagger document can contain local-file or remote $ref targets supplied by an attacker"
+  review_confidence: high
+}
 concept ServerSideBrowserActiveHtmlRendering : sink {
   vulnerable_to: [request_forgery.Ssrf, injection.Xss, secrets.SecretLeak]
   cwe: [CWE_918, CWE_79, CWE_200]
