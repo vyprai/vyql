@@ -1259,6 +1259,16 @@ adapter javascript {
     lacks "Object.getOwnPropertyNames(props)"
     lacks "hasOwnProperty.call(props,x)"
   }
+  flag code.ControlledMergeInheritedKeyPrototypePollution in function {
+    lang "javascript"
+    token subscript "base[key]"
+    token subscript "obj[key]"
+    expr "typeofvalue==='object'"
+    call path "Array.isArray"
+    not literal "__proto__"
+    not literal "constructor"
+    not literal "prototype"
+  }
   flag code.ChartkickRecursiveExtendPrototypePollution in function {
     lang "javascript"
     name "extend"
