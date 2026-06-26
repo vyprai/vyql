@@ -1601,6 +1601,12 @@ review code.NumericParserMissingProgressCheck {
   expected: [core.InputValidation]
   text: "review numeric parsers for a cursor-progress guard before retrying fallback parse paths"
 }
+review code.PairwiseConstraintIntersectionDos {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review constraint-list intersection for sorted merge or bounded processing instead of pairwise nested intersection"
+}
 review code.RecursiveObjectParentResolveWithoutCycleGuard {
   category: "resource"
   kind: "target"

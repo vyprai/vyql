@@ -3018,6 +3018,15 @@ concept NumericParserMissingProgressCheck : sink {
   review_assumption: "malformed numeric input can leave the parse cursor unchanged and cause repeated parser work or an infinite loop"
   review_confidence: high
 }
+concept PairwiseConstraintIntersectionDos : sink {
+  vulnerable_to: [dos.UncontrolledResourceConsumption]
+  cwe: [CWE_400, CWE_407]
+  review_category: "resource"
+  review_condition: "constraint-list intersection performs pairwise nested intersection work instead of a sorted or bounded merge"
+  review_evidence: "constraint intersection context {pattern} iterates one constraint list against another and adds intersection results without observed sorted-view merge processing"
+  review_assumption: "attackers can provide certificates or structured inputs with many constraints, causing CPU and allocation growth from pairwise intersection"
+  review_confidence: high
+}
 concept RecursiveObjectParentResolveWithoutCycleGuard : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_400, CWE_674]

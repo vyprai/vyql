@@ -270,6 +270,15 @@ adapter c {
     has "tmp=pos"
     lacks "tmp==pos"
   }
+  flag code.PairwiseConstraintIntersectionDos in function {
+    lang "c"
+    call path contains_any ["intersect_nodes", "name_constraints_intersect_nodes"]
+    call path contains_any ["node_list_add", "name_constraints_node_list_add"]
+    selector contains_any ["permitted.size", "permitted2.size", "removed.size"]
+    binary contains_any ["i<permitted2->size", "j<removed.size", "j<permitted2->size"]
+    not call path contains_any ["ensure_sorted", "compare_name_constraint_nodes"]
+    not selector "sorted_view"
+  }
   flag code.EcPointIdentityElementMissing in function {
     lang "c"
     param type "PointZZ_p"

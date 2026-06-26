@@ -194,3 +194,8 @@ rule UnboundedNaturalLanguageScheduleParse {
   meta { id: "VYQL-DOS-038", severity: high, cwe: [CWE_400], confidence_floor: high }
   match code.UnboundedNaturalLanguageScheduleParse as parser
 }
+
+rule PairwiseConstraintIntersectionDos {
+  meta { id: "VYQL-DOS-039", severity: high, cwe: [CWE_400, CWE_407], confidence_floor: high }
+  match code.PairwiseConstraintIntersectionDos as intersection
+}
