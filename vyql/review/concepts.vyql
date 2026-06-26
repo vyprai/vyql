@@ -2000,6 +2000,12 @@ review code.WordPressAddQueryArgHrefXss {
   expected: [core.HtmlEscape]
   text: "review WordPress add_query_arg URLs for esc_url or equivalent escaping before href attribute rendering"
 }
+review code.StoredUrlHrefAttributeXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation, core.HtmlEscape]
+  text: "review stored URL fields rendered into href attributes for URL sanitization and HTML attribute escaping"
+}
 review code.EzPublishSearchNumericParamXss {
   category: "xss"
   kind: "attention"

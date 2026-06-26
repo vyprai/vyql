@@ -4331,6 +4331,15 @@ concept WordPressAddQueryArgHrefXss : sink {
   review_assumption: "the generated URL may include request-controlled current-URL data and is served to a browser as HTML"
   review_confidence: high
 }
+concept StoredUrlHrefAttributeXss : sink {
+  vulnerable_to: [injection.Xss, validation.ImproperInputValidation]
+  cwe: [CWE_79, CWE_116, CWE_20]
+  review_category: "xss"
+  review_condition: "stored URL fields are rendered into HTML href attributes without URL validation and attribute escaping"
+  review_evidence: "function context {pattern} builds an anchor href from a stored URL-like field through a formatting helper without sanitizeURL/htmlspecialchars-style hardening"
+  review_assumption: "the stored URL-like field can be supplied by an authenticated user and is later rendered in another user's browser"
+  review_confidence: high
+}
 concept EzPublishSearchNumericParamXss : sink {
   vulnerable_to: [injection.Xss]
   cwe: [CWE_79, CWE_20]

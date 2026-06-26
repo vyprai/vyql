@@ -469,6 +469,34 @@ adapter php {
     flows to path exact "$column.__setitem__"
     lacks call contains_any ["noHtml", "htmlspecialchars", "htmlentities", "strip_tags"]
   }
+  flag code.StoredUrlHrefAttributeXss in function {
+    lang "php"
+    literal contains_any ["<a href='", "<a href=\"", "href='", "href=\""]
+    token subscript contains_any [
+      "$this->fields['website']",
+      "$this->fields[\"website\"]",
+      "$this->fields['url']",
+      "$this->fields[\"url\"]",
+      "$this->fields['link']",
+      "$this->fields[\"link\"]"
+    ]
+    call path contains_any [
+      "Toolbox.formatOutputWebLink",
+      "formatOutputWebLink",
+      "formatOutputWebUrl",
+      "formatUrl",
+      "buildUrl"
+    ]
+    not call path contains_any [
+      "URL.sanitizeURL",
+      "sanitizeURL",
+      "htmlspecialchars",
+      "htmlentities",
+      "esc_url",
+      "esc_attr",
+      "filter_var"
+    ]
+  }
   flag code.QuickAppsUserRealNameStoredXss in class {
     lang "php"
     name "User"

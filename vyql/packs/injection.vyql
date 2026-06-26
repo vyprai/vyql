@@ -362,6 +362,11 @@ rule WordPressAddQueryArgHrefXss {
   match code.WordPressAddQueryArgHrefXss as sink
 }
 
+rule StoredUrlHrefAttributeXss {
+  meta { id: "VYQL-INJ-195", severity: high, cwe: [CWE_79, CWE_116, CWE_20], confidence_floor: high }
+  match code.StoredUrlHrefAttributeXss as sink
+}
+
 rule EzPublishSearchNumericParamXss {
   meta { id: "VYQL-INJ-170", severity: high, cwe: [CWE_79, CWE_20], confidence_floor: high }
   match code.EzPublishSearchNumericParamXss as sink
