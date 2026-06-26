@@ -1,10 +1,6 @@
 module bindings.config.migration.m2b6375a9;
 
 binding dspaceJspuiAutocompleteLabelXss17 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "analysis.config.dspace_jspui_autocomplete_label_xss"
+  query pattern presenceNode where node.path ~= "analysis.config.dspace_jspui_autocomplete_label_xss"
   emit issue code.DspaceJspuiAutocompleteLabelXss at node
 }

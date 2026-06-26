@@ -1,10 +1,6 @@
 module bindings.swift.migration.m388f23d0;
 
 binding unboundedCopySmell72 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "BIO_puts"
+  query pattern presenceNode where node.path ~= "BIO_puts"
   emit issue code.UnboundedCopySmell at node
 }

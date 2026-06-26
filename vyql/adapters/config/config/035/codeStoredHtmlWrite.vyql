@@ -1,10 +1,6 @@
 module bindings.config.migration.m2b6375a9;
 
 binding storedHtmlWrite35 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "analysis.template.django.safe_filter_raw_html"
+  query pattern presenceNode where node.path ~= "analysis.template.django.safe_filter_raw_html"
   emit issue code.StoredHtmlWrite at node
 }

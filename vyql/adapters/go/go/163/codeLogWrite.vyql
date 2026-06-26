@@ -1,11 +1,7 @@
 module bindings.go.migration.m48a985c1;
 
 binding logWrite163 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "log.Print"
+  query pattern presenceNode where node.path ~= "log.Print"
   emit issue code.LogWrite at node
   emit sink code.LogWriteSink at node
 }

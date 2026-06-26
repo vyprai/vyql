@@ -1,10 +1,6 @@
 module bindings.groovy.migration.m6eabb149;
 
 binding weakHash30 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "DigestUtils.sha1Hex"
+  query pattern presenceNode where node.path ~= "DigestUtils.sha1Hex"
   emit issue code.WeakHash at node
 }

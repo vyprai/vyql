@@ -1,10 +1,6 @@
 module bindings.solidity.migration.m88e544d8;
 
 binding stateWrite13 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "state_write"
+  query pattern presenceNode where node.path ~= "state_write"
   emit issue code.StateWrite at node
 }

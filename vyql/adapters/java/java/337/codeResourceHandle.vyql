@@ -1,11 +1,7 @@
 module bindings.java.migration.m420f6b67;
 
 binding resourceHandle337 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "Files.newBufferedReader"
+  query pattern presenceNode where node.path ~= "Files.newBufferedReader"
   emit issue code.ResourceHandle at node
   emit sink code.ResourceHandleSink at node
 }

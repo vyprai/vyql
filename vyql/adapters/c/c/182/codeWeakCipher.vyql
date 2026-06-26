@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding weakCipher182 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "DES_ncbc_encrypt"
+  query pattern presenceNode where node.path ~= "DES_ncbc_encrypt"
   emit issue code.WeakCipher at node
 }

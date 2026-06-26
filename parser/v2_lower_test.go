@@ -1161,6 +1161,119 @@ binding cleartextChannel {
 	}
 }
 
+func TestV2PresenceNodePatternLowersToFlag(t *testing.T) {
+	decls, err := ParseV2Runtime(`
+module bindings.bash.crypto;
+binding weakRandom {
+  query pattern presenceNode where node.path ~= "RANDOM"
+  emit issue code.WeakRandomValue at node
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Runtime: %v", err)
+	}
+	adapter := decls[0].(*AdapterDecl)
+	if adapter.Name != "bash" || len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	m := adapter.Mappings[0]
+	if m.Kind != "flag" || m.Concept != "code.WeakRandomValue" || m.Flag == nil {
+		t.Fatalf("presenceNode mapping wrong: %+v", m)
+	}
+	if m.Flag.NodeKind != "any" || len(m.Flag.Predicates) != 1 {
+		t.Fatalf("presenceNode flag wrong: %+v", m.Flag)
+	}
+	if got := m.Flag.Predicates[0]; got.Subject != "node" || got.Property != "path" || got.Op != "match" || got.Exact || got.Values[0] != "RANDOM" {
+		t.Fatalf("presenceNode path predicate wrong: %+v", got)
+	}
+}
+
+func TestV2PresenceNodeExactPathLowering(t *testing.T) {
+	decls, err := ParseV2Runtime(`
+module bindings.dart.crypto;
+binding weakRandom {
+  query pattern presenceNode where node.path == "Random"
+  emit issue code.WeakRandomValue at node
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Runtime: %v", err)
+	}
+	flag := decls[0].(*AdapterDecl).Mappings[0].Flag
+	if flag == nil || len(flag.Predicates) != 1 {
+		t.Fatalf("presenceNode flag wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "path" || got.Op != "match" || !got.Exact || got.Values[0] != "Random" {
+		t.Fatalf("presenceNode exact path predicate wrong: %+v", got)
+	}
+}
+
+func TestV2PresenceNodeMethodPackagesAndMultipleEmits(t *testing.T) {
+	decls, err := ParseV2Runtime(`
+module bindings.ruby.logging;
+binding logWrite {
+  requires {
+    dependency("rails")
+  }
+  query pattern presenceNode where node.method == "warn"
+  emit issue code.LogWrite at node
+  emit sink code.LogOutput at node
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Runtime: %v", err)
+	}
+	adapter := decls[0].(*AdapterDecl)
+	if adapter.Name != "ruby" || len(adapter.Mappings) != 2 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	for _, m := range adapter.Mappings {
+		if m.Kind != "flag" || m.Flag == nil || len(m.Flag.Predicates) != 1 || len(m.Packages) != 1 || m.Packages[0] != "rails" {
+			t.Fatalf("presenceNode mapping wrong: %+v", m)
+		}
+		if got := m.Flag.Predicates[0]; got.Subject != "node" || got.Property != "method" || got.Op != "equals" || got.Values[0] != "warn" {
+			t.Fatalf("presenceNode method predicate wrong: %+v", got)
+		}
+	}
+}
+
+func TestV2ImportedPresenceNodePatternLowering(t *testing.T) {
+	decls, err := ParseV2Runtime(`
+module bindings.lua.crypto;
+uses patterns.core.presenceNode;
+binding weakHash {
+  query pattern presenceNode where node.path ~= "ngx.md5"
+  emit issue code.WeakHash at node
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Runtime: %v", err)
+	}
+	flag := decls[0].(*AdapterDecl).Mappings[0].Flag
+	if flag == nil || len(flag.Predicates) != 1 {
+		t.Fatalf("presenceNode import flag wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "path" || got.Values[0] != "ngx.md5" {
+		t.Fatalf("imported presenceNode path predicate wrong: %+v", got)
+	}
+}
+
+func TestV2PresenceNodeRejectsNonPresencePredicates(t *testing.T) {
+	_, err := ParseV2Runtime(`
+module bindings.javascript.web;
+binding unsupported {
+  query pattern presenceNode where node.token contains "secret"
+  emit issue code.SecretValue at node
+}
+`)
+	if err == nil {
+		t.Fatal("presenceNode lowered unsupported token predicate")
+	}
+	if !strings.Contains(err.Error(), "presenceNode only supports") {
+		t.Fatalf("presenceNode error = %v", err)
+	}
+}
+
 func TestV2LegacyFlagOperandAndPseudoSubjectLowering(t *testing.T) {
 	decls, err := ParseV2Runtime(`
 module bindings.javascript.migration;

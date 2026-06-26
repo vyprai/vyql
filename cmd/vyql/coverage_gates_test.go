@@ -643,16 +643,28 @@ func TestProductionRuntimeDoesNotUseLegacyV1Parser(t *testing.T) {
 }
 
 func TestSimplePresenceFlagsDoNotUseLegacyFlagBridge(t *testing.T) {
-	simpleLegacy := regexp.MustCompile(`query unstable\.legacyFlag as node where node\.kind == "any" and node\.method == "([^"]+)"\s*$`)
+	simpleLegacy := regexp.MustCompile(`^query unstable\.legacyFlag as node where node\.kind == "any" and node\.(method|path) (==|~=) "([^"]+)"\s*$`)
 	var hits []string
 	for path, src := range readDataFiles(t, "adapters", ".vyql") {
-		for i, line := range strings.Split(src, "\n") {
-			m := simpleLegacy.FindStringSubmatch(strings.TrimSpace(line))
-			if m == nil || strings.HasPrefix(m[1], "analysis.") {
+		lines := strings.Split(src, "\n")
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if !strings.HasPrefix(trimmed, "query unstable.legacyFlag") {
+				continue
+			}
+			query := trimmed
+			for j := i + 1; j < len(lines); j++ {
+				next := strings.TrimSpace(lines[j])
+				if next == "" || strings.HasPrefix(next, "emit ") || strings.HasSuffix(next, "}") {
+					break
+				}
+				query += " " + next
+			}
+			if !simpleLegacy.MatchString(query) {
 				continue
 			}
 			rel, _ := filepath.Rel(datadir.Root(), path)
-			hits = append(hits, filepath.ToSlash(rel)+":"+strconv.Itoa(i+1)+": "+strings.TrimSpace(line))
+			hits = append(hits, filepath.ToSlash(rel)+":"+strconv.Itoa(i+1)+": "+query)
 			if len(hits) >= 20 {
 				break
 			}
@@ -660,7 +672,7 @@ func TestSimplePresenceFlagsDoNotUseLegacyFlagBridge(t *testing.T) {
 	}
 	if len(hits) > 0 {
 		sort.Strings(hits)
-		t.Fatalf("simple method presence flags must use stable `query pattern callExpr where callee.method ...`, not unstable.legacyFlag:\n%s", strings.Join(hits, "\n"))
+		t.Fatalf("simple method/path presence flags must use stable `callExpr` or `presenceNode` patterns, not unstable.legacyFlag:\n%s", strings.Join(hits, "\n"))
 	}
 }
 

@@ -1,10 +1,6 @@
 module bindings.kotlin.migration.m304d1620;
 
 binding weakRandomValue71 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path == "Random"
+  query pattern presenceNode where node.path == "Random"
   emit issue code.WeakRandomValue at node
 }

@@ -1,10 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding weakCipher76 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "Des.new"
+  query pattern presenceNode where node.path ~= "Des.new"
   emit issue code.WeakCipher at node
 }

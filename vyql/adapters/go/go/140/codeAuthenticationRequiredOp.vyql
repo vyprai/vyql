@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding authenticationRequiredOp140 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "ChangeEmail"
+  query pattern presenceNode where node.path ~= "ChangeEmail"
   emit issue code.AuthenticationRequiredOp at node
 }

@@ -1,10 +1,6 @@
 module bindings.elixir.migration.m728b8a72;
 
 binding authenticationRequiredOp24 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "reset_password"
+  query pattern presenceNode where node.path ~= "reset_password"
   emit issue code.AuthenticationRequiredOp at node
 }

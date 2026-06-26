@@ -426,10 +426,16 @@ func (r v2PatternResolver) resolve(name string) (*V2PatternDecl, bool, error) {
 		if lastSeg(imported) == "callExpr" {
 			return builtinV2CallExprPattern(), true, nil
 		}
+		if lastSeg(imported) == "presenceNode" {
+			return builtinV2PresenceNodePattern(), true, nil
+		}
 		return nil, false, fmt.Errorf("imported pattern %s requires native cross-file pattern lowering", imported)
 	}
 	if lastSeg(name) == "callExpr" {
 		return builtinV2CallExprPattern(), true, nil
+	}
+	if lastSeg(name) == "presenceNode" {
+		return builtinV2PresenceNodePattern(), true, nil
 	}
 	if r.module != "" && !strings.Contains(name, ".") {
 		if p := r.patterns[r.module+"."+name]; p != nil {
@@ -444,6 +450,14 @@ func builtinV2CallExprPattern() *V2PatternDecl {
 		Name:  "callExpr",
 		Alias: "call",
 		Items: []V2PatternItem{{Kind: "node", Name: "call"}},
+	}
+}
+
+func builtinV2PresenceNodePattern() *V2PatternDecl {
+	return &V2PatternDecl{
+		Name:  "presenceNode",
+		Alias: "node",
+		Items: []V2PatternItem{{Kind: "node", Name: "node"}},
 	}
 }
 
@@ -578,6 +592,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		queryWhere, queryAlias, err = lowerV2PatternQuery(b.Name, b.Query, patterns)
 		if err != nil {
 			return nil, err
+		}
+	}
+	if queryAlias == "node" {
+		if out, ok, err := lowerV2PresenceBinding(b, names, queryWhere, queryAlias); ok || err != nil {
+			return out, err
 		}
 	}
 	shape, err := lowerV2CallShape(b.Name, queryWhere)
@@ -783,7 +802,7 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 		switch item.Kind {
 		case "node":
 			nodeCount++
-			if item.Name != "call" && item.Name != "callExpr" {
+			if item.Name != "call" && item.Name != "callExpr" && item.Name != "node" {
 				return nil, "", nil, fmt.Errorf("binding %s: pattern %s node family %q needs native pattern lowering", binding, pat.Name, item.Name)
 			}
 			if alias == "" {
@@ -809,6 +828,81 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 		return nil, "", nil, fmt.Errorf("binding %s: pattern %s must have exactly one call node for legacy lowering", binding, pat.Name)
 	}
 	return where, alias, binds, nil
+}
+
+func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string) ([]AdapterMapping, bool, error) {
+	fl, ok, err := lowerV2PresenceFlagExpr(alias, expr)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	pkgs, err := lowerV2RequirementsToPackages(b.Requirements)
+	if err != nil {
+		return nil, true, fmt.Errorf("binding %s: %w", b.Name, err)
+	}
+	var out []AdapterMapping
+	for _, action := range b.Outputs {
+		action.Concept = names.concept(action.Concept)
+		if action.Kind != "emit issue" && action.Kind != "emit sink" && action.Kind != "emit source" && action.Kind != "emit check" {
+			return nil, true, fmt.Errorf("binding %s: presenceNode only supports emit issue/source/sink/check", b.Name)
+		}
+		if action.Location != alias {
+			return nil, true, fmt.Errorf("binding %s: presenceNode emit location must be %q", b.Name, alias)
+		}
+		if len(action.Covers) != 0 || action.Advisory != nil || action.About != "" {
+			return nil, true, fmt.Errorf("binding %s: presenceNode does not support coverage, advisory, or about metadata", b.Name)
+		}
+		flag := *fl
+		out = append(out, AdapterMapping{
+			Kind:     "flag",
+			Concept:  action.Concept,
+			Packages: pkgs,
+			Flag:     &flag,
+		})
+	}
+	return out, true, nil
+}
+
+func lowerV2PresenceFlagExpr(alias string, expr V2Expr) (*AdapterFlag, bool, error) {
+	if alias == "" {
+		return nil, true, fmt.Errorf("query alias is required")
+	}
+	fl := &AdapterFlag{NodeKind: "any"}
+	handled := false
+	for _, atom := range flattenV2And(expr) {
+		neg := false
+		if u, ok := atom.(V2UnaryExpr); ok && u.Op == "not" {
+			neg = true
+			atom = u.X
+		}
+		pred, err := lowerV2PresencePredicate(alias, atom, neg)
+		if err != nil {
+			return nil, true, err
+		}
+		if pred.Property == "" {
+			return nil, false, nil
+		}
+		handled = true
+		fl.Predicates = append(fl.Predicates, pred)
+	}
+	if !handled {
+		return nil, false, nil
+	}
+	return fl, true, nil
+}
+
+func lowerV2PresencePredicate(alias string, expr V2Expr, neg bool) (AdapterFlagPredicate, error) {
+	cmp, ok := expr.(V2BinaryExpr)
+	if !ok {
+		return AdapterFlagPredicate{}, nil
+	}
+	field, ok := v2LegacyFlagField(alias, cmp.Left)
+	if !ok {
+		return AdapterFlagPredicate{}, nil
+	}
+	if field != "path" && field != "method" {
+		return AdapterFlagPredicate{}, fmt.Errorf("presenceNode only supports %s.path or %s.method predicates", alias, alias)
+	}
+	return lowerV2LegacyFlagPredicate(alias, "node", cmp, neg)
 }
 
 func andV2Expr(left, right V2Expr) V2Expr {
