@@ -124,6 +124,14 @@ adapter rust {
     token assign "self.driver_status=value"
     not call path "self.set_device_status"
   }
+  flag code.UnvalidatedDependencyMapKeyDeserialization on any {
+    path exact "analysis.rust.serde_field"
+    token derive "Deserialize"
+    token semantic "dependency_map"
+    field contains_any ["depend", "package", "plugin"]
+    token field_type contains_any ["Map", "Dependencies", "Packages", "Plugins"]
+    not token serde_attr "deserialize_with"
+  }
   flag code.ModexpZeroExponentIterationUnderflow on binop {
     op "-"
     operand {

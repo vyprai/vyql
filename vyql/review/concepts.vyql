@@ -2559,6 +2559,12 @@ review code.NuxtPublicRuntimeConfigSecretExposure {
   expected: [core.SecretRedaction]
   text: "keep tokens and credentials out of Nuxt public runtime config; merge them only into private runtimeConfig"
 }
+review code.UnvalidatedDependencyMapKeyDeserialization {
+  category: "supply_chain"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "validate dependency or package map keys during deserialization before they are accepted as manifest identifiers"
+}
 review code.JenkinsJellySecretTextboxExposure {
   category: "secret"
   kind: "target"

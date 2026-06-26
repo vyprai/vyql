@@ -81,6 +81,9 @@ func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
 		add("attr:repr(" + arg + ")")
 		add("repr:" + arg)
 	}
+	for _, tok := range rsDeriveTokens(rawItem) {
+		add(tok)
+	}
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		if m.Kind() == "attribute" {
@@ -127,7 +130,9 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		return c.decls(field(n, "body"))
 	case "enum_item":
 		return c.rsEnumMetadata(n, attrs)
-	case "struct_item", "use_declaration", "const_item", "static_item":
+	case "struct_item":
+		return c.rsStructFieldMetadata(n, attrs)
+	case "use_declaration", "const_item", "static_item":
 		return nil
 	case "let_declaration":
 		val := field(n, "value")
@@ -206,6 +211,172 @@ func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt 
 		Method: "enum",
 		Loc:    loc,
 	}}}
+}
+
+func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
+	name := c.text(field(n, "name"))
+	if name == "" {
+		return nil
+	}
+	structTokens := []string{"lang=rust", "struct_name:" + name}
+	structTokens = append(structTokens, attrs...)
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil {
+			return
+		}
+		if m.Kind() == "field_declaration_list" {
+			var pendingAttrs []string
+			for _, ch := range namedChildren(m) {
+				if ch.Kind() == "attribute_item" {
+					pendingAttrs = append(pendingAttrs, c.rsAttrTokens(ch)...)
+					pendingAttrs = append(pendingAttrs, rsSerdeTokens(c.text(ch))...)
+					continue
+				}
+				if ch.Kind() == "field_declaration" {
+					if stmt, ok := c.rsStructFieldMetadataCall(ch, structTokens, pendingAttrs); ok {
+						out = append(out, stmt)
+					}
+					pendingAttrs = nil
+					continue
+				}
+				pendingAttrs = nil
+				walk(ch)
+			}
+			return
+		}
+		if m.Kind() == "field_declaration" {
+			if stmt, ok := c.rsStructFieldMetadataCall(m, structTokens, nil); ok {
+				out = append(out, stmt)
+			}
+			return
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pendingAttrs []string) (nir.Stmt, bool) {
+	name := c.text(field(n, "name"))
+	if name == "" {
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "field_identifier" || ch.Kind() == "identifier" {
+				name = c.text(ch)
+				break
+			}
+		}
+	}
+	if name == "" {
+		return nil, false
+	}
+	typ := c.text(field(n, "type"))
+	fieldAttrs := append([]string{}, pendingAttrs...)
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "attribute_item" {
+			fieldAttrs = append(fieldAttrs, c.rsAttrTokens(ch)...)
+			fieldAttrs = append(fieldAttrs, rsSerdeTokens(c.text(ch))...)
+		}
+	}
+	tokens := append([]string{}, structTokens...)
+	tokens = append(tokens, "field:"+name)
+	if typ != "" {
+		tokens = append(tokens, "field_type:"+rustCompactText(typ))
+	}
+	tokens = append(tokens, fieldAttrs...)
+	if rsDependencyMapField(name, typ) {
+		tokens = append(tokens, "semantic:dependency_map")
+	}
+	args := make([]nir.Expr, 0, len(tokens))
+	loc := c.loc(n)
+	for _, tok := range dedupeStrings(tokens) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	path := "analysis.rust.serde_field"
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: "serde_field",
+		Loc:    loc,
+	}}, true
+}
+
+func rsDeriveTokens(raw string) []string {
+	compact := rustCompactText(raw)
+	start := strings.Index(compact, "#[derive(")
+	if start < 0 {
+		return nil
+	}
+	rest := compact[start+len("#[derive("):]
+	end := strings.Index(rest, ")]")
+	if end < 0 {
+		return nil
+	}
+	var out []string
+	for _, part := range strings.Split(rest[:end], ",") {
+		if part != "" {
+			out = append(out, "derive:"+part)
+		}
+	}
+	return out
+}
+
+func rsSerdeTokens(raw string) []string {
+	compact := rustCompactText(raw)
+	if !strings.HasPrefix(compact, "#[serde(") || !strings.HasSuffix(compact, ")]") {
+		return nil
+	}
+	body := strings.TrimSuffix(strings.TrimPrefix(compact, "#[serde("), ")]")
+	var out []string
+	for _, part := range strings.Split(body, ",") {
+		if part == "" {
+			continue
+		}
+		key, val, hasVal := strings.Cut(part, "=")
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		out = append(out, "serde_attr:"+key)
+		if hasVal {
+			val = strings.Trim(val, "\"")
+			switch key {
+			case "alias":
+				out = append(out, "serde_alias:"+val)
+			case "serialize_with":
+				out = append(out, "serde_serialize_with:"+val)
+			case "deserialize_with":
+				out = append(out, "serde_deserialize_with:"+val)
+			}
+		}
+	}
+	return out
+}
+
+func rsDependencyMapField(name, typ string) bool {
+	n := strings.ToLower(name)
+	if !strings.Contains(n, "depend") && !strings.Contains(n, "package") && !strings.Contains(n, "plugin") {
+		return false
+	}
+	t := strings.ToLower(typ)
+	return strings.Contains(t, "map") || strings.Contains(t, "dependencies") || strings.Contains(t, "packages") || strings.Contains(t, "plugins")
+}
+
+func dedupeStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {

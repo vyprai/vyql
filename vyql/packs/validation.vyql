@@ -82,3 +82,8 @@ rule GitPackSignatureSearchParsingBypass {
   meta { id: "VYQL-VAL-016", severity: high, cwe: [CWE_20, CWE_115], confidence_floor: high }
   match code.GitPackSignatureSearchParsingBypass as parser
 }
+
+rule UnvalidatedDependencyMapKeyDeserialization {
+  meta { id: "VYQL-VAL-017", severity: high, cwe: [CWE_20], confidence_floor: high }
+  match code.UnvalidatedDependencyMapKeyDeserialization as field
+}

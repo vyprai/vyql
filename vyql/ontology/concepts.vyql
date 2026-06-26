@@ -152,6 +152,15 @@ concept PackageVersionSpecifierValidationReview : sink {
   review_assumption: "project metadata or action inputs can influence the dependency specifier passed to the package installer"
   review_confidence: medium
 }
+concept UnvalidatedDependencyMapKeyDeserialization : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "supply_chain"
+  review_condition: "dependency or package map keys are deserialized without a custom key validator"
+  review_evidence: "serde field metadata {pattern} marks a dependency/package-style map field in a Deserialize struct without deserialize_with key validation"
+  review_assumption: "the deserialized manifest or configuration keys select dependency, package, plugin, or module names that must obey an identifier policy before later resolution"
+  review_confidence: high
+}
 concept UnboundedJupyterKernelDependency : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_1104]

@@ -193,6 +193,85 @@ fn fixed_calculate_iteration_count(exp_length: u64, exponent: &BigUint) -> u64 {
 	}
 }
 
+func TestRustSerdeStructFieldMetadataIncludesDependencyMapValidationTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.rs")
+	src := []byte(`
+use serde::{Deserialize, Serialize};
+
+type Dependencies = std::collections::HashMap<String, String>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PackageConfig {
+    #[serde(default, serialize_with = "ordered_map")]
+    pub dependencies: Dependencies,
+    #[serde(
+        default,
+        alias = "dev-dependencies",
+        serialize_with = "ordered_map",
+        deserialize_with = "dependencies_map::deserialize"
+    )]
+    pub dev_dependencies: Dependencies,
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var deps, devDeps string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.rust.serde_field" {
+			continue
+		}
+		args := n.Prop("str_args")
+		switch {
+		case strings.Contains(args, "field:dependencies"):
+			deps = args
+		case strings.Contains(args, "field:dev_dependencies"):
+			devDeps = args
+		}
+	}
+	for _, want := range []string{
+		"struct_name:PackageConfig",
+		"derive:Deserialize",
+		"field:dependencies",
+		"field_type:Dependencies",
+		"serde_attr:default",
+		"serde_attr:serialize_with",
+		"serde_serialize_with:ordered_map",
+		"semantic:dependency_map",
+	} {
+		if !strings.Contains(deps, want) {
+			t.Fatalf("serde dependency field metadata missing %q; context=%q", want, deps)
+		}
+	}
+	if strings.Contains(deps, "serde_attr:deserialize_with") {
+		t.Fatalf("vulnerable dependency field should not have deserialize_with token; context=%q", deps)
+	}
+	for _, want := range []string{
+		"field:dev_dependencies",
+		"serde_alias:dev-dependencies",
+		"serde_attr:deserialize_with",
+		"serde_deserialize_with:dependencies_map::deserialize",
+		"semantic:dependency_map",
+	} {
+		if !strings.Contains(devDeps, want) {
+			t.Fatalf("serde dev dependency field metadata missing %q; context=%q", want, devDeps)
+		}
+	}
+}
+
 func rustFunctionContextArgs(nodes []usg.Node, name string) string {
 	for _, n := range nodes {
 		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
