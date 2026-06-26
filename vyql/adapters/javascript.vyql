@@ -1256,6 +1256,12 @@ adapter javascript {
     has "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g"
     lacks "[^]*?(?:\\*\\/|$)"
   }
+  flag code.CatastrophicRegex in module {
+    lang "javascript"
+    literal contains "[\\{\\[].*[\\/]*.*[\\}\\]]$"
+    call path "enclosure.test"
+    not literal contains "[\\{\\[].*[\\}\\]]$"
+  }
   flag code.CatastrophicRegex on any {
     method "match"
     has "^(\\s|\\/\\*.*?\\*\\/)*[\\[\\(\\w]"
