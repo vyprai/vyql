@@ -107,6 +107,7 @@ func cmdScan(args []string) error {
 	format := fs.String("format", "text", "output format: text | sarif | json")
 	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
+	allResults := fs.Bool("all", false, "include review flags with findings (json output becomes {findings, flags})")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	adapterOverlay := fs.String("adapter-overlay", os.Getenv("VYQL_ADAPTER_OVERLAY"), "optional repo-local adapter overlay directory")
 	agenticPrep := fs.Bool("agentic-prep", envBool("VYQL_AGENTIC_PREP"), "run optional agentic pre-scan adapter preparation")
@@ -147,7 +148,7 @@ func cmdScan(args []string) error {
 	}
 	restore := setOptionalEnv("VYQL_ADAPTER_OVERLAY", *adapterOverlay)
 	defer restore()
-	return run(paths, *rulesPath, *format, *profileName, *stats)
+	return run(paths, *rulesPath, *format, *profileName, *stats, *allResults)
 }
 
 // applyMaxRAM honors --max-ram (or $VYQL_MAX_RAM): set the soft heap limit and route the graph
@@ -282,7 +283,7 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	return all, stats, g, nil
 }
 
-func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
+func run(paths []string, rulesPath, format, profileName string, showStats bool, includeAll bool) error {
 	if cp := os.Getenv("VYQL_CPUPROFILE"); cp != "" {
 		f, _ := os.Create(cp)
 		_ = pprof.StartCPUProfile(f)
@@ -311,7 +312,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	var stats scanStats
 	var graph usg.Store
 	hit := false
-	if cache != nil && syncCollector == nil {
+	if cache != nil && syncCollector == nil && !includeAll {
 		rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
 			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
@@ -323,7 +324,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		if err != nil {
 			return err
 		}
-		if cache != nil && syncCollector == nil {
+		if cache != nil && syncCollector == nil && !includeAll {
 			storeCachedScan(cache, rkey, all, stats)
 		}
 	}
@@ -337,18 +338,33 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	}
 
 	// output
+	var flags []reviewItem
+	if includeAll {
+		if format == "sarif" {
+			return fmt.Errorf("--all is supported with -format text or json")
+		}
+		flags = collectReviewItems(graph)
+	}
 	switch format {
 	case "sarif":
 		doc := sarif.ToSARIF(all, version, nil)
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	case "json":
-		b, _ := json.MarshalIndent(findingsJSON(all), "", "  ")
+		var payload any = findingsJSON(all)
+		if includeAll {
+			payload = scanAllJSON{Findings: findingsJSON(all), Flags: flags}
+		}
+		b, _ := json.MarshalIndent(payload, "", "  ")
 		fmt.Println(string(b))
 	default:
 		fmt.Printf("analysis profile: %s (%s)\n\n", prof.Title, prof.Name)
 		printReport(all)
-		printSummary(stats, len(all))
+		if includeAll {
+			fmt.Println()
+			printScanFlags(flags)
+		}
+		printSummaryWithFlags(stats, len(all), len(flags), includeAll)
 	}
 	if showStats {
 		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
@@ -413,8 +429,41 @@ func printReport(fs []*findings.Finding) {
 	}
 }
 
+type scanAllJSON struct {
+	Findings []jsonFinding `json:"findings"`
+	Flags    []reviewItem  `json:"flags"`
+}
+
+func printScanFlags(rows []reviewItem) {
+	if len(rows) == 0 {
+		fmt.Println("No flags.")
+		return
+	}
+	fmt.Printf("%d flag(s):\n", len(rows))
+	for _, r := range rows {
+		fmt.Printf("\nFLAG %-11s %s @ %s", r.Category, r.Concept, r.Loc)
+		if r.Call != "" {
+			fmt.Printf("  call=%s", r.Call)
+		}
+		if r.Provenance != "" {
+			fmt.Printf("  via=%s", r.Provenance)
+		}
+		fmt.Println()
+		if len(r.Expected) > 0 {
+			fmt.Printf("  expects: %s\n", strings.Join(r.Expected, ", "))
+		}
+		if r.Review != "" {
+			fmt.Printf("  review: %s\n", r.Review)
+		}
+	}
+}
+
 // printSummary reports what was scanned (languages + file counts) and the total.
 func printSummary(stats scanStats, n int) {
+	printSummaryWithFlags(stats, n, 0, false)
+}
+
+func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags bool) {
 	var parts []string
 	for _, lg := range stats.languages {
 		parts = append(parts, fmt.Sprintf("%s:%d", lg, stats.files[lg]))
@@ -423,7 +472,11 @@ func printSummary(stats scanStats, n int) {
 	if len(parts) > 0 {
 		scanned = strings.Join(parts, " ")
 	}
-	fmt.Printf("scanned %s — %d finding(s)\n", scanned, n)
+	if includeFlags {
+		fmt.Printf("scanned %s — %d finding(s), %d flag(s)\n", scanned, findingsN, flagsN)
+		return
+	}
+	fmt.Printf("scanned %s — %d finding(s)\n", scanned, findingsN)
 }
 
 func usage() {
@@ -432,7 +485,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats -all]")
 	fmt.Fprintln(os.Stderr, "  prep       build an optional repo-local adapter overlay for scan   [-provider off|vertex -out DIR]")
 	fmt.Fprintln(os.Stderr, "  review     list non-finding review targets and supporting checks for AI/manual review   [-format text|json]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
