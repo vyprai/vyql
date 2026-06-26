@@ -4919,6 +4919,15 @@ concept LogWrite : sink {
   enabled_by: [taint.SecretValue]
   possibility: exclude
 }
+concept CredentialAttributeLogExposure : sink {
+  vulnerable_to: [secrets.SecretLeak]
+  cwe: [CWE_532]
+  review_category: "secret"
+  review_condition: "credential attributes such as access keys or secret keys are included in application log messages"
+  review_evidence: "logging context {pattern} references credential attributes in the same function as a logging call"
+  review_assumption: "debug or diagnostic logs may be collected by lower-trust operators or support systems"
+  review_confidence: high
+}
 // A hardcoded secret literal flagged by the text-pattern frontend (presence — no flow).
 concept HardcodedSecret : sink {
   vulnerable_to: [secrets.HardcodedCredentials]

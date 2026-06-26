@@ -2595,6 +2595,12 @@ review code.KubernetesCurlAuthorizationHeaderLogLeak {
   expected: [core.SecretRedaction]
   text: "review Kubernetes client-go curl debug logging for authorization-header redaction before formatting header values"
 }
+review code.CredentialAttributeLogExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review diagnostic logging for credential attributes such as access keys or secret keys"
+}
 review code.UnescapedContentDispositionFilename {
   category: "injection"
   kind: "target"

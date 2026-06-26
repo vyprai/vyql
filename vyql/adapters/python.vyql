@@ -465,6 +465,24 @@ adapter python {
   flag code.LogWrite on any {
     path "log.info"
   }
+  flag code.LogWrite on any {
+    path "LOG.debug"
+  }
+  flag code.LogWrite on any {
+    path "LOG.info"
+  }
+  flag code.LogWrite on any {
+    path "LOG.warning"
+  }
+  flag code.LogWrite on any {
+    path "LOG.error"
+  }
+  flag code.CredentialAttributeLogExposure in function {
+    lang "python"
+    call path contains_any ["LOG.debug", "logger.debug", "logging.debug"]
+    selector contains_any ["loc.accesskey", "loc.secretkey"]
+    token identifier contains_any ["accesskey", "access_key", "secretkey", "secret_key"]
+  }
   sink path "os.system" -> code.CommandExecution
   sink path "os.popen" -> code.CommandExecution
   sink path "os.popen2" -> code.CommandExecution
