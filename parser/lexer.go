@@ -12,8 +12,14 @@ const (
 	tWord
 	tString
 	tArrow  // ->
+	tAssign // =
 	tEq     // ==
 	tNe     // !=
+	tGe     // >=
+	tLe     // <=
+	tGt     // >
+	tLt     // <
+	tMatch  // ~=
 	tLBrace // {
 	tRBrace // }
 	tLBrack // [
@@ -67,9 +73,27 @@ func lex(src string) ([]tok, error) {
 		case c == '=' && i+1 < n && src[i+1] == '=':
 			toks = append(toks, tok{tEq, "==", i})
 			i += 2
+		case c == '=':
+			toks = append(toks, tok{tAssign, "=", i})
+			i++
 		case c == '!' && i+1 < n && src[i+1] == '=':
 			toks = append(toks, tok{tNe, "!=", i})
 			i += 2
+		case c == '>' && i+1 < n && src[i+1] == '=':
+			toks = append(toks, tok{tGe, ">=", i})
+			i += 2
+		case c == '<' && i+1 < n && src[i+1] == '=':
+			toks = append(toks, tok{tLe, "<=", i})
+			i += 2
+		case c == '~' && i+1 < n && src[i+1] == '=':
+			toks = append(toks, tok{tMatch, "~=", i})
+			i += 2
+		case c == '>':
+			toks = append(toks, tok{tGt, ">", i})
+			i++
+		case c == '<':
+			toks = append(toks, tok{tLt, "<", i})
+			i++
 		case c == '"':
 			start := i
 			i++
